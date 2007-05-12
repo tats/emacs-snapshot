@@ -1,0 +1,91 @@
+* An attempt is made to avoid silently losing mail via fakemail.
+  Patch: avoid-fakemail-mail-loss.diff
+  Author: Rob Browning <rlb@defaultvalue.org>
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+
+  This fix attempts to avoid a situation where Emacs can silently lose
+  mail.  This can occur if sendmail.el (at least) falls back to
+  fakemail, and the underlying binary (MAIL_PROGRAM_NAME) that
+  fakemail is configured to use doesn't exist.  Unless
+  mail-interactive is true, Emacs won't wait for the mailer and so
+  won't know that fakemail failed.
+
+  For now, Debian sets fakemail's MAIL_PROGRAM_NAME to /usr/bin/mail
+  (which is the correct value for Debian systems) rather than
+  /bin/mail.  Debian also adjusts Emacs to test for the existence of
+  /usr/bin/mail before trying to run fakemail.  This is not an ideal
+  solution, but it should be an improvement.
+
+  Note that Debian forces the value to /usr/bin/mail.  The build will
+  fail if any other value is specified.  This is done to ensure that
+  MAIL_PROGRAM_NAME isn't accidentally set to some other value during
+  the build process.  If this is undesirable for some reason, just
+  commment out avoid-fakemail-loss.diff in debian/patches/series.
+  
+Index: sid/lib-src/fakemail.c
+===================================================================
+--- sid.orig/lib-src/fakemail.c
++++ sid/lib-src/fakemail.c
+@@ -135,8 +135,10 @@
+ #define NIL ((line_list) NULL)
+ #define INITIAL_LINE_SIZE 200
+ 
+-#ifndef MAIL_PROGRAM_NAME
+-#define MAIL_PROGRAM_NAME "/bin/mail"
++#ifdef MAIL_PROGRAM_NAME
++#error "Debian assumption violated -- see avoid-fakemail-mail-loss.diff"
++#else
++#define MAIL_PROGRAM_NAME "/usr/bin/mail"
+ #endif
+ 
+ static char *my_name;
+Index: sid/lisp/mail/feedmail.el
+===================================================================
+--- sid.orig/lisp/mail/feedmail.el
++++ sid/lisp/mail/feedmail.el
+@@ -1348,7 +1348,10 @@
+ 			      "/usr/lib/sendmail")
+ 			     ((file-exists-p "/usr/ucblib/sendmail")
+ 			      "/usr/ucblib/sendmail")
+-			     (t "fakemail"))
++			     (t
++                              (if (not (file-executable-p "/usr/bin/mail"))
++                                  (error "/usr/bin/mail is not executable"))
++                              "fakemail"))
+ 		       nil errors-to nil "-oi" "-t")
+ 		 ;; provide envelope "from" to sendmail; results will vary
+ 		 (list "-f" user-mail-address)
+Index: sid/lisp/mail/sendmail.el
+===================================================================
+--- sid.orig/lisp/mail/sendmail.el
++++ sid/lisp/mail/sendmail.el
+@@ -53,7 +53,10 @@
+     ((file-exists-p "/usr/sbin/sendmail") "/usr/sbin/sendmail")
+     ((file-exists-p "/usr/lib/sendmail") "/usr/lib/sendmail")
+     ((file-exists-p "/usr/ucblib/sendmail") "/usr/ucblib/sendmail")
+-    (t "fakemail"))			;In ../etc, to interface to /bin/mail.
++    (t
++     (if (not (file-executable-p "/usr/bin/mail"))
++         (error "/usr/bin/mail is not executable"))
++     "fakemail"))			;In ../etc, to interface to /bin/mail.
+   "Program used to send messages."
+   :group 'mail
+   :type 'file)
+Index: sid/lisp/gnus/message.el
+===================================================================
+--- sid.orig/lisp/gnus/message.el
++++ sid/lisp/gnus/message.el
+@@ -4027,7 +4027,12 @@
+ 				     "/usr/lib/sendmail")
+ 				    ((file-exists-p "/usr/ucblib/sendmail")
+ 				     "/usr/ucblib/sendmail")
+-				    (t "fakemail"))
++				    (t
++                                     (if (not
++                                          (file-executable-p "/usr/bin/mail"))
++                                         (error
++                                          "/usr/bin/mail is not executable"))
++                                     "fakemail"))
+ 			      nil errbuf nil "-oi")
+ 			;; Always specify who from,
+ 			;; since some systems have broken sendmails.

@@ -1,0 +1,125 @@
+-*-text-*-
+
+This package was debianized by Rob Browning <rlb@defaultvalue.org> on
+Tue, 16 Dec 1997 00:05:45 -0600.
+
+This is the original source archive:
+
+  prep.ai.mit.edu:/pub/gnu/emacs/emacs-@UPSTREAM_VERSION@.tar.gz
+
+Please see /usr/share/doc/@DEB_FLAVOR@-common/README.Debian.gz for a
+description of the Debian specific differences from the upstream
+version.
+
+As mentioned there, some files (including some of the Emacs
+documentation) have been removed from this package because their
+licenses do not appear to satisfy the requirements of the Debian Free
+Software Guidelines (DFSG).  See http://www.debian.org/social_contract.
+
+In particular, some of the info pages are covered under the GNU Free
+Documentation License (GFDL), which Debian has decided does not
+satisfy the DFSG in cases where "Invariant Sections" are specified
+(this includes front and back cover texts).  See this Debian General
+Resolution on the topic: http://www.debian.org/vote/2006/vote_001.
+
+Some other files have been removed because their license only allows
+verbatim copying, or because there was some other question.
+
+Copyright:
+
+  Emacs itself is licensed under the terms of the GNU General Public
+  License (GPL).  See the file /usr/share/common-licenses/GPL for more
+  information.
+
+  etc/eterm.1 is licensed as follows:
+
+      Copyright (C) 1999, 2001, 2002, 2003, 2004, 2005, 2006, 2007
+      Free Software Foundation, Inc.
+
+      Permission is granted to make and distribute verbatim copies of
+      this document provided the copyright notice and this permission
+      notice are preserved on all copies.
+
+      Permission is granted to copy and distribute modified versions
+      of this document under the conditions for verbatim copying,
+      provided that the entire resulting derived work is distributed
+      under the terms of a permission notice identical to this one.
+
+      Permission is granted to copy and distribute translations of
+      this document into another language, under the above conditions
+      for modified versions, except that this permission notice may be
+      stated in a translation approved by the Free Software
+      Foundation.
+
+  etc/emacs.1 is licensed as follows:
+
+      Copyright (C) 1995, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
+      2006, 2007 Free Software Foundation, Inc.
+
+      Permission is granted to make and distribute verbatim copies of
+      this document provided the copyright notice and this permission
+      notice are preserved on all copies.
+
+      Permission is granted to copy and distribute modified versions
+      of this document under the conditions for verbatim copying,
+      provided that the entire resulting derived work is distributed
+      under the terms of a permission notice identical to this one.
+
+      Permission is granted to copy and distribute translations of
+      this document into another language, under the above conditions
+      for modified versions, except that this permission notice may be
+      stated in a translation approved by the Free Software
+      Foundation.
+
+  man/dired-x.texi is licensed as follows:
+
+      Copyright (C) 1993, 1994, 2001, 2002, 2003, 2004,
+      2005, 2006, 2007  Free Software Foundation, Inc.
+
+      Permission is granted to make and distribute verbatim copies of
+      this manual provided the copyright notice and this permission
+      notice are preserved on all copies.
+
+      Permission is granted to copy and distribute modified versions
+      of this manual under the conditions for verbatim copying,
+      provided that the entire resulting derived work is distributed
+      under the terms of a permission notice identical to this one.
+
+      Permission is granted to copy and distribute translations of
+      this manual into another language, under the above conditions
+      for modified versions, except that this permission notice may be
+      stated in a translation approved by the Free Software
+      Foundation.
+
+      The file used to create this is called dired-x.texi, but the
+      original work that was altered to make that file was called
+      dired.texi written by Sebastian Kremer.
+
+      Permission is granted to process this file through TeX and print
+      the results, provided the printed document carries copying
+      permission notice identical to this one except for the removal
+      of this paragraph (this paragraph not being relevant to the
+      printed manual).
+ 
+  man/faq.texi is licensed as follows:
+
+      Copyright (C) 1994,1995,1996,1997,1998,1999,2000 Reuven M. Lerner
+      Copyright (C) 1992,1993 Steven Byrnes
+      Copyright (C) 1990,1991,1992 Joseph Brian Wells
+
+      This list of frequently asked questions about GNU Emacs with
+      answers ("FAQ") may be translated into other languages,
+      transformed into other formats (e.g. Texinfo, Info, WWW, WAIS),
+      and updated with new information.
+
+      The same conditions apply to any derivative of the FAQ as apply
+      to the FAQ itself.  Every copy of the FAQ must include this
+      notice or an approved translation, information on who is
+      currently maintaining the FAQ and how to contact them (including
+      their e-mail address), and information on where the latest
+      version of the FAQ is archived (including FTP information).
+
+      The FAQ may be copied and redistributed under these conditions,
+      except that the FAQ may not be embedded in a larger literary
+      work unless that work itself allows free copying and
+      redistribution.

@@ -1,0 +1,24 @@
+* The build will fail if liblockfile isn't selected for movemail.
+  Patch: require-movemail-use-liblockfile.diff
+  Author: Rob Browning <rlb@defaultvalue.org>
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+
+  This makes sure the Debian Emacs won't accidentally be built with
+  the wrong locking strategy.  To disable this check, comment out
+  require-movemail-use-liblockfile.diff in debian/patches/series.
+
+Index: sid/lib-src/movemail.c
+===================================================================
+--- sid.orig/lib-src/movemail.c
++++ sid/lib-src/movemail.c
+@@ -167,6 +167,10 @@
+ /* Nonzero means this is name of a lock file to delete on fatal error.  */
+ char *delete_lockname;
+ 
++#ifndef MAIL_USE_MAILLOCK
++#error "Debian requires that mail locking be handled by liblockfile."
++#endif /* ndef MAIL_USE_MAILLOCK */
++
+ int
+ main (argc, argv)
+      int argc;

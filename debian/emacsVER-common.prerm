@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+MAJOR=@MAJOR_VERSION@
+MINOR=@MINOR_VERSION@
+FULL=@FULL_VERSION@
+INFO_FILES="@INFO_FILES@"
+INFO_SUBDIR="@INFO_SUBDIR@"
+
+for file in ${INFO_FILES}
+do
+  install-info --quiet --remove-exactly ${INFO_SUBDIR}/${file} || true
+done
+
+# emacsen-common/emacs-remove used to be here.
+
+(rmdir /usr/local/share/emacs/${FULL}/site-lisp 2>/dev/null && \
+ rmdir /usr/local/share/emacs/${FULL}           2>/dev/null) || true
+
+#DEBHELPER#

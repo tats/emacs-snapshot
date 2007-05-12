@@ -1,0 +1,19 @@
+* The default vc-path variable value has been adjusted for Debian.
+  Patch: fix-vc-path.diff
+  Bug: 120079
+
+Index: sid/lisp/vc-hooks.el
+===================================================================
+--- sid.orig/lisp/vc-hooks.el
++++ sid/lisp/vc-hooks.el
+@@ -73,8 +73,8 @@
+   :group 'vc)
+ 
+ (defcustom vc-path
+-  (if (file-directory-p "/usr/sccs")
+-      '("/usr/sccs")
++  (if (file-directory-p "/usr/lib/cssc")
++      '("/usr/lib/cssc")
+     nil)
+   "*List of extra directories to search for version control commands."
+   :type '(repeat directory)

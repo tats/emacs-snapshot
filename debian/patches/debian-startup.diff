@@ -1,0 +1,47 @@
+* Emacs runs debian-startup and sets debian-emacs-flavor.
+  Patch: debian-startup.diff
+
+  * Emacs runs debian-startup during the startup process unless
+    site-run-file is false.
+    
+  * The global variable debian-emacs-flavor is bound to 'emacs22.
+    Author: Rob Browning <rlb@defaultvalue.org>
+    
+Index: sid/lisp/startup.el
+===================================================================
+--- sid.orig/lisp/startup.el
++++ sid/lisp/startup.el
+@@ -295,6 +295,10 @@
+ (defvar pure-space-overflow nil
+   "Non-nil if building Emacs overflowed pure space.")
+ 
++(defconst debian-emacs-flavor 'emacs22
++  "A symbol representing the particular debian flavor of emacs running.
++Something like 'emacs20, 'xemacs20, etc.")
++
+ (defun normal-top-level-add-subdirs-to-load-path ()
+   "Add all subdirectories of current directory to `load-path'.
+ More precisely, this uses only the subdirectories whose names
+@@ -815,8 +819,21 @@
+     ;; Run the site-start library if it exists.  The point of this file is
+     ;; that it is run before .emacs.  There is no point in doing this after
+     ;; .emacs; that is useless.
++
++    ;; Original upstream startup
++    ;; (if site-run-file
++    ;;     (load site-run-file t t))
++    ;;
++
++    ;; Debian startup
+     (if site-run-file
+-	(load site-run-file t t))
++        (progn
++          ;; Load all the debian package snippets.
++          ;; It's in here because we want -q to kill it too.
++          (if (load "debian-startup" t t nil)
++              (debian-startup debian-emacs-flavor))
++          ;; Now the normal site file...
++          (load site-run-file t t nil)))
+ 
+     ;; Sites should not disable this.  Only individuals should disable
+     ;; the startup message.

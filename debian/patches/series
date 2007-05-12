@@ -1,0 +1,9 @@
+debian-startup.diff
+debian-adjust-mail-from-addresses.diff
+handle-dfsg-split.diff
+misc-unseparated.diff
+fix-vc-path.diff
+require-movemail-use-liblockfile.diff
+avoid-fakemail-mail-loss.diff
+version-mention-debian.diff
+autofiles.diff

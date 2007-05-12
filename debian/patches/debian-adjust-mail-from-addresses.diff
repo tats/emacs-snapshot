@@ -1,0 +1,46 @@
+* The default handling of mail from addresses has been changed.
+  Patch: debian-adjust-mail-from-addresses.diff
+  Bug: 7051 35128
+
+  * The default for message-sendmail-f-is-evil has been changed to t.
+
+    This is correct for Debian systems where we know the MTA should be
+    trusted.
+    
+  * The default mail-from-style is 'system-default rather than 'angles.
+    
+Index: sid/lisp/gnus/message.el
+===================================================================
+--- sid.orig/lisp/gnus/message.el
++++ sid/lisp/gnus/message.el
+@@ -738,9 +738,14 @@
+ 		 (const never)
+ 		 (const ask)))
+ 
+-(defcustom message-sendmail-f-is-evil nil
+-  "*Non-nil means don't add \"-f username\" to the sendmail command line.
+-Doing so would be even more evil than leaving it out."
++;; message-sendmail-f-is-evil is nil here in the upstream source, but
++;; sendmail works right under Debian Linux, so we want t. [was
++;; orignally reported for emacs 19 as debian#7051]
++(defcustom message-sendmail-f-is-evil t
++  "*Non-nil means don't add \"-f username\" to the sendmail command
++line, because adding it would be more evil than leaving it out.  Under
++Debian/GNU/Linux, sendmail works right, so it should be safe for this
++to be set to true."
+   :group 'message-sending
+   :link '(custom-manual "(message)Mail Variables")
+   :type 'boolean)
+Index: sid/lisp/mail/sendmail.el
+===================================================================
+--- sid.orig/lisp/mail/sendmail.el
++++ sid/lisp/mail/sendmail.el
+@@ -59,7 +59,7 @@
+   :type 'file)
+ 
+ ;;;###autoload
+-(defcustom mail-from-style 'angles
++(defcustom mail-from-style 'system-default
+   "Specifies how \"From:\" fields look.
+ 
+ If `nil', they contain just the return address like:

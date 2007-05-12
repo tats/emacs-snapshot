@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=Emacs @MENU_VERSION@ (X11)
+GenericName=Emacs
+Comment=GNU Emacs Text Editor @MENU_VERSION@
+Exec=/usr/bin/@DEB_FLAVOR@
+TryExec=@DEB_FLAVOR@
+Terminal=false
+Type=Application
+Icon=/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_48.png
+Categories=Application;Utility;TextEditor;
+MimeType=text/plain

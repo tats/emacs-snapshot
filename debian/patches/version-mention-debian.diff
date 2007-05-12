@@ -1,0 +1,20 @@
+* The output of (version) has been modified to indicate Debian modifications.
+  Patch: version-mention-debian.diff
+  Author: Rob Browning <rlb@defaultvalue.org>
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+
+Index: sid/lisp/version.el
+===================================================================
+--- sid.orig/lisp/version.el
++++ sid/lisp/version.el
+@@ -55,8 +55,8 @@
+   (interactive "P")
+   (let ((version-string
+          (format (if (not (interactive-p))
+-		     "GNU Emacs %s (%s%s%s)\n of %s on %s"
+-		   "GNU Emacs %s (%s%s%s) of %s on %s")
++		     "GNU Emacs %s (%s%s%s)\n of %s on %s, modified by Debian"
++		   "GNU Emacs %s (%s%s%s) of %s on %s, modified by Debian")
+                  emacs-version
+ 		 system-configuration
+ 		 (cond ((featurep 'motif)
