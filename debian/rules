@@ -1,0 +1,492 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# This file is licensed under the terms of the Gnu Public License.
+# With the one additional provision that Ian Jackson's name may not be
+# removed from the file.
+
+# Copyright 1994,1995 Ian Jackson
+# Copyright 1998-2005 Rob Browning <rlb@defaultvalue.org>
+# Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
+
+# Originally copied from the GNU Hello Debian rules file (1.3).
+# Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
+# Debhelper support added via one of Joey Hess' example files.
+# See the debian/changelog for further historical information.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+SHELL := /bin/bash
+
+quilt := QUILT_PATCHES=debian/patches quilt
+
+deb_trash :=
+
+# For now we assume that emacs' versioning scheme is always
+# MAJOR.MINORtinyrev where MAJOR and MINOR are integers and tinyrev is
+# an optional lowercase letter (or letters).  We also assume that
+# upstream uses a numbering scheme that sorts in a "Debian friendly"
+# way.  So far that's always been true.  If it becomes false, some of
+# the values below will have to be set manually.
+
+# At the moment, we try to make it so that a "debian/rules clean" will
+# get you back to the same state you were in before "debian/rules
+# build".
+
+# Note that we use quilt to handle the debian patches.  One of the
+# biggest differences between quilt and say dpatch is that you have to
+# explicitly "quilt add" a file to a patch before you edit it.  See
+# "man quilt" for details..
+
+# If the source tree ever ends up in an untenable "can't go forward,
+# can't go back" state with respect to patching, you can always start
+# over by just moving the current debian directory to a newly unpacked
+# orig.tar.gz tree.  Note that if you were in the process of editing a
+# patch, you will lose those edits, but shouldn't lose anything else.
+# This process just reverts all of the upstream files and abandons the
+# volatile "what's been done to the current tree" state that quilt
+# maintains in ./.pc.  All of the actual patches are stored in
+# debian/patches and should be unharmed.
+
+######################################################################
+# Important top-level targets:
+#
+# check-vars - displays how the version number has been parsed.
+# buildpackage - build binary packages via dpkg-buildpackage w/suitable args
+# prepare-release - prepare and check debs for upload.
+# autofiles-sync - force a new autofiles.diff to be generated.
+#
+######################################################################
+
+# The name of the Debian source package
+src_name := $(shell dpkg-parsechangelog | egrep '^Source:')
+src_name := $(shell echo $(src_name) | perl -pe 's/Source:\s+//o')
+
+# The version from the changelog (i.e. 20.5-1)
+debian_ver := $(shell dpkg-parsechangelog | egrep '^Version:')
+debian_ver := $(shell echo $(debian_ver) | perl -pe 's/Version:\s+//o')
+# The Debian revision (i.e. the 1 from 20.5-1)
+# Always everything after the last '-'
+debian_rev := $(shell echo $(debian_ver) | perl -pe 's/.*-//o')
+
+# The official upstream version defined by emacs-version in lisp/version.el.
+# The extraction method matches the code in the upstream configure.in.
+nominal_ver := $(shell grep 'defconst[	 ]*emacs-version' lisp/version.el \
+	 | sed -e 's/^[^"]*"\([^"]*\)".*$$/\1/')
+
+# This must be the version that's actually used at runtime for things
+# like load-path.  It may not be the same as the upstream version
+# (i.e. when you have upstream 20.5a, the functional version may still
+# be 20.5), so sometimes we may have to do this by hand.
+runtime_ver := $(shell echo $(nominal_ver) | perl -pe 's/[a-z]+$$//o')
+
+major_ver := $(shell echo $(runtime_ver) | perl -pe 's/\..*$$//o')
+minor_ver := $(shell echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
+
+# version for the debian source, i.e. if the upstream is 21.3, this
+# might be 21.3, or it might be 21.3+1 if we've had to have more than
+# one re-release of the upstream source.  Rare, but it happens...
+# Always everything before the last '-'
+debsrc_ver := $(shell echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
+
+deb_orig_tgz := $(src_name)_$(debsrc_ver).orig.tar.gz
+# name of the orig_tgz unpack directory
+deb_orig_tgz_dir := emacs-$(runtime_ver)-non-dfsg
+
+######################################################################
+# Customizable variables
+
+# The flavor (i.e. emacs21) currently matches the source package name.
+flavor := $(shell echo $(src_name) | perl -pe 's/-non-dfsg$$//o')
+
+######################################################################
+
+# Should these be exported like this (as autotools-dev recommends for
+# the two vars below) or not?
+export DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+export DEB_HOST_GNU_CPU ?= $(shell dpkg-architecture -qDEB_HOST_GNU_CPU)
+
+# As recommended by /usr/share/doc/autotools-dev/README.Debian.gz.
+# Handle cross-compiling and don't make ./configure guess.
+export DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+export DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+confflags += --build=$(DEB_BUILD_GNU_TYPE) --host=$(DEB_HOST_GNU_TYPE)
+
+LDFLAGS   := -g
+CFLAGS    := -DDEBIAN -g
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+  CFLAGS += -O0
+else # not noopt
+  ifeq (m68k,$(DEB_HOST_ARCH))
+    # fix problem with newer versions of gcc on m68k
+    # -O2 causes a build failure (broken byte compiler)
+    CFLAGS += -O1
+  else # neq (m68k,$(DEB_HOST_ARCH))
+    CFLAGS += -O2
+  endif # neq (m68k,$(DEB_HOST_ARCH))
+endif # not noopt
+
+target := $(DEB_HOST_GNU_TYPE)
+
+# Info files that are going to show up in the main dir.
+main_dir_info_files := \
+  ada-mode \
+  autotype \
+  calc \
+  ccmode \
+  cl \
+  ebrowse \
+  ediff \
+  eintr \
+  elisp \
+  emacs \
+  emacs-mime \
+  erc \
+  eshell \
+  eudc \
+  flymake \
+  forms \
+  gnus \
+  idlwave \
+  info \
+  message \
+  mh-e \
+  newsticker \
+  org \
+  pcl-cvs \
+  pgg \
+  rcirc \
+  reftex \
+  sc \
+  ses \
+  sieve \
+  smtpmail \
+  speedbar \
+  tramp \
+  url \
+  vip \
+  viper \
+  widget \
+  woman
+
+# These files must always exist, i.e. can't ever be cleaned.
+persistent_autogen_files := debian/control debian/copyright
+
+nonpersistent_autogen_files := debian/$(flavor)-common-non-dfsg.README.Debian
+
+debpkgfiles := $(persistent_autogen_files) $(nonpersistent_autogen_files)
+
+# Build directories
+pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
+
+define checkroot
+  test root = "`whoami`"
+endef
+
+define checkdir
+  dpkg-parsechangelog > /dev/null
+  dh_testdir debian/emacs-common-non-dfsg.postinst
+  @if ! test -f man/emacs.texi; \
+  then \
+    echo; \
+    echo -n "The upstream source does not appear to be available."; \
+    echo "  Please put the contents"; \
+    echo -n "of $(deb_orig_tgz) into the"; \
+    echo " current directory."; \
+    echo; \
+    false; \
+  fi
+endef
+
+define patch
+  $(quilt) push -a
+endef
+
+define unpatch
+  test -z "$$($(quilt) applied)" || $(quilt) pop -a
+  rm -f debian/stamp/patch
+  rm -rf .pc
+endef
+
+define cleanup_all
+  # distclean goes first so we clean using patched code
+  rm -f debian/stamp/build
+  -$(MAKE) -C man distclean
+  rm -rf info
+  rm -f man/Makefile
+  dh_clean
+  $(unpatch)
+  #   now clean up bits in the source tree that the above didn't handle
+
+  #   now clean up everything else (mostly ./debian related stuff)
+  find -name '*~' | xargs --no-run-if-empty rm -f
+  rm -f debian/substvars
+  rm -f $(nonpersistent_autogen_files)
+  rm -rf debian/files*
+  rm -rf debian/*.tmp
+  rm -rf $(deb_trash)
+  rm -rf .pc
+  test ! -e debian/stamp || rmdir debian/stamp
+endef
+
+# If we ever need it, we can create a copy that doesn't assume ./debian/
+define deb_sub
+  perl -p \
+    -e "s|\@PKG_NAME\@|$(pkg_name)|go;" \
+    -e "s|\@MAJOR_VERSION\@|$(major_ver)|go;" \
+    -e "s|\@MINOR_VERSION\@|$(minor_ver)|go;" \
+    -e "s|\@FULL_VERSION\@|$(runtime_ver)|go;" \
+    -e "s|\@PACKAGE_VERSION\@|$(debian_ver)|go;" \
+    -e "s|\@DEBIAN_REV\@|$(deb_rev)|go;" \
+    -e "s|\@NOMINAL_VERSION\@|$(nominal_ver)|go;" \
+    -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
+    -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
+    -e "s|\@INFOFILES\@|$(main_dir_info_files)|go;" \
+      < debian/$(1) > debian/$(2)
+endef
+
+check-vars:
+	@echo "debian_ver: $(debian_ver)"
+	@echo "debsrc_ver: $(debsrc_ver)"
+	@echo "debian_rev: $(debian_rev)"
+	@echo "nominal_ver: $(nominal_ver)"
+	@echo "runtime_ver: $(runtime_ver)"
+	@echo "major_ver: $(major_ver)"
+	@echo "minor_ver: $(minor_ver)"
+.PHONY: check-vars
+
+.PHONY: check-diff
+check-diff: clean
+	$(checkdir)
+	test -r ../$(deb_orig_tgz)
+	rm -rf debian/tmp-diff && mkdir debian/tmp-diff
+	cd debian/tmp-diff && tar xzpSf ../../../$(deb_orig_tgz)
+	cd debian/tmp-diff && mv $(deb_orig_tgz_dir) orig
+
+	mkdir debian/tmp-diff/new
+	tar cpf - --exclude './debian' --exclude './.pc' . \
+	  | (cd debian/tmp-diff/new && tar xpf -)
+
+	@echo
+	@echo "########################################"
+	@echo "### Diffs outside ./debian"
+	@cd debian/tmp-diff && diff -ruN orig new
+	@echo "########################################"
+	@echo "### Empty file list differences"
+	@diff -u \
+	  <(cd debian/tmp-diff/orig && find -size 0) \
+	  <(cd debian/tmp-diff/new && find -size 0) \
+	    > debian/tmp-diff/empty-files.diff || test $$? -eq 1
+	@cat debian/tmp-diff/empty-files.diff
+	@test ! -s debian/tmp-diff/empty-files.diff || false
+	@echo "########################################"
+	@rm -rf debian/tmp-diff
+
+deb_trash += debian/tmp-diff
+
+
+buildpackage:
+	$(checkdir)
+	dpkg-buildpackage -D -us -uc -rfakeroot -i'\.git|\.pc'
+.PHONY: buildpackage
+
+prepare-release:
+	$(checkdir)
+        # don't want to be root -- using fakeroot below.
+        # also, stacking fakeroots seems to cause trouble generating diff.
+	@test "`whoami`" != root || \
+	  (echo "please run prepare-release as a normal user (not root)"; \
+	   false)
+        # check for any uncommitted changes
+	@if test $$(cd debian && git-diff-files | wc -c) -ne 0; \
+	then \
+	  read -p "Uncommitted changes.  Continue? [y/n] "; \
+          if test "$${REPLY}" != y; \
+	  then \
+	    false; \
+	  fi; \
+	fi
+        # TODO: make sure we actually installed the binary.
+        # TODO: run tests (use a check target?)
+	$(MAKE) -f debian/rules clean
+	$(MAKE) -f debian/rules buildpackage
+	test -f ../$(src_name)_$(debian_ver).diff.gz
+	@if [ $$(zgrep '^---' \
+	           ../$(src_name)_$(debian_ver).diff.gz  \
+	             | grep -v /debian/ | wc -c) -ne 0 ]; \
+	then \
+	  echo "Diffs outside debian/ found, please fix and retry."; \
+	  echo "This probably means either something wasn't cleaned"; \
+	  echo "properly, or you need to do some work in debian/patches."; \
+	  false; \
+	else \
+	  echo "Everything looks OK.  Ready for release."; \
+	  echo "Don't forget to run debsign if needed."; \
+	fi
+.PHONY: prepare-release 
+
+debian-sync: $(persistent_autogen_files)
+.PHONY: debian-sync
+
+debian/$(flavor)-common-non-dfsg.README.Debian: \
+  debian/emacs-common-non-dfsg.README debian/patches/*.diff debian/patches/series
+	cd debian && \
+	  csplit -s -f emacs-common-non-dfsg.README. \
+	  emacs-common-non-dfsg.README '/@@PATCH_LIST_HERE@@/'
+	cp debian/emacs-common-non-dfsg.README.00 debian/emacs-common-non-dfsg.README.tmp
+	for p in $$(quilt series); do quilt header $$p; done \
+	  >> debian/emacs-common-non-dfsg.README.tmp
+	tail +2 \
+	  < debian/emacs-common-non-dfsg.README.01 >> debian/emacs-common-non-dfsg.README.tmp
+	mv debian/emacs-common-non-dfsg.README.tmp $@
+
+deb_trash += debian/emacs-common-non-dfsg.README.tmp
+deb_trash += debian/emacs-common-non-dfsg.README.00
+deb_trash += debian/emacs-common-non-dfsg.README.01
+
+debian/%: debian/%.in debian/changelog
+	$(call deb_sub,$(notdir $<),$(notdir $@))
+
+debian/stamp/patch:
+	$(checkdir)
+	$(patch)
+	mkdir -p $(dir $@) && touch $@
+
+build: debian/stamp/build
+.PHONY: build
+
+debian/stamp/build: debian/stamp/patch
+	$(checkdir)
+
+	cp lispintro/Makefile.in lispintro/Makefile
+	cp lispref/Makefile.in lispref/Makefile
+	cp man/Makefile.in man/Makefile
+
+	perl -p -i \
+	  -e "s|\@top_srcdir\@|$(CURDIR)|go;" \
+	  -e "s|\@SHELL\@|/bin/bash|go;" \
+	  lispintro/Makefile \
+	  lispref/Makefile \
+	  man/Makefile
+
+	perl -p -i \
+	  -e "s|\@srcdir\@|$(CURDIR)/lispintro|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/lispintro|go;" \
+	  lispintro/Makefile
+
+	perl -p -i \
+	  -e "s|\@srcdir\@|$(CURDIR)/lispref|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/lispref|go;" \
+	  lispref/Makefile
+
+	perl -p -i \
+	  -e "s|\@srcdir\@|$(CURDIR)/man|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/man|go;" \
+	  man/Makefile
+
+	mkdir -p info
+	$(MAKE) -C lispintro
+	$(MAKE) -C lispref
+	$(MAKE) -C man
+	mkdir -p debian/stamp && touch $@
+
+deb_trash += lispintro/Makefile
+deb_trash += lispref/Makefile
+deb_trash += man/Makefile
+
+define debinst_indep
+  dh_testdir -p$(1)
+  dh_testroot -p$(1)
+  dh_installchangelogs -p$(1)
+  dh_installdocs -p$(1)
+  dh_link -p$(1)
+  dh_strip -p$(1)
+  dh_compress -p$(1)
+  dh_fixperms -p$(1)
+  dh_installdeb -p$(1)
+  dh_shlibdeps -p$(1)
+  dh_gencontrol -p$(1)
+  dh_md5sums -p$(1)
+  dh_builddeb -p$(1)
+endef
+
+define debinst_bin
+  $(checkdir)
+  dh_testdir -p$(1)
+  dh_testroot -p$(1)
+  dh_installinfo -p$(1)
+  dh_installman -p$(1)
+  dh_installchangelogs -p$(1)
+  dh_installdocs -p$(1)
+  dh_installexamples -p$(1)
+  # dh_install -p$(1)
+  dh_installmenu -p$(1)
+  dh_link -p$(1)
+  dh_strip -p$(1)
+  dh_compress -p$(1)
+  dh_fixperms -p$(1)
+  dh_installdeb -p$(1)
+  dh_shlibdeps -p$(1)
+  dh_gencontrol -p$(1)
+  dh_md5sums -p$(1)
+  dh_builddeb -p$(1)
+endef
+
+common_etc_dir := $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc
+
+##################################################
+# emacsXY-common-non-dfsg
+.PHONY: binary-common-non-dfsg
+binary-common-non-dfsg: pkg_name := $(flavor)-common-non-dfsg
+binary-common-non-dfsg: debian/stamp/build $(debpkgfiles)
+	$(checkroot)
+	$(checkdir)
+	dh_clean -k
+	rm -rf $(pkgdir_common)
+	install -d $(pkgdir_common)
+
+        # info files
+	mkdir -p $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
+	cp -a info/* $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/
+
+        # etc files
+	mkdir -p $(common_etc_dir)
+	cp -a etc/* $(common_etc_dir)/
+	rm $(common_etc_dir)/COPYING
+
+	install -d $(pkgdir_common)/usr/share/doc/$(flavor)-common-non-dfsg
+
+        # info files
+        # Mangle menu entries for subdir.
+	chmod 755 debian/mangle-info
+	for f in $(main_dir_info_files); \
+	do \
+	  DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
+	    debian/mangle-info \
+	      $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/$$f; \
+	done
+
+	$(call deb_sub,emacs-common-non-dfsg.postinst,$(flavor)-common-non-dfsg.postinst)
+	$(call deb_sub,emacs-common-non-dfsg.prerm,$(flavor)-common-non-dfsg.prerm)
+
+	$(call debinst_indep,$(flavor)-common-non-dfsg)
+
+deb_trash += debian/$(flavor)-common-non-dfsg.postinst
+deb_trash += debian/$(flavor)-common-non-dfsg.prerm
+
+binary-indep: binary-common-non-dfsg
+
+binary-arch:
+
+binary: binary-indep binary-arch
+
+clean: debian-sync
+	$(checkdir)
+	$(cleanup_all)
+
+source diff:
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+.PHONY: binary binary-arch binary-indep clean

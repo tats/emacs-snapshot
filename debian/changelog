@@ -1,0 +1,23 @@
+emacs22-non-dfsg (22.0.99+1-1) experimental; urgency=low
+
+  * Update to 22.0.99.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 May 2007 11:26:42 -0700
+
+emacs22-non-dfsg (22.0.95+1-1) unstable; urgency=low
+
+  * New emacs22 packages.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 15 Apr 2007 16:32:16 -0700
+
+emacs21-non-dfsg (21.4a+1-1) unstable; urgency=low
+
+  * New package: in accordance with the recent General Resolution
+    (http://www.debian.org/vote/2006/vote_001), move all non-DFSG files to
+    new packages that will be included in Debian's non-free section.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 28 Jul 2006 22:37:16 -0700
+
+Local Variables:
+coding: utf-8
+End:

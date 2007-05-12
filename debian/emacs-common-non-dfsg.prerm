@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -e
+
+MAJOR=@MAJOR_VERSION@
+MINOR=@MINOR_VERSION@
+FULL=@FULL_VERSION@
+INFOFILES="@INFOFILES@"
+
+if [ \( "$1" = "upgrade" -o "$1" = "remove" \) -a -L /usr/doc/@PKG_NAME@ ]
+then
+  rm -f /usr/doc/@PKG_NAME@
+fi
+
+for file in ${INFOFILES}
+do
+  install-info --quiet --remove-exactly emacs-${MAJOR}/${file} || true
+done
+
+#DEBHELPER#

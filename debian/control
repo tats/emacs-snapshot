@@ -1,0 +1,20 @@
+Source: emacs22-non-dfsg
+Section: non-free/editors
+Priority: optional
+Maintainer: Rob Browning <rlb@defaultvalue.org>
+Uploaders: Jerome Marant <jerome@debian.org>
+Build-Depends: texinfo, autotools-dev, dpkg-dev (>> 1.10.0), quilt, debhelper (>= 4)
+Standards-Version: 3.7.2
+
+Package: emacs22-common-non-dfsg
+Section: non-free/editors
+Priority: optional
+Architecture: all
+Depends: ${shlibs:Depends}
+Description: GNU Emacs shared, architecture independent, non-DFSG items
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains the architecture independent infrastructure that is
+ not compliant with the Debian Free Software Guidelines.  In
+ particular, this includes some of the GNU Emacs info pages, as they
+ are covered under the GFDL, and they specify invariant sections.
+ See http://www.debian.org/vote/2006/vote_001 for more information.

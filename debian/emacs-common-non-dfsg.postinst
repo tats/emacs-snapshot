@@ -1,0 +1,24 @@
+#!/bin/sh -e
+
+MAJOR=@MAJOR_VERSION@
+MINOR=@MINOR_VERSION@
+FULL=@FULL_VERSION@
+INFOFILES="@INFOFILES@"
+
+CRUFT_INFOFILES="ccmode emacs widget"
+
+# We have to clean these up because the old package didn't.  The info
+# files were being removed in the postinst, not the prerm, and so
+# install-info wasn't doing anything because the files weren't there..
+for file in ${CRUFT_INFOFILES}
+do
+  install-info --quiet --remove-exactly ${file} || true
+done
+
+for file in ${INFOFILES}
+do
+  install-info --quiet --section Emacs Emacs \
+    /usr/share/info/emacs-${MAJOR}/${file}.gz || true
+done
+
+#DEBHELPER#

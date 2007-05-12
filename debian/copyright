@@ -1,0 +1,60 @@
+-*-text-*-
+
+This package is derived from the main Emacs packages which were
+debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
+00:05:45 -0600.
+
+This is the original source archive:
+
+  prep.ai.mit.edu:/pub/gnu/emacs/emacs-22.0.99+1.tar.gz
+
+Please see
+/usr/share/doc/emacs22-common-non-dfsg/README.Debian.gz
+for a description of the Debian specific differences from the upstream
+version.
+
+This package contains files which have been deemed unsuitable for
+Debian main because their licenses do not appear to satisfy the
+requirements of the Debian Free Software Guidelines (DFSG).  See
+http://www.debian.org/social_contract.
+
+In particular, some of the info pages included in this package are
+covered under the GNU Free Documentation License (GFDL), which Debian
+has decided does not satisfy the DFSG in cases where "Invariant
+Sections" are specified.  See this Debian General Resolution on the
+topic: http://www.debian.org/vote/2006/vote_001.
+
+Some other files are included here because their license only allows
+verbatim copying, or because there was some other question regarding
+their license.
+
+Copyright:
+
+  Most of Emacs is covered under the terms of the GPL.  See the file
+  /usr/share/common-licenses/GPL for more information.
+
+  In general, the info pages are covered under the GNU Free
+  Documentation License (GFDL).  See the "GNU Free Documentation
+  License" node in "info emacs-22/emacs".
+
+  etc/INTERVIEW contains the following statement:
+    Copyright (C) 1986 Richard Stallman.  Permission is granted to
+    make and distribute copies of this article as long as the
+    copyright and this notice appear on all copies.
+
+  etc/MOTIVATION contains the following statement:
+    [reprinted with permission of the author
+     from the Monday 19 January 1987 Boston Globe]
+       
+  These files appear to only allow verbatim copying:
+    etc/CENSORSHIP
+    etc/GNU
+    etc/LINUX-GNU
+    etc/THE-GNU-PROJECT
+    etc/WHY-FREE
+    etc/copying.paper
+
+  These files appear to have no explicit copyright statement:
+    etc/COOKIES
+    etc/DEVEL.HUMOR
+    etc/JOKES
