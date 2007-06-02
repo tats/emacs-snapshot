@@ -1655,11 +1655,10 @@ they default to the whole buffer.
 @end defun
 
 @defun indent-to-left-margin
-This is the default @code{indent-line-function}, used in Fundamental
-mode, Text mode, etc.  Its effect is to adjust the indentation at the
-beginning of the current line to the value specified by the variable
-@code{left-margin}.  This may involve either inserting or deleting
-whitespace.
+This function adjusts the indentation at the beginning of the current
+line to the value specified by the variable @code{left-margin}.  (That
+may involve either inserting or deleting whitespace.)  This function
+is value of @code{indent-line-function} in Paragraph-Indent Text mode.
 @end defun
 
 @defvar left-margin
@@ -2199,9 +2198,7 @@ various commands) to indent the current line.  The command
 
 In Lisp mode, the value is the symbol @code{lisp-indent-line}; in C
 mode, @code{c-indent-line}; in Fortran mode, @code{fortran-indent-line}.
-In Fundamental mode, Text mode, and many other modes with no standard
-for indentation, the value is @code{indent-to-left-margin} (which is the
-default value).
+The default value is @code{indent-relative}.
 @end defvar
 
 @deffn Command indent-according-to-mode
@@ -2956,6 +2953,11 @@ meanings.  The following sections list a few additional special property
 names that control filling and property inheritance.  All other names
 have no standard meaning, and you can use them as you like.
 
+  Note: the properties @code{composition}, @code{display},
+@code{invisible} and @code{intangible} can also cause point to move to
+an acceptable place, after each Emacs command.  @xref{Adjusting
+Point}.
+
 @table @code
 @cindex property category of text character
 @kindex category @r{(text property)}
@@ -3024,24 +3026,11 @@ that all text between the character and where the mouse is have the same
 
 @item fontified
 @kindex fontified @r{(text property)}
-This property says whether the character has a face assigned to it by font
-locking.  The display engine tests it to decide whether a buffer
-portion needs refontifying before display.  @xref{Auto Faces}.  It
-takes one of three values:
-
-@table @asis
-@item @code{nil}
-Font locking is disabled, or the character's @code{face} property, if
-any, is invalid.
-
-@item @code{defer}
-This value is only used when ``just in time'' font locking is enabled
-and it means that the character's @code{face} property is invalid and
-needs deferred fontification.
-
-@item @code{t}
-The character's @code{face} property, or absence of one, is valid.
-@end table
+This property says whether the text is ready for display.  If
+@code{nil}, Emacs's redisplay routine calls the functions in
+@code{fontification-functions} (@pxref{Auto Faces}) to prepare this
+part of the buffer before it is displayed.  It is used internally by
+the ``just in time'' font locking code.
 
 @item display
 This property activates various features that change the
@@ -3143,6 +3132,10 @@ If you try to move point forward into the group, point actually moves to
 the end of the group.  If you try to move point backward into the group,
 point actually moves to the start of the group.
 
+If consecutive characters have unequal non-@code{nil}
+@code{intangible} properties, they belong to separate groups; each
+group is separately treated as described above.
+
 When the variable @code{inhibit-point-motion-hooks} is non-@code{nil},
 the @code{intangible} property is ignored.
 
@@ -3194,6 +3187,9 @@ the function will be called.
 If these functions modify the buffer, they should bind
 @code{inhibit-modification-hooks} to @code{t} around doing so, to
 avoid confusing the internal mechanism that calls these hooks.
+
+Overlays also support the @code{modification-hooks} property, but the
+details are somewhat different (@pxref{Overlay Properties}).
 
 @item insert-in-front-hooks
 @itemx insert-behind-hooks
