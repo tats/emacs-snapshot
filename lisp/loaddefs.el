@@ -306,7 +306,7 @@ Fix any old-style date entries in the current log file to default format.
 
 ;;;### (autoloads (defadvice ad-activate ad-add-advice ad-disable-advice
 ;;;;;;  ad-enable-advice ad-default-compilation-action ad-redefinition-action)
-;;;;;;  "advice" "emacs-lisp/advice.el" (17842 54152))
+;;;;;;  "advice" "emacs-lisp/advice.el" (17992 30878))
 ;;; Generated autoloads from emacs-lisp/advice.el
 
 (defvar ad-redefinition-action (quote warn) "\
@@ -1461,7 +1461,7 @@ Special commands:
 
 (defvar autoarg-mode nil "\
 Non-nil if Autoarg mode is enabled.
-See the command `autoarg-mode' for a description of this minor-mode.")
+See the command `autoarg-mode' for a description of this minor mode.")
 
 (custom-autoload (quote autoarg-mode) "autoarg" nil)
 
@@ -1489,7 +1489,7 @@ then invokes the normal binding of \\[autoarg-terminate].
 
 (defvar autoarg-kp-mode nil "\
 Non-nil if Autoarg-Kp mode is enabled.
-See the command `autoarg-kp-mode' for a description of this minor-mode.
+See the command `autoarg-kp-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `autoarg-kp-mode'.")
@@ -1539,7 +1539,7 @@ or if CONDITION had no actions, after all other CONDITIONs.
 
 (defvar auto-insert-mode nil "\
 Non-nil if Auto-Insert mode is enabled.
-See the command `auto-insert-mode' for a description of this minor-mode.
+See the command `auto-insert-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `auto-insert-mode'.")
@@ -1645,7 +1645,7 @@ This function is designed to be added to hooks, for example:
 
 (defvar global-auto-revert-mode nil "\
 Non-nil if Global-Auto-Revert mode is enabled.
-See the command `global-auto-revert-mode' for a description of this minor-mode.
+See the command `global-auto-revert-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `global-auto-revert-mode'.")
@@ -1743,7 +1743,7 @@ The text being displayed in the echo area is controlled by the variables
 
 (defvar display-battery-mode nil "\
 Non-nil if Display-Battery mode is enabled.
-See the command `display-battery-mode' for a description of this minor-mode.
+See the command `display-battery-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `display-battery-mode'.")
@@ -2582,8 +2582,8 @@ name of buffer configuration.
 ;;;***
 
 ;;;### (autoloads (insert-text-button make-text-button insert-button
-;;;;;;  make-button define-button-type) "button" "button.el" (17964
-;;;;;;  48350))
+;;;;;;  make-button define-button-type) "button" "button.el" (17992
+;;;;;;  30877))
 ;;; Generated autoloads from button.el
 
 (defvar button-map (let ((map (make-sparse-keymap))) (define-key map "" (quote push-button)) (define-key map [mouse-2] (quote push-button)) map) "\
@@ -3519,7 +3519,7 @@ Return the syntactic context of the current line.
 
 ;;;### (autoloads (pike-mode idl-mode java-mode objc-mode c++-mode
 ;;;;;;  c-mode c-initialize-cc-mode) "cc-mode" "progmodes/cc-mode.el"
-;;;;;;  (17962 52849))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from progmodes/cc-mode.el
 
 (autoload (quote c-initialize-cc-mode) "cc-mode" "\
@@ -4595,7 +4595,7 @@ on third call it again advances points to the next difference and so on.
 ;;;;;;  compilation-shell-minor-mode compilation-mode compilation-start
 ;;;;;;  compile compilation-disable-input compile-command compilation-search-path
 ;;;;;;  compilation-ask-about-save compilation-window-height compilation-mode-hook)
-;;;;;;  "compile" "progmodes/compile.el" (17952 11093))
+;;;;;;  "compile" "progmodes/compile.el" (18006 55797))
 ;;; Generated autoloads from progmodes/compile.el
 
 (defvar compilation-mode-hook nil "\
@@ -4763,7 +4763,7 @@ This is the value of `next-error-function' in Compilation buffers.
 
 (defvar partial-completion-mode nil "\
 Non-nil if Partial-Completion mode is enabled.
-See the command `partial-completion-mode' for a description of this minor-mode.
+See the command `partial-completion-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `partial-completion-mode'.")
@@ -4805,7 +4805,7 @@ second TAB brings up the `*Completions*' buffer.
 
 (defvar dynamic-completion-mode nil "\
 Non-nil if Dynamic-Completion mode is enabled.
-See the command `dynamic-completion-mode' for a description of this minor-mode.
+See the command `dynamic-completion-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `dynamic-completion-mode'.")
@@ -5535,7 +5535,7 @@ INHERIT-INPUT-METHOD.
 
 (defvar cua-mode nil "\
 Non-nil if Cua mode is enabled.
-See the command `cua-mode' for a description of this minor-mode.
+See the command `cua-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `cua-mode'.")
@@ -6012,7 +6012,7 @@ This function is designed to be added to hooks, for example:
 
 (defvar global-cwarn-mode nil "\
 Non-nil if Global-Cwarn mode is enabled.
-See the command `global-cwarn-mode' for a description of this minor-mode.
+See the command `global-cwarn-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `global-cwarn-mode'.")
@@ -6060,7 +6060,7 @@ If the argument is nil, we return the display table to its standard state.
 ;;;***
 
 ;;;### (autoloads (dabbrev-expand dabbrev-completion) "dabbrev" "dabbrev.el"
-;;;;;;  (17842 58280))
+;;;;;;  (18006 55794))
 ;;; Generated autoloads from dabbrev.el
  (define-key esc-map "/" 'dabbrev-expand)
  (define-key esc-map [?\C-/] 'dabbrev-completion)
@@ -6389,7 +6389,7 @@ no args, if that value is non-nil.
 
 (defvar delete-selection-mode nil "\
 Non-nil if Delete-Selection mode is enabled.
-See the command `delete-selection-mode' for a description of this minor-mode.
+See the command `delete-selection-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `delete-selection-mode'.")
@@ -6507,7 +6507,7 @@ as well as widgets, buttons, overlays, and text properties.
 
 (defvar desktop-save-mode nil "\
 Non-nil if Desktop-Save mode is enabled.
-See the command `desktop-save-mode' for a description of this minor-mode.")
+See the command `desktop-save-mode' for a description of this minor mode.")
 
 (custom-autoload (quote desktop-save-mode) "desktop" nil)
 
@@ -6782,7 +6782,7 @@ Major mode for editing the diary file.
 ;;;***
 
 ;;;### (autoloads (diff-backup diff diff-command diff-switches) "diff"
-;;;;;;  "diff.el" (17842 58280))
+;;;;;;  "diff.el" (17992 30877))
 ;;; Generated autoloads from diff.el
 
 (defvar diff-switches "-c" "\
@@ -6816,7 +6816,7 @@ With prefix arg, prompt for diff switches.
 ;;;***
 
 ;;;### (autoloads (diff-minor-mode diff-mode) "diff-mode" "diff-mode.el"
-;;;;;;  (17942 63381))
+;;;;;;  (17992 30877))
 ;;; Generated autoloads from diff-mode.el
 
 (autoload (quote diff-mode) "diff-mode" "\
@@ -6848,7 +6848,7 @@ Minor mode for viewing/editing context diffs.
 ;;;;;;  dired dired-copy-preserve-time dired-dwim-target dired-keep-marker-symlink
 ;;;;;;  dired-keep-marker-hardlink dired-keep-marker-copy dired-keep-marker-rename
 ;;;;;;  dired-trivial-filenames dired-ls-F-marks-symlinks dired-listing-switches)
-;;;;;;  "dired" "dired.el" (17963 25980))
+;;;;;;  "dired" "dired.el" (18015 32019))
 ;;; Generated autoloads from dired.el
 
 (defvar dired-listing-switches "-al" "\
@@ -7468,7 +7468,7 @@ true then the type of the file linked to by FILE is printed instead.
 ;;;***
 
 ;;;### (autoloads (dired-do-relsymlink dired-jump) "dired-x" "dired-x.el"
-;;;;;;  (17962 27565))
+;;;;;;  (17992 30877))
 ;;; Generated autoloads from dired-x.el
 
 (autoload (quote dired-jump) "dired-x" "\
@@ -7768,7 +7768,7 @@ Play sounds in message buffers.
 
 ;;;### (autoloads (easy-mmode-defsyntax easy-mmode-defmap easy-mmode-define-keymap
 ;;;;;;  define-globalized-minor-mode define-minor-mode) "easy-mmode"
-;;;;;;  "emacs-lisp/easy-mmode.el" (17964 48351))
+;;;;;;  "emacs-lisp/easy-mmode.el" (17992 30878))
 ;;; Generated autoloads from emacs-lisp/easy-mmode.el
 
 (defalias (quote easy-mmode-define-minor-mode) (quote define-minor-mode))
@@ -8939,7 +8939,7 @@ Not documented
 ;;;***
 
 ;;;### (autoloads (turn-on-eldoc-mode eldoc-mode eldoc-minor-mode-string)
-;;;;;;  "eldoc" "emacs-lisp/eldoc.el" (17842 54152))
+;;;;;;  "eldoc" "emacs-lisp/eldoc.el" (17992 30878))
 ;;; Generated autoloads from emacs-lisp/eldoc.el
 
 (defvar eldoc-minor-mode-string " ElDoc" "\
@@ -8960,7 +8960,7 @@ With prefix ARG, turn ElDoc mode on if and only if ARG is positive.
 \(fn &optional ARG)" t nil)
 
 (autoload (quote turn-on-eldoc-mode) "eldoc" "\
-Unequivocally turn on eldoc-mode (see variable documentation).
+Unequivocally turn on ElDoc mode (see command `eldoc-mode').
 
 \(fn)" t nil)
 
@@ -9138,7 +9138,7 @@ Not documented
 
 (defvar encoded-kbd-mode nil "\
 Non-nil if Encoded-Kbd mode is enabled.
-See the command `encoded-kbd-mode' for a description of this minor-mode.
+See the command `encoded-kbd-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `encoded-kbd-mode'.")
@@ -9628,7 +9628,7 @@ This will add a speedbar major display mode.
 
 (defvar erc-track-minor-mode nil "\
 Non-nil if Erc-Track minor mode is enabled.
-See the command `erc-track-minor-mode' for a description of this minor-mode.")
+See the command `erc-track-minor-mode' for a description of this minor mode.")
 
 (custom-autoload (quote erc-track-minor-mode) "erc-track" nil)
 
@@ -10905,7 +10905,7 @@ Set up hooks, load the cache file -- if existing -- and build the menu.
 
 ;;;***
 
-;;;### (autoloads nil "fill" "textmodes/fill.el" (17961 33560))
+;;;### (autoloads nil "fill" "textmodes/fill.el" (18007 39658))
 ;;; Generated autoloads from textmodes/fill.el
 (put 'colon-double-space 'safe-local-variable 'booleanp)
 
@@ -10913,7 +10913,7 @@ Set up hooks, load the cache file -- if existing -- and build the menu.
 
 ;;;### (autoloads (find-grep-dired find-name-dired find-dired find-grep-options
 ;;;;;;  find-ls-subdir-switches find-ls-option) "find-dired" "find-dired.el"
-;;;;;;  (17842 58279))
+;;;;;;  (17992 30877))
 ;;; Generated autoloads from find-dired.el
 
 (defvar find-ls-option (if (eq system-type (quote berkeley-unix)) (quote ("-ls" . "-gilsb")) (quote ("-exec ls -ld {} \\;" . "-ld"))) "\
@@ -11327,7 +11327,7 @@ Turn flymake mode off.
 
 ;;;### (autoloads (flyspell-buffer flyspell-region flyspell-mode-off
 ;;;;;;  turn-off-flyspell turn-on-flyspell flyspell-mode flyspell-prog-mode)
-;;;;;;  "flyspell" "textmodes/flyspell.el" (17962 52849))
+;;;;;;  "flyspell" "textmodes/flyspell.el" (18006 55797))
 ;;; Generated autoloads from textmodes/flyspell.el
 
 (autoload (quote flyspell-prog-mode) "flyspell" "\
@@ -12110,7 +12110,7 @@ Checking delayed messages is skipped if optional arg NO-CHECK is non-nil.
 ;;;***
 
 ;;;### (autoloads (gnus-user-format-function-D gnus-user-format-function-d)
-;;;;;;  "gnus-diary" "gnus/gnus-diary.el" (17842 54741))
+;;;;;;  "gnus-diary" "gnus/gnus-diary.el" (17992 30878))
 ;;; Generated autoloads from gnus/gnus-diary.el
 
 (autoload (quote gnus-user-format-function-d) "gnus-diary" "\
@@ -12810,7 +12810,7 @@ the form \"WINDOW-ID PIXMAP-ID\".  Value is non-nil if successful.
 ;;;***
 
 ;;;### (autoloads (gdb-script-mode jdb pdb perldb xdb dbx sdb gdb)
-;;;;;;  "gud" "progmodes/gud.el" (17950 21759))
+;;;;;;  "gud" "progmodes/gud.el" (17992 30878))
 ;;; Generated autoloads from progmodes/gud.el
 
 (autoload (quote gdb) "gud" "\
@@ -13341,7 +13341,7 @@ This discards the buffer's undo information.
 ;;;### (autoloads (hi-lock-write-interactive-patterns hi-lock-unface-buffer
 ;;;;;;  hi-lock-face-phrase-buffer hi-lock-face-buffer hi-lock-line-face-buffer
 ;;;;;;  global-hi-lock-mode hi-lock-mode) "hi-lock" "hi-lock.el"
-;;;;;;  (17964 48351))
+;;;;;;  (17992 30877))
 ;;; Generated autoloads from hi-lock.el
 
 (autoload (quote hi-lock-mode) "hi-lock" "\
@@ -13397,7 +13397,7 @@ is found.  A mode is excluded if it's in the list `hi-lock-exclude-modes'.
 
 (defvar global-hi-lock-mode nil "\
 Non-nil if Global-Hi-Lock mode is enabled.
-See the command `global-hi-lock-mode' for a description of this minor-mode.
+See the command `global-hi-lock-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `global-hi-lock-mode'.")
@@ -13814,7 +13814,7 @@ addition to `hl-line-highlight' on `post-command-hook'.
 
 (defvar global-hl-line-mode nil "\
 Non-nil if Global-Hl-Line mode is enabled.
-See the command `global-hl-line-mode' for a description of this minor-mode.
+See the command `global-hl-line-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `global-hl-line-mode'.")
@@ -14457,7 +14457,7 @@ buffer `*icalendar-errors*'.
 
 (defvar icomplete-mode nil "\
 Non-nil if Icomplete mode is enabled.
-See the command `icomplete-mode' for a description of this minor-mode.
+See the command `icomplete-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `icomplete-mode'.")
@@ -14539,7 +14539,7 @@ See also the variable `idlwave-shell-prompt-pattern'.
 ;;;***
 
 ;;;### (autoloads (idlwave-mode) "idlwave" "progmodes/idlwave.el"
-;;;;;;  (17935 59227))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from progmodes/idlwave.el
 
 (autoload (quote idlwave-mode) "idlwave" "\
@@ -15149,7 +15149,7 @@ Example:
 ;;;;;;  image-dired-jump-thumbnail-buffer image-dired-delete-tag
 ;;;;;;  image-dired-tag-files image-dired-show-all-from-dir image-dired-display-thumbs
 ;;;;;;  image-dired-dired-with-window-configuration image-dired-dired-insert-marked-thumbs)
-;;;;;;  "image-dired" "image-dired.el" (17963 26200))
+;;;;;;  "image-dired" "image-dired.el" (17992 30877))
 ;;; Generated autoloads from image-dired.el
 
 (autoload (quote image-dired-dired-insert-marked-thumbs) "image-dired" "\
@@ -15324,7 +15324,7 @@ the command `insert-file-contents'.
 
 (defvar auto-image-file-mode nil "\
 Non-nil if Auto-Image-File mode is enabled.
-See the command `auto-image-file-mode' for a description of this minor-mode.
+See the command `auto-image-file-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `auto-image-file-mode'.")
@@ -15608,7 +15608,7 @@ of `inferior-lisp-program').  Runs the hooks from
 ;;;### (autoloads (Info-speedbar-browser Info-goto-emacs-key-command-node
 ;;;;;;  Info-goto-emacs-command-node Info-mode info-apropos Info-index
 ;;;;;;  Info-directory Info-on-current-buffer info-standalone info-emacs-manual
-;;;;;;  info info-other-window) "info" "info.el" (17964 52883))
+;;;;;;  info info-other-window) "info" "info.el" (18006 55795))
 ;;; Generated autoloads from info.el
 
 (autoload (quote info-other-window) "info" "\
@@ -15927,7 +15927,7 @@ accessed via isearchb.
 ;;;### (autoloads (iso-cvt-define-menu iso-cvt-write-only iso-cvt-read-only
 ;;;;;;  iso-sgml2iso iso-iso2sgml iso-iso2duden iso-iso2gtex iso-gtex2iso
 ;;;;;;  iso-tex2iso iso-iso2tex iso-german iso-spanish) "iso-cvt"
-;;;;;;  "international/iso-cvt.el" (17842 54888))
+;;;;;;  "international/iso-cvt.el" (17992 30878))
 ;;; Generated autoloads from international/iso-cvt.el
 
 (autoload (quote iso-spanish) "iso-cvt" "\
@@ -15996,12 +15996,12 @@ Optional arg BUFFER is ignored (for use in `format-alist').
 (autoload (quote iso-cvt-read-only) "iso-cvt" "\
 Warn that format is read-only.
 
-\(fn)" t nil)
+\(fn &rest IGNORE)" t nil)
 
 (autoload (quote iso-cvt-write-only) "iso-cvt" "\
 Warn that format is write-only.
 
-\(fn)" t nil)
+\(fn &rest IGNORE)" t nil)
 
 (autoload (quote iso-cvt-define-menu) "iso-cvt" "\
 Add submenus to the File menu, to convert to and from various formats.
@@ -16024,7 +16024,7 @@ Add submenus to the File menu, to convert to and from various formats.
 ;;;;;;  ispell-region ispell-change-dictionary ispell-kill-ispell
 ;;;;;;  ispell-help ispell-pdict-save ispell-word ispell-local-dictionary-alist
 ;;;;;;  ispell-personal-dictionary) "ispell" "textmodes/ispell.el"
-;;;;;;  (17921 16827))
+;;;;;;  (18006 55797))
 ;;; Generated autoloads from textmodes/ispell.el
 (put 'ispell-check-comments 'safe-local-variable (lambda (a) (memq a '(nil t exclusive))))
 
@@ -16317,7 +16317,7 @@ You can bind this to the key C-c i in GNUS or mail by adding to
 
 (defvar iswitchb-mode nil "\
 Non-nil if Iswitchb mode is enabled.
-See the command `iswitchb-mode' for a description of this minor-mode.
+See the command `iswitchb-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `iswitchb-mode'.")
@@ -16935,7 +16935,7 @@ such as redefining an Emacs function.
 ;;;***
 
 ;;;### (autoloads (locate-with-filter locate locate-ls-subdir-switches)
-;;;;;;  "locate" "locate.el" (17965 12050))
+;;;;;;  "locate" "locate.el" (17992 30877))
 ;;; Generated autoloads from locate.el
 
 (defvar locate-ls-subdir-switches "-al" "\
@@ -16986,7 +16986,7 @@ except that FILTER is not optional.
 
 ;;;***
 
-;;;### (autoloads (log-edit) "log-edit" "log-edit.el" (17842 58279))
+;;;### (autoloads (log-edit) "log-edit" "log-edit.el" (18010 5298))
 ;;; Generated autoloads from log-edit.el
 
 (autoload (quote log-edit) "log-edit" "\
@@ -17018,8 +17018,8 @@ Major mode for browsing CVS log output.
 
 ;;;***
 
-;;;### (autoloads (longlines-mode) "longlines" "longlines.el" (17842
-;;;;;;  58279))
+;;;### (autoloads (longlines-mode) "longlines" "longlines.el" (17992
+;;;;;;  30877))
 ;;; Generated autoloads from longlines.el
 
 (autoload (quote longlines-mode) "longlines" "\
@@ -17135,7 +17135,7 @@ for further customization of the printer command.
 ;;;***
 
 ;;;### (autoloads (ls-lisp-support-shell-wildcards) "ls-lisp" "ls-lisp.el"
-;;;;;;  (17851 20943))
+;;;;;;  (18006 55796))
 ;;; Generated autoloads from ls-lisp.el
 
 (defvar ls-lisp-support-shell-wildcards t "\
@@ -17392,7 +17392,7 @@ If 4th arg LIST is non-nil, return a list of all such fields.
 ;;;***
 
 ;;;### (autoloads (define-mail-abbrev build-mail-abbrevs mail-abbrevs-setup)
-;;;;;;  "mailabbrev" "mail/mailabbrev.el" (17842 55035))
+;;;;;;  "mailabbrev" "mail/mailabbrev.el" (17992 30878))
 ;;; Generated autoloads from mail/mailabbrev.el
 
 (autoload (quote mail-abbrevs-setup) "mailabbrev" "\
@@ -17605,7 +17605,7 @@ Previous contents of that buffer are killed first.
 
 ;;;***
 
-;;;### (autoloads (man-follow man) "man" "man.el" (17925 15265))
+;;;### (autoloads (man-follow man) "man" "man.el" (17992 30877))
 ;;; Generated autoloads from man.el
 
 (defalias (quote manual-entry) (quote man))
@@ -17662,7 +17662,7 @@ yourself the value of `master-of' by calling `master-show-slave'.
 
 (defvar menu-bar-mode nil "\
 Non-nil if Menu-Bar mode is enabled.
-See the command `menu-bar-mode' for a description of this minor-mode.
+See the command `menu-bar-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `menu-bar-mode'.")
@@ -17690,7 +17690,7 @@ turn on menu bars; otherwise, turn off menu bars.
 ;;;;;;  message-cite-function message-yank-prefix message-citation-line-function
 ;;;;;;  message-send-mail-function message-user-organization-file
 ;;;;;;  message-signature-separator message-from-style) "message"
-;;;;;;  "gnus/message.el" (17949 41467))
+;;;;;;  "gnus/message.el" (18010 19867))
 ;;; Generated autoloads from gnus/message.el
 
 (defvar message-from-style (quote default) "\
@@ -18236,7 +18236,7 @@ to its second argument TM.
 
 (defvar minibuffer-electric-default-mode nil "\
 Non-nil if Minibuffer-Electric-Default mode is enabled.
-See the command `minibuffer-electric-default-mode' for a description of this minor-mode.
+See the command `minibuffer-electric-default-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `minibuffer-electric-default-mode'.")
@@ -18478,7 +18478,7 @@ Convert morse coded text in region to ordinary ASCII text.
 
 (defvar mouse-sel-mode nil "\
 Non-nil if Mouse-Sel mode is enabled.
-See the command `mouse-sel-mode' for a description of this minor-mode.
+See the command `mouse-sel-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `mouse-sel-mode'.")
@@ -18535,12 +18535,12 @@ Multiplication puzzle with GNU Emacs.
 
 ;;;***
 
-;;;### (autoloads (msb-mode) "msb" "msb.el" (17842 58279))
+;;;### (autoloads (msb-mode) "msb" "msb.el" (18006 55796))
 ;;; Generated autoloads from msb.el
 
 (defvar msb-mode nil "\
 Non-nil if Msb mode is enabled.
-See the command `msb-mode' for a description of this minor-mode.
+See the command `msb-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `msb-mode'.")
@@ -18870,7 +18870,7 @@ basis, this may not be accurate.
 
 (defvar mouse-wheel-mode nil "\
 Non-nil if Mouse-Wheel mode is enabled.
-See the command `mouse-wheel-mode' for a description of this minor-mode.
+See the command `mouse-wheel-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `mouse-wheel-mode'.")
@@ -18990,7 +18990,7 @@ Open a network connection to HOST on PORT.
 ;;;;;;  uncomment-region comment-kill comment-set-column comment-indent
 ;;;;;;  comment-indent-default comment-normalize-vars comment-multi-line
 ;;;;;;  comment-padding comment-style comment-column) "newcomment"
-;;;;;;  "newcomment.el" (17936 9617))
+;;;;;;  "newcomment.el" (17992 30877))
 ;;; Generated autoloads from newcomment.el
 
 (defalias (quote indent-for-comment) (quote comment-indent))
@@ -19228,7 +19228,7 @@ Switch to newsticker buffer.  You may want to bind this to a key.
 ;;;***
 
 ;;;### (autoloads (nndiary-generate-nov-databases) "nndiary" "gnus/nndiary.el"
-;;;;;;  (17842 54741))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from gnus/nndiary.el
 
 (autoload (quote nndiary-generate-nov-databases) "nndiary" "\
@@ -19845,12 +19845,12 @@ See the command `outline-mode' for more information on this mode.
 
 ;;;***
 
-;;;### (autoloads (show-paren-mode) "paren" "paren.el" (17960 50513))
+;;;### (autoloads (show-paren-mode) "paren" "paren.el" (18016 8765))
 ;;; Generated autoloads from paren.el
 
 (defvar show-paren-mode nil "\
 Non-nil if Show-Paren mode is enabled.
-See the command `show-paren-mode' for a description of this minor-mode.
+See the command `show-paren-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `show-paren-mode'.")
@@ -19959,7 +19959,7 @@ C-Escape does list-buffers.
 
 (defvar pc-selection-mode nil "\
 Non-nil if Pc-Selection mode is enabled.
-See the command `pc-selection-mode' for a description of this minor-mode.
+See the command `pc-selection-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `pc-selection-mode'.")
@@ -20213,7 +20213,7 @@ Setup shell-mode to use pcomplete.
 
 ;;;### (autoloads (cvs-dired-use-hook cvs-dired-action cvs-status
 ;;;;;;  cvs-update cvs-examine cvs-quickdir cvs-checkout) "pcvs"
-;;;;;;  "pcvs.el" (17842 58279))
+;;;;;;  "pcvs.el" (18006 55796))
 ;;; Generated autoloads from pcvs.el
 
 (autoload (quote cvs-checkout) "pcvs" "\
@@ -20277,7 +20277,7 @@ Sensible values are `cvs-examine', `cvs-status' and `cvs-quickdir'.")
 
 (defvar cvs-dired-use-hook (quote (4)) "\
 Whether or not opening a CVS directory should run PCL-CVS.
-nil means never do it.
+A value of nil means never do it.
 ALWAYS means to always do it unless a prefix argument is given to the
   command that prompted the opening of the directory.
 Anything else means to do it only if the prefix arg is equal to this value.")
@@ -20666,7 +20666,7 @@ Ignores leading comment characters.
 ;;;;;;  pr-ps-buffer-print pr-ps-buffer-using-ghostscript pr-ps-buffer-preview
 ;;;;;;  pr-ps-directory-ps-print pr-ps-directory-print pr-ps-directory-using-ghostscript
 ;;;;;;  pr-ps-directory-preview pr-interface) "printing" "printing.el"
-;;;;;;  (17866 8704))
+;;;;;;  (18006 55796))
 ;;; Generated autoloads from printing.el
 
 (autoload (quote pr-interface) "printing" "\
@@ -21191,7 +21191,7 @@ Interactively, you have the following situations:
    C-u 2 M-x pr-ps-fast-fire RET
       The command prompts the user for a N-UP value, then for a current
       PostScript printer and, finally, for a file name.  Then change the active
-      printer to that choosen by user and saves the PostScript image in
+      printer to that chosen by user and saves the PostScript image in
       that file instead of sending it to the printer.
 
 
@@ -21210,7 +21210,7 @@ zero and the argument SELECT is treated as follows:
 
    If it's an integer greater or equal to 2, the command prompts the user for a
    current PostScript printer and for a file name.  Then change the active
-   printer to that choosen by user and saves the PostScript image in that file
+   printer to that chosen by user and saves the PostScript image in that file
    instead of sending it to the printer.
 
    If it's a symbol which it's defined in `pr-ps-printer-alist', it's the new
@@ -21457,8 +21457,8 @@ Not documented
 ;;;;;;  ps-spool-region ps-spool-buffer-with-faces ps-spool-buffer
 ;;;;;;  ps-print-region-with-faces ps-print-region ps-print-buffer-with-faces
 ;;;;;;  ps-print-buffer ps-print-customize ps-print-color-p ps-paper-type
-;;;;;;  ps-page-dimensions-database) "ps-print" "ps-print.el" (17900
-;;;;;;  43896))
+;;;;;;  ps-page-dimensions-database) "ps-print" "ps-print.el" (18006
+;;;;;;  55796))
 ;;; Generated autoloads from ps-print.el
 
 (defvar ps-page-dimensions-database (list (list (quote a4) (/ (* 72 21.0) 2.54) (/ (* 72 29.7) 2.54) "A4") (list (quote a3) (/ (* 72 29.7) 2.54) (/ (* 72 42.0) 2.54) "A3") (list (quote letter) (* 72 8.5) (* 72 11.0) "Letter") (list (quote legal) (* 72 8.5) (* 72 14.0) "Legal") (list (quote letter-small) (* 72 7.68) (* 72 10.16) "LetterSmall") (list (quote tabloid) (* 72 11.0) (* 72 17.0) "Tabloid") (list (quote ledger) (* 72 17.0) (* 72 11.0) "Ledger") (list (quote statement) (* 72 5.5) (* 72 8.5) "Statement") (list (quote executive) (* 72 7.5) (* 72 10.0) "Executive") (list (quote a4small) (* 72 7.47) (* 72 10.85) "A4Small") (list (quote b4) (* 72 10.125) (* 72 14.33) "B4") (list (quote b5) (* 72 7.16) (* 72 10.125) "B5")) "\
@@ -21651,6 +21651,81 @@ EXTENSION is one of the following symbols:
 If EXTENSION is any other symbol, it is ignored.
 
 \(fn FACE-EXTENSION &optional MERGE-P ALIST-SYM)" nil nil)
+
+;;;***
+
+;;;### (autoloads (jython-mode python-mode run-python) "python" "progmodes/python.el"
+;;;;;;  (17992 30878))
+;;; Generated autoloads from progmodes/python.el
+
+(add-to-list (quote interpreter-mode-alist) (quote ("jython" . jython-mode)))
+
+(add-to-list (quote interpreter-mode-alist) (quote ("python" . python-mode)))
+
+(add-to-list (quote auto-mode-alist) (quote ("\\.py\\'" . python-mode)))
+
+(autoload (quote run-python) "python" "\
+Run an inferior Python process, input and output via buffer *Python*.
+CMD is the Python command to run.  NOSHOW non-nil means don't show the
+buffer automatically.
+
+Normally, if there is a process already running in `python-buffer',
+switch to that buffer.  Interactively, a prefix arg allows you to edit
+the initial command line (default is `python-command'); `-i' etc. args
+will be added to this as appropriate.  A new process is started if:
+one isn't running attached to `python-buffer', or interactively the
+default `python-command', or argument NEW is non-nil.  See also the
+documentation for `python-buffer'.
+
+Runs the hook `inferior-python-mode-hook' (after the
+`comint-mode-hook' is run).  (Type \\[describe-mode] in the process
+buffer for a list of commands.)
+
+\(fn &optional CMD NOSHOW NEW)" t nil)
+
+(autoload (quote python-mode) "python" "\
+Major mode for editing Python files.
+Font Lock mode is currently required for correct parsing of the source.
+See also `jython-mode', which is actually invoked if the buffer appears to
+contain Jython code.  See also `run-python' and associated Python mode
+commands for running Python under Emacs.
+
+The Emacs commands which work with `defun's, e.g. \\[beginning-of-defun], deal
+with nested `def' and `class' blocks.  They take the innermost one as
+current without distinguishing method and class definitions.  Used multiple
+times, they move over others at the same indentation level until they reach
+the end of definitions at that level, when they move up a level.
+\\<python-mode-map>
+Colon is electric: it outdents the line if appropriate, e.g. for
+an else statement.  \\[python-backspace] at the beginning of an indented statement
+deletes a level of indentation to close the current block; otherwise it
+deletes a character backward.  TAB indents the current line relative to
+the preceding code.  Successive TABs, with no intervening command, cycle
+through the possibilities for indentation on the basis of enclosing blocks.
+
+\\[fill-paragraph] fills comments and multi-line strings appropriately, but has no
+effect outside them.
+
+Supports Eldoc mode (only for functions, using a Python process),
+Info-Look and Imenu.  In Outline minor mode, `class' and `def'
+lines count as headers.  Symbol completion is available in the
+same way as in the Python shell using the `rlcompleter' module
+and this is added to the Hippie Expand functions locally if
+Hippie Expand mode is turned on.  Completion of symbols of the
+form x.y only works if the components are literal
+module/attribute names, not variables.  An abbrev table is set up
+with skeleton expansions for compound statement templates.
+
+\\{python-mode-map}
+
+\(fn)" t nil)
+
+(autoload (quote jython-mode) "python" "\
+Major mode for editing Jython files.
+Like `python-mode', but sets up parameters for Jython subprocesses.
+Runs `jython-mode-hook' after `python-mode-hook'.
+
+\(fn)" t nil)
 
 ;;;***
 
@@ -21982,7 +22057,7 @@ Display `quickurl-list' as a formatted list using `quickurl-list-mode'.
 ;;;***
 
 ;;;### (autoloads (rcirc-track-minor-mode rcirc-connect rcirc) "rcirc"
-;;;;;;  "net/rcirc.el" (17907 1946))
+;;;;;;  "net/rcirc.el" (18006 55797))
 ;;; Generated autoloads from net/rcirc.el
 
 (autoload (quote rcirc) "rcirc" "\
@@ -22000,7 +22075,7 @@ Not documented
 
 (defvar rcirc-track-minor-mode nil "\
 Non-nil if Rcirc-Track minor mode is enabled.
-See the command `rcirc-track-minor-mode' for a description of this minor-mode.
+See the command `rcirc-track-minor-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `rcirc-track-minor-mode'.")
@@ -22044,7 +22119,7 @@ Construct a regexp interactively.
 
 (defvar recentf-mode nil "\
 Non-nil if Recentf mode is enabled.
-See the command `recentf-mode' for a description of this minor-mode.
+See the command `recentf-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `recentf-mode'.")
@@ -22496,7 +22571,7 @@ With zero or negative ARG turn mode off.
 
 (defvar global-reveal-mode nil "\
 Non-nil if Global-Reveal mode is enabled.
-See the command `global-reveal-mode' for a description of this minor-mode.
+See the command `global-reveal-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `global-reveal-mode'.")
@@ -22582,8 +22657,8 @@ variable.
 ;;;;;;  rmail-mail-new-frame rmail-primary-inbox-list rmail-delete-after-output
 ;;;;;;  rmail-highlight-face rmail-highlighted-headers rmail-retry-ignored-headers
 ;;;;;;  rmail-displayed-headers rmail-ignored-headers rmail-dont-reply-to-names
-;;;;;;  rmail-movemail-variant-p) "rmail" "mail/rmail.el" (17938
-;;;;;;  22875))
+;;;;;;  rmail-movemail-variant-p) "rmail" "mail/rmail.el" (18006
+;;;;;;  55797))
 ;;; Generated autoloads from mail/rmail.el
 
 (autoload (quote rmail-movemail-variant-p) "rmail" "\
@@ -23163,8 +23238,8 @@ Display a ruler in the header line if ARG > 0.
 
 ;;;***
 
-;;;### (autoloads (rx rx-to-string) "rx" "emacs-lisp/rx.el" (17842
-;;;;;;  54152))
+;;;### (autoloads (rx rx-to-string) "rx" "emacs-lisp/rx.el" (18011
+;;;;;;  44080))
 ;;; Generated autoloads from emacs-lisp/rx.el
 
 (autoload (quote rx-to-string) "rx" "\
@@ -23236,8 +23311,7 @@ CHAR
      matches the empty string, but only at point.
 
 `word-start', `bow'
-     matches the empty string, but only at the beginning or end of a
-     word.
+     matches the empty string, but only at the beginning of a word.
 
 `word-end', `eow'
      matches the empty string, but only at the end of a word.
@@ -23250,6 +23324,12 @@ CHAR
 `not-word-boundary'
      matches the empty string, but not at the beginning or end of a
      word.
+
+`symbol-start'
+     matches the empty string, but only at the beginning of a symbol.
+
+`symbol-end'
+     matches the empty string, but only at the end of a symbol.
 
 `digit', `numeric', `num'
      matches 0 through 9.
@@ -23559,7 +23639,7 @@ This mode is an extended emacs-lisp mode.
 
 (defvar scroll-all-mode nil "\
 Non-nil if Scroll-All mode is enabled.
-See the command `scroll-all-mode' for a description of this minor-mode.
+See the command `scroll-all-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `scroll-all-mode'.")
@@ -23917,7 +23997,7 @@ kill any existing server communications subprocess.
 
 (defvar server-mode nil "\
 Non-nil if Server mode is enabled.
-See the command `server-mode' for a description of this minor-mode.
+See the command `server-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `server-mode'.")
@@ -23953,7 +24033,7 @@ These are active only in the minibuffer, when entering or editing a formula:
 ;;;***
 
 ;;;### (autoloads (html-mode sgml-mode) "sgml-mode" "textmodes/sgml-mode.el"
-;;;;;;  (17887 16434))
+;;;;;;  (18010 58080))
 ;;; Generated autoloads from textmodes/sgml-mode.el
 
 (autoload (quote sgml-mode) "sgml-mode" "\
@@ -24021,7 +24101,7 @@ To work around that, do:
 ;;;***
 
 ;;;### (autoloads (sh-mode) "sh-script" "progmodes/sh-script.el"
-;;;;;;  (17842 56332))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from progmodes/sh-script.el
 (put 'sh-shell 'safe-local-variable 'symbolp)
 
@@ -24270,7 +24350,7 @@ Turning on Sieve mode runs `sieve-mode-hook'.
 
 ;;;***
 
-;;;### (autoloads nil "simple" "simple.el" (17965 11665))
+;;;### (autoloads nil "simple" "simple.el" (18009 38727))
 ;;; Generated autoloads from simple.el
 (put 'fill-prefix 'safe-local-variable 'string-or-null-p)
 
@@ -25474,7 +25554,7 @@ If STROKES-MAP is not given, `strokes-global-map' will be used instead.
 
 (defvar strokes-mode nil "\
 Non-nil if Strokes mode is enabled.
-See the command `strokes-mode' for a description of this minor-mode.
+See the command `strokes-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `strokes-mode'.")
@@ -25587,12 +25667,12 @@ before, and `sc-post-hook' is run after the guts of this function.
 
 ;;;***
 
-;;;### (autoloads (t-mouse-mode) "t-mouse" "t-mouse.el" (17963 25911))
+;;;### (autoloads (t-mouse-mode) "t-mouse" "t-mouse.el" (18006 55796))
 ;;; Generated autoloads from t-mouse.el
 
 (defvar t-mouse-mode nil "\
 Non-nil if T-Mouse mode is enabled.
-See the command `t-mouse-mode' for a description of this minor-mode.
+See the command `t-mouse-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `t-mouse-mode'.")
@@ -25600,10 +25680,12 @@ or call the function `t-mouse-mode'.")
 (custom-autoload (quote t-mouse-mode) "t-mouse" nil)
 
 (autoload (quote t-mouse-mode) "t-mouse" "\
-Toggle t-mouse mode.
+Toggle t-mouse mode to use the mouse in Linux consoles.
 With prefix arg, turn t-mouse mode on iff arg is positive.
 
-Turn it on to use Emacs mouse commands, and off to use t-mouse commands.
+This allows the use of the mouse when operating on a Linux console, in the
+same way as you can use the mouse under X11.
+It requires the `mev' program, part of the `gpm' utilities.
 
 \(fn &optional ARG)" t nil)
 
@@ -25644,7 +25726,7 @@ The variable `tab-width' controls the spacing of tab stops.
 ;;;;;;  table-recognize table-insert-row-column table-insert-column
 ;;;;;;  table-insert-row table-insert table-point-left-cell-hook
 ;;;;;;  table-point-entered-cell-hook table-load-hook table-cell-map-hook)
-;;;;;;  "table" "textmodes/table.el" (17842 58276))
+;;;;;;  "table" "textmodes/table.el" (18012 17784))
 ;;; Generated autoloads from textmodes/table.el
 
 (defvar table-cell-map-hook nil "\
@@ -26242,7 +26324,7 @@ Connect to display DISPLAY for the Emacs talk group.
 
 ;;;***
 
-;;;### (autoloads (tar-mode) "tar-mode" "tar-mode.el" (17842 58278))
+;;;### (autoloads (tar-mode) "tar-mode" "tar-mode.el" (18010 5426))
 ;;; Generated autoloads from tar-mode.el
 
 (autoload (quote tar-mode) "tar-mode" "\
@@ -26452,7 +26534,7 @@ tetris-mode keybindings:
 ;;;;;;  tex-start-commands tex-start-options slitex-run-command latex-run-command
 ;;;;;;  tex-run-command tex-offer-save tex-main-file tex-first-line-header-regexp
 ;;;;;;  tex-directory tex-shell-file-name) "tex-mode" "textmodes/tex-mode.el"
-;;;;;;  (17842 58276))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from textmodes/tex-mode.el
 
 (defvar tex-shell-file-name nil "\
@@ -27124,7 +27206,7 @@ This function performs no refilling of the changed text.
 ;;;***
 
 ;;;### (autoloads (display-time-mode display-time display-time-day-and-date)
-;;;;;;  "time" "time.el" (17842 58278))
+;;;;;;  "time" "time.el" (18006 55796))
 ;;; Generated autoloads from time.el
 
 (defvar display-time-day-and-date nil "\
@@ -27143,7 +27225,7 @@ This runs the normal hook `display-time-hook' after each update.
 
 (defvar display-time-mode nil "\
 Non-nil if Display-Time mode is enabled.
-See the command `display-time-mode' for a description of this minor-mode.
+See the command `display-time-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `display-time-mode'.")
@@ -27296,7 +27378,7 @@ With ARG, turn time stamping on if and only if arg is positive.
 ;;;;;;  timeclock-workday-remaining-string timeclock-reread-log timeclock-query-out
 ;;;;;;  timeclock-change timeclock-status-string timeclock-out timeclock-in
 ;;;;;;  timeclock-modeline-display) "timeclock" "calendar/timeclock.el"
-;;;;;;  (17842 53792))
+;;;;;;  (17992 30878))
 ;;; Generated autoloads from calendar/timeclock.el
 
 (autoload (quote timeclock-modeline-display) "timeclock" "\
@@ -27694,12 +27776,12 @@ holds a keymap.
 ;;;***
 
 ;;;### (autoloads (tpu-edt-on tpu-edt-mode) "tpu-edt" "emulation/tpu-edt.el"
-;;;;;;  (17842 54264))
+;;;;;;  (18006 55796))
 ;;; Generated autoloads from emulation/tpu-edt.el
 
 (defvar tpu-edt-mode nil "\
 Non-nil if Tpu-Edt mode is enabled.
-See the command `tpu-edt-mode' for a description of this minor-mode.
+See the command `tpu-edt-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `tpu-edt-mode'.")
@@ -27919,8 +28001,8 @@ Not documented
 
 ;;;***
 
-;;;### (autoloads (help-with-tutorial) "tutorial" "tutorial.el" (17892
-;;;;;;  62683))
+;;;### (autoloads (help-with-tutorial) "tutorial" "tutorial.el" (18006
+;;;;;;  55796))
 ;;; Generated autoloads from tutorial.el
 
 (autoload (quote help-with-tutorial) "tutorial" "\
@@ -28423,7 +28505,7 @@ Might do a non-blocking connection; use `process-status' to check.
 
 (defvar url-handler-mode nil "\
 Non-nil if Url-Handler mode is enabled.
-See the command `url-handler-mode' for a description of this minor-mode.
+See the command `url-handler-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `url-handler-mode'.")
@@ -28552,7 +28634,7 @@ URL can be a URL string, or a URL vector of the type returned by
 ;;;***
 
 ;;;### (autoloads (url-mailto url-mail) "url-mailto" "url/url-mailto.el"
-;;;;;;  (17842 56569))
+;;;;;;  (18012 18089))
 ;;; Generated autoloads from url/url-mailto.el
 
 (autoload (quote url-mail) "url-mailto" "\
@@ -28887,7 +28969,7 @@ If FILE-NAME is non-nil, save the result to FILE-NAME.
 ;;;;;;  vc-directory vc-merge vc-insert-headers vc-version-other-window
 ;;;;;;  vc-diff vc-register vc-next-action vc-do-command edit-vc-file
 ;;;;;;  with-vc-file vc-branch-part vc-trunk-p vc-before-checkin-hook
-;;;;;;  vc-checkin-hook vc-checkout-hook) "vc" "vc.el" (17842 58278))
+;;;;;;  vc-checkin-hook vc-checkout-hook) "vc" "vc.el" (17992 30877))
 ;;; Generated autoloads from vc.el
 
 (defvar vc-checkout-hook nil "\
@@ -29896,8 +29978,8 @@ Not documented
 
 ;;;### (autoloads (View-exit-and-edit view-mode-enter view-mode view-buffer-other-frame
 ;;;;;;  view-buffer-other-window view-buffer view-file-other-frame
-;;;;;;  view-file-other-window view-file) "view" "view.el" (17930
-;;;;;;  34071))
+;;;;;;  view-file-other-window view-file) "view" "view.el" (18006
+;;;;;;  55796))
 ;;; Generated autoloads from view.el
 
 (defvar view-mode nil "\
@@ -30272,7 +30354,7 @@ Please submit bug reports and other feedback to the author, Neil W. Van Dyke
 
 (defvar which-function-mode nil "\
 Non-nil if Which-Function mode is enabled.
-See the command `which-function-mode' for a description of this minor-mode.
+See the command `which-function-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `which-function-mode'.")
@@ -30362,7 +30444,7 @@ Whitespace cleanup on the region.
 
 (defvar whitespace-global-mode nil "\
 Non-nil if Whitespace-Global mode is enabled.
-See the command `whitespace-global-mode' for a description of this minor-mode.
+See the command `whitespace-global-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `whitespace-global-mode'.")
@@ -30706,13 +30788,13 @@ If PARSE-NS is non-nil, then QNAMES are expanded.
 
 ;;;***
 
-;;;### (autoloads (xterm-mouse-mode) "xt-mouse" "xt-mouse.el" (17938
-;;;;;;  61442))
+;;;### (autoloads (xterm-mouse-mode) "xt-mouse" "xt-mouse.el" (18007
+;;;;;;  39657))
 ;;; Generated autoloads from xt-mouse.el
 
 (defvar xterm-mouse-mode nil "\
 Non-nil if Xterm-Mouse mode is enabled.
-See the command `xterm-mouse-mode' for a description of this minor-mode.
+See the command `xterm-mouse-mode' for a description of this minor mode.
 Setting this variable directly does not take effect;
 either customize it (see the info node `Easy Customization')
 or call the function `xterm-mouse-mode'.")
@@ -30917,7 +30999,7 @@ Zone out, completely.
 ;;;;;;  "url/url-vars.el" "url/vc-dav.el" "vc-hooks.el" "vcursor.el"
 ;;;;;;  "version.el" "vms-patch.el" "vmsproc.el" "vt-control.el"
 ;;;;;;  "vt100-led.el" "w32-fns.el" "w32-vars.el" "widget.el" "window.el"
-;;;;;;  "x-dnd.el") (17965 26976 559735))
+;;;;;;  "x-dnd.el") (18016 63490 111736))
 
 ;;;***
 

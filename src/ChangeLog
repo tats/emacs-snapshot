@@ -1,3 +1,108 @@
+2007-06-02  Chong Yidong  <cyd@stupidchicken.com>
+
+	* Version 22.1 released.
+
+	* xfns.c (x_set_name_internal): Undo last change.
+
+2007-06-01  Richard Stallman  <rms@gnu.org>
+
+	* xfns.c (x_encode_text): Add GCPRO.
+	(x_set_name_internal): Separate USE_GTK and non-USE_GTK cases.
+
+2007-06-01  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* xfns.c (x_set_name_internal): Save encoded name before
+	x_encode_text in case string data is relocated.
+
+2007-05-31  Richard Stallman  <rms@gnu.org>
+
+	* buffer.c (syms_of_buffer): Doc fix.
+
+2007-05-28  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* xdisp.c (redisplay_internal): Bind inhibit-point-motion-hooks to t
+	around current_column call.
+
+2007-05-24  Chong Yidong  <cyd@stupidchicken.com>
+
+	* xdisp.c (redisplay_window): If first window line is a
+	continuation line, recompute the new window start instead of
+	recentering.
+
+2007-05-24  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* macterm.c [USE_CARBON_EVENTS] (mac_handle_window_event):
+	Call mac_wakeup_from_rne on window size change.
+
+2007-05-22  Richard Stallman  <rms@gnu.org>
+
+	* xterm.c (x_connection_closed): Remove NO_RETURN.
+
+2007-05-19  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* syntax.c (skip_chars): Update syntax-table only after we checked that
+	the new location is valid.
+
+2007-05-19  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* macterm.c (x_calc_absolute_position): Add BLOCK_INPUT around
+	mac_get_window_bounds.
+
+2007-05-17  Glenn Morris  <rgm@gnu.org>
+
+	* m/macppc.h (ORDINARY_LINK): No longer define on OpenBSD.
+
+2007-05-16  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* macterm.c [USE_CARBON_EVENTS] (mac_convert_event_ref): Also convert
+	dead key repeat and up events.
+
+2007-05-13  Chong Yidong  <cyd@stupidchicken.com>
+
+	* xterm.c (XTread_socket): Revert last change.
+
+2007-05-12  Chong Yidong  <cyd@stupidchicken.com>
+
+	* image.c (pbm_load): Correctly check image size for greyscale pbm.
+
+	* xterm.c (XTread_socket): Yet Another Uncaught X Error Crash (YAUXEC).
+
+2007-05-07  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* editfns.c (Ftranspose_regions): Yet another int/Lisp_Object mixup (YAILOM)
+
+2007-05-06  Richard Stallman  <rms@gnu.org>
+
+	* process.c: Undo May 3 change.
+
+2007-05-03  Per Cederqvist  <ceder@lysator.liu.se>  (tiny change)
+
+	* process.c (Faccept_process_output): Revert 2006-03-22 change so
+	that the third argument once again is in microseconds (not
+	milliseconds).  This makes it compatible with Emacs 21 and
+	earlier.  Problem found by Henrik Rindl,Av(Bw.
+
+2007-05-01  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* macmenu.c (mac_dialog_show): Apply 2007-04-27 change for xmenu.c.
+	(Fx_popup_dialog) [MAC_OSX]: Likewise.
+
+2007-04-29  Richard Stallman  <rms@gnu.org>
+
+	* insdel.c (replace_range): For undo, record insertion first.
+
+2007-04-29  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* xdisp.c (try_window_reusing_current_matrix): Fix number of
+	disabled lines.
+
+2007-04-27  Jan Dj,Ad(Brv  <jan.h.d@swipnet.se>
+
+	* xmenu.c (xdialog_show): Call Fredisplay before showing the dialog.
+
+	* gtkutil.c (xg_update_menubar, create_menus): Create empty
+	submenu for menu bar items.
+
 2007-04-24  Chong Yidong  <cyd@stupidchicken.com>
 
 	* xdisp.c (redisplay_window): Use BEG_UNCHANGED and END_UNCHANGED
@@ -33,8 +138,8 @@
 
 2007-04-16  Chong Yidong  <cyd@stupidchicken.com>
 
-	* dispnew.c (adjust_frame_glyphs_for_frame_redisplay): Set
-	garbaged flag in presence of window margins.
+	* dispnew.c (adjust_frame_glyphs_for_frame_redisplay):
+	Set garbaged flag in presence of window margins.
 	(showing_window_margins_p): New function.
 
 	* xdisp.c (cursor_row_p): Only end row on newline if it's a

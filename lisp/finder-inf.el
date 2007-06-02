@@ -1543,7 +1543,7 @@
         "daemonic Gnus behaviour"
         (news))
     ("gnus-diary.el"
-        "Wrapper around the NNDiary Gnus backend"
+        "Wrapper around the NNDiary Gnus back end"
         (calendar mail news))
     ("gnus-dired.el"
         "utility functions where gnus and dired meet"
@@ -1738,7 +1738,7 @@
         "nndb access for Gnus"
         (news))
     ("nndiary.el"
-        "A diary backend for Gnus"
+        "A diary back end for Gnus"
         (calendar mail news))
     ("nndir.el"
         "single directory newsgroup access for Gnus"
@@ -2682,6 +2682,9 @@
     ("ps-mode.el"
         "PostScript mode for GNU Emacs"
         (postscript  languages))
+    ("python.el"
+        "silly walks for Python"
+        (languages))
     ("scheme.el"
         "Scheme (and DSSSL) editing mode"
         (languages  lisp))

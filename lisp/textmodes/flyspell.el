@@ -1961,12 +1961,8 @@ Sets `flyspell-auto-correct-previous-pos' to nil"
 But don't look beyond what's visible on the screen."
   (interactive "d")
 
-  (let (top bot)
-    (save-excursion
-      (move-to-window-line 0)
-      (setq top (point))
-      (move-to-window-line -1)
-      (setq bot (point)))
+  (let ((top (window-start))
+	(bot (window-end)))
     (save-excursion
       (save-restriction
 	(narrow-to-region top bot)
@@ -2029,6 +2025,7 @@ If OPOINT is non-nil, restore point there after adjusting it for replacement."
     (error "Pop-up menus do not work on this terminal"))
   ;; use the correct dictionary
   (flyspell-accept-buffer-local-defs)
+  (or opoint (setq opoint (point-marker)))
   (let ((cursor-location (point))
 	(word (flyspell-get-word nil)))
     (if (consp word)
@@ -2137,6 +2134,8 @@ If OPOINT is non-nil, restore point there after adjusting it for replacement."
 ;;*---------------------------------------------------------------------*/
 (defun flyspell-emacs-popup (event poss word)
   "The Emacs popup menu."
+  (unless window-system
+    (error "This command requires pop-up dialogs"))
   (if (not event)
       (let* ((mouse-pos  (mouse-position))
 	     (mouse-pos  (if (nth 1 mouse-pos)

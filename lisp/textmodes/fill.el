@@ -159,6 +159,11 @@ Leave one space between words, two at end of sentences or after colons
 and `sentence-end-without-period').
 Remove indentation from each line."
   (interactive "*r")
+  ;; Ideally, we'd want to scan the text from the end, so that changes to
+  ;; text don't affect the boundary, but the regexp we match against does
+  ;; not match as eagerly when matching backward, so we instead use
+  ;; a marker.
+  (unless (markerp end) (setq end (copy-marker end t)))
   (let ((end-spc-re (concat "\\(" (sentence-end) "\\) *\\|  +")))
     (save-excursion
       (goto-char beg)
@@ -748,7 +753,9 @@ space does not end a sentence, so don't break a line there."
     (fill-paragraph arg)))
 
 (defun fill-paragraph (arg)
-  "Fill paragraph at or after point.  Prefix ARG means justify as well.
+  "Fill paragraph at or after point.
+
+If ARG is non-nil (interactively, with prefix argument), justify as well.
 If `sentence-end-double-space' is non-nil, then period followed by one
 space does not end a sentence, so don't break a line there.
 the variable `fill-column' controls the width for filling.
