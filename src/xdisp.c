@@ -10836,7 +10836,7 @@ redisplay_internal (preserve_echo_area)
   int must_finish = 0;
   struct text_pos tlbufpos, tlendpos;
   int number_of_visible_frames;
-  int count;
+  int count, count1;
   struct frame *sf;
   int polling_stopped_here = 0;
 
@@ -10974,6 +10974,10 @@ redisplay_internal (preserve_echo_area)
 	update_mode_lines++;
     }
 
+  /* Avoid invocation of point motion hooks by `current_column' below.  */
+  count1 = SPECPDL_INDEX ();
+  specbind (Qinhibit_point_motion_hooks, Qt);
+
   /* If %c is in the mode line, update it if needed.  */
   if (!NILP (w->column_number_displayed)
       /* This alternative quickly identifies a common case
@@ -10984,6 +10988,8 @@ redisplay_internal (preserve_echo_area)
       && (XFASTINT (w->column_number_displayed)
           != (int) current_column ()))  /* iftc */
     w->update_mode_line = Qt;
+
+  unbind_to (count1, Qnil);
 
   FRAME_SCROLL_BOTTOM_VPOS (XFRAME (w->frame)) = -1;
 
@@ -12968,6 +12974,8 @@ redisplay_window (window, just_this_one_p)
 	w->force_start = Qt;
     }
 
+ force_start:
+
   /* Handle case where place to start displaying has been specified,
      unless the specified location is outside the accessible range.  */
   if (!NILP (w->force_start)
@@ -13147,39 +13155,15 @@ redisplay_window (window, just_this_one_p)
 	 than a simple mouse-click.  */
       if (NILP (w->start_at_line_beg)
 	  && NILP (do_mouse_tracking)
-	  && CHARPOS (startp) > BEGV)
+	  && CHARPOS (startp) > BEGV
+	  && CHARPOS (startp) > BEG + save_beg_unchanged
+	  && CHARPOS (startp) <= Z - save_end_unchanged)
 	{
-#if 0
-	  /* The following code tried to make BEG_UNCHANGED and
-	     END_UNCHANGED up to date (similar to try_window_id).
-	     Is it important to do so?
-
-	     The trouble is that it's a little too strict when it
-	     comes to overlays: modify_overlay can call
-	     BUF_COMPUTE_UNCHANGED, which alters BUF_BEG_UNCHANGED and
-	     BUF_END_UNCHANGED directly without moving the gap.
-
-	     This can result in spurious recentering when overlays are
-	     altered in the buffer.  So unless it's proven necessary,
-	     let's leave this commented out for now. -- cyd.  */
-	  if (MODIFF > SAVE_MODIFF
-	      || BEG_UNCHANGED + END_UNCHANGED > Z_BYTE)
-	    {
-	      if (GPT - BEG < BEG_UNCHANGED)
-		BEG_UNCHANGED = GPT - BEG;
-	      if (Z - GPT < END_UNCHANGED)
-		END_UNCHANGED = Z - GPT;
-	    }
-#endif
-
-	  if (CHARPOS (startp) > BEG + save_beg_unchanged
-	      && CHARPOS (startp) <= Z - save_end_unchanged)
-	    {
-	      /* There doesn't seems to be a simple way to find a new
-		 window start that is near the old window start, so
-		 we just recenter.  */
-	      goto recenter;
-	    }
+	  w->force_start = Qt;
+	  if (XMARKER (w->start)->buffer == current_buffer)
+	    compute_window_start_on_continuation_line (w);
+	  SET_TEXT_POS_FROM_MARKER (startp, w->start);
+	  goto force_start;
 	}
 
 #if GLYPH_DEBUG
@@ -13811,7 +13795,7 @@ try_window_reusing_current_matrix (w)
 			 nrows_scrolled);
 
 	  /* Disable lines that must be updated.  */
-	  for (i = 0; i < it.vpos; ++i)
+	  for (i = 0; i < nrows_scrolled; ++i)
 	    (start_row + i)->enabled_p = 0;
 
 	  /* Re-compute Y positions.  */
