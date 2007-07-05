@@ -3,6 +3,7 @@ debian-adjust-mail-from-addresses.diff
 handle-dfsg-split.diff
 misc-unseparated.diff
 fix-vc-path.diff
+fix-cc-mode-local-vars.diff
 require-movemail-use-liblockfile.diff
 avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
