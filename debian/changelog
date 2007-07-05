@@ -18,7 +18,9 @@ emacs22 (22.1+1-1) unstable; urgency=low
     update-game-score is setuid and Debian's isn't.
     (closes: #423948, #430533) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:44:55 -0700
+  * New release restores python mode. (closes: #430553) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:51:14 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
