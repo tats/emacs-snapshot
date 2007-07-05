@@ -2,7 +2,10 @@ emacs22 (22.1+1-1) unstable; urgency=low
 
   * New upstream release. (closes: #427279) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:05:33 -0700
+  * Change build dependency from libpng3-dev to libpng12-dev.
+    (closes: #424622) [rlb]
+  
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:32:47 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
