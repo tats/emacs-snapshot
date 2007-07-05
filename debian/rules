@@ -220,6 +220,7 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-nox.postinst \
   debian/$(flavor)-nox.prerm \
   debian/$(flavor)-gtk.README.Debian \
+  debian/$(flavor)-gtk.desktop \
   debian/$(flavor)-gtk.menu \
   debian/$(flavor)-gtk.postinst \
   debian/$(flavor)-gtk.prerm \
@@ -789,6 +790,10 @@ install: debian/stamp/build $(autogen_install_files)
 	$(call emacs_inst,build-gtk,$(install_dir_gtk))
 	$(call install_common_binpkg_bits,\
 	  $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-gtk,gtk)
+        # install desktop entry
+	install -d $(pkgdir_gtk)/usr/share/applications
+	install -m 0644 \
+	  debian/$(flavor)-gtk.desktop $(pkgdir_gtk)/usr/share/applications/
 	rm -rf $(install_dir_gtk)
 
         ##################################################

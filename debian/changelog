@@ -12,7 +12,9 @@ emacs22 (22.1+1-1) unstable; urgency=low
     <sven_joachim@web.de> for forwarding the upstream patch.
     (closes: #428898) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:38:56 -0700
+  * Add desktop file for emacs22-gtk. (closes: #424069) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:42:12 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
