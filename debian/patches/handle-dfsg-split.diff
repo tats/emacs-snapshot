@@ -482,7 +482,7 @@ Index: sid/configure.in
 ===================================================================
 --- sid.orig/configure.in
 +++ sid/configure.in
-@@ -3306,7 +3306,7 @@
+@@ -3305,7 +3305,7 @@
  
  AC_OUTPUT(Makefile lib-src/Makefile.c:lib-src/Makefile.in oldXMenu/Makefile \
  	man/Makefile lwlib/Makefile src/Makefile.c:src/Makefile.in \

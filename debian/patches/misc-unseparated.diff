@@ -59,8 +59,8 @@ Index: sid/etc/NEWS
 ===================================================================
 --- sid.orig/etc/NEWS
 +++ sid/etc/NEWS
-@@ -38,6 +38,11 @@
-    http://www.emacswiki.org/cgi-bin/wiki/PythonMode
+@@ -35,6 +35,11 @@
+ ** cua.el, cua-mode.el: remove old versions.
  
  
 +* Debian specific changes to Emacs
