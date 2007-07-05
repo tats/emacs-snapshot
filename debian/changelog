@@ -4,8 +4,11 @@ emacs22 (22.1+1-1) unstable; urgency=low
 
   * Change build dependency from libpng3-dev to libpng12-dev.
     (closes: #424622) [rlb]
+
+  * If allowed, create and remove non-flavor-specific
+    /usr/local/share/emacs/site-lisp.
   
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:32:47 -0700
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:36:10 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
