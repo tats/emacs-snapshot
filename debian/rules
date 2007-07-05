@@ -735,6 +735,15 @@ install: debian/stamp/build $(autogen_install_files)
 	rm $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
 	rm $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
 
+        # Remove the shared game score directory to as a simple way to avoid
+        # a conflict with other flavors of Emacs.  Since Debian's
+        # update-game-score binary isn't setuid, that directory is never used.
+	rm $(pkgdir_common)/var/games/emacs/tetris-scores
+	rm $(pkgdir_common)/var/games/emacs/snake-scores
+	rmdir $(pkgdir_common)/var/games/emacs/
+	rmdir $(pkgdir_common)/var/games/
+	rmdir $(pkgdir_common)/var/
+
         # Make sure /usr/local dir doesn't exist.
 	rm -r $(pkgdir_common)/usr/local
 

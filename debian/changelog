@@ -14,7 +14,11 @@ emacs22 (22.1+1-1) unstable; urgency=low
 
   * Add desktop file for emacs22-gtk. (closes: #424069) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:42:12 -0700
+  * Remove /var/games/emacs/ since Emacs doesn't use it unless
+    update-game-score is setuid and Debian's isn't.
+    (closes: #423948, #430533) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2007 23:44:55 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
