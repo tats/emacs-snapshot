@@ -375,6 +375,7 @@ define update_debian_autofiles_quilt
   $(quilt) import -f -P autofiles.diff debian/tmp-autofiles/new.diff
   $(quilt) header -r autofiles.diff < debian/autofiles-diff-header
   $(patch)
+  $(quilt) refresh --no-timestamps autofiles.diff
   $(cleanup_all)
 endef
 deb_trash += debian/tmp-autofiles
