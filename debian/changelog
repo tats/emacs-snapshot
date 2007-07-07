@@ -1,3 +1,9 @@
+emacs22-non-dfsg (22.1+1-1) unstable; urgency=low
+
+  * New upstream release. [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 06 Jul 2007 20:41:10 -0700
+
 emacs22-non-dfsg (22.0.99+1-1) experimental; urgency=low
 
   * Update to 22.0.99.
