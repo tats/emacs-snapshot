@@ -24,10 +24,10 @@ emacs22 (22.1+1-1) unstable; urgency=low
     /usr/share/info. (closes: #425924, #429526) [rlb]
 
   * Change the desktop file to only use the major version in the name,
-    rather than full upstream version, so that the string won't change
+    rather than the full upstream version, so that the string won't change
     from say 22.0.99 to 22.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 06 Jul 2007 20:18:11 -0700
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 06 Jul 2007 20:20:15 -0700
 
 emacs22 (22.0.99+1-1) experimental; urgency=low
 
