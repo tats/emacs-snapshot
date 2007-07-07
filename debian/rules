@@ -151,7 +151,7 @@ flavor := $(src_name)
 bin_priority := 25
 
 # This might also be something like 2006-09-09 for snapshots.
-menu_ver := $(upstream_ver)
+menu_ver := $(major_ver)
 
 info_subdir := emacs-$(major_ver)
 
