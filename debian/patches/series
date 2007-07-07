@@ -1,3 +1,4 @@
+debian-site-init-el.diff
 debian-startup.diff
 debian-adjust-mail-from-addresses.diff
 handle-dfsg-split.diff
