@@ -1,3 +1,10 @@
+emacs22 (22.1+1-2) unstable; urgency=low
+
+  * Fix mail locking patch for Debian's non-Linux architectures.  Thanks
+    to Michael Banck <mbanck@debian.org>.  (closes: #433816) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jul 2007 19:04:00 -0700
+
 emacs22 (22.1+1-1) unstable; urgency=low
 
   * New upstream release. (closes: #427279) [rlb]
