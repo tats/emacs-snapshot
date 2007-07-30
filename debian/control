@@ -21,7 +21,7 @@ Package: emacs22
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs22-common-non-dfsg
 Conflicts: emacs22-nox, emacs22-gtk, w3-el
@@ -33,7 +33,7 @@ Package: emacs22-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs22-common-non-dfsg
 Conflicts: emacs22, emacs22-gtk, w3-el
@@ -46,7 +46,7 @@ Package: emacs22-gtk
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs22-common-non-dfsg
 Conflicts: emacs22, emacs22-nox, w3-el
@@ -59,7 +59,7 @@ Package: emacs22-bin-common
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: emacs22-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
@@ -81,7 +81,7 @@ Package: emacs22-el
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacs22-common (= ${Source-Version})
+Depends: emacs22-common (= ${source:Version})
 Description: GNU Emacs LISP (.el) files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the elisp sources for the convenience of users,

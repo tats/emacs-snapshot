@@ -21,7 +21,7 @@ Package: @DEB_FLAVOR@
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-nox, @DEB_FLAVOR@-gtk, w3-el
@@ -33,7 +33,7 @@ Package: @DEB_FLAVOR@-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk, w3-el
@@ -46,7 +46,7 @@ Package: @DEB_FLAVOR@-gtk
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, w3-el
@@ -59,7 +59,7 @@ Package: @DEB_FLAVOR@-bin-common
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-common (= ${Source-Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
@@ -81,7 +81,7 @@ Package: @DEB_FLAVOR@-el
 Section: editors
 Priority: optional
 Architecture: all
-Depends: @DEB_FLAVOR@-common (= ${Source-Version})
+Depends: @DEB_FLAVOR@-common (= ${source:Version})
 Description: GNU Emacs LISP (.el) files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the elisp sources for the convenience of users,
