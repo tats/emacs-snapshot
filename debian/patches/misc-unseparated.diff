@@ -6,55 +6,6 @@
     References to /usr/local/... have been changed to
     /usr/... as appropriate, etc.
     
-Index: sid/etc/emacs.1
-===================================================================
---- sid.orig/etc/emacs.1
-+++ sid/etc/emacs.1
-@@ -424,28 +424,28 @@
- manual is also included in the Emacs source distribution.
- .PP
- .SH FILES
--/usr/local/share/info - files for the Info documentation browser.
-+/usr/share/info - files for the Info documentation browser.
- The complete text of the Emacs reference manual is included in a
- convenient tree structured form.  Also includes the Emacs Lisp
- Reference Manual, useful to anyone wishing to write programs in the
- Emacs Lisp extension language.
- 
--/usr/local/share/emacs/$VERSION/lisp - Lisp source files and compiled files
-+/usr/share/emacs/$VERSION/lisp - Lisp source files and compiled files
- that define most editing commands.  Some are preloaded;
- others are autoloaded from this directory when used.
- 
--/usr/local/libexec/emacs/$VERSION/$ARCH - various programs that are
--used with GNU Emacs.
-+/usr/lib/emacs/$VERSION/$ARCH - various programs that are used with
-+GNU Emacs.
- 
--/usr/local/share/emacs/$VERSION/etc - various files of information.
-+/usr/share/emacs/$VERSION/etc - various files of information.
- 
--/usr/local/share/emacs/$VERSION/etc/DOC.* - contains the documentation
-+/usr/share/emacs/$VERSION/etc/DOC.* - contains the documentation
- strings for the Lisp primitives and preloaded Lisp functions
- of GNU Emacs.  They are stored here to reduce the size of
- Emacs proper.
- 
- .br
--/usr/local/share/emacs/$VERSION/etc/SERVICE lists people offering
-+/usr/share/emacs/$VERSION/etc/SERVICE lists people offering
- various services to assist users of GNU Emacs, including education,
- troubleshooting, porting and customization.
- 
-@@ -466,7 +466,7 @@
- 
- Please do not send anything but bug reports to this mailing list.
- For more information about Emacs mailing lists, see the
--file /usr/local/emacs/etc/MAILINGLISTS.  Bugs tend actually to be
-+file /usr/share/emacs/$VERSION/etc/MAILINGLISTS.  Bugs tend actually to be
- fixed if they can be isolated, so it is in your interest to report
- them in such a way that they can be easily reproduced.
- .SH UNRESTRICTIONS
 Index: sid/etc/NEWS
 ===================================================================
 --- sid.orig/etc/NEWS

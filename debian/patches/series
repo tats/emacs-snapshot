@@ -1,3 +1,4 @@
+fix-emacs-manpage.diff
 fix-bitmap-icon-arg.diff
 debian-site-init-el.diff
 debian-startup.diff

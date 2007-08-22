@@ -5,6 +5,9 @@
   Added-by: Rob Browning <rlb@defaultvalue.org>
   Status: appears to be incorporated upstream
 
+  In addition to the upstream changes, the page has been adjusted for
+  Debian.
+
   Upstream changelog entry:
 
   2007-07-15  Werner Lemberg  <wl@gnu.org>
@@ -88,7 +91,7 @@ Index: sid/etc/emacs.1
  many special packages handle mail reading (RMail) and sending (Mail),
  outline editing (Outline), compiling (Compile), running subshells
  within
-@@ -81,130 +88,176 @@
+@@ -81,218 +88,299 @@
  There is an extensive reference manual, but
  users of other Emacses
  should have little trouble adapting even
@@ -311,7 +314,11 @@ Index: sid/etc/emacs.1
  You will find the various
  .I X
  fonts in the
-@@ -215,84 +268,119 @@
+-.I /usr/lib/X11/fonts
++.I /usr/share/fonts/X11
+ directory.
+ Note that
+ .I Emacs
  will only accept fixed width fonts.
  Under the X11 Release 4 font-naming conventions, any font with the
  value "m" or "c" in the eleventh field of the font name is a fixed
@@ -846,7 +853,7 @@ Index: sid/etc/emacs.1
 -file /usr/local/emacs/etc/MAILINGLISTS.  Bugs tend actually to be
 -fixed if they can be isolated, so it is in your interest to report
 -them in such a way that they can be easily reproduced.
-+file /usr/share/emacs/$VERSION/etc/etc/MAILINGLISTS.
++file /usr/share/emacs/$VERSION/etc/MAILINGLISTS.
 +Bugs tend actually to be fixed if they can be isolated, so it is
 +in your interest to report them in such a way that they can be
 +easily reproduced.

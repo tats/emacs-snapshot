@@ -13,7 +13,10 @@ emacs22 (22.1+1-2) unstable; urgency=low
     "header".  Thanks to Max Dmitrichenko
     <dmitrmax@rain.ifmo.ru>. (closes: #432695) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jul 2007 19:45:46 -0700
+  * Incorporate upstream fixes to Emacs manpage.  Thanks to Sven Joachim
+    <sven_joachim@web.de>.(closes: #432732) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 21 Aug 2007 21:36:19 -0700
 
 emacs22 (22.1+1-1) unstable; urgency=low
 
