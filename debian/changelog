@@ -14,7 +14,7 @@ emacs22 (22.1+1-2) unstable; urgency=low
     <dmitrmax@rain.ifmo.ru>. (closes: #432695) [rlb]
 
   * Incorporate upstream fixes to Emacs manpage.  Thanks to Sven Joachim
-    <sven_joachim@web.de>.(closes: #432732) [rlb]
+    <sven_joachim@web.de>. (closes: #432732) [rlb]
 
   * Symlink etc/COPYING and lisp/COPYING to
     /usr/share/common-licenses/GPL-2.  Thanks to Milan Zamazal
