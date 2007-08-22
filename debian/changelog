@@ -16,7 +16,11 @@ emacs22 (22.1+1-2) unstable; urgency=low
   * Incorporate upstream fixes to Emacs manpage.  Thanks to Sven Joachim
     <sven_joachim@web.de>.(closes: #432732) [rlb]
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 21 Aug 2007 21:36:19 -0700
+  * Symlink etc/COPYING and lisp/COPYING to
+    /usr/share/common-licenses/GPL-2.  Thanks to Milan Zamazal
+    <pdm@debian.org> for the report.  (closes: #436810) [rlb]
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 21 Aug 2007 22:29:09 -0700
 
 emacs22 (22.1+1-1) unstable; urgency=low
 

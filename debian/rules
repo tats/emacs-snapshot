@@ -708,12 +708,14 @@ install: debian/stamp/build $(autogen_install_files)
 	perl -pi -e "s|man1/etags\\.1|man1/etags\\.1$(flavor)|" \
 	  $(pkgdir_common)/usr/share/man/man1/ctags.1$(flavor)
 
-        # Remove extra license files
+        # At least etc/COPYING is needed by M-x describe-copying.
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
-
-	dh_link -p$(flavor)-common \
-	  usr/share/emacs/$(runtime_ver)/etc usr/share/doc/$(flavor)-common/etc
+	diff -q COPYING /usr/share/common-licenses/GPL-2
+	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-2 \
+	  usr/share/emacs/$(runtime_ver)/etc/COPYING
+	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-2 \
+	  usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
         # Install replacements for non-free files that can be reached
         # through C-h
