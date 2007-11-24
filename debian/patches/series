@@ -1,4 +1,5 @@
 fix-emacs-manpage.diff
+fix-local-variables-risk-cve-2007-5795.diff
 fix-bitmap-icon-arg.diff
 debian-site-init-el.diff
 debian-startup.diff
