@@ -12,4 +12,5 @@ require-movemail-use-liblockfile.diff
 avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
 support-gnu-kfreebsd.diff
+fix-format-overflow-cve-2007-6109.diff
 autofiles.diff
