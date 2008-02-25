@@ -11,4 +11,5 @@ fix-cc-mode-local-vars.diff
 require-movemail-use-liblockfile.diff
 avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
+support-gnu-kfreebsd.diff
 autofiles.diff

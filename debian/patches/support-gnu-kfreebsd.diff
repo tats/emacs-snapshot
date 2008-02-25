@@ -1,0 +1,45 @@
+* Support for GNU/kFreeBSD has been added.
+  Patch: support-gnu-kfreebsd.diff
+  Provided-by: Petr Salinger <Petr.Salinger@seznam.cz>
+  Date: Tue, 13 Nov 2007 23:41:25 +0100 (CET)
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+
+Index: sid/configure.in
+===================================================================
+--- sid.orig/configure.in
++++ sid/configure.in
+@@ -249,6 +249,19 @@
+     esac
+   ;;
+ 
++  ## FreeBSD kenrel + glibc based userland
++  *-*-kfreebsd*gnu* )
++    opsys=gnu-kfreebsd
++    case "${canonical}" in
++      alpha*-*-kfreebsd*)	machine=alpha ;;
++      ia64-*-kfreebsd*)	machine=ia64 ;;
++      sparc64-*-kfreebsd*)	machine=sparc ;;
++      powerpc-*-kfreebsd*)	machine=macppc ;;
++      i[3456]86-*-kfreebsd*)	machine=intel386 ;;
++      amd64-*-kfreebsd*|x86_64-*-kfreebsd*) machine=amdx86-64 ;;
++    esac
++  ;;
++
+   ## NetBSD ports
+   *-*-netbsd* )
+     opsys=netbsd
+Index: sid/src/s/gnu-kfreebsd.h
+===================================================================
+--- /dev/null
++++ sid/src/s/gnu-kfreebsd.h
+@@ -0,0 +1,10 @@
++
++#include "gnu-linux.h"
++
++/* SYSTEM_TYPE should indicate the kind of system you are using.
++ It sets the Lisp variable system-type.  */
++#undef SYSTEM_TYPE
++#define SYSTEM_TYPE "gnu/kfreebsd"		/* All the best software is free. */
++
++#define NO_TERMIO	/* use only <termios.h> */
++
