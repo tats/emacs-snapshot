@@ -1,5 +1,0 @@
-#!/bin/sh
-
-# Dummy script to fool emacs install into thinking it did something useful.
-
-exit 0

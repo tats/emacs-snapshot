@@ -303,7 +303,7 @@ endef
 # INSTALL_STRIP="-s" to the make vars below.
 
 emacs_inst = (cd debian/$(1) && \
-  PATH=$(CURDIR)/debian/bin/info:$(PATH) $(MAKE) install \
+  $(MAKE) install \
     DESTDIR=$(2) \
     infodir=/usr/share/info/emacs-$(major_ver) \
     localstatedir=/var \
@@ -562,7 +562,6 @@ debian/stamp/setup: debian/stamp/patch
 	$(checkdir)
 	cp /usr/share/misc/config.sub .
 	cp /usr/share/misc/config.guess .
-	$(pf); find debian/bin -type f | xargs chmod 775
 	mkdir -p $(dir $@) && touch $@
 
 # common configure flags

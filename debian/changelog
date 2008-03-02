@@ -16,7 +16,9 @@ emacs22 (22.1+1-3) unstable; urgency=low
     (#455432) and a bug introduced by an incomplete initial patch
     (#456235).
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 24 Feb 2008 21:52:24 -0800
+  * Don't override install-info anymore. (closes: #438695)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Mar 2008 10:55:51 -0800
 
 emacs22 (22.1+1-2) unstable; urgency=low
 
