@@ -13,4 +13,5 @@ avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
 support-gnu-kfreebsd.diff
 fix-format-overflow-cve-2007-6109.diff
+fix-auto-save-file-name.diff
 autofiles.diff
