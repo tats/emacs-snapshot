@@ -14,4 +14,5 @@ version-mention-debian.diff
 support-gnu-kfreebsd.diff
 fix-format-overflow-cve-2007-6109.diff
 fix-auto-save-file-name.diff
+fix-switch-to-buffer-other-frame.diff
 autofiles.diff

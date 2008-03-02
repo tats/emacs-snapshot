@@ -1,0 +1,40 @@
+* The switch-to-buffer-other-frame function now returns the new buffer.
+  Patch: fix-switch-to-buffer-other-frame.diff
+  Provided-by: Sven Joachim <svenjoac@gmx.de>
+  Date: Sun, 23 Dec 2007 17:44:08 +0100
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: merged upstream
+
+  This also means that find-file-read-only-other-frame will now
+  correctly mark the new buffer as read only.
+
+  Upstream changelog entry:
+
+  2007-12-23  Andreas Schwab  <schwab@suse.de>
+
+        * files.el (switch-to-buffer-other-frame): Return the buffer
+        switched to.
+
+Index: sid/lisp/files.el
+===================================================================
+--- sid.orig/lisp/files.el
++++ sid/lisp/files.el
+@@ -1006,14 +1006,16 @@
+   "Switch to buffer BUFFER in another frame.
+ Optional second arg NORECORD non-nil means
+ do not put this buffer at the front of the list of recently selected ones.
++This function returns the buffer it switched to.
+ 
+ This uses the function `display-buffer' as a subroutine; see its
+ documentation for additional customization information."
+   (interactive "BSwitch to buffer in other frame: ")
+   (let ((pop-up-frames t)
+ 	same-window-buffer-names same-window-regexps)
+-    (pop-to-buffer buffer t norecord)
+-    (raise-frame (window-frame (selected-window)))))
++    (prog1
++	(pop-to-buffer buffer t norecord)
++      (raise-frame (window-frame (selected-window))))))
+ 
+ (defun display-buffer-other-frame (buffer)
+   "Switch to buffer BUFFER in another frame.
