@@ -1,9 +1,3 @@
-@c -*-texinfo-*-
-@setfilename ../info/gpl
-
-@node GPL, Tips, GNU Free Documentation License, Top
-@comment  node-name,  next,  previous,  up
-@appendix GNU General Public License
 @c The GNU General Public License.
 @center Version 3, 29 June 2007
 
@@ -723,5 +717,5 @@ the GNU Lesser General Public License instead of this License.  But
 first, please read @url{http://www.gnu.org/philosophy/why-not-lgpl.html}.
 
 @ignore
-   arch-tag: d00ac830-e120-41fb-bbc5-7ca3eeaa227f
+   arch-tag: 0c4a2556-f87e-464f-9b1d-efd920fcaf67
 @end ignore
