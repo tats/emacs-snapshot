@@ -1,6 +1,6 @@
 emacs22 (22.2+1-1) unstable; urgency=low
 
-  * New upstream release. (closes: #473021)
+  * New upstream release. (closes: #473021, #474271)
 
   * Move dired-x.texi to the non-DFSG package because the license has
     changed.
@@ -9,7 +9,7 @@ emacs22 (22.2+1-1) unstable; urgency=low
 
   * Update debian/dfsg-splitter for new upstream release.
 
- --
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 10 Apr 2008 18:36:00 -0700
 
 emacs22 (22.1+1-3) unstable; urgency=low
 
