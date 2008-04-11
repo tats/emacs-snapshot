@@ -9,7 +9,10 @@ emacs22 (22.2+1-1) unstable; urgency=low
 
   * Update debian/dfsg-splitter for new upstream release.
 
- -- Rob Browning <rlb@defaultvalue.org>  Thu, 10 Apr 2008 18:36:00 -0700
+  * Add libgif-dev to debian/control.  Thanks to Sven Joachim
+    <svenjoac@gmx.de>.  (closes: #472419)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 10 Apr 2008 18:41:02 -0700
 
 emacs22 (22.1+1-3) unstable; urgency=low
 
