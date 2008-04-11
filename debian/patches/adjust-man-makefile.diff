@@ -9,12 +9,7 @@ Index: sid-non-dfsg/man/Makefile.in
 ===================================================================
 --- sid-non-dfsg.orig/man/Makefile.in
 +++ sid-non-dfsg/man/Makefile.in
-@@ -34,19 +34,19 @@
- # Use --force so that it generates output even if there are errors.
- MAKEINFO = makeinfo --force
- INFO_TARGETS = ../info/emacs ../info/ccmode ../info/cl \
--	        ../info/dired-x ../info/ediff ../info/forms ../info/gnus \
-+	        ../info/ediff ../info/forms ../info/gnus \
+@@ -38,7 +38,7 @@
  		../info/message ../info/sieve ../info/pgg ../info/emacs-mime \
  		../info/info ../info/mh-e ../info/reftex \
  		../info/sc ../info/vip ../info/viper ../info/widget \
@@ -23,9 +18,8 @@ Index: sid-non-dfsg/man/Makefile.in
  		../info/idlwave ../info/eudc ../info/ebrowse ../info/pcl-cvs \
  		../info/woman ../info/eshell ../info/org ../info/url \
  		../info/speedbar ../info/tramp ../info/ses ../info/smtpmail \
- 		../info/flymake ../info/newsticker ../info/rcirc ../info/erc
--DVI_TARGETS = 	emacs.dvi calc.dvi cc-mode.dvi cl.dvi dired-x.dvi \
-+DVI_TARGETS = 	emacs.dvi calc.dvi cc-mode.dvi cl.dvi \
+@@ -46,7 +46,7 @@
+ DVI_TARGETS = 	emacs.dvi calc.dvi cc-mode.dvi cl.dvi dired-x.dvi \
  		 ediff.dvi forms.dvi gnus.dvi message.dvi emacs-mime.dvi \
                   gnus.dvi message.dvi sieve.dvi pgg.dvi mh-e.dvi \
 -		 reftex.dvi sc.dvi vip.dvi viper.dvi widget.dvi faq.dvi \
@@ -33,19 +27,7 @@ Index: sid-non-dfsg/man/Makefile.in
  		 ada-mode.dvi autotype.dvi idlwave.dvi eudc.dvi ebrowse.dvi \
  		 pcl-cvs.dvi woman.dvi eshell.dvi org.dvi url.dvi \
  		 speedbar.dvi tramp.dvi ses.dvi smtpmail.dvi flymake.dvi \
-@@ -179,11 +179,6 @@
- cl.dvi: cl.texi
- 	$(ENVADD) $(TEXI2DVI) ${srcdir}/cl.texi
- 
--../info/dired-x: dired-x.texi
--	cd $(srcdir); $(MAKEINFO) dired-x.texi
--dired-x.dvi: dired-x.texi
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/dired-x.texi
--
- ../info/ediff: ediff.texi
- 	cd $(srcdir); $(MAKEINFO) ediff.texi
- ediff.dvi: ediff.texi
-@@ -256,11 +251,6 @@
+@@ -256,11 +256,6 @@
  widget.dvi: widget.texi
  	$(ENVADD) $(TEXI2DVI) ${srcdir}/widget.texi
  

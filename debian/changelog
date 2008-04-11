@@ -1,3 +1,11 @@
+emacs22-non-dfsg (22.2+1-1) unstable; urgency=low
+
+  * New upstream release.
+
+  * Move dired-x.texi to this package since the license has changed.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 10 Apr 2008 18:57:47 -0700
+
 emacs22-non-dfsg (22.1+1-1) unstable; urgency=low
 
   * New upstream release. [rlb]

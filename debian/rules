@@ -137,6 +137,7 @@ main_dir_info_files := \
   calc \
   ccmode \
   cl \
+  dired-x \
   ebrowse \
   ediff \
   eintr \
