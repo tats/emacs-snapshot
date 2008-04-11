@@ -22,7 +22,7 @@ Index: sid/lisp/help.el
 ===================================================================
 --- sid.orig/lisp/help.el
 +++ sid/lisp/help.el
-@@ -279,6 +279,14 @@
+@@ -281,6 +281,14 @@
  
  ;;; `User' help functions
  
@@ -37,20 +37,20 @@ Index: sid/lisp/help.el
  (defun describe-distribution ()
    "Display info on how to obtain the latest version of GNU Emacs."
    (interactive)
-@@ -293,7 +301,7 @@
- (defun describe-project ()
+@@ -295,7 +303,7 @@
+ (defun describe-gnu-project ()
    "Display info on the GNU project."
    (interactive)
 -  (view-file (expand-file-name "THE-GNU-PROJECT" data-directory))
 +  (view-file (debian-expand-file-name-dfsg "THE-GNU-PROJECT" data-directory))
    (goto-char (point-min)))
  
- (defun describe-no-warranty ()
+ (define-obsolete-function-alias 'describe-project 'describe-gnu-project "22.2")
 Index: sid/Makefile.in
 ===================================================================
 --- sid.orig/Makefile.in
 +++ sid/Makefile.in
-@@ -138,11 +138,7 @@
+@@ -139,11 +139,7 @@
  # since there are now many packages documented with the texinfo
  # system, it is inappropriate to imply that it is part of Emacs.
  infodir=@infodir@
@@ -59,11 +59,11 @@ Index: sid/Makefile.in
 -           forms gnus idlwave info message mh-e newsticker org pcl-cvs \
 -           pgg reftex sc ses sieve speedbar tramp vip viper widget     \
 -           woman smtpmail url rcirc erc
-+INFO_FILES=dired-x efaq
++INFO_FILES=efaq
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -250,7 +246,7 @@
+@@ -251,7 +247,7 @@
  SUBDIR = lib-src src
  
  # The makefiles of the directories in $SUBDIR.
@@ -72,7 +72,7 @@ Index: sid/Makefile.in
  
  # Subdirectories to install, and where they'll go.
  # lib-src's makefile knows how to install it, so we don't do that here.
-@@ -339,12 +335,6 @@
+@@ -340,12 +336,6 @@
  man/Makefile: $(srcdir)/man/Makefile.in config.status
  	./config.status
  
@@ -85,7 +85,7 @@ Index: sid/Makefile.in
  oldXMenu/Makefile: $(srcdir)/oldXMenu/Makefile.in config.status
  	./config.status
  
-@@ -616,8 +606,6 @@
+@@ -617,8 +607,6 @@
  	(cd lwlib;    $(MAKE) $(MFLAGS) mostlyclean)
  	(cd lib-src;  $(MAKE) $(MFLAGS) mostlyclean)
  	-(cd man &&   $(MAKE) $(MFLAGS) mostlyclean)
@@ -94,7 +94,7 @@ Index: sid/Makefile.in
  	(cd leim;     $(MAKE) $(MFLAGS) mostlyclean)
  
  ### `clean'
-@@ -634,8 +622,6 @@
+@@ -635,8 +623,6 @@
  	(cd lwlib;    $(MAKE) $(MFLAGS) clean)
  	(cd lib-src;  $(MAKE) $(MFLAGS) clean)
  	-(cd man &&   $(MAKE) $(MFLAGS) clean)
@@ -103,7 +103,7 @@ Index: sid/Makefile.in
  	(cd leim;     $(MAKE) $(MFLAGS) clean)
  
  ### `distclean'
-@@ -654,8 +640,6 @@
+@@ -655,8 +641,6 @@
  	(cd lwlib;    $(MAKE) $(MFLAGS) distclean)
  	(cd lib-src;  $(MAKE) $(MFLAGS) distclean)
  	(cd man &&    $(MAKE) $(MFLAGS) distclean)
@@ -112,7 +112,7 @@ Index: sid/Makefile.in
  	(cd leim;     $(MAKE) $(MFLAGS) distclean)
  	(cd lisp;     $(MAKE) $(MFLAGS) distclean)
  	${top_distclean}
-@@ -677,8 +661,6 @@
+@@ -678,8 +662,6 @@
  	(cd lwlib;    $(MAKE) $(MFLAGS) maintainer-clean)
  	(cd lib-src;  $(MAKE) $(MFLAGS) maintainer-clean)
  	-(cd man &&   $(MAKE) $(MFLAGS) maintainer-clean)
@@ -121,7 +121,7 @@ Index: sid/Makefile.in
  	(cd leim;     $(MAKE) $(MFLAGS) maintainer-clean)
  	(cd lisp;     $(MAKE) $(MFLAGS) maintainer-clean)
  	${top_distclean}
-@@ -716,8 +698,6 @@
+@@ -717,8 +699,6 @@
  	(cd lisp; $(MAKE) $(MFLAGS) unlock)
  	(cd lisp/term; chmod u+w README *.el)
  	(cd man; chmod u+w *texi* ChangeLog split-man)
@@ -130,7 +130,7 @@ Index: sid/Makefile.in
  	(cd oldXMenu; chmod u+w *.[ch] Makefile README)
  	(cd lwlib; chmod u+w *.[ch] Makefile README)
  	(cd src; $(MAKE) $(MFLAGS) unlock)
-@@ -730,8 +710,6 @@
+@@ -731,8 +711,6 @@
  	(cd lisp; $(MAKE) $(MFLAGS) relock)
  	(cd lisp/term; chmod u+w README *.el)
  	(cd man; chmod u+w *texi* ChangeLog split-man)
@@ -139,7 +139,7 @@ Index: sid/Makefile.in
  	(cd oldXMenu; chmod u+w *.[ch] Makefile README)
  	(cd lwlib; chmod u+w *.[ch] Makefile README)
  	(cd src; $(MAKE) $(MFLAGS) relock)
-@@ -754,12 +732,8 @@
+@@ -755,12 +733,8 @@
  # so we can do ok running make in the build dir.
  info: force-info
  	-(cd man; $(MAKE) $(MFLAGS) info)
@@ -152,7 +152,7 @@ Index: sid/Makefile.in
  
  #### Bootstrapping.
  
-@@ -809,6 +783,4 @@
+@@ -810,6 +784,4 @@
  	(cd lwlib;    $(MAKE) $(MFLAGS) clean)
  	(cd lib-src;  $(MAKE) $(MFLAGS) clean)
  	-(cd man &&   $(MAKE) $(MFLAGS) clean)
@@ -185,12 +185,12 @@ Index: sid/man/Makefile.in
 -		 pcl-cvs.dvi woman.dvi eshell.dvi org.dvi url.dvi \
 -		 speedbar.dvi tramp.dvi ses.dvi smtpmail.dvi flymake.dvi \
 -                 newsticker.dvi emacs-xtra.dvi rcirc.dvi erc.dvi
-+INFO_TARGETS = ../info/dired-x ../info/efaq
-+DVI_TARGETS = dired-x.dvi faq.dvi
++INFO_TARGETS = ../info/efaq
++DVI_TARGETS = faq.dvi
  INFOSOURCES = info.texi
  
  # The following rule does not work with all versions of `make'.
-@@ -61,64 +45,6 @@
+@@ -61,65 +45,6 @@
  TEXI2DVI = texi2dvi
  ENVADD = TEXINPUTS="$(srcdir):$(TEXINPUTS)" MAKEINFO="$(MAKEINFO) -I$(srcdir)"
  
@@ -209,6 +209,7 @@ Index: sid/man/Makefile.in
 -EMACSSOURCES= \
 -	${srcdir}/emacs.texi \
 -	${srcdir}/doclicense.texi \
+-	${srcdir}/gpl.texi \
 -	${srcdir}/screen.texi \
 -	${srcdir}/commands.texi \
 -	${srcdir}/entering.texi \
@@ -255,7 +256,7 @@ Index: sid/man/Makefile.in
  info: $(top_srcdir)/info $(INFO_TARGETS)
  
  $(top_srcdir)/info:
-@@ -131,222 +57,16 @@
+@@ -132,222 +57,11 @@
  # to exist in the build directory.
  # In a distribution of Emacs, the Info files should be up to date.
  
@@ -307,11 +308,11 @@ Index: sid/man/Makefile.in
 -cl.dvi: cl.texi
 -	$(ENVADD) $(TEXI2DVI) ${srcdir}/cl.texi
 -
- ../info/dired-x: dired-x.texi
- 	cd $(srcdir); $(MAKEINFO) dired-x.texi
- dired-x.dvi: dired-x.texi
- 	$(ENVADD) $(TEXI2DVI) ${srcdir}/dired-x.texi
- 
+-../info/dired-x: dired-x.texi
+-	cd $(srcdir); $(MAKEINFO) dired-x.texi
+-dired-x.dvi: dired-x.texi
+-	$(ENVADD) $(TEXI2DVI) ${srcdir}/dired-x.texi
+-
 -../info/ediff: ediff.texi
 -	cd $(srcdir); $(MAKEINFO) ediff.texi
 -ediff.dvi: ediff.texi
@@ -345,7 +346,7 @@ Index: sid/man/Makefile.in
 -	$(ENVADD) $(TEXI2DVI) ${srcdir}/sieve.texi
 -
 -../info/emacs-mime: emacs-mime.texi
--	cd $(srcdir); $(MAKEINFO) emacs-mime.texi
+-	cd $(srcdir); $(MAKEINFO) --enable-encoding emacs-mime.texi
 -emacs-mime.dvi: emacs-mime.texi
 -	$(ENVADD) $(TEXI2DVI) ${srcdir}/emacs-mime.texi
 -
@@ -482,7 +483,7 @@ Index: sid/configure.in
 ===================================================================
 --- sid.orig/configure.in
 +++ sid/configure.in
-@@ -3305,7 +3305,7 @@
+@@ -3346,7 +3346,7 @@
  
  AC_OUTPUT(Makefile lib-src/Makefile.c:lib-src/Makefile.in oldXMenu/Makefile \
  	man/Makefile lwlib/Makefile src/Makefile.c:src/Makefile.in \

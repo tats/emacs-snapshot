@@ -7,7 +7,7 @@ Index: sid/lisp/version.el
 ===================================================================
 --- sid.orig/lisp/version.el
 +++ sid/lisp/version.el
-@@ -55,8 +55,8 @@
+@@ -58,8 +58,8 @@
    (interactive "P")
    (let ((version-string
           (format (if (not (interactive-p))

@@ -199,7 +199,6 @@ protected_files := \
 
 # Info files that are going to show up in the main dir.
 main_dir_info_files := \
-  dired-x \
   efaq
 
 # Files that the build stage depends on (may also be listed in other vars).
@@ -617,6 +616,8 @@ debian/stamp/build: debian/stamp/configure $(autogen_build_files)
 	$(checkdir)
         # first build has to be a bootstrap build
 	cd debian/build-x && $(build_cmd) bootstrap
+	cd debian/build-x && $(build_cmd) clean
+	cd debian/build-x && $(build_cmd)
 	cd debian/build-nox && $(build_cmd)
 	cd debian/build-gtk && $(build_cmd)
 	mkdir -p debian/stamp && touch $@
@@ -710,10 +711,9 @@ install: debian/stamp/build $(autogen_install_files)
         # At least etc/COPYING is needed by M-x describe-copying.
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
-	diff -q COPYING /usr/share/common-licenses/GPL-2
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-2 \
+	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
 	  usr/share/emacs/$(runtime_ver)/etc/COPYING
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-2 \
+	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
 	  usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
         # Install replacements for non-free files that can be reached

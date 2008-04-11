@@ -75,7 +75,7 @@ Index: sid/lisp/gnus/message.el
 ===================================================================
 --- sid.orig/lisp/gnus/message.el
 +++ sid/lisp/gnus/message.el
-@@ -4025,7 +4025,12 @@
+@@ -4026,7 +4026,12 @@
  				     "/usr/lib/sendmail")
  				    ((file-exists-p "/usr/ucblib/sendmail")
  				     "/usr/ucblib/sendmail")

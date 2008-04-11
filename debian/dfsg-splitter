@@ -7,9 +7,9 @@ set -x
 # run the script.  The resulting two orig.tar.gz files will be placed
 # into a new ./split-tmp directory.
 
-emacs_archive_name="emacs-22.1.tar.gz"
-emacs_dir="emacs-22.1"
-emacs_version="22.1"
+emacs_archive_name="emacs-22.2.tar.gz"
+emacs_dir="emacs-22.2"
+emacs_version="22.2"
 emacs_major="22"
 deb_src_rev="1"
 
@@ -112,7 +112,6 @@ copy_to_non_main_dir "lisp/version.el"
 
 # man files which appear to be compatible with the DFSG
 dfsg_man_files="
-  dired-x.texi
   faq.texi"
 
 pushd "${emacs_dir}"

@@ -6,7 +6,7 @@ Index: sid/lisp/vc-hooks.el
 ===================================================================
 --- sid.orig/lisp/vc-hooks.el
 +++ sid/lisp/vc-hooks.el
-@@ -75,8 +75,8 @@
+@@ -77,8 +77,8 @@
    :group 'vc)
  
  (defcustom vc-path

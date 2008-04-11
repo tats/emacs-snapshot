@@ -11,9 +11,9 @@ Index: sid/lisp/startup.el
 ===================================================================
 --- sid.orig/lisp/startup.el
 +++ sid/lisp/startup.el
-@@ -295,6 +295,10 @@
- (defvar pure-space-overflow nil
-   "Non-nil if building Emacs overflowed pure space.")
+@@ -302,6 +302,10 @@
+ Warning Warning!!!  Pure space overflow    !!!Warning Warning
+ \(See the node Pure Storage in the Lisp manual for details.)\n")
  
 +(defconst debian-emacs-flavor 'emacs22
 +  "A symbol representing the particular debian flavor of emacs running.
@@ -22,10 +22,12 @@ Index: sid/lisp/startup.el
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of current directory to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -815,8 +819,21 @@
-     ;; Run the site-start library if it exists.  The point of this file is
-     ;; that it is run before .emacs.  There is no point in doing this after
-     ;; .emacs; that is useless.
+@@ -826,8 +830,21 @@
+     ;; be loaded from site-run-file and wants to test if -q was given
+     ;; should check init-file-user instead, since that is already set.
+     ;; See cus-edit.el for an example.
+-    (if site-run-file
+-	(load site-run-file t t))
 +
 +    ;; Original upstream startup
 +    ;; (if site-run-file
@@ -33,8 +35,7 @@ Index: sid/lisp/startup.el
 +    ;;
 +
 +    ;; Debian startup
-     (if site-run-file
--	(load site-run-file t t))
++     (if site-run-file
 +        (progn
 +          ;; Load all the debian package snippets.
 +          ;; It's in here because we want -q to kill it too.
@@ -44,4 +45,4 @@ Index: sid/lisp/startup.el
 +          (load site-run-file t t nil)))
  
      ;; Sites should not disable this.  Only individuals should disable
-     ;; the startup message.
+     ;; the startup screen.

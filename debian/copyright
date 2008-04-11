@@ -5,7 +5,7 @@ Tue, 16 Dec 1997 00:05:45 -0600.
 
 This is the original source archive:
 
-  prep.ai.mit.edu:/pub/gnu/emacs/emacs-22.1.tar.gz
+  prep.ai.mit.edu:/pub/gnu/emacs/emacs-22.2.tar.gz
 
 Please see /usr/share/doc/emacs22-common/README.Debian.gz for a
 description of the Debian specific differences from the upstream
@@ -31,26 +31,6 @@ Copyright:
   License (GPL).  See the file /usr/share/common-licenses/GPL for more
   information.
 
-  etc/eterm.1 is licensed as follows:
-
-      Copyright (C) 1999, 2001, 2002, 2003, 2004, 2005, 2006, 2007
-      Free Software Foundation, Inc.
-
-      Permission is granted to make and distribute verbatim copies of
-      this document provided the copyright notice and this permission
-      notice are preserved on all copies.
-
-      Permission is granted to copy and distribute modified versions
-      of this document under the conditions for verbatim copying,
-      provided that the entire resulting derived work is distributed
-      under the terms of a permission notice identical to this one.
-
-      Permission is granted to copy and distribute translations of
-      this document into another language, under the above conditions
-      for modified versions, except that this permission notice may be
-      stated in a translation approved by the Free Software
-      Foundation.
-
   etc/emacs.1 is licensed as follows:
 
       Copyright (C) 1995, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
@@ -71,36 +51,6 @@ Copyright:
       stated in a translation approved by the Free Software
       Foundation.
 
-  man/dired-x.texi is licensed as follows:
-
-      Copyright (C) 1993, 1994, 2001, 2002, 2003, 2004,
-      2005, 2006, 2007  Free Software Foundation, Inc.
-
-      Permission is granted to make and distribute verbatim copies of
-      this manual provided the copyright notice and this permission
-      notice are preserved on all copies.
-
-      Permission is granted to copy and distribute modified versions
-      of this manual under the conditions for verbatim copying,
-      provided that the entire resulting derived work is distributed
-      under the terms of a permission notice identical to this one.
-
-      Permission is granted to copy and distribute translations of
-      this manual into another language, under the above conditions
-      for modified versions, except that this permission notice may be
-      stated in a translation approved by the Free Software
-      Foundation.
-
-      The file used to create this is called dired-x.texi, but the
-      original work that was altered to make that file was called
-      dired.texi written by Sebastian Kremer.
-
-      Permission is granted to process this file through TeX and print
-      the results, provided the printed document carries copying
-      permission notice identical to this one except for the removal
-      of this paragraph (this paragraph not being relevant to the
-      printed manual).
- 
   man/faq.texi is licensed as follows:
 
       Copyright (C) 1994,1995,1996,1997,1998,1999,2000 Reuven M. Lerner

@@ -10,15 +10,15 @@ Index: sid/etc/NEWS
 ===================================================================
 --- sid.orig/etc/NEWS
 +++ sid/etc/NEWS
-@@ -35,6 +35,11 @@
- ** cua.el, cua-mode.el: remove old versions.
- 
+@@ -15,6 +15,11 @@
+ You can narrow news to a specific version by calling `view-emacs-news'
+ with a prefix argument or by typing C-u C-h C-n.
  
 +* Debian specific changes to Emacs
 +
 +Please see /usr/share/doc/emacs22-common/README.Debian.gz.
 +
 +
- * Installation Changes in Emacs 22.1
+ * About external Lisp packages
  
- ** You can build Emacs with Gtk+ widgets by specifying `--with-x-toolkit=gtk'
+ When you upgrade to Emacs 22 from a previous version, some older
