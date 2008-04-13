@@ -1,3 +1,11 @@
+emacs22-non-dfsg (22.2+1-2) unstable; urgency=low
+
+  * Add Conflicts and Replaces emacs22-common (<< 22.2) to
+    debian/control.in to handle move of dired-x.  Thanks to Sven Joachim
+    <svenjoac@gmx.de>.  (closes: #475519)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 Apr 2008 16:24:48 -0700
+
 emacs22-non-dfsg (22.2+1-1) unstable; urgency=low
 
   * New upstream release.

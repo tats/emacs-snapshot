@@ -11,6 +11,8 @@ Section: non-free/editors
 Priority: optional
 Architecture: all
 Depends: ${shlibs:Depends}
+Conflicts: emacs22-common (<< 22.2)
+Replaces: emacs22-common (<< 22.2)
 Description: GNU Emacs shared, architecture independent, non-DFSG items
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains the architecture independent infrastructure that is
