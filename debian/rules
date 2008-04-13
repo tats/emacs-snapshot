@@ -337,9 +337,9 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
 	  csplit -s -f emacs-common-non-dfsg.README. \
 	  emacs-common-non-dfsg.README '/@@PATCH_LIST_HERE@@/'
 	cp debian/emacs-common-non-dfsg.README.00 debian/emacs-common-non-dfsg.README.tmp
-	for p in $$(quilt series); do quilt header $$p; done \
+	for p in $$($(quilt) series); do $(quilt) header $$p; done \
 	  >> debian/emacs-common-non-dfsg.README.tmp
-	tail +2 \
+	tail -n +2 \
 	  < debian/emacs-common-non-dfsg.README.01 >> debian/emacs-common-non-dfsg.README.tmp
 	mv debian/emacs-common-non-dfsg.README.tmp $@
 

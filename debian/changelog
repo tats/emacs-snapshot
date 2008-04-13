@@ -4,7 +4,12 @@ emacs22-non-dfsg (22.2+1-2) unstable; urgency=low
     debian/control.in to handle move of dired-x.  Thanks to Sven Joachim
     <svenjoac@gmx.de>.  (closes: #475519)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 Apr 2008 16:24:48 -0700
+  * Use "tail -n +N" rather than "tail +N" in debian/rules.  Thanks to
+    John Zaitseff <J.Zaitseff@zap.org.au>.  (closes: #467525)
+
+  * Fix quilt invocation to create README.Debian correctly.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 Apr 2008 16:35:04 -0700
 
 emacs22-non-dfsg (22.2+1-1) unstable; urgency=low
 
