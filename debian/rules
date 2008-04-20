@@ -90,6 +90,9 @@ minor_ver := $(shell echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
 # Always everything before the last '-'
 debsrc_ver := $(shell echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
 
+# upstream version - the actual upstream version, i.e. 21.4a, minus any +foo
+upstream_ver := $(shell echo $(debsrc_ver) | perl -pe 's/\+[^+]+$$//o')
+
 deb_orig_tgz := $(src_name)_$(debsrc_ver).orig.tar.gz
 # name of the orig_tgz unpack directory
 deb_orig_tgz_dir := emacs-$(runtime_ver)-non-dfsg
@@ -242,6 +245,7 @@ define deb_sub
     -e "s|\@PACKAGE_VERSION\@|$(debian_ver)|go;" \
     -e "s|\@DEBIAN_REV\@|$(deb_rev)|go;" \
     -e "s|\@NOMINAL_VERSION\@|$(nominal_ver)|go;" \
+    -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
     -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
     -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
     -e "s|\@INFOFILES\@|$(main_dir_info_files)|go;" \
@@ -249,6 +253,7 @@ define deb_sub
 endef
 
 check-vars:
+	@echo "upstream_ver: $(upstream_ver)"
 	@echo "debian_ver: $(debian_ver)"
 	@echo "debsrc_ver: $(debsrc_ver)"
 	@echo "debian_rev: $(debian_rev)"

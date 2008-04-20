@@ -4,7 +4,9 @@ emacs22-non-dfsg (22.2+2-1) unstable; urgency=low
     DFSG compatible.  Thanks to Peter S Galbraith
     <psg@debian.org>. (closes: #433953)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 20 Apr 2008 13:34:03 -0700
+  * Fix upstream archive name in debian/copyright.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 20 Apr 2008 14:09:57 -0700
 
 emacs22-non-dfsg (22.2+1-2) unstable; urgency=low
 
