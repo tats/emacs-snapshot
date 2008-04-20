@@ -156,7 +156,6 @@ main_dir_info_files := \
   idlwave \
   info \
   message \
-  mh-e \
   newsticker \
   org \
   pcl-cvs \
