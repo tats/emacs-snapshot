@@ -199,7 +199,8 @@ protected_files := \
 
 # Info files that are going to show up in the main dir.
 main_dir_info_files := \
-  efaq
+  efaq \
+  mh-e
 
 # Files that the build stage depends on (may also be listed in other vars).
 persistent_autogen_build_files := debian/control debian/copyright
