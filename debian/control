@@ -71,7 +71,8 @@ Priority: optional
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.9.0), ${shlibs:Depends}
 Suggests: emacs22-el, emacs22-common-non-dfsg
-Conflicts: emacs22-el (<< ${Source-Version}), w3-el
+Conflicts: emacs22-el (<< ${Source-Version}), w3-el, emacs22-common-non-dfsg (<< 22.2+2-1)
+Replaces: emacs22-common (<< 22.2), emacs22-common-non-dfsg (<< 22.2+2-1)
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure

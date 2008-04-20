@@ -59,7 +59,7 @@ Index: sid/Makefile.in
 -           forms gnus idlwave info message mh-e newsticker org pcl-cvs \
 -           pgg reftex sc ses sieve speedbar tramp vip viper widget     \
 -           woman smtpmail url rcirc erc
-+INFO_FILES=efaq
++INFO_FILES=efaq mh-e
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
@@ -185,8 +185,8 @@ Index: sid/man/Makefile.in
 -		 pcl-cvs.dvi woman.dvi eshell.dvi org.dvi url.dvi \
 -		 speedbar.dvi tramp.dvi ses.dvi smtpmail.dvi flymake.dvi \
 -                 newsticker.dvi emacs-xtra.dvi rcirc.dvi erc.dvi
-+INFO_TARGETS = ../info/efaq
-+DVI_TARGETS = faq.dvi
++INFO_TARGETS = ../info/efaq ../info/mh-e
++DVI_TARGETS = faq.dvi mh-e.dvi
  INFOSOURCES = info.texi
  
  # The following rule does not work with all versions of `make'.
@@ -256,7 +256,7 @@ Index: sid/man/Makefile.in
  info: $(top_srcdir)/info $(INFO_TARGETS)
  
  $(top_srcdir)/info:
-@@ -132,222 +57,11 @@
+@@ -132,222 +57,16 @@
  # to exist in the build directory.
  # In a distribution of Emacs, the Info files should be up to date.
  
@@ -355,11 +355,11 @@ Index: sid/man/Makefile.in
 -pgg.dvi: pgg.texi
 -	$(ENVADD) $(TEXI2DVI) ${srcdir}/pgg.texi
 -
--../info/mh-e: mh-e.texi
--	cd $(srcdir); $(MAKEINFO) mh-e.texi
--mh-e.dvi: mh-e.texi
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/mh-e.texi
--
+ ../info/mh-e: mh-e.texi
+ 	cd $(srcdir); $(MAKEINFO) mh-e.texi
+ mh-e.dvi: mh-e.texi
+ 	$(ENVADD) $(TEXI2DVI) ${srcdir}/mh-e.texi
+ 
 -../info/reftex: reftex.texi
 -	cd $(srcdir); $(MAKEINFO) reftex.texi
 -reftex.dvi: reftex.texi

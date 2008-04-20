@@ -11,7 +11,7 @@ emacs_archive_name="emacs-22.2.tar.gz"
 emacs_dir="emacs-22.2"
 emacs_version="22.2"
 emacs_major="22"
-deb_src_rev="1"
+deb_src_rev="2"
 
 non_main_dir="${emacs_dir}-non-dfsg"
 
@@ -112,7 +112,8 @@ copy_to_non_main_dir "lisp/version.el"
 
 # man files which appear to be compatible with the DFSG
 dfsg_man_files="
-  faq.texi"
+  faq.texi
+  mh-e.texi"
 
 pushd "${emacs_dir}"
 mkdir ../"${non_main_dir}"/man

@@ -1,3 +1,14 @@
+emacs22 (22.2+2-1) unstable; urgency=low
+
+  * Move mh-e.texi here from the non-DFSG package because the license does
+    appear to be DFSG compatible.  Thanks to Peter S Galbraith
+    <psg@debian.org>. (closes: #433953)
+
+  * Add Conflicts and Replaces emacs22-common-non-dfsg (<< 22.2+1-2) to
+    debian/control.in to handle move of mh-e.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 20 Apr 2008 13:25:33 -0700
+
 emacs22 (22.2+1-1) unstable; urgency=low
 
   * New upstream release. (closes: #473021, #474271)
