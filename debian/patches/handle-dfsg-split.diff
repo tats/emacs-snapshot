@@ -29,7 +29,7 @@ Index: sid/lisp/help.el
 +(defun debian-expand-file-name-dfsg (filename)
 +  "Apply expand-file-name to FILENAME.
 +If expand-file-name does not find a file, append `.dfsg' and try again."
-+  (let ((file (expand-file-name file data-directory)))
++  (let ((file (expand-file-name filename data-directory)))
 +    (if (file-exists-p file)
 +        file
 +      (expand-file-name (concat file ".dfsg") data-directory))))
@@ -42,7 +42,7 @@ Index: sid/lisp/help.el
    "Display info on the GNU project."
    (interactive)
 -  (view-file (expand-file-name "THE-GNU-PROJECT" data-directory))
-+  (view-file (debian-expand-file-name-dfsg "THE-GNU-PROJECT" data-directory))
++  (view-file (debian-expand-file-name-dfsg "THE-GNU-PROJECT"))
    (goto-char (point-min)))
  
  (define-obsolete-function-alias 'describe-project 'describe-gnu-project "22.2")

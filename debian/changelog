@@ -1,3 +1,11 @@
+emacs22 (22.2+2-2) unstable; urgency=low
+
+  * Fix debian-expand-file-name-dfsg and describe-gnu-project (C-h C-p).
+    Thanks to Valery V. Vorotyntsev <valery.vv@gmail.com>.
+    (closes: #448391, #477215)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 26 Apr 2008 20:15:07 -0700
+
 emacs22 (22.2+2-1) unstable; urgency=low
 
   * Move mh-e.texi here from the non-DFSG package because the license does
