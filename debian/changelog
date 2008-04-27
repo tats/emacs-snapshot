@@ -1,10 +1,14 @@
-emacs22 (22.2+2-2) unstable; urgency=low
+emacs22 (22.2+2-2) unstable; urgency=medium
 
   * Fix debian-expand-file-name-dfsg and describe-gnu-project (C-h C-p).
     Thanks to Valery V. Vorotyntsev <valery.vv@gmail.com>.
     (closes: #448391, #477215)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 26 Apr 2008 20:15:07 -0700
+  * Fix an insecurity in vcdiff's temporary file handling
+    (CVE-2008-1694). Thanks to Moritz Muehlenhoff <jmm@debian.org> and
+    Steve Grubb. (closes: #476611)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 26 Apr 2008 22:02:40 -0700
 
 emacs22 (22.2+2-1) unstable; urgency=low
 

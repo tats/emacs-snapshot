@@ -7,4 +7,5 @@ fix-vc-path.diff
 require-movemail-use-liblockfile.diff
 avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
+fix-vcdiff-tmp-file-handling-cve-2008-1694.diff
 autofiles.diff
