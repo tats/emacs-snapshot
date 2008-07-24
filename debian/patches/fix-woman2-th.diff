@@ -1,0 +1,27 @@
+* WoMan should now handle various manpages without raising an error.
+  Patch: fix-woman2-th.diff
+  Provided-by: Sven Joachim <svenjoac@gmx.de>
+  Date: Tue, 15 Apr 2008 09:42:31 +0200
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: incorporated upstream
+
+  WoMan should now correctly handle a number of manpages which
+  previously caused it to raise an error.
+
+Index: sid/lisp/woman.el
+===================================================================
+--- sid.orig/lisp/woman.el
++++ sid/lisp/woman.el
+@@ -3810,10 +3810,9 @@
+       (insert " -- ")
+       (woman-forward-arg 'unquote 'concat)
+       ;; Delete repeated arguments:
+-      (if (string-match (buffer-substring here (point))
++      (if (string-equal (buffer-substring here (point))
+ 			(buffer-substring start here))
+-	  (delete-region here (point)))
+-      ))
++	  (delete-region here (point)))))
+   ;; Embolden heading (point is at end of heading):
+   (woman-set-face
+    (save-excursion (beginning-of-line) (point)) (point) 'woman-bold)

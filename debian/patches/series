@@ -11,4 +11,5 @@ fix-vcdiff-tmp-file-handling-cve-2008-1694.diff
 make-fast-lock-cache-directories-risky-cve-2008-2142.diff
 fix-mule-select-safe-coding.diff
 look-for-news-to-find-etc.diff
+fix-woman2-th.diff
 autofiles.diff
