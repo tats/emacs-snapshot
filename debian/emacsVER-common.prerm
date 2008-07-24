@@ -19,7 +19,6 @@ set +e
 # Only remove these directories if they're empty.
 rmdir /usr/local/share/emacs/${FULL}/site-lisp 2>/dev/null
 rmdir /usr/local/share/emacs/${FULL} 2>/dev/null
-rmdir /usr/local/share/emacs/site-lisp 2>/dev/null
 set -e
 
 #DEBHELPER#

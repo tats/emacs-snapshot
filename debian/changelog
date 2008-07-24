@@ -4,7 +4,11 @@ emacs22 (22.2+2-3) unstable; urgency=low
     (CVE-2008-2142).  Thanks to   Provided-by: Sven Joachim <svenjoac@gmx.de>
     and Morten Welinder <mwelinder@gmail.com>. (closes: #480885)
 
- --
+  * Don't remove /usr/local/share/emacs/site-lisp in emacs22-common.
+    Leave that up to emacsen-common.  Thanks to Sven Joachim
+    <svenjoac@gmx.de>. (closes: #490524)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 23 Jul 2008 19:31:57 -0700
 
 emacs22 (22.2+2-2) unstable; urgency=medium
 
