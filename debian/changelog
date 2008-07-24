@@ -8,7 +8,12 @@ emacs22 (22.2+2-3) unstable; urgency=low
     Leave that up to emacsen-common.  Thanks to Sven Joachim
     <svenjoac@gmx.de>. (closes: #490524)
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 23 Jul 2008 19:31:57 -0700
+  * Don't prematurely raise an error when trying to save a non-ASCII
+    buffer when select-safe-coding-system-accept-default-p is set to a
+    function.  Thanks to Jun Inoue <jun.lambda@gmail.com>.
+    (closes: #488427)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 23 Jul 2008 19:58:11 -0700
 
 emacs22 (22.2+2-2) unstable; urgency=medium
 

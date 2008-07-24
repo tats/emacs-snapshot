@@ -9,4 +9,5 @@ avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
 fix-vcdiff-tmp-file-handling-cve-2008-1694.diff
 make-fast-lock-cache-directories-risky-cve-2008-2142.diff
+fix-mule-select-safe-coding.diff
 autofiles.diff

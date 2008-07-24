@@ -1,0 +1,25 @@
+* A problem with saving non-ASCII buffers has been fixed.
+  Patch: fix-mule-select-safe-coding.diff
+  Provided-by: Jun Inoue <jun.lambda@gmail.com>
+  Date: Sun, 29 Jun 2008 05:07:24 +0900
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: incorporated upstream
+
+  Previously, Emacs would raise an error if even one coding system was
+  rejected when trying to save a buffer containing non-ASCII text when
+  select-safe-coding-system-accept-default-p was set to a function.
+  Now Emacs should continue.
+
+Index: sid/lisp/international/mule-cmds.el
+===================================================================
+--- sid.orig/lisp/international/mule-cmds.el
++++ sid/lisp/international/mule-cmds.el
+@@ -733,7 +733,7 @@
+ 	    (let ((pos (point))
+ 		  (fill-prefix "  "))
+ 	      (dolist (x (append rejected unsafe))
+-		(princ "  ") (princ (car x)))
++		(princ "  ") (princ x))
+ 	      (insert "\n")
+ 	      (fill-region-as-paragraph pos (point)))
+ 	    (when rejected
