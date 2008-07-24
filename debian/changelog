@@ -1,4 +1,4 @@
-emacs22 (22.2+2-3) unstable; urgency=low
+emacs22 (22.2+2-3) unstable; urgency=medium
 
   * Fix an insecurity related to fast-lock-cache-directories
     (CVE-2008-2142).  Thanks to   Provided-by: Sven Joachim <svenjoac@gmx.de>
@@ -13,7 +13,11 @@ emacs22 (22.2+2-3) unstable; urgency=low
     function.  Thanks to Jun Inoue <jun.lambda@gmail.com>.
     (closes: #488427)
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 23 Jul 2008 19:58:11 -0700
+  * Don't look for GNU to find etc/.  Look for NEWS instead.  Thanks to
+    "Bernhard Michler" <Boregard@gmx.net> for the report and Sven Joachim
+    <svenjoac@gmx.de> for the fix. (closes: #478240)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 23 Jul 2008 20:32:25 -0700
 
 emacs22 (22.2+2-2) unstable; urgency=medium
 
