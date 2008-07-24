@@ -1,3 +1,11 @@
+emacs22 (22.2+2-3) unstable; urgency=low
+
+  * Fix an insecurity related to fast-lock-cache-directories
+    (CVE-2008-2142).  Thanks to   Provided-by: Sven Joachim <svenjoac@gmx.de>
+    and Morten Welinder <mwelinder@gmail.com>. (closes: #480885)
+
+ --
+
 emacs22 (22.2+2-2) unstable; urgency=medium
 
   * Fix debian-expand-file-name-dfsg and describe-gnu-project (C-h C-p).
