@@ -7,7 +7,7 @@ emacs22 (22.2+2-4) unstable; urgency=medium
     (closes: #499568)
 
   * Invoke xmlstarlet from flymake as xmlstarlet rather than xml.  Thanks
-    to Jussi Judin <jjudin+debian@iki.fi>. (closes: 447378)
+    to Jussi Judin <jjudin+debian@iki.fi>. (closes: #447378)
 
   * Fix vc-mode's handling of internal temporary buffers.  This should
     avoid failures when trying to open files under monotone version
