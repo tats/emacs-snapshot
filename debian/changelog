@@ -1,3 +1,13 @@
+emacs22 (22.2+2-4) unstable; urgency=medium
+
+  * Fix a security problem related to the invocation of python
+    (CVE-2008-3949).  Avoid including the current directory in the module
+    lookup path when invoking python from python.el.  Thanks to Sven
+    Joachim <svenjoac@gmx.de> and Michael Berg <michaeljberg@gmail.com>.
+    (closes: #499568)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 14 Oct 2008 21:15:42 -0700
+
 emacs22 (22.2+2-3) unstable; urgency=medium
 
   * Fix an insecurity related to fast-lock-cache-directories
