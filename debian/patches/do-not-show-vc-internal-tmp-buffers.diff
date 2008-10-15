@@ -1,0 +1,40 @@
+* A problem with vc mode's handling of temporary buffers has been fixed.
+  Patch: do-not-show-vc-internal-tmp-buffers.diff
+  Provided-by: Sven Joachim <svenjoac@gmx.de>
+  Originally-reported-by: Michael Berg <michaeljberg@gmail.com>
+  Date: Mon, 14 Apr 2008 14:36:05 UTC
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: incorporated upstream
+  Bug: 476108
+
+  Emacs should no longer fail when trying to open files under monotone
+  version control.
+
+  From the upstream ChangeLog:
+
+    2008-03-29  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* vc.el (vc-do-command): Don't show internal temp buffers.
+
+Index: sid/lisp/vc.el
+===================================================================
+--- sid.orig/lisp/vc.el
++++ sid/lisp/vc.el
+@@ -1047,9 +1047,14 @@
+ 	  (when (and (not (eq t okstatus))
+                      (or (not (integerp status))
+                          (and okstatus (< okstatus status))))
+-	    (pop-to-buffer (current-buffer))
+-	    (goto-char (point-min))
+-	    (shrink-window-if-larger-than-buffer)
++            ;; Don't show internal temp buffers.  Especially since, together
++            ;; with with-temp-buffer and pop-up-frames, this can result in
++            ;; bugs where with-temp-buffer ends up not preserving
++            ;; current-buffer (because kill-buffer doesn't preserve it).
++            (unless (eq ?\s (aref (buffer-name (current-buffer)) 0))
++              (pop-to-buffer (current-buffer))
++              (goto-char (point-min))
++              (shrink-window-if-larger-than-buffer))
+ 	    (error "Running %s...FAILED (%s)" command
+ 		   (if (integerp status) (format "status %d" status) status))))
+ 	(if vc-command-messages

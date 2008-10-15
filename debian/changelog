@@ -9,7 +9,12 @@ emacs22 (22.2+2-4) unstable; urgency=medium
   * Invoke xmlstarlet from flymake as xmlstarlet rather than xml.  Thanks
     to Jussi Judin <jjudin+debian@iki.fi>. (closes: 447378)
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 14 Oct 2008 21:22:59 -0700
+  * Fix vc-mode's handling of internal temporary buffers.  This should
+    avoid failures when trying to open files under monotone version
+    control.  Thanks to Sven Joachim <svenjoac@gmx.de> and Michael Berg
+    <michaeljberg@gmail.com>. (closes: #476108)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 14 Oct 2008 21:28:47 -0700
 
 emacs22 (22.2+2-3) unstable; urgency=medium
 
