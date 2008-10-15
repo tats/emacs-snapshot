@@ -1,8 +1,8 @@
 emacs22 (22.2+2-3) unstable; urgency=medium
 
   * Fix an insecurity related to fast-lock-cache-directories
-    (CVE-2008-2142).  Thanks to   Provided-by: Sven Joachim <svenjoac@gmx.de>
-    and Morten Welinder <mwelinder@gmail.com>. (closes: #480885)
+    (CVE-2008-2142).  Thanks to Sven Joachim <svenjoac@gmx.de> and Morten
+    Welinder <mwelinder@gmail.com>. (closes: #480885)
 
   * Don't remove /usr/local/share/emacs/site-lisp in emacs22-common.
     Leave that up to emacsen-common.  Thanks to Sven Joachim
