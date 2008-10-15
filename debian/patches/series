@@ -13,4 +13,5 @@ fix-mule-select-safe-coding.diff
 look-for-news-to-find-etc.diff
 fix-woman2-th.diff
 fix-python-module-handling-cve-2008-3949.diff
+fix-flymake-xmlstarlet-invocation.diff
 autofiles.diff

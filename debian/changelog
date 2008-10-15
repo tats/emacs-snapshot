@@ -6,7 +6,10 @@ emacs22 (22.2+2-4) unstable; urgency=medium
     Joachim <svenjoac@gmx.de> and Michael Berg <michaeljberg@gmail.com>.
     (closes: #499568)
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 14 Oct 2008 21:15:42 -0700
+  * Invoke xmlstarlet from flymake as xmlstarlet rather than xml.  Thanks
+    to Jussi Judin <jjudin+debian@iki.fi>. (closes: 447378)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 14 Oct 2008 21:22:59 -0700
 
 emacs22 (22.2+2-3) unstable; urgency=medium
 
