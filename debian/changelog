@@ -1,3 +1,12 @@
+emacs22 (22.2+2-5) unstable; urgency=low
+
+  * Add a build dependency on libasound2-dev which emacs22 is already
+    linked against on i386.  This change just makes things consistent
+    across all the relevant platforms. Thanks to Sven Joachim
+    <svenjoac@gmx.de> for the fix. (closes: #503054)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Nov 2008 10:40:43 -0800
+
 emacs22 (22.2+2-4) unstable; urgency=medium
 
   * Fix a security problem related to the invocation of python
