@@ -5,7 +5,13 @@ emacs22 (22.2+2-5) unstable; urgency=low
     across all the relevant platforms. Thanks to Sven Joachim
     <svenjoac@gmx.de> for the fix. (closes: #503054)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Nov 2008 10:40:43 -0800
+  * Set mail-interactive to t if /usr/bin/mail is not an executable and
+    fakemail is chosen.  This should still help avoid silent mail loss,
+    but won't signal an error if the mailer is never invoked.  Thanks to
+    Ralf Resack <horch_loeffelchen@yahoo.de> for proposing the
+    fix. (closes: #429059)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Nov 2008 12:05:33 -0800
 
 emacs22 (22.2+2-4) unstable; urgency=medium
 
