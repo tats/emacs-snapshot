@@ -7,11 +7,11 @@ set -x
 # run the script.  The resulting two orig.tar.gz files will be placed
 # into a new ./split-tmp directory.
 
-emacs_archive_name="emacs-22.2.tar.gz"
-emacs_dir="emacs-22.2"
-emacs_version="22.2"
+emacs_archive_name="emacs-22.3.tar.gz"
+emacs_dir="emacs-22.3"
+emacs_version="22.3"
 emacs_major="22"
-deb_src_rev="2"
+deb_src_rev="1"
 
 non_main_dir="${emacs_dir}-non-dfsg"
 

@@ -1,3 +1,9 @@
+emacs22 (22.3+1-1) unstable; urgency=low
+
+  * New upstream release. (closes: #512134)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 28 Mar 2009 19:18:43 -0700
+
 emacs22 (22.2+2-5) unstable; urgency=low
 
   * Add a build dependency on libasound2-dev which emacs22 is already
