@@ -651,10 +651,10 @@ define install_common_binpkg_bits
 
   install -d $(2)/usr/share/man/man1
   dh_link -p$(3) \
-    usr/share/man/man1/emacs.1$(flavor).gz \
+    usr/share/man/man1/emacs.$(flavor).1.gz \
     usr/share/man/man1/$(flavor).1.gz
   dh_link -p$(3) \
-    usr/share/man/man1/emacs.1$(flavor).gz \
+    usr/share/man/man1/emacs.$(flavor).1.gz \
     usr/share/man/man1/$(flavor)-$(4).1.gz
 
 endef
@@ -729,11 +729,11 @@ install: debian/stamp/build $(autogen_install_files)
 	      $(pkgdir_common)/usr/share/info/$(info_subdir)/$$f; \
 	done
 
-	perl -pi -e "s|man1/etags\\.1|man1/etags\\.1$(flavor)|" \
-	  $(pkgdir_common)/usr/share/man/man1/ctags.1$(flavor)
+	perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
+	  $(pkgdir_common)/usr/share/man/man1/ctags.$(flavor).1
 
 	cd $(pkgdir_common)/usr/share/man/man1/ && \
-	  for f in *.1; do mv $$f $${f}$(flavor); done
+	  for f in *.1; do mv $$f $$(basename $${f} .1).$(flavor).1; done
 
         # At least etc/COPYING is needed by M-x describe-copying.
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING

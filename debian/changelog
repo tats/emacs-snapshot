@@ -14,7 +14,12 @@ emacs23 (23.1+1-2) unstable; urgency=low
     warnings.  Thanks to Sven Joachim <svenjoac@gmx.de> for the
     reminder.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 14:53:26 -0700
+  * Fix update-alternatives to reflect the fact that all the binaries
+    have manpages now.  Thanks to Sven Joachim <svenjoac@gmx.de> for
+    the suggestion.  Rename manpages from NAME.1FLAVOR to
+    NAME.FLAVOR.1.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 16:52:20 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 
