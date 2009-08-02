@@ -5,53 +5,36 @@
   Added-by: Rob Browning <rlb@defaultvalue.org>
   Status: new
 
-Index: sid-non-dfsg/man/Makefile.in
+Index: b/doc/misc/Makefile.in
 ===================================================================
---- sid-non-dfsg.orig/man/Makefile.in
-+++ sid-non-dfsg/man/Makefile.in
-@@ -36,17 +36,17 @@
- INFO_TARGETS = ../info/emacs ../info/ccmode ../info/cl \
- 	        ../info/dired-x ../info/ediff ../info/forms ../info/gnus \
- 		../info/message ../info/sieve ../info/pgg ../info/emacs-mime \
--		../info/info ../info/mh-e ../info/reftex \
-+		../info/info ../info/reftex \
- 		../info/sc ../info/vip ../info/viper ../info/widget \
--		../info/efaq ../info/ada-mode ../info/autotype ../info/calc \
-+		../info/ada-mode ../info/autotype ../info/calc \
- 		../info/idlwave ../info/eudc ../info/ebrowse ../info/pcl-cvs \
- 		../info/woman ../info/eshell ../info/org ../info/url \
- 		../info/speedbar ../info/tramp ../info/ses ../info/smtpmail \
- 		../info/flymake ../info/newsticker ../info/rcirc ../info/erc
- DVI_TARGETS = 	emacs.dvi calc.dvi cc-mode.dvi cl.dvi dired-x.dvi \
- 		 ediff.dvi forms.dvi gnus.dvi message.dvi emacs-mime.dvi \
--                 gnus.dvi message.dvi sieve.dvi pgg.dvi mh-e.dvi \
--		 reftex.dvi sc.dvi vip.dvi viper.dvi widget.dvi faq.dvi \
-+                 gnus.dvi message.dvi sieve.dvi pgg.dvi \
-+		 reftex.dvi sc.dvi vip.dvi viper.dvi widget.dvi \
- 		 ada-mode.dvi autotype.dvi idlwave.dvi eudc.dvi ebrowse.dvi \
- 		 pcl-cvs.dvi woman.dvi eshell.dvi org.dvi url.dvi \
- 		 speedbar.dvi tramp.dvi ses.dvi smtpmail.dvi flymake.dvi \
-@@ -227,11 +227,6 @@
- pgg.dvi: pgg.texi
- 	$(ENVADD) $(TEXI2DVI) ${srcdir}/pgg.texi
+--- a/doc/misc/Makefile.in
++++ b/doc/misc/Makefile.in
+@@ -53,7 +53,6 @@
+ 	$(infodir)/erc \
+ 	$(infodir)/eshell \
+ 	$(infodir)/eudc \
+-	$(infodir)/efaq \
+ 	$(infodir)/flymake \
+ 	$(infodir)/forms \
+ 	$(infodir)/gnus \
+@@ -99,7 +98,6 @@
+ 	erc.dvi \
+ 	eshell.dvi \
+ 	eudc.dvi \
+-	faq.dvi \
+ 	flymake.dvi \
+ 	forms.dvi \
+ 	gnus.dvi \
+@@ -244,12 +242,6 @@
+ eudc.dvi: eudc.texi
+ 	$(ENVADD) $(TEXI2DVI) ${srcdir}/eudc.texi
  
--../info/mh-e: mh-e.texi
--	cd $(srcdir); $(MAKEINFO) mh-e.texi
--mh-e.dvi: mh-e.texi
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/mh-e.texi
--
- ../info/reftex: reftex.texi
- 	cd $(srcdir); $(MAKEINFO) reftex.texi
- reftex.dvi: reftex.texi
-@@ -257,11 +252,6 @@
- widget.dvi: widget.texi
- 	$(ENVADD) $(TEXI2DVI) ${srcdir}/widget.texi
- 
--../info/efaq: faq.texi
+-efaq : $(infodir)/efaq
+-$(infodir)/efaq: faq.texi
 -	cd $(srcdir); $(MAKEINFO) faq.texi
 -faq.dvi: faq.texi
 -	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
 -
- ../etc/GNU: gnu1.texi gnu.texi
- 	cd $(srcdir) && makeinfo --no-headers -o ../etc/GNU gnu1.texi
- 
+ flymake : $(infodir)/flymake
+ $(infodir)/flymake: flymake.texi
+ 	cd $(srcdir); $(MAKEINFO) flymake.texi

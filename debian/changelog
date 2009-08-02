@@ -1,3 +1,11 @@
+emacs23-non-dfsg (23.1+1-1) unstable; urgency=low
+
+  * New emacs23 packages.
+
+  * Patches have been removed or adjusted.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 Aug 2009 13:19:40 -0700
+
 emacs22-non-dfsg (22.3+1-1) unstable; urgency=low
 
   * New upstream release.

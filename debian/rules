@@ -6,7 +6,7 @@
 # removed from the file.
 
 # Copyright 1994,1995 Ian Jackson
-# Copyright 1998-2005 Rob Browning <rlb@defaultvalue.org>
+# Copyright 1998-2009 Rob Browning <rlb@defaultvalue.org>
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
@@ -136,10 +136,12 @@ target := $(DEB_HOST_GNU_TYPE)
 # Info files that are going to show up in the main dir.
 main_dir_info_files := \
   ada-mode \
+  auth \
   autotype \
   calc \
   ccmode \
   cl \
+  dbus \
   dired-x \
   ebrowse \
   ediff \
@@ -147,6 +149,7 @@ main_dir_info_files := \
   elisp \
   emacs \
   emacs-mime \
+  epa \
   erc \
   eshell \
   eudc \
@@ -155,13 +158,18 @@ main_dir_info_files := \
   gnus \
   idlwave \
   info \
+  mairix-el \
   message \
+  mh-e \
   newsticker \
+  nxml-mode \
   org \
   pcl-cvs \
   pgg \
   rcirc \
   reftex \
+  remember \
+  sasl \
   sc \
   ses \
   sieve \
@@ -170,7 +178,7 @@ main_dir_info_files := \
   tramp \
   url \
   vip \
-  viper \
+  viper	\
   widget \
   woman
 
@@ -191,7 +199,7 @@ endef
 define checkdir
   dpkg-parsechangelog > /dev/null
   dh_testdir debian/emacs-common-non-dfsg.postinst
-  @if ! test -f man/emacs.texi; \
+  @if ! test -f etc/THE-GNU-PROJECT; \
   then \
     echo; \
     echo -n "The upstream source does not appear to be available."; \
@@ -365,36 +373,44 @@ build: debian/stamp/build
 debian/stamp/build: debian/stamp/patch
 	$(checkdir)
 
-	cp lispintro/Makefile.in lispintro/Makefile
-	cp lispref/Makefile.in lispref/Makefile
-	cp man/Makefile.in man/Makefile
+	cp doc/emacs/Makefile.in doc/emacs/Makefile
+	cp doc/lispintro/Makefile.in doc/lispintro/Makefile
+	cp doc/lispref/Makefile.in doc/lispref/Makefile
+	cp doc/misc/Makefile.in doc/misc/Makefile
 
 	perl -p -i \
 	  -e "s|\@top_srcdir\@|$(CURDIR)|go;" \
 	  -e "s|\@SHELL\@|/bin/bash|go;" \
-	  lispintro/Makefile \
-	  lispref/Makefile \
-	  man/Makefile
+	  doc/emacs/Makefile \
+	  doc/lispintro/Makefile \
+	  doc/lispref/Makefile \
+	  doc/misc/Makefile
 
 	perl -p -i \
-	  -e "s|\@srcdir\@|$(CURDIR)/lispintro|go;" \
-	  -e "s|\@VPATH\@|$(CURDIR)/lispintro|go;" \
-	  lispintro/Makefile
+	  -e "s|\@srcdir\@|$(CURDIR)/doc/emacs|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/doc/emacs|go;" \
+	  doc/emacs/Makefile
 
 	perl -p -i \
-	  -e "s|\@srcdir\@|$(CURDIR)/lispref|go;" \
-	  -e "s|\@VPATH\@|$(CURDIR)/lispref|go;" \
-	  lispref/Makefile
+	  -e "s|\@srcdir\@|$(CURDIR)/doc/lispintro|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/doc/lispintro|go;" \
+	  doc/lispintro/Makefile
 
 	perl -p -i \
-	  -e "s|\@srcdir\@|$(CURDIR)/man|go;" \
-	  -e "s|\@VPATH\@|$(CURDIR)/man|go;" \
-	  man/Makefile
+	  -e "s|\@srcdir\@|$(CURDIR)/doc/lispref|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/doc/lispref|go;" \
+	  doc/lispref/Makefile
+
+	perl -p -i \
+	  -e "s|\@srcdir\@|$(CURDIR)/doc/misc|go;" \
+	  -e "s|\@VPATH\@|$(CURDIR)/doc/misc|go;" \
+	  doc/misc/Makefile
 
 	mkdir -p info
-	$(MAKE) -C lispintro
-	$(MAKE) -C lispref
-	$(MAKE) -C man
+	$(MAKE) -C doc/emacs
+	$(MAKE) -C doc/lispintro
+	$(MAKE) -C doc/lispref
+	$(MAKE) -C doc/misc
 	mkdir -p debian/stamp && touch $@
 
 deb_trash += lispintro/Makefile
