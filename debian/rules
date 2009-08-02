@@ -809,28 +809,15 @@ install: debian/stamp/build $(autogen_install_files)
         ##################################################
         # emacsXY-nox
 	$(call emacs_inst,build-nox,$(install_dir_nox))
-	echo point-2 >> debian/tmplog
-	find -name "DOC*" >> debian/tmplog
-
 	$(call install_common_binpkg_bits,\
 	  $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
-
-	echo point-3 >> debian/tmplog
-	find -name "DOC*" >> debian/tmplog
-
 	rm -rf $(install_dir_nox)
 
         ##################################################
         # emacsXY-gtk
 	$(call emacs_inst,build-gtk,$(install_dir_gtk))
-	echo point-4 >> debian/tmplog
-	find -name "DOC*" >> debian/tmplog
-
 	$(call install_common_binpkg_bits,\
 	  $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-gtk,gtk)
-	echo point-5 >> debian/tmplog
-	find -name "DOC*" >> debian/tmplog
-
 
         # install desktop entry
 	install -d $(pkgdir_gtk)/usr/share/applications
