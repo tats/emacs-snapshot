@@ -10,11 +10,11 @@
   licenses are in /usr/share/common-licenses), Emacs will now look for
   NEWS to find the etc directory instead of GNU.
 
-Index: sid/src/callproc.c
+Index: b/src/callproc.c
 ===================================================================
---- sid.orig/src/callproc.c
-+++ sid/src/callproc.c
-@@ -1587,14 +1587,14 @@
+--- a/src/callproc.c
++++ b/src/callproc.c
+@@ -1521,14 +1521,14 @@
  
        srcdir = Fexpand_file_name (build_string ("../src/"),
  				  build_string (PATH_DUMPLOADSEARCH));

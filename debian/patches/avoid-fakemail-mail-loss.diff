@@ -25,11 +25,11 @@
   undesirable for some reason, just comment out
   avoid-fakemail-loss.diff in debian/patches/series.
   
-Index: sid/lib-src/fakemail.c
+Index: b/lib-src/fakemail.c
 ===================================================================
---- sid.orig/lib-src/fakemail.c
-+++ sid/lib-src/fakemail.c
-@@ -135,8 +135,10 @@
+--- a/lib-src/fakemail.c
++++ b/lib-src/fakemail.c
+@@ -136,8 +136,10 @@
  #define NIL ((line_list) NULL)
  #define INITIAL_LINE_SIZE 200
  
@@ -42,11 +42,11 @@ Index: sid/lib-src/fakemail.c
  #endif
  
  static char *my_name;
-Index: sid/lisp/mail/feedmail.el
+Index: b/lisp/mail/feedmail.el
 ===================================================================
---- sid.orig/lisp/mail/feedmail.el
-+++ sid/lisp/mail/feedmail.el
-@@ -1348,7 +1348,12 @@
+--- a/lisp/mail/feedmail.el
++++ b/lisp/mail/feedmail.el
+@@ -1323,7 +1323,12 @@
  			      "/usr/lib/sendmail")
  			     ((file-exists-p "/usr/ucblib/sendmail")
  			      "/usr/ucblib/sendmail")
@@ -60,11 +60,11 @@ Index: sid/lisp/mail/feedmail.el
  		       nil errors-to nil "-oi" "-t")
  		 ;; provide envelope "from" to sendmail; results will vary
  		 (list "-f" user-mail-address)
-Index: sid/lisp/mail/sendmail.el
+Index: b/lisp/mail/sendmail.el
 ===================================================================
---- sid.orig/lisp/mail/sendmail.el
-+++ sid/lisp/mail/sendmail.el
-@@ -53,7 +53,12 @@
+--- a/lisp/mail/sendmail.el
++++ b/lisp/mail/sendmail.el
+@@ -52,7 +52,12 @@
      ((file-exists-p "/usr/sbin/sendmail") "/usr/sbin/sendmail")
      ((file-exists-p "/usr/lib/sendmail") "/usr/lib/sendmail")
      ((file-exists-p "/usr/ucblib/sendmail") "/usr/ucblib/sendmail")
@@ -78,11 +78,11 @@ Index: sid/lisp/mail/sendmail.el
    "Program used to send messages."
    :group 'mail
    :type 'file)
-Index: sid/lisp/gnus/message.el
+Index: b/lisp/gnus/message.el
 ===================================================================
---- sid.orig/lisp/gnus/message.el
-+++ sid/lisp/gnus/message.el
-@@ -4026,7 +4026,13 @@
+--- a/lisp/gnus/message.el
++++ b/lisp/gnus/message.el
+@@ -4520,7 +4520,13 @@
  				     "/usr/lib/sendmail")
  				    ((file-exists-p "/usr/ucblib/sendmail")
  				     "/usr/ucblib/sendmail")
@@ -95,5 +95,5 @@ Index: sid/lisp/gnus/message.el
 +                                           (setq mail-interactive t)))
 +                                     "fakemail"))
  			      nil errbuf nil "-oi")
+ 			message-sendmail-extra-arguments
  			;; Always specify who from,
- 			;; since some systems have broken sendmails.

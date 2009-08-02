@@ -1,88 +1,88 @@
-Source: emacs22
+Source: emacs23
 Section: editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
 Uploaders: Jerome Marant <jerome@debian.org>
-Build-Depends: mailx, libncurses5-dev, texinfo, liblockfile-dev, libgif-dev | libungif4-dev, libtiff4-dev | libtiff-dev, xaw3dg-dev, libpng12-dev, libjpeg62-dev, autotools-dev, dpkg-dev (>> 1.10.0), quilt (>= 0.42-1), debhelper (>= 4), libxaw7-dev, sharutils, imagemagick, libgtk2.0-dev, libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64]
+Build-Depends: mailx, libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev, libgif-dev | libungif4-dev, libtiff4-dev | libtiff-dev, xaw3dg-dev, libpng12-dev, libjpeg62-dev, libm17n-dev, libotf-dev, autotools-dev, dpkg-dev (>> 1.10.0), quilt (>= 0.42-1), debhelper (>= 4), libxaw7-dev, sharutils, imagemagick, libgtk2.0-dev, libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64]
 Standards-Version: 3.7.2
 
 Package: emacs
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacs22 | emacs22-gtk | emacs22-nox
+Depends: emacs23 | emacs23-gtk | emacs23-nox
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Description: The GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage which will always depend on the latest Emacs
  release.
 
-Package: emacs22
+Package: emacs23
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
-Suggests: emacs22-common-non-dfsg
-Conflicts: emacs22-nox, emacs22-gtk, w3-el
-Replaces: emacs22-nox, emacs22-gtk
+Suggests: emacs23-common-non-dfsg
+Conflicts: emacs23-nox, emacs23-gtk, w3-el
+Replaces: emacs23-nox, emacs23-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
 
-Package: emacs22-nox
+Package: emacs23-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
-Suggests: emacs22-common-non-dfsg
-Conflicts: emacs22, emacs22-gtk, w3-el
-Replaces: emacs22, emacs22-gtk
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
+Suggests: emacs23-common-non-dfsg
+Conflicts: emacs23, emacs23-gtk, w3-el
+Replaces: emacs23, emacs23-gtk
 Description: The GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
 
-Package: emacs22-gtk
+Package: emacs23-gtk
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
-Suggests: emacs22-common-non-dfsg
-Conflicts: emacs22, emacs22-nox, w3-el
-Replaces: emacs22, emacs22-nox
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
+Suggests: emacs23-common-non-dfsg
+Conflicts: emacs23, emacs23-nox, w3-el
+Replaces: emacs23, emacs23-nox
 Description: The GNU Emacs editor (with GTK user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK user interface.
 
-Package: emacs22-bin-common
+Package: emacs23-bin-common
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs22-common (= ${source:Version}), ${shlibs:Depends}
+Depends: emacs23-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
- that's shared by emacs22, emacs22-gtk, and emacs22-nox.
+ that's shared by emacs23, emacs23-gtk, and emacs23-nox.
 
-Package: emacs22-common
+Package: emacs23-common
 Section: editors
 Priority: optional
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.9.0), ${shlibs:Depends}
-Suggests: emacs22-el, emacs22-common-non-dfsg
-Conflicts: emacs22-el (<< ${Source-Version}), w3-el, emacs22-common-non-dfsg (<< 22.2+2-1)
+Suggests: emacs23-el, emacs23-common-non-dfsg
+Conflicts: emacs23-el (<< ${Source-Version}), w3-el, emacs22-common-non-dfsg (<< 22.2+2-1)
 Replaces: emacs22-common (<< 22.2), emacs22-common-non-dfsg (<< 22.2+2-1)
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
- that's shared by emacs22, emacs22-gtk, and emacs22-nox.
+ that's shared by emacs23, emacs23-gtk, and emacs23-nox.
 
-Package: emacs22-el
+Package: emacs23-el
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacs22-common (= ${source:Version})
+Depends: emacs23-common (= ${source:Version})
 Description: GNU Emacs LISP (.el) files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the elisp sources for the convenience of users,

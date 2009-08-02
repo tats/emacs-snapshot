@@ -9,11 +9,11 @@
   Emacs invokes xmlstarlet rather than xml, which is the correct
   executable name on Debian systems.
 
-Index: sid/lisp/progmodes/flymake.el
+Index: b/lisp/progmodes/flymake.el
 ===================================================================
---- sid.orig/lisp/progmodes/flymake.el
-+++ sid/lisp/progmodes/flymake.el
-@@ -1756,7 +1756,7 @@
+--- a/lisp/progmodes/flymake.el
++++ b/lisp/progmodes/flymake.el
+@@ -1754,7 +1754,7 @@
  
  ;;;; xml-specific init-cleanup routines
  (defun flymake-xml-init ()

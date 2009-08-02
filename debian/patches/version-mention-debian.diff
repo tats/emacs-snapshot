@@ -3,11 +3,11 @@
   Author: Rob Browning <rlb@defaultvalue.org>
   Added-by: Rob Browning <rlb@defaultvalue.org>
 
-Index: sid/lisp/version.el
+Index: b/lisp/version.el
 ===================================================================
---- sid.orig/lisp/version.el
-+++ sid/lisp/version.el
-@@ -58,8 +58,8 @@
+--- a/lisp/version.el
++++ b/lisp/version.el
+@@ -57,8 +57,8 @@
    (interactive "P")
    (let ((version-string
           (format (if (not (interactive-p))

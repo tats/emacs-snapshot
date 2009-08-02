@@ -5,10 +5,10 @@
   site-init.el to include /usr/share/info/emacs-22 before
   /usr/share/info.
     
-Index: sid/lisp/site-init.el
+Index: b/lisp/site-init.el
 ===================================================================
 --- /dev/null
-+++ sid/lisp/site-init.el
++++ b/lisp/site-init.el
 @@ -0,0 +1,11 @@
 +
 +;; Add the flavor specific directory for Debian.

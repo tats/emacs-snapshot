@@ -3,8 +3,8 @@
   section="Apps/Editors"\
   title="Emacs @MENU_VERSION@ (X11)"\
   command="/usr/bin/@DEB_FLAVOR@"\
-  icon16x16="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_16.xpm"\
-  icon32x32="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_32.xpm"\
+  icon16x16="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/16x16/apps/emacs.xpm"\
+  icon32x32="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/32x32/apps/emacs.xpm"\
   hints="Text"
 
 ?package(@PKG_NAME@):\
@@ -12,6 +12,6 @@
   section="Apps/Editors"\
   title="Emacs @MENU_VERSION@ (text)"\
   command="/usr/bin/@DEB_FLAVOR@ -nw"\
-  icon16x16="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_16.xpm"\
-  icon32x32="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_32.xpm"\
+  icon16x16="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/16x16/apps/emacs.xpm"\
+  icon32x32="/usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/32x32/apps/emacs.xpm"\
   hints="Text"

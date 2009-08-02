@@ -1,3 +1,13 @@
+emacs23 (23.1+1-1) unstable; urgency=low
+
+  * New emacs23 packages.
+
+  * The debian/dfsg-splitter has been updated.
+
+  * Patches have been removed or adjusted.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 18 Jul 2009 18:41:25 -0700
+
 emacs22 (22.3+1-1) unstable; urgency=low
 
   * New upstream release. (closes: #512134)

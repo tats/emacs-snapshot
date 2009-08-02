@@ -7,13 +7,13 @@
   * The global variable debian-emacs-flavor is bound to 'emacs22.
     Author: Rob Browning <rlb@defaultvalue.org>
     
-Index: sid/lisp/startup.el
+Index: b/lisp/startup.el
 ===================================================================
---- sid.orig/lisp/startup.el
-+++ sid/lisp/startup.el
-@@ -302,6 +302,10 @@
- Warning Warning!!!  Pure space overflow    !!!Warning Warning
- \(See the node Pure Storage in the Lisp manual for details.)\n")
+--- a/lisp/startup.el
++++ b/lisp/startup.el
+@@ -394,6 +394,10 @@
+  (setq tutorial-directory (file-name-as-directory
+                            (expand-file-name "tutorials" data-directory))))
  
 +(defconst debian-emacs-flavor 'emacs22
 +  "A symbol representing the particular debian flavor of emacs running.
@@ -22,7 +22,7 @@ Index: sid/lisp/startup.el
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of current directory to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -826,8 +830,21 @@
+@@ -977,8 +981,21 @@
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.

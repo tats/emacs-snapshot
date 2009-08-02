@@ -7,13 +7,14 @@ set -x
 # run the script.  The resulting two orig.tar.gz files will be placed
 # into a new ./split-tmp directory.
 
-emacs_archive_name="emacs-22.3.tar.gz"
-emacs_dir="emacs-22.3"
-emacs_version="22.3"
-emacs_major="22"
+emacs_archive_name="emacs-23.1.tar.gz"
+emacs_dir="emacs-23.1"
+emacs_version="23.1"
+emacs_major="23"
 deb_src_rev="1"
 
-non_main_dir="${emacs_dir}-non-dfsg"
+main_dir="$(pwd)/split-tmp/${emacs_dir}"
+non_main_dir="$(pwd)/split-tmp/${emacs_dir}-non-dfsg"
 
 if ! test root = "`whoami`"
 then
@@ -35,7 +36,8 @@ umask 002
 tar xzf "../${emacs_archive_name}"
 
 find "${emacs_dir}" -name "*.elc" -exec rm {} +
-find "${emacs_dir}"/info -type f -not -name "COPYING" -exec rm {} +
+find "${emacs_dir}"/info -type f \
+  -not -name "COPYING" -not -name dir -exec rm {} +
 
 mkdir "${non_main_dir}"
 
@@ -43,8 +45,8 @@ function move_to_non_main_dir()
 {
   pushd "${emacs_dir}"
   test "$1"
-  test ! -e "../${non_main_dir}/$1"
-  cp -a --parents "$1" "../${non_main_dir}/"
+  test ! -e "${non_main_dir}/$1"
+  cp -a --parents "$1" "${non_main_dir}/"
   rm -r "$1"
   popd
 }
@@ -52,7 +54,7 @@ function move_to_non_main_dir()
 function copy_to_non_main_dir()
 {
   pushd "${emacs_dir}"
-  cp -a --parents "$1" "../${non_main_dir}/"
+  cp -a --parents "$1" "${non_main_dir}/"
   popd
 }
 
@@ -67,7 +69,7 @@ function remove_from_main_dir()
 function move_to_main_dir()
 {
   pushd "${non_main_dir}"
-  cp -a --parents "$1" "../${emacs_dir}/"
+  cp -a --parents "$1" "${main_dir}/"
   rm "$1"
   popd
 }
@@ -76,11 +78,9 @@ function move_to_main_dir()
 function copy_to_main_dir()
 {
   pushd "${non_main_dir}"
-  cp -a --parents "$1" "../${emacs_dir}/"
+  cp -a --parents "$1" "${main_dir}/"
   popd
 }
-
-
 
 # So both sides will have a copy (at the very least, version.el refers to it).
 copy_to_non_main_dir "etc/COPYING"
@@ -94,10 +94,6 @@ move_to_non_main_dir "etc/WHY-FREE"
 move_to_non_main_dir "etc/GNU"
 move_to_non_main_dir "etc/MOTIVATION"
 
-# GFDL
-move_to_non_main_dir "lispintro"
-move_to_non_main_dir "lispref"
-
 # reprinted with permissions or copyright mentioned
 # no modification mention
 move_to_non_main_dir "etc/INTERVIEW"
@@ -110,24 +106,23 @@ move_to_non_main_dir "etc/JOKES"
 # This is used via debian/rules to track the nominal_ver.
 copy_to_non_main_dir "lisp/version.el"
 
-# man files which appear to be compatible with the DFSG
-dfsg_man_files="
-  faq.texi
-  mh-e.texi"
+# GFDL documentation in doc/
+move_to_non_main_dir "doc/lispintro"
+move_to_non_main_dir "doc/lispref"
+move_to_non_main_dir "doc/emacs"
 
-pushd "${emacs_dir}"
-mkdir ../"${non_main_dir}"/man
-mv man/* ../"${non_main_dir}"/man/
-popd
+# doc/misc
 
-# want these files in both archives, so put them back
-copy_to_main_dir "man/ChangeLog"
-copy_to_main_dir "man/Makefile.in"
+# Most doc/misc files don't appear to be compatible with the DFSG.
+move_to_non_main_dir "doc/misc"
 
-for f in ${dfsg_man_files}
-do
-  move_to_main_dir "man/$f"
-done
+# doc/misc files that do appear to be compatible with the DFSG
+move_to_main_dir "doc/misc/faq.texi"
+
+# Copy back files we want in both archives.
+copy_to_main_dir "doc/misc/ChangeLog"
+copy_to_main_dir "doc/misc/Makefile.in"
+
 
 GZIP=-9v tar czpSf \
   "emacs${emacs_major}_${emacs_version}+${deb_src_rev}.orig.tar.gz" \
