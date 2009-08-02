@@ -11,7 +11,7 @@ Section: editors
 Priority: optional
 Architecture: all
 Depends: @DEB_FLAVOR@ | @DEB_FLAVOR@-gtk | @DEB_FLAVOR@-nox
-Provides: emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, mail-reader, news-reader
 Description: The GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage which will always depend on the latest Emacs
@@ -21,7 +21,7 @@ Package: @DEB_FLAVOR@
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-nox, @DEB_FLAVOR@-gtk, w3-el
@@ -33,7 +33,7 @@ Package: @DEB_FLAVOR@-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk, w3-el
@@ -46,7 +46,7 @@ Package: @DEB_FLAVOR@-gtk
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, w3-el

@@ -1,3 +1,12 @@
+emacs23 (23.1+1-2) unstable; urgency=low
+
+  * Add dependencies on install-info to primary binary packages and
+    remove install-info from meta package provides.  Thanks to Norbert
+    Preining <preining@logic.at>.  (See emacs21 bugs #532600, #532599,
+    #532597, and #532602.)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 11:34:18 -0700
+
 emacs23 (23.1+1-1) unstable; urgency=low
 
   * New emacs23 packages.

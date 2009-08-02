@@ -11,7 +11,7 @@ Section: editors
 Priority: optional
 Architecture: all
 Depends: emacs23 | emacs23-gtk | emacs23-nox
-Provides: emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, mail-reader, news-reader
 Description: The GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage which will always depend on the latest Emacs
@@ -21,7 +21,7 @@ Package: emacs23
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23-nox, emacs23-gtk, w3-el
@@ -33,7 +33,7 @@ Package: emacs23-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-gtk, w3-el
@@ -46,7 +46,7 @@ Package: emacs23-gtk
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-nox, w3-el
