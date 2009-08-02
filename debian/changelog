@@ -5,7 +5,10 @@ emacs23 (23.1+1-2) unstable; urgency=low
     Preining <preining@logic.at>.  (See emacs21 bugs #532600, #532599,
     #532597, and #532602.)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 11:34:18 -0700
+  * Add libpm-dev and libdbus-1-dev build dependencies.  Thanks to
+    Sven Joachim <svenjoac@gmx.de>.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 12:11:56 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 
