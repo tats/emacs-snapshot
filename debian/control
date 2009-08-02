@@ -51,9 +51,9 @@ Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-nox, w3-el
 Replaces: emacs23, emacs23-nox
-Description: The GNU Emacs editor (with GTK user interface)
+Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a GTK user interface.
+ This package contains a version of Emacs with a GTK+ user interface.
 
 Package: emacs23-bin-common
 Section: editors

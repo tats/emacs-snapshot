@@ -207,25 +207,31 @@ nonpersistent_autogen_build_files :=
 
 # These files must always exist, i.e. can't ever be cleaned.
 persistent_autogen_install_files :=
+
 nonpersistent_autogen_install_files := \
+  debian/$(flavor)-bin-common.lintian-overrides \
   debian/$(flavor)-bin-common.postinst \
   debian/$(flavor)-bin-common.prerm \
   debian/$(flavor)-common.README.Debian \
   debian/$(flavor)-common.docs \
+  debian/$(flavor)-common.lintian-overrides \
   debian/$(flavor)-common.postinst \
   debian/$(flavor)-common.prerm \
   debian/$(flavor)-nox.README.Debian \
+  debian/$(flavor)-nox.lintian-overrides \
   debian/$(flavor)-nox.menu \
   debian/$(flavor)-nox.postinst \
   debian/$(flavor)-nox.prerm \
   debian/$(flavor)-gtk.README.Debian \
   debian/$(flavor)-gtk.desktop \
+  debian/$(flavor)-gtk.lintian-overrides \
   debian/$(flavor)-gtk.menu \
   debian/$(flavor)-gtk.postinst \
   debian/$(flavor)-gtk.prerm \
   debian/$(flavor).README.Debian \
   debian/$(flavor).desktop \
   debian/$(flavor).menu \
+  debian/$(flavor).lintian-overrides \
   debian/$(flavor).postinst \
   debian/$(flavor).prerm
 
@@ -413,6 +419,7 @@ check-vars:
 	@echo "runtime_ver: $(runtime_ver)"
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
+	@echo "movemail_bin: $(movemail_bin)"
 .PHONY: check-vars
 
 .PHONY: check-diff
@@ -512,6 +519,9 @@ debian/$(flavor)-nox.%: pkg_name := $(flavor)-nox
 
 debian/$(flavor)-gtk.%: xsupport := "gtk"
 debian/$(flavor)-gtk.%: pkg_name := $(flavor)-gtk
+
+debian/$(flavor)-common.%: pkg_name := $(flavor)-common
+debian/$(flavor)-bin-common.%: pkg_name := $(flavor)-bin-common
 
 debian/%: debian/%.in debian/changelog
 	$(call deb_sub,$<,$@)
@@ -845,6 +855,7 @@ binary-indep: build install
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i
+	dh_lintian -i
 	dh_installdocs -i
 	dh_link -i
 	dh_strip -i
@@ -861,6 +872,7 @@ binary-arch: build install
 	dh_testdir -a
 	dh_testroot -a
 	dh_installinfo -a
+	dh_lintian -a
 	dh_installman -a
 	dh_installchangelogs -a
 	dh_installdocs -a

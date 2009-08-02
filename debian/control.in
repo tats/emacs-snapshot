@@ -51,9 +51,9 @@ Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, w3-el
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
-Description: The GNU Emacs editor (with GTK user interface)
+Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a GTK user interface.
+ This package contains a version of Emacs with a GTK+ user interface.
 
 Package: @DEB_FLAVOR@-bin-common
 Section: editors

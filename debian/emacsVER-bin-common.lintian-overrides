@@ -1,0 +1,1 @@
+@PKG_NAME@ binary: setgid-binary @MOVEMAIL_BIN@ 2755 root/mail

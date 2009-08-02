@@ -33,8 +33,8 @@ verbatim copying, or because there was some other question.
 Copyright:
 
   Emacs itself is licensed under the terms of the GNU General Public
-  License (GPL).  See the file /usr/share/common-licenses/GPL for more
-  information.
+  License (GPL), Version 3.  See the file
+  /usr/share/common-licenses/GPL-3 for more information.
 
   doc/man/b2m.1, doc/man/ebrowse.1, doc/man/grep-changelog.1, and
   doc/man/rcs-checkin.1 are licensed as follows:

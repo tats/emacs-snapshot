@@ -8,7 +8,13 @@ emacs23 (23.1+1-2) unstable; urgency=low
   * Add libpm-dev and libdbus-1-dev build dependencies.  Thanks to
     Sven Joachim <svenjoac@gmx.de>.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 12:11:56 -0700
+  * Fix a spelling error, fix a menu section error, add a version to
+    the GPL file referred to by debian/copyright, and add a number of
+    debian/emacsVER*.lintian-overrides to quiet long-standing
+    warnings.  Thanks to Sven Joachim <svenjoac@gmx.de> for the
+    reminder.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 14:53:26 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 

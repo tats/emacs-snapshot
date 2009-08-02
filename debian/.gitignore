@@ -10,6 +10,7 @@
 /emacs23-bin-common
 /emacs23-bin-common.README.Debian
 /emacs23-bin-common.debhelper.log
+/emacs23-bin-common.lintian-overrides
 /emacs23-bin-common.postinst
 /emacs23-bin-common.postrm
 /emacs23-bin-common.prerm
@@ -19,6 +20,7 @@
 /emacs23-common.debhelper.log
 /emacs23-common.docs
 /emacs23-common.links
+/emacs23-common.lintian-overrides
 /emacs23-common.postinst
 /emacs23-common.prerm
 /emacs23-common.substvars
@@ -30,6 +32,7 @@
 /emacs23-gtk.README.Debian
 /emacs23-gtk.debhelper.log
 /emacs23-gtk.desktop
+/emacs23-gtk.lintian-overrides
 /emacs23-gtk.menu
 /emacs23-gtk.postinst
 /emacs23-gtk.postinst.debhelper
@@ -41,6 +44,7 @@
 /emacs23-nox.debhelper.log
 /emacs23-nox.desktop
 /emacs23-nox.links
+/emacs23-nox.lintian-overrides
 /emacs23-nox.menu
 /emacs23-nox.postinst
 /emacs23-nox.postinst.debhelper
@@ -52,6 +56,7 @@
 /emacs23.debhelper.log
 /emacs23.desktop
 /emacs23.links
+/emacs23.lintian-overrides
 /emacs23.menu
 /emacs23.postinst
 /emacs23.postinst.debhelper
