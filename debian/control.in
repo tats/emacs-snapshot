@@ -24,7 +24,7 @@ Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-nox, @DEB_FLAVOR@-gtk, w3-el
+Conflicts: @DEB_FLAVOR@-nox, @DEB_FLAVOR@-gtk
 Replaces: @DEB_FLAVOR@-nox, @DEB_FLAVOR@-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
@@ -36,7 +36,7 @@ Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk, w3-el
+Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk
 Description: The GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
@@ -49,7 +49,7 @@ Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, w3-el
+Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
@@ -71,8 +71,7 @@ Priority: optional
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.9.0), ${shlibs:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version}), w3-el, emacs22-common-non-dfsg (<< 22.2+2-1)
-Replaces: emacs22-common (<< 22.2), emacs22-common-non-dfsg (<< 22.2+2-1)
+Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version})
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure

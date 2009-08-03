@@ -6,20 +6,22 @@ emacs23 (23.1+1-2) unstable; urgency=low
     #532597, and #532602.)
 
   * Add libpm-dev and libdbus-1-dev build dependencies.  Thanks to
-    Sven Joachim <svenjoac@gmx.de>.
+    Sven Joachim <svenjoac@gmx.de> for reporting this and most of the
+    following additional issues.
 
   * Fix a spelling error, fix a menu section error, add a version to
     the GPL file referred to by debian/copyright, and add a number of
     debian/emacsVER*.lintian-overrides to quiet long-standing
-    warnings.  Thanks to Sven Joachim <svenjoac@gmx.de> for the
-    reminder.
+    warnings.
 
   * Fix update-alternatives to reflect the fact that all the binaries
-    have manpages now.  Thanks to Sven Joachim <svenjoac@gmx.de> for
-    the suggestion.  Rename manpages from NAME.1FLAVOR to
+    have manpages now.  Rename manpages from NAME.1FLAVOR to
     NAME.FLAVOR.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 16:52:20 -0700
+  * Remove obsolete dependencies and conflicts (w3-el, emacs22
+    packages, etc.).
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 19:13:04 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 
