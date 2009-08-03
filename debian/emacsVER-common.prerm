@@ -5,15 +5,6 @@ set -e
 MAJOR=@MAJOR_VERSION@
 MINOR=@MINOR_VERSION@
 FULL=@FULL_VERSION@
-INFO_FILES="@INFO_FILES@"
-INFO_SUBDIR="@INFO_SUBDIR@"
-
-for file in ${INFO_FILES}
-do
-  install-info --quiet --remove-exactly ${INFO_SUBDIR}/${file} || true
-done
-
-# emacsen-common/emacs-remove used to be here.
 
 set +e
 # Only remove these directories if they're empty.
