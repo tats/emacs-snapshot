@@ -1,8 +1,8 @@
-* Emacs will prefer /usr/share/info/emacs22 over /usr/share/info.
+* Emacs will prefer /usr/share/info/emacs-23 over /usr/share/info.
   Patch: debian-site-init-el.diff
 
   The value of Info-default-directory-list has been augmented via
-  site-init.el to include /usr/share/info/emacs-22 before
+  site-init.el to include /usr/share/info/emacs-23 before
   /usr/share/info.
     
 Index: b/lisp/site-init.el
@@ -18,6 +18,6 @@ Index: b/lisp/site-init.el
 +        (dolist (elt Info-default-directory-list (nreverse result))
 +          (if (and (not found-match) (equal elt "/usr/share/info/"))
 +              (progn
-+                (push "/usr/share/info/emacs-22" result)
++                (push "/usr/share/info/emacs-23" result)
 +                (setq found-match t)))
 +          (push elt result))))
