@@ -1,5 +1,8 @@
 emacs23 (23.1+1-2) unstable; urgency=low
 
+  * Set debian-emacs-flavor to 'emacs23.  Somehow that change didn't
+    make it in to the initial package and it was still set to emacs22.
+
   * Add dependencies on install-info to primary binary packages and
     remove install-info from meta package provides.  Thanks to Norbert
     Preining <preining@logic.at>.  (See emacs21 bugs #532600, #532599,
@@ -23,7 +26,7 @@ emacs23 (23.1+1-2) unstable; urgency=low
 
   * Remove explicit install-info calls.  Rely on triggers now.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 19:21:47 -0700
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 19:26:23 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 
