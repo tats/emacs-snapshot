@@ -21,7 +21,9 @@ emacs23 (23.1+1-2) unstable; urgency=low
   * Remove obsolete dependencies and conflicts (w3-el, emacs22
     packages, etc.).
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 19:13:04 -0700
+  * Remove explicit install-info calls.  Rely on triggers now.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Aug 2009 19:21:47 -0700
 
 emacs23 (23.1+1-1) unstable; urgency=low
 
