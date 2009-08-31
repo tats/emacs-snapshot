@@ -10,22 +10,22 @@ Package: emacs
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacs23 | emacs23-gtk | emacs23-nox
+Depends: emacs23 | emacs23-lucid | emacs23-nox
 Provides: emacsen, editor, mail-reader, news-reader
 Description: The GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage which will always depend on the latest Emacs
  release.
 
-Package: emacs23
+Package: emacs23-lucid
 Section: editors
 Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
-Conflicts: emacs23-nox, emacs23-gtk
-Replaces: emacs23-nox, emacs23-gtk
+Conflicts: emacs23, emacs23-nox, emacs23-gtk
+Replaces: emacs23, emacs23-nox, emacs23-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
 
@@ -36,21 +36,21 @@ Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
-Conflicts: emacs23, emacs23-gtk
-Replaces: emacs23, emacs23-gtk
+Conflicts: emacs23, emacs23-lucid, emacs23-gtk
+Replaces: emacs23, emacs23-lucid, emacs23-gtk
 Description: The GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
 
-Package: emacs23-gtk
+Package: emacs23
 Section: editors
 Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
-Conflicts: emacs23, emacs23-nox
-Replaces: emacs23, emacs23-nox
+Conflicts: emacs23-lucid, emacs23-nox, emacs23-gtk
+Replaces: emacs23-lucid, emacs23-nox, emacs23-gtk
 Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK+ user interface.
@@ -63,7 +63,7 @@ Depends: emacs23-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
- that's shared by emacs23, emacs23-gtk, and emacs23-nox.
+ that's shared by emacs23, emacs23-lucid, and emacs23-nox.
 
 Package: emacs23-common
 Section: editors
@@ -75,7 +75,7 @@ Conflicts: emacs23-el (<< ${Source-Version})
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
- that's shared by emacs23, emacs23-gtk, and emacs23-nox.
+ that's shared by emacs23, emacs23-lucid, and emacs23-nox.
 
 Package: emacs23-el
 Section: editors

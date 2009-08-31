@@ -222,12 +222,12 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-nox.menu \
   debian/$(flavor)-nox.postinst \
   debian/$(flavor)-nox.prerm \
-  debian/$(flavor)-gtk.README.Debian \
-  debian/$(flavor)-gtk.desktop \
-  debian/$(flavor)-gtk.lintian-overrides \
-  debian/$(flavor)-gtk.menu \
-  debian/$(flavor)-gtk.postinst \
-  debian/$(flavor)-gtk.prerm \
+  debian/$(flavor)-lucid.README.Debian \
+  debian/$(flavor)-lucid.desktop \
+  debian/$(flavor)-lucid.lintian-overrides \
+  debian/$(flavor)-lucid.menu \
+  debian/$(flavor)-lucid.postinst \
+  debian/$(flavor)-lucid.prerm \
   debian/$(flavor).README.Debian \
   debian/$(flavor).desktop \
   debian/$(flavor).menu \
@@ -253,12 +253,12 @@ pkgdir_common := $(CURDIR)/debian/$(flavor)-common
 pkgdir_bin_common := $(CURDIR)/debian/$(flavor)-bin-common
 pkgdir_x := $(CURDIR)/debian/$(flavor)
 pkgdir_nox := $(CURDIR)/debian/$(flavor)-nox
-pkgdir_gtk := $(CURDIR)/debian/$(flavor)-gtk
+pkgdir_lucid := $(CURDIR)/debian/$(flavor)-lucid
 pkgdir_el := $(CURDIR)/debian/$(flavor)-el
 
 install_dir_x := $(CURDIR)/debian/install-x
 install_dir_nox := $(CURDIR)/debian/install-nox
-install_dir_gtk := $(CURDIR)/debian/install-gtk
+install_dir_lucid := $(CURDIR)/debian/install-lucid
 
 local_lpath := /etc/$(flavor):/etc/emacs
 local_lpath := $(local_lpath):/usr/local/share/emacs/$(runtime_ver)/site-lisp
@@ -351,8 +351,8 @@ define cleanup_all
     debian/install-x \
     debian/build-nox \
     debian/install-nox \
-    debian/build-gtk \
-    debian/install-gtk \
+    debian/build-lucid \
+    debian/install-lucid \
     debian/files*
   rm -rf debian/*.tmp
   rm -rf $(deb_trash)
@@ -517,8 +517,8 @@ debian/$(flavor).%: pkg_name := $(flavor)
 debian/$(flavor)-nox.%: xsupport := "nox"
 debian/$(flavor)-nox.%: pkg_name := $(flavor)-nox
 
-debian/$(flavor)-gtk.%: xsupport := "gtk"
-debian/$(flavor)-gtk.%: pkg_name := $(flavor)-gtk
+debian/$(flavor)-lucid.%: xsupport := "lucid"
+debian/$(flavor)-lucid.%: pkg_name := $(flavor)-lucid
 
 debian/$(flavor)-common.%: pkg_name := $(flavor)-common
 debian/$(flavor)-bin-common.%: pkg_name := $(flavor)-bin-common
@@ -541,7 +541,7 @@ debian/$(flavor).%: debian/emacsVER.% debian/changelog
 debian/$(flavor)-nox.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-gtk.%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-lucid.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-common.README.Debian: \
@@ -589,18 +589,18 @@ confflags += --enable-locallisppath=$(local_lpath)
 # x configure flags
 confflags_x := $(confflags) 
 confflags_x += --with-x=yes
-confflags_x += --with-x-toolkit=athena
+confflags_x += --with-x-toolkit=gtk
 confflags_x += --with-toolkit-scroll-bars
 
 # nox configure flags
 confflags_nox := $(confflags) 
 confflags_nox += --with-x=no
 
-# gtk configure flags
-confflags_gtk := $(confflags) 
-confflags_gtk += --with-x=yes
-confflags_gtk += --with-x-toolkit=gtk
-confflags_gtk += --with-toolkit-scroll-bars
+# lucid configure flags
+confflags_lucid := $(confflags)
+confflags_lucid += --with-x=yes
+confflags_lucid += --with-x-toolkit=lucid
+confflags_lucid += --with-toolkit-scroll-bars
 
 configure: debian/stamp/configure
 .PHONY: configure
@@ -620,7 +620,7 @@ debian/stamp/configure: debian/stamp/setup
 	$(checkdir)
 	$(call cfg_tree,debian/build-x,$(confflags_x))
 	$(call cfg_tree,debian/build-nox,$(confflags_nox))
-	$(call cfg_tree,debian/build-gtk,$(confflags_gtk))
+	$(call cfg_tree,debian/build-lucid,$(confflags_lucid))
 	mkdir -p debian/stamp && touch $@
 
 build: debian/stamp/build
@@ -633,7 +633,7 @@ debian/stamp/build: debian/stamp/configure $(autogen_build_files)
         #cd debian/build-x && $(build_cmd) clean
 	$(call build_cmd,debian/build-x)
 	$(call build_cmd,debian/build-nox)
-	$(call build_cmd,debian/build-gtk)
+	$(call build_cmd,debian/build-lucid)
 	mkdir -p debian/stamp && touch $@
 
 
@@ -667,7 +667,7 @@ install: debian/stamp/build $(autogen_install_files)
 	dh_clean -k
 	dh_installdirs
 
-	rm -rf $(install_dir_x) $(install_dir_nox) $(install_dir_gtk)
+	rm -rf $(install_dir_x) $(install_dir_nox) $(install_dir_lucid)
 
         # Deal with accidental multiple version problem.
 	rm -f debian/build-x/etc/DOC-$(runtime_ver).*
@@ -681,7 +681,7 @@ install: debian/stamp/build $(autogen_install_files)
 	rm -f debian/build-nox/src/emacs
 	$(call emacs_inst,build-nox,$(install_dir_nox))
 
-	$(call emacs_inst,build-gtk,$(install_dir_gtk))
+	$(call emacs_inst,build-lucid,$(install_dir_lucid))
 
 #        # Use X install dir for the common packages too.
 #	$(call emacs_inst,build-x,$(install_dir_x))
@@ -824,16 +824,16 @@ install: debian/stamp/build $(autogen_install_files)
 	rm -rf $(install_dir_nox)
 
         ##################################################
-        # emacsXY-gtk
-	$(call emacs_inst,build-gtk,$(install_dir_gtk))
+        # emacsXY-lucid
+	$(call emacs_inst,build-lucid,$(install_dir_lucid))
 	$(call install_common_binpkg_bits,\
-	  $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-gtk,gtk)
+	  $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
 
         # install desktop entry
-	install -d $(pkgdir_gtk)/usr/share/applications
+	install -d $(pkgdir_lucid)/usr/share/applications
 	install -m 0644 \
-	  debian/$(flavor)-gtk.desktop $(pkgdir_gtk)/usr/share/applications/
-	rm -rf $(install_dir_gtk)
+	  debian/$(flavor)-lucid.desktop $(pkgdir_lucid)/usr/share/applications/
+	rm -rf $(install_dir_lucid)
 
         ##################################################
         # emacsXY-el
@@ -847,7 +847,7 @@ install: debian/stamp/build $(autogen_install_files)
         # final cleanup
 	rm -rf $(install_dir_x)
 	rm -rf $(install_dir_nox)
-	rm -rf $(install_dir_gtk)
+	rm -rf $(install_dir_lucid)
 
 
 binary-indep: build install
