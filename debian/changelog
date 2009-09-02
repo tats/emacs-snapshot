@@ -5,7 +5,9 @@ emacs23 (23.1+1-3) unstable; urgency=low
 
   * Change emacsVER to be the GTK+ version to match the upstream
     default, and add an emacsVER-lucid package for those who still
-    want the non-GTK+ version. (closes: #539800)
+    want the non-GTK+ version.  Thanks to Romain Francoise
+    <rfrancoise@debian.org> and others for the report.
+    (closes: #539800)
 
   * Don't build-depend on libgmp-dev on hurd or kfreebsd.  Thanks to
     Cyril Brulebois <kibi@debian.org>. (closes: #541353)
