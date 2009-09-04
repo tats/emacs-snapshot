@@ -13,7 +13,7 @@ update-alternatives \
           /usr/share/icons/hicolor/scalable/apps/${FLAVOR}.svg \
   --slave /usr/share/icons/hicolor/scalable/mimetypes/emacs-document.svg \
           emacs-document.svg \
-          /usr/share/icons/hicolor/scalable/apps/${FLAVOR}-document.svg \
+          /usr/share/icons/hicolor/scalable/mimetypes/${FLAVOR}-document.svg \
   --slave /usr/share/icons/hicolor/16x16/apps/emacs.png emacs-16x16.png \
           /usr/share/icons/hicolor/16x16/apps/${FLAVOR}.png \
   --slave /usr/share/icons/hicolor/24x24/apps/emacs.png  emacs-24x24.png \
