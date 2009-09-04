@@ -8,6 +8,6 @@ Exec=/usr/bin/@DEB_FLAVOR@
 TryExec=@DEB_FLAVOR@
 Terminal=false
 Type=Application
-Icon=/usr/share/emacs/@FULL_VERSION@/etc/images/icons/emacs_48.png
+Icon=/usr/share/icons/hicolor/scalable/apps/@DEB_FLAVOR@.svg
 Categories=Application;Utility;TextEditor;
 MimeType=text/plain

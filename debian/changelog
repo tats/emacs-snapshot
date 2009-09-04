@@ -12,7 +12,15 @@ emacs23 (23.1+1-3) unstable; urgency=low
   * Don't build-depend on libgmp-dev on hurd or kfreebsd.  Thanks to
     Cyril Brulebois <kibi@debian.org>. (closes: #541353)
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 01 Sep 2009 20:04:40 -0700
+  * Fix emacsVER.desktop to refer to SVG file instead of incorrect
+    PNG, remove emacs22.png files from unversioned /usr/share/icons
+    directory, and change emacs*.png and emacs*.svg files to
+    emacsVER*.png and emacsVER*.svg.  Also use update-alternatives to
+    manage the unversioned names for these files.  Thanks to Atsuhito
+    KOHDA <kohda@pm.tokushima-u.ac.jp> for the initial
+    report. (closes: #539851)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 01 Sep 2009 21:14:54 -0700
 
 emacs23 (23.1+1-2) unstable; urgency=low
 
