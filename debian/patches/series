@@ -8,4 +8,5 @@ avoid-fakemail-mail-loss.diff
 version-mention-debian.diff
 look-for-news-to-find-etc.diff
 fix-flymake-xmlstarlet-invocation.diff
+fix-rmail-capitalized-month-names.diff
 autofiles.diff
