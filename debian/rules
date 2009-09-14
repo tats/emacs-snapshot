@@ -781,9 +781,10 @@ install: debian/stamp/build $(autogen_install_files)
 	$(pf); cd $(pkgdir_common) && \
 	  find -name "*.elc" | perl -pe 's/\.elc$$/\.el\.gz/o' | xargs rm -f
 
-        # Remove extraneous info dir file.
-	rm $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
-	rm $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
+        # Remove extraneous info dir files.  These may not exist if dpkg
+        # is 1.5.4 or newer.
+	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
+	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
 
         # Remove the shared game score directory to as a simple way to avoid
         # a conflict with other flavors of Emacs.  Since Debian's
