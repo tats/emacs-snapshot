@@ -28,6 +28,7 @@ Conflicts: emacs23, emacs23-nox, emacs23-gtk
 Replaces: emacs23, emacs23-nox, emacs23-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
+ This package contains a version of Emacs with a Lucid user interface.
 
 Package: emacs23-nox
 Section: editors

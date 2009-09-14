@@ -28,6 +28,7 @@ Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
+ This package contains a version of Emacs with a Lucid user interface.
 
 Package: @DEB_FLAVOR@-nox
 Section: editors

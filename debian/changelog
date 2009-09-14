@@ -11,7 +11,11 @@ emacs23 (23.1+1-4) unstable; urgency=low
     to Sven Joachim <svenjoac@gmx.de> for the report and the
     fix. (closes: 545379)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 Sep 2009 16:49:33 -0700
+  * Add a bit to the emacsVER-lucid description.  Thanks to Drew
+    Parsons <dparsons@debian.org> for the suggestion.
+    (closes: #545263)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 Sep 2009 17:45:22 -0700
 
 emacs23 (23.1+1-3) unstable; urgency=low
 
