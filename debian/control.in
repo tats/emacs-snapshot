@@ -48,7 +48,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
-Provides: editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
 Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk

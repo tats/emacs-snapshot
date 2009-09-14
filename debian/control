@@ -48,7 +48,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
-Provides: editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23-lucid, emacs23-nox, emacs23-gtk
 Replaces: emacs23-lucid, emacs23-nox, emacs23-gtk
