@@ -1,3 +1,12 @@
+emacs23 (23.1+1-5) unstable; urgency=low
+
+  * Apply upstream patch to fix problem with GTK and dynamically
+    generated menus (which could be unexpectedly empty).  Thanks to
+    Baylis Shanks <bshanks3@hotmail.com> for the report.
+    (closes: 550541)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 01 Nov 2009 10:00:58 -0800
+
 emacs23 (23.1+1-4) unstable; urgency=low
 
   * Remove redundant upstream emacs.desktop files from emacs23-common,
