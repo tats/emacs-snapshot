@@ -411,6 +411,7 @@ define deb_sub
 endef
 
 check-vars:
+	@echo "src_name: $(src_name)"
 	@echo "upstream_ver: $(upstream_ver)"
 	@echo "debian_ver: $(debian_ver)"
 	@echo "debsrc_ver: $(debsrc_ver)"
@@ -422,39 +423,35 @@ check-vars:
 	@echo "movemail_bin: $(movemail_bin)"
 .PHONY: check-vars
 
-.PHONY: check-diff
+
+define check_diff
+  lsdiff -z \
+    -x $(src_name)-$(debsrc_ver)/debian/'*' \
+    ../$(src_name)_$(debian_ver).diff.gz \
+      > debian/tmp-src-lsdiff
+  @if test -s debian/tmp-src-lsdiff; \
+  then \
+    echo "Diffs found outside ./debian in" \
+      " ../$(src_name)_$(debsrc_ver).diff.gz"; \
+    cat debian/tmp-src-lsdiff; \
+    false; \
+  else \
+    echo "../$(src_name)_$(debsrc_ver).diff.gz looks OK."; \
+  fi
+endef
+
+deb_trash += debian/tmp-src-lsdiff
+
 check-diff: clean
 	$(checkdir)
-	test -r ../$(deb_orig_tgz)
-	rm -rf debian/tmp-diff && mkdir debian/tmp-diff
-	cd debian/tmp-diff && tar xzpSf ../../../$(deb_orig_tgz)
-	cd debian/tmp-diff && mv $(deb_orig_tgz_dir) orig
-
-	mkdir debian/tmp-diff/new
-	$(pf); tar cpf - --exclude './debian' --exclude './.pc' . \
-	  | (cd debian/tmp-diff/new && tar xpf -)
-
-	@echo
-	@echo "########################################"
-	@echo "### Diffs outside ./debian"
-	@cd debian/tmp-diff && diff -ruN orig new
-	@echo "########################################"
-	@echo "### Empty file list differences"
-	@diff -u \
-	  <(cd debian/tmp-diff/orig && find -size 0) \
-	  <(cd debian/tmp-diff/new && find -size 0) \
-	    > debian/tmp-diff/empty-files.diff || test $$? -eq 1
-	@cat debian/tmp-diff/empty-files.diff
-	@test ! -s debian/tmp-diff/empty-files.diff || false
-	@echo "########################################"
-	@rm -rf debian/tmp-diff
-
-deb_trash += debian/tmp-diff
-
+	cd .. && dpkg-source -b -i'\.git|\.pc' "$(basename $(CURDIR))"
+	$(check_diff)
 
 buildpackage:
 	$(checkdir)
 	dpkg-buildpackage -D -us -uc -rfakeroot -i'\.git|\.pc'
+	$(check_diff)
+
 .PHONY: buildpackage
 
 prepare-release:
