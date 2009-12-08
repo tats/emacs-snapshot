@@ -1,3 +1,11 @@
+emacs23 (23.1+1-6) unstable; urgency=low
+
+  * Fix update-alternatives call for emacs manpage.  Thanks to
+    Jörg-Volker Peetz <peetz@dynato-kyma.net> and Sven Joachim
+    <svenjoac@gmx.de> for the report. (closes: #552565)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 07 Nov 2009 16:18:51 -0800
+
 emacs23 (23.1+1-5) unstable; urgency=low
 
   * Apply upstream patch to fix problem with GTK and dynamically

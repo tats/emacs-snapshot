@@ -29,7 +29,7 @@ update-alternatives \
   --install /usr/bin/editor editor \
             /usr/bin/${FLAVOR} 0 \
   --slave /usr/share/man/man1/editor.1.gz editor.1.gz \
-          /usr/share/man/man1/emacs.1${FLAVOR}.1.gz
+          /usr/share/man/man1/emacs.${FLAVOR}.1.gz
 
 # emacsen-common registration.
 /usr/lib/emacsen-common/emacs-install ${FLAVOR}
