@@ -1,3 +1,12 @@
+emacs23 (23.1+1-7) unstable; urgency=low
+
+  * Apply an upstream patch to fix a problem with GTK+ scroll
+    bars. Thanks to Eugen Dedu <Eugen.Dedu@pu-pm.univ-fcomte.fr> for
+    the report and Sven Joachim <svenjoac@gmx.de> for tracking down
+    the patch. (closes: #560573)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 21 Jan 2010 21:51:45 -0800
+
 emacs23 (23.1+1-6) unstable; urgency=low
 
   * Fix update-alternatives call for emacs manpage.  Thanks to

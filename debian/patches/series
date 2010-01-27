@@ -10,4 +10,5 @@ look-for-news-to-find-etc.diff
 fix-flymake-xmlstarlet-invocation.diff
 fix-rmail-capitalized-month-names.diff
 fix-dynamic-menus.diff
+fix-gtk-scroll-bar-events.diff
 autofiles.diff
