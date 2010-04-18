@@ -183,6 +183,11 @@ else # not noopt
   endif # neq (m68k,$(DEB_HOST_ARCH))
 endif # not noopt
 
+joblimit := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ifeq (,$(joblimit))
+  joblimit := 1
+endif
+
 target := $(DEB_HOST_GNU_TYPE)
 movemail_bin := usr/lib/emacs/$(runtime_ver)/$(target)/movemail
 
@@ -296,7 +301,7 @@ define checkdir
 endef
 
 define build_cmd
-  $(MAKE) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
+  $(MAKE) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
 endef
 
 # If we ever need to do the stripping outside of dh_strip, just add an
