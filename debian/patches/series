@@ -12,4 +12,3 @@ fix-rmail-capitalized-month-names.diff
 fix-dynamic-menus.diff
 fix-gtk-scroll-bar-events.diff
 use-zwj-and-zwnj-for-indic-scripts.diff
-autofiles.diff
