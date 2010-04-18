@@ -3,7 +3,9 @@ emacs23 (23.1+1-7) unstable; urgency=low
   * Remove Jerome from debian/control Uploaders since he has
     retired. (closes: #573442)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 17 Apr 2010 19:38:45 -0700
+  * Support DEB_BUILD_OPTIONS parallel=N.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 17 Apr 2010 23:37:04 -0700
 
 emacs23 (23.1+1-6) unstable; urgency=low
 
