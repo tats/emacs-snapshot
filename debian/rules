@@ -71,11 +71,6 @@ pf := set -o pipefail
 # we'll need to be careful.  We'll probably have to build completely
 # separate packages from completely separate source trees.
 
-# Note that we use quilt to handle the debian patches.  One of the
-# biggest differences between quilt and say dpatch is that you have to
-# explicitly "quilt add" a file to a patch before you edit it.  See
-# "man quilt" for details..
-
 # If the source tree ever ends up in an untenable "can't go forward,
 # can't go back" state with respect to patching, you can always start
 # over by just moving the current debian directory to a newly unpacked
@@ -189,15 +184,6 @@ endif
 target := $(DEB_HOST_GNU_TYPE)
 movemail_bin := usr/lib/emacs/$(runtime_ver)/$(target)/movemail
 
-# These files may be modified in the *source* tree during the build.
-# Wonder if we could patch emacs to copy/use these files to/from the
-# build tree... (See Makefile.in's AUTOGENEL definition.)
-protected_files := \
-  lisp/cus-load.el \
-  lisp/finder-inf.el \
-  lisp/loaddefs.el \
-  lisp/subdirs.el
-
 # Info files that are going to show up in the main dir.
 main_dir_info_files := \
   efaq \
@@ -287,10 +273,6 @@ define checkdir
   fi
 endef
 
-define build_cmd
-  $(MAKE) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
-endef
-
 # If we ever need to do the stripping outside of dh_strip, just add an
 # INSTALL_STRIP="-s" to the make vars below.
 
@@ -300,16 +282,6 @@ emacs_inst = (cd debian/$(1) && \
     infodir=/usr/share/info/emacs-$(major_ver) \
     localstatedir=/var \
     manext=.1$(flavor))
-
-define patch
-  $(quilt) push -a
-endef
-
-define unpatch
-  test -z "$$($(quilt) applied)" || $(quilt) pop -a
-  rm -f debian/stamp/patch
-  rm -rf .pc
-endef
 
 define cleanup_all
   # distclean goes first so we clean using patched code
@@ -321,13 +293,8 @@ define cleanup_all
   -$(MAKE) distclean
   cd info && rm -f $$(ls | grep -v COPYING)
   dh_clean
-  $(unpatch)
   #   now clean up bits in the source tree that the above didn't handle
   find -name "*.elc" | xargs --no-run-if-empty rm
-  if [ -e debian/protected-files.tgz ]; then \
-    tar xzpf debian/protected-files.tgz; \
-  fi
-  rm -f debian/protected-files.tgz
   #   now clean up everything else (mostly ./debian related stuff)
   find -name '*~' | xargs --no-run-if-empty rm -f
   rm -f debian/substvars
@@ -342,7 +309,6 @@ define cleanup_all
     debian/files*
   rm -rf debian/*.tmp
   rm -rf $(deb_trash)
-  rm -rf .pc
   test ! -e debian/stamp || rmdir debian/stamp
 endef
 
@@ -501,16 +467,7 @@ deb_trash += debian/emacsVER-common.README.tmp
 deb_trash += debian/emacsVER-common.README.00
 deb_trash += debian/emacsVER-common.README.01
 
-debian/protected-files.tgz:
-	tar czpSf debian/protected-files.tgz.tmp $(protected_files)
-	mv debian/protected-files.tgz.tmp $@
-
-debian/stamp/patch: debian/protected-files.tgz
-	$(checkdir)
-	$(patch)
-	mkdir -p $(dir $@) && touch $@
-
-debian/stamp/setup: debian/stamp/patch
+debian/stamp/setup:
 	$(checkdir)
 	dh_autotools-dev_updateconfig
 	aclocal
@@ -551,6 +508,10 @@ define cfg_tree
   rm -rf $(1)
   mkdir $(1)
   cd $(1) && CFLAGS="$(CFLAGS)" ../../configure $(confflags) $(2)
+endef
+
+define build_cmd
+  $(MAKE) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
 endef
 
 # For those who prefer the old-style non-toolkit scrollbars, just add
