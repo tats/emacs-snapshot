@@ -10,3 +10,4 @@ version-mention-debian.diff
 fix-mule-select-safe-coding.diff
 look-for-news-to-find-etc.diff
 fix-flymake-xmlstarlet-invocation.diff
+add-unix-to-cpp-undefs.diff
