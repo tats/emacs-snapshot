@@ -655,7 +655,7 @@ install: debian/stamp/build $(autogen_install_files)
 	done
 
 	perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
-	  $(pkgdir_common)/usr/share/man/man1/ctags.$(flavor).1
+	  $(pkgdir_common)/usr/share/man/man1/ctags.1
 
 	cd $(pkgdir_common)/usr/share/man/man1/ && \
 	  for f in *.1; do mv $$f $$(basename $${f} .1).$(flavor).1; done
