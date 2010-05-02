@@ -20,7 +20,7 @@ Package: @DEB_FLAVOR@-lucid
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
@@ -33,7 +33,7 @@ Package: @DEB_FLAVOR@-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
@@ -46,7 +46,7 @@ Package: @DEB_FLAVOR@
 Section: editors
 Priority: optional
 Architecture: any
-Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
@@ -69,7 +69,7 @@ Package: @DEB_FLAVOR@-common
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.9.0), ${shlibs:Depends}
+Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version})
 Description: The GNU Emacs editor's shared, architecture independent infrastructure

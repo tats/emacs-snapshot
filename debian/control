@@ -20,7 +20,7 @@ Package: emacs23-lucid
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs23, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-nox, emacs23-gtk
@@ -33,7 +33,7 @@ Package: emacs23-nox
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-lucid, emacs23-gtk
@@ -46,7 +46,7 @@ Package: emacs23
 Section: editors
 Priority: optional
 Architecture: any
-Depends: emacs23-bin-common (= ${binary:Version}), install-info, ${shlibs:Depends}
+Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23-lucid, emacs23-nox, emacs23-gtk
@@ -69,7 +69,7 @@ Package: emacs23-common
 Section: editors
 Priority: optional
 Architecture: all
-Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.9.0), ${shlibs:Depends}
+Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}
 Suggests: emacs23-el, emacs23-common-non-dfsg
 Conflicts: emacs23-el (<< ${Source-Version})
 Description: The GNU Emacs editor's shared, architecture independent infrastructure

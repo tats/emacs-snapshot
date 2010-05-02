@@ -20,7 +20,12 @@ emacs23 (23.1+1-7) unstable; urgency=low
 
   * Change debian/rules to use "dh $@" approach.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 May 2010 19:13:17 -0700
+  * Update emacsFLAVOR-common dpkg dependency to require "dpkg (>=
+    1.15.4) | install-info" for proper info page handling (Debian
+    Policy 12.2), and remove install-info dependency from packages
+    without info files.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 May 2010 19:48:11 -0700
 
 emacs23 (23.1+1-6) unstable; urgency=low
 
