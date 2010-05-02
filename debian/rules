@@ -7,7 +7,7 @@
 
 # Copyright 1994,1995 Ian Jackson
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
-# Copyright 1998-2009 Rob Browning <rlb@defaultvalue.org>
+# Copyright 1998-2010 Rob Browning <rlb@defaultvalue.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
 # Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
@@ -27,9 +27,9 @@ SHELL := /bin/bash
 
 quilt := QUILT_PATCHES=debian/patches quilt
 
-deb_trash :=
-
 pf := set -o pipefail
+
+# This package uses debian/source/format 3.0 (quilt).
 
 # For now we assume that emacs' versioning scheme is always
 # MAJOR.MINORtinyrev where MAJOR and MINOR are integers and tinyrev is
@@ -38,48 +38,53 @@ pf := set -o pipefail
 # way.  So far that's always been true.  If it becomes false, some of
 # the values below will have to be set manually.
 
-# At the moment, we try to make it so that a "debian/rules clean" will
-# get you back to the same state you were in before "debian/rules
-# build".  With the original upstream source that's somewhat tricky
-# because they ship the .elc files, but we need to re-build them when
-# we patch the corresponding .el files.  This is further complicated
-# by the fact that any of these .el files may have macros, and if
-# those are changed, then any other .el files that use those macros
-# must also be recompiled.  Over the years, we've tried various ways
-# to handle this problem, originally by trying to keep track of which
-# files need to be recompiled and only recompiling those, then later
-# by just re-building all the .elc files with "make bootstrap".  In
-# either case, if you don't want to have diff bloat, you have to do
-# something to keep track of the original .elc files so you can
-# restore them during make clean.
+# As you might expect, a "debian/rules clean" should always get you
+# back to the state you were in before "debian/rules build".  In order
+# to accomplish that, this rules file actually performs three
+# independent builds to produce the emacsXY, emacsXY-nox, and
+# emacsXY-lucid packages.  The source is actually copied into separate
+# debian/build-* directories and built there.  Certain aspects of the
+# upstream build process have led to this approach.
+
+# For example, the original upstream source ships the .elc files, but
+# we need to re-build them when we patch the corresponding .el files.
+# The situation is further complicated by the fact that any of these
+# .el files may have macros, and if those are changed, then any other
+# .el files that use those macros must also be recompiled.  Over the
+# years, we've tried various ways to handle this issue, originally by
+# trying to keep track of which files need to be recompiled and only
+# recompiling those, then later by just re-building all the .elc files
+# with "make bootstrap".  In either case, if you don't want to have
+# diff bloat, you have to do something to keep track of the original
+# .elc files so you can restore them during make clean.
 
 # All of this was a lot of work, and was using quite a bit of
-# unnecessary storage both in the .orig.tar.gz and during the package
-# build.  So in order to avoid this, and to dramatically simplify
-# things, we now just remove the .elc files from the upstream
-# distribution whenever we create the debian .orig.tar.gz file for a
-# given upstream release.  Since were always clobbering all of the
-# .elc files during the package build anyway, this shouldn't be any
-# great loss, and it also means that "debian/rules clean" now needs to
-# be little more than a "make distclean" followed by a purge of all
-# the remaining .elc files.
+# unnecessary storage both in the .orig.tar.gz.  To avoid that, and to
+# simplify the process, we now just remove the .elc files from the
+# upstream distribution whenever we create the debian .orig.tar.gz
+# file for a given upstream release.  Since we were always clobbering
+# the .elc files during the package build, that was no great loss.
 
-# NOTE -- emacs doesn't respect .elc files in VPATH build.  They're
-# modified in srcdir, not builddir.  We don't worry about this because
-# it shouldn't affect our builds ATM, but if we ever have more than
-# one emacs configuration which could produce differing .elc files,
-# we'll need to be careful.  We'll probably have to build completely
-# separate packages from completely separate source trees.
+# (You might imagine that a VPATH build would allow us to avoid having
+#  to copy the entire source tree for each of the three builds, but it
+#  turns out that without additional complexity, VPATH builds will
+#  cause diff bloat.  That's because the emacs build process doesn't
+#  completely respect the .elc files; some are modified in srcdir, not
+#  builddir.)
+
+# Copying the source to a separate build directory and building there
+# is much simpler than previous approaches, it makes cleaning trivial,
+# and it avoids any diff bloat.
 
 # If the source tree ever ends up in an untenable "can't go forward,
 # can't go back" state with respect to patching, you can always start
 # over by just moving the current debian directory to a newly unpacked
-# orig.tar.gz tree.  Note that f you were in the process of editing a
-# patch, you will lose those edits, but shouldn't lose anything else.
-# This process just reverts all of the upstream files and abandons the
-# volatile "what's been done to the current tree" state that quilt
-# maintains in ./.pc.  All of the actual patches are stored in
-# debian/patches and should be unharmed.
+# orig.tar.gz tree.  Note that if you were in the process of editing a
+# patch, you will lose those edits, but you shouldn't lose anything
+# else.  This process just reverts all of the upstream files and
+# abandons the volatile "what's been done to the current tree" state
+# that quilt maintains in ./.pc.  All of the actual patches are stored
+# in debian/patches and should be unharmed.
 
 ######################################################################
 # Important top-level targets:
@@ -257,14 +262,10 @@ local_lpath := $(local_lpath):/usr/share/emacs/site-lisp
 local_lpath := $(local_lpath):/usr/share/emacs/$(runtime_ver)/leim
 
 # Installation local_lpath
-local_lpath_install := $(pkgdir_common)/$(subst :,:$(pkgdir_common)/,$(local_lpath))
+local_lpath_install \
+  := $(pkgdir_common)/$(subst :,:$(pkgdir_common)/,$(local_lpath))
 
-define checkroot
-  test root = "`whoami`"
-endef
-
-define checkdir
-  dpkg-parsechangelog > /dev/null
+define testdir
   dh_testdir debian/emacsVER.postinst
   @if ! test -f src/emacs.c; \
   then \
@@ -285,35 +286,6 @@ define emacs_inst
   $(MAKE) -C debian/$(1) install DESTDIR=$(2) \
     infodir=/usr/share/info/emacs-$(major_ver) \
     localstatedir=/var
-endef
-
-define cleanup_all
-  # distclean goes first so we clean using patched code
-  rm -f debian/stamp/setup
-  rm -f debian/stamp/configure
-  rm -f debian/stamp/build
-  rm -f configure src/config.in
-  dh_autotools-dev_restoreconfig
-  -$(MAKE) distclean
-  cd info && rm -f $$(ls | grep -v COPYING | grep -v '^dir$$')
-  dh_clean
-  #   now clean up bits in the source tree that the above didn't handle
-  find -name "*.elc" | xargs --no-run-if-empty rm
-  #   now clean up everything else (mostly ./debian related stuff)
-  find -name '*~' | xargs --no-run-if-empty rm -f
-  rm -f debian/substvars
-  rm -f $(nonpersistent_autogen_files)
-  rm -rf \
-    debian/build-x \
-    debian/install-x \
-    debian/build-nox \
-    debian/install-nox \
-    debian/build-lucid \
-    debian/install-lucid \
-    debian/files*
-  rm -rf debian/*.tmp
-  rm -rf $(deb_trash)
-  test ! -e debian/stamp || rmdir debian/stamp
 endef
 
 # If we ever need it, we can create a copy that doesn't assume ./debian/
@@ -338,6 +310,9 @@ define deb_sub
       < $(1) > $(2)
 endef
 
+%:
+	dh $@ --parallel --with autotools_dev
+
 check-vars:
 	@echo "src_name: $(src_name)"
 	@echo "upstream_ver: $(upstream_ver)"
@@ -349,11 +324,9 @@ check-vars:
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
 	@echo "movemail_bin: $(movemail_bin)"
-.PHONY: check-vars
-
 
 define check_diff
-  @if quilt series | grep -e '^debian-changes-'; \
+  @if $(quilt) series | grep -e '^debian-changes-'; \
   then \
     echo "Diffs found outside ./debian:"; \
     ls debian/patches/debian-changes-*; \
@@ -363,21 +336,18 @@ define check_diff
   fi
 endef
 
-deb_trash += debian/tmp-src-lsdiff
-
 check-diff: clean
-	$(checkdir)
-	cd .. && dpkg-source -b -i'\.git|\.pc' "$(basename $(CURDIR))"
+	$(testdir)
+	cd .. && dpkg-source -b -i "$(basename $(CURDIR))"
 	$(check_diff)
 
-.PHONY: buildpackage
 buildpackage:
-	$(checkdir)
-	dpkg-buildpackage -D -us -uc -rfakeroot -i'\.git|\.pc'
+	$(testdir)
+	dpkg-buildpackage -D -us -uc -rfakeroot -i
 	$(check_diff)
 
 prepare-release:
-	$(checkdir)
+	$(testdir)
         # don't want to be root -- using fakeroot below.
         # also, stacking fakeroots seems to cause trouble generating diff.
 	@test "`whoami`" != root || \
@@ -409,12 +379,11 @@ prepare-release:
 	  echo "Everything looks OK.  Ready for release."; \
 	  echo "Don't forget to run debsign if needed."; \
 	fi
-.PHONY: prepare-release 
 
 
 debian-sync: $(persistent_autogen_files)
-
-.PHONY: force-debian-sync debian-sync
+        # so dh pattern rule doesn't try to handle this target
+	true
 
 debian/$(flavor).%: xsupport := "x"
 debian/$(flavor).%: pkg_name := $(flavor)
@@ -462,13 +431,8 @@ debian/$(flavor)-common.README.Debian: \
 	  >> debian/emacsVER-common.README.tmp
 	mv debian/emacsVER-common.README.tmp $@
 
-deb_trash += debian/emacsVER-common.README.tmp
-deb_trash += debian/emacsVER-common.README.00
-deb_trash += debian/emacsVER-common.README.01
-
-debian/stamp/setup:
-	$(checkdir)
-	dh_autotools-dev_updateconfig
+debian/setup-stamp:
+	$(testdir)
 	aclocal
 	autoconf
 	autoheader
@@ -488,6 +452,9 @@ confflags += --enable-locallisppath=$(local_lpath)
 confflags_x := $(confflags) 
 confflags_x += --with-x=yes
 confflags_x += --with-x-toolkit=gtk
+# For those who prefer the old-style non-toolkit scrollbars, just
+# change the assignment below to --without-toolkit-scroll-bars.  The
+# resulting emacsXY package will have the old scrollbars.
 confflags_x += --with-toolkit-scroll-bars
 
 # nox configure flags
@@ -499,9 +466,6 @@ confflags_lucid := $(confflags)
 confflags_lucid += --with-x=yes
 confflags_lucid += --with-x-toolkit=lucid
 confflags_lucid += --with-toolkit-scroll-bars
-
-configure: debian/stamp/configure
-.PHONY: configure
 
 define cfg_tree
   rm -rf $(1)
@@ -516,30 +480,15 @@ define build_cmd
   $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" info
 endef
 
-# For those who prefer the old-style non-toolkit scrollbars, just add
-# --without-toolkit-scroll-bars to the build-x cfg_tree line below.
-# The resulting emacsXY package will have the old scrollbars.
-
-debian/stamp/configure: debian/stamp/setup
-	$(checkdir)
+override_dh_auto_configure: debian/setup-stamp
 	$(call cfg_tree,debian/build-x,$(confflags_x))
 	$(call cfg_tree,debian/build-nox,$(confflags_nox))
 	$(call cfg_tree,debian/build-lucid,$(confflags_lucid))
-	mkdir -p debian/stamp && touch $@
 
-build: debian/stamp/build
-.PHONY: build
-
-debian/stamp/build: debian/stamp/configure $(autogen_build_files)
-	$(checkdir)
-        # See if we can do without the bootstrap now...
-        #cd debian/build-x && $(build_cmd) bootstrap
-        #cd debian/build-x && $(build_cmd) clean
+override_dh_auto_build: $(autogen_build_files)
 	$(call build_cmd,debian/build-x)
 	$(call build_cmd,debian/build-nox)
 	$(call build_cmd,debian/build-lucid)
-	mkdir -p debian/stamp && touch $@
-
 
 define install_common_binpkg_bits
   # args: (1) srcdir (2) pkgdir (3) pkgname (4) bin-suffix
@@ -560,18 +509,17 @@ define install_common_binpkg_bits
   dh_link -p$(3) \
     usr/share/man/man1/emacs.$(flavor).1.gz \
     usr/share/man/man1/$(flavor)-$(4).1.gz
-
 endef
 
-
-install: debian/stamp/build $(autogen_install_files)
-	$(checkdir)
-	dh_testdir
-	dh_testroot
-	dh_clean -k
-	dh_installdirs
-
-	rm -rf $(install_dir_x) $(install_dir_nox) $(install_dir_lucid)
+override_dh_auto_install: $(autogen_install_files)
+	rm -rf \
+	  $(install_dir_x) $(install_dir_nox) $(install_dir_lucid) \
+	  $(pkgdir_common)/* \
+	  $(pkgdir_bin_common)/* \
+	  $(pkgdir_x)/* \
+	  $(pkgdir_nox)/* \
+	  $(pkgdir_lucid)/* \
+	  $(pkgdir_el)/*
 
         # Deal with accidental multiple version problem.
 	rm -f debian/build-x/etc/DOC-$(runtime_ver).*
@@ -586,9 +534,6 @@ install: debian/stamp/build $(autogen_install_files)
 	$(call emacs_inst,build-nox,$(install_dir_nox))
 
 	$(call emacs_inst,build-lucid,$(install_dir_lucid))
-
-#        # Use X install dir for the common packages too.
-#	$(call emacs_inst,build-x,$(install_dir_x))
 
         ##################################################
         # emacsXY-common
@@ -690,9 +635,10 @@ install: debian/stamp/build $(autogen_install_files)
 	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
 	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
 
-        # Remove the shared game score directory to as a simple way to avoid
-        # a conflict with other flavors of Emacs.  Since Debian's
-        # update-game-score binary isn't setuid, that directory is never used.
+        # Remove the shared game score directory as a simple way to
+        # avoid a conflict with other flavors of Emacs.  Since
+        # Debian's update-game-score binary isn't setuid, that
+        # directory is never used.
 	rm $(pkgdir_common)/var/games/emacs/tetris-scores
 	rm $(pkgdir_common)/var/games/emacs/snake-scores
 	rmdir $(pkgdir_common)/var/games/emacs/
@@ -775,53 +721,19 @@ install: debian/stamp/build $(autogen_install_files)
 	rm -rf $(install_dir_nox)
 	rm -rf $(install_dir_lucid)
 
+override_dh_testdir:
+	$(testdir)
 
-binary-indep: build install
-	$(checkdir)
-	dh_testdir -i
-	dh_testroot -i
-	dh_installchangelogs -i
-	dh_lintian -i
-	dh_installdocs -i
-	dh_link -i
-	dh_strip -i
-	dh_compress -i
-	dh_fixperms -i
-	dh_installdeb -i
-	dh_shlibdeps -i
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
+override_dh_fixperms:
+	dh_fixperms -X$(movemail_bin)
 
-binary-arch: build install
-	$(checkdir)
-	dh_testdir -a
-	dh_testroot -a
-	dh_installinfo -a
-	dh_lintian -a
-	dh_installman -a
-	dh_installchangelogs -a
-	dh_installdocs -a
-	dh_installexamples -a
-#	dh_install -a
-	dh_installmenu -a
-	dh_link -a
-	dh_strip -a
-	dh_compress -a
-	dh_fixperms -a -X$(movemail_bin)
-	dh_installdeb -a
-	dh_shlibdeps -a
-	dh_gencontrol -a
-	dh_md5sums -a
-	dh_builddeb -a
-
-binary: binary-indep binary-arch
-
-clean: debian-sync
-	$(checkdir)
-	$(cleanup_all)
-
-source diff:
-	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
-
-.PHONY: binary binary-arch binary-indep clean
+override_dh_clean: $(persistent_autogen_files)
+	rm -rf \
+	  debian/build-x \
+	  debian/install-x \
+	  debian/build-nox \
+	  debian/install-nox \
+	  debian/build-lucid \
+	  debian/install-lucid \
+	  debian/*-stamp
+	dh_clean

@@ -1,5 +1,6 @@
 *~
 .\#*
+/*-stamp
 /build-lucid
 /build-nox
 /build-x
@@ -69,6 +70,5 @@
 /files
 /patches/autofiles.diff
 /protected-files.tgz
-/stamp
 /tmp-alt-list
 \#*\#

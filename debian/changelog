@@ -18,7 +18,9 @@ emacs23 (23.1+1-7) unstable; urgency=low
   * Fix ctags manpage rewriting so that ctags.FLAVOR.1 actually refers
     to man1/etags.FLAVOR.1 as intended.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 May 2010 19:03:38 -0700
+  * Change debian/rules to use "dh $@" approach.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 May 2010 19:13:17 -0700
 
 emacs23 (23.1+1-6) unstable; urgency=low
 
