@@ -735,5 +735,7 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/install-nox \
 	  debian/build-lucid \
 	  debian/install-lucid \
-	  debian/*-stamp
+	  debian/*-stamp \
+	  configure \
+	  src/config.in
 	dh_clean
