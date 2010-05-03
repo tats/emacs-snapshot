@@ -1,3 +1,9 @@
+emacs23 (23.1+1-8) unstable; urgency=low
+
+  * Add automake to Build-Depends. (closes: #580006)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 May 2010 19:53:36 -0700
+
 emacs23 (23.1+1-7) unstable; urgency=low
 
   * Remove Jerome from debian/control Uploaders since he has
