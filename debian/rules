@@ -521,199 +521,198 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(pkgdir_lucid)/* \
 	  $(pkgdir_el)/*
 
-        # Deal with accidental multiple version problem.
-	rm -f debian/build-x/etc/DOC-$(runtime_ver).*
-	rm -f debian/build-x/src/emacs-$(runtime_ver).*
-	rm -f debian/build-x/src/emacs
 	$(call emacs_inst,build-x,$(install_dir_x))
-
-        # Deal with accidental multiple version problem.
-	rm -f debian/build-nox/etc/DOC-$(runtime_ver).*
-	rm -f debian/build-nox/src/emacs-$(runtime_ver).*
-	rm -f debian/build-nox/src/emacs
-	$(call emacs_inst,build-nox,$(install_dir_nox))
-
-	$(call emacs_inst,build-lucid,$(install_dir_lucid))
 
         ##################################################
         # emacsXY-common
+        ifneq (,$(findstring $(flavor)-common, $(shell dh_listpackages)))
+	  install -d $(pkgdir_common)
+	  cp -a $(install_dir_x)/* $(pkgdir_common)
 
-	cp -a $(install_dir_x)/* $(pkgdir_common)
+	  rm -r $(pkgdir_common)/usr/bin
+	  rm -r $(pkgdir_common)/usr/lib
 
-	rm -r $(pkgdir_common)/usr/bin
-	rm -r $(pkgdir_common)/usr/lib
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
+	    && test -f DOC-$(runtime_ver).*
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
+	    && rm DOC-$(runtime_ver).*
 
-	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
-	  && test -f DOC-$(runtime_ver).*
-	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
-	  && rm DOC-$(runtime_ver).*
+	  # lisp path directories
+	  install -d $(pkgdir_common)/etc/$(flavor)/site-start.d
+	  install -d $(pkgdir_common)/usr/share/$(flavor)
 
-        # lisp path directories
-	install -d $(pkgdir_common)/etc/$(flavor)/site-start.d
-	install -d $(pkgdir_common)/usr/share/$(flavor)
+	  # The version-specific site-lisp dir, say emacs/21.1/site-lisp, needs
+	  # to be in share/FLAVOR so that as we upgrade from 21.1 to 21.2,
+	  # etc., add-on package bits don't get left behind.
+	  mv $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/site-lisp \
+		  $(pkgdir_common)/usr/share/$(flavor)
+	  dh_link -p$(flavor)-common usr/share/$(flavor)/site-lisp \
+			  usr/share/emacs/$(runtime_ver)/site-lisp
 
-        # The version-specific site-lisp dir, say emacs/21.1/site-lisp, needs
-        # to be in share/FLAVOR so that as we upgrade from 21.1 to 21.2,
-        # etc., add-on package bits don't get left behind.
-	mv $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/site-lisp \
-		$(pkgdir_common)/usr/share/$(flavor)
-	dh_link -p$(flavor)-common usr/share/$(flavor)/site-lisp \
-			usr/share/emacs/$(runtime_ver)/site-lisp
+	  # This is a duplicate of the file in FLAVOR/site-lisp
+	  rm $(pkgdir_common)/usr/share/emacs/site-lisp/subdirs.el
 
-        # This is a duplicate of the file in FLAVOR/site-lisp
-	rm $(pkgdir_common)/usr/share/emacs/site-lisp/subdirs.el
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
+	    && convert hicolor/16x16/apps/emacs.{png,xpm}
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
+	    && convert hicolor/32x32/apps/emacs.{png,xpm}
 
-	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
-	  && convert hicolor/16x16/apps/emacs.{png,xpm}
-	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
-	  && convert hicolor/32x32/apps/emacs.{png,xpm}
+	  # Fixup image files in unversioned directories (remove old
+	  # images, version unversioned images) and prepare for
+	  # update-alternatives.
+	  rm $(pkgdir_common)/usr/share/icons/hicolor/16x16/apps/emacs22.png
+	  rm $(pkgdir_common)/usr/share/icons/hicolor/24x24/apps/emacs22.png
+	  rm $(pkgdir_common)/usr/share/icons/hicolor/48x48/apps/emacs22.png
 
-        # Fixup image files in unversioned directories (remove old
-        # images, version unversioned images) and prepare for
-        # update-alternatives.
-	rm $(pkgdir_common)/usr/share/icons/hicolor/16x16/apps/emacs22.png
-	rm $(pkgdir_common)/usr/share/icons/hicolor/24x24/apps/emacs22.png
-	rm $(pkgdir_common)/usr/share/icons/hicolor/48x48/apps/emacs22.png
+	  cd $(pkgdir_common)/usr/share/icons/hicolor \
+	    && mv scalable/apps/emacs.svg scalable/apps/${flavor}.svg \
+	    && mv 16x16/apps/emacs.png 16x16/apps/${flavor}.png \
+	    && mv 24x24/apps/emacs.png 24x24/apps/${flavor}.png \
+	    && mv 32x32/apps/emacs.png 32x32/apps/${flavor}.png \
+	    && mv 48x48/apps/emacs.png 48x48/apps/${flavor}.png \
+	    && mv 128x128/apps/emacs.png 128x128/apps/${flavor}.png
 
-	cd $(pkgdir_common)/usr/share/icons/hicolor \
-	  && mv scalable/apps/emacs.svg scalable/apps/${flavor}.svg \
-	  && mv 16x16/apps/emacs.png 16x16/apps/${flavor}.png \
-	  && mv 24x24/apps/emacs.png 24x24/apps/${flavor}.png \
-	  && mv 32x32/apps/emacs.png 32x32/apps/${flavor}.png \
-	  && mv 48x48/apps/emacs.png 48x48/apps/${flavor}.png \
-	  && mv 128x128/apps/emacs.png 128x128/apps/${flavor}.png
+	  cd $(pkgdir_common)/usr/share/icons/hicolor/scalable/mimetypes \
+	    && mv emacs-document.svg ${flavor}-document.svg
 
-	cd $(pkgdir_common)/usr/share/icons/hicolor/scalable/mimetypes \
-	  && mv emacs-document.svg ${flavor}-document.svg
+	  # Remove redundant emacs.desktop file.
+	  rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/emacs.desktop
+	  rm $(pkgdir_common)/usr/share/applications/emacs.desktop
 
-        # Remove redundant emacs.desktop file.
-	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/emacs.desktop
-	rm $(pkgdir_common)/usr/share/applications/emacs.desktop
+	  # Mangle info files.
+	  chmod 755 debian/mangle-info
+	  for f in $(main_dir_info_files); \
+	  do \
+	    DEBIAN_INFO_PREFIX=$(info_subdir) \
+	      debian/mangle-info \
+		$(pkgdir_common)/usr/share/info/$(info_subdir)/$$f; \
+	  done
 
-        # Mangle info files.
-	chmod 755 debian/mangle-info
-	for f in $(main_dir_info_files); \
-	do \
-	  DEBIAN_INFO_PREFIX=$(info_subdir) \
-	    debian/mangle-info \
-	      $(pkgdir_common)/usr/share/info/$(info_subdir)/$$f; \
-	done
+	  perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
+	    $(pkgdir_common)/usr/share/man/man1/ctags.1
 
-	perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
-	  $(pkgdir_common)/usr/share/man/man1/ctags.1
+	  cd $(pkgdir_common)/usr/share/man/man1/ && \
+	    for f in *.1; do mv $$f $$(basename $${f} .1).$(flavor).1; done
 
-	cd $(pkgdir_common)/usr/share/man/man1/ && \
-	  for f in *.1; do mv $$f $$(basename $${f} .1).$(flavor).1; done
+	  # At least etc/COPYING is needed by M-x describe-copying.
+	  rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
+	  rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
+	  dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	    usr/share/emacs/$(runtime_ver)/etc/COPYING
+	  dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	    usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
-        # At least etc/COPYING is needed by M-x describe-copying.
-	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
-	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
-	  usr/share/emacs/$(runtime_ver)/etc/COPYING
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
-	  usr/share/emacs/$(runtime_ver)/lisp/COPYING
+	  # Install replacements for non-free files that can be reached
+	  # through C-h
+	  for f in THE-GNU-PROJECT; \
+	  do \
+	    sed \
+	      -e "s/@FILE@/$$f/g" \
+	      -e "s/@MAJOR_VERSION@/$(major_ver)/g" \
+	      $(CURDIR)/debian/missing-file.dfsg > \
+	      $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/$$f.dfsg ; \
+	  done
 
-        # Install replacements for non-free files that can be reached
-        # through C-h
-	for f in THE-GNU-PROJECT; \
-	do \
-	  sed \
-	    -e "s/@FILE@/$$f/g" \
-	    -e "s/@MAJOR_VERSION@/$(major_ver)/g" \
-	    $(CURDIR)/debian/missing-file.dfsg > \
-	    $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/$$f.dfsg ; \
-	done
+	  $(pf); cd $(pkgdir_common) && \
+	    find -name "*.elc" | perl -pe 's/\.elc$$/\.el/o' | xargs rm -f
 
-	$(pf); cd $(pkgdir_common) && \
-	  find -name "*.elc" | perl -pe 's/\.elc$$/\.el/o' | xargs rm -f
+	  $(pf); cd $(pkgdir_common) && \
+	    find -name "*.elc" | perl -pe 's/\.elc$$/\.el\.gz/o' | xargs rm -f
 
-	$(pf); cd $(pkgdir_common) && \
-	  find -name "*.elc" | perl -pe 's/\.elc$$/\.el\.gz/o' | xargs rm -f
+	  # Remove extraneous info dir files.  These may not exist if dpkg
+	  # is 1.5.4 or newer.
+	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
+	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
 
-        # Remove extraneous info dir files.  These may not exist if dpkg
-        # is 1.5.4 or newer.
-	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
-	rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
+	  # Remove the shared game score directory as a simple way to
+	  # avoid a conflict with other flavors of Emacs.  Since
+	  # Debian's update-game-score binary isn't setuid, that
+	  # directory is never used.
+	  rm $(pkgdir_common)/var/games/emacs/tetris-scores
+	  rm $(pkgdir_common)/var/games/emacs/snake-scores
+	  rmdir $(pkgdir_common)/var/games/emacs/
+	  rmdir $(pkgdir_common)/var/games/
+	  rmdir $(pkgdir_common)/var/
 
-        # Remove the shared game score directory as a simple way to
-        # avoid a conflict with other flavors of Emacs.  Since
-        # Debian's update-game-score binary isn't setuid, that
-        # directory is never used.
-	rm $(pkgdir_common)/var/games/emacs/tetris-scores
-	rm $(pkgdir_common)/var/games/emacs/snake-scores
-	rmdir $(pkgdir_common)/var/games/emacs/
-	rmdir $(pkgdir_common)/var/games/
-	rmdir $(pkgdir_common)/var/
-
-        # Make sure /usr/local dir doesn't exist.
-	rm -r $(pkgdir_common)/usr/local
+	  # Make sure /usr/local dir doesn't exist.
+	  rm -r $(pkgdir_common)/usr/local
+        endif
 
         ##################################################
         # emacsXY-bin-common
+        ifneq (,$(findstring $(flavor)-bin-common, $(shell dh_listpackages)))
+	  # Move common binaries to emacs-bin-common.
+	  install -d $(pkgdir_bin_common)/usr
+	  cp -a $(install_dir_x)/usr/bin $(pkgdir_bin_common)/usr
+	  cp -a $(install_dir_x)/usr/lib $(pkgdir_bin_common)/usr
 
-        # Move common binaries to emacs-bin-common.
-	install -d $(pkgdir_bin_common)/usr
-	cp -a $(install_dir_x)/usr/bin $(pkgdir_bin_common)/usr
-	cp -a $(install_dir_x)/usr/lib $(pkgdir_bin_common)/usr
+	  # Make sure there's just one.
+	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
+	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
 
-        # Make sure there's just one.
-	test -f $(pkgdir_bin_common)/usr/bin/emacs-*
-	rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
+	  # Set up movemail.
+	  chown root.mail $(pkgdir_bin_common)/$(movemail_bin)
+	  chmod g+s $(pkgdir_bin_common)/$(movemail_bin)
 
-        # Set up movemail.
-	chown root.mail $(pkgdir_bin_common)/$(movemail_bin)
-	chmod g+s $(pkgdir_bin_common)/$(movemail_bin)
+	  # Set up alternatives.
+	  alternatives=`ls $(pkgdir_bin_common)/usr/bin | xargs` && \
+	    set -x && \
+	    for f in debian/$(flavor)-bin-common.*; \
+	    do \
+	      perl -pwi -e "s|\@ALTERNATIVES\@|$${alternatives}|go" $$f ; \
+	    done
 
-        # Set up alternatives.
-	alternatives=`ls $(pkgdir_bin_common)/usr/bin | xargs` && \
-	  set -x && \
-	  for f in debian/$(flavor)-bin-common.*; \
+	  for f in `ls $(pkgdir_bin_common)/usr/bin`; \
 	  do \
-	    perl -pwi -e "s|\@ALTERNATIVES\@|$${alternatives}|go" $$f ; \
+	    mv $(pkgdir_bin_common)/usr/bin/$$f \
+	       $(pkgdir_bin_common)/usr/bin/$$f.$(flavor) ; \
 	  done
-
-	for f in `ls $(pkgdir_bin_common)/usr/bin`; \
-	do \
-	  mv $(pkgdir_bin_common)/usr/bin/$$f \
-	     $(pkgdir_bin_common)/usr/bin/$$f.$(flavor) ; \
-	done
+        endif
 
         ##################################################
         # emacsXY
-	$(call install_common_binpkg_bits,\
-	  $(install_dir_x),$(pkgdir_x),$(flavor),x)
+        ifneq (,$(findstring $(flavor), $(shell dh_listpackages)))
+	  $(call install_common_binpkg_bits,\
+	    $(install_dir_x),$(pkgdir_x),$(flavor),x)
 
-        # install desktop entry
-	install -d $(pkgdir_x)/usr/share/applications
-	install -m 0644 \
-	  debian/$(flavor).desktop $(pkgdir_x)/usr/share/applications/
+          # install desktop entry
+	  install -d $(pkgdir_x)/usr/share/applications
+	  install -m 0644 \
+	    debian/$(flavor).desktop $(pkgdir_x)/usr/share/applications/
+        endif
 
         ##################################################
         # emacsXY-nox
-	$(call emacs_inst,build-nox,$(install_dir_nox))
-	$(call install_common_binpkg_bits,\
-	  $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
-	rm -rf $(install_dir_nox)
+        ifneq (,$(findstring $(flavor)-nox, $(shell dh_listpackages)))
+	  $(call emacs_inst,build-nox,$(install_dir_nox))
+	  $(call install_common_binpkg_bits,\
+	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
+	  rm -rf $(install_dir_nox)
+        endif
 
         ##################################################
         # emacsXY-lucid
-	$(call emacs_inst,build-lucid,$(install_dir_lucid))
-	$(call install_common_binpkg_bits,\
-	  $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
+        ifneq (,$(findstring $(flavor)-lucid, $(shell dh_listpackages)))
+	  $(call emacs_inst,build-lucid,$(install_dir_lucid))
+	  $(call install_common_binpkg_bits,\
+	    $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
 
-        # install desktop entry
-	install -d $(pkgdir_lucid)/usr/share/applications
-	install -m 0644 \
-	  debian/$(flavor)-lucid.desktop $(pkgdir_lucid)/usr/share/applications/
-	rm -rf $(install_dir_lucid)
+          # install desktop entry
+	  install -d $(pkgdir_lucid)/usr/share/applications
+	  install -m 0644 \
+	    debian/$(flavor)-lucid.desktop \
+	    $(pkgdir_lucid)/usr/share/applications/
+	  rm -rf $(install_dir_lucid)
+        endif
 
         ##################################################
         # emacsXY-el
-
-	$(pf); \
-	(cd $(install_dir_x) && find -name "*.el" -o -name "*.el.gz" -print0 \
-	 | tar cpf - --null --files-from -) \
-	   | (cd $(pkgdir_el) && tar xpf -)
+        ifneq (,$(findstring $(flavor)-el, $(shell dh_listpackages)))
+	  $(pf); \
+	  (cd $(install_dir_x) && find -name "*.el" -o -name "*.el.gz" -print0 \
+	   | tar cpf - --null --files-from -) \
+	     | (cd $(pkgdir_el) && tar xpf -)
+        endif
 
         ##################################################
         # final cleanup
