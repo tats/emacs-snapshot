@@ -13,7 +13,9 @@ emacs23-non-dfsg (23.2+1-1) unstable; urgency=low
 
   * Switch to Debian 3.0 (quilt) source format.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 10 May 2010 23:42:46 -0700
+  * Add dependency on "dpkg (>= 1.15.4) | install-info".
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 10 May 2010 23:58:57 -0700
 
 emacs23-non-dfsg (23.1+1-1) unstable; urgency=low
 
