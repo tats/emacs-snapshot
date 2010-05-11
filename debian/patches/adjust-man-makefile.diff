@@ -37,3 +37,11 @@
  
  flymake : $(infodir)/flymake
  $(infodir)/flymake: flymake.texi
+@@ -624,5 +615,7 @@
+ maintainer-clean: distclean
+ 	for file in $(INFO_TARGETS); do rm -f $${file}*; done
+ 
++echo-info-targets:
++	@echo INFO_TARGETS=$(INFO_TARGETS)
+ 
+ ### Makefile ends here
