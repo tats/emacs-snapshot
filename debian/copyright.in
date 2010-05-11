@@ -35,8 +35,9 @@ their license.
 
 Copyright:
 
-  Most of Emacs is covered under the terms of the GPL.  See the file
-  /usr/share/common-licenses/GPL for more information.
+  Emacs itself is licensed under the terms of the GNU General Public
+  License (GPL), Version 3.  See the file
+  /usr/share/common-licenses/GPL-3 for more information.
 
   In general, the info pages are covered under the GNU Free
   Documentation License (GFDL).  See the "GNU Free Documentation
