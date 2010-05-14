@@ -25,8 +25,6 @@
   undesirable for some reason, just comment out
   avoid-fakemail-loss.diff in debian/patches/series.
   
-Index: b/lib-src/fakemail.c
-===================================================================
 --- a/lib-src/fakemail.c
 +++ b/lib-src/fakemail.c
 @@ -136,8 +136,10 @@
@@ -42,11 +40,9 @@ Index: b/lib-src/fakemail.c
  #endif
  
  static char *my_name;
-Index: b/lisp/mail/feedmail.el
-===================================================================
 --- a/lisp/mail/feedmail.el
 +++ b/lisp/mail/feedmail.el
-@@ -1323,7 +1323,12 @@
+@@ -1327,7 +1327,12 @@
  			      "/usr/lib/sendmail")
  			     ((file-exists-p "/usr/ucblib/sendmail")
  			      "/usr/ucblib/sendmail")
@@ -60,8 +56,6 @@ Index: b/lisp/mail/feedmail.el
  		       nil errors-to nil "-oi" "-t")
  		 ;; provide envelope "from" to sendmail; results will vary
  		 (list "-f" user-mail-address)
-Index: b/lisp/mail/sendmail.el
-===================================================================
 --- a/lisp/mail/sendmail.el
 +++ b/lisp/mail/sendmail.el
 @@ -52,7 +52,12 @@
@@ -78,11 +72,9 @@ Index: b/lisp/mail/sendmail.el
    "Program used to send messages."
    :group 'mail
    :type 'file)
-Index: b/lisp/gnus/message.el
-===================================================================
 --- a/lisp/gnus/message.el
 +++ b/lisp/gnus/message.el
-@@ -4520,7 +4520,13 @@
+@@ -4594,7 +4594,13 @@
  				     "/usr/lib/sendmail")
  				    ((file-exists-p "/usr/ucblib/sendmail")
  				     "/usr/ucblib/sendmail")

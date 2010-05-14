@@ -3,14 +3,12 @@
   Author: Rob Browning <rlb@defaultvalue.org>
   Added-by: Rob Browning <rlb@defaultvalue.org>
 
-Index: b/lisp/version.el
-===================================================================
 --- a/lisp/version.el
 +++ b/lisp/version.el
-@@ -57,8 +57,8 @@
+@@ -56,8 +56,8 @@
    (interactive "P")
    (let ((version-string
-          (format (if (not (interactive-p))
+          (format (if (not (called-interactively-p 'interactive))
 -		     "GNU Emacs %s (%s%s%s)\n of %s on %s"
 -		   "GNU Emacs %s (%s%s%s) of %s on %s")
 +		     "GNU Emacs %s (%s%s%s)\n of %s on %s, modified by Debian"

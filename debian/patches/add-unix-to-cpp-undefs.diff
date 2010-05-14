@@ -19,7 +19,7 @@
 
 --- a/configure.in
 +++ b/configure.in
-@@ -2937,7 +2937,7 @@
+@@ -3072,7 +3072,7 @@
  # the C preprocessor to some helpful value like 1, or maybe the empty
  # string.  Needless to say consequent macro substitutions are less
  # than conducive to the makefile finding the correct directory.

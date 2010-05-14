@@ -1,3 +1,22 @@
+emacs23 (23.2+1-1) unstable; urgency=low
+
+  * New emacs23 packages.
+
+  * Update debian/dfsg-splitter.
+
+  * Add dependency on libgconf2-dev and use --without-gconf for
+    emacsFLAVOR-nox and emacsFLAVOR-lucid builds.
+
+  * Remove patches:
+      patches/fix-dynamic-menus.diff
+      patches/fix-gtk-scroll-bar-events.diff
+      patches/fix-rmail-capitalized-month-names.diff
+      patches/use-zwj-and-zwnj-for-indic-scripts.diff
+
+  * Refresh remaining patches.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 13 May 2010 19:21:32 -0700
+
 emacs23 (23.1+1-9) unstable; urgency=low
 
   * Fix binary-only builds (dpkg-buildpackage -B) and conditionalize

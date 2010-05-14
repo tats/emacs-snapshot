@@ -326,7 +326,7 @@ check-vars:
 	@echo "movemail_bin: $(movemail_bin)"
 
 define check_diff
-  @if $(quilt) series | grep -e '^debian-changes-'; \
+  @if $(quilt) series | grep -E '^debian-changes-'; \
   then \
     echo "Diffs found outside ./debian:"; \
     ls debian/patches/debian-changes-*; \
@@ -354,8 +354,11 @@ prepare-release:
 	  (echo "please run prepare-release as a normal user (not root)"; \
 	   false)
         # check for any uncommitted changes
-	@if test $$(cd debian && git-diff-files | wc -c) -ne 0; \
+	@cd debian; \
+	if ! git diff-files --quiet; \
 	then \
+	  git status; \
+	  echo; \
 	  read -p "Uncommitted changes.  Continue? [y/n] "; \
           if test "$${REPLY}" != y; \
 	  then \
@@ -364,22 +367,8 @@ prepare-release:
 	fi
         # TODO: make sure we actually installed the binary.
         # TODO: run tests (use a check target?)
-	$(MAKE) -f debian/rules clean
 	$(MAKE) -f debian/rules buildpackage
-	test -f ../$(src_name)_$(debian_ver).diff.gz
-	@if [ $$(zgrep '^---' \
-	           ../$(src_name)_$(debian_ver).diff.gz  \
-	             | grep -v /debian/ | wc -c) -ne 0 ]; \
-	then \
-	  echo "Diffs outside debian/ found, please fix and retry."; \
-	  echo "This probably means either something wasn't cleaned"; \
-	  echo "properly, or you need to do some work in debian/patches."; \
-	  false; \
-	else \
-	  echo "Everything looks OK.  Ready for release."; \
-	  echo "Don't forget to run debsign if needed."; \
-	fi
-
+	@echo "Everything looks OK.  Ready for release."
 
 debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target
@@ -460,12 +449,14 @@ confflags_x += --with-toolkit-scroll-bars
 # nox configure flags
 confflags_nox := $(confflags) 
 confflags_nox += --with-x=no
+confflags_nox += --without-gconf
 
 # lucid configure flags
 confflags_lucid := $(confflags)
 confflags_lucid += --with-x=yes
 confflags_lucid += --with-x-toolkit=lucid
 confflags_lucid += --with-toolkit-scroll-bars
+confflags_lucid += --without-gconf
 
 define cfg_tree
   rm -rf $(1)
@@ -737,4 +728,5 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/*-stamp \
 	  configure \
 	  src/config.in
+	rm -f $(nonpersistent_autogen_files)
 	dh_clean

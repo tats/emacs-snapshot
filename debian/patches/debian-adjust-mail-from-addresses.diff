@@ -7,13 +7,9 @@
     This is correct for Debian systems where we know the MTA should be
     trusted.
     
-  * The default mail-from-style is 'system-default rather than 'angles.
-    
-Index: b/lisp/gnus/message.el
-===================================================================
 --- a/lisp/gnus/message.el
 +++ b/lisp/gnus/message.el
-@@ -808,9 +808,14 @@
+@@ -825,9 +825,14 @@
  		 (const never)
  		 (const ask)))
  
@@ -31,16 +27,3 @@ Index: b/lisp/gnus/message.el
    :group 'message-sending
    :link '(custom-manual "(message)Mail Variables")
    :type 'boolean)
-Index: b/lisp/mail/sendmail.el
-===================================================================
---- a/lisp/mail/sendmail.el
-+++ b/lisp/mail/sendmail.el
-@@ -58,7 +58,7 @@
-   :type 'file)
- 
- ;;;###autoload
--(defcustom mail-from-style 'angles
-+(defcustom mail-from-style 'system-default
-   "Specifies how \"From:\" fields look.
- 
- If `nil', they contain just the return address like:

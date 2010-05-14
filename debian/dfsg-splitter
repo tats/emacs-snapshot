@@ -7,9 +7,9 @@ set -x
 # run the script.  The resulting two orig.tar.gz files will be placed
 # into a new ./split-tmp directory.
 
-emacs_archive_name="emacs-23.1.tar.gz"
-emacs_dir="emacs-23.1"
-emacs_version="23.1"
+emacs_archive_name="emacs-23.2.tar.bz2"
+emacs_dir="emacs-23.2"
+emacs_version="23.2"
 emacs_major="23"
 deb_src_rev="1"
 
@@ -33,7 +33,7 @@ pushd split-tmp
 
 umask 002
 
-tar xzf "../${emacs_archive_name}"
+tar xf "../${emacs_archive_name}"
 
 find "${emacs_dir}" -name "*.elc" -exec rm {} +
 find "${emacs_dir}"/info -type f \
@@ -124,12 +124,12 @@ copy_to_main_dir "doc/misc/ChangeLog"
 copy_to_main_dir "doc/misc/Makefile.in"
 
 
-GZIP=-9v tar czpSf \
-  "emacs${emacs_major}_${emacs_version}+${deb_src_rev}.orig.tar.gz" \
+BZIP2=-9v tar cjpSf \
+  "emacs${emacs_major}_${emacs_version}+${deb_src_rev}.orig.tar.bz2" \
   "${emacs_dir}"
 
-GZIP=-9v tar czpSf \
-  "emacs${emacs_major}-non-dfsg_${emacs_version}+${deb_src_rev}.orig.tar.gz" \
+BZIP2=-9v tar cjpSf \
+  "emacs${emacs_major}-non-dfsg_${emacs_version}+${deb_src_rev}.orig.tar.bz2" \
   "${emacs_dir}"-non-dfsg
 
 exit 0

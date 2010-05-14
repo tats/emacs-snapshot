@@ -7,13 +7,11 @@
   * The global variable debian-emacs-flavor is bound to 'emacs23.
     Author: Rob Browning <rlb@defaultvalue.org>
     
-Index: b/lisp/startup.el
-===================================================================
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -394,6 +394,10 @@
-  (setq tutorial-directory (file-name-as-directory
-                            (expand-file-name "tutorials" data-directory))))
+@@ -393,6 +393,10 @@
+   :type 'directory
+   :initialize 'custom-initialize-delay)
  
 +(defconst debian-emacs-flavor 'emacs23
 +  "A symbol representing the particular debian flavor of emacs running.
@@ -22,7 +20,7 @@ Index: b/lisp/startup.el
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of current directory to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -977,8 +981,21 @@
+@@ -955,8 +959,21 @@
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.
