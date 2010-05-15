@@ -255,6 +255,18 @@
  
  PDF_TARGETS = \
  	ada-mode.pdf \
+@@ -198,9 +104,9 @@
+ ENVADD = TEXINPUTS="$(srcdir):$(TEXINPUTS)" MAKEINFO="$(MAKEINFO) -I$(srcdir)"
+ 
+ 
+-info: $(infodir) $(INFO_TARGETS)
++info: $(DESTDIR)$(infodir) $(INFO_TARGETS)
+ 
+-$(infodir):
++$(DESTDIR)$(infodir):
+ 	mkdir $@
+ 
+ dvi: $(DVI_TARGETS)
 @@ -213,150 +119,6 @@
  # In a distribution of Emacs, the Info files should be up to date.
  
