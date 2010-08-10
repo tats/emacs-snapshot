@@ -255,19 +255,19 @@
  
  PDF_TARGETS = \
  	ada-mode.pdf \
-@@ -198,9 +104,9 @@
+@@ -198,10 +104,7 @@
  ENVADD = TEXINPUTS="$(srcdir):$(TEXINPUTS)" MAKEINFO="$(MAKEINFO) -I$(srcdir)"
  
  
 -info: $(infodir) $(INFO_TARGETS)
-+info: $(DESTDIR)$(infodir) $(INFO_TARGETS)
- 
+-
 -$(infodir):
-+$(DESTDIR)$(infodir):
- 	mkdir $@
+-	mkdir $@
++info: $(INFO_TARGETS)
  
  dvi: $(DVI_TARGETS)
-@@ -213,150 +119,6 @@
+ 
+@@ -213,150 +116,6 @@
  # In a distribution of Emacs, the Info files should be up to date.
  
  ## "short" target names for convenience, to just rebuild one manual.
@@ -418,7 +418,7 @@
  efaq : $(infodir)/efaq
  $(infodir)/efaq: faq.texi
  	cd $(srcdir); $(MAKEINFO) faq.texi
-@@ -365,249 +127,6 @@
+@@ -365,249 +124,6 @@
  faq.pdf: faq.texi
  	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
  
