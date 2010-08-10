@@ -2,7 +2,13 @@ emacs23 (23.2+1-3) unstable; urgency=low
 
   * Don't try to "mkdir $(infodir)" in doc/*/Makefile.in.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 09 Aug 2010 23:50:27 -0500
+  * Use -O1 rather than -O2 on ia64.  Fixes a build failure (looks
+    like a broken byte compiler) with newer versions of gcc
+    (c.f. #207580).  Thanks to Sven Joachim <svenjoac@gmx.de> for the
+    report and thanks to Stéphane Glondu <glondu@debian.org> for the
+    23.2+1-2.1 NMU. (closes: 582439)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 10 Aug 2010 00:20:41 -0500
 
 emacs23 (23.2+1-2) unstable; urgency=low
 

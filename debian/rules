@@ -172,13 +172,14 @@ CFLAGS    := -DDEBIAN -g
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
   CFLAGS += -O0
 else # not noopt
-  ifeq (m68k,$(DEB_HOST_ARCH))
-    # fix problem with newer versions of gcc on m68k
-    # -O2 causes a build failure (broken byte compiler)
+  ifneq (,$(filter $(DEB_HOST_ARCH),m68k ia64))
+    # Fix a problem with newer versions of gcc on m68k and ia64.
+    # There -O2 causes a build failure (broken byte compiler) - see
+    # bugs #207580 and #582439.
     CFLAGS += -O1
-  else # neq (m68k,$(DEB_HOST_ARCH))
+  else # neq (m68k or ia64)
     CFLAGS += -O2
-  endif # neq (m68k,$(DEB_HOST_ARCH))
+  endif # neq (m68k or ia64)
 endif # not noopt
 
 joblimit := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
