@@ -7,8 +7,6 @@ Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
 Package: emacs
-Section: editors
-Priority: optional
 Architecture: all
 Depends: @DEB_FLAVOR@ | @DEB_FLAVOR@-lucid | @DEB_FLAVOR@-nox
 Provides: emacsen, editor, mail-reader, news-reader
@@ -18,8 +16,6 @@ Description: The GNU Emacs editor (metapackage)
  release.
 
 Package: @DEB_FLAVOR@-lucid
-Section: editors
-Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
@@ -31,8 +27,6 @@ Description: The GNU Emacs editor
  This package contains a version of Emacs with a Lucid user interface.
 
 Package: @DEB_FLAVOR@-nox
-Section: editors
-Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
@@ -44,8 +38,6 @@ Description: The GNU Emacs editor (without X support)
  This package contains a version of Emacs compiled without support for X.
 
 Package: @DEB_FLAVOR@
-Section: editors
-Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
@@ -57,8 +49,6 @@ Description: The GNU Emacs editor (with GTK+ user interface)
  This package contains a version of Emacs with a GTK+ user interface.
 
 Package: @DEB_FLAVOR@-bin-common
-Section: editors
-Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
@@ -67,8 +57,6 @@ Description: The GNU Emacs editor's shared, architecture dependent files
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
 
 Package: @DEB_FLAVOR@-common
-Section: editors
-Priority: optional
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
@@ -79,8 +67,6 @@ Description: The GNU Emacs editor's shared, architecture independent infrastruct
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
 
 Package: @DEB_FLAVOR@-el
-Section: editors
-Priority: optional
 Architecture: all
 Depends: @DEB_FLAVOR@-common (= ${source:Version})
 Description: GNU Emacs LISP (.el) files

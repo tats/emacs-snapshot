@@ -7,8 +7,6 @@ Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
 Package: emacs
-Section: editors
-Priority: optional
 Architecture: all
 Depends: emacs23 | emacs23-lucid | emacs23-nox
 Provides: emacsen, editor, mail-reader, news-reader
@@ -18,8 +16,6 @@ Description: The GNU Emacs editor (metapackage)
  release.
 
 Package: emacs23-lucid
-Section: editors
-Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs23, emacsen, editor, info-browser, mail-reader, news-reader
@@ -31,8 +27,6 @@ Description: The GNU Emacs editor
  This package contains a version of Emacs with a Lucid user interface.
 
 Package: emacs23-nox
-Section: editors
-Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
@@ -44,8 +38,6 @@ Description: The GNU Emacs editor (without X support)
  This package contains a version of Emacs compiled without support for X.
 
 Package: emacs23
-Section: editors
-Priority: optional
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
@@ -57,8 +49,6 @@ Description: The GNU Emacs editor (with GTK+ user interface)
  This package contains a version of Emacs with a GTK+ user interface.
 
 Package: emacs23-bin-common
-Section: editors
-Priority: optional
 Architecture: any
 Depends: emacs23-common (= ${source:Version}), ${shlibs:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
@@ -67,8 +57,6 @@ Description: The GNU Emacs editor's shared, architecture dependent files
  that's shared by emacs23, emacs23-lucid, and emacs23-nox.
 
 Package: emacs23-common
-Section: editors
-Priority: optional
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}
 Suggests: emacs23-el, emacs23-common-non-dfsg
@@ -79,8 +67,6 @@ Description: The GNU Emacs editor's shared, architecture independent infrastruct
  that's shared by emacs23, emacs23-lucid, and emacs23-nox.
 
 Package: emacs23-el
-Section: editors
-Priority: optional
 Architecture: all
 Depends: emacs23-common (= ${source:Version})
 Description: GNU Emacs LISP (.el) files
