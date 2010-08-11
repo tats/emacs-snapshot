@@ -16,7 +16,10 @@ emacs23 (23.2+1-3) unstable; urgency=low
     and emacsVER-bin-common.postinst.  Thanks to Stéphane Glondu
     <glondu@debian.org> for the 23.2+1-2.1 NMU.
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 10 Aug 2010 23:44:41 -0500
+  * Add a Homepage field to debian/control.in.  Thanks to Stéphane
+    Glondu <glondu@debian.org> for the 23.2+1-2.1 NMU.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 10 Aug 2010 23:55:22 -0500
 
 emacs23 (23.2+1-2) unstable; urgency=low
 
