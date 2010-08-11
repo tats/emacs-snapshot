@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/sh
+
+set -e
 
 FLAVOR=@DEB_FLAVOR@
 MAJOR=@MAJOR_VERSION@
