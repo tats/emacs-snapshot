@@ -1,12 +1,13 @@
 emacs23 (23.2+1-3) unstable; urgency=low
 
-  * Don't try to "mkdir $(infodir)" in doc/*/Makefile.in.
+  * Don't try to "mkdir $(infodir)" in doc/*/Makefile.in.  Thanks to
+    Stéphane Glondu <glondu@debian.org> for the 23.2+1-2.1 NMU.
 
   * Use -O1 rather than -O2 on ia64.  Fixes a build failure (looks
     like a broken byte compiler) with newer versions of gcc
     (c.f. #207580).  Thanks to Sven Joachim <svenjoac@gmx.de> for the
     report and thanks to Stéphane Glondu <glondu@debian.org> for the
-    23.2+1-2.1 NMU. (closes: 582439)
+    23.2+1-2.1 NMU. (closes: #582439)
 
   * Remove deprecated Encoding field from emacsVER.desktop.  Thanks to
     Stéphane Glondu <glondu@debian.org> for the 23.2+1-2.1
