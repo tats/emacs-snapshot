@@ -181,6 +181,10 @@ ifeq (,$(joblimit))
   joblimit := 1
 endif
 
+# Force joblimit to 1 until an upstream race condition is fixed:
+#   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=592992
+joblimit := 1
+
 target := $(DEB_HOST_GNU_TYPE)
 movemail_bin := usr/lib/emacs/$(runtime_ver)/$(target)/movemail
 
