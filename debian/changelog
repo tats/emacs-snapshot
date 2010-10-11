@@ -1,3 +1,15 @@
+emacs23 (23.2+1-5) unstable; urgency=low
+
+  * Apply upstream patches to prevent the string and unibyte-string
+    functions from overflowing the stack
+    (prevent-string-stack-overflow.diff,
+    prevent-let-eval-apply-stack-overflow.diff, and
+    use-safe-alloca-lisp-in-let-eval-apply-apply_lambda.diff).  Thanks
+    to Carl Worth <cworth@debian.org> and Sven Joachim
+    <svenjoac@gmx.de> for finding the patches (closes: #586459).
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 17 Oct 2010 23:53:54 -0500
+
 emacs23 (23.2+1-4) unstable; urgency=low
 
   * Disable parallel builds (via DEB_BUILD_OPTIONS=parallel) until an
