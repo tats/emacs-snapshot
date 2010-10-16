@@ -15,7 +15,13 @@ emacs23 (23.2+1-5) unstable; urgency=low
     Joachim <svenjoac@gmx.de> for tracking down the patch.
     (closes: #597255)
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Oct 2010 00:14:01 -0500
+  * Remove debian-adjust-mail-from-addresses-patch.diff to stop
+    adjusting the message-sendmail-f-is-evil default.  Match the
+    behavior of the Debian gnus package, Emacs upstream, and
+    emacs-snapshot.  Thanks to Artem Chuprina <ran@wizzle.ran.pp.ru>
+    for the report. (closes: #397757)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Oct 2010 00:16:26 -0500
 
 emacs23 (23.2+1-4) unstable; urgency=low
 

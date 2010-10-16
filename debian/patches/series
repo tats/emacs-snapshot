@@ -1,6 +1,5 @@
 debian-site-init-el.diff
 debian-startup.diff
-debian-adjust-mail-from-addresses.diff
 handle-dfsg-split.diff
 misc-unseparated.diff
 require-movemail-use-liblockfile.diff

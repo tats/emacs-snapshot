@@ -74,7 +74,7 @@
    :type 'file)
 --- a/lisp/gnus/message.el
 +++ b/lisp/gnus/message.el
-@@ -4594,7 +4594,13 @@
+@@ -4589,7 +4589,13 @@
  				     "/usr/lib/sendmail")
  				    ((file-exists-p "/usr/ucblib/sendmail")
  				     "/usr/ucblib/sendmail")
