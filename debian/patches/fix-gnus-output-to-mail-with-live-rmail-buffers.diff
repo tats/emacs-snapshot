@@ -1,0 +1,49 @@
+* Fcc should work properly even if the buffer is being visited in rmail-mode.
+  Patch: fix-gnus-output-to-mail-with-live-rmail-buffers.diff
+  Provided-by: Sven Joachim <svenjoac@gmx.de>
+  Date: Tue, 21 Sep 2010 08:14:57 +0200
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: incorporated upstream
+
+  The Debian patch is taken from this upstream commit:
+
+  revno: 100052
+  committer: Glenn Morris <rgm@gnu.org>
+  branch nick: emacs-23
+  timestamp: Mon 2010-09-20 20:11:34 -0700
+  message:
+    Fix message-mode bug with fcc to Rmail buffers.
+
+    * lisp/gnus/message.el (message-output): Use gnus-output-to-rmail if a
+    buffer is visiting the fcc file in rmail-mode.
+
+--- a/lisp/gnus/ChangeLog
++++ b/lisp/gnus/ChangeLog
+@@ -1,3 +1,8 @@
++2010-09-21  Glenn Morris  <rgm@gnu.org>
++
++	* message.el (message-output): Use gnus-output-to-rmail if a buffer is
++	visiting the fcc file in rmail-mode.
++
+ 2010-04-22  Andreas Seltenreich  <seltenreich@gmx.de>
+ 
+ 	* message.el (message-generate-headers): Record insertion of optional
+--- a/lisp/gnus/message.el
++++ b/lisp/gnus/message.el
+@@ -5322,8 +5322,14 @@
+ 
+ (defun message-output (filename)
+   "Append this article to Unix/babyl mail file FILENAME."
+-  (if (and (file-readable-p filename)
+-	   (mail-file-babyl-p filename))
++  (if (or (and (file-readable-p filename)
++	       (mail-file-babyl-p filename))
++	  ;; gnus-output-to-mail does the wrong thing with live, mbox
++	  ;; Rmail buffers in Emacs 23.
++	  ;; http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=597255
++	  (let ((buff (find-buffer-visiting filename)))
++	    (and buff (with-current-buffer buff
++			(eq major-mode 'rmail-mode)))))
+       (gnus-output-to-rmail filename t)
+     (gnus-output-to-mail filename t)))
+ 

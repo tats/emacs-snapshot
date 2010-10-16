@@ -8,7 +8,14 @@ emacs23 (23.2+1-5) unstable; urgency=low
     to Carl Worth <cworth@debian.org> and Sven Joachim
     <svenjoac@gmx.de> for finding the patches (closes: #586459).
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 17 Oct 2010 23:53:54 -0500
+  * Apply upstream patch to prevent mail destined for
+    mail-archive-file-name from being lost
+    (fix-gnus-output-to-mail-with-live-rmail-buffers.diff).  Thanks to
+    Jeroen Nijhof <jeroen@nijhof.uklinux.net> for the report and Sven
+    Joachim <svenjoac@gmx.de> for tracking down the patch.
+    (closes: #597255)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Oct 2010 00:14:01 -0500
 
 emacs23 (23.2+1-4) unstable; urgency=low
 
