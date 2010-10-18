@@ -21,7 +21,13 @@ emacs23 (23.2+1-5) unstable; urgency=low
     emacs-snapshot.  Thanks to Artem Chuprina <ran@wizzle.ran.pp.ru>
     for the report. (closes: #397757)
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Oct 2010 00:16:26 -0500
+  * Apply upstream patch to fix the computation of the width of
+    dual-width fonts (fix-fc-dual-font-width-calculation.diff).
+    Thanks to mizuno hajime <hajime.mizuno@gmail.com> for the report
+    and Sven Joachim <svenjoac@gmx.de> for tracking down the
+    patch. (closes: #588808)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Oct 2010 00:17:56 -0500
 
 emacs23 (23.2+1-4) unstable; urgency=low
 
