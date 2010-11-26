@@ -1,3 +1,12 @@
+emacs23 (23.2+1-6) unstable; urgency=low
+
+  * Build-depend on "bsd-mailx | mailx" rather than just "mailx" since
+    the latter is a virtual package.  Thanks to Cyril Brulebois
+    <kibi@debian.org> for the report, and thanks to Mehdi Dogguy
+    <mehdi@debian.org> for the 23.2+1-5.1 NMU. (closes: #600826)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 26 Nov 2010 11:34:32 -0600
+
 emacs23 (23.2+1-5) unstable; urgency=low
 
   * Apply upstream patches to prevent the string and unibyte-string
