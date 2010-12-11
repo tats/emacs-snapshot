@@ -6,7 +6,12 @@ emacs23 (23.2+1-7) unstable; urgency=low
     Thanks to Courtney Bane <debian-bugs-5265@cbane.org> for the
     report and the patch. (closes: #599463)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 11 Dec 2010 10:38:51 -0600
+  * Fix the value for RIPEMD-160 in epg-digest-algorithm-alist
+    according to RFC 4880.  Thanks to Daniel Kahn Gillmor
+    <dkg@fifthhorseman.net> for the report and the fix.
+    (closes: #594510)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 11 Dec 2010 11:00:07 -0600
 
 emacs23 (23.2+1-6) unstable; urgency=low
 
