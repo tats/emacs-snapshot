@@ -14,3 +14,4 @@ prevent-let-eval-apply-stack-overflow.diff
 use-safe-alloca-lisp-in-let-eval-apply-apply_lambda.diff
 fix-gnus-output-to-mail-with-live-rmail-buffers.diff
 fix-fc-dual-font-width-calculation.diff
+do-not-initialize-terminal-twice.diff
