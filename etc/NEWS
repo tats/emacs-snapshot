@@ -22,6 +22,11 @@ When you add a new item, use the appropriate mark if you are sure it
 applies, and please also update docstrings as needed.
 
 
+* Debian specific changes to Emacs
+
+Please see /usr/share/doc/emacs-common/README.Debian.gz.
+
+
 * Installation Changes in Emacs 27.1
 
 ---
