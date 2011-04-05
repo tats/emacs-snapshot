@@ -436,6 +436,10 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning
   :type 'directory
   :initialize #'custom-initialize-delay)
 
+(defconst debian-emacs-flavor 'emacs
+  "A symbol representing the particular debian flavor of emacs running.
+Something like 'emacs, 'xemacs21, etc.")
+
 (defun normal-top-level-add-subdirs-to-load-path ()
   "Recursively add all subdirectories of `default-directory' to `load-path'.
 More precisely, this uses only the subdirectories whose names
@@ -1361,7 +1365,14 @@ please check its value")
         ;; Sites should not disable the startup screen.
         ;; Only individuals should disable the startup screen.
         (let ((inhibit-startup-screen inhibit-startup-screen))
-	  (load site-run-file t t)))
+          (progn
+            ;; This form has been added by Debian to load all the
+            ;; debian package snippets (dh-elpa, etc.).  It's in here
+            ;; because we want -q to kill it too.
+            (if (load "debian-startup" t t nil)
+                (debian-startup debian-emacs-flavor))
+            ;; This is the normal upstream behavior
+            (load site-run-file t t))))
 
     ;; Load that user's init file, or the default one, or none.
     (startup--load-user-init-file
