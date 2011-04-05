@@ -3123,8 +3123,8 @@ AC_EGREP_CPP(yes..yes,
 	CPP_NEED_TRADITIONAL=yes)
 
 AC_OUTPUT(Makefile lib-src/Makefile.c:lib-src/Makefile.in oldXMenu/Makefile \
-	doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile \
-	doc/lispref/Makefile src/Makefile.c:src/Makefile.in \
+	doc/misc/Makefile \
+	src/Makefile.c:src/Makefile.in \
 	lwlib/Makefile lisp/Makefile leim/Makefile, [
 
 ### Make the necessary directories, if they don't exist.
