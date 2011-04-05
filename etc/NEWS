@@ -192,6 +192,11 @@ build-time.  See nextstep/INSTALL for details.
 (This change was actually made in Emacs 26.1, but was undocumented and
 not called out in its NEWS.)
 
+ 
+* Debian specific changes to Emacs
+
+Please see /usr/share/doc/emacs-common/README.Debian.gz.
+
 
 * Installation Changes in Emacs 26.1
 
