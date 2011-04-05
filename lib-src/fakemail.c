@@ -136,8 +136,10 @@ struct linebuffer lb;
 #define NIL ((line_list) NULL)
 #define INITIAL_LINE_SIZE 200
 
-#ifndef MAIL_PROGRAM_NAME
-#define MAIL_PROGRAM_NAME "/bin/mail"
+#ifdef MAIL_PROGRAM_NAME
+#error "Debian assumption violated -- see avoid-fakemail-mail-loss.diff"
+#else
+#define MAIL_PROGRAM_NAME "/usr/bin/mail"
 #endif
 
 static char *my_name;

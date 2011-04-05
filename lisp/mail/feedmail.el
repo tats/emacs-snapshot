@@ -1327,7 +1327,12 @@ complicated cases."
 			      "/usr/lib/sendmail")
 			     ((file-exists-p "/usr/ucblib/sendmail")
 			      "/usr/ucblib/sendmail")
-			     (t "fakemail"))
+			     (t
+                              (if (not (file-executable-p "/usr/bin/mail"))
+                                  (progn
+                                    (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
+                                    (setq mail-interactive t)))
+                              "fakemail"))
 		       nil errors-to nil "-oi" "-t")
 		 ;; provide envelope "from" to sendmail; results will vary
 		 (list "-f" user-mail-address)

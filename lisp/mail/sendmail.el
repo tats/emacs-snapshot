@@ -52,7 +52,12 @@
     ((file-exists-p "/usr/sbin/sendmail") "/usr/sbin/sendmail")
     ((file-exists-p "/usr/lib/sendmail") "/usr/lib/sendmail")
     ((file-exists-p "/usr/ucblib/sendmail") "/usr/ucblib/sendmail")
-    (t "fakemail"))			;In ../etc, to interface to /bin/mail.
+    (t
+     (if (not (file-executable-p "/usr/bin/mail"))
+         (progn
+           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
+           (setq mail-interactive t)))
+     "fakemail"))			;In ../etc, to interface to /bin/mail.
   "Program used to send messages."
   :group 'mail
   :type 'file)
