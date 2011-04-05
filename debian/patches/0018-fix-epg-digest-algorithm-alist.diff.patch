@@ -1,9 +1,13 @@
-* The value for RIPEMD-160 in epg-digest-algorithm-alist has been fixed.
-  Patch: fix-epg-digest-algorithm-alist.diff
-  Provided-by: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-  Date: Thu, 26 Aug 2010 14:09:01 UTC
-  Added-by: Rob Browning <rlb@defaultvalue.org>
-  Status: incorporated upstream
+From 6e4370372ed0900861ba8d832974c70a96490d44 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:39 -0500
+Subject: fix-epg-digest-algorithm-alist.diff
+ * The value for RIPEMD-160 in epg-digest-algorithm-alist has been fixed.
+   Patch: fix-epg-digest-algorithm-alist.diff
+   Provided-by: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+   Date: Thu, 26 Aug 2010 14:09:01 UTC
+   Added-by: Rob Browning <rlb@defaultvalue.org>
+   Status: incorporated upstream
 
   The Debian patch is taken from this upstream commit:
 
@@ -18,7 +22,13 @@
     "RIPEMD160" (Bug#7490).  Reported by Daniel Kahn Gillmor.
     (epg-context-set-passphrase-callback): Mention that the callback
     is not called when used with GnuPG 2.x.
+---
+ lisp/ChangeLog |    7 +++++++
+ lisp/epg.el    |   10 ++++++++--
+ 2 files changed, 15 insertions(+), 2 deletions(-)
 
+diff --git a/lisp/ChangeLog b/lisp/ChangeLog
+index ebb21c4..f5b616d 100644
 --- a/lisp/ChangeLog
 +++ b/lisp/ChangeLog
 @@ -1,3 +1,10 @@
@@ -32,6 +42,8 @@
  2010-05-07  Chong Yidong  <cyd@stupidchicken.com>
  
  	* Version 23.2 released.
+diff --git a/lisp/epg.el b/lisp/epg.el
+index 9fde76d..ad172df 100644
 --- a/lisp/epg.el
 +++ b/lisp/epg.el
 @@ -66,7 +66,7 @@
@@ -43,7 +55,7 @@
      (8 . "SHA256")
      (9 . "SHA384")
      (10 . "SHA512")
-@@ -335,7 +335,13 @@
+@@ -335,7 +335,13 @@ PASSPHRASE-CALLBACK is either a function, or a cons-cell whose
  car is a function and cdr is a callback data.
  
  The function gets three arguments: the context, the key-id in
@@ -58,3 +70,6 @@
    (unless (eq (car-safe context) 'epg-context)
      (signal 'wrong-type-argument (list 'epg-context-p context)))
    (aset (cdr context) 7 (if (consp passphrase-callback)
+-- 
+1.7.4.1
+

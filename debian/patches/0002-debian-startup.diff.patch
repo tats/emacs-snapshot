@@ -1,15 +1,24 @@
-* Emacs runs debian-startup and sets debian-emacs-flavor.
-  Patch: debian-startup.diff
+From f7fa7cb4f30ec7cb083d046300850a2900fd95f3 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:22 -0500
+Subject: debian-startup.diff
+ * Emacs runs debian-startup and sets debian-emacs-flavor.
+   Patch: debian-startup.diff
 
   * Emacs runs debian-startup during the startup process unless
     site-run-file is false.
-    
+
   * The global variable debian-emacs-flavor is bound to 'emacs23.
     Author: Rob Browning <rlb@defaultvalue.org>
-    
+---
+ lisp/startup.el |   21 +++++++++++++++++++--
+ 1 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/startup.el b/lisp/startup.el
+index 87f1a00..cffc24a 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -393,6 +393,10 @@
+@@ -393,6 +393,10 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning
    :type 'directory
    :initialize 'custom-initialize-delay)
  
@@ -20,7 +29,7 @@
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of current directory to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -955,8 +959,21 @@
+@@ -955,8 +959,21 @@ opening the first frame (e.g. open a connection to an X server).")
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.
@@ -44,3 +53,6 @@
  
      ;; Sites should not disable this.  Only individuals should disable
      ;; the startup screen.
+-- 
+1.7.4.1
+

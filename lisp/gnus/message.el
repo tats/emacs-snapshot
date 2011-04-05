@@ -4589,7 +4589,13 @@ If you always want Gnus to send messages in one piece, set
 				     "/usr/lib/sendmail")
 				    ((file-exists-p "/usr/ucblib/sendmail")
 				     "/usr/ucblib/sendmail")
-				    (t "fakemail"))
+				    (t
+                                     (if (not (file-executable-p
+                                               "/usr/bin/mail"))
+                                         (progn
+                                           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
+                                           (setq mail-interactive t)))
+                                     "fakemail"))
 			      nil errbuf nil "-oi")
 			message-sendmail-extra-arguments
 			;; Always specify who from,
@@ -5311,8 +5317,14 @@ Otherwise, generate and save a value for `canlock-password' first."
 
 (defun message-output (filename)
   "Append this article to Unix/babyl mail file FILENAME."
-  (if (and (file-readable-p filename)
-	   (mail-file-babyl-p filename))
+  (if (or (and (file-readable-p filename)
+	       (mail-file-babyl-p filename))
+	  ;; gnus-output-to-mail does the wrong thing with live, mbox
+	  ;; Rmail buffers in Emacs 23.
+	  ;; http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=597255
+	  (let ((buff (find-buffer-visiting filename)))
+	    (and buff (with-current-buffer buff
+			(eq major-mode 'rmail-mode)))))
       (gnus-output-to-rmail filename t)
     (gnus-output-to-mail filename t)))
 

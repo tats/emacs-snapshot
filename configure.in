@@ -3072,7 +3072,7 @@ test "${exec_prefix}" != NONE &&
 # the C preprocessor to some helpful value like 1, or maybe the empty
 # string.  Needless to say consequent macro substitutions are less
 # than conducive to the makefile finding the correct directory.
-[cpp_undefs="`echo $srcdir $configuration $canonical |
+[cpp_undefs="`echo $srcdir $configuration $canonical unix |
   sed -e 's/[^a-zA-Z0-9_]/ /g' -e 's/^/ /' -e 's/  *$//' \
   -e 's/  */ -U/g' -e 's/-U[0-9][^ ]*//g'`"]
 
@@ -3087,8 +3087,8 @@ AC_EGREP_CPP(yes..yes,
 	CPP_NEED_TRADITIONAL=yes)
 
 AC_OUTPUT(Makefile lib-src/Makefile.c:lib-src/Makefile.in oldXMenu/Makefile \
-	doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile \
-	doc/lispref/Makefile src/Makefile.c:src/Makefile.in \
+	doc/misc/Makefile \
+	src/Makefile.c:src/Makefile.in \
 	lwlib/Makefile lisp/Makefile leim/Makefile, [
 
 ### Make the necessary directories, if they don't exist.

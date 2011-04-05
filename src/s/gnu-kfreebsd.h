@@ -5,6 +5,11 @@
 #undef SYSTEM_TYPE
 #define SYSTEM_TYPE "gnu/kfreebsd" /* All the best software is free */
 
+#undef INTERRUPT_INPUT
+#define BROKEN_SIGIO
+#define BROKEN_SIGURG
+#define BROKEN_SIGPOLL
+
 #define NO_TERMIO               /* use only <termios.h> */
 
 /* arch-tag: 8d098200-2586-469e-99ab-6d092c035e03

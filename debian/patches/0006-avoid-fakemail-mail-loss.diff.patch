@@ -1,7 +1,11 @@
-* An attempt is made to avoid silently losing mail via fakemail.
-  Patch: avoid-fakemail-mail-loss.diff
-  Author: Rob Browning <rlb@defaultvalue.org>
-  Added-by: Rob Browning <rlb@defaultvalue.org>
+From eb373e1c4659501ff060cd1ef98c1564baa4cc6a Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:27 -0500
+Subject: avoid-fakemail-mail-loss.diff
+ * An attempt is made to avoid silently losing mail via fakemail.
+   Patch: avoid-fakemail-mail-loss.diff
+   Author: Rob Browning <rlb@defaultvalue.org>
+   Added-by: Rob Browning <rlb@defaultvalue.org>
 
   This fix attempts to avoid a situation where Emacs can silently lose
   mail.  This can occur if sendmail.el (at least) falls back to
@@ -24,10 +28,18 @@
   to some other value during the build process.  If this is
   undesirable for some reason, just comment out
   avoid-fakemail-loss.diff in debian/patches/series.
-  
+---
+ lib-src/fakemail.c    |    6 ++++--
+ lisp/gnus/message.el  |    8 +++++++-
+ lisp/mail/feedmail.el |    7 ++++++-
+ lisp/mail/sendmail.el |    7 ++++++-
+ 4 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/lib-src/fakemail.c b/lib-src/fakemail.c
+index f98fb74..9f81fa6 100644
 --- a/lib-src/fakemail.c
 +++ b/lib-src/fakemail.c
-@@ -136,8 +136,10 @@
+@@ -136,8 +136,10 @@ struct linebuffer lb;
  #define NIL ((line_list) NULL)
  #define INITIAL_LINE_SIZE 200
  
@@ -40,9 +52,30 @@
  #endif
  
  static char *my_name;
+diff --git a/lisp/gnus/message.el b/lisp/gnus/message.el
+index 2fe8a4d..dd230ba 100644
+--- a/lisp/gnus/message.el
++++ b/lisp/gnus/message.el
+@@ -4589,7 +4589,13 @@ If you always want Gnus to send messages in one piece, set
+ 				     "/usr/lib/sendmail")
+ 				    ((file-exists-p "/usr/ucblib/sendmail")
+ 				     "/usr/ucblib/sendmail")
+-				    (t "fakemail"))
++				    (t
++                                     (if (not (file-executable-p
++                                               "/usr/bin/mail"))
++                                         (progn
++                                           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
++                                           (setq mail-interactive t)))
++                                     "fakemail"))
+ 			      nil errbuf nil "-oi")
+ 			message-sendmail-extra-arguments
+ 			;; Always specify who from,
+diff --git a/lisp/mail/feedmail.el b/lisp/mail/feedmail.el
+index 77d82f6..29cc891 100644
 --- a/lisp/mail/feedmail.el
 +++ b/lisp/mail/feedmail.el
-@@ -1327,7 +1327,12 @@
+@@ -1327,7 +1327,12 @@ complicated cases."
  			      "/usr/lib/sendmail")
  			     ((file-exists-p "/usr/ucblib/sendmail")
  			      "/usr/ucblib/sendmail")
@@ -56,6 +89,8 @@
  		       nil errors-to nil "-oi" "-t")
  		 ;; provide envelope "from" to sendmail; results will vary
  		 (list "-f" user-mail-address)
+diff --git a/lisp/mail/sendmail.el b/lisp/mail/sendmail.el
+index 3cc1bf5..1ad1add 100644
 --- a/lisp/mail/sendmail.el
 +++ b/lisp/mail/sendmail.el
 @@ -52,7 +52,12 @@
@@ -72,20 +107,6 @@
    "Program used to send messages."
    :group 'mail
    :type 'file)
---- a/lisp/gnus/message.el
-+++ b/lisp/gnus/message.el
-@@ -4589,7 +4589,13 @@
- 				     "/usr/lib/sendmail")
- 				    ((file-exists-p "/usr/ucblib/sendmail")
- 				     "/usr/ucblib/sendmail")
--				    (t "fakemail"))
-+				    (t
-+                                     (if (not (file-executable-p
-+                                               "/usr/bin/mail"))
-+                                         (progn
-+                                           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
-+                                           (setq mail-interactive t)))
-+                                     "fakemail"))
- 			      nil errbuf nil "-oi")
- 			message-sendmail-extra-arguments
- 			;; Always specify who from,
+-- 
+1.7.4.1
+

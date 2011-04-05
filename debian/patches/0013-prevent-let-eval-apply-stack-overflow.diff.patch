@@ -1,9 +1,13 @@
-* A potential stack overflow should be fixed in let, eval, and apply.
-  Patch: prevent-let-eval-apply-stack-overflow.diff
-  Provided-by: Sven Joachim <svenjoac@gmx.de>
-  Date: Thu, 19 Aug 2010 21:24:11 +0200
-  Added-by: Rob Browning <rlb@defaultvalue.org>
-  Status: incorporated upstream
+From 52282e72d1f64823f2662f3c8e83d82e2535ae9f Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:34 -0500
+Subject: prevent-let-eval-apply-stack-overflow.diff
+ * A potential stack overflow should be fixed in let, eval, and apply.
+   Patch: prevent-let-eval-apply-stack-overflow.diff
+   Provided-by: Sven Joachim <svenjoac@gmx.de>
+   Date: Thu, 19 Aug 2010 21:24:11 +0200
+   Added-by: Rob Browning <rlb@defaultvalue.org>
+   Status: incorporated upstream
 
   The Debian patch is taken from this upstream commit:
 
@@ -15,7 +19,13 @@
     Avoid stack overflow in let, eval, and apply (Bug#6214).
 
     * eval.c (Flet, Feval, Fapply, apply_lambda): Use SAFE_ALLOCA (Bug#6214).
+---
+ src/ChangeLog |    5 +++++
+ src/eval.c    |   31 ++++++++++++++++++++++---------
+ 2 files changed, 27 insertions(+), 9 deletions(-)
 
+diff --git a/src/ChangeLog b/src/ChangeLog
+index c27cc24..ba78f95 100644
 --- a/src/ChangeLog
 +++ b/src/ChangeLog
 @@ -1,3 +1,8 @@
@@ -27,9 +37,11 @@
  2010-05-18  Chong Yidong  <cyd@stupidchicken.com>
  
  	* character.c (Fstring, Funibyte_string): Use SAFE_ALLOCA to
+diff --git a/src/eval.c b/src/eval.c
+index 6609d3b..7bd27a0 100644
 --- a/src/eval.c
 +++ b/src/eval.c
-@@ -1028,12 +1028,13 @@
+@@ -1028,12 +1028,13 @@ usage: (let VARLIST BODY...)  */)
    int count = SPECPDL_INDEX ();
    register int argnum;
    struct gcpro gcpro1, gcpro2;
@@ -44,7 +56,7 @@
  
    /* Compute the values and store them in `temps' */
  
-@@ -1066,6 +1067,7 @@
+@@ -1066,6 +1067,7 @@ usage: (let VARLIST BODY...)  */)
      }
  
    elt = Fprogn (Fcdr (args));
@@ -52,7 +64,7 @@
    return unbind_to (count, elt);
  }
  
-@@ -2299,8 +2301,10 @@
+@@ -2299,8 +2301,10 @@ DEFUN ("eval", Feval, Seval, 1, 1, 0,
  	  /* Pass a vector of evaluated arguments */
  	  Lisp_Object *vals;
  	  register int argnum = 0;
@@ -64,7 +76,7 @@
  
  	  GCPRO3 (args_left, fun, fun);
  	  gcpro3.var = vals;
-@@ -2318,6 +2322,7 @@
+@@ -2318,6 +2322,7 @@ DEFUN ("eval", Feval, Seval, 1, 1, 0,
  
  	  val = (*XSUBR (fun)->function) (XINT (numargs), vals);
  	  UNGCPRO;
@@ -72,7 +84,7 @@
  	  goto done;
  	}
  
-@@ -2430,8 +2435,9 @@
+@@ -2430,8 +2435,9 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
    register int i, numargs;
    register Lisp_Object spread_arg;
    register Lisp_Object *funcall_args;
@@ -83,7 +95,7 @@
  
    fun = args [0];
    funcall_args = 0;
-@@ -2470,8 +2476,8 @@
+@@ -2470,8 +2476,8 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
  	{
  	  /* Avoid making funcall cons up a yet another new vector of arguments
  	     by explicitly supplying nil's for optional values */
@@ -94,7 +106,7 @@
  	  for (i = numargs; i < XSUBR (fun)->max_args;)
  	    funcall_args[++i] = Qnil;
  	  GCPRO1 (*funcall_args);
-@@ -2483,8 +2489,8 @@
+@@ -2483,8 +2489,8 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
       function itself as well as its arguments.  */
    if (!funcall_args)
      {
@@ -105,7 +117,7 @@
        GCPRO1 (*funcall_args);
        gcpro1.nvars = 1 + numargs;
      }
-@@ -2500,7 +2506,11 @@
+@@ -2500,7 +2506,11 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
      }
  
    /* By convention, the caller needs to gcpro Ffuncall's args.  */
@@ -118,7 +130,7 @@
  }
  
  /* Run hook variables in various ways.  */
-@@ -3108,9 +3118,11 @@
+@@ -3108,9 +3118,11 @@ apply_lambda (fun, args, eval_flag)
    struct gcpro gcpro1, gcpro2, gcpro3;
    register int i;
    register Lisp_Object tem;
@@ -131,7 +143,7 @@
    args_left = args;
  
    GCPRO3 (*arg_vector, args_left, fun);
-@@ -3139,6 +3151,7 @@
+@@ -3139,6 +3151,7 @@ apply_lambda (fun, args, eval_flag)
      tem = call_debugger (Fcons (Qexit, Fcons (tem, Qnil)));
    /* Don't do it again when we return to eval.  */
    backtrace_list->debug_on_exit = 0;
@@ -139,3 +151,6 @@
    return tem;
  }
  
+-- 
+1.7.4.1
+

@@ -1,9 +1,13 @@
-* The font width should now be computed correctly for dual-width fonts.
-  Patch: fix-fc-dual-font-width-calculation.diff
-  Provided-by: Sven Joachim <svenjoac@gmx.de>
-  Date: Mon, 12 Jul 2010 16:32:53 +0200
-  Added-by: Rob Browning <rlb@defaultvalue.org>
-  Status: incorporated upstream
+From 9f99dcafd0db14592d2f1ee982ccde6baf871ee1 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:37 -0500
+Subject: fix-fc-dual-font-width-calculation.diff
+ * The font width should now be computed correctly for dual-width fonts.
+   Patch: fix-fc-dual-font-width-calculation.diff
+   Provided-by: Sven Joachim <svenjoac@gmx.de>
+   Date: Mon, 12 Jul 2010 16:32:53 +0200
+   Added-by: Rob Browning <rlb@defaultvalue.org>
+   Status: incorporated upstream
 
   The Debian patch is taken from this upstream commit:
 
@@ -18,7 +22,14 @@
     spacing is dual.
 
     * ftfont.c (ftfont_open): Ditto.
+---
+ src/ChangeLog |    7 +++++++
+ src/ftfont.c  |    2 +-
+ src/xftfont.c |    2 +-
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/src/ChangeLog b/src/ChangeLog
+index f5c73db..59eaf48 100644
 --- a/src/ChangeLog
 +++ b/src/ChangeLog
 @@ -8,6 +8,13 @@
@@ -35,9 +46,11 @@
  2010-05-18  Chong Yidong  <cyd@stupidchicken.com>
  
  	* character.c (Fstring, Funibyte_string): Use SAFE_ALLOCA to
+diff --git a/src/ftfont.c b/src/ftfont.c
+index 6956c13..7801f22 100644
 --- a/src/ftfont.c
 +++ b/src/ftfont.c
-@@ -1262,7 +1262,7 @@
+@@ -1262,7 +1262,7 @@ ftfont_open (f, entity, pixel_size)
      spacing = XINT (AREF (entity, FONT_SPACING_INDEX));
    else
      spacing = FC_PROPORTIONAL;
@@ -46,9 +59,11 @@
      font->min_width = font->average_width = font->space_width
        = (scalable ? ft_face->max_advance_width * size / upEM
  	 : ft_face->size->metrics.max_advance >> 6);
+diff --git a/src/xftfont.c b/src/xftfont.c
+index 5d4581b..197cc9c 100644
 --- a/src/xftfont.c
 +++ b/src/xftfont.c
-@@ -429,7 +429,7 @@
+@@ -429,7 +429,7 @@ xftfont_open (f, entity, pixel_size)
  	ascii_printable[i] = ' ' + i;
      }
    BLOCK_INPUT;
@@ -57,3 +72,6 @@
      {
        font->min_width = font->average_width = font->space_width
  	= xftfont->max_advance_width;
+-- 
+1.7.4.1
+

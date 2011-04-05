@@ -1,8 +1,12 @@
-* ./configure should no longer define "unix" when building Emacs.
-  Patch: add-unix-to-cpp-undefs.diff
-  Date: Sun May  2 07:23:27 UTC 2010
-  Added-by: Rob Browning <rlb@defaultvalue.org>
-  Status: incorporated upstream
+From f5c912bee9fabdfa4d2d797cc9167ebe55d9ad35 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:31 -0500
+Subject: add-unix-to-cpp-undefs.diff
+ * ./configure should no longer define "unix" when building Emacs.
+   Patch: add-unix-to-cpp-undefs.diff
+   Date: Sun May  2 07:23:27 UTC 2010
+   Added-by: Rob Browning <rlb@defaultvalue.org>
+   Status: incorporated upstream
 
   Before this fix, gcc would produce the following warning:
 
@@ -16,10 +20,15 @@
     timestamp: Thu 2010-04-22 09:10:30 +0900
     message:
       get rid of "unix" pre-defined macro when preprocessing Makefile
+---
+ configure.in |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/configure.in b/configure.in
+index d3dc403..912a7da 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -3072,7 +3072,7 @@
+@@ -3072,7 +3072,7 @@ test "${exec_prefix}" != NONE &&
  # the C preprocessor to some helpful value like 1, or maybe the empty
  # string.  Needless to say consequent macro substitutions are less
  # than conducive to the makefile finding the correct directory.
@@ -28,3 +37,6 @@
    sed -e 's/[^a-zA-Z0-9_]/ /g' -e 's/^/ /' -e 's/  *$//' \
    -e 's/  */ -U/g' -e 's/-U[0-9][^ ]*//g'`"]
  
+-- 
+1.7.4.1
+
