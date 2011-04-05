@@ -1,0 +1,112 @@
+From 7ab2699f68cd8227e58bc2177cc48b4239eb929e Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:27 -0500
+Subject: Avoid silently losing mail via fakemail.
+
+An attempt is made to avoid silently losing mail via fakemail.
+
+This fix attempts to avoid a situation where Emacs can silently lose
+mail.  This can occur if sendmail.el (at least) falls back to
+fakemail, and the underlying binary (MAIL_PROGRAM_NAME) that fakemail
+is configured to use doesn't exist.  Unless mail-interactive is true,
+Emacs won't wait for the mailer and so won't know that fakemail
+failed.
+
+For now, Debian sets fakemail's MAIL_PROGRAM_NAME to /usr/bin/mail
+(which is the correct value for Debian systems) rather than /bin/mail.
+Debian also adjusts Emacs to test whether or not /usr/bin/mail exists
+and is executable.  If either of these tests fail, then
+mail-interactive is set to t.  That should ensure that a user will
+actually see an error if they attempt to use the broken fakemail.
+
+Note that Debian actually forces the MAIL_PROGRAM_NAME value to
+/usr/bin/mail.  The build will fail if any other value is specified.
+This is done to ensure that MAIL_PROGRAM_NAME isn't accidentally set
+to some other value during the build process.  If this is undesirable
+for some reason, just comment out avoid-fakemail-loss.diff in
+debian/patches/series.
+
+Author: Rob Browning <rlb@defaultvalue.org>
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lib-src/fakemail.c    |    6 ++++--
+ lisp/gnus/message.el  |    8 +++++++-
+ lisp/mail/feedmail.el |    7 ++++++-
+ lisp/mail/sendmail.el |    7 ++++++-
+ 4 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/lib-src/fakemail.c b/lib-src/fakemail.c
+index f83c0fb..5c5fb6d 100644
+--- a/lib-src/fakemail.c
++++ b/lib-src/fakemail.c
+@@ -136,8 +136,10 @@ struct linebuffer lb;
+ #define NIL ((line_list) NULL)
+ #define INITIAL_LINE_SIZE 200
+ 
+-#ifndef MAIL_PROGRAM_NAME
+-#define MAIL_PROGRAM_NAME "/bin/mail"
++#ifdef MAIL_PROGRAM_NAME
++#error "Debian assumption violated -- see avoid-fakemail-mail-loss.diff"
++#else
++#define MAIL_PROGRAM_NAME "/usr/bin/mail"
+ #endif
+ 
+ static char *my_name;
+diff --git a/lisp/gnus/message.el b/lisp/gnus/message.el
+index 63fcf50..d6a417a 100644
+--- a/lisp/gnus/message.el
++++ b/lisp/gnus/message.el
+@@ -4609,7 +4609,13 @@ If you always want Gnus to send messages in one piece, set
+ 				     "/usr/lib/sendmail")
+ 				    ((file-exists-p "/usr/ucblib/sendmail")
+ 				     "/usr/ucblib/sendmail")
+-				    (t "fakemail"))
++				    (t
++                                     (if (not (file-executable-p
++                                               "/usr/bin/mail"))
++                                         (progn
++                                           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
++                                           (setq mail-interactive t)))
++                                     "fakemail"))
+ 			      nil errbuf nil "-oi")
+ 			message-sendmail-extra-arguments
+ 			;; Always specify who from,
+diff --git a/lisp/mail/feedmail.el b/lisp/mail/feedmail.el
+index 77d82f6..29cc891 100644
+--- a/lisp/mail/feedmail.el
++++ b/lisp/mail/feedmail.el
+@@ -1327,7 +1327,12 @@ complicated cases."
+ 			      "/usr/lib/sendmail")
+ 			     ((file-exists-p "/usr/ucblib/sendmail")
+ 			      "/usr/ucblib/sendmail")
+-			     (t "fakemail"))
++			     (t
++                              (if (not (file-executable-p "/usr/bin/mail"))
++                                  (progn
++                                    (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
++                                    (setq mail-interactive t)))
++                              "fakemail"))
+ 		       nil errors-to nil "-oi" "-t")
+ 		 ;; provide envelope "from" to sendmail; results will vary
+ 		 (list "-f" user-mail-address)
+diff --git a/lisp/mail/sendmail.el b/lisp/mail/sendmail.el
+index 8cd6503..1adc2ca 100644
+--- a/lisp/mail/sendmail.el
++++ b/lisp/mail/sendmail.el
+@@ -52,7 +52,12 @@
+     ((file-exists-p "/usr/sbin/sendmail") "/usr/sbin/sendmail")
+     ((file-exists-p "/usr/lib/sendmail") "/usr/lib/sendmail")
+     ((file-exists-p "/usr/ucblib/sendmail") "/usr/ucblib/sendmail")
+-    (t "fakemail"))			;In ../etc, to interface to /bin/mail.
++    (t
++     (if (not (file-executable-p "/usr/bin/mail"))
++         (progn
++           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
++           (setq mail-interactive t)))
++     "fakemail"))			;In ../etc, to interface to /bin/mail.
+   "Program used to send messages."
+   :group 'mail
+   :type 'file)
+-- 
+1.7.4.1
+

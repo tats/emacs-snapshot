@@ -1,9 +1,9 @@
 /* Basic character support.
    Copyright (C) 1995, 1997, 1998, 2001 Electrotechnical Laboratory, JAPAN.
      Licensed to the Free Software Foundation.
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
      Free Software Foundation, Inc.
-   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
 
@@ -829,7 +829,7 @@ str_as_unibyte (str, bytes)
    corresponding byte and store in DST.  CHARS is the number of
    characters in SRC.  The value is the number of bytes stored in DST.
    Usually, the value is the same as CHARS, but is less than it if SRC
-   contains a non-ASCII, non-eight-bit characater.  If ACCEPT_LATIN_1
+   contains a non-ASCII, non-eight-bit character.  If ACCEPT_LATIN_1
    is nonzero, a Latin-1 character is accepted and converted to a byte
    of that character code.
    Note: Currently the arg ACCEPT_LATIN_1 is not used.  */

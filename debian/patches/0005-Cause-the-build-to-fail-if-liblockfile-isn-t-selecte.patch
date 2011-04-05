@@ -1,0 +1,52 @@
+From 0f624911022e9a8a544eb527054c6178fe713100 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:26 -0500
+Subject: Cause the build to fail if liblockfile isn't selected for movemail.
+
+The build will fail if liblockfile isn't selected for movemail.
+
+This makes sure the Debian Emacs won't accidentally be built with the
+wrong locking strategy.  To disable this check, comment out
+require-movemail-use-liblockfile.diff in debian/patches/series.
+
+Author: Rob Browning <rlb@defaultvalue.org>
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lib-src/movemail.c |    4 ++++
+ src/s/bsd-common.h |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/lib-src/movemail.c b/lib-src/movemail.c
+index 5fcc6de..58add49 100644
+--- a/lib-src/movemail.c
++++ b/lib-src/movemail.c
+@@ -166,6 +166,10 @@ int mbx_delimit_end ();
+ /* Nonzero means this is name of a lock file to delete on fatal error.  */
+ char *delete_lockname;
+ 
++#ifndef MAIL_USE_MAILLOCK
++#error "Debian requires that mail locking be handled by liblockfile."
++#endif /* ndef MAIL_USE_MAILLOCK */
++
+ int
+ main (argc, argv)
+      int argc;
+diff --git a/src/s/bsd-common.h b/src/s/bsd-common.h
+index 7889255..56fcb4a 100644
+--- a/src/s/bsd-common.h
++++ b/src/s/bsd-common.h
+@@ -66,7 +66,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+    The alternative is that a lock file named
+    /usr/spool/mail/$USER.lock.  */
+ 
++/* conditional copied from gnu-linux.h */
++#if !((defined (HAVE_LIBMAIL) || defined (HAVE_LIBLOCKFILE)) && \
++      defined (HAVE_MAILLOCK_H))
+ #define MAIL_USE_FLOCK
++#endif
+ 
+ /* Define CLASH_DETECTION if you want lock files to be written
+    so that Emacs can tell instantly when you try to modify
+-- 
+1.7.4.1
+

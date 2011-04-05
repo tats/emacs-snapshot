@@ -1,0 +1,58 @@
+From 949a2c6776362b398896f819bbac67c0c3a2728b Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:22 -0500
+Subject: Run debian-startup and set debian-emacs-flavor.
+
+Emacs runs debian-startup and sets debian-emacs-flavor.
+
+* Emacs runs debian-startup during the startup process unless
+  site-run-file is false.
+
+* The global variable debian-emacs-flavor is bound to 'emacs23.
+  Author: Rob Browning <rlb@defaultvalue.org>
+---
+ lisp/startup.el |   21 +++++++++++++++++++--
+ 1 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/startup.el b/lisp/startup.el
+index 471b688..a77e3fa 100644
+--- a/lisp/startup.el
++++ b/lisp/startup.el
+@@ -393,6 +393,10 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning
+   :type 'directory
+   :initialize 'custom-initialize-delay)
+ 
++(defconst debian-emacs-flavor 'emacs23
++  "A symbol representing the particular debian flavor of emacs running.
++Something like 'emacs20, 'xemacs20, etc.")
++
+ (defun normal-top-level-add-subdirs-to-load-path ()
+   "Add all subdirectories of current directory to `load-path'.
+ More precisely, this uses only the subdirectories whose names
+@@ -955,8 +959,21 @@ opening the first frame (e.g. open a connection to an X server).")
+     ;; be loaded from site-run-file and wants to test if -q was given
+     ;; should check init-file-user instead, since that is already set.
+     ;; See cus-edit.el for an example.
+-    (if site-run-file
+-	(load site-run-file t t))
++
++    ;; Original upstream startup
++    ;; (if site-run-file
++    ;;     (load site-run-file t t))
++    ;;
++
++    ;; Debian startup
++     (if site-run-file
++        (progn
++          ;; Load all the debian package snippets.
++          ;; It's in here because we want -q to kill it too.
++          (if (load "debian-startup" t t nil)
++              (debian-startup debian-emacs-flavor))
++          ;; Now the normal site file...
++          (load site-run-file t t nil)))
+ 
+     ;; Sites should not disable this.  Only individuals should disable
+     ;; the startup screen.
+-- 
+1.7.4.1
+

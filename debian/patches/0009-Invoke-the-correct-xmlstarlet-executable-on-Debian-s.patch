@@ -1,0 +1,35 @@
+From 13c08a7c91dfd6a6334d7f06d2e7b1dbb7bfb208 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:30 -0500
+Subject: Invoke the correct xmlstarlet executable on Debian systems.
+
+Emacs now invokes the correct xmlstarlet executable on Debian systems.
+
+Emacs invokes xmlstarlet rather than xml, which is the correct
+executable name on Debian systems.
+
+Provided-by: Jussi Judin <jjudin+debian@iki.fi>
+Date: Sat, 20 Oct 2007 14:42:02 UTC
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Status: Debian specific
+Bug: 447378
+---
+ lisp/progmodes/flymake.el |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/lisp/progmodes/flymake.el b/lisp/progmodes/flymake.el
+index da28a2e..81f6017 100644
+--- a/lisp/progmodes/flymake.el
++++ b/lisp/progmodes/flymake.el
+@@ -1760,7 +1760,7 @@ Use CREATE-TEMP-F for creating temp copy."
+ 
+ ;;;; xml-specific init-cleanup routines
+ (defun flymake-xml-init ()
+-  (list "xml" (list "val" (flymake-init-create-temp-buffer-copy 'flymake-create-temp-inplace))))
++  (list "xmlstarlet" (list "val" (flymake-init-create-temp-buffer-copy 'flymake-create-temp-inplace))))
+ 
+ (provide 'flymake)
+ 
+-- 
+1.7.4.1
+
