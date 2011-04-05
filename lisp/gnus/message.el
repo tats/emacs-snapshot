@@ -4609,7 +4609,13 @@ If you always want Gnus to send messages in one piece, set
 				     "/usr/lib/sendmail")
 				    ((file-exists-p "/usr/ucblib/sendmail")
 				     "/usr/ucblib/sendmail")
-				    (t "fakemail"))
+				    (t
+                                     (if (not (file-executable-p
+                                               "/usr/bin/mail"))
+                                         (progn
+                                           (message "/usr/bin/mail is not an executable.  Setting mail-interactive to t.")
+                                           (setq mail-interactive t)))
+                                     "fakemail"))
 			      nil errbuf nil "-oi")
 			message-sendmail-extra-arguments
 			;; Always specify who from,
