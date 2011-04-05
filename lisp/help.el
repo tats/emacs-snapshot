@@ -301,6 +301,14 @@ If that doesn't give a function, return nil."
   (goto-address-mode 1)
   (goto-char (point-min)))
 
+(defun debian-expand-file-name-dfsg (filename)
+  "Apply expand-file-name to FILENAME.
+If expand-file-name does not find a file, append `.dfsg' and try again."
+  (let ((file (expand-file-name filename data-directory)))
+    (if (file-exists-p file)
+        file
+      (expand-file-name (concat file ".dfsg") data-directory))))
+
 (defun describe-distribution ()
   "Display info on how to obtain the latest version of GNU Emacs."
   (interactive)
@@ -314,7 +322,7 @@ If that doesn't give a function, return nil."
 (defun describe-gnu-project ()
   "Display info on the GNU project."
   (interactive)
-  (view-help-file "THE-GNU-PROJECT"))
+  (view-help-file (debian-expand-file-name-dfsg "THE-GNU-PROJECT")))
 
 (define-obsolete-function-alias 'describe-project 'describe-gnu-project "22.2")
 
