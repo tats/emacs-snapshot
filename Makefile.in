@@ -135,12 +135,7 @@ MAN_PAGES=ctags.1 ebrowse.1 emacs.1 emacsclient.1 etags.1 \
 # since there are now many packages documented with the texinfo
 # system, it is inappropriate to imply that it is part of Emacs.
 infodir=@infodir@
-INFO_FILES=ada-mode auth autotype calc ccmode cl dbus dired-x ebrowse	\
-           ede ediff edt eieio efaq eintr elisp emacs emacs-gnutls emacs-mime epa erc \
-	   ert eshell eudc flymake forms gnus idlwave info mairix-el	\
-	   message mh-e newsticker nxml-mode org pcl-cvs pgg rcirc	\
-	   reftex remember sasl sc semantic ses sieve smtpmail speedbar \
-	   tramp url vip viper widget woman
+INFO_FILES=efaq
 
 # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
 HAVE_MAKEINFO=@HAVE_MAKEINFO@
@@ -768,10 +763,7 @@ mostlyclean: FRC
 	(cd lwlib;    $(MAKE) $(MFLAGS) mostlyclean)
 	(cd lib;      $(MAKE) $(MFLAGS) mostlyclean)
 	(cd lib-src;  $(MAKE) $(MFLAGS) mostlyclean)
-	-(cd doc/emacs &&   $(MAKE) $(MFLAGS) mostlyclean)
 	-(cd doc/misc &&   $(MAKE) $(MFLAGS) mostlyclean)
-	-(cd doc/lispref &&   $(MAKE) $(MFLAGS) mostlyclean)
-	-(cd doc/lispintro &&   $(MAKE) $(MFLAGS) mostlyclean)
 	(cd leim;     $(MAKE) $(MFLAGS) mostlyclean)
 
 ### `clean'
@@ -788,10 +780,7 @@ clean: FRC
 	(cd lwlib;    $(MAKE) $(MFLAGS) clean)
 	(cd lib;      $(MAKE) $(MFLAGS) clean)
 	(cd lib-src;  $(MAKE) $(MFLAGS) clean)
-	-(cd doc/emacs &&   $(MAKE) $(MFLAGS) clean)
 	-(cd doc/misc &&   $(MAKE) $(MFLAGS) clean)
-	-(cd doc/lispref &&   $(MAKE) $(MFLAGS) clean)
-	-(cd doc/lispintro &&   $(MAKE) $(MFLAGS) clean)
 	(cd leim;     $(MAKE) $(MFLAGS) clean)
 
 ### `bootclean'
@@ -813,10 +802,7 @@ distclean: FRC
 	(cd lwlib;    $(MAKE) $(MFLAGS) distclean)
 	(cd lib;      $(MAKE) $(MFLAGS) distclean)
 	(cd lib-src;  $(MAKE) $(MFLAGS) distclean)
-	(cd doc/emacs &&    $(MAKE) $(MFLAGS) distclean)
 	(cd doc/misc &&    $(MAKE) $(MFLAGS) distclean)
-	(cd doc/lispref &&    $(MAKE) $(MFLAGS) distclean)
-	(cd doc/lispintro &&    $(MAKE) $(MFLAGS) distclean)
 	(cd leim;     $(MAKE) $(MFLAGS) distclean)
 	(cd lisp;     $(MAKE) $(MFLAGS) distclean)
 	${top_distclean}
@@ -830,10 +816,7 @@ bootstrap-clean: FRC
 	(cd lwlib;    $(MAKE) $(MFLAGS) maintainer-clean)
 	(cd lib;      $(MAKE) $(MFLAGS) maintainer-clean)
 	(cd lib-src;  $(MAKE) $(MFLAGS) maintainer-clean)
-	-(cd doc/emacs &&   $(MAKE) $(MFLAGS) maintainer-clean)
 	-(cd doc/misc &&   $(MAKE) $(MFLAGS) maintainer-clean)
-	-(cd doc/lispref &&   $(MAKE) $(MFLAGS) maintainer-clean)
-	-(cd doc/lispintro &&   $(MAKE) $(MFLAGS) maintainer-clean)
 	(cd leim;     $(MAKE) $(MFLAGS) maintainer-clean)
 	(cd lisp;     $(MAKE) $(MFLAGS) bootstrap-clean)
 	[ ! -f config.log ] || mv -f config.log config.log~
@@ -889,10 +872,7 @@ dist:
 .PHONY: info dvi dist check html
 
 info-real:
-	(cd doc/emacs; $(MAKE) $(MFLAGS) info)
 	(cd doc/misc; $(MAKE) $(MFLAGS) info)
-	(cd doc/lispref; $(MAKE) $(MFLAGS) info)
-	(cd doc/lispintro; $(MAKE) $(MFLAGS) info)
 
 force-info:
 # Note that man/Makefile knows how to put the info files in $(srcdir),
@@ -931,10 +911,7 @@ check-info-dir: info
 	echo "info/dir is OK"
 
 dvi:
-	(cd doc/emacs; $(MAKE) $(MFLAGS) dvi)
 	(cd doc/misc; $(MAKE) $(MFLAGS) dvi)
-	(cd doc/lispref; $(MAKE) $(MFLAGS) elisp.dvi)
-	(cd doc/lispintro; $(MAKE) $(MFLAGS) emacs-lisp-intro.dvi)
 
 #### Bootstrapping.
 
