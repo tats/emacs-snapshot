@@ -76,8 +76,7 @@ for topic in "Texinfo documentation system" "Emacs" "Emacs lisp" \
 $topic
 EOF
     ## Bit faster than doc/*/*.texi.
-    for file in doc/emacs/emacs.texi doc/lispintro/emacs-lisp-intro.texi \
-        doc/lispref/elisp.texi doc/misc/*.texi; do
+    for file in doc/misc/*.texi; do
 
         ## FIXME do not ignore w32 if OS is w32.
         case $file in
