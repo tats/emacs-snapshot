@@ -166,6 +166,10 @@ int mbx_delimit_end ();
 /* Nonzero means this is name of a lock file to delete on fatal error.  */
 char *delete_lockname;
 
+#ifndef MAIL_USE_MAILLOCK
+#error "Debian requires that mail locking be handled by liblockfile."
+#endif /* ndef MAIL_USE_MAILLOCK */
+
 int
 main (argc, argv)
      int argc;

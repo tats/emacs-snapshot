@@ -66,7 +66,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
    The alternative is that a lock file named
    /usr/spool/mail/$USER.lock.  */
 
+/* conditional copied from gnu-linux.h */
+#if !((defined (HAVE_LIBMAIL) || defined (HAVE_LIBLOCKFILE)) && \
+      defined (HAVE_MAILLOCK_H))
 #define MAIL_USE_FLOCK
+#endif
 
 /* Define CLASH_DETECTION if you want lock files to be written
    so that Emacs can tell instantly when you try to modify
