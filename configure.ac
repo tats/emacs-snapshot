@@ -5798,7 +5798,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
 AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
 
 m4_define([subdir_makefiles],
-  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile])
+  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/misc/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile])
 SUBDIR_MAKEFILES="subdir_makefiles"
 AC_CONFIG_FILES(subdir_makefiles)
 
@@ -5850,14 +5850,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
 fi
 ])
 
-dnl Perhaps this would be better named doc-emacs-emacsver.texi?
-dnl See comments for etc-refcards-emacsver.tex.
-dnl Since we get a doc/emacs directory generated anyway, for the Makefile,
-dnl it is not quite the same.  But we are generating in $srcdir.
-AC_CONFIG_COMMANDS([doc/emacs/emacsver.texi], [
-${MAKE-make} -s --no-print-directory -C doc/emacs doc-emacsver || \
-AC_MSG_ERROR(['doc/emacs/emacsver.texi' could not be made.])
-])
+# This file is normally generated indirectly via
+# doc/emacs/Makefile.in, but since we've removed the other doc/emacs
+# files for the DFSG split, and we don't have any prebuilt info files,
+# generate it directly here.
+AC_CONFIG_FILES([doc/emacs/emacsver.texi])
 
 dnl If we give this the more natural name, etc/refcards/emacsver.texi,
 dnl then a directory etc/refcards is created in the build directory,
