@@ -2044,11 +2044,7 @@ if test "${HAVE_X11}" = "yes"; then
     ## We used to allow building with FreeType and without Xft.
     ## However, the ftx font backend driver is not in good shape.
     if test "${HAVE_XFT}" = "yes"; then
-      dnl As we use Xft, we anyway use freetype.
-      dnl There's no need for additional CFLAGS and LIBS.
       HAVE_FREETYPE=yes
-      FONTCONFIG_CFLAGS=
-      FONTCONFIG_LIBS=
     fi
 
     HAVE_LIBOTF=no
