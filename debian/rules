@@ -413,13 +413,17 @@ debian/$(flavor)-lucid.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-common.README.Debian: \
-  debian/emacsVER-common.README debian/patches/*.diff debian/patches/series
+  debian/emacsVER-common.README debian/patches/*.patch debian/patches/series \
+  debian/rules debian/patch-to-news
 	cd debian && \
 	  csplit -s -f emacsVER-common.README. \
 	  emacsVER-common.README '/@@PATCH_LIST_HERE@@/'
 	cp debian/emacsVER-common.README.00 debian/emacsVER-common.README.tmp
-	for p in $$($(quilt) series); do $(quilt) header $$p; done \
-	  >> debian/emacsVER-common.README.tmp
+	for p in $$($(quilt) series); do \
+	  debian/patch-to-news debian/patches/$$p \
+	    >> debian/emacsVER-common.README.tmp; \
+	  echo >> debian/emacsVER-common.README.tmp; \
+	done
 	tail -n +2 \
 	  < debian/emacsVER-common.README.01 \
 	  >> debian/emacsVER-common.README.tmp
