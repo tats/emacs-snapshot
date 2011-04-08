@@ -1,10 +1,8 @@
-emacs23 (23.2+1-8) unstable; urgency=low
+emacs23 (23.3+1-1) UNRELEASED; urgency=low
 
-  * Mention the fullscreen "maximized" value in the emacs man page.
-    Thanks to Peter Eisentraut <petere@debian.org> for the report and
-    Sven Joachim <svenjoac@gmx.de> for the patch. (closes: #594320)
+  * Incorporate new upstream version 23.3.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 11 Dec 2010 12:12:37 -0600
+ -- Rob Browning <rlb@raven.defaultvalue.org>  Thu, 07 Apr 2011 21:54:04 -0500
 
 emacs23 (23.2+1-7) unstable; urgency=low
 
