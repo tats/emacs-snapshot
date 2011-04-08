@@ -20,14 +20,6 @@ code to the Debian package.
   our source archive would match the upstream md5sum because we have
   to repackage it anyway to add leim support.
 
-* The etc/yow.lines file has been updated from the upstream development tree.
-
-The etc/yow.lines file in the Debian package is newer than the one in
-the original distribution.  It has been copied from the upstream Emacs
-development tree.
-
-* The -i icon is the Emacs GNU.
-
 * Those who prefer the old-style scrollbars can edit debian/rules
 
   If you prefer the old-style, non-toolkit scrollbars, just edit
