@@ -198,15 +198,19 @@ debian-sync: $(persistent_autogen_files)
 	true
 
 debian/$(flavor)-common-non-dfsg.README.Debian: \
-  debian/emacs-common-non-dfsg.README debian/patches/*.diff \
-  debian/patches/series
+  debian/emacs-common-non-dfsg.README \
+  debian/patches/*.patch debian/patches/series \
+  debian/rules debian/patch-to-news
 	cd debian && \
 	  csplit -s -f emacs-common-non-dfsg.README. \
 	  emacs-common-non-dfsg.README '/@@PATCH_LIST_HERE@@/'
 	cp debian/emacs-common-non-dfsg.README.00 \
 	  debian/emacs-common-non-dfsg.README.tmp
-	for p in $$($(quilt) series); do $(quilt) header $$p; done \
-	  >> debian/emacs-common-non-dfsg.README.tmp
+	for p in $$($(quilt) series); do \
+	  debian/patch-to-news debian/patches/$$p \
+	    >> debian/emacs-common-non-dfsg.README.tmp; \
+	  echo >> debian/emacs-common-non-dfsg.README.tmp; \
+	done
 	tail -n +2 \
 	  < debian/emacs-common-non-dfsg.README.01 \
 	  >> debian/emacs-common-non-dfsg.README.tmp
