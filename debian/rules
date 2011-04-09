@@ -481,6 +481,8 @@ define build_cmd
 endef
 
 override_dh_auto_configure: debian/setup-stamp
+	cp -a /usr/share/misc/config.guess .
+	cp -a /usr/share/misc/config.sub .
 	$(call cfg_tree,debian/build-x,$(confflags_x))
 	$(call cfg_tree,debian/build-nox,$(confflags_nox))
 	$(call cfg_tree,debian/build-lucid,$(confflags_lucid))
@@ -735,6 +737,8 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/build-lucid \
 	  debian/install-lucid \
 	  debian/*-stamp \
+	  config.guess \
+	  config.sub \
 	  configure \
 	  src/config.in
 	rm -f $(nonpersistent_autogen_files)
