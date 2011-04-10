@@ -117,3 +117,6 @@ distclean: clean
 maintainer-clean: clean
 	rm -f elisp.dvi elisp.oaux
 	cd $(infodir); rm -f elisp elisp-[1-9] elisp-[1-9][0-9]
+
+echo-info-targets:
+	@echo INFO_TARGETS=$(infodir)/elisp

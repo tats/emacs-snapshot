@@ -75,3 +75,6 @@ maintainer-clean: distclean
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
+
+echo-info-targets:
+	@echo INFO_TARGETS=$(INFO_TARGETS)

@@ -56,7 +56,6 @@ INFO_TARGETS = \
 	$(infodir)/erc \
 	$(infodir)/eshell \
 	$(infodir)/eudc \
-	$(infodir)/efaq \
 	$(infodir)/flymake \
 	$(infodir)/forms \
 	$(infodir)/gnus \
@@ -106,7 +105,6 @@ DVI_TARGETS = \
 	erc.dvi \
 	eshell.dvi \
 	eudc.dvi \
-	faq.dvi \
 	flymake.dvi \
 	forms.dvi \
 	gnus.dvi \
@@ -357,13 +355,6 @@ eudc.dvi: eudc.texi
 eudc.pdf: eudc.texi
 	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
 
-efaq : $(infodir)/efaq
-$(infodir)/efaq: faq.texi
-	cd $(srcdir); $(MAKEINFO) faq.texi
-faq.dvi: faq.texi
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
-faq.pdf: faq.texi
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
 
 flymake : $(infodir)/flymake
 $(infodir)/flymake: flymake.texi
@@ -624,5 +615,7 @@ distclean: clean
 maintainer-clean: distclean
 	for file in $(INFO_TARGETS); do rm -f $${file}*; done
 
+echo-info-targets:
+	@echo INFO_TARGETS=$(INFO_TARGETS)
 
 ### Makefile ends here
