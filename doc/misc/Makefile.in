@@ -64,7 +64,6 @@ INFO_TARGETS = \
 	$(buildinfodir)/ert \
 	$(buildinfodir)/eshell \
 	$(buildinfodir)/eudc \
-	$(buildinfodir)/efaq \
 	$(buildinfodir)/flymake \
 	$(buildinfodir)/forms \
 	$(buildinfodir)/gnus \
@@ -116,7 +115,6 @@ DVI_TARGETS = \
 	ert.dvi \
 	eshell.dvi \
 	eudc.dvi \
-	faq.dvi \
 	flymake.dvi \
 	forms.dvi \
 	gnus.dvi \
@@ -168,7 +166,6 @@ PDF_TARGETS = \
 	ert.pdf \
 	eshell.pdf \
 	eudc.pdf \
-	faq.pdf \
 	flymake.pdf \
 	forms.pdf \
 	gnus.pdf \
@@ -200,7 +197,7 @@ PDF_TARGETS = \
 	widget.pdf \
 	woman.pdf
 
-HTML_TARGETS = emacs-faq.html
+HTML_TARGETS =
 
 TEXI2DVI = texi2dvi
 TEXI2PDF = texi2pdf
@@ -409,24 +406,6 @@ eudc.dvi: ${srcdir}/eudc.texi
 	$(ENVADD) $(TEXI2DVI) ${srcdir}/eudc.texi
 eudc.pdf: ${srcdir}/eudc.texi
 	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
-
-efaq : $(buildinfodir)/efaq
-$(buildinfodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
-	$(mkinfodir)
-	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) faq.texi
-faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
-faq.pdf: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
-## This is the name used on the Emacs web-page.
-## sed fixes up links to point to split version of the manual.
-emacs-faq.html: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(MAKEINFO) $(MAKEINFO_OPTS) --no-split \
-	  --css-ref='/layout.css' --html -o $@ ${srcdir}/faq.texi
-	sed -i -e 's|a href="\([a-z]*\)\.html#\([^"]*\)"|a href="manual/html_node/\1/\2.html"|g' \
-	  -e 's|/Top\.html|/|g' $@
-emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
 
 flymake : $(buildinfodir)/flymake
 $(buildinfodir)/flymake: flymake.texi
