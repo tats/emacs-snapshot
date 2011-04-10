@@ -65,7 +65,7 @@ DOCMISC_W32 = @DOCMISC_W32@
 ## Info files to build and install on all platforms.
 INFO_COMMON = ada-mode auth autotype bovine calc ccmode cl \
 	dbus dired-x ebrowse ede ediff edt eieio \
-	emacs-mime epa erc ert eshell eudc efaq eww \
+	emacs-mime epa erc ert eshell eudc eww \
 	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
 	mairix-el message mh-e newsticker nxml-mode octave-mode \
 	org pcl-cvs pgg rcirc remember reftex sasl \
@@ -78,7 +78,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 ## Info files to build on current platform.
 ## This is all of them, even though they might not all get installed,
 ## because the info files are pre-built in release tarfiles.
-INFO_TARGETS = $(INFO_COMMON) efaq-w32
+INFO_TARGETS = $(INFO_COMMON)
 
 # There are some naming differences between the info targets and the other
 # targets, so let's resolve them here.
@@ -288,31 +288,6 @@ edt.pdf: $(edt_deps)
 	$(ENVADD) $(TEXI2PDF) ${srcdir}/edt.texi
 edt.html: $(edt_deps)
 	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/edt.texi
-
-## No gfdl dependency.
-efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
-efaq : $(buildinfodir)/efaq$(INFO_EXT)
-$(buildinfodir)/efaq$(INFO_EXT): $(efaq_deps)
-	$(mkinfodir)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq.texi
-efaq.dvi: $(efaq_deps)
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq.texi
-efaq.pdf: $(efaq_deps)
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq.texi
-efaq.html: $(efaq_deps)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq.texi
-
-efaq_w32_deps = ${srcdir}/efaq-w32.texi $(emacsdir)/emacsver.texi
-efaq-w32 : $(buildinfodir)/efaq-w32$(INFO_EXT)
-$(buildinfodir)/efaq-w32$(INFO_EXT): $(efaq_w32_deps)
-	$(mkinfodir)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq-w32.texi
-efaq-w32.dvi: $(efaq_w32_deps)
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq-w32.texi
-efaq-w32.pdf: $(efaq_w32_deps)
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq-w32.texi
-efaq-w32.html: $(efaq_w32_deps)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
 
 eieio_deps = ${srcdir}/eieio.texi ${gfdl}
 eieio : $(buildinfodir)/eieio$(INFO_EXT)
@@ -862,7 +837,6 @@ mostlyclean:
 
 clean: mostlyclean
 	rm -f $(DVI_TARGETS) $(HTML_TARGETS) $(PDF_TARGETS) $(PS_TARGETS)
-	rm -f efaq-w32.dvi efaq-w32.html efaq-w32.pdf efaq-w32.ps
 	rm -f emacs-misc-${version}.tar*
 
 distclean: clean
