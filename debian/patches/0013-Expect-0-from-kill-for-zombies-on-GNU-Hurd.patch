@@ -1,4 +1,4 @@
-From 7eaf227281e7c35cd09405ef3f94a4eeced22882 Mon Sep 17 00:00:00 2001
+From 07daa825f4a4af9e269ace4071b86e6528412619 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 10 Apr 2011 10:03:45 -0500
 Subject: Expect 0 from kill() for zombies on GNU/Hurd.
