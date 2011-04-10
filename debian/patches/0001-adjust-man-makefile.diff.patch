@@ -1,4 +1,4 @@
-From eaaccd4f1d26b20185d5574abd49aa7644876b1c Mon Sep 17 00:00:00 2001
+From 6b28200278d0fedb5e69e42c1267ca863dd07671 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 10 Apr 2011 12:19:54 -0500
 Subject: adjust-man-makefile.diff
@@ -16,7 +16,7 @@ Subject: adjust-man-makefile.diff
  4 files changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/doc/emacs/Makefile.in b/doc/emacs/Makefile.in
-index 765f6aa..49996af 100644
+index 3f2f635..5765c1c 100644
 --- a/doc/emacs/Makefile.in
 +++ b/doc/emacs/Makefile.in
 @@ -162,5 +162,7 @@ maintainer-clean: distclean
@@ -28,7 +28,7 @@ index 765f6aa..49996af 100644
  
  ### Makefile ends here
 diff --git a/doc/lispintro/Makefile.in b/doc/lispintro/Makefile.in
-index d834ef7..a79aa34 100644
+index e85185f..a81cf74 100644
 --- a/doc/lispintro/Makefile.in
 +++ b/doc/lispintro/Makefile.in
 @@ -75,3 +75,6 @@ maintainer-clean: distclean
@@ -39,7 +39,7 @@ index d834ef7..a79aa34 100644
 +echo-info-targets:
 +	@echo INFO_TARGETS=$(INFO_TARGETS)
 diff --git a/doc/lispref/Makefile.in b/doc/lispref/Makefile.in
-index bc13a63..67b558d 100644
+index f4cd594..034211a 100644
 --- a/doc/lispref/Makefile.in
 +++ b/doc/lispref/Makefile.in
 @@ -117,3 +117,6 @@ distclean: clean
@@ -50,7 +50,7 @@ index bc13a63..67b558d 100644
 +echo-info-targets:
 +	@echo INFO_TARGETS=$(infodir)/elisp
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 18d9d9a..0a1efe6 100644
+index 9e93be4..b18631b 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -56,7 +56,6 @@ INFO_TARGETS = \
