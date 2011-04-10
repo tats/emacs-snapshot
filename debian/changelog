@@ -1,3 +1,13 @@
+emacs23-non-dfsg (23.3+1-1) unstable; urgency=low
+
+  * Incorporate new upstream version 23.3.
+
+  * Adjust emacsVER-common.README to accommodate new patch headers.
+    Add debian/patch-to-news to handle converting new git-dpm style
+    patch headers to emacsVER-common.README.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 10 Apr 2011 12:21:08 -0500
+
 emacs23-non-dfsg (23.2+1-1) unstable; urgency=low
 
   * New emacs23 packages.
