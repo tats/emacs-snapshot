@@ -1,13 +1,14 @@
-From 6b28200278d0fedb5e69e42c1267ca863dd07671 Mon Sep 17 00:00:00 2001
+From ebb4ba97d3c65c3d09c86ccbec9456187f865d9b Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
-Date: Sun, 10 Apr 2011 12:19:54 -0500
-Subject: adjust-man-makefile.diff
- * This package contains the non-DFSG info files.
+Date: Sat, 9 Apr 2011 20:41:52 -0500
+Subject: Adjust the build system to handle the DFSG split.
 
-  Patch: adjust-man-makefile.diff
-  Author: Rob Browning <rlb@defaultvalue.org>
-  Added-by: Rob Browning <rlb@defaultvalue.org>
-  Status: new
+This package contains the Emacs files that do not appear to satisfy
+the DFSG.
+
+Author: Rob Browning <rlb@defaultvalue.org>
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Status: new
 ---
  doc/emacs/Makefile.in     |    2 ++
  doc/lispintro/Makefile.in |    3 +++
