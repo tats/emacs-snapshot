@@ -43,7 +43,7 @@ MAKEINFO_OPTS = --force -I$(emacsdir)
 
 INFO_TARGETS = ada-mode auth autotype bovine calc ccmode cl \
 	dbus dired-x ebrowse ede ediff edt eieio \
-	emacs-mime epa erc ert eshell eudc efaq \
+	emacs-mime epa erc ert eshell eudc \
 	flymake forms gnus emacs-gnutls htmlfontify idlwave info.info \
 	mairix-el message mh-e newsticker nxml-mode \
 	org pcl-cvs pgg rcirc remember reftex sasl \
@@ -71,7 +71,6 @@ DVI_TARGETS = \
 	ert.dvi \
 	eshell.dvi \
 	eudc.dvi \
-	faq.dvi \
 	flymake.dvi \
 	forms.dvi \
 	gnus.dvi \
@@ -127,7 +126,6 @@ PDF_TARGETS = \
 	ert.pdf \
 	eshell.pdf \
 	eudc.pdf \
-	faq.pdf \
 	flymake.pdf \
 	forms.pdf \
 	gnus.pdf \
@@ -162,7 +160,7 @@ PDF_TARGETS = \
 	wisent.pdf \
 	woman.pdf
 
-HTML_TARGETS = emacs-faq.html
+HTML_TARGETS =
 
 TEXI2DVI = texi2dvi
 TEXI2PDF = texi2pdf
