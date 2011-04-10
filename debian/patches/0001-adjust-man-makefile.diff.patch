@@ -1,0 +1,96 @@
+From eaaccd4f1d26b20185d5574abd49aa7644876b1c Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 10 Apr 2011 12:19:54 -0500
+Subject: adjust-man-makefile.diff
+ * This package contains the non-DFSG info files.
+
+  Patch: adjust-man-makefile.diff
+  Author: Rob Browning <rlb@defaultvalue.org>
+  Added-by: Rob Browning <rlb@defaultvalue.org>
+  Status: new
+---
+ doc/emacs/Makefile.in     |    2 ++
+ doc/lispintro/Makefile.in |    3 +++
+ doc/lispref/Makefile.in   |    3 +++
+ doc/misc/Makefile.in      |   11 ++---------
+ 4 files changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/doc/emacs/Makefile.in b/doc/emacs/Makefile.in
+index 765f6aa..49996af 100644
+--- a/doc/emacs/Makefile.in
++++ b/doc/emacs/Makefile.in
+@@ -162,5 +162,7 @@ maintainer-clean: distclean
+ # Since we expect to get texi2dvi from elsewhere,
+ # it is ok to expect texindex from elsewhere also.
+ 
++echo-info-targets:
++	@echo INFO_TARGETS=$(INFO_TARGETS)
+ 
+ ### Makefile ends here
+diff --git a/doc/lispintro/Makefile.in b/doc/lispintro/Makefile.in
+index d834ef7..a79aa34 100644
+--- a/doc/lispintro/Makefile.in
++++ b/doc/lispintro/Makefile.in
+@@ -75,3 +75,6 @@ maintainer-clean: distclean
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.
+ .NOEXPORT:
++
++echo-info-targets:
++	@echo INFO_TARGETS=$(INFO_TARGETS)
+diff --git a/doc/lispref/Makefile.in b/doc/lispref/Makefile.in
+index bc13a63..67b558d 100644
+--- a/doc/lispref/Makefile.in
++++ b/doc/lispref/Makefile.in
+@@ -117,3 +117,6 @@ distclean: clean
+ maintainer-clean: clean
+ 	rm -f elisp.dvi elisp.oaux
+ 	cd $(infodir); rm -f elisp elisp-[1-9] elisp-[1-9][0-9]
++
++echo-info-targets:
++	@echo INFO_TARGETS=$(infodir)/elisp
+diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
+index 18d9d9a..0a1efe6 100644
+--- a/doc/misc/Makefile.in
++++ b/doc/misc/Makefile.in
+@@ -56,7 +56,6 @@ INFO_TARGETS = \
+ 	$(infodir)/erc \
+ 	$(infodir)/eshell \
+ 	$(infodir)/eudc \
+-	$(infodir)/efaq \
+ 	$(infodir)/flymake \
+ 	$(infodir)/forms \
+ 	$(infodir)/gnus \
+@@ -106,7 +105,6 @@ DVI_TARGETS = \
+ 	erc.dvi \
+ 	eshell.dvi \
+ 	eudc.dvi \
+-	faq.dvi \
+ 	flymake.dvi \
+ 	forms.dvi \
+ 	gnus.dvi \
+@@ -357,13 +355,6 @@ eudc.dvi: eudc.texi
+ eudc.pdf: eudc.texi
+ 	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
+ 
+-efaq : $(infodir)/efaq
+-$(infodir)/efaq: faq.texi
+-	cd $(srcdir); $(MAKEINFO) faq.texi
+-faq.dvi: faq.texi
+-	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
+-faq.pdf: faq.texi
+-	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
+ 
+ flymake : $(infodir)/flymake
+ $(infodir)/flymake: flymake.texi
+@@ -624,5 +615,7 @@ distclean: clean
+ maintainer-clean: distclean
+ 	for file in $(INFO_TARGETS); do rm -f $${file}*; done
+ 
++echo-info-targets:
++	@echo INFO_TARGETS=$(INFO_TARGETS)
+ 
+ ### Makefile ends here
+-- 
+1.7.4.1
+

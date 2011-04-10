@@ -162,5 +162,7 @@ maintainer-clean: distclean
 # Since we expect to get texi2dvi from elsewhere,
 # it is ok to expect texindex from elsewhere also.
 
+echo-info-targets:
+	@echo INFO_TARGETS=$(INFO_TARGETS)
 
 ### Makefile ends here
