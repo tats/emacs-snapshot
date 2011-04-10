@@ -69,7 +69,7 @@ DOCMISC_W32 = @DOCMISC_W32@
 ## Info files to build and install on all platforms.
 INFO_COMMON = auth autotype bovine calc ccmode cl \
 	dbus dired-x ebrowse ede ediff edt eieio \
-	emacs-mime epa erc ert eshell eudc efaq eww \
+	emacs-mime epa erc ert eshell eudc eww \
 	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
 	mairix-el message mh-e modus-themes newsticker nxml-mode octave-mode \
 	org pcl-cvs pgg rcirc remember reftex sasl \
@@ -82,7 +82,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 ## Info files to build on current platform.
 ## This is all of them, even though they might not all get installed,
 ## because the info files are pre-built in release tarfiles.
-INFO_TARGETS = $(INFO_COMMON) efaq-w32
+INFO_TARGETS = $(INFO_COMMON)
 
 ## Some manuals have their source in .org format.
 ## This is discouraged because the .texi files it generates
@@ -185,7 +185,7 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
 
 ## Extra dependencies.
 
-need_emacsver = calc cl dired-x efaq efaq-w32 erc ido reftex woman
+need_emacsver = calc cl dired-x erc ido reftex woman
 need_emacsver_prefix = $(addprefix ${buildinfodir}/,${need_emacsver})
 
 $(need_emacsver_prefix:=.info) $(need_emacsver:=.dvi) $(need_emacsver:=.pdf) $(need_emacsver:=.html) : ${emacsdir}/emacsver.texi
@@ -199,20 +199,6 @@ $(buildinfodir)/semantic.info semantic.dvi semantic.pdf semantic.html: ${srcdir}
 ${buildinfodir}/ccmode.info: \
   ${srcdir}/cc-mode.texi ${gfdl} ${style} | ${buildinfodir}
 	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
-
-## efaq, efaq_w32 do not depend on gfdl.
-## Maybe we can use .SECONDEXPANSION for this.
-${buildinfodir}/efaq%.info: ${srcdir}/efaq%.texi ${style} | ${buildinfodir}
-	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
-
-efaq%.dvi: ${srcdir}/efaq%.texi
-	$(ENVADD) $(TEXI2DVI) $<
-
-efaq%.pdf: ${srcdir}/efaq%.texi
-	$(ENVADD) $(TEXI2PDF) $<
-
-efaq%.html: ${srcdir}/efaq%.texi
-	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ $<
 
 ${buildinfodir}/emacs-mime.info emacs-mime.html: EXTRA_OPTS = --enable-encoding
 
