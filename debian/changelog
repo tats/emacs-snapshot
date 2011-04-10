@@ -1,8 +1,31 @@
-emacs23 (23.3+1-1) UNRELEASED; urgency=low
+emacs23 (23.3+1-1) unstable; urgency=low
 
   * Incorporate new upstream version 23.3.
 
- -- Rob Browning <rlb@raven.defaultvalue.org>  Thu, 07 Apr 2011 21:54:04 -0500
+  * Don't clear FONTCONFIG_LIBS and FONTCONFIG_CFLAGS in configure.
+    Thanks to Peter Fritzsche <peter.fritzsche@gmx.de> for the report
+    and Matthias Klose <doko@ubuntu.com> for the patch.
+    (closes: #554324)
+
+  * Adjust emacsVER-common.README to accommodate new patch headers.
+    Add debian/patch-to-news to handle converting new git-dpm style
+    patch headers to emacsVER-common.README.
+
+  * Rely on autotools-dev for config.guess and config.sub.
+
+  * Fix a tty-related preprocessor inclusion error affecting GNU/Hurd
+    systems.  Thanks to Samuel Thibault <sthibault@debian.org> for the
+    report and the patch. (closes: #610576)
+
+  * Expect 0 from kill() for zombies on GNU/Hurd.  This should prevent
+    Emacs from hanging on affected systems.  Thanks to Samuel Thibault
+    <sthibault@debian.org> for the report and the patch.
+    (closes: #611591)
+
+  * Remove debian/dfsg-splitter since the split is now being handled
+    directly in git.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 10 Apr 2011 10:33:31 -0500
 
 emacs23 (23.2+1-7) unstable; urgency=low
 
