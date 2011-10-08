@@ -166,6 +166,8 @@ else
   confflags += --build $(DEB_BUILD_GNU_TYPE) --host $(DEB_HOST_GNU_TYPE)
 endif
 
+deb_host_multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
 LDFLAGS   := -g
 CFLAGS    := -DDEBIAN -g
 
@@ -432,6 +434,9 @@ confflags += --infodir=/usr/share/info
 confflags += --mandir=/usr/share/man
 confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
+
+# multiarch compatibility
+confflags += --with-crt-dir=/usr/lib/$(deb_host_multiarch)
 
 # x configure flags
 confflags_x := $(confflags) 
