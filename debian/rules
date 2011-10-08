@@ -303,7 +303,7 @@ define deb_sub
 endef
 
 %:
-	dh $@ --parallel --with autotools_dev
+	dh $@ --parallel
 
 check-vars:
 	@echo "src_name: $(src_name)"
@@ -468,6 +468,9 @@ define build_cmd
 endef
 
 override_dh_auto_configure: debian/setup-stamp
+        # Can't use dh --with autotools_dev because it only works if
+        # you haven't removed the config.sub and config.guess files
+        # from the source tree.
 	cp -a /usr/share/misc/config.guess .
 	cp -a /usr/share/misc/config.sub .
 	$(call cfg_tree,debian/build-x,$(confflags_x))
