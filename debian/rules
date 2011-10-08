@@ -269,16 +269,6 @@ local_lpath_install \
 
 define testdir
   dh_testdir debian/emacsVER.postinst
-  @if ! test -f src/emacs.c; \
-  then \
-    echo; \
-    echo -n "The upstream source does not appear to be available."; \
-    echo "  Please put the contents"; \
-    echo -n "of $(deb_orig_tgz) into the"; \
-    echo " current directory."; \
-    echo; \
-    false; \
-  fi
 endef
 
 # If we ever need to do the stripping outside of dh_strip, just add an
