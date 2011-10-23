@@ -11,3 +11,4 @@
 0011-Don-t-clear-FONTCONFIG_LIBS-and-FONTCONFIG_CFLAGS-in.patch
 0012-Fix-a-tty-related-preprocessor-inclusion-error-affec.patch
 0013-Expect-0-from-kill-for-zombies-on-GNU-Hurd.patch
+0014-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch

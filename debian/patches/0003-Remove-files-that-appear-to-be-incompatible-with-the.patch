@@ -700,5 +700,5 @@ index 97690ea..482b4a1 100644
  (define-obsolete-function-alias 'describe-project 'describe-gnu-project "22.2")
  
 -- 
-1.7.4.1
+1.7.6.3
 

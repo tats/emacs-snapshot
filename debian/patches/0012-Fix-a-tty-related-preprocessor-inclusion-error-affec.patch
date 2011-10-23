@@ -1,7 +1,8 @@
 From 136cc18a735081b12da58fbcfec5092fe8e7826d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Fri, 8 Apr 2011 22:50:51 -0500
-Subject: Fix a tty-related preprocessor inclusion error affecting GNU/Hurd systems.
+Subject: Fix a tty-related preprocessor inclusion error affecting GNU/Hurd
+ systems.
 
 A problem with the preprocessor defines in src/term.c has been fixed.
 This problem would cause Emacs to fail on GNU/Hurd systems as follows:
@@ -38,5 +39,5 @@ index 6d16a65..44e127e 100644
      tty->name = xstrdup (name);
      terminal->name = xstrdup (name);
 -- 
-1.7.4.1
+1.7.6.3
 

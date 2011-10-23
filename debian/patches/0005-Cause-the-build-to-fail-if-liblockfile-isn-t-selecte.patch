@@ -48,5 +48,5 @@ index 7889255..56fcb4a 100644
  /* Define CLASH_DETECTION if you want lock files to be written
     so that Emacs can tell instantly when you try to modify
 -- 
-1.7.4.1
+1.7.6.3
 

@@ -40,5 +40,5 @@ index ffb7a7c..812c345 100644
  	  if (!NILP (tem1))
  	    Vdata_directory = newdir;
 -- 
-1.7.4.1
+1.7.6.3
 

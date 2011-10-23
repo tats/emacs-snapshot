@@ -27,5 +27,5 @@ index 92eb564..f9103b1 100644
  		 system-configuration
  		 (cond ((featurep 'motif)
 -- 
-1.7.4.1
+1.7.6.3
 
