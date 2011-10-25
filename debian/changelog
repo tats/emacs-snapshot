@@ -1,3 +1,12 @@
+emacs23 (23.3+1-3) unstable; urgency=low
+
+  * Add 0015-Look-for-crt1.o-in-the-correct-multiarch-location.patch.
+    Thanks to Sven Joachim <svenjoac@gmx.de> for the report and the patch,
+    and and Philipp Kern <pkern@debian.org> for the 23.3+1-1.1 NMU, which
+    included it. (Closes: #629567)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 24 Oct 2011 22:45:37 -0500
+
 emacs23 (23.3+1-2) unstable; urgency=low
 
   * Add 0014-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch.
