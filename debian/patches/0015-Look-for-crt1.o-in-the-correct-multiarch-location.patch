@@ -1,0 +1,42 @@
+From a81a47f989199e0705fdd7b2142dee04f497f721 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 24 Oct 2011 22:29:59 -0500
+Subject: Look for crt1.o in the correct multiarch location.
+
+The Emacs build should now be able to handle the fact that crt1.o is
+no longer in /usr/lib.  It was moved to support multarch.
+
+Provided-by: Sven Joachim <svenjoac@gmx.de>
+Date: Sat, 25 Jun 2011 08:25:48 +0200
+Applied-by: Rob Browning <rlb@defaultvalue.org>
+Bug-Debian: http://bugs.debian.org/629567
+Applied-Upstream: http://lists.gnu.org/archive/html/emacs-diffs/2010-04/msg00325.html
+---
+ src/s/gnu-linux.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/s/gnu-linux.h b/src/s/gnu-linux.h
+index c13cb60..953341d 100644
+--- a/src/s/gnu-linux.h
++++ b/src/s/gnu-linux.h
+@@ -168,7 +168,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ /* Ask GCC where to find libgcc.a.  */
+ #define LIB_GCC `$(CC) $(C_SWITCH_X_SITE) -print-libgcc-file-name`
+ 
+-#define START_FILES pre-crt0.o /usr/lib/crt1.o /usr/lib/crti.o
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
+ 
+ /* Here is how to find X Windows.  LD_SWITCH_X_SITE_AUX gives an -R option
+    says where to find X windows at run time.  */
+@@ -198,7 +198,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ #define LIBS_DEBUG
+ #undef LIB_GCC
+ #define LIB_GCC
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtn.o
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
+ 
+ /* Don't use -g in test compiles in configure.
+    This is so we will use the same shared libs for that linking
+-- 
+1.7.6.3
+
