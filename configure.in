@@ -172,7 +172,7 @@ fi
 CRT_DIR=
 AC_ARG_WITH([crt-dir],dnl
 [AS_HELP_STRING([--with-crt-dir=DIR],[directory containing crtn.o etc.
-This option is only used on x86-64 and s390x GNU/Linux architectures.])])
+This option is only used on x86-64, powerpc64 and s390x GNU/Linux architectures.])])
 CRT_DIR="${with_crt_dir}"
 
 AC_ARG_WITH([gnustep-conf],dnl
@@ -1006,11 +1006,11 @@ AC_CONFIG_LIBOBJ_DIR(src)
 dnl Do this early because it can frob feature test macros for Unix-98 &c.
 AC_SYS_LARGEFILE
 
-## Note: at present CRT_DIR is only used for amdx86-64 and ibms390x.
+## Note: at present CRT_DIR is only used for amdx86-64, powerpc64 and ibms390x.
 ## Other machine types hard-code the location in src/[ms]/*.h.
 case "${canonical}" in
-  x86_64-*-linux-gnu* | s390x-*-linux-gnu* )
-   ## On x86-64 and s390x GNU/Linux distributions, the standard library
+  x86_64-*-linux-gnu* | powerpc64-*-linux-gnu* | s390x-*-linux-gnu* )
+   ## On x86-64, powerpc64 and s390x GNU/Linux distributions, the standard library
    ## can be in a variety of places.  We only try /usr/lib64 and /usr/lib.
    ## For anything else (eg /usr/lib32), it is up the user to specify
    ## the location (bug#5655).
