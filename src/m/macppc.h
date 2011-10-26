@@ -50,9 +50,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #define LD_SWITCH_MACHINE_TEMACS -Xlinker -znocombreloc
 #ifdef _ARCH_PPC64
 #undef START_FILES
-#define START_FILES pre-crt0.o /usr/lib64/crt1.o /usr/lib64/crti.o
+#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
 #undef LIB_STANDARD
-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib64/crtn.o
+#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
 #endif
 #endif
 
