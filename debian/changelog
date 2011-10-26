@@ -1,3 +1,11 @@
+emacs23 (23.3+1-4) unstable; urgency=low
+
+  * Add 0016-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch.
+    Thanks to Hiroyuki Yamamoto <yama1066@gmail.com> for the report
+    and the patch. (Closes: #646609)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 25 Oct 2011 19:58:32 -0500
+
 emacs23 (23.3+1-3) unstable; urgency=low
 
   * Add 0015-Look-for-crt1.o-in-the-correct-multiarch-location.patch.
