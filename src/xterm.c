@@ -375,7 +375,7 @@ static void x_scroll_bar_report_motion P_ ((struct frame **, Lisp_Object *,
 					    enum scroll_bar_part *,
 					    Lisp_Object *, Lisp_Object *,
 					    unsigned long *));
-static void x_handle_net_wm_state P_ ((struct frame *, XPropertyEvent *));
+static int x_handle_net_wm_state P_ ((struct frame *, XPropertyEvent *));
 static void x_check_fullscreen P_ ((struct frame *));
 static void x_check_expected_move P_ ((struct frame *, int, int));
 static void x_sync_with_move P_ ((struct frame *, int, int, int));
@@ -6148,7 +6148,19 @@ handle_one_xevent (dpyinfo, eventp, finish, hold_quit)
       last_user_time = event.xproperty.time;
       f = x_top_window_to_frame (dpyinfo, event.xproperty.window);
       if (f && event.xproperty.atom == dpyinfo->Xatom_net_wm_state)
-        x_handle_net_wm_state (f, &event.xproperty);
+        if (x_handle_net_wm_state (f, &event.xproperty) && f->iconified)
+          {
+            /* Gnome shell does not iconify us when C-z is pressed.  It hides
+               the frame.  So if our state says we aren't hidden anymore,
+               treat is as deiconfied.  */
+            if (! f->async_iconified)
+              SET_FRAME_GARBAGED (f);
+            f->async_visible = 1;
+            f->async_iconified = 0;
+            f->output_data.x->has_been_visible = 1;
+            inev.ie.kind = DEICONIFY_EVENT;
+            XSETFRAME (inev.ie.frame_or_window, f);
+          }
 
       x_handle_property_notify (&event.xproperty);
       xft_settings_event (dpyinfo, &event);
@@ -8600,17 +8612,19 @@ x_set_sticky (f, new_value, old_value)
 
 /* Return the current _NET_WM_STATE.
    SIZE_STATE is set to one of the FULLSCREEN_* values.
-   STICKY is set to 1 if the sticky state is set, 0 if not.  */
+   STICKY is set to 1 if the sticky state is set, 0 if not.
 
-static void
-get_current_vm_state (struct frame *f,
+   Return non-zero if we are not hidden, zero if we are.  */
+
+static int
+get_current_wm_state (struct frame *f,
                       Window window,
                       int *size_state,
                       int *sticky)
 {
   Atom actual_type;
   unsigned long actual_size, bytes_remaining;
-  int i, rc, actual_format;
+  int i, rc, actual_format, is_hidden = 0;
   struct x_display_info *dpyinfo = FRAME_X_DISPLAY_INFO (f);
   long max_len = 65536;
   Display *dpy = FRAME_X_DISPLAY (f);
@@ -8632,7 +8646,7 @@ get_current_vm_state (struct frame *f,
       if (tmp_data) XFree (tmp_data);
       x_uncatch_errors ();
       UNBLOCK_INPUT;
-      return;
+      return ! f->iconified;
     }
 
   x_uncatch_errors ();
@@ -8640,7 +8654,9 @@ get_current_vm_state (struct frame *f,
   for (i = 0; i < actual_size; ++i)
     {
       Atom a = ((Atom*)tmp_data)[i];
-      if (a == dpyinfo->Xatom_net_wm_state_maximized_horz) 
+      if (a == dpyinfo->Xatom_net_wm_state_hidden)
+        is_hidden = 1;
+      else if (a == dpyinfo->Xatom_net_wm_state_maximized_horz)
         {
           if (*size_state == FULLSCREEN_HEIGHT)
             *size_state = FULLSCREEN_MAXIMIZED;
@@ -8662,6 +8678,7 @@ get_current_vm_state (struct frame *f,
 
   if (tmp_data) XFree (tmp_data);
   UNBLOCK_INPUT;
+  return ! is_hidden;
 }
 
 /* Do fullscreen as specified in extended window manager hints */
@@ -8674,7 +8691,7 @@ do_ewmh_fullscreen (f)
   Lisp_Object lval = get_frame_param (f, Qfullscreen);
   int cur, dummy;
 
-  get_current_vm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy);
+  (void)get_current_wm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy);
 
   /* Some window managers don't say they support _NET_WM_STATE, but they do say
      they support _NET_WM_STATE_FULLSCREEN.  Try that also.  */
@@ -8748,7 +8765,7 @@ XTfullscreen_hook (f)
 }
 
 
-static void
+static int
 x_handle_net_wm_state (f, event)
      struct frame *f;
      XPropertyEvent *event;
@@ -8756,8 +8773,8 @@ x_handle_net_wm_state (f, event)
   int value = FULLSCREEN_NONE;
   Lisp_Object lval;
   int sticky = 0;
+  int not_hidden = get_current_wm_state (f, event->window, &value, &sticky);
 
-  get_current_vm_state (f, event->window, &value, &sticky);
   lval = Qnil;
   switch (value) 
     {
@@ -8777,6 +8794,8 @@ x_handle_net_wm_state (f, event)
       
   store_frame_param (f, Qfullscreen, lval);
   store_frame_param (f, Qsticky, sticky ? Qt : Qnil);
+
+  return not_hidden;
 }
 
 /* Check if we need to resize the frame due to a fullscreen request.
@@ -9514,7 +9533,7 @@ x_iconify_frame (f)
   if (!NILP (type))
     x_bitmap_icon (f, type);
 
-#ifdef USE_GTK
+#if defined (USE_GTK)
   if (FRAME_GTK_OUTER_WIDGET (f))
     {
       if (! FRAME_VISIBLE_P (f))
@@ -10545,6 +10564,8 @@ x_term_init (display_name, xrm_option, resource_name)
     = XInternAtom (dpyinfo->display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
   dpyinfo->Xatom_net_wm_state_sticky
     = XInternAtom (dpyinfo->display, "_NET_WM_STATE_STICKY", False);
+  dpyinfo->Xatom_net_wm_state_sticky
+    = XInternAtom (dpyinfo->display, "_NET_WM_STATE_HIDDEN", False);
   dpyinfo->Xatom_net_window_type
     = XInternAtom (dpyinfo->display, "_NET_WM_WINDOW_TYPE", False);
   dpyinfo->Xatom_net_window_type_tooltip
