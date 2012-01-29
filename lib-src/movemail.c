@@ -60,6 +60,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <sys/file.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <time.h>
 
 #include <getopt.h>
@@ -152,7 +153,7 @@ extern char *rindex __P((const char *, int));
 #endif
 
 void fatal ();
-void error ();
+void error (const char *template, ...) __attribute__ ((format (printf, 1, 2)));
 void pfatal_with_name ();
 void pfatal_and_delete ();
 char *concat ();
@@ -610,16 +611,13 @@ fatal (s1, s2, s3)
    are args for it or null. */
 
 void
-error (s1, s2, s3)
-     char *s1, *s2, *s3;
+error (const char *template, ...)
 {
+  va_list ap;
   fprintf (stderr, "movemail: ");
-  if (s3)
-    fprintf (stderr, s1, s2, s3);
-  else if (s2)
-    fprintf (stderr, s1, s2);
-  else
-    fprintf (stderr, s1);
+  va_start (ap, template);
+  vfprintf (stderr, template, ap);
+  va_end (ap);
   fprintf (stderr, "\n");
 }
 
@@ -733,13 +731,13 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
   server = pop_open (hostname, user, password, POP_NO_GETPASS);
   if (! server)
     {
-      error ("Error connecting to POP server: %s", pop_error, 0);
+      error ("Error connecting to POP server: %s", pop_error);
       return EXIT_FAILURE;
     }
 
   if (pop_stat (server, &nmsgs, &nbytes))
     {
-      error ("Error getting message count from POP server: %s", pop_error, 0);
+      error ("Error getting message count from POP server: %s", pop_error);
       return EXIT_FAILURE;
     }
 
@@ -761,7 +759,7 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
   if ((mbf = fdopen (mbfi, "wb")) == NULL)
     {
       pop_close (server);
-      error ("Error in fdopen: %s", strerror (errno), 0);
+      error ("Error in fdopen: %s", strerror (errno));
       close (mbfi);
       unlink (outfile);
       return EXIT_FAILURE;
@@ -785,7 +783,7 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
       mbx_delimit_begin (mbf);
       if (pop_retr (server, i, mbf) != OK)
 	{
-	  error ("%s", Errmsg, 0);
+	  error ("%s", Errmsg);
 	  close (mbfi);
 	  return EXIT_FAILURE;
 	}
@@ -793,7 +791,7 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
       fflush (mbf);
       if (ferror (mbf))
 	{
-	  error ("Error in fflush: %s", strerror (errno), 0);
+	  error ("Error in fflush: %s", strerror (errno));
 	  pop_close (server);
 	  close (mbfi);
 	  return EXIT_FAILURE;
@@ -809,14 +807,14 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
 #ifdef BSD_SYSTEM
   if (fsync (mbfi) < 0)
     {
-      error ("Error in fsync: %s", strerror (errno), 0);
+      error ("Error in fsync: %s", strerror (errno));
       return EXIT_FAILURE;
     }
 #endif
 
   if (close (mbfi) == -1)
     {
-      error ("Error in close: %s", strerror (errno), 0);
+      error ("Error in close: %s", strerror (errno));
       return EXIT_FAILURE;
     }
 
@@ -825,7 +823,7 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
       {
 	if (pop_delete (server, i))
 	  {
-	    error ("Error from POP server: %s", pop_error, 0);
+	    error ("Error from POP server: %s", pop_error);
 	    pop_close (server);
 	    return EXIT_FAILURE;
 	  }
@@ -833,7 +831,7 @@ popmail (mailbox, outfile, preserve, password, reverse_order)
 
   if (pop_quit (server))
     {
-      error ("Error from POP server: %s", pop_error, 0);
+      error ("Error from POP server: %s", pop_error);
       return EXIT_FAILURE;
     }
 

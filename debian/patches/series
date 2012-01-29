@@ -16,3 +16,4 @@
 0016-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch
 0017-Define-POSIX_SIGNALS-for-GNU-Hurd.patch
 0018-Don-t-let-CEDET-execute-code-from-an-arbitrary-Proje.patch
+0019-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch
