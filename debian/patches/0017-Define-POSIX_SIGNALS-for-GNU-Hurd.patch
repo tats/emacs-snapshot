@@ -1,0 +1,30 @@
+From e46e3fe4cd794f1c1e50a5bc445d184e2f82ce38 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 29 Jan 2012 13:34:44 -0600
+Subject: Define POSIX_SIGNALS for GNU/Hurd.
+
+Emacs will now use POSIX signals on GNU/Hurd which avoids a build
+failure when a 15MiB-long write is interrupted by a signal, and Emacs
+hasn't set the SA_RESTART flag.
+
+Author: Samuel Thibault <sthibault@debian.org>
+Date: Sun, 4 Dec 2011 19:47:54 +0100
+Applied-By: Rob Browning <rlb@defaultvalue.org>
+Forwarded: bug-gnu-emacs@gnu.org
+Closes: #650976
+---
+ src/s/gnu.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/src/s/gnu.h b/src/s/gnu.h
+index 6d3d20e..f0348d3 100644
+--- a/src/s/gnu.h
++++ b/src/s/gnu.h
+@@ -83,5 +83,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ #endif /* !_IO_STDIO_H */
+ #endif /* emacs */
+ 
++#define POSIX_SIGNALS 1
++
+ /* arch-tag: 577983d9-87a6-4922-b8f8-ff2b563714a4
+    (do not change this comment) */

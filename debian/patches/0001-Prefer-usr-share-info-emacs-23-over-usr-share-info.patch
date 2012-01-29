@@ -30,6 +30,3 @@ index 0000000..d8d6256
 +                (push "/usr/share/info/emacs-23" result)
 +                (setq found-match t)))
 +          (push elt result))))
--- 
-1.7.6.3
-

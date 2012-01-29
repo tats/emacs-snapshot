@@ -14,3 +14,4 @@
 0014-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch
 0015-Look-for-crt1.o-in-the-correct-multiarch-location.patch
 0016-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch
+0017-Define-POSIX_SIGNALS-for-GNU-Hurd.patch

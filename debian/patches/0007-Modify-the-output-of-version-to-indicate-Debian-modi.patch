@@ -26,6 +26,3 @@ index 92eb564..f9103b1 100644
                   emacs-version
  		 system-configuration
  		 (cond ((featurep 'motif)
--- 
-1.7.6.3
-

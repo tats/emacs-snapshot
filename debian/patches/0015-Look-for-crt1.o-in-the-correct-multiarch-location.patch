@@ -37,6 +37,3 @@ index c13cb60..953341d 100644
  
  /* Don't use -g in test compiles in configure.
     This is so we will use the same shared libs for that linking
--- 
-1.7.6.3
-

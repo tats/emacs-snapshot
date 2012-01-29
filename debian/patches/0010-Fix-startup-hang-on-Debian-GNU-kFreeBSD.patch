@@ -30,6 +30,3 @@ index a1e8c02..89563de 100644
  #define NO_TERMIO               /* use only <termios.h> */
  
  /* arch-tag: 8d098200-2586-469e-99ab-6d092c035e03
--- 
-1.7.6.3
-

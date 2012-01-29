@@ -38,6 +38,3 @@ index 6d16a65..44e127e 100644
  
      tty->name = xstrdup (name);
      terminal->name = xstrdup (name);
--- 
-1.7.6.3
-
