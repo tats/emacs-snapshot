@@ -1,3 +1,11 @@
+emacs23 (23.3+1-5~1.gbp344d01) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @344d0169c6eca18f03c02c940fb1f0d20ad1bf6a **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jan 2012 13:30:32 -0600
+
 emacs23 (23.3+1-4) unstable; urgency=low
 
   * Add 0016-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch.
