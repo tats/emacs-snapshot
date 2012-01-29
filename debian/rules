@@ -168,12 +168,15 @@ endif
 
 deb_host_multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-LDFLAGS   := -g
-CFLAGS    := -DDEBIAN -g
+CFLAGS = `dpkg-buildflags --get CFLAGS`
+CFLAGS += -Wall
+LDFLAGS = `dpkg-buildflags --get LDFLAGS`
+CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
 
-ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-  CFLAGS += -O0
-else # not noopt
+LDFLAGS   += -g
+CFLAGS    += -DDEBIAN
+
+ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
   ifneq (,$(filter $(DEB_HOST_ARCH),m68k ia64))
     # Fix a problem with newer versions of gcc on m68k and ia64.
     # There -O2 causes a build failure (broken byte compiler) - see
@@ -463,13 +466,13 @@ define cfg_tree
   rm -rf $(1)
   mkdir $(1)
   cp -a $$(ls -A | grep -v '^debian$$' | grep -v '^.pc$$') "$(1)"
-  cd $(1) && CFLAGS="$(CFLAGS)" ./configure $(confflags) $(2)
+  cd $(1) && CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" ./configure $(confflags) $(2)
 endef
 
 define build_cmd
-  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
+  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)"
   # If we don't use bootstrap, we need to explicitly build info.
-  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" info
+  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" info
 endef
 
 override_dh_auto_configure: debian/setup-stamp
