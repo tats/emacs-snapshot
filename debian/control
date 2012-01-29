@@ -66,7 +66,7 @@ Package: emacs23-common
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Suggests: emacs23-el, emacs23-common-non-dfsg
-Conflicts: emacs23-el (<< ${Source-Version})
+Conflicts: emacs23-el (<< ${Source-Version}), cedet, eieio, speedbar
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
