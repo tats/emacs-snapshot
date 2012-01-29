@@ -83,5 +83,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #endif /* !_IO_STDIO_H */
 #endif /* emacs */
 
+#define POSIX_SIGNALS 1
+
 /* arch-tag: 577983d9-87a6-4922-b8f8-ff2b563714a4
    (do not change this comment) */
