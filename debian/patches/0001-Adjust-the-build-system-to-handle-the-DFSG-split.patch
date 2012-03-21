@@ -1,4 +1,4 @@
-From ebb4ba97d3c65c3d09c86ccbec9456187f865d9b Mon Sep 17 00:00:00 2001
+From 20a2654f99c1c2940d4e97f8923c700229127655 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -17,7 +17,7 @@ Status: new
  4 files changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/doc/emacs/Makefile.in b/doc/emacs/Makefile.in
-index 3f2f635..5765c1c 100644
+index 09986ec..c532022 100644
 --- a/doc/emacs/Makefile.in
 +++ b/doc/emacs/Makefile.in
 @@ -162,5 +162,7 @@ maintainer-clean: distclean
@@ -29,7 +29,7 @@ index 3f2f635..5765c1c 100644
  
  ### Makefile ends here
 diff --git a/doc/lispintro/Makefile.in b/doc/lispintro/Makefile.in
-index e85185f..a81cf74 100644
+index fe89fa6..c7ef6a6 100644
 --- a/doc/lispintro/Makefile.in
 +++ b/doc/lispintro/Makefile.in
 @@ -75,3 +75,6 @@ maintainer-clean: distclean
@@ -40,7 +40,7 @@ index e85185f..a81cf74 100644
 +echo-info-targets:
 +	@echo INFO_TARGETS=$(INFO_TARGETS)
 diff --git a/doc/lispref/Makefile.in b/doc/lispref/Makefile.in
-index f4cd594..034211a 100644
+index 80382a1..b3d2871 100644
 --- a/doc/lispref/Makefile.in
 +++ b/doc/lispref/Makefile.in
 @@ -117,3 +117,6 @@ distclean: clean
@@ -51,7 +51,7 @@ index f4cd594..034211a 100644
 +echo-info-targets:
 +	@echo INFO_TARGETS=$(infodir)/elisp
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 9e93be4..b18631b 100644
+index 201428e..878fcdc 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -56,7 +56,6 @@ INFO_TARGETS = \
@@ -92,6 +92,3 @@ index 9e93be4..b18631b 100644
 +	@echo INFO_TARGETS=$(INFO_TARGETS)
  
  ### Makefile ends here
--- 
-1.7.4.1
-
