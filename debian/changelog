@@ -1,10 +1,20 @@
-emacs23 (23.4+1-1~1.gbp5956f5) UNRELEASED; urgency=low
+emacs23 (23.4+1-1) unstable; urgency=low
 
-  ** SNAPSHOT build @5956f557be0f9f901119fdff2a95dec0ddb31e2d **
+  * Upgrade to upstream version 23.4.  Emacs 23.4 includes grammars
+    that were missing for some of its bison parsers.  Thanks to Julian
+    Andres Klode <jak@debian.org> for the report. (Closes: #635938)
 
-  * UNRELEASED
+  * Update debian/* for Emacs 23.4.
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 20 Mar 2012 20:37:23 -0500
+  * Depend on libpng-dev rather than libpng12-dev.  Thanks to Nobuhiro
+    Iwamatsu <iwamatsu@nigauri.org> for the report.  (Closes: #662312)
+
+  * Add 0014-Fix-hang-after-C-z-in-gnome-shell.patch.  Emacs should no
+    longer hang when C-z is pressed within the Gnome shell.  Thanks to
+    Nikolay Pelov <npelov@gmail.com> for the report.
+    (Closes: #655592)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 20 Mar 2012 23:39:44 -0500
 
 emacs23 (23.3+1-5) unstable; urgency=high
 
