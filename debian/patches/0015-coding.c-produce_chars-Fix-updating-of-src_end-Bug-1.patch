@@ -1,0 +1,58 @@
+From 910975a324eddfbc55751b6ccf2d04000239063e Mon Sep 17 00:00:00 2001
+From: Kenichi Handa <handa@m17n.org>
+Date: Wed, 8 Feb 2012 17:31:05 +0900
+Subject: coding.c (produce_chars): Fix updating of src_end (Bug#10701).
+
+Emacs should no longer crash while decoding input with DOS EOLs.
+
+Applied-By: Rob Browning <rlb@defaultvalue.org>
+Origin: upstream, commit: 77a56e3d815991289bbae393af4821ddaf0b5b7a
+Bug: http://debbugs.gnu.org/cgi/bugreport.cgi?bug=10701
+---
+ src/ChangeLog |    4 ++++
+ src/coding.c  |    6 +++---
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/ChangeLog b/src/ChangeLog
+index e1f24d1..ed4dcf6 100644
+--- a/src/ChangeLog
++++ b/src/ChangeLog
+@@ -1,3 +1,7 @@
++2012-02-08  Kenichi Handa  <handa@m17n.org>
++
++	* coding.c (produce_chars): Fix updating of src_end (Bug#10701).
++
+ 2012-01-25  Chong Yidong  <cyd@gnu.org>
+ 
+ 	* Version 23.4 released.
+diff --git a/src/coding.c b/src/coding.c
+index 8e96db1..c0393e7 100644
+--- a/src/coding.c
++++ b/src/coding.c
+@@ -7038,7 +7038,7 @@ produce_chars (coding, translation_table, last_block)
+ 			  dst_end = coding->destination + coding->dst_bytes;
+ 			  coding_set_source (coding);
+ 			  src = coding->source + offset;
+-			  src_end = coding->source + coding->src_bytes;
++			  src_end = coding->source + coding->consumed;
+ 			  if (EQ (coding->src_object, coding->dst_object))
+ 			    dst_end = (unsigned char *) src;
+ 			}
+@@ -7072,7 +7072,7 @@ produce_chars (coding, translation_table, last_block)
+ 			dst_end = coding->destination + coding->dst_bytes;
+ 			coding_set_source (coding);
+ 			src = coding->source + offset;
+-			src_end = coding->source + coding->src_bytes;
++			src_end = coding->source + coding->consumed;
+ 			if (EQ (coding->src_object, coding->dst_object))
+ 			  dst_end = (unsigned char *) src;
+ 		      }
+@@ -7093,7 +7093,7 @@ produce_chars (coding, translation_table, last_block)
+ 		  dst = alloc_destination (coding, require, dst);
+ 		  coding_set_source (coding);
+ 		  src = coding->source + offset;
+-		  src_end = coding->source + coding->src_bytes;
++		  src_end = coding->source + coding->consumed;
+ 		}
+ 	    }
+ 	  produced_chars = coding->consumed_char;

@@ -12,3 +12,4 @@
 0012-Define-POSIX_SIGNALS-for-GNU-Hurd.patch
 0013-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch
 0014-Fix-hang-after-C-z-in-gnome-shell.patch
+0015-coding.c-produce_chars-Fix-updating-of-src_end-Bug-1.patch
