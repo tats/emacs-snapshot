@@ -1,3 +1,11 @@
+emacs23 (23.4+1-2~1.gbp8b0656) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @8b065607fcdf1315997ceff7c7afde3057e964dd **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 21 Mar 2012 00:55:16 -0500
+
 emacs23 (23.4+1-1) unstable; urgency=low
 
   * Upgrade to upstream version 23.4.  Emacs 23.4 includes grammars
