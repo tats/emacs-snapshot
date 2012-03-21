@@ -1,4 +1,4 @@
-From a63b92f0a8f02b186b5c14c2827c0027a0d637b4 Mon Sep 17 00:00:00 2001
+From 937769ea76b5787bb334678c8685692859128b66 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 29 Jan 2012 13:42:57 -0600
 Subject: Add a printf attribute to movemail.c to allow hardened build flags.
@@ -17,7 +17,7 @@ Applied-By: Rob Browning <rlb@defaultvalue.org>
  1 files changed, 16 insertions(+), 18 deletions(-)
 
 diff --git a/lib-src/movemail.c b/lib-src/movemail.c
-index 58add49..6b2fc20 100644
+index ec38678..74ae004 100644
 --- a/lib-src/movemail.c
 +++ b/lib-src/movemail.c
 @@ -60,6 +60,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */

@@ -1,4 +1,4 @@
-From 0f624911022e9a8a544eb527054c6178fe713100 Mon Sep 17 00:00:00 2001
+From e8cb9f40dca14735f4c5f20aefd5c8371cea5ed2 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:26 -0500
 Subject: Cause the build to fail if liblockfile isn't selected for movemail.
@@ -17,7 +17,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  2 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/lib-src/movemail.c b/lib-src/movemail.c
-index 5fcc6de..58add49 100644
+index d6fc1ce..ec38678 100644
 --- a/lib-src/movemail.c
 +++ b/lib-src/movemail.c
 @@ -166,6 +166,10 @@ int mbx_delimit_end ();
@@ -32,7 +32,7 @@ index 5fcc6de..58add49 100644
  main (argc, argv)
       int argc;
 diff --git a/src/s/bsd-common.h b/src/s/bsd-common.h
-index 7889255..56fcb4a 100644
+index 4179d33..70a4a1a 100644
 --- a/src/s/bsd-common.h
 +++ b/src/s/bsd-common.h
 @@ -66,7 +66,11 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */

@@ -1,4 +1,4 @@
-From c182c7be6589ad19958a76596b2d215fb6017ec3 Mon Sep 17 00:00:00 2001
+From c302d1083869a891fe8d75f8ac9be22dcb3e873f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG.
@@ -29,7 +29,7 @@ Status: new
  4 files changed, 16 insertions(+), 518 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 32a09ff..41cf979 100644
+index 5e0d128..8162889 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -139,12 +139,7 @@ MAN_PAGES=b2m.1 ctags.1 ebrowse.1 emacs.1 emacsclient.1 etags.1 \
@@ -133,10 +133,10 @@ index 32a09ff..41cf979 100644
  #### Bootstrapping.
  
 diff --git a/configure.in b/configure.in
-index 275e812..baacfe4 100644
+index 05b724f..958903d 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -3118,8 +3118,8 @@ AC_EGREP_CPP(yes..yes,
+@@ -3123,8 +3123,8 @@ AC_EGREP_CPP(yes..yes,
  	CPP_NEED_TRADITIONAL=yes)
  
  AC_OUTPUT(Makefile lib-src/Makefile.c:lib-src/Makefile.in oldXMenu/Makefile \
@@ -148,7 +148,7 @@ index 275e812..baacfe4 100644
  
  ### Make the necessary directories, if they don't exist.
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 9e93be4..b1dd019 100644
+index 201428e..bcaec12 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -38,104 +38,10 @@ MAKEINFO = makeinfo --force
@@ -672,7 +672,7 @@ index 9e93be4..b1dd019 100644
  
  mostlyclean:
 diff --git a/lisp/help.el b/lisp/help.el
-index 97690ea..482b4a1 100644
+index 84692c4..6d96e57 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -301,6 +301,14 @@ If that doesn't give a function, return nil."

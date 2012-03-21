@@ -1,4 +1,4 @@
-From e46e3fe4cd794f1c1e50a5bc445d184e2f82ce38 Mon Sep 17 00:00:00 2001
+From 8a1d66b717aedf49c61b56b2ad3ce2d3ba9b7ce7 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 29 Jan 2012 13:34:44 -0600
 Subject: Define POSIX_SIGNALS for GNU/Hurd.
@@ -17,7 +17,7 @@ Closes: #650976
  1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/src/s/gnu.h b/src/s/gnu.h
-index 6d3d20e..f0348d3 100644
+index 388b3e3..51e6ec4 100644
 --- a/src/s/gnu.h
 +++ b/src/s/gnu.h
 @@ -83,5 +83,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */

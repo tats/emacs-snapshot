@@ -8,12 +8,6 @@
 0008-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
 0009-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
 0010-Fix-startup-hang-on-Debian-GNU-kFreeBSD.patch
-0011-Don-t-clear-FONTCONFIG_LIBS-and-FONTCONFIG_CFLAGS-in.patch
-0012-Fix-a-tty-related-preprocessor-inclusion-error-affec.patch
-0013-Expect-0-from-kill-for-zombies-on-GNU-Hurd.patch
-0014-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch
-0015-Look-for-crt1.o-in-the-correct-multiarch-location.patch
-0016-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch
-0017-Define-POSIX_SIGNALS-for-GNU-Hurd.patch
-0018-Don-t-let-CEDET-execute-code-from-an-arbitrary-Proje.patch
-0019-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch
+0011-Use-CRT_DIR-to-find-crt-.o-on-ppc64.patch
+0012-Define-POSIX_SIGNALS-for-GNU-Hurd.patch
+0013-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch

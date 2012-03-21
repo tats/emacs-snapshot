@@ -1,4 +1,4 @@
-From 207579eda5c7603a93d3f0ffed09596850e33ace Mon Sep 17 00:00:00 2001
+From 730582ceef35035f2379283f0b8b7f211194351c Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:21 -0500
 Subject: Prefer /usr/share/info/emacs-23 over /usr/share/info.

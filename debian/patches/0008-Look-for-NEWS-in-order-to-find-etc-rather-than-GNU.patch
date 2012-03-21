@@ -1,4 +1,4 @@
-From 0d990c036114c29958aa694f5d57a1d49ab07254 Mon Sep 17 00:00:00 2001
+From 54e9d1a87ea67bd2ae5933bd9c1542cb2803bcf8 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:29 -0500
 Subject: Look for NEWS in order to find etc/ rather than GNU.
@@ -19,7 +19,7 @@ Status: Debian specific
  1 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/callproc.c b/src/callproc.c
-index ffb7a7c..812c345 100644
+index 6898bd9..84b1c30 100644
 --- a/src/callproc.c
 +++ b/src/callproc.c
 @@ -1509,14 +1509,14 @@ init_callproc ()
