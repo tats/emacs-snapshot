@@ -1,10 +1,10 @@
-emacs23-non-dfsg (23.4+1-1~1.gbp9472bf) UNRELEASED; urgency=low
+emacs23-non-dfsg (23.4+1-1) unstable; urgency=low
 
-  ** SNAPSHOT build @9472bf8ab484420e4f98a1a2a7f8e95587d0364b **
+  * Upgrade to upstream version 23.4.
 
-  * UNRELEASED
+  * Update debian/* for Emacs 23.4.
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 20 Mar 2012 20:16:10 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 20 Mar 2012 20:23:53 -0500
 
 emacs23-non-dfsg (23.3+1-1) unstable; urgency=low
 
