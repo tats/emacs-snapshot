@@ -1,3 +1,11 @@
+emacs23 (23.4+1-1~1.gbp5956f5) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @5956f557be0f9f901119fdff2a95dec0ddb31e2d **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 20 Mar 2012 20:37:23 -0500
+
 emacs23 (23.3+1-5) unstable; urgency=high
 
   * Add 0017-Define-POSIX_SIGNALS-for-GNU-Hurd.patch.  Thanks to
