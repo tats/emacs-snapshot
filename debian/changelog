@@ -1,10 +1,14 @@
-emacs23 (23.4+1-2~1.gbp8b0656) UNRELEASED; urgency=low
+emacs23 (23.4+1-2) unstable; urgency=low
 
-  ** SNAPSHOT build @8b065607fcdf1315997ceff7c7afde3057e964dd **
+  * Add 0015-coding.c-produce_chars-Fix-updating-of-src_end-Bug-1.patch.
+    Incorporate upstream fix to prevent Emacs from crashing while
+    decoding input with DOS EOLs.
 
-  * UNRELEASED
+  * Add 0016-quail-indian.el-indian-tlg-base-table-Fix-typo-dev-t.patch.
+    Rename indian-dev-base-table to indian-tlg-base-table to correct a
+    typo in quail/indian.el.
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 21 Mar 2012 00:55:16 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 21 Mar 2012 01:19:53 -0500
 
 emacs23 (23.4+1-1) unstable; urgency=low
 
