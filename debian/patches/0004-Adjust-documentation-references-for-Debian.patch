@@ -9,7 +9,7 @@ References to /usr/local/... have been changed to /usr/... as
 appropriate, etc.
 ---
  etc/NEWS |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ 1 file changed, 5 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
 index 136bdf1..bb5f6b3 100644

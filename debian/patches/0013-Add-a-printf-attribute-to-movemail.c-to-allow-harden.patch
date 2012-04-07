@@ -14,7 +14,7 @@ Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=655118
 Applied-By: Rob Browning <rlb@defaultvalue.org>
 ---
  lib-src/movemail.c |   34 ++++++++++++++++------------------
- 1 files changed, 16 insertions(+), 18 deletions(-)
+ 1 file changed, 16 insertions(+), 18 deletions(-)
 
 diff --git a/lib-src/movemail.c b/lib-src/movemail.c
 index ec38678..74ae004 100644

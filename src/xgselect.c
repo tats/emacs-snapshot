@@ -55,10 +55,15 @@ xg_select (max_fds, rfds, wfds, efds, timeout)
   do {
     if (n_gfds > gfds_size) 
       {
-        while (n_gfds > gfds_size) 
-          gfds_size *= 2;
-        xfree (gfds);
-        gfds = xmalloc (sizeof (*gfds) * gfds_size);
+        if (gfds_size == 0)
+          xgselect_initialize ();
+        else
+          {
+            while (n_gfds > gfds_size)
+              gfds_size *= 2;
+            xfree (gfds);
+            gfds = xmalloc (sizeof (*gfds) * gfds_size);
+          }
       }
 
     n_gfds = g_main_context_query (context,

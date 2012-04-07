@@ -12,7 +12,7 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
   Author: Rob Browning <rlb@defaultvalue.org>
 ---
  lisp/startup.el |   21 +++++++++++++++++++--
- 1 files changed, 19 insertions(+), 2 deletions(-)
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
 index 775d2f7..b3e56ad 100644

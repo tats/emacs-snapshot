@@ -12,7 +12,7 @@ Bug: 559392
 Status: new
 ---
  src/s/gnu-kfreebsd.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ 1 file changed, 5 insertions(+)
 
 diff --git a/src/s/gnu-kfreebsd.h b/src/s/gnu-kfreebsd.h
 index a1e8c02..89563de 100644

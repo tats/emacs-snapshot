@@ -14,7 +14,7 @@ Forwarded: bug-gnu-emacs@gnu.org
 Closes: #650976
 ---
  src/s/gnu.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ 1 file changed, 2 insertions(+)
 
 diff --git a/src/s/gnu.h b/src/s/gnu.h
 index 388b3e3..51e6ec4 100644

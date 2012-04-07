@@ -1,0 +1,41 @@
+From c566c20428a35fb0d29960819ef0034808f4cd12 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Karel=20Kl=C3=AD=C4=8D?= <kklic@redhat.com>
+Date: Fri, 25 Nov 2011 16:36:04 +0100
+Subject: Initialize xgselect in function xg_select when gfds_size == 0.
+
+Emacs should no longer hang when using newer versions of GLib
+(initially reported against libglib2.0-0 2.32.0-2).
+
+Origin: http://pkgs.fedoraproject.org/gitweb/?p=emacs.git;a=commitdiff;h=a2302b156dba1cc136e8363605d78a66eb3a92a6
+Bug: http://debbugs.gnu.org/cgi/bugreport.cgi?bug=9754
+Bug-Red-Hat: https://bugzilla.redhat.com/show_bug.cgi?id=711739
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=666691
+Applied-Upstream: Fixed in Emacs 24
+---
+ src/xgselect.c |   13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/src/xgselect.c b/src/xgselect.c
+index 333f7b1..7bb5f00 100644
+--- a/src/xgselect.c
++++ b/src/xgselect.c
+@@ -55,10 +55,15 @@ xg_select (max_fds, rfds, wfds, efds, timeout)
+   do {
+     if (n_gfds > gfds_size) 
+       {
+-        while (n_gfds > gfds_size) 
+-          gfds_size *= 2;
+-        xfree (gfds);
+-        gfds = xmalloc (sizeof (*gfds) * gfds_size);
++        if (gfds_size == 0)
++          xgselect_initialize ();
++        else
++          {
++            while (n_gfds > gfds_size)
++              gfds_size *= 2;
++            xfree (gfds);
++            gfds = xmalloc (sizeof (*gfds) * gfds_size);
++          }
+       }
+ 
+     n_gfds = g_main_context_query (context,

@@ -11,7 +11,7 @@ Origin: upstream, commit: 141162dace9e05123a73dfe6d8be921840ff2416
 ---
  leim/ChangeLog       |    4 ++++
  leim/quail/indian.el |    2 +-
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/leim/ChangeLog b/leim/ChangeLog
 index 1a8c37a..7ca7270 100644
