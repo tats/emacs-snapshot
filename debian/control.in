@@ -26,8 +26,8 @@ Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
-Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
+Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
+Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a Lucid user interface.
@@ -37,8 +37,8 @@ Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
-Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
+Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
+Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
 Description: The GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
@@ -46,10 +46,10 @@ Description: The GNU Emacs editor (without X support)
 Package: @DEB_FLAVOR@
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
-Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
+Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
+Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
 Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK+ user interface.
