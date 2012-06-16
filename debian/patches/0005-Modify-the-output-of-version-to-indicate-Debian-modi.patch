@@ -1,0 +1,28 @@
+From 380dbf08bbb2e9e9da3fc0fe4bf60df03c2d0777 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 4 Apr 2011 22:46:28 -0500
+Subject: Modify the output of (version) to indicate Debian modifications.
+
+The output of (version) has been modified to indicate Debian modifications.
+
+Author: Rob Browning <rlb@defaultvalue.org>
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lisp/version.el |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/version.el b/lisp/version.el
+index bd30f0f..7de3f1b 100644
+--- a/lisp/version.el
++++ b/lisp/version.el
+@@ -51,8 +51,8 @@ to the system configuration; look at `system-configuration' instead."
+   (interactive "P")
+   (let ((version-string
+          (format (if (not (called-interactively-p 'interactive))
+-		     "GNU Emacs %s (%s%s%s)\n of %s on %s"
+-		   "GNU Emacs %s (%s%s%s) of %s on %s")
++		     "GNU Emacs %s (%s%s%s)\n of %s on %s, modified by Debian"
++		   "GNU Emacs %s (%s%s%s) of %s on %s, modified by Debian")
+                  emacs-version
+ 		 system-configuration
+ 		 (cond ((featurep 'motif)

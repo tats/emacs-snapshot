@@ -1,7 +1,6 @@
 #### Makefile for documentation other than the Emacs manual.
 
-# Copyright (C) 1994, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-#   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+# Copyright (C) 1994, 1996-2012 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -18,23 +17,31 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
+SHELL = /bin/sh
 
 # Where to find the source code.  $(srcdir) will be the man-aux
 # subdirectory of the source tree.  This is
 # set by the configure script's `--srcdir' option.
 srcdir=@srcdir@
-top_srcdir=@top_srcdir@
 
 # Tell make where to find source files; this is needed for the makefiles.
+# Note the other doc Makefiles do not use VPATH anymore, instead
+# they set infodir to an absolute path.  Not doing that here in
+# case INFO_TARGETS gets too long for some feeble shells.
+# (cf src/Makefile.in's passing of $lisp to make-docfile)
 VPATH=@srcdir@
 
 ## Where the output files go.
 ## Note that the setfilename command in the .texi files assumes this.
 infodir=../../info
+## Directory with emacsver.texi.
+## Currently only used by efaq and calc.
+emacsdir = $(srcdir)/../emacs
 
 # The makeinfo program is part of the Texinfo distribution.
 # Use --force so that it generates output even if there are errors.
-MAKEINFO = makeinfo --force
+MAKEINFO = @MAKEINFO@
+MAKEINFO_OPTS = --force -I$(emacsdir)
 
 # Also add new entries to INFO_FILES in the top-level Makefile.in.
 INFO_TARGETS = \
@@ -44,67 +51,25 @@ DVI_TARGETS = \
 	faq.dvi
 
 PDF_TARGETS = \
-	ada-mode.pdf \
-	auth.pdf \
-	autotype.pdf \
-	calc.pdf \
-	cc-mode.pdf \
-	cl.pdf \
-	dbus.pdf \
-	dired-x.pdf \
-	ebrowse.pdf \
-	ede.pdf \
-	ediff.pdf \
-	edt.pdf \
-	eieio.pdf \
-	emacs-mime.pdf \
-	epa.pdf \
-	erc.pdf \
-	eshell.pdf \
-	eudc.pdf \
-	faq.pdf \
-	flymake.pdf \
-	forms.pdf \
-	gnus.pdf \
-	idlwave.pdf \
-	info.pdf \
-	mairix-el.pdf \
-	message.pdf \
-	mh-e.pdf \
-	newsticker.pdf \
-	nxml-mode.pdf \
-	org.pdf \
-	pcl-cvs.pdf \
-	pgg.pdf \
-	rcirc.pdf \
-	reftex.pdf \
-	remember.pdf \
-	sasl.pdf \
-	sc.pdf \
-	semantic.pdf \
-	ses.pdf \
-	sieve.pdf \
-	smtpmail.pdf \
-	speedbar.pdf \
-	tramp.pdf \
-	url.pdf \
-	vip.pdf \
-	viper.pdf \
-	widget.pdf \
-	woman.pdf
+	faq.pdf
+
+HTML_TARGETS = emacs-faq.html
 
 TEXI2DVI = texi2dvi
 TEXI2PDF = texi2pdf
 
-# The following rule does not work with all versions of `make'.
-.SUFFIXES: .texi .dvi
-.texi.dvi:
-	$(TEXI2DVI) $<
+ENVADD = TEXINPUTS="$(srcdir):$(emacsdir):$(TEXINPUTS)" \
+         MAKEINFO="$(MAKEINFO) $(MAKEINFO_OPTS)"
 
-ENVADD = TEXINPUTS="$(srcdir):$(TEXINPUTS)" MAKEINFO="$(MAKEINFO) -I$(srcdir)"
+mkinfodir = @cd ${srcdir}; test -d ${infodir} || mkdir ${infodir} || test -d ${infodir}
 
+.PHONY: info dvi pdf
 
 info: $(INFO_TARGETS)
+
+# please modify this for all the web manual targets
+webhack: clean
+	$(MAKE) pdf MAKEINFO_OPTS="-DWEBHACKDEVEL $(MAKEINFO_OPTS)"
 
 dvi: $(DVI_TARGETS)
 
@@ -115,30 +80,44 @@ pdf: $(PDF_TARGETS)
 # to exist in the build directory.
 # In a distribution of Emacs, the Info files should be up to date.
 
+# Note: "<" is not portable in ordinary make rules.
+
 ## "short" target names for convenience, to just rebuild one manual.
 efaq : $(infodir)/efaq
-$(infodir)/efaq: faq.texi
-	cd $(srcdir); $(MAKEINFO) faq.texi
-faq.dvi: faq.texi
+$(infodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
+	$(mkinfodir)
+	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) faq.texi
+faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
-faq.pdf: faq.texi
+faq.pdf: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
+## This is the name used on the Emacs web-page.
+## sed fixes up links to point to split version of the manual.
+emacs-faq.html: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
+	$(MAKEINFO) $(MAKEINFO_OPTS) --no-split \
+	  --css-ref='/layout.css' --html -o $@ ${srcdir}/faq.texi
+	sed -i -e 's|a href="\([a-z]*\)\.html#\([^"]*\)"|a href="manual/html_node/\1/\2.html"|g' \
+	  -e 's|/Top\.html|/|g' $@
+emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
+	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
 
-
+.PHONY: mostlyclean clean distclean maintainer-clean
 
 mostlyclean:
-	rm -f *.log *.cp *.fn *.ky *.op *.ops *.pg *.vr core *.tp \
-	*.tps *.core gnustmp.*
-	rm -f *.aux *.cps *.fns *.kys *.pgs *.vrs *.toc
+	rm -f *.aux *.log *.toc *.cp *.cps *.fn *.fns *.ky *.kys \
+	  *.op *.ops *.pg *.pgs *.tp *.tps *.vr *.vrs
+	rm -f gnustmp.*
 
 clean: mostlyclean
-	rm -f *.dvi *.pdf
+	rm -f $(DVI_TARGETS) $(PDF_TARGETS) $(HTML_TARGETS) emacs-faq.text
 
 distclean: clean
 #	rm -f Makefile
 
+## infodir is relative to srcdir.
 maintainer-clean: distclean
-	for file in $(INFO_TARGETS); do rm -f $${file}*; done
-
+	cd $(srcdir); for file in $(INFO_TARGETS); do \
+	  rm -f $${file} $${file}-[1-9] $${file}-[1-9][0-9]; \
+	done
 
 ### Makefile ends here
