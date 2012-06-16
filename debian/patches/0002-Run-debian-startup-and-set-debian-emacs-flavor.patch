@@ -1,4 +1,4 @@
-From 4a71dc22c9312abbdcb6bb56492b9304fb1baa4e Mon Sep 17 00:00:00 2001
+From ce48d6297b8fa209d932ebc158f55066ba35332a Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor.
@@ -8,7 +8,7 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
 * Emacs runs debian-startup during the startup process unless
   site-run-file is false.
 
-* The global variable debian-emacs-flavor is bound to 'emacs23.
+* The global variable debian-emacs-flavor is bound to 'emacs24.
   Author: Rob Browning <rlb@defaultvalue.org>
 ---
  lisp/startup.el |   21 +++++++++++++++++++--
