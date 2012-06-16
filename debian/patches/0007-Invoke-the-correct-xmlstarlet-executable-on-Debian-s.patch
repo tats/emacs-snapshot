@@ -1,4 +1,4 @@
-From e2e8329320dc0a54246b1d664b91e994719f2af6 Mon Sep 17 00:00:00 2001
+From e49ae208040b9cb9d5829157f811238477df03dd Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:30 -0500
 Subject: Invoke the correct xmlstarlet executable on Debian systems.

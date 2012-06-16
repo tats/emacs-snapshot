@@ -1,12 +1,12 @@
-From b229f5c33dce6effe3ecb45bf80898a53a5cd7a1 Mon Sep 17 00:00:00 2001
+From cf9a7ce757bd916d2d5119aa35c6681d331a3e30 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:21 -0500
-Subject: Prefer /usr/share/info/emacs-23 over /usr/share/info.
+Subject: Prefer /usr/share/info/emacs-24 over /usr/share/info.
 
-Emacs will prefer /usr/share/info/emacs-23 over /usr/share/info.
+Emacs will prefer /usr/share/info/emacs-24 over /usr/share/info.
 
 The value of Info-default-directory-list has been augmented via
-site-init.el to include /usr/share/info/emacs-23 before
+site-init.el to include /usr/share/info/emacs-24 before
 /usr/share/info.
 ---
  lisp/site-init.el |   11 +++++++++++
@@ -15,7 +15,7 @@ site-init.el to include /usr/share/info/emacs-23 before
 
 diff --git a/lisp/site-init.el b/lisp/site-init.el
 new file mode 100644
-index 0000000..d8d6256
+index 0000000..ab3396c
 --- /dev/null
 +++ b/lisp/site-init.el
 @@ -0,0 +1,11 @@
@@ -27,6 +27,6 @@ index 0000000..d8d6256
 +        (dolist (elt Info-default-directory-list (nreverse result))
 +          (if (and (not found-match) (equal elt "/usr/share/info/"))
 +              (progn
-+                (push "/usr/share/info/emacs-23" result)
++                (push "/usr/share/info/emacs-24" result)
 +                (setq found-match t)))
 +          (push elt result))))

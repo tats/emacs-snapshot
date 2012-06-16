@@ -1,4 +1,4 @@
-From e6f5c8017989746ef385163c5339475042069790 Mon Sep 17 00:00:00 2001
+From ae2281bb2228eb7cf2b6f4533a4be71af3bb51a2 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:29 -0500
 Subject: Look for NEWS in order to find etc/ rather than GNU.

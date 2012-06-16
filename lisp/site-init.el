@@ -6,6 +6,6 @@
         (dolist (elt Info-default-directory-list (nreverse result))
           (if (and (not found-match) (equal elt "/usr/share/info/"))
               (progn
-                (push "/usr/share/info/emacs-23" result)
+                (push "/usr/share/info/emacs-24" result)
                 (setq found-match t)))
           (push elt result))))
