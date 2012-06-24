@@ -6,8 +6,8 @@
 # removed from the file.
 
 # Copyright 1994,1995 Ian Jackson
-# Copyright 1998-2010 Rob Browning <rlb@defaultvalue.org>
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
+# Copyright 1998-2012 Rob Browning <rlb@defaultvalue.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
 # Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
@@ -18,7 +18,6 @@
 #export DH_VERBOSE=1
 
 SHELL := /bin/bash
-
 quilt := QUILT_PATCHES=debian/patches quilt
 
 # For now we assume that emacs' versioning scheme is always
@@ -28,29 +27,15 @@ quilt := QUILT_PATCHES=debian/patches quilt
 # way.  So far that's always been true.  If it becomes false, some of
 # the values below will have to be set manually.
 
-# Note that we use quilt to handle the debian patches.  One of the
-# biggest differences between quilt and say dpatch is that you have to
-# explicitly "quilt add" a file to a patch before you edit it.  See
-# "man quilt" for details..
+# The official upstream version defined by AC_INIT in configure.in.
+upstream_ver := 24.1
 
-# If the source tree ever ends up in an untenable "can't go forward,
-# can't go back" state with respect to patching, you can always start
-# over by just moving the current debian directory to a newly unpacked
-# orig.tar.gz tree.  Note that if you were in the process of editing a
-# patch, you will lose those edits, but shouldn't lose anything else.
-# This process just reverts all of the upstream files and abandons the
-# volatile "what's been done to the current tree" state that quilt
-# maintains in ./.pc.  All of the actual patches are stored in
-# debian/patches and should be unharmed.
-
-######################################################################
-# Important top-level targets:
-#
-# check-vars - displays how the version number has been parsed.
-# buildpackage - build binary packages via dpkg-buildpackage w/suitable args
-# prepare-release - prepare and check debs for upload.
-#
-######################################################################
+# This must be the version that's actually used at runtime for things
+# like load-path.  Historically, it's only differed from upstream_ver
+# by a trailing letter, i.e. 20.5a -> 20.5.
+runtime_ver := $(shell echo $(upstream_ver) | perl -pe 's/[a-z]+$$//o')
+major_ver := $(shell echo $(runtime_ver) | perl -pe 's/\..*$$//o')
+minor_ver := $(shell echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
 
 # The name of the Debian source package
 src_name := $(shell dpkg-parsechangelog | egrep '^Source:')
@@ -59,44 +44,19 @@ src_name := $(shell echo $(src_name) | perl -pe 's/Source:\s+//o')
 # The version from the changelog (i.e. 20.5-1)
 debian_ver := $(shell dpkg-parsechangelog | egrep '^Version:')
 debian_ver := $(shell echo $(debian_ver) | perl -pe 's/Version:\s+//o')
+
 # The Debian revision (i.e. the 1 from 20.5-1)
 # Always everything after the last '-'
 debian_rev := $(shell echo $(debian_ver) | perl -pe 's/.*-//o')
 
-# The official upstream version defined by emacs-version in lisp/version.el.
-# The extraction method matches the code in the upstream configure.in.
-nominal_ver := $(shell grep 'defconst[	 ]*emacs-version' lisp/version.el \
-	 | sed -e 's/^[^"]*"\([^"]*\)".*$$/\1/')
-
-# This must be the version that's actually used at runtime for things
-# like load-path.  It may not be the same as the upstream version
-# (i.e. when you have upstream 20.5a, the functional version may still
-# be 20.5), so sometimes we may have to do this by hand.
-runtime_ver := $(shell echo $(nominal_ver) | perl -pe 's/[a-z]+$$//o')
-
-major_ver := $(shell echo $(runtime_ver) | perl -pe 's/\..*$$//o')
-minor_ver := $(shell echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
-
-# version for the debian source, i.e. if the upstream is 21.3, this
-# might be 21.3, or it might be 21.3+1 if we've had to have more than
-# one re-release of the upstream source.  Rare, but it happens...
-# Always everything before the last '-'
+# Might be 21.3, or it might be 21.3+1 if we've had to have more than
+# one re-release of the upstream source (rare, but it happens), or if
+# we have to split the package for DFSG purposes.  Always everything
+# before the last '-'
 debsrc_ver := $(shell echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
-
-# upstream version - the actual upstream version, i.e. 21.4a, minus any +foo
-upstream_ver := $(shell echo $(debsrc_ver) | perl -pe 's/\+[^+]+$$//o')
-
-deb_orig_tgz := $(src_name)_$(debsrc_ver).orig.tar.gz
-# name of the orig_tgz unpack directory
-deb_orig_tgz_dir := emacs-$(runtime_ver)-non-dfsg
-
-######################################################################
-# Customizable variables
 
 # The flavor (i.e. emacs21) currently matches the source package name.
 flavor := $(shell echo $(src_name) | perl -pe 's/-non-dfsg$$//o')
-
-######################################################################
 
 # These files must always exist, i.e. can't ever be cleaned.
 persistent_autogen_files := debian/control debian/copyright
@@ -106,20 +66,6 @@ autogen_files := $(persistent_autogen_files) $(nonpersistent_autogen_files)
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
 common_etc_dir := $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc
 
-define testdir
-  dh_testdir debian/emacs-common-non-dfsg.README
-  @if ! test -f etc/THE-GNU-PROJECT; \
-  then \
-    echo; \
-    echo -n "The upstream source does not appear to be available."; \
-    echo "  Please put the contents"; \
-    echo -n "of $(deb_orig_tgz) into the"; \
-    echo " current directory."; \
-    echo; \
-    false; \
-  fi
-endef
-
 define deb_sub
   perl -p \
     -e "s|\@PKG_NAME\@|$(pkg_name)|go;" \
@@ -128,7 +74,6 @@ define deb_sub
     -e "s|\@FULL_VERSION\@|$(runtime_ver)|go;" \
     -e "s|\@PACKAGE_VERSION\@|$(debian_ver)|go;" \
     -e "s|\@DEBIAN_REV\@|$(deb_rev)|go;" \
-    -e "s|\@NOMINAL_VERSION\@|$(nominal_ver)|go;" \
     -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
     -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
     -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
@@ -138,61 +83,17 @@ endef
 %:
 	dh $@ --parallel
 
+.PHONY: check-vars
 check-vars:
 	@echo "upstream_ver: $(upstream_ver)"
 	@echo "debian_ver: $(debian_ver)"
 	@echo "debsrc_ver: $(debsrc_ver)"
 	@echo "debian_rev: $(debian_rev)"
-	@echo "nominal_ver: $(nominal_ver)"
 	@echo "runtime_ver: $(runtime_ver)"
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
 
-define check_diff
-  @if $(quilt) series | grep -E '^debian-changes-'; \
-  then \
-    echo "Diffs found outside ./debian:"; \
-    ls debian/patches/debian-changes-*; \
-    false; \
-  else \
-    echo "../$(src_name)_$(debsrc_ver).diff.gz looks OK."; \
-  fi
-endef
-
-check-diff: clean
-	$(testdir)
-	cd .. && dpkg-source -b -i "$(basename $(CURDIR))"
-	$(check_diff)
-
-buildpackage:
-	$(testdir)
-	dpkg-buildpackage -D -us -uc -rfakeroot -i
-	$(check_diff)
-
-prepare-release:
-	$(testdir)
-        # don't want to be root -- using fakeroot below.
-        # also, stacking fakeroots seems to cause trouble generating diff.
-	@test "`whoami`" != root || \
-	  (echo "please run prepare-release as a normal user (not root)"; \
-	   false)
-        # check for any uncommitted changes
-	@cd debian; \
-	if ! git diff-files --quiet; \
-	then \
-	  git status; \
-	  echo; \
-	  read -p "Uncommitted changes.  Continue? [y/n] "; \
-          if test "$${REPLY}" != y; \
-	  then \
-	    false; \
-	  fi; \
-	fi
-        # TODO: make sure we actually installed the binary.
-        # TODO: run tests (use a check target?)
-	$(MAKE) -f debian/rules buildpackage
-	@echo "Everything looks OK.  Ready for release."
-
+.PHONY: debian-sync
 debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target
 	true
@@ -225,6 +126,7 @@ define gen_makefile
     -e "s|\@SHELL\@|/bin/bash|go;" \
     -e "s|\@srcdir\@|$(CURDIR)/$1|go;" \
     -e "s|\@VPATH\@|$(CURDIR)/$1|go;" \
+    -e "s|\@MAKEINFO\@|makeinfo|go;" \
     < $1/Makefile.in > $1/Makefile
 endef
 
@@ -241,16 +143,7 @@ override_dh_auto_build: $(autogen_files)
 	$(MAKE) -C doc/lispref
 	$(MAKE) -C doc/misc
 
-
-define mangle-info
-  for f in $$(make -C $1 echo-info-targets \
-    | grep INFO_TARGETS= | cut -b 14- | xargs -n 1 basename); \
-  do \
-    DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
-      debian/mangle-info \
-        $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/$$f; \
-  done
-endef
+pkg_infodir := $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
 
 override_dh_auto_install: pkg_name := $(flavor)-common-non-dfsg
 override_dh_auto_install: $(autogen_files)
@@ -269,17 +162,29 @@ override_dh_auto_install: $(autogen_files)
 
         # Mangle info menu entries for subdir.
 	chmod 755 debian/mangle-info
-	$(call mangle-info,doc/emacs)
-	$(call mangle-info,doc/lispintro)
-	$(call mangle-info,doc/lispref)
-	$(call mangle-info,doc/misc)
+	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
+	  debian/mangle-info $(pkg_infodir)/eintr
+	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
+	  debian/mangle-info $(pkg_infodir)/emacs
+	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
+	  debian/mangle-info $(pkg_infodir)/elisp
+        # Handle doc/misc files.
+	set -e; \
+	set -x; \
+	for f in $$(make -f doc/misc/Makefile -f debian/makefile-bit-doc-misc \
+	              echo-info-targets \
+	            | grep INFO_TARGETS= | cut -b 14- | xargs -n 1 basename); \
+	do \
+	  DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
+	    debian/mangle-info $(pkg_infodir)/$$f; \
+	done
 
 	install -d $(pkgdir_common)/usr/share/lintian/overrides
 	cp -a debian/emacs-common-non-dfsg.lintian-overrides \
 	  $(pkgdir_common)/usr/share/lintian/overrides/$(flavor)-common-non-dfsg
 
 override_dh_testdir:
-	$(testdir)
+	dh_testdir debian/emacs-common-non-dfsg.README etc/THE-GNU-PROJECT
 
 override_dh_clean: $(persistent_autogen_files)
 	rm -rf \

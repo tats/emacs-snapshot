@@ -1,0 +1,5 @@
+# -*-makefile-*-
+
+.PHONY: echo-info-targets
+echo-info-targets:
+	@echo INFO_TARGETS=$(INFO_TARGETS)
