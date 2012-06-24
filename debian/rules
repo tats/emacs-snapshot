@@ -108,15 +108,8 @@ CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
 LDFLAGS   += -g
 
 ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-  ifneq (,$(filter $(DEB_HOST_ARCH),m68k ia64))
-    # Fix a problem with newer versions of gcc on m68k and ia64.
-    # There -O2 causes a build failure (broken byte compiler) - see
-    # bugs #207580 and #582439.
-    CFLAGS += -O1
-  else # neq (m68k or ia64)
-    CFLAGS += -O2
-  endif # neq (m68k or ia64)
-endif # not noopt
+  CFLAGS += -O2
+endif
 
 joblimit := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 ifeq (,$(joblimit))
