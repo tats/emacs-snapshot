@@ -106,7 +106,6 @@ LDFLAGS = `dpkg-buildflags --get LDFLAGS`
 CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
 
 LDFLAGS   += -g
-CFLAGS    += -DDEBIAN
 
 ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
   ifneq (,$(filter $(DEB_HOST_ARCH),m68k ia64))
