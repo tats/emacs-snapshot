@@ -17,7 +17,7 @@ Package: emacs
 Architecture: all
 Depends: emacs23 | emacs23-lucid | emacs23-nox, ${misc:Depends}
 Provides: emacsen, editor, mail-reader, news-reader
-Description: The GNU Emacs editor (metapackage)
+Description: GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage which will always depend on the latest Emacs
  release.
@@ -29,7 +29,7 @@ Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
-Description: The GNU Emacs editor
+Description: GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a Lucid user interface.
 
@@ -40,7 +40,7 @@ Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
-Description: The GNU Emacs editor (without X support)
+Description: GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
 
@@ -51,14 +51,14 @@ Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
 Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
-Description: The GNU Emacs editor (with GTK+ user interface)
+Description: GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK+ user interface.
 
 Package: @DEB_FLAVOR@-bin-common
 Architecture: any
 Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
-Description: The GNU Emacs editor's shared, architecture dependent files
+Description: GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
@@ -68,7 +68,7 @@ Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version}), cedet, eieio, speedbar
-Description: The GNU Emacs editor's shared, architecture independent infrastructure
+Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
