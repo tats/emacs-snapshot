@@ -15,7 +15,7 @@ Standards-Version: 3.7.2
 
 Package: emacs
 Architecture: all
-Depends: @DEB_FLAVOR@ | @DEB_FLAVOR@-lucid | @DEB_FLAVOR@-nox, ${misc:Depends}
+Depends: emacs23 | emacs23-lucid | emacs23-nox, ${misc:Depends}
 Provides: emacsen, editor, mail-reader, news-reader
 Description: The GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
