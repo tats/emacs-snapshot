@@ -7,26 +7,18 @@
 
 # Copyright 1994,1995 Ian Jackson
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
-# Copyright 1998-2010 Rob Browning <rlb@defaultvalue.org>
+# Copyright 1998-2012 Rob Browning <rlb@defaultvalue.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
 # Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
 # Debhelper support added via one of Joey Hess' example files.
 # See the debian/changelog for further historical information.
 
-# TODO:
-#
-#   Figure out what happened to fns-*.elc
-#   Should we set defaults for things like xsupport at the top here?
-#   Deal with build_binary_pkg and continue integration.
-
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
 SHELL := /bin/bash
-
 quilt := QUILT_PATCHES=debian/patches quilt
-
 pf := set -o pipefail
 
 # This package uses debian/source/format 3.0 (quilt).
@@ -38,33 +30,6 @@ pf := set -o pipefail
 # way.  So far that's always been true.  If it becomes false, some of
 # the values below will have to be set manually.
 
-# As you might expect, a "debian/rules clean" should always get you
-# back to the state you were in before "debian/rules build".  In order
-# to accomplish that, this rules file actually performs three
-# independent builds to produce the emacsXY, emacsXY-nox, and
-# emacsXY-lucid packages.  The source is actually copied into separate
-# debian/build-* directories and built there.  Certain aspects of the
-# upstream build process have led to this approach.
-
-# For example, the original upstream source ships the .elc files, but
-# we need to re-build them when we patch the corresponding .el files.
-# The situation is further complicated by the fact that any of these
-# .el files may have macros, and if those are changed, then any other
-# .el files that use those macros must also be recompiled.  Over the
-# years, we've tried various ways to handle this issue, originally by
-# trying to keep track of which files need to be recompiled and only
-# recompiling those, then later by just re-building all the .elc files
-# with "make bootstrap".  In either case, if you don't want to have
-# diff bloat, you have to do something to keep track of the original
-# .elc files so you can restore them during make clean.
-
-# All of this was a lot of work, and was using quite a bit of
-# unnecessary storage both in the .orig.tar.gz.  To avoid that, and to
-# simplify the process, we now just remove the .elc files from the
-# upstream distribution whenever we create the debian .orig.tar.gz
-# file for a given upstream release.  Since we were always clobbering
-# the .elc files during the package build, that was no great loss.
-
 # (You might imagine that a VPATH build would allow us to avoid having
 #  to copy the entire source tree for each of the three builds, but it
 #  turns out that without additional complexity, VPATH builds will
@@ -72,28 +37,16 @@ pf := set -o pipefail
 #  completely respect the .elc files; some are modified in srcdir, not
 #  builddir.)
 
-# Copying the source to a separate build directory and building there
-# is much simpler than previous approaches, it makes cleaning trivial,
-# and it avoids any diff bloat.
+# The official upstream version defined by AC_INIT in configure.in.
+upstream_ver := 24.1
 
-# If the source tree ever ends up in an untenable "can't go forward,
-# can't go back" state with respect to patching, you can always start
-# over by just moving the current debian directory to a newly unpacked
-# orig.tar.gz tree.  Note that if you were in the process of editing a
-# patch, you will lose those edits, but you shouldn't lose anything
-# else.  This process just reverts all of the upstream files and
-# abandons the volatile "what's been done to the current tree" state
-# that quilt maintains in ./.pc.  All of the actual patches are stored
-# in debian/patches and should be unharmed.
-
-######################################################################
-# Important top-level targets:
-#
-# check-vars - displays how the version number has been parsed.
-# buildpackage - build binary packages via dpkg-buildpackage w/suitable args
-# prepare-release - prepare and check debs for upload.
-#
-######################################################################
+# This must be the version that's actually used at runtime for things
+# like load-path.  It may not be the same as the upstream version
+# (i.e. when you have upstream 20.5a, the functional version may still
+# be 20.5), so sometimes we may have to do this by hand.
+runtime_ver := $(shell $(pf); echo $(upstream_ver) | perl -pe 's/[a-z]+$$//o')
+major_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/\..*$$//o')
+minor_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
 
 # The name of the Debian source package
 src_name := $(shell $(pf); dpkg-parsechangelog | egrep '^Source:')
@@ -102,50 +55,29 @@ src_name := $(shell $(pf); echo $(src_name) | perl -pe 's/Source:\s+//o')
 # The version from the changelog (i.e. 20.5-1)
 debian_ver := $(shell $(pf); dpkg-parsechangelog | egrep '^Version:')
 debian_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/Version:\s+//o')
+
 # The Debian revision (i.e. the 1 from 20.5-1)
 # Always everything after the last '-'
 debian_rev := $(shell $(pf); echo $(debian_ver) | perl -pe 's/.*-//o')
 
-# The official upstream version defined by emacs-version in lisp/version.el.
-# The extraction method matches the code in the upstream configure.in.
-nominal_ver := \
-  $(shell $(pf); grep 'defconst[	 ]*emacs-version' lisp/version.el \
-    | sed -e 's/^[^"]*"\([^"]*\)".*$$/\1/')
-
-# This must be the version that's actually used at runtime for things
-# like load-path.  It may not be the same as the upstream version
-# (i.e. when you have upstream 20.5a, the functional version may still
-# be 20.5), so sometimes we may have to do this by hand.
-runtime_ver := $(shell $(pf); echo $(nominal_ver) | perl -pe 's/[a-z]+$$//o')
-
-major_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/\..*$$//o')
-minor_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
-
-# version for the debian source, i.e. if the upstream is 21.3, this
-# might be 21.3, or it might be 21.3+1 if we've had to have more than
-# one re-release of the upstream source.  Rare, but it happens...
-# Always everything before the last '-'
+# Might be 21.3, or it might be 21.3+1 if we've had to have more than
+# one re-release of the upstream source (rare, but it happens), or if
+# we have to split the package for DFSG purposes.  Always everything
+# before the last '-'
 debsrc_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
-
-# upstream version - the actual upstream version, i.e. 21.4a, minus any +foo
-upstream_ver := $(shell $(pf); echo $(debsrc_ver) | perl -pe 's/\+[^+]+$$//o')
-
-deb_orig_tgz := $(src_name)_$(debsrc_ver).orig.tar.gz
-# name of the orig_tgz unpack directory
-deb_orig_tgz_dir := emacs-$(runtime_ver)
-
-######################################################################
-# Customizable variables
 
 # The flavor (i.e. emacs21) currently matches the source package name.
 flavor := $(src_name)
 
-bin_priority := 26
+info_subdir := emacs-$(major_ver)
+
+######################################################################
+# Customizable variables
+
+bin_priority := 27
 
 # This might also be something like 2006-09-09 for snapshots.
 menu_ver := $(major_ver)
-
-info_subdir := emacs-$(major_ver)
 
 ######################################################################
 
@@ -280,7 +212,8 @@ endef
 # INSTALL_STRIP="-s" to the make vars below.
 
 define emacs_inst
-  $(MAKE) -C debian/$(1) install DESTDIR=$(2) \
+  $(MAKE) -C debian/$(1) install \
+    DESTDIR=$(2) \
     infodir=/usr/share/info/emacs-$(major_ver) \
     localstatedir=/var
 endef
@@ -294,7 +227,6 @@ define deb_sub
     -e "s|\@FULL_VERSION\@|$(runtime_ver)|go;" \
     -e "s|\@PACKAGE_VERSION\@|$(debian_ver)|go;" \
     -e "s|\@DEBIAN_REV\@|$(deb_rev)|go;" \
-    -e "s|\@NOMINAL_VERSION\@|$(nominal_ver)|go;" \
     -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
     -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
     -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
@@ -316,56 +248,10 @@ check-vars:
 	@echo "debian_ver: $(debian_ver)"
 	@echo "debsrc_ver: $(debsrc_ver)"
 	@echo "debian_rev: $(debian_rev)"
-	@echo "nominal_ver: $(nominal_ver)"
 	@echo "runtime_ver: $(runtime_ver)"
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
 	@echo "movemail_bin: $(movemail_bin)"
-
-define check_diff
-  @if $(quilt) series | grep -E '^debian-changes-'; \
-  then \
-    echo "Diffs found outside ./debian:"; \
-    ls debian/patches/debian-changes-*; \
-    false; \
-  else \
-    echo "../$(src_name)_$(debsrc_ver).diff.gz looks OK."; \
-  fi
-endef
-
-check-diff: clean
-	$(testdir)
-	cd .. && dpkg-source -b -i "$(basename $(CURDIR))"
-	$(check_diff)
-
-buildpackage:
-	$(testdir)
-	dpkg-buildpackage -D -us -uc -rfakeroot -i
-	$(check_diff)
-
-prepare-release:
-	$(testdir)
-        # don't want to be root -- using fakeroot below.
-        # also, stacking fakeroots seems to cause trouble generating diff.
-	@test "`whoami`" != root || \
-	  (echo "please run prepare-release as a normal user (not root)"; \
-	   false)
-        # check for any uncommitted changes
-	@cd debian; \
-	if ! git diff-files --quiet; \
-	then \
-	  git status; \
-	  echo; \
-	  read -p "Uncommitted changes.  Continue? [y/n] "; \
-          if test "$${REPLY}" != y; \
-	  then \
-	    false; \
-	  fi; \
-	fi
-        # TODO: make sure we actually installed the binary.
-        # TODO: run tests (use a check target?)
-	$(MAKE) -f debian/rules buildpackage
-	@echo "Everything looks OK.  Ready for release."
 
 debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target
@@ -423,9 +309,7 @@ debian/$(flavor)-common.README.Debian: \
 
 debian/setup-stamp:
 	$(testdir)
-	aclocal
-	autoconf
-	autoheader
+	./autogen.sh
 	mkdir -p $(dir $@) && touch $@
 
 # common configure flags
@@ -562,6 +446,7 @@ override_dh_auto_install: $(autogen_install_files)
 	  # update-alternatives.
 	  rm $(pkgdir_common)/usr/share/icons/hicolor/16x16/apps/emacs22.png
 	  rm $(pkgdir_common)/usr/share/icons/hicolor/24x24/apps/emacs22.png
+	  rm $(pkgdir_common)/usr/share/icons/hicolor/32x32/apps/emacs22.png
 	  rm $(pkgdir_common)/usr/share/icons/hicolor/48x48/apps/emacs22.png
 
 	  cd $(pkgdir_common)/usr/share/icons/hicolor \
@@ -583,11 +468,13 @@ override_dh_auto_install: $(autogen_install_files)
 	  chmod 755 debian/mangle-info
 	  for f in $(main_dir_info_files); \
 	  do \
+	    gunzip $(pkgdir_common)/usr/share/info/$(info_subdir)/$$f.gz; \
 	    DEBIAN_INFO_PREFIX=$(info_subdir) \
 	      debian/mangle-info \
 		$(pkgdir_common)/usr/share/info/$(info_subdir)/$$f; \
 	  done
 
+	  gunzip $(pkgdir_common)/usr/share/man/man1/ctags.1.gz
 	  perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
 	    $(pkgdir_common)/usr/share/man/man1/ctags.1
 
@@ -728,16 +615,27 @@ override_dh_fixperms:
 
 override_dh_clean: $(persistent_autogen_files)
 	rm -rf \
-	  debian/build-x \
-	  debian/install-x \
-	  debian/build-nox \
-	  debian/install-nox \
-	  debian/build-lucid \
-	  debian/install-lucid \
-	  debian/*-stamp \
+	  aclocal.m4 \
+	  build-aux/compile \
+	  build-aux/config.guess \
+	  build-aux/config.sub \
+	  build-aux/depcomp \
+	  build-aux/install-sh \
+	  build-aux/missing \
 	  config.guess \
 	  config.sub \
 	  configure \
-	  src/config.in
+	  debian/*-stamp \
+	  debian/build-lucid \
+	  debian/build-nox \
+	  debian/build-x \
+	  debian/emacsVER-common.README.00 \
+	  debian/emacsVER-common.README.01 \
+	  debian/install-lucid \
+	  debian/install-nox \
+	  debian/install-x \
+	  lib/Makefile.in \
+	  src/config.in \
+	  src/stamp-h1
 	rm -f $(nonpersistent_autogen_files)
 	dh_clean
