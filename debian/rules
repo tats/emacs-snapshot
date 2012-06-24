@@ -345,6 +345,8 @@ define build_cmd
   $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)"
   # If we don't use bootstrap, we need to explicitly build info.
   $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" info
+  # Make sure we chose liblockfile.
+  ldd $(1)/lib-src/movemail | grep liblockfile
 endef
 
 override_dh_auto_configure: debian/setup-stamp
