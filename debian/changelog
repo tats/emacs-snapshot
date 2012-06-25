@@ -1,10 +1,16 @@
-emacs24-non-dfsg (24.1+1-1~1.gbp857199) UNRELEASED; urgency=low
-
-  ** SNAPSHOT build @85719949bf63dc1344a318c701563e403a33171a **
+emacs24-non-dfsg (24.1+1-1) unstable; urgency=low
 
   * Upgrade to upstream version 24.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 24 Jun 2012 12:58:15 -0500
+  * Update debian/.gitignore for emacs24.
+
+  * Update debian control, copyright, etc. for emacs24.
+
+  * Update debian control and compat for debhelper 9.
+
+  * Clean up debian/rules, and update it for emacs24.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 24 Jun 2012 21:35:06 -0500
 
 emacs23-non-dfsg (23.4+1-1) unstable; urgency=low
 
