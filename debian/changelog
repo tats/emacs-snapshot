@@ -1,10 +1,10 @@
-emacs24 (24.1+1-2~1.gbpe29dda) UNRELEASED; urgency=low
+emacs24 (24.1+1-2) unstable; urgency=low
 
-  ** SNAPSHOT build @e29dda0169b7c98dbdc166779f2dc47586054868 **
+  * Restrict libselinux1-dev build dependency to [linux-any].
+    Thanks to James McCoy <jamessan@debian.org> for the report.
+    (Closes: #679679)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@trouble.defaultvalue.org>  Sun, 01 Jul 2012 13:32:54 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 04 Jul 2012 19:16:00 -0500
 
 emacs24 (24.1+1-1) unstable; urgency=low
 
