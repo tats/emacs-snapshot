@@ -64,6 +64,12 @@
 	(Fdelete_other_windows_internal): Signal an error if the window is
 	on a dead frame (Bug#11984).
 
+2012-07-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* floatfns.c (Fabs): Do not wrap fabs inside IN_FLOAT (Bug#11913).
+	Unlike the other wrapped functions, fabs has an unspecified
+	effect on errno.
+
 2012-07-14  Eli Zaretskii  <eliz@gnu.org>
 
 	Remove FILE_SYSTEM_CASE.
