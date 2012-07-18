@@ -1,3 +1,12 @@
+emacs24 (24.1+1-3) unstable; urgency=low
+
+  * Add 0011-Don-t-use-IN_FLOAT-when-calling-fabs-since-it-may-cl.patch.
+    Fix FTBS on i386 by adding an upstream patch to skip fabs() errno
+    checking.  Since fabs() has no error conditions, it doesn't guarantee
+    that it won't clobber errno.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 17 Jul 2012 19:25:59 -0500
+
 emacs24 (24.1+1-2) unstable; urgency=low
 
   * Restrict libselinux1-dev build dependency to [linux-any].
