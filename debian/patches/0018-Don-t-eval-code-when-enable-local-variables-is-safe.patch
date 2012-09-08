@@ -1,0 +1,63 @@
+From e53a987370a1ea362b4247d4a621257c28f35f52 Mon Sep 17 00:00:00 2001
+From: Glenn Morris <rgm@gnu.org>
+Date: Tue, 7 Aug 2012 14:41:39 -0400
+Subject: Don't eval code when enable-local-variables is :safe.
+
+Emacs should no longer eval code when enable-local-variables is :safe.
+
+Previously, Emacs might eval forms in file-local variable sections
+even when the Emacs user option `enable-local-variables' was set to
+:safe.  This patch fixes CVE-2012-3479:
+
+  http://security-tracker.debian.org/tracker/CVE-2012-3479
+
+Origin: upstream, commit: 108092 (90c310d22c6f06332257c816253c642fd2bf90aa)
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Provided-By: Glenn Morris  <rgm@gnu.org>
+Bug: http://debbugs.gnu.org/cgi/bugreport.cgi?bug=12155
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=684695
+---
+ lisp/ChangeLog |    6 ++++++
+ lisp/files.el  |   15 ++++++++++-----
+ 2 files changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/lisp/ChangeLog b/lisp/ChangeLog
+index 6d780e9..791092d 100644
+--- a/lisp/ChangeLog
++++ b/lisp/ChangeLog
+@@ -1,3 +1,9 @@
++2012-08-07  Glenn Morris  <rgm@gnu.org>
++
++	* files.el (hack-local-variables-filter): If an eval: form is not
++	known to be safe, and enable-local-variables is :safe, then ignore
++	the form totally, as is done for non-eval forms.  (Bug#12155)
++
+ 2012-01-19  Chong Yidong  <cyd@gnu.org>
+ 
+ 	* Version 23.4 released.
+diff --git a/lisp/files.el b/lisp/files.el
+index ed1a69d..113968d 100644
+--- a/lisp/files.el
++++ b/lisp/files.el
+@@ -2986,11 +2986,16 @@ DIR-NAME is a directory name if these settings come from
+ 	      ;; Obey `enable-local-eval'.
+ 	      ((eq var 'eval)
+ 	       (when enable-local-eval
+-		 (push elt all-vars)
+-		 (or (eq enable-local-eval t)
+-		     (hack-one-local-variable-eval-safep (eval (quote val)))
+-		     (safe-local-variable-p var val)
+-		     (push elt unsafe-vars))))
++		 (let ((safe (or (hack-one-local-variable-eval-safep
++				  (eval (quote val)))
++				 ;; In case previously marked safe (bug#5636).
++				 (safe-local-variable-p var val))))
++		   ;; If not safe and e-l-v = :safe, ignore totally.
++		   (when (or safe (not (eq enable-local-variables :safe)))
++		     (push elt all-vars)
++		     (or (eq enable-local-eval t)
++			 safe
++			 (push elt unsafe-vars))))))
+ 	      ;; Ignore duplicates (except `mode') in the present list.
+ 	      ((and (assq var all-vars) (not (eq var 'mode))) nil)
+ 	      ;; Accept known-safe variables.

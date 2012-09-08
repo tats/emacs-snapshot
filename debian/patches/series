@@ -15,3 +15,4 @@
 0015-coding.c-produce_chars-Fix-updating-of-src_end-Bug-1.patch
 0016-quail-indian.el-indian-tlg-base-table-Fix-typo-dev-t.patch
 0017-Initialize-xgselect-in-function-xg_select-when-gfds_.patch
+0018-Don-t-eval-code-when-enable-local-variables-is-safe.patch
