@@ -1,3 +1,11 @@
+emacs24 (24.2+1-1~1.gbpfee5d5) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @fee5d583f06d048c0fa332c70a875f789d318485 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 08 Sep 2012 16:54:16 -0500
+
 emacs24 (24.1+1-4) unstable; urgency=low
 
   * Fix FTBS on ia64 with -O1.  Remove redundant LDFLAGS+=-g and
