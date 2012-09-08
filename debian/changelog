@@ -1,3 +1,11 @@
+emacs23 (23.4+1-4~1.gbpa86b64) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @a86b64fa1fe87f4f0d2c038e0ead9695e7890a66 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 08 Sep 2012 14:57:00 -0500
+
 emacs23 (23.4+1-3) unstable; urgency=low
 
   * Add 0017-Initialize-xgselect-in-function-xg_select-when-gfds_.patch.
