@@ -1,4 +1,4 @@
-From d9f7fbf55a600a1c0eb8fd00ad82fef195fb9a40 Mon Sep 17 00:00:00 2001
+From a55087cd4ef31a9b8bcedfbee83ec6fe49e094ad Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG.
@@ -113,10 +113,10 @@ index 9a9be4f..0935af2 100644
  #### Bootstrapping.
  
 diff --git a/configure.in b/configure.in
-index ad9966b..101ce5c 100644
+index 2b0b2f7..35ae014 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -3819,11 +3819,11 @@ dnl This will work, but you get a config.status that is not quite right
+@@ -3820,11 +3820,11 @@ dnl This will work, but you get a config.status that is not quite right
  dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
  dnl That doesn't have any obvious consequences for Emacs, but on the whole
  dnl it seems better to just live with the duplication.
@@ -132,64 +132,64 @@ index ad9966b..101ce5c 100644
  
  dnl test/ is not present in release tarfiles.
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index e387631..f28746f 100644
+index dd8cf4b..f274153 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -45,160 +45,13 @@ MAKEINFO_OPTS = --force -I$(emacsdir)
  
  # Also add new entries to INFO_FILES in the top-level Makefile.in.
  INFO_TARGETS = \
--	$(infodir)/ada-mode \
--	$(infodir)/auth \
--	$(infodir)/autotype \
--	$(infodir)/calc \
--	$(infodir)/ccmode \
--	$(infodir)/cl \
--	$(infodir)/dbus \
--	$(infodir)/dired-x \
--	$(infodir)/ebrowse \
--	$(infodir)/ede \
--	$(infodir)/ediff \
--	$(infodir)/edt \
--	$(infodir)/eieio \
--	$(infodir)/emacs-mime \
--	$(infodir)/epa \
--	$(infodir)/erc \
--	$(infodir)/ert \
--	$(infodir)/eshell \
--	$(infodir)/eudc \
--	$(infodir)/efaq \
--	$(infodir)/flymake \
--	$(infodir)/forms \
--	$(infodir)/gnus \
--	$(infodir)/emacs-gnutls \
--	$(infodir)/idlwave \
--	$(infodir)/info \
--	$(infodir)/mairix-el \
--	$(infodir)/message \
--	$(infodir)/mh-e \
--	$(infodir)/newsticker \
--	$(infodir)/nxml-mode \
--	$(infodir)/org \
--	$(infodir)/pcl-cvs \
--	$(infodir)/pgg \
--	$(infodir)/rcirc \
--	$(infodir)/remember \
--	$(infodir)/reftex \
--	$(infodir)/sasl \
--	$(infodir)/sc \
--	$(infodir)/semantic \
--	$(infodir)/ses \
--	$(infodir)/sieve \
--	$(infodir)/smtpmail \
--	$(infodir)/speedbar \
--	$(infodir)/tramp \
--	$(infodir)/url \
--	$(infodir)/vip \
--	$(infodir)/viper \
--	$(infodir)/widget \
--	$(infodir)/woman
-+	$(infodir)/efaq
+-	$(buildinfodir)/ada-mode \
+-	$(buildinfodir)/auth \
+-	$(buildinfodir)/autotype \
+-	$(buildinfodir)/calc \
+-	$(buildinfodir)/ccmode \
+-	$(buildinfodir)/cl \
+-	$(buildinfodir)/dbus \
+-	$(buildinfodir)/dired-x \
+-	$(buildinfodir)/ebrowse \
+-	$(buildinfodir)/ede \
+-	$(buildinfodir)/ediff \
+-	$(buildinfodir)/edt \
+-	$(buildinfodir)/eieio \
+-	$(buildinfodir)/emacs-mime \
+-	$(buildinfodir)/epa \
+-	$(buildinfodir)/erc \
+-	$(buildinfodir)/ert \
+-	$(buildinfodir)/eshell \
+-	$(buildinfodir)/eudc \
+-	$(buildinfodir)/efaq \
+-	$(buildinfodir)/flymake \
+-	$(buildinfodir)/forms \
+-	$(buildinfodir)/gnus \
+-	$(buildinfodir)/emacs-gnutls \
+-	$(buildinfodir)/idlwave \
+-	$(buildinfodir)/info \
+-	$(buildinfodir)/mairix-el \
+-	$(buildinfodir)/message \
+-	$(buildinfodir)/mh-e \
+-	$(buildinfodir)/newsticker \
+-	$(buildinfodir)/nxml-mode \
+-	$(buildinfodir)/org \
+-	$(buildinfodir)/pcl-cvs \
+-	$(buildinfodir)/pgg \
+-	$(buildinfodir)/rcirc \
+-	$(buildinfodir)/remember \
+-	$(buildinfodir)/reftex \
+-	$(buildinfodir)/sasl \
+-	$(buildinfodir)/sc \
+-	$(buildinfodir)/semantic \
+-	$(buildinfodir)/ses \
+-	$(buildinfodir)/sieve \
+-	$(buildinfodir)/smtpmail \
+-	$(buildinfodir)/speedbar \
+-	$(buildinfodir)/tramp \
+-	$(buildinfodir)/url \
+-	$(buildinfodir)/vip \
+-	$(buildinfodir)/viper \
+-	$(buildinfodir)/widget \
+-	$(buildinfodir)/woman
++	$(buildinfodir)/efaq
  
  DVI_TARGETS = \
 -	ada-mode.dvi \
@@ -303,8 +303,8 @@ index e387631..f28746f 100644
  # Note: "<" is not portable in ordinary make rules.
  
  ## "short" target names for convenience, to just rebuild one manual.
--ada-mode : $(infodir)/ada-mode
--$(infodir)/ada-mode: ada-mode.texi
+-ada-mode : $(buildinfodir)/ada-mode
+-$(buildinfodir)/ada-mode: ada-mode.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ada-mode.texi
 -ada-mode.dvi: ${srcdir}/ada-mode.texi
@@ -312,8 +312,8 @@ index e387631..f28746f 100644
 -ada-mode.pdf: ${srcdir}/ada-mode.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ada-mode.texi
 -
--auth : $(infodir)/auth
--$(infodir)/auth: auth.texi
+-auth : $(buildinfodir)/auth
+-$(buildinfodir)/auth: auth.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) auth.texi
 -auth.dvi: ${srcdir}/auth.texi
@@ -321,8 +321,8 @@ index e387631..f28746f 100644
 -auth.pdf: ${srcdir}/auth.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/auth.texi
 -
--autotype : $(infodir)/autotype
--$(infodir)/autotype: autotype.texi
+-autotype : $(buildinfodir)/autotype
+-$(buildinfodir)/autotype: autotype.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) autotype.texi
 -autotype.dvi: ${srcdir}/autotype.texi
@@ -330,8 +330,8 @@ index e387631..f28746f 100644
 -autotype.pdf: ${srcdir}/autotype.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/autotype.texi
 -
--calc : $(infodir)/calc
--$(infodir)/calc: calc.texi $(emacsdir)/emacsver.texi
+-calc : $(buildinfodir)/calc
+-$(buildinfodir)/calc: calc.texi $(emacsdir)/emacsver.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) calc.texi
 -calc.dvi: ${srcdir}/calc.texi $(emacsdir)/emacsver.texi
@@ -339,8 +339,8 @@ index e387631..f28746f 100644
 -calc.pdf: ${srcdir}/calc.texi $(emacsdir)/emacsver.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/calc.texi
 -
--ccmode : $(infodir)/ccmode
--$(infodir)/ccmode: cc-mode.texi
+-ccmode : $(buildinfodir)/ccmode
+-$(buildinfodir)/ccmode: cc-mode.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) cc-mode.texi
 -cc-mode.dvi: ${srcdir}/cc-mode.texi
@@ -348,8 +348,8 @@ index e387631..f28746f 100644
 -cc-mode.pdf: ${srcdir}/cc-mode.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/cc-mode.texi
 -
--cl : $(infodir)/cl
--$(infodir)/cl: cl.texi
+-cl : $(buildinfodir)/cl
+-$(buildinfodir)/cl: cl.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) cl.texi
 -cl.dvi: ${srcdir}/cl.texi
@@ -357,8 +357,8 @@ index e387631..f28746f 100644
 -cl.pdf: ${srcdir}/cl.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/cl.texi
 -
--dbus : $(infodir)/dbus
--$(infodir)/dbus: dbus.texi
+-dbus : $(buildinfodir)/dbus
+-$(buildinfodir)/dbus: dbus.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) dbus.texi
 -dbus.dvi: ${srcdir}/dbus.texi
@@ -366,8 +366,8 @@ index e387631..f28746f 100644
 -dbus.pdf: ${srcdir}/dbus.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/dbus.texi
 -
--dired-x : $(infodir)/dired-x
--$(infodir)/dired-x: dired-x.texi $(emacsdir)/emacsver.texi
+-dired-x : $(buildinfodir)/dired-x
+-$(buildinfodir)/dired-x: dired-x.texi $(emacsdir)/emacsver.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) dired-x.texi
 -dired-x.dvi: ${srcdir}/dired-x.texi $(emacsdir)/emacsver.texi
@@ -375,8 +375,8 @@ index e387631..f28746f 100644
 -dired-x.pdf: ${srcdir}/dired-x.texi $(emacsdir)/emacsver.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/dired-x.texi
 -
--ebrowse : $(infodir)/ebrowse
--$(infodir)/ebrowse: ebrowse.texi
+-ebrowse : $(buildinfodir)/ebrowse
+-$(buildinfodir)/ebrowse: ebrowse.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ebrowse.texi
 -ebrowse.dvi: ${srcdir}/ebrowse.texi
@@ -384,8 +384,8 @@ index e387631..f28746f 100644
 -ebrowse.pdf: ${srcdir}/ebrowse.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ebrowse.texi
 -
--ede : $(infodir)/ede
--$(infodir)/ede: ede.texi
+-ede : $(buildinfodir)/ede
+-$(buildinfodir)/ede: ede.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ede.texi
 -ede.dvi: ${srcdir}/ede.texi
@@ -393,8 +393,8 @@ index e387631..f28746f 100644
 -ede.pdf: ${srcdir}/ede.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ede.texi
 -
--ediff : $(infodir)/ediff
--$(infodir)/ediff: ediff.texi
+-ediff : $(buildinfodir)/ediff
+-$(buildinfodir)/ediff: ediff.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ediff.texi
 -ediff.dvi: ${srcdir}/ediff.texi
@@ -402,8 +402,8 @@ index e387631..f28746f 100644
 -ediff.pdf: ${srcdir}/ediff.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ediff.texi
 -
--edt : $(infodir)/edt
--$(infodir)/edt: edt.texi
+-edt : $(buildinfodir)/edt
+-$(buildinfodir)/edt: edt.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) edt.texi
 -edt.dvi: ${srcdir}/edt.texi
@@ -411,8 +411,8 @@ index e387631..f28746f 100644
 -edt.pdf: ${srcdir}/edt.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/edt.texi
 -
--eieio : $(infodir)/eieio
--$(infodir)/eieio: eieio.texi
+-eieio : $(buildinfodir)/eieio
+-$(buildinfodir)/eieio: eieio.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) eieio.texi
 -eieio.dvi: ${srcdir}/eieio.texi
@@ -420,8 +420,8 @@ index e387631..f28746f 100644
 -eieio.pdf: ${srcdir}/eieio.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/eieio.texi
 -
--emacs-gnutls : $(infodir)/emacs-gnutls
--$(infodir)/emacs-gnutls: emacs-gnutls.texi
+-emacs-gnutls : $(buildinfodir)/emacs-gnutls
+-$(buildinfodir)/emacs-gnutls: emacs-gnutls.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) emacs-gnutls.texi
 -emacs-gnutls.dvi: ${srcdir}/emacs-gnutls.texi
@@ -429,8 +429,8 @@ index e387631..f28746f 100644
 -emacs-gnutls.pdf: ${srcdir}/emacs-gnutls.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/emacs-gnutls.texi
 -
--emacs-mime : $(infodir)/emacs-mime
--$(infodir)/emacs-mime: emacs-mime.texi
+-emacs-mime : $(buildinfodir)/emacs-mime
+-$(buildinfodir)/emacs-mime: emacs-mime.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) --enable-encoding emacs-mime.texi
 -emacs-mime.dvi: ${srcdir}/emacs-mime.texi
@@ -438,8 +438,8 @@ index e387631..f28746f 100644
 -emacs-mime.pdf: ${srcdir}/emacs-mime.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/emacs-mime.texi
 -
--epa : $(infodir)/epa
--$(infodir)/epa: epa.texi
+-epa : $(buildinfodir)/epa
+-$(buildinfodir)/epa: epa.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) epa.texi
 -epa.dvi: ${srcdir}/epa.texi
@@ -447,8 +447,8 @@ index e387631..f28746f 100644
 -epa.pdf: ${srcdir}/epa.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/epa.texi
 -
--erc : $(infodir)/erc
--$(infodir)/erc: erc.texi
+-erc : $(buildinfodir)/erc
+-$(buildinfodir)/erc: erc.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) erc.texi
 -erc.dvi: ${srcdir}/erc.texi
@@ -456,8 +456,8 @@ index e387631..f28746f 100644
 -erc.pdf: ${srcdir}/erc.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/erc.texi
 -
--ert : $(infodir)/ert
--$(infodir)/ert: ert.texi
+-ert : $(buildinfodir)/ert
+-$(buildinfodir)/ert: ert.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ert.texi
 -ert.dvi: ${srcdir}/ert.texi
@@ -465,8 +465,8 @@ index e387631..f28746f 100644
 -ert.pdf: ${srcdir}/ert.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ert.texi
 -
--eshell : $(infodir)/eshell
--$(infodir)/eshell: eshell.texi
+-eshell : $(buildinfodir)/eshell
+-$(buildinfodir)/eshell: eshell.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) eshell.texi
 -eshell.dvi: ${srcdir}/eshell.texi
@@ -474,8 +474,8 @@ index e387631..f28746f 100644
 -eshell.pdf: ${srcdir}/eshell.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/eshell.texi
 -
--eudc : $(infodir)/eudc
--$(infodir)/eudc: eudc.texi
+-eudc : $(buildinfodir)/eudc
+-$(buildinfodir)/eudc: eudc.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) eudc.texi
 -eudc.dvi: ${srcdir}/eudc.texi
@@ -483,15 +483,15 @@ index e387631..f28746f 100644
 -eudc.pdf: ${srcdir}/eudc.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
 -
- efaq : $(infodir)/efaq
- $(infodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
+ efaq : $(buildinfodir)/efaq
+ $(buildinfodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
  	$(mkinfodir)
 @@ -428,280 +101,6 @@ emacs-faq.html: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
  emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
  	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
  
--flymake : $(infodir)/flymake
--$(infodir)/flymake: flymake.texi
+-flymake : $(buildinfodir)/flymake
+-$(buildinfodir)/flymake: flymake.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) flymake.texi
 -flymake.dvi: ${srcdir}/flymake.texi
@@ -499,8 +499,8 @@ index e387631..f28746f 100644
 -flymake.pdf: ${srcdir}/flymake.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/flymake.texi
 -
--forms : $(infodir)/forms
--$(infodir)/forms: forms.texi
+-forms : $(buildinfodir)/forms
+-$(buildinfodir)/forms: forms.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) forms.texi
 -forms.dvi: ${srcdir}/forms.texi
@@ -509,8 +509,8 @@ index e387631..f28746f 100644
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/forms.texi
 -
 -# gnus/message/emacs-mime/sieve/pgg are part of Gnus:
--gnus : $(infodir)/gnus
--$(infodir)/gnus: gnus.texi gnus-faq.texi
+-gnus : $(buildinfodir)/gnus
+-$(buildinfodir)/gnus: gnus.texi gnus-faq.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) gnus.texi
 -gnus.dvi: ${srcdir}/gnus.texi gnus-faq.texi
@@ -526,8 +526,8 @@ index e387631..f28746f 100644
 -
 -# This is produced with --no-split to avoid making files whose
 -# names clash on DOS 8+3 filesystems
--idlwave : $(infodir)/idlwave
--$(infodir)/idlwave: idlwave.texi
+-idlwave : $(buildinfodir)/idlwave
+-$(buildinfodir)/idlwave: idlwave.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) --no-split idlwave.texi
 -idlwave.dvi: ${srcdir}/idlwave.texi
@@ -538,8 +538,8 @@ index e387631..f28746f 100644
 -# The following target uses an explicit -o switch to work around
 -# the @setfilename directive in info.texi, which is required for
 -# the Texinfo distribution.
--###info : $(infodir)/info   # circular!
--$(infodir)/info: info.texi
+-###info : $(buildinfodir)/info   # circular!
+-$(buildinfodir)/info: info.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) --no-split -o $@ info.texi
 -info.dvi: ${srcdir}/info.texi
@@ -547,8 +547,8 @@ index e387631..f28746f 100644
 -info.pdf: ${srcdir}/info.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/info.texi
 -
--mairix-el : $(infodir)/mairix-el
--$(infodir)/mairix-el: mairix-el.texi
+-mairix-el : $(buildinfodir)/mairix-el
+-$(buildinfodir)/mairix-el: mairix-el.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) mairix-el.texi
 -mairix-el.dvi: ${srcdir}/mairix-el.texi
@@ -556,8 +556,8 @@ index e387631..f28746f 100644
 -mairix-el.pdf: ${srcdir}/mairix-el.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/mairix-el.texi
 -
--message : $(infodir)/message
--$(infodir)/message: message.texi
+-message : $(buildinfodir)/message
+-$(buildinfodir)/message: message.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) message.texi
 -message.dvi: ${srcdir}/message.texi
@@ -565,8 +565,8 @@ index e387631..f28746f 100644
 -message.pdf: ${srcdir}/message.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/message.texi
 -
--mh-e : $(infodir)/mh-e
--$(infodir)/mh-e: mh-e.texi
+-mh-e : $(buildinfodir)/mh-e
+-$(buildinfodir)/mh-e: mh-e.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) mh-e.texi
 -mh-e.dvi: ${srcdir}/mh-e.texi
@@ -574,8 +574,8 @@ index e387631..f28746f 100644
 -mh-e.pdf: ${srcdir}/mh-e.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/mh-e.texi
 -
--newsticker : $(infodir)/newsticker
--$(infodir)/newsticker: newsticker.texi
+-newsticker : $(buildinfodir)/newsticker
+-$(buildinfodir)/newsticker: newsticker.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) newsticker.texi
 -newsticker.dvi: ${srcdir}/newsticker.texi
@@ -583,8 +583,8 @@ index e387631..f28746f 100644
 -newsticker.pdf: ${srcdir}/newsticker.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/newsticker.texi
 -
--nxml-mode : $(infodir)/nxml-mode
--$(infodir)/nxml-mode: nxml-mode.texi
+-nxml-mode : $(buildinfodir)/nxml-mode
+-$(buildinfodir)/nxml-mode: nxml-mode.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) nxml-mode.texi
 -nxml-mode.dvi: ${srcdir}/nxml-mode.texi
@@ -592,8 +592,8 @@ index e387631..f28746f 100644
 -nxml-mode.pdf: ${srcdir}/nxml-mode.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/nxml-mode.texi
 -
--org : $(infodir)/org
--$(infodir)/org: org.texi
+-org : $(buildinfodir)/org
+-$(buildinfodir)/org: org.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) org.texi
 -org.dvi: ${srcdir}/org.texi
@@ -601,8 +601,8 @@ index e387631..f28746f 100644
 -org.pdf: ${srcdir}/org.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/org.texi
 -
--pcl-cvs : $(infodir)/pcl-cvs
--$(infodir)/pcl-cvs: pcl-cvs.texi
+-pcl-cvs : $(buildinfodir)/pcl-cvs
+-$(buildinfodir)/pcl-cvs: pcl-cvs.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) pcl-cvs.texi
 -pcl-cvs.dvi: ${srcdir}/pcl-cvs.texi
@@ -610,8 +610,8 @@ index e387631..f28746f 100644
 -pcl-cvs.pdf: ${srcdir}/pcl-cvs.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/pcl-cvs.texi
 -
--pgg : $(infodir)/pgg
--$(infodir)/pgg: pgg.texi
+-pgg : $(buildinfodir)/pgg
+-$(buildinfodir)/pgg: pgg.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) pgg.texi
 -pgg.dvi: ${srcdir}/pgg.texi
@@ -619,8 +619,8 @@ index e387631..f28746f 100644
 -pgg.pdf: ${srcdir}/pgg.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/pgg.texi
 -
--rcirc : $(infodir)/rcirc
--$(infodir)/rcirc: rcirc.texi
+-rcirc : $(buildinfodir)/rcirc
+-$(buildinfodir)/rcirc: rcirc.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) rcirc.texi
 -rcirc.dvi: ${srcdir}/rcirc.texi
@@ -628,8 +628,8 @@ index e387631..f28746f 100644
 -rcirc.pdf: ${srcdir}/rcirc.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/rcirc.texi
 -
--reftex : $(infodir)/reftex
--$(infodir)/reftex: reftex.texi
+-reftex : $(buildinfodir)/reftex
+-$(buildinfodir)/reftex: reftex.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) reftex.texi
 -reftex.dvi: ${srcdir}/reftex.texi
@@ -637,8 +637,8 @@ index e387631..f28746f 100644
 -reftex.pdf: ${srcdir}/reftex.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/reftex.texi
 -
--remember : $(infodir)/remember
--$(infodir)/remember: remember.texi
+-remember : $(buildinfodir)/remember
+-$(buildinfodir)/remember: remember.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) remember.texi
 -remember.dvi: ${srcdir}/remember.texi
@@ -646,8 +646,8 @@ index e387631..f28746f 100644
 -remember.pdf: ${srcdir}/remember.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/remember.texi
 -
--sasl : $(infodir)/sasl
--$(infodir)/sasl: sasl.texi
+-sasl : $(buildinfodir)/sasl
+-$(buildinfodir)/sasl: sasl.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) sasl.texi
 -sasl.dvi: ${srcdir}/sasl.texi
@@ -655,8 +655,8 @@ index e387631..f28746f 100644
 -sasl.pdf: ${srcdir}/sasl.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/sasl.texi
 -
--sc : $(infodir)/sc
--$(infodir)/sc: sc.texi
+-sc : $(buildinfodir)/sc
+-$(buildinfodir)/sc: sc.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) sc.texi
 -sc.dvi: ${srcdir}/sc.texi
@@ -664,8 +664,8 @@ index e387631..f28746f 100644
 -sc.pdf: ${srcdir}/sc.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/sc.texi
 -
--semantic : $(infodir)/semantic
--$(infodir)/semantic: semantic.texi sem-user.texi
+-semantic : $(buildinfodir)/semantic
+-$(buildinfodir)/semantic: semantic.texi sem-user.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) semantic.texi
 -semantic.dvi: ${srcdir}/semantic.texi sem-user.texi
@@ -673,8 +673,8 @@ index e387631..f28746f 100644
 -semantic.pdf: ${srcdir}/semantic.texi sem-user.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/semantic.texi
 -
--ses : $(infodir)/ses
--$(infodir)/ses: ses.texi
+-ses : $(buildinfodir)/ses
+-$(buildinfodir)/ses: ses.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) ses.texi
 -ses.dvi: ${srcdir}/ses.texi
@@ -682,8 +682,8 @@ index e387631..f28746f 100644
 -ses.pdf: ${srcdir}/ses.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/ses.texi
 -
--sieve : $(infodir)/sieve
--$(infodir)/sieve: sieve.texi
+-sieve : $(buildinfodir)/sieve
+-$(buildinfodir)/sieve: sieve.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) sieve.texi
 -sieve.dvi: ${srcdir}/sieve.texi
@@ -691,8 +691,8 @@ index e387631..f28746f 100644
 -sieve.pdf: ${srcdir}/sieve.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/sieve.texi
 -
--smtpmail : $(infodir)/smtpmail
--$(infodir)/smtpmail: smtpmail.texi
+-smtpmail : $(buildinfodir)/smtpmail
+-$(buildinfodir)/smtpmail: smtpmail.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) smtpmail.texi
 -smtpmail.dvi: ${srcdir}/smtpmail.texi
@@ -700,8 +700,8 @@ index e387631..f28746f 100644
 -smtpmail.pdf: ${srcdir}/smtpmail.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/smtpmail.texi
 -
--speedbar : $(infodir)/speedbar
--$(infodir)/speedbar: speedbar.texi
+-speedbar : $(buildinfodir)/speedbar
+-$(buildinfodir)/speedbar: speedbar.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) speedbar.texi
 -speedbar.dvi: ${srcdir}/speedbar.texi
@@ -709,8 +709,8 @@ index e387631..f28746f 100644
 -speedbar.pdf: ${srcdir}/speedbar.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/speedbar.texi
 -
--tramp : $(infodir)/tramp
--$(infodir)/tramp: tramp.texi trampver.texi
+-tramp : $(buildinfodir)/tramp
+-$(buildinfodir)/tramp: tramp.texi trampver.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) -D emacs tramp.texi
 -tramp.dvi: ${srcdir}/tramp.texi trampver.texi
@@ -718,8 +718,8 @@ index e387631..f28746f 100644
 -tramp.pdf: ${srcdir}/tramp.texi trampver.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/tramp.texi
 -
--url : $(infodir)/url
--$(infodir)/url: url.texi
+-url : $(buildinfodir)/url
+-$(buildinfodir)/url: url.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) url.texi
 -url.dvi: ${srcdir}/url.texi
@@ -727,8 +727,8 @@ index e387631..f28746f 100644
 -url.pdf: ${srcdir}/url.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/url.texi
 -
--vip : $(infodir)/vip
--$(infodir)/vip: vip.texi
+-vip : $(buildinfodir)/vip
+-$(buildinfodir)/vip: vip.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) vip.texi
 -vip.dvi: ${srcdir}/vip.texi
@@ -736,8 +736,8 @@ index e387631..f28746f 100644
 -vip.pdf: ${srcdir}/vip.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/vip.texi
 -
--viper : $(infodir)/viper
--$(infodir)/viper: viper.texi
+-viper : $(buildinfodir)/viper
+-$(buildinfodir)/viper: viper.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) viper.texi
 -viper.dvi: ${srcdir}/viper.texi
@@ -745,8 +745,8 @@ index e387631..f28746f 100644
 -viper.pdf: ${srcdir}/viper.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/viper.texi
 -
--widget : $(infodir)/widget
--$(infodir)/widget: widget.texi
+-widget : $(buildinfodir)/widget
+-$(buildinfodir)/widget: widget.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) widget.texi
 -widget.dvi: ${srcdir}/widget.texi
@@ -754,8 +754,8 @@ index e387631..f28746f 100644
 -widget.pdf: ${srcdir}/widget.texi
 -	$(ENVADD) $(TEXI2PDF) ${srcdir}/widget.texi
 -
--woman : $(infodir)/woman
--$(infodir)/woman: woman.texi
+-woman : $(buildinfodir)/woman
+-$(buildinfodir)/woman: woman.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) woman.texi
 -woman.dvi: ${srcdir}/woman.texi

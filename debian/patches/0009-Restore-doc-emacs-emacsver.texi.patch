@@ -1,4 +1,4 @@
-From fe2769bc74dc588c74c43b295292f83b504d6345 Mon Sep 17 00:00:00 2001
+From c9640d487bb7ca38088a87bd969ce29939787cd2 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 17 Jun 2012 10:38:50 -0500
 Subject: Restore doc/emacs/emacsver.texi.

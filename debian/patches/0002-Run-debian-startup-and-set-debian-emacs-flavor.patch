@@ -1,4 +1,4 @@
-From ce48d6297b8fa209d932ebc158f55066ba35332a Mon Sep 17 00:00:00 2001
+From 00f1169fb8a41d1f5cd6d2bc41f692c9ceb63a4b Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor.

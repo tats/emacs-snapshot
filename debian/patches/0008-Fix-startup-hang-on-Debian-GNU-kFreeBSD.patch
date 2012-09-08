@@ -1,4 +1,4 @@
-From f83dd2b7a89cddb38f9b9791c388d4be4bd75985 Mon Sep 17 00:00:00 2001
+From 9eb44f6dd7805bc5c95ab5251c5780c8b0aaaac7 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:32 -0500
 Subject: Fix startup hang on Debian GNU/kFreeBSD.

@@ -7,5 +7,4 @@
 0007-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
 0008-Fix-startup-hang-on-Debian-GNU-kFreeBSD.patch
 0009-Restore-doc-emacs-emacsver.texi.patch
-0010-Rename-infodir-to-buildinfodir-in-doc-Makefile.in-GN.patch
-0011-Don-t-use-IN_FLOAT-when-calling-fabs-since-it-may-cl.patch
+0010-Don-t-use-IN_FLOAT-when-calling-fabs-since-it-may-cl.patch
