@@ -6,17 +6,6 @@ Uploaders: Jerome Marant <jerome@debian.org>
 Build-Depends: mailx, libncurses5-dev, texinfo, liblockfile-dev, libgif-dev | libungif4-dev, libtiff4-dev | libtiff-dev, xaw3dg-dev, libpng-dev, libjpeg-dev, autoconf, automake, autotools-dev, dpkg-dev (>> 1.10.0), quilt (>= 0.42-1), debhelper (>= 4), libxaw7-dev, sharutils, imagemagick, libgtk2.0-dev, libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64]
 Standards-Version: 3.7.2
 
-Package: emacs
-Section: editors
-Priority: optional
-Architecture: all
-Depends: @DEB_FLAVOR@ | @DEB_FLAVOR@-gtk | @DEB_FLAVOR@-nox
-Provides: emacsen, editor, info-browser, mail-reader, news-reader
-Description: The GNU Emacs editor (metapackage)
- GNU Emacs is the extensible self-documenting text editor.
- This is a metapackage which will always depend on the latest Emacs
- release.
-
 Package: @DEB_FLAVOR@
 Section: editors
 Priority: optional
