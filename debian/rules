@@ -259,7 +259,7 @@ debian/$(flavor)-lucid.%: pkg_name := $(flavor)-lucid
 debian/$(flavor)-common.%: pkg_name := $(flavor)-common
 debian/$(flavor)-bin-common.%: pkg_name := $(flavor)-bin-common
 
-debian/%: debian/%.in debian/changelog
+debian/%: debian/%.in debian/changelog debian/rules
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-bin-common.%: debian/emacsVER-bin-common.% debian/changelog
