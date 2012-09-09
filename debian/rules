@@ -38,7 +38,7 @@ pf := set -o pipefail
 #  builddir.)
 
 # The official upstream version defined by AC_INIT in configure.in.
-upstream_ver := 24.1
+upstream_ver := 24.2
 
 # This must be the version that's actually used at runtime for things
 # like load-path.  It may not be the same as the upstream version
