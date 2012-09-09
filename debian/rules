@@ -117,7 +117,7 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
 	  >> debian/emacs-common-non-dfsg.README.tmp
 	mv debian/emacs-common-non-dfsg.README.tmp $@
 
-debian/%: debian/%.in debian/changelog
+debian/%: debian/%.in debian/changelog debian/rules
 	$(call deb_sub,$(notdir $<),$(notdir $@))
 
 define gen_makefile
