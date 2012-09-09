@@ -1,4 +1,4 @@
-From 51d87cec5dfd71f5b1c4f74961c914ce246cc0ac Mon Sep 17 00:00:00 2001
+From 06092052fe836bc869aaf148e5951e81e4591da6 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -14,17 +14,17 @@ Status: new
  1 file changed, 1 insertion(+), 22 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index e387631..f440e84 100644
+index dd8cf4b..d680b6c 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -64,7 +64,6 @@ INFO_TARGETS = \
- 	$(infodir)/ert \
- 	$(infodir)/eshell \
- 	$(infodir)/eudc \
--	$(infodir)/efaq \
- 	$(infodir)/flymake \
- 	$(infodir)/forms \
- 	$(infodir)/gnus \
+ 	$(buildinfodir)/ert \
+ 	$(buildinfodir)/eshell \
+ 	$(buildinfodir)/eudc \
+-	$(buildinfodir)/efaq \
+ 	$(buildinfodir)/flymake \
+ 	$(buildinfodir)/forms \
+ 	$(buildinfodir)/gnus \
 @@ -116,7 +115,6 @@ DVI_TARGETS = \
  	ert.dvi \
  	eshell.dvi \
@@ -54,8 +54,8 @@ index e387631..f440e84 100644
  eudc.pdf: ${srcdir}/eudc.texi
  	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
  
--efaq : $(infodir)/efaq
--$(infodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
+-efaq : $(buildinfodir)/efaq
+-$(buildinfodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
 -	$(mkinfodir)
 -	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) faq.texi
 -faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
@@ -72,6 +72,6 @@ index e387631..f440e84 100644
 -emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 -	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
 -
- flymake : $(infodir)/flymake
- $(infodir)/flymake: flymake.texi
+ flymake : $(buildinfodir)/flymake
+ $(buildinfodir)/flymake: flymake.texi
  	$(mkinfodir)
