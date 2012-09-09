@@ -1,10 +1,14 @@
-emacs24-non-dfsg (24.2+1-1~1.gbpaceb4b) UNRELEASED; urgency=low
+emacs24-non-dfsg (24.2+1-1) unstable; urgency=low
 
-  ** SNAPSHOT build @aceb4b4368036a5d9c9c6844da990ff87f2836c5 **
+  * Upgrade to upstream version 24.2 and update debian/patches.
 
-  * UNRELEASED
+  * Have debian/% depend on debian/rules since it now sets the
+    upstream_ver.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Sep 2012 12:55:56 -0500
+  * Update debian/rules upstream_ver to 24.2 and run "debian/rules
+    debian-sync".
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Sep 2012 13:12:36 -0500
 
 emacs24-non-dfsg (24.1+1-1) unstable; urgency=low
 
