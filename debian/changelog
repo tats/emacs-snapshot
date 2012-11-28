@@ -1,3 +1,11 @@
+emacs24 (24.2+1-2~1.gbpe3794e) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @e3794e57e3084522bf5fd6c4bc3ad59a50a4bef8 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 27 Nov 2012 18:06:29 -0600
+
 emacs24 (24.2+1-1) unstable; urgency=high
 
   * Upgrade to upstream version 24.2 and update debian/patches.
