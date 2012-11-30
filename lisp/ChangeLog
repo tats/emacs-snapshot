@@ -508,6 +508,11 @@
 	* files.el (dir-locals-read-from-file): Check file non-empty
 	before reading.  (Bug#13038)
 
+2012-11-30  Toru TSUNEYOSHI  <t_tuneyosi@hotmail.com>
+
+	* textmodes/fill.el (fill-region-as-paragraph): Handle overshoot
+	by move-to-column (Bug#3234).
+
 2012-11-28  Glenn Morris  <rgm@gnu.org>
 
 	* jka-cmpr-hook.el (jka-compr-get-compression-info):
