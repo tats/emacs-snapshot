@@ -24,6 +24,16 @@ Description: GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a Lucid user interface.
 
+Package: @DEB_FLAVOR@-lucid-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: @DEB_FLAVOR@-lucid-dbg (= ${binary:Version}), ${misc:Depends}
+Description: Debugging symbols for @DEB_FLAVOR@-lucid
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains the debugging symbols for the version of Emacs with
+ a Lucid user interface.
+
 Package: @DEB_FLAVOR@-nox
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
@@ -35,6 +45,16 @@ Description: GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
 
+Package: @DEB_FLAVOR@-nox-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: @DEB_FLAVOR@-nox-dbg (= ${binary:Version}), ${misc:Depends}
+Description: Debugging symbols for @DEB_FLAVOR@-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains the debugging symbols for a version of Emacs
+ compiled without support for X.
+
 Package: @DEB_FLAVOR@
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
@@ -45,6 +65,16 @@ Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
 Description: GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK+ user interface.
+
+Package: @DEB_FLAVOR@-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: @DEB_FLAVOR@-dbg (= ${binary:Version}), ${misc:Depends}
+Description: Debugging symbols for @DEB_FLAVOR@
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains the debugging symbols for a version of Emacs with a
+ GTK+ user interface.
 
 Package: @DEB_FLAVOR@-bin-common
 Architecture: any

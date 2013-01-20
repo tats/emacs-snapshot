@@ -599,6 +599,13 @@ override_dh_auto_install: $(autogen_install_files)
 	rm -rf $(install_dir_nox)
 	rm -rf $(install_dir_lucid)
 
+.PHONY: override_dh_strip
+override_dh_strip:
+	dh_strip -p$(flavor) --dbg-package=$(flavor)-dbg
+	dh_strip -p$(flavor)-lucid --dbg-package=$(flavor)-lucid-dbg
+	dh_strip -p$(flavor)-nox --dbg-package=$(flavor)-nox-dbg
+	dh_strip
+
 override_dh_testdir:
 	$(testdir)
 
