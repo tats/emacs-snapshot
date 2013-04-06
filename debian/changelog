@@ -1,3 +1,11 @@
+emacs24 (24.3+1-1~1.gbpdf31ac) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @df31ac9113fd22a2df0fd97f20eb0c1b8b21410a **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@trouble.defaultvalue.org>  Sat, 06 Apr 2013 10:07:45 -0500
+
 emacs24 (24.2+1-2) unstable; urgency=low
 
   * Switch emacs24 from GTK+ 2 to GTK+ 3. (Closes: #679931)
