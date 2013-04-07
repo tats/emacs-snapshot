@@ -1,4 +1,4 @@
-From 75131d9aaf177993a9ee798442e85f4046c1776a Mon Sep 17 00:00:00 2001
+From ddf9e08026a67cd040984ff42dd1597d205b214d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:30 -0500
 Subject: Invoke the correct xmlstarlet executable on Debian systems.
@@ -18,10 +18,10 @@ Bug: 447378
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/progmodes/flymake.el b/lisp/progmodes/flymake.el
-index 07393c6..e249e3b 100644
+index 7ca0ece..c7d697a 100644
 --- a/lisp/progmodes/flymake.el
 +++ b/lisp/progmodes/flymake.el
-@@ -1774,7 +1774,7 @@ Use CREATE-TEMP-F for creating temp copy."
+@@ -1829,7 +1829,7 @@ Use CREATE-TEMP-F for creating temp copy."
  
  ;;;; xml-specific init-cleanup routines
  (defun flymake-xml-init ()

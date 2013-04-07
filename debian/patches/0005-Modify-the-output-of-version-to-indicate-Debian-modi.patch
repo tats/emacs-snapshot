@@ -1,4 +1,4 @@
-From a8263831c854955871e4dc155989175470e1919b Mon Sep 17 00:00:00 2001
+From ac816724bc650c3ee163a9ce64e3116780977b2d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:28 -0500
 Subject: Modify the output of (version) to indicate Debian modifications.
@@ -12,10 +12,10 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index bd30f0f..7de3f1b 100644
+index 5db45da..602d33e 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
-@@ -51,8 +51,8 @@ to the system configuration; look at `system-configuration' instead."
+@@ -56,8 +56,8 @@ to the system configuration; look at `system-configuration' instead."
    (interactive "P")
    (let ((version-string
           (format (if (not (called-interactively-p 'interactive))

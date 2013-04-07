@@ -5,6 +5,3 @@
 0005-Modify-the-output-of-version-to-indicate-Debian-modi.patch
 0006-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
 0007-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
-0008-Fix-startup-hang-on-Debian-GNU-kFreeBSD.patch
-0009-Restore-doc-emacs-emacsver.texi.patch
-0010-Don-t-use-IN_FLOAT-when-calling-fabs-since-it-may-cl.patch

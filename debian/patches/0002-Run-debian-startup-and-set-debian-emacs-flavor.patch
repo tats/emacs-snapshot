@@ -1,4 +1,4 @@
-From 00f1169fb8a41d1f5cd6d2bc41f692c9ceb63a4b Mon Sep 17 00:00:00 2001
+From f5b94d0cc1084a2f47c67c851b2ca7a24ff0e5b6 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor.
@@ -15,10 +15,10 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 5c90595..2edfae8 100644
+index aaba900..a4e985d 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -412,6 +412,10 @@ The second subexpression is the version string.
+@@ -420,6 +420,10 @@ The second subexpression is the version string.
  The regexp should not contain a starting \"\\`\" or a trailing
   \"\\'\"; those are added automatically by callers.")
  
@@ -29,7 +29,7 @@ index 5c90595..2edfae8 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -987,8 +991,21 @@ Amongst another things, it parses the command-line arguments."
+@@ -981,8 +985,21 @@ Amongst another things, it parses the command-line arguments."
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.

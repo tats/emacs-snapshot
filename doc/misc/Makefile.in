@@ -1,6 +1,6 @@
 #### Makefile for documentation other than the Emacs manual.
 
-# Copyright (C) 1994, 1996-2012 Free Software Foundation, Inc.
+# Copyright (C) 1994, 1996-2013 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -24,34 +24,30 @@ SHELL = /bin/sh
 # set by the configure script's `--srcdir' option.
 srcdir=@srcdir@
 
-# Tell make where to find source files; this is needed for the makefiles.
-# Note the other doc Makefiles do not use VPATH anymore, instead
-# they set buildinfodir to an absolute path.  Not doing that here in
-# case INFO_TARGETS gets too long for some feeble shells.
-# (cf src/Makefile.in's passing of $lisp to make-docfile)
-VPATH=@srcdir@
-
 ## Where the output files go.
-## Note that the setfilename command in the .texi files assumes this.
-buildinfodir=../../info
+buildinfodir = $(srcdir)/../../info
 ## Directory with emacsver.texi.
 ## Currently only used by efaq and calc.
 emacsdir = $(srcdir)/../emacs
+
+MKDIR_P = @MKDIR_P@
+
+INFO_EXT=@INFO_EXT@
+# Options used only when making info output.
+INFO_OPTS=@INFO_OPTS@
 
 # The makeinfo program is part of the Texinfo distribution.
 # Use --force so that it generates output even if there are errors.
 MAKEINFO = @MAKEINFO@
 MAKEINFO_OPTS = --force -I$(emacsdir)
 
-# Also add new entries to INFO_FILES in the top-level Makefile.in.
-INFO_TARGETS = \
-	$(buildinfodir)/efaq
+# Debian: moved DFSG incompatible files to emacs*-common-non-dfsg
+# pacakge (see /usr/share/doc/emacs*-common/copyright).
+INFO_TARGETS = efaq
 
-DVI_TARGETS = \
-	faq.dvi
+DVI_TARGETS = faq.dvi
 
-PDF_TARGETS = \
-	faq.pdf
+PDF_TARGETS = faq.pdf
 
 HTML_TARGETS = emacs-faq.html
 
@@ -61,11 +57,22 @@ TEXI2PDF = texi2pdf
 ENVADD = TEXINPUTS="$(srcdir):$(emacsdir):$(TEXINPUTS)" \
          MAKEINFO="$(MAKEINFO) $(MAKEINFO_OPTS)"
 
-mkinfodir = @cd ${srcdir}; test -d ${buildinfodir} || mkdir ${buildinfodir} || test -d ${buildinfodir}
+mkinfodir = @${MKDIR_P} ${buildinfodir}
 
-.PHONY: info dvi pdf
+gfdl = ${srcdir}/doclicense.texi
 
+.PHONY: info dvi pdf echo-info
+## Prevent implicit rule triggering for foo.info.
+.SUFFIXES:
+
+# Default.
 info: $(INFO_TARGETS)
+
+## Used by top-level Makefile.
+## Base file names of output info files.
+echo-info:
+	@echo "$(INFO_TARGETS) " | \
+	  sed -e 's|[^ ]*/||g' -e 's/\.info//g' -e "s/  */$(INFO_EXT) /g"
 
 # please modify this for all the web manual targets
 webhack: clean
@@ -75,18 +82,17 @@ dvi: $(DVI_TARGETS)
 
 pdf: $(PDF_TARGETS)
 
-# Note that all the Info targets build the Info files
-# in srcdir.  There is no provision for Info files
-# to exist in the build directory.
+# Note that all the Info targets build the Info files in srcdir.
+# There is no provision for Info files to exist in the build directory.
 # In a distribution of Emacs, the Info files should be up to date.
 
 # Note: "<" is not portable in ordinary make rules.
 
-## "short" target names for convenience, to just rebuild one manual.
-efaq : $(buildinfodir)/efaq
-$(buildinfodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
+## No gfdl dependency.
+efaq : $(buildinfodir)/efaq$(INFO_EXT)
+$(buildinfodir)/efaq$(INFO_EXT): ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 	$(mkinfodir)
-	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) faq.texi
+	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/faq.texi
 faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
 faq.pdf: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
@@ -104,8 +110,9 @@ emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
 .PHONY: mostlyclean clean distclean maintainer-clean
 
 mostlyclean:
-	rm -f *.aux *.log *.toc *.cp *.cps *.fn *.fns *.ky *.kys \
-	  *.op *.ops *.pg *.pgs *.tp *.tps *.vr *.vrs
+	rm -f *.aux *.log *.toc *.c[mp] *.c[mp]s *.fn *.fns \
+	  *.ky *.kys *.op *.ops *.p[gj] *.p[gj]s *.sc *.scs *.ss \
+	  *.t[gp] *.t[gp]s *.vr *.vrs
 	rm -f gnustmp.*
 
 clean: mostlyclean
@@ -116,7 +123,8 @@ distclean: clean
 
 ## buildinfodir is relative to srcdir.
 maintainer-clean: distclean
-	cd $(srcdir); for file in $(INFO_TARGETS); do \
+	cd $(buildinfodir); for file in $(INFO_TARGETS); do \
+	  file=`echo $${file} | sed 's/\.info$$//'`${INFO_EXT}; \
 	  rm -f $${file} $${file}-[1-9] $${file}-[1-9][0-9]; \
 	done
 
