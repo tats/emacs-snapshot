@@ -125,8 +125,7 @@ target := $(DEB_HOST_GNU_TYPE)
 movemail_bin := usr/lib/emacs/$(runtime_ver)/$(target)/movemail
 
 # Info files that are going to show up in the main dir.
-main_dir_info_files := \
-  efaq
+main_dir_info_files := efaq.info
 
 # Files that the build stage depends on (may also be listed in other vars).
 persistent_autogen_build_files := debian/control debian/copyright
@@ -436,14 +435,8 @@ override_dh_auto_install: $(autogen_install_files)
 	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
 	    && convert hicolor/32x32/apps/emacs.{png,xpm}
 
-	  # Fixup image files in unversioned directories (remove old
-	  # images, version unversioned images) and prepare for
-	  # update-alternatives.
-	  rm $(pkgdir_common)/usr/share/icons/hicolor/16x16/apps/emacs22.png
-	  rm $(pkgdir_common)/usr/share/icons/hicolor/24x24/apps/emacs22.png
-	  rm $(pkgdir_common)/usr/share/icons/hicolor/32x32/apps/emacs22.png
-	  rm $(pkgdir_common)/usr/share/icons/hicolor/48x48/apps/emacs22.png
-
+	  # Fixup image files in unversioned directories (version
+	  # unversioned images) and prepare for update-alternatives.
 	  cd $(pkgdir_common)/usr/share/icons/hicolor \
 	    && mv scalable/apps/emacs.svg scalable/apps/${flavor}.svg \
 	    && mv 16x16/apps/emacs.png 16x16/apps/${flavor}.png \
