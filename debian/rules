@@ -38,7 +38,10 @@ pf := set -o pipefail
 #  builddir.)
 
 # The official upstream version defined by AC_INIT in configure.in.
-upstream_ver := 24.2
+upstream_ver := $(shell debian/upstream-version)
+ifeq (,$(upstream_ver))
+  $(error 'Unable to find upstream version number.')
+endif
 
 # This must be the version that's actually used at runtime for things
 # like load-path.  It may not be the same as the upstream version
