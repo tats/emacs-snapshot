@@ -28,7 +28,7 @@ quilt := QUILT_PATCHES=debian/patches quilt
 # the values below will have to be set manually.
 
 # The official upstream version defined by AC_INIT in configure.in.
-upstream_ver := 24.2
+upstream_ver := 24.3
 
 # This must be the version that's actually used at runtime for things
 # like load-path.  Historically, it's only differed from upstream_ver
