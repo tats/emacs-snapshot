@@ -1,3 +1,11 @@
+emacs24-non-dfsg (24.3+1-1~1.gbp20228b) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @20228bf64c2e8dafdac6af2bd4b5f8f8365b5a6c **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@trouble.defaultvalue.org>  Tue, 09 Apr 2013 19:45:43 -0500
+
 emacs24-non-dfsg (24.2+1-1) unstable; urgency=low
 
   * Upgrade to upstream version 24.2 and update debian/patches.
