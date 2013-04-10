@@ -1,4 +1,4 @@
-From 06092052fe836bc869aaf148e5951e81e4591da6 Mon Sep 17 00:00:00 2001
+From 3e90823b842631b17930f5c6b690c17bc1e47bb0 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -10,22 +10,23 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- doc/misc/Makefile.in |   23 +----------------------
- 1 file changed, 1 insertion(+), 22 deletions(-)
+ doc/misc/Makefile.in |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index dd8cf4b..d680b6c 100644
+index dfe633c..c936a23 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -64,7 +64,6 @@ INFO_TARGETS = \
- 	$(buildinfodir)/ert \
- 	$(buildinfodir)/eshell \
- 	$(buildinfodir)/eudc \
--	$(buildinfodir)/efaq \
- 	$(buildinfodir)/flymake \
- 	$(buildinfodir)/forms \
- 	$(buildinfodir)/gnus \
-@@ -116,7 +115,6 @@ DVI_TARGETS = \
+@@ -43,7 +43,7 @@ MAKEINFO_OPTS = --force -I$(emacsdir)
+ 
+ INFO_TARGETS = ada-mode auth autotype bovine calc ccmode cl \
+ 	dbus dired-x ebrowse ede ediff edt eieio \
+-	emacs-mime epa erc ert eshell eudc efaq \
++	emacs-mime epa erc ert eshell eudc \
+ 	flymake forms gnus emacs-gnutls htmlfontify idlwave info.info \
+ 	mairix-el message mh-e newsticker nxml-mode \
+ 	org pcl-cvs pgg rcirc remember reftex sasl \
+@@ -71,7 +71,6 @@ DVI_TARGETS = \
  	ert.dvi \
  	eshell.dvi \
  	eudc.dvi \
@@ -33,7 +34,7 @@ index dd8cf4b..d680b6c 100644
  	flymake.dvi \
  	forms.dvi \
  	gnus.dvi \
-@@ -168,7 +166,6 @@ PDF_TARGETS = \
+@@ -127,7 +126,6 @@ PDF_TARGETS = \
  	ert.pdf \
  	eshell.pdf \
  	eudc.pdf \
@@ -41,8 +42,8 @@ index dd8cf4b..d680b6c 100644
  	flymake.pdf \
  	forms.pdf \
  	gnus.pdf \
-@@ -200,7 +197,7 @@ PDF_TARGETS = \
- 	widget.pdf \
+@@ -162,7 +160,7 @@ PDF_TARGETS = \
+ 	wisent.pdf \
  	woman.pdf
  
 -HTML_TARGETS = emacs-faq.html
@@ -50,28 +51,3 @@ index dd8cf4b..d680b6c 100644
  
  TEXI2DVI = texi2dvi
  TEXI2PDF = texi2pdf
-@@ -410,24 +407,6 @@ eudc.dvi: ${srcdir}/eudc.texi
- eudc.pdf: ${srcdir}/eudc.texi
- 	$(ENVADD) $(TEXI2PDF) ${srcdir}/eudc.texi
- 
--efaq : $(buildinfodir)/efaq
--$(buildinfodir)/efaq: faq.texi $(emacsdir)/emacsver.texi
--	$(mkinfodir)
--	cd $(srcdir); $(MAKEINFO) $(MAKEINFO_OPTS) faq.texi
--faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
--faq.pdf: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
--	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
--## This is the name used on the Emacs web-page.
--## sed fixes up links to point to split version of the manual.
--emacs-faq.html: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
--	$(MAKEINFO) $(MAKEINFO_OPTS) --no-split \
--	  --css-ref='/layout.css' --html -o $@ ${srcdir}/faq.texi
--	sed -i -e 's|a href="\([a-z]*\)\.html#\([^"]*\)"|a href="manual/html_node/\1/\2.html"|g' \
--	  -e 's|/Top\.html|/|g' $@
--emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
--	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
--
- flymake : $(buildinfodir)/flymake
- $(buildinfodir)/flymake: flymake.texi
- 	$(mkinfodir)
