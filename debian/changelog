@@ -1,10 +1,24 @@
-emacs24 (24.3+1-1~1.gbpdf31ac) UNRELEASED; urgency=low
+emacs24 (24.3+1-1) unstable; urgency=low
 
-  ** SNAPSHOT build @df31ac9113fd22a2df0fd97f20eb0c1b8b21410a **
+  * Upgrade to upstream version 24.3 and update debian/copyright,
+    debian/patches, debian/rules, etc.
 
-  * UNRELEASED
+  * Remove patches that appear to have been incorporated upstream:
+      0008-Fix-startup-hang-on-Debian-GNU-kFreeBSD.patch
+      0009-Restore-doc-emacs-emacsver.texi.patch
+      0010-Don-t-use-IN_FLOAT-when-calling-fabs-since-it-may-cl.patch
 
- -- Rob Browning <rlb@trouble.defaultvalue.org>  Sat, 06 Apr 2013 10:07:45 -0500
+  * 0001-Prefer-usr-share-info-emacs-24-over-usr-share-info.patch:
+    remove lisp/site-init.el in favor of a modification to
+    lisp/info.el to directly prepend /usr/share/info/emacs-%d to
+    Info-default-directory-list (setting it directly in site-lisp.el
+    no longer worked, and was more complicated).
+
+  * Automatically compute upstream version in debian/rules.
+
+  * Mention the etc/publicsuffix.txt license in debian/copyright.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 13 Apr 2013 11:11:16 -0500
 
 emacs24 (24.2+1-2) unstable; urgency=low
 
