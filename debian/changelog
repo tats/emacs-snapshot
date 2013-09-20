@@ -1,3 +1,11 @@
+emacs24 (24.3+1-2~1.gbp3011ae) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @3011ae69e609d6250ac253280d8f0c8cd5090e82 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@trouble.defaultvalue.org>  Fri, 20 Sep 2013 16:17:26 -0500
+
 emacs24 (24.3+1-1) unstable; urgency=low
 
   * Upgrade to upstream version 24.3 and update debian/copyright,
