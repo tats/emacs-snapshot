@@ -342,13 +342,13 @@ define cfg_tree
   rm -rf $(1)
   mkdir $(1)
   cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') "$(1)"
-  cd $(1) && CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" ./configure $(confflags) $(2)
+  cd $(1) && CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" ./configure $(confflags) $(2)
 endef
 
 define build_cmd
-  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)"
+  $(MAKE) -C $(1) -j $(joblimit)
   # If we don't use bootstrap, we need to explicitly build info.
-  $(MAKE) -C $(1) -j $(joblimit) CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" info
+  $(MAKE) -C $(1) -j $(joblimit) info
   # Make sure we chose liblockfile.
   ldd $(1)/lib-src/movemail | grep liblockfile
 endef
