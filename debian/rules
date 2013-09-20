@@ -631,6 +631,6 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/install-x \
 	  lib/Makefile.in \
 	  src/config.in \
-	  src/stamp-h1
+	  src/stamp-h1 src/stamp-h.in
 	rm -f $(nonpersistent_autogen_files)
 	dh_clean
