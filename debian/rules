@@ -583,6 +583,7 @@ override_dh_auto_install: $(autogen_install_files)
         ##################################################
         # emacsXY-el
         ifneq (,$(findstring $(flavor)-el, $(shell dh_listpackages)))
+	  install -d $(pkgdir_el)
 	  $(pf); \
 	  (cd $(install_dir_x) && find -name "*.el" -o -name "*.el.gz" -print0 \
 	   | tar cpf - --null --files-from -) \
