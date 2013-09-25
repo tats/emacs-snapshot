@@ -735,7 +735,7 @@ install: debian/stamp/build $(autogen_install_files)
 
         ##################################################
         # emacsXY-el
-
+	install -d $(pkgdir_el)
 	$(pf); \
 	(cd $(install_dir_x) && find -name "*.el" -o -name "*.el.gz" -print0 \
 	 | tar cpf - --null --files-from -) \
