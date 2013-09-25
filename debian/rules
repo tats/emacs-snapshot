@@ -330,6 +330,7 @@ confflags_x += --with-toolkit-scroll-bars
 confflags_nox := $(confflags) 
 confflags_nox += --with-x=no
 confflags_nox += --without-gconf
+confflags_nox += --without-gsettings
 
 # lucid configure flags
 confflags_lucid := $(confflags)
@@ -337,6 +338,7 @@ confflags_lucid += --with-x=yes
 confflags_lucid += --with-x-toolkit=lucid
 confflags_lucid += --with-toolkit-scroll-bars
 confflags_lucid += --without-gconf
+confflags_lucid += --without-gsettings
 
 define cfg_tree
   rm -rf $(1)
