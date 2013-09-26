@@ -1,10 +1,33 @@
-emacs24 (24.3+1-2~1.gbp3011ae) UNRELEASED; urgency=low
+emacs24 (24.3+1-2) unstable; urgency=low
 
-  ** SNAPSHOT build @3011ae69e609d6250ac253280d8f0c8cd5090e82 **
+  * Set CFLAGS, CPPFLAGS, and LDFLAGS solely via configure in debian/rules.
+    Don't override the CFLAGS, CPPFLAGS, and LDFLAGS values chosen by the
+    upstream configure script; instead, make any adjustments at configure
+    time.  Our quashing of "-Wl,-znocombreloc" during the make invocation
+    was causing i386 builds of emacs24-lucid to fail under X.
+    Thanks to Łukasz Pankowski <lukpank@o2.pl> for the report, and Samuel
+    Bronson <naesten@gmail.com> for the patch. (Closes: 684788)
 
-  * UNRELEASED
+  * debian/rules: clean src/stamp-h.in.
+    Thanks to Samuel Bronson <naesten@gmail.com> for the patch.
 
- -- Rob Browning <rlb@trouble.defaultvalue.org>  Fri, 20 Sep 2013 16:17:26 -0500
+  * Explicitly create $(pkgdir_el) in debian/rules (fix FTBS).
+    Thanks to Lucas Nussbaum <lucas@lucas-nussbaum.net> for the report,
+    Matt Kraai <kraai@ftbfs.org> for the patch, and Dmitrijs Ledkovs
+    <xnox@debian.org> for the 24.3+1-1.1 NMU. (Closes: 707488)
+
+  * Specify --without-gsettings for emacsFLAVOR-nox and emacsFLAVOR-lucid.
+    Thanks to Yuri D'Elia <wavexx@thregr.org> for the report.
+    (Closes: 687299, 687303)
+
+  * Fix hang at startup on kFreeBSD.
+    Add debian/patches/0008-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
+    and debian/patches/0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
+    to incorporate the two relevant upstream patches.
+    Thanks to Christoph Egger <christoph@debian.org> for the report.
+    (Closes: 712974)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 26 Sep 2013 17:42:00 -0500
 
 emacs24 (24.3+1-1) unstable; urgency=low
 
