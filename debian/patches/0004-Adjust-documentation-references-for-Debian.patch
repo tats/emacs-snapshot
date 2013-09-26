@@ -8,7 +8,7 @@ Various documentation references have been adjusted for Debian.
 References to /usr/local/... have been changed to /usr/... as
 appropriate, etc.
 ---
- etc/NEWS |    5 +++++
+ etc/NEWS | 5 +++++
  1 file changed, 5 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS

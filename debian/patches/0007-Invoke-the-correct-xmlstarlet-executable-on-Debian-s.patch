@@ -14,7 +14,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: Debian specific
 Bug: 447378
 ---
- lisp/progmodes/flymake.el |    2 +-
+ lisp/progmodes/flymake.el | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/progmodes/flymake.el b/lisp/progmodes/flymake.el

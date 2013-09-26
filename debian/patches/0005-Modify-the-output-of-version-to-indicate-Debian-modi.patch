@@ -8,7 +8,7 @@ The output of (version) has been modified to indicate Debian modifications.
 Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 ---
- lisp/version.el |    4 ++--
+ lisp/version.el | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/version.el b/lisp/version.el

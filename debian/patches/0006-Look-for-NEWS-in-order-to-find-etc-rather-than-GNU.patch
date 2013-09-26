@@ -15,7 +15,7 @@ Date: Mon, 28 Apr 2008 11:20:23 +0200
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: Debian specific
 ---
- src/callproc.c |    4 ++--
+ src/callproc.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/callproc.c b/src/callproc.c

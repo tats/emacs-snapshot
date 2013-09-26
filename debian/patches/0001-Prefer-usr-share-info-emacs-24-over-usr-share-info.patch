@@ -9,7 +9,7 @@ The value of Info-default-directory-list has been augmented via
 lisp/info.el to include /usr/share/info/emacs-MAJORVERSION before
 /usr/share/info.
 ---
- lisp/info.el |    3 ++-
+ lisp/info.el | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/info.el b/lisp/info.el

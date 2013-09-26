@@ -22,10 +22,10 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- Makefile.in          |   22 +-
- configure.ac         |    6 +-
- doc/misc/Makefile.in |  615 +-------------------------------------------------
- lisp/help.el         |   10 +-
+ Makefile.in          |  22 +-
+ configure.ac         |   6 +-
+ doc/misc/Makefile.in | 615 +--------------------------------------------------
+ lisp/help.el         |  10 +-
  4 files changed, 22 insertions(+), 631 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
