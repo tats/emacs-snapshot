@@ -1838,12 +1838,12 @@ hack_wm_protocols (FRAME_PTR f, Widget widget)
 #ifdef HAVE_X_I18N
 
 static XFontSet xic_create_xfontset (struct frame *);
-static XIMStyle best_xim_style (XIMStyles *, XIMStyles *);
+static XIMStyle best_xim_style (XIMStyles *);
 
 
 /* Supported XIM styles, ordered by preference.  */
 
-static XIMStyle supported_xim_styles[] =
+static const XIMStyle supported_xim_styles[] =
 {
   XIMPreeditPosition | XIMStatusArea,
   XIMPreeditPosition | XIMStatusNothing,
@@ -2141,14 +2141,16 @@ xic_free_xfontset (struct frame *f)
    input method XIM.  */
 
 static XIMStyle
-best_xim_style (XIMStyles *user, XIMStyles *xim)
+best_xim_style (XIMStyles *xim)
 {
   int i, j;
+  int nr_supported =
+    sizeof (supported_xim_styles) / sizeof (supported_xim_styles[0]);
 
-  for (i = 0; i < user->count_styles; ++i)
+  for (i = 0; i < nr_supported; ++i)
     for (j = 0; j < xim->count_styles; ++j)
-      if (user->supported_styles[i] == xim->supported_styles[j])
-	return user->supported_styles[i];
+      if (supported_xim_styles[i] == xim->supported_styles[j])
+	return supported_xim_styles[i];
 
   /* Return the default style.  */
   return XIMPreeditNothing | XIMStatusNothing;
@@ -2166,7 +2168,6 @@ create_frame_xic (struct frame *f)
   XVaNestedList preedit_attr = NULL;
   XRectangle s_area;
   XPoint spot;
-  XIMStyles supported_list;
   XIMStyle xic_style;
 
   if (FRAME_XIC (f))
@@ -2177,10 +2178,7 @@ create_frame_xic (struct frame *f)
     goto out;
 
   /* Determine XIC style.  */
-  supported_list.count_styles = (sizeof supported_xim_styles
-                                 / sizeof supported_xim_styles[0]);
-  supported_list.supported_styles = supported_xim_styles;
-  xic_style = best_xim_style (&supported_list, FRAME_X_XIM_STYLES (f));
+  xic_style = best_xim_style (FRAME_X_XIM_STYLES (f));
 
   /* Create X fontset. */
   if (xic_style & (XIMPreeditPosition | XIMStatusArea))
