@@ -1,3 +1,8 @@
+2014-03-23  Daniel Colascione  <dancol@dancol.org>
+
+	* xfns.c (create_frame_xic): If XCreateIC fails, try again without
+	XNStatusAttributes; works around flaky XIM modules, apparently.
+
 2013-08-21  Paul Eggert  <eggert@cs.ucla.edu>
 
 	* process.c (allocate_pty) [PTY_OPEN]: Set fd's FD_CLOEXEC flag.
