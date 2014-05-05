@@ -7,3 +7,4 @@
 0007-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
 0008-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
 0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
+0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch

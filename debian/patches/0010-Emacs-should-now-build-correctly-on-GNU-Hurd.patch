@@ -1,0 +1,69 @@
+From 528d95ed8059eff519fc4f1826109dafdff2e9b0 Mon Sep 17 00:00:00 2001
+From: Paul Eggert <eggert@cs.ucla.edu>
+Date: Tue, 12 Mar 2013 22:04:46 -0700
+Subject: Emacs should now build correctly on GNU/Hurd.
+
+Applied upstream patch:
+
+  * sysdep.c: Remove a use of BSD_SYSTEM, which I'm trying to phase out.
+
+  Include <sys/param.h> unconditionally, as that works elsewhere and
+  is simpler here.  Include <sys/sysctl.h> if DARWIN_OS ||
+  __FreeBSD__, not if BSD_SYSTEM, since it's needed only for Darwin
+  and FreeBSD now.
+
+Origin: upstream, commit: 112030, f83f57c2e20531ff3442904bc450607db19e999c
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Provided-By: Paul Eggert  <eggert@cs.ucla.edu>
+Bug: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=725099
+---
+ src/ChangeLog | 8 ++++++++
+ src/sysdep.c  | 7 +++----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/src/ChangeLog b/src/ChangeLog
+index 921d411..01acb02 100644
+--- a/src/ChangeLog
++++ b/src/ChangeLog
+@@ -4,6 +4,14 @@
+ 	We can't portably rely on PTY_OPEN doing that, even if
+ 	it calls posix_openpt with O_CLOEXEC.
+ 
++2013-03-13  Paul Eggert  <eggert@cs.ucla.edu>
++
++	* sysdep.c: Remove a use of BSD_SYSTEM, which I'm trying to phase out.
++	Include <sys/param.h> unconditionally, as that works elsewhere and
++	is simpler here.  Include <sys/sysctl.h> if DARWIN_OS ||
++	__FreeBSD__, not if BSD_SYSTEM, since it's needed only for Darwin
++	and FreeBSD now.
++
+ 2013-03-11  Glenn Morris  <rgm@gnu.org>
+ 
+ 	* Version 24.3 released.
+diff --git a/src/sysdep.c b/src/sysdep.c
+index 19c5686..f62b6f0 100644
+--- a/src/sysdep.c
++++ b/src/sysdep.c
+@@ -40,9 +40,8 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ #include "sysselect.h"
+ #include "blockinput.h"
+ 
+-#ifdef BSD_SYSTEM
+-#include <sys/param.h>
+-#include <sys/sysctl.h>
++#if defined DARWIN_OS || defined __FreeBSD__
++# include <sys/sysctl.h>
+ #endif
+ 
+ #ifdef __FreeBSD__
+@@ -71,9 +70,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ 
+ #ifdef MSDOS	/* Demacs 1.1.2 91/10/20 Manabu Higashida, MW Aug 1993 */
+ #include "msdos.h"
+-#include <sys/param.h>
+ #endif
+ 
++#include <sys/param.h>
+ #include <sys/file.h>
+ #include <fcntl.h>
+ 
