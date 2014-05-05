@@ -20,9 +20,16 @@ Provides: emacs24, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs24-common-non-dfsg
 Conflicts: emacs24, emacs24-nox
 Replaces: emacs24, emacs24-nox
-Description: GNU Emacs editor
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a Lucid user interface.
+Description: GNU Emacs editor (with Lucid GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs with support for a graphical user
+ interface based on the Lucid toolkit (instead of the GTK+ interface
+ provided by the emacs24 package).  Until some known GTK+
+ problems are fixed, this version may help avoid crashing Emacs during
+ an emacsclient disconnect.  See
+ https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=567934 and
+ https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
+ information.
 
 Package: emacs24-lucid-dbg
 Section: debug
@@ -31,8 +38,8 @@ Architecture: any
 Depends: emacs24-lucid-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs24-lucid
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the version of Emacs with
- a Lucid user interface.
+ package contains the debugging symbols for the emacs24-lucid
+ package.
 
 Package: emacs24-nox
 Architecture: any
@@ -41,9 +48,10 @@ Provides: emacs24, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs24-common-non-dfsg
 Conflicts: emacs24, emacs24-lucid
 Replaces: emacs24, emacs24-lucid
-Description: GNU Emacs editor (without X support)
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs compiled without support for X.
+Description: GNU Emacs editor (without GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs compiled without support for X,
+ and provides only a text terminal interface.
 
 Package: emacs24-nox-dbg
 Section: debug
@@ -52,8 +60,8 @@ Architecture: any
 Depends: emacs24-nox-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs24-nox
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for a version of Emacs
- compiled without support for X.
+ package contains the debugging symbols for the emacs24-nox
+ package.
 
 Package: emacs24
 Architecture: any
@@ -62,9 +70,11 @@ Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs24-common-non-dfsg
 Conflicts: emacs24-lucid, emacs24-nox
 Replaces: emacs24-lucid, emacs24-nox
-Description: GNU Emacs editor (with GTK+ user interface)
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a GTK+ user interface.
+Description: GNU Emacs editor (with GTK+ GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs with a graphical user interface
+ based on GTK+ (instead of the Lucid toolkit provided by the
+ emacs24-lucid package).
 
 Package: emacs24-dbg
 Section: debug
@@ -73,8 +83,7 @@ Architecture: any
 Depends: emacs24-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs24
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for a version of Emacs with a
- GTK+ user interface.
+ package contains the debugging symbols for the emacs24 package.
 
 Package: emacs24-bin-common
 Architecture: any

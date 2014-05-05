@@ -20,9 +20,16 @@ Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
-Description: GNU Emacs editor
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a Lucid user interface.
+Description: GNU Emacs editor (with Lucid GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs with support for a graphical user
+ interface based on the Lucid toolkit (instead of the GTK+ interface
+ provided by the @DEB_FLAVOR@ package).  Until some known GTK+
+ problems are fixed, this version may help avoid crashing Emacs during
+ an emacsclient disconnect.  See
+ https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=567934 and
+ https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
+ information.
 
 Package: @DEB_FLAVOR@-lucid-dbg
 Section: debug
@@ -31,8 +38,8 @@ Architecture: any
 Depends: @DEB_FLAVOR@-lucid-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for @DEB_FLAVOR@-lucid
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the version of Emacs with
- a Lucid user interface.
+ package contains the debugging symbols for the @DEB_FLAVOR@-lucid
+ package.
 
 Package: @DEB_FLAVOR@-nox
 Architecture: any
@@ -41,9 +48,10 @@ Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
-Description: GNU Emacs editor (without X support)
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs compiled without support for X.
+Description: GNU Emacs editor (without GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs compiled without support for X,
+ and provides only a text terminal interface.
 
 Package: @DEB_FLAVOR@-nox-dbg
 Section: debug
@@ -52,8 +60,8 @@ Architecture: any
 Depends: @DEB_FLAVOR@-nox-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for @DEB_FLAVOR@-nox
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for a version of Emacs
- compiled without support for X.
+ package contains the debugging symbols for the @DEB_FLAVOR@-nox
+ package.
 
 Package: @DEB_FLAVOR@
 Architecture: any
@@ -62,9 +70,11 @@ Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
 Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
-Description: GNU Emacs editor (with GTK+ user interface)
- GNU Emacs is the extensible self-documenting text editor.
- This package contains a version of Emacs with a GTK+ user interface.
+Description: GNU Emacs editor (with GTK+ GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs with a graphical user interface
+ based on GTK+ (instead of the Lucid toolkit provided by the
+ @DEB_FLAVOR@-lucid package).
 
 Package: @DEB_FLAVOR@-dbg
 Section: debug
@@ -73,8 +83,7 @@ Architecture: any
 Depends: @DEB_FLAVOR@-dbg (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for @DEB_FLAVOR@
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for a version of Emacs with a
- GTK+ user interface.
+ package contains the debugging symbols for the @DEB_FLAVOR@ package.
 
 Package: @DEB_FLAVOR@-bin-common
 Architecture: any
