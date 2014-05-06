@@ -3,7 +3,7 @@ Section: editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
 Build-Depends: bsd-mailx | mailx, libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev,
- libgif-dev | libungif4-dev, libtiff4-dev | libtiff-dev, xaw3dg-dev,
+ libgif-dev | libungif4-dev, libtiff-dev | libtiff-dev, xaw3dg-dev,
  libpng-dev, libjpeg-dev, libm17n-dev, libotf-dev,
  libgpm-dev [linux-any], libdbus-1-dev,
  autoconf, automake, autotools-dev, dpkg-dev (>> 1.10.0), quilt (>= 0.42),
