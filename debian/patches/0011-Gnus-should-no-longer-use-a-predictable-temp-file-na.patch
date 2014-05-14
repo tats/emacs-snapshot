@@ -1,0 +1,62 @@
+From 8bdda92a3650f53fa84087d70507a78458e6b163 Mon Sep 17 00:00:00 2001
+From: Glenn Morris <rgm@gnu.org>
+Date: Mon, 5 May 2014 20:50:51 -0700
+Subject: Gnus should no longer use a predictable temp-file name
+ (CVE-2014-3421)
+
+Applied upstream patch to fix
+https://security-tracker.debian.org/tracker/CVE-2014-3421
+
+  * gnus-fun.el (gnus-grab-cam-face): Do not use predictable temp-file name.
+
+Origin: upstream, commit: r117066, 0ec1e3c1301a0301ec0d4f5d0e7cd9ec1314d361
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Bug: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=748140
+---
+ lisp/gnus/ChangeLog   | 5 +++++
+ lisp/gnus/gnus-fun.el | 9 +++++----
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/lisp/gnus/ChangeLog b/lisp/gnus/ChangeLog
+index 07ef0e5..b88c8cc 100644
+--- a/lisp/gnus/ChangeLog
++++ b/lisp/gnus/ChangeLog
+@@ -1,3 +1,8 @@
++2014-05-06  Glenn Morris  <rgm@gnu.org>
++
++	* gnus-fun.el (gnus-grab-cam-face):
++	Do not use predictable temp-file name.  (http://bugs.debian.org/747100)
++
+ 2013-03-11  Glenn Morris  <rgm@gnu.org>
+ 
+ 	* Version 24.3 released.
+diff --git a/lisp/gnus/gnus-fun.el b/lisp/gnus/gnus-fun.el
+index 1c9b4ce..ecb714b 100644
+--- a/lisp/gnus/gnus-fun.el
++++ b/lisp/gnus/gnus-fun.el
+@@ -250,20 +250,21 @@ colors of the displayed X-Faces."
+   (interactive)
+   (shell-command "xawtv-remote snap ppm")
+   (let ((file nil)
++	(tempfile (make-temp-file "gnus-face-" nil ".ppm"))
+ 	result)
+     (while (null (setq file (directory-files "/tftpboot/sparky/tmp"
+ 					     t "snap.*ppm")))
+       (sleep-for 1))
+     (setq file (car file))
+     (shell-command
+-     (format "pnmcut -left 110 -top 30 -width 144 -height 144 '%s' | pnmscale -width 48 -height 48 | ppmtopgm > /tmp/gnus.face.ppm"
+-	     file))
++     (format "pnmcut -left 110 -top 30 -width 144 -height 144 '%s' | pnmscale -width 48 -height 48 | ppmtopgm >> %s"
++	     file tempfile))
+     (let ((gnus-convert-image-to-face-command
+ 	   (format "cat '%%s' | ppmquant %%d | ppmchange %s | pnmtopng"
+ 		   (gnus-fun-ppm-change-string))))
+-      (setq result (gnus-face-from-file "/tmp/gnus.face.ppm")))
++      (setq result (gnus-face-from-file tempfile)))
+     (delete-file file)
+-    ;;(delete-file "/tmp/gnus.face.ppm")
++    ;;(delete-file tempfile)    ; FIXME why are we not deleting it?!
+     result))
+ 
+ (defun gnus-fun-ppm-change-string ()

@@ -8,3 +8,4 @@
 0008-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
 0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
 0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch
+0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch
