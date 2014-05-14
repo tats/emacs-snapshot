@@ -9,3 +9,4 @@
 0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
 0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch
 0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch
+0012-Security-issues-in-find-gc.el-have-been-fixed-CVE-20.patch
