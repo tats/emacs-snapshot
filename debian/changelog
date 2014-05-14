@@ -1,3 +1,11 @@
+emacs24 (24.3+1-4~1.gbp4884f3) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @4884f370c1ce55a6ce5d0db39b899ce4909c30e3 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 14 May 2014 14:53:50 -0500
+
 emacs24 (24.3+1-3) unstable; urgency=low
 
   * Describe emacs24/emacs24-lucid/emacs24-nox more clearly in
