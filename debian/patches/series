@@ -10,3 +10,4 @@
 0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch
 0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch
 0012-Security-issues-in-find-gc.el-have-been-fixed-CVE-20.patch
+0013-Security-issues-in-tramp-have-been-fixed-CVE-2014-34.patch
