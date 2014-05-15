@@ -1,10 +1,32 @@
-emacs24 (24.3+1-4~1.gbp4884f3) UNRELEASED; urgency=medium
+emacs24 (24.3+1-4) unstable; urgency=medium
 
-  ** SNAPSHOT build @4884f370c1ce55a6ce5d0db39b899ce4909c30e3 **
+  [ Rob Browning ]
+  * Fix insecure temp file in gnus-fun.el (CVE-2014-3421)
+    Add 0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch to
+    incorporate the relevant upstream patch.
+    Partially-fixes: 748140
 
-  * UNRELEASED
+  * Fix insecure temp file in gnus-fun.el (CVE-2014-3421)
+    Add 0012-Security-issues-in-find-gc.el-have-been-fixed-CVE-20.patch to
+    incorporate the relevant upstream patch.
+    Partially-fixes: 748140
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 14 May 2014 14:53:50 -0500
+  * Fix tramp security issues (CVE-2014-3424)
+    Add 0013-Security-issues-in-tramp-have-been-fixed-CVE-2014-34.patch to
+    incorporate the relevant upstream patch.
+    Partially-fixes: 748140
+
+  * Fix browse-url-mosaic security issues (CVE-2014-3423)
+    Add 0014-Insecure-file-handling-in-browse-url-mosaic-has-been.patch to
+    incorporate the relevant upstream patch.
+    Partially-fixes: 748140
+
+  * Given the four fixes above: (Closes: 748140)
+
+  [ Dimitri John Ledkov ]
+  * Build using gnutls28. (Closes: 747448)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 14 May 2014 19:21:11 -0500
 
 emacs24 (24.3+1-3) unstable; urgency=low
 
