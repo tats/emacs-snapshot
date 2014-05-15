@@ -1,0 +1,82 @@
+From 6e82b5fbe2761d479f1fec96fb3d4afee12b9d67 Mon Sep 17 00:00:00 2001
+From: Glenn Morris <rgm@gnu.org>
+Date: Thu, 8 May 2014 14:10:36 -0400
+Subject: Insecure file handling in browse-url-mosaic has been fixed
+ (CVE-2014-3423)
+
+Applied upstream patch to fix
+https://security-tracker.debian.org/tracker/CVE-2014-3423
+
+  * browse-url.el (browse-url-mosaic): Be careful when writing /tmp/Mosaic.PID.
+  This is CVE-2014-3423.
+
+Origin: upstream, commit: r117087, 25147805fa875f23495904785e6df61f9d426c13
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Bug: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=748140
+---
+ lisp/ChangeLog         |  6 ++++++
+ lisp/net/browse-url.el | 32 +++++++++++++++-----------------
+ 2 files changed, 21 insertions(+), 17 deletions(-)
+
+diff --git a/lisp/ChangeLog b/lisp/ChangeLog
+index b5f5d26..01b4a02 100644
+--- a/lisp/ChangeLog
++++ b/lisp/ChangeLog
+@@ -1,3 +1,9 @@
++2014-05-08  Glenn Morris  <rgm@gnu.org>
++
++	* net/browse-url.el (browse-url-mosaic):
++	Be careful when writing /tmp/Mosaic.PID.  (Bug#17428)
++	This is CVE-2014-3423.
++
+ 2014-05-06  Michael Albinus  <michael.albinus@gmx.de>
+ 
+ 	* net/tramp-sh.el (tramp-remote-process-environment): Remove
+diff --git a/lisp/net/browse-url.el b/lisp/net/browse-url.el
+index 19e513a..b8b2fde 100644
+--- a/lisp/net/browse-url.el
++++ b/lisp/net/browse-url.el
+@@ -1328,28 +1328,26 @@ used instead of `browse-url-new-window-flag'."
+   (let ((pidfile (expand-file-name browse-url-mosaic-pidfile))
+ 	pid)
+     (if (file-readable-p pidfile)
+-	(save-excursion
+-	  (find-file pidfile)
+-	  (goto-char (point-min))
+-	  (setq pid (read (current-buffer)))
+-	  (kill-buffer nil)))
+-    (if (and pid (zerop (signal-process pid 0))) ; Mosaic running
+-	(save-excursion
+-	  (find-file (format "/tmp/Mosaic.%d" pid))
+-	  (erase-buffer)
+-	  (insert (if (browse-url-maybe-new-window new-window)
+-		      "newwin\n"
+-		    "goto\n")
+-		  url "\n")
+-	  (save-buffer)
+-	  (kill-buffer nil)
++        (with-temp-buffer
++          (insert-file-contents pidfile)
++	  (setq pid (read (current-buffer)))))
++    (if (and (integerp pid) (zerop (signal-process pid 0))) ; Mosaic running
++        (progn
++          (with-temp-buffer
++            (insert (if (browse-url-maybe-new-window new-window)
++                        "newwin\n"
++                      "goto\n")
++                    url "\n")
++            (if (file-exists-p (setq pidfile (format "/tmp/Mosaic.%d" pid)))
++                (delete-file pidfile))
++            ;; http://debbugs.gnu.org/17428.  Use O_EXCL.
++            (write-region nil nil pidfile nil 'silent nil 'excl))
+ 	  ;; Send signal SIGUSR to Mosaic
+ 	  (message "Signaling Mosaic...")
+ 	  (signal-process pid 'SIGUSR1)
+ 	  ;; Or you could try:
+ 	  ;; (call-process "kill" nil 0 nil "-USR1" (int-to-string pid))
+-	  (message "Signaling Mosaic...done")
+-	  )
++	  (message "Signaling Mosaic...done"))
+       ;; Mosaic not running - start it
+       (message "Starting %s..." browse-url-mosaic-program)
+       (apply 'start-process "xmosaic" nil browse-url-mosaic-program
