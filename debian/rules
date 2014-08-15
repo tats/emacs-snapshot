@@ -290,9 +290,8 @@ debian/$(flavor)-common.README.Debian: \
 	  emacsVER-common.README '/@@PATCH_LIST_HERE@@/'
 	cp debian/emacsVER-common.README.00 debian/emacsVER-common.README.tmp
 	for p in $$($(quilt) series); do \
-	  debian/patch-to-news debian/patches/$$p \
-	    >> debian/emacsVER-common.README.tmp; \
-	  echo >> debian/emacsVER-common.README.tmp; \
+	  debian/patch-to-news "$$p" >> debian/emacsVER-common.README.tmp \
+	  && echo >> debian/emacsVER-common.README.tmp; \
 	done
 	tail -n +2 \
 	  < debian/emacsVER-common.README.01 \
