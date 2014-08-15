@@ -1,0 +1,168 @@
+From 6befc5cb46ff5204d2c4176b5cf7f678f87c0202 Mon Sep 17 00:00:00 2001
+From: Daniel Colascione <dancol@dancol.org>
+Date: Sun, 23 Mar 2014 03:56:30 -0700
+Subject: The compose key should now work better with UIM (2/4).
+
+This upstream patch has been added:
+
+  Improve XIC fix
+
+Origin: upstream, commit: r116856.1.2, 0cd1fce9d7bf93d034539146b05161d6dfc8fee7
+Added-by: Rob Browning <rlb@defaultvalue.org>
+Bug: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=753534
+---
+ src/ChangeLog |   5 +--
+ src/xfns.c    | 102 +++++++++++++++++++++++++++++++++++-----------------------
+ 2 files changed, 65 insertions(+), 42 deletions(-)
+
+diff --git a/src/ChangeLog b/src/ChangeLog
+index 271d81d..09d645a 100644
+--- a/src/ChangeLog
++++ b/src/ChangeLog
+@@ -1,7 +1,8 @@
+ 2014-03-23  Daniel Colascione  <dancol@dancol.org>
+ 
+-	* xfns.c (create_frame_xic): If XCreateIC fails, try again without
+-	XNStatusAttributes; works around flaky XIM modules, apparently.
++	* xfns.c (create_frame_xic): Pass XNStatusAttributes to XCreateIC
++	only if xic_style calls for it.  This change allows Emacs to work
++	with ibus.  Also, don't leak resources if create_frame_xic fails.
+ 
+ 2013-08-21  Paul Eggert  <eggert@cs.ucla.edu>
+ 
+diff --git a/src/xfns.c b/src/xfns.c
+index f1d4a48..2fe98c3 100644
+--- a/src/xfns.c
++++ b/src/xfns.c
+@@ -2164,27 +2164,27 @@ create_frame_xic (struct frame *f)
+   XIM xim;
+   XIC xic = NULL;
+   XFontSet xfs = NULL;
++  XVaNestedList status_attr = NULL;
++  XVaNestedList preedit_attr = NULL;
++  XRectangle s_area;
++  XPoint spot;
++  XIMStyles supported_list;
+ 
+   if (FRAME_XIC (f))
+     return;
+ 
+   /* Create X fontset. */
+   xfs = xic_create_xfontset (f);
++  FRAME_XIC_FONTSET (f) = xfs;
++
+   xim = FRAME_X_XIM (f);
+   if (xim)
+     {
+-      XRectangle s_area;
+-      XPoint spot;
+-      XVaNestedList preedit_attr;
+-      XVaNestedList status_attr;
+-
+-      s_area.x = 0; s_area.y = 0; s_area.width = 1; s_area.height = 1;
+       spot.x = 0; spot.y = 1;
+ 
+       /* Determine XIC style.  */
+       if (xic_style == 0)
+ 	{
+-	  XIMStyles supported_list;
+ 	  supported_list.count_styles = (sizeof supported_xim_styles
+ 					 / sizeof supported_xim_styles[0]);
+ 	  supported_list.supported_styles = supported_xim_styles;
+@@ -2203,41 +2203,63 @@ create_frame_xic (struct frame *f)
+ 					   : NULL),
+ 					  &spot,
+ 					  NULL);
+-      status_attr = XVaCreateNestedList (0,
+-					 XNArea,
+-					 &s_area,
+-					 XNFontSet,
+-					 xfs,
+-					 XNForeground,
+-					 FRAME_FOREGROUND_PIXEL (f),
+-					 XNBackground,
+-					 FRAME_BACKGROUND_PIXEL (f),
+-					 NULL);
+-
+-      xic = XCreateIC (xim,
+-		       XNInputStyle, xic_style,
+-		       XNClientWindow, FRAME_X_WINDOW (f),
+-		       XNFocusWindow, FRAME_X_WINDOW (f),
+-		       XNStatusAttributes, status_attr,
+-		       XNPreeditAttributes, preedit_attr,
+-		       NULL);
+-
+-      /* Some input methods don't support a status pixel.  */
+-      if (xic == NULL)
+-        xic = XCreateIC (xim,
+-                         XNInputStyle, xic_style,
+-                         XNClientWindow, FRAME_X_WINDOW (f),
+-                         XNFocusWindow, FRAME_X_WINDOW (f),
+-                         XNPreeditAttributes, preedit_attr,
+-                         NULL);
+-
+-      XFree (preedit_attr);
+-      XFree (status_attr);
++
++      if (!preedit_attr)
++        goto out;
++
++      if (xic_style & XIMStatusArea)
++        {
++          s_area.x = 0; s_area.y = 0; s_area.width = 1; s_area.height = 1;
++          status_attr = XVaCreateNestedList (0,
++                                             XNArea,
++                                             &s_area,
++                                             XNFontSet,
++                                             xfs,
++                                             XNForeground,
++                                             FRAME_FOREGROUND_PIXEL (f),
++                                             XNBackground,
++                                             FRAME_BACKGROUND_PIXEL (f),
++                                             NULL);
++
++          if (!status_attr)
++            goto out;
++
++          xic = XCreateIC (xim,
++                           XNInputStyle, xic_style,
++                           XNClientWindow, FRAME_X_WINDOW (f),
++                           XNFocusWindow, FRAME_X_WINDOW (f),
++                           XNStatusAttributes, status_attr,
++                           XNPreeditAttributes, preedit_attr,
++                           NULL);
++        }
++      else
++        {
++          xic = XCreateIC (xim,
++                           XNInputStyle, xic_style,
++                           XNClientWindow, FRAME_X_WINDOW (f),
++                           XNFocusWindow, FRAME_X_WINDOW (f),
++                           XNPreeditAttributes, preedit_attr,
++                           NULL);
++        }
++
++      if (!xic)
++        goto out;
++
++      FRAME_XIC (f) = xic;
++      FRAME_XIC_STYLE (f) = xic_style;
++      xfs = NULL; /* Don't free below.  */
+     }
+ 
+-  FRAME_XIC (f) = xic;
+-  FRAME_XIC_STYLE (f) = xic_style;
+-  FRAME_XIC_FONTSET (f) = xfs;
++ out:
++
++  if (xfs)
++    free_frame_xic (f);
++
++  if (preedit_attr)
++    XFree (preedit_attr);
++
++  if (status_attr)
++    XFree (status_attr);
+ }
+ 
+ 
