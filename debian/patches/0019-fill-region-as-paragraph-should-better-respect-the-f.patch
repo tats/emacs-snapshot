@@ -1,0 +1,51 @@
+From 79b09b9067bac0f0f3076a72cf066b630217c83e Mon Sep 17 00:00:00 2001
+From: Toru TSUNEYOSHI <t_tuneyosi@hotmail.com>
+Date: Fri, 30 Nov 2012 15:10:30 +0800
+Subject: fill-region-as-paragraph should better respect the fill-column
+
+This upstream patch has been added:
+
+  * textmodes/fill.el (fill-region-as-paragraph): Handle overshoot by move-to-column.
+
+Origin: upstream, commit: r111035, 0483a4f3930f62a0b4d05402c71fa734c6258b8a
+Bug: http://debbugs.gnu.org/3234
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=539634
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lisp/ChangeLog         | 5 +++++
+ lisp/textmodes/fill.el | 6 +++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/lisp/ChangeLog b/lisp/ChangeLog
+index 01b4a02..8a90261 100644
+--- a/lisp/ChangeLog
++++ b/lisp/ChangeLog
+@@ -508,6 +508,11 @@
+ 	* files.el (dir-locals-read-from-file): Check file non-empty
+ 	before reading.  (Bug#13038)
+ 
++2012-11-30  Toru TSUNEYOSHI  <t_tuneyosi@hotmail.com>
++
++	* textmodes/fill.el (fill-region-as-paragraph): Handle overshoot
++	by move-to-column (Bug#3234).
++
+ 2012-11-28  Glenn Morris  <rgm@gnu.org>
+ 
+ 	* jka-cmpr-hook.el (jka-compr-get-compression-info):
+diff --git a/lisp/textmodes/fill.el b/lisp/textmodes/fill.el
+index feb2fa6..5b6d5f3 100644
+--- a/lisp/textmodes/fill.el
++++ b/lisp/textmodes/fill.el
+@@ -721,7 +721,11 @@ space does not end a sentence, so don't break a line there."
+ 	    (move-to-column (current-fill-column))
+ 	    (if (when (< (point) to)
+ 		  ;; Find the position where we'll break the line.
+-		  (forward-char 1) ;Use an immediately following space, if any.
++		  ;; Use an immediately following space, if any.
++		  ;; However, note that `move-to-column' may overshoot
++		  ;; if there are wide characters (Bug#3234).
++		  (unless (> (current-column) (current-fill-column))
++		    (forward-char 1))
+ 		  (fill-move-to-break-point linebeg)
+ 		  ;; Check again to see if we got to the end of
+ 		  ;; the paragraph.
