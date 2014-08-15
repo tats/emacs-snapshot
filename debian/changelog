@@ -1,3 +1,11 @@
+emacs24 (24.3+1-5~1.gbp771df1) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @771df146717a00951898079d904c35afaa441c41 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 15 Aug 2014 11:47:35 -0500
+
 emacs24 (24.3+1-4) unstable; urgency=medium
 
   [ Rob Browning ]
