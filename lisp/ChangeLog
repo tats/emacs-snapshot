@@ -28,6 +28,12 @@
 	(trace-call-tree): Simplify and update.
 	Avoid predictable temp-file names.  (http://bugs.debian.org/747100)
 
+2013-10-23  Jed Brown  <jed@59A2.org>  (tiny change)
+
+	* progmodes/compile.el (compilation-directory-matcher)
+	(compilation-page-delimiter):
+	Support GNU Make-4.0 directory quoting.  (Bug#15678)
+
 2013-03-11  Glenn Morris  <rgm@gnu.org>
 
 	* Version 24.3 released.

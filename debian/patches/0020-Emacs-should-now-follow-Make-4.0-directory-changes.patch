@@ -1,0 +1,60 @@
+From 25165cbbd5aca3a56aa5921d05a361b16a11b591 Mon Sep 17 00:00:00 2001
+From: Jed Brown <jed@59A2.org>
+Date: Wed, 23 Oct 2013 09:25:56 -0700
+Subject: Emacs should now follow Make 4.0 directory changes.
+
+This upstream patch has been added:
+
+  compile: Support GNU Make-4.0 directory quoting (tiny change)
+
+  * lisp/progmodes/compile.el (compilation-directory-matcher)
+  (compilation-page-delimiter): Support GNU Make-4.0 directory quoting.
+
+Origin: upstream, commit: r114757, 1ecd341c106bec179db172bc5c992ac236e70274
+Bug: http://debbugs.gnu.org/15678
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=747624
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lisp/ChangeLog            | 6 ++++++
+ lisp/progmodes/compile.el | 4 ++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/ChangeLog b/lisp/ChangeLog
+index 8a90261..abde30f 100644
+--- a/lisp/ChangeLog
++++ b/lisp/ChangeLog
+@@ -28,6 +28,12 @@
+ 	(trace-call-tree): Simplify and update.
+ 	Avoid predictable temp-file names.  (http://bugs.debian.org/747100)
+ 
++2013-10-23  Jed Brown  <jed@59A2.org>  (tiny change)
++
++	* progmodes/compile.el (compilation-directory-matcher)
++	(compilation-page-delimiter):
++	Support GNU Make-4.0 directory quoting.  (Bug#15678)
++
+ 2013-03-11  Glenn Morris  <rgm@gnu.org>
+ 
+ 	* Version 24.3 released.
+diff --git a/lisp/progmodes/compile.el b/lisp/progmodes/compile.el
+index 68a83b4..8e0d501 100644
+--- a/lisp/progmodes/compile.el
++++ b/lisp/progmodes/compile.el
+@@ -514,7 +514,7 @@ listed text properties PROP# are given values VAL# as well."
+   "Directory to restore to when doing `recompile'.")
+ 
+ (defvar compilation-directory-matcher
+-  '("\\(?:Entering\\|Leavin\\(g\\)\\) directory `\\(.+\\)'$" (2 . 1))
++  '("\\(?:Entering\\|Leavin\\(g\\)\\) directory [`']\\(.+\\)'$" (2 . 1))
+   "A list for tracking when directories are entered or left.
+ If nil, do not track directories, e.g. if all file names are absolute.  The
+ first element is the REGEXP matching these messages.  It can match any number
+@@ -527,7 +527,7 @@ directory we were in before the last entering message.  If you change this,
+ you may also want to change `compilation-page-delimiter'.")
+ 
+ (defvar compilation-page-delimiter
+-  "^\\(?:\f\\|.*\\(?:Entering\\|Leaving\\) directory `.+'\n\\)+"
++  "^\\(?:\f\\|.*\\(?:Entering\\|Leaving\\) directory [`'].+'\n\\)+"
+   "Value of `page-delimiter' in Compilation mode.")
+ 
+ (defvar compilation-mode-font-lock-keywords
