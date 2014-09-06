@@ -1,10 +1,28 @@
-emacs24 (24.3+1-5~1.gbp771df1) UNRELEASED; urgency=medium
+emacs24 (24.3+1-5) unstable; urgency=medium
 
-  ** SNAPSHOT build @771df146717a00951898079d904c35afaa441c41 **
+  * Fix patch-to-news: notice error; correct path
 
-  * UNRELEASED
+  * Fix a problem with UIM and the compose key.
+    Incorporate the relevant upstream patches:
+      0015-The-compose-key-should-now-work-better-with-UIM-1-4.patch
+      0016-The-compose-key-should-now-work-better-with-UIM-2-4.patch
+      0017-The-compose-key-should-now-work-better-with-UIM-3-4.patch
+      0018-The-compose-key-should-now-work-better-with-UIM-4-4.patch
+    Thanks to Anders Kaseorg <andersk@MIT.EDU> for the report, and for
+    tracking down the relevant patches. (Closes: 753534)
 
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 15 Aug 2014 11:47:35 -0500
+  * Make fill-region-as-paragraph respect the fill-column.
+    Add 0019-fill-region-as-paragraph-should-better-respect-the-f.patch.
+    Thanks to Nobuhiro IMAI <nov@yo.rim.or.jp> for reporting the problem
+    and tracking down the relevant patch. (Closes: 539634)
+
+  * Follow Make 4.0 directory changes in compile mode.
+    Add 0020-Emacs-should-now-follow-Make-4.0-directory-changes.patch
+    to incorporate the relevant upstream patch.
+    Thanks to Christophe Troestler <Christophe.Troestler@umons.ac.be> for
+    reporting the problem. (Closes: 747624)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 06 Sep 2014 11:38:08 -0500
 
 emacs24 (24.3+1-4) unstable; urgency=medium
 
