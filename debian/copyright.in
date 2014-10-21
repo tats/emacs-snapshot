@@ -105,24 +105,68 @@ Copyright:
     for the specific language governing rights and limitations under the
     License.
 
-  man/faq.texi is licensed as follows:
+  doc/misc/efaq.texi is licensed as follows:
 
-    Copyright (C) 1994,1995,1996,1997,1998,1999,2000 Reuven M. Lerner
-    Copyright (C) 1992,1993 Steven Byrnes
-    Copyright (C) 1990,1991,1992 Joseph Brian Wells
+    This list of frequently asked questions about GNU Emacs with answers
+    (``FAQ'') may be translated into other languages, transformed into other
+    formats (e.g., Texinfo, Info, WWW, WAIS), and updated with new information.
 
-    This list of frequently asked questions about GNU Emacs with
-    answers ("FAQ") may be translated into other languages,
-    transformed into other formats (e.g. Texinfo, Info, WWW, WAIS),
-    and updated with new information.
+    The same conditions apply to any derivative of the FAQ as apply to the FAQ
+    itself.  Every copy of the FAQ must include this notice or an approved
+    translation, information on who is currently maintaining the FAQ and how to
+    contact them (including their e-mail address), and information on where the
+    latest version of the FAQ is archived (including FTP information).
 
-    The same conditions apply to any derivative of the FAQ as apply to
-    the FAQ itself.  Every copy of the FAQ must include this notice or
-    an approved translation, information on who is currently
-    maintaining the FAQ and how to contact them (including their
-    e-mail address), and information on where the latest version of
-    the FAQ is archived (including FTP information).
+    The FAQ may be copied and redistributed under these conditions, except that
+    the FAQ may not be embedded in a larger literary work unless that work
+    itself allows free copying and redistribution.
 
-    The FAQ may be copied and redistributed under these conditions,
-    except that the FAQ may not be embedded in a larger literary work
-    unless that work itself allows free copying and redistribution.
+    [This version has been heavily edited since it was included in the Emacs
+    distribution.]
+
+  doc/misc/efaq-w32.texi is licensed as follows:
+
+    This list of frequently asked questions about GNU Emacs on MS Windows
+    with answers (``FAQ'') may be translated into other languages,
+    transformed into other formats (e.g. Texinfo, Info, WWW), and updated
+    with new information.
+
+    The same conditions apply to any derivative of the FAQ as apply to the FAQ
+    itself.  Every copy of the FAQ must include this notice or an approved
+    translation, information on who is currently maintaining the FAQ and how to
+    contact them (including their e-mail address), and information on where the
+    latest version of the FAQ is archived (including FTP information).
+
+    The FAQ may be copied and redistributed under these conditions, except that
+    the FAQ may not be embedded in a larger literary work unless that work
+    itself allows free copying and redistribution.
+
+  lisp/obsolete/meese.el is licensed as follows:
+
+    This is in the public domain on account of being distributed since
+    1985 or 1986 without a copyright notice.
+
+  msdos/sedadmin.inp is licensed as follows:
+
+    This file is part of GNU Emacs.
+
+    This file is free software; as a special exception, the author gives
+    unlimited permission to copy and/or distribute it, with or without
+    modifications, as long as this notice is preserved.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+  nt/inc/dirent.h is licensed as follows:
+
+    The code here is forced by the interface, and is not subject to
+    copyright, constituting the only possible expression of the
+    algorithm in this format.
+
+  All of the files in m4/ except gnulib-comp.m4 are licensed as
+  follows:
+
+    This file is free software; the Free Software Foundation
+    gives unlimited permission to copy and/or distribute it,
+    with or without modifications, as long as this notice is preserved.
