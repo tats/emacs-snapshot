@@ -4,17 +4,3 @@
 0004-Adjust-documentation-references-for-Debian.patch
 0005-Modify-the-output-of-version-to-indicate-Debian-modi.patch
 0006-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
-0007-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
-0008-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
-0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
-0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch
-0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch
-0012-Security-issues-in-find-gc.el-have-been-fixed-CVE-20.patch
-0013-Security-issues-in-tramp-have-been-fixed-CVE-2014-34.patch
-0014-Insecure-file-handling-in-browse-url-mosaic-has-been.patch
-0015-The-compose-key-should-now-work-better-with-UIM-1-4.patch
-0016-The-compose-key-should-now-work-better-with-UIM-2-4.patch
-0017-The-compose-key-should-now-work-better-with-UIM-3-4.patch
-0018-The-compose-key-should-now-work-better-with-UIM-4-4.patch
-0019-fill-region-as-paragraph-should-better-respect-the-f.patch
-0020-Emacs-should-now-follow-Make-4.0-directory-changes.patch

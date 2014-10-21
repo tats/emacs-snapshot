@@ -1,4 +1,4 @@
-From 29a4e33107f12c44f34fa111e049499b8ee3dc8b Mon Sep 17 00:00:00 2001
+From 8adcb1e0139fcd29a68b0ea8746090f97c3fe0f0 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:29 -0500
 Subject: Look for NEWS in order to find etc/ rather than GNU.
@@ -19,21 +19,20 @@ Status: Debian specific
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/callproc.c b/src/callproc.c
-index c4177d5..6d07327 100644
+index 7ba3e39..0ba15d7 100644
 --- a/src/callproc.c
 +++ b/src/callproc.c
-@@ -1580,14 +1580,14 @@ init_callproc (void)
+@@ -1628,13 +1628,13 @@ init_callproc (void)
  
-       srcdir = Fexpand_file_name (build_string ("../src/"),
- 				  build_string (PATH_DUMPLOADSEARCH));
+       srcdir = Fexpand_file_name (build_string ("../src/"), lispdir);
+ 
 -      tem = Fexpand_file_name (build_string ("GNU"), Vdata_directory);
 +      tem = Fexpand_file_name (build_string ("NEWS"), Vdata_directory);
        tem1 = Ffile_exists_p (tem);
        if (!NILP (Fequal (srcdir, Vinvocation_directory)) || NILP (tem1))
  	{
  	  Lisp_Object newdir;
- 	  newdir = Fexpand_file_name (build_string ("../etc/"),
- 				      build_string (PATH_DUMPLOADSEARCH));
+ 	  newdir = Fexpand_file_name (build_string ("../etc/"), lispdir);
 -	  tem = Fexpand_file_name (build_string ("GNU"), newdir);
 +	  tem = Fexpand_file_name (build_string ("NEWS"), newdir);
  	  tem1 = Ffile_exists_p (tem);

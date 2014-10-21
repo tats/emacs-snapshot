@@ -1,6 +1,6 @@
-#### Makefile for documentation other than the Emacs manual.
+### @configure_input@
 
-# Copyright (C) 1994, 1996-2013 Free Software Foundation, Inc.
+# Copyright (C) 1994, 1996-2014 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -17,24 +17,42 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
-SHELL = /bin/sh
+SHELL = @SHELL@
 
 # Where to find the source code.  $(srcdir) will be the man-aux
 # subdirectory of the source tree.  This is
 # set by the configure script's `--srcdir' option.
 srcdir=@srcdir@
 
+version=@version@
+
 ## Where the output files go.
 buildinfodir = $(srcdir)/../../info
 ## Directory with emacsver.texi.
-## Currently only used by efaq and calc.
 emacsdir = $(srcdir)/../emacs
 
+prefix = @prefix@
+datarootdir = @datarootdir@
+datadir = @datadir@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+docdir = @docdir@
+dvidir = @dvidir@
+htmldir = @htmldir@
+pdfdir = @pdfdir@
+psdir = @psdir@
+
 MKDIR_P = @MKDIR_P@
+
+GZIP_PROG = @GZIP_PROG@
+
+HTML_OPTS = --no-split --html
 
 INFO_EXT=@INFO_EXT@
 # Options used only when making info output.
 INFO_OPTS=@INFO_OPTS@
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
 
 # The makeinfo program is part of the Texinfo distribution.
 # Use --force so that it generates output even if there are errors.
@@ -43,16 +61,34 @@ MAKEINFO_OPTS = --force -I$(emacsdir)
 
 # Debian: moved DFSG incompatible files to emacs*-common-non-dfsg
 # pacakge (see /usr/share/doc/emacs*-common/copyright).
-INFO_TARGETS = efaq
 
-DVI_TARGETS = faq.dvi
+## On MS Windows, efaq-w32; otherwise blank.
+DOCMISC_W32 = @DOCMISC_W32@
 
-PDF_TARGETS = faq.pdf
+## Info files to build and install on all platforms.
+INFO_COMMON = efaq
 
-HTML_TARGETS = emacs-faq.html
+## Info files to install on current platform.
+INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
+
+## Info files to build on current platform.
+## This is all of them, even though they might not all get installed,
+## because the info files are pre-built in release tarfiles.
+INFO_TARGETS = $(INFO_COMMON) efaq-w32
+
+# There are some naming differences between the info targets and the other
+# targets, so let's resolve them here.
+TARGETS_1 = $(INFO_INSTALL:ccmode=cc-mode)
+TARGETS = $(TARGETS_1:info.info=info)
+
+DVI_TARGETS  = $(TARGETS:=.dvi)
+HTML_TARGETS = $(TARGETS:=.html)
+PDF_TARGETS  = $(TARGETS:=.pdf)
+PS_TARGETS   = $(TARGETS:=.ps)
 
 TEXI2DVI = texi2dvi
 TEXI2PDF = texi2pdf
+DVIPS = dvips
 
 ENVADD = TEXINPUTS="$(srcdir):$(emacsdir):$(TEXINPUTS)" \
          MAKEINFO="$(MAKEINFO) $(MAKEINFO_OPTS)"
@@ -61,9 +97,14 @@ mkinfodir = @${MKDIR_P} ${buildinfodir}
 
 gfdl = ${srcdir}/doclicense.texi
 
-.PHONY: info dvi pdf echo-info
+.PHONY: info dvi html pdf ps echo-info
 ## Prevent implicit rule triggering for foo.info.
 .SUFFIXES:
+
+.SUFFIXES: .ps .dvi
+
+.dvi.ps:
+	$(DVIPS) -o $@ $<
 
 # Default.
 info: $(INFO_TARGETS)
@@ -71,16 +112,16 @@ info: $(INFO_TARGETS)
 ## Used by top-level Makefile.
 ## Base file names of output info files.
 echo-info:
-	@echo "$(INFO_TARGETS) " | \
+	@echo "$(INFO_INSTALL) " | \
 	  sed -e 's|[^ ]*/||g' -e 's/\.info//g' -e "s/  */$(INFO_EXT) /g"
-
-# please modify this for all the web manual targets
-webhack: clean
-	$(MAKE) pdf MAKEINFO_OPTS="-DWEBHACKDEVEL $(MAKEINFO_OPTS)"
 
 dvi: $(DVI_TARGETS)
 
+html: $(HTML_TARGETS)
+
 pdf: $(PDF_TARGETS)
+
+ps: $(PS_TARGETS)
 
 # Note that all the Info targets build the Info files in srcdir.
 # There is no provision for Info files to exist in the build directory.
@@ -89,23 +130,29 @@ pdf: $(PDF_TARGETS)
 # Note: "<" is not portable in ordinary make rules.
 
 ## No gfdl dependency.
+efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
 efaq : $(buildinfodir)/efaq$(INFO_EXT)
-$(buildinfodir)/efaq$(INFO_EXT): ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
+$(buildinfodir)/efaq$(INFO_EXT): $(efaq_deps)
 	$(mkinfodir)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/faq.texi
-faq.dvi: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/faq.texi
-faq.pdf: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/faq.texi
-## This is the name used on the Emacs web-page.
-## sed fixes up links to point to split version of the manual.
-emacs-faq.html: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(MAKEINFO) $(MAKEINFO_OPTS) --no-split \
-	  --css-ref='/layout.css' --html -o $@ ${srcdir}/faq.texi
-	sed -i -e 's|a href="\([a-z]*\)\.html#\([^"]*\)"|a href="manual/html_node/\1/\2.html"|g' \
-	  -e 's|/Top\.html|/|g' $@
-emacs-faq.text: ${srcdir}/faq.texi $(emacsdir)/emacsver.texi
-	$(MAKEINFO) $(MAKEINFO_OPTS) --plaintext -o $@ ${srcdir}/faq.texi
+	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq.texi
+efaq.dvi: $(efaq_deps)
+	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq.texi
+efaq.pdf: $(efaq_deps)
+	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq.texi
+efaq.html: $(efaq_deps)
+	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq.texi
+
+efaq_w32_deps = ${srcdir}/efaq-w32.texi $(emacsdir)/emacsver.texi
+efaq-w32 : $(buildinfodir)/efaq-w32$(INFO_EXT)
+$(buildinfodir)/efaq-w32$(INFO_EXT): $(efaq_w32_deps)
+	$(mkinfodir)
+	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq-w32.texi
+efaq-w32.dvi: $(efaq_w32_deps)
+	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq-w32.texi
+efaq-w32.pdf: $(efaq_w32_deps)
+	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq-w32.texi
+efaq-w32.html: $(efaq_w32_deps)
+	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
 
 .PHONY: mostlyclean clean distclean maintainer-clean
 
@@ -116,16 +163,103 @@ mostlyclean:
 	rm -f gnustmp.*
 
 clean: mostlyclean
-	rm -f $(DVI_TARGETS) $(PDF_TARGETS) $(HTML_TARGETS) emacs-faq.text
+	rm -f $(DVI_TARGETS) $(HTML_TARGETS) $(PDF_TARGETS) $(PS_TARGETS)
+	rm -f efaq-w32.dvi efaq-w32.html efaq-w32.pdf efaq-w32.ps
+	rm -f emacs-misc-${version}.tar*
 
 distclean: clean
-#	rm -f Makefile
+	rm -f Makefile
 
 ## buildinfodir is relative to srcdir.
-maintainer-clean: distclean
+infoclean:
 	cd $(buildinfodir); for file in $(INFO_TARGETS); do \
 	  file=`echo $${file} | sed 's/\.info$$//'`${INFO_EXT}; \
 	  rm -f $${file} $${file}-[1-9] $${file}-[1-9][0-9]; \
 	done
+
+maintainer-clean: distclean infoclean
+
+dist:
+	rm -rf emacs-misc-${version}
+	mkdir emacs-misc-${version}
+	cp ${srcdir}/*.texi ${srcdir}/texinfo.tex \
+	  $(emacsdir)/emacsver.texi ${srcdir}/ChangeLog* \
+	  emacs-misc-${version}/
+	sed -e 's/@sr[c]dir@/./' \
+	  -e 's/^\(emacsdir *=\).*/\1 ./' \
+	  -e 's/^\(buildinfodir *=\).*/\1 ./' \
+	  -e 's/^\(clean:.*\)/\1 infoclean/' \
+	  -e "s/@ver[s]ion@/${version}/" \
+	  -e 's/@MAKE[I]NFO@/makeinfo/' -e 's/@MK[D]IR_P@/mkdir -p/' \
+	  -e 's/@IN[F]O_EXT@/.info/' -e 's/@IN[F]O_OPTS@//' \
+	  -e 's|@SH[E]LL@|/bin/bash|' \
+	  -e 's|@[p]refix@|/usr/local|' \
+	  -e 's|@[d]atarootdir@|$${prefix}/share|' \
+	  -e 's|@[d]atadir@|$${datarootdir}|' \
+	  -e 's|@[P]ACKAGE_TARNAME@|emacs|' \
+	  -e 's|@[d]ocdir@|$${datarootdir}/doc/$${PACKAGE_TARNAME}|' \
+	  -e 's|@[d]vidir@|$${docdir}|' \
+	  -e 's|@[h]tmldir@|$${docdir}|' \
+	  -e 's|@[p]dfdir@|$${docdir}|' \
+	  -e 's|@[p]sdir@|$${docdir}|' \
+	  -e 's|@[G]ZIP_PROG@|gzip|' \
+	  -e 's|@IN[S]TALL@|install -c|' \
+	  -e 's|@IN[S]TALL_DATA@|$${INSTALL} -m 644|' \
+	  -e '/@[c]onfigure_input@/d' \
+	  ${srcdir}/Makefile.in > emacs-misc-${version}/Makefile
+	@if grep '@[a-zA-Z_]*@' emacs-misc-${version}/Makefile; then \
+	  echo "Unexpanded configure variables in Makefile?" 1>&2; exit 1; \
+	fi
+	tar -cf emacs-misc-${version}.tar emacs-misc-${version}
+	rm -rf emacs-misc-${version}
+
+
+.PHONY: install-dvi install-html install-pdf install-ps install-doc
+
+install-dvi: dvi
+	umask 022; $(MKDIR_P) "$(DESTDIR)$(dvidir)"
+	$(INSTALL_DATA) $(DVI_TARGETS) "$(DESTDIR)$(dvidir)"
+install-html: html
+	umask 022; $(MKDIR_P) "$(DESTDIR)$(htmldir)"
+	$(INSTALL_DATA) $(HTML_TARGETS) "$(DESTDIR)$(htmldir)"
+install-pdf: pdf
+	 umask 022;$(MKDIR_P) "$(DESTDIR)$(pdfdir)"
+	$(INSTALL_DATA) $(PDF_TARGETS) "$(DESTDIR)$(pdfdir)"
+install-ps: ps
+	umask 022; $(MKDIR_P) "$(DESTDIR)$(psdir)"
+	for file in $(PS_TARGETS); do \
+	  $(INSTALL_DATA) $${file} "$(DESTDIR)$(psdir)"; \
+	  [ -n "${GZIP_PROG}" ] || continue; \
+	  rm -f "$(DESTDIR)$(psdir)/$${file}.gz"; \
+	  ${GZIP_PROG} -9n "$(DESTDIR)$(psdir)/$${file}"; \
+	done
+
+## Top-level Makefile installs the info pages.
+install-doc: install-dvi install-html install-pdf install-ps
+
+
+
+.PHONY: uninstall-dvi uninstall-html uninstall-pdf uninstall-ps uninstall-doc
+
+uninstall-dvi:
+	for file in $(DVI_TARGETS); do \
+	  rm -f "$(DESTDIR)$(dvidir)/$${file}"; \
+	done
+uninstall-html:
+	for file in $(HTML_TARGETS); do \
+	  rm -f "$(DESTDIR)$(htmldir)/$${file}"; \
+	done
+uninstall-ps:
+	ext= ; [ -n "${GZIP_PROG}" ] && ext=.gz; \
+	for file in $(PS_TARGETS); do \
+	  rm -f "$(DESTDIR)$(psdir)/$${file}$${ext}"; \
+	done
+uninstall-pdf:
+	for file in $(PDF_TARGETS); do \
+	  rm -f "$(DESTDIR)$(pdfdir)/$${file}"; \
+	done
+
+uninstall-doc: uninstall-dvi uninstall-html uninstall-pdf uninstall-ps
+
 
 ### Makefile ends here

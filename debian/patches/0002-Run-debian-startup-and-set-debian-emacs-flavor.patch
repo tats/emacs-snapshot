@@ -1,4 +1,4 @@
-From f5b94d0cc1084a2f47c67c851b2ca7a24ff0e5b6 Mon Sep 17 00:00:00 2001
+From 5be85719ea7f157bba912a3f611db2a42343f2b7 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor.
@@ -15,12 +15,12 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index aaba900..a4e985d 100644
+index 58e9708..c4f9f79 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -420,6 +420,10 @@ The second subexpression is the version string.
- The regexp should not contain a starting \"\\`\" or a trailing
-  \"\\'\"; those are added automatically by callers.")
+@@ -435,6 +435,10 @@ as a list.")
+                 (match-string 1 subdir) subdir))
+           "-pkg.el"))
  
 +(defconst debian-emacs-flavor 'emacs24
 +  "A symbol representing the particular debian flavor of emacs running.
@@ -29,7 +29,7 @@ index aaba900..a4e985d 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -981,8 +985,21 @@ Amongst another things, it parses the command-line arguments."
+@@ -1065,8 +1069,21 @@ please check its value")
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.
