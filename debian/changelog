@@ -1,10 +1,54 @@
-emacs24 (24.4+1-1~1.gbp83189e) UNRELEASED; urgency=medium
+emacs24 (24.4+1-1) experimental; urgency=medium
 
-  ** SNAPSHOT build @83189e7ab8266988428673cd9c18c4394e16026d **
+  * Merge upstream version 24.4.
+    Remove (unneeded) src/macuvs.h and admin/unidata/IVD_Sequences.txt
+    until we're sure about the license:
+      https://lists.gnu.org/archive/html/emacs-devel/2014-10/msg00742.html
+    Remove new GFDL files (moved to emacs24-common-non-dfsg):
+      doc/misc/eww.texi
+      doc/misc/ido.texi
+      doc/misc/octave-mode.texi
+      doc/misc/todo-mode.texi
+    Remove redundant patches:
+      0007-Invoke-the-correct-xmlstarlet-executable-on-Debian-s.patch
+      0008-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
+      0009-Emacs-should-no-longer-hang-at-startup-on-kFreeBSD.patch
+      0010-Emacs-should-now-build-correctly-on-GNU-Hurd.patch
+      0011-Gnus-should-no-longer-use-a-predictable-temp-file-na.patch
+      0012-Security-issues-in-find-gc.el-have-been-fixed-CVE-20.patch
+      0013-Security-issues-in-tramp-have-been-fixed-CVE-2014-34.patch
+      0014-Insecure-file-handling-in-browse-url-mosaic-has-been.patch
+      0015-The-compose-key-should-now-work-better-with-UIM-1-4.patch
+      0016-The-compose-key-should-now-work-better-with-UIM-2-4.patch
+      0017-The-compose-key-should-now-work-better-with-UIM-3-4.patch
+      0018-The-compose-key-should-now-work-better-with-UIM-4-4.patch
+      0019-fill-region-as-paragraph-should-better-respect-the-f.patch
+      0020-Emacs-should-now-follow-Make-4.0-directory-changes.patch
 
-  * UNRELEASED
+  * Update debian/copyright* for 24.4.  Update entry for man/faq.texi
+    (now doc/mis/efaq.texi); add entries for doc/misc/efaq-w32.texi,
+    lisp/obsolete/meese.el, msdos/sedadmin.inp, nt/inc/dirent.h, and
+    all of the files in m4/ except gnulib-comp.m4.
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 21 Oct 2014 16:36:07 -0500
+  * Ignore src/macuvs.h and IVD_Sequences.txt for now.  Add
+    0007-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch to
+    avoid trying to build src/macuvs.h (via IVD_Sequences.txt) since
+    we removed it for the time being, due to uncertainty over the
+    licensing.
+
+  * Build depend on libacl1-dev for new ACL support
+
+  * Build depend on zlib1g-dev for new zlib support
+
+  * Remove obsolete configure argument --with-crt-dir
+
+  * Look for DOC, not DOC-$(runtime_ver) in debian/rules.  The DOC
+    file is now just DOC.
+
+  * Don't try to remove /usr/local in debian/rules.  It's not created
+    during the build anymore.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 21 Oct 2014 21:27:56 -0500
 
 emacs24 (24.3+1-5) unstable; urgency=medium
 
