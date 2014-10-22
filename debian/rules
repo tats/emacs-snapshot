@@ -507,8 +507,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  rmdir $(pkgdir_common)/var/games/
 	  rmdir $(pkgdir_common)/var/
 
-	  # Make sure /usr/local dir doesn't exist.
-	  rm -r $(pkgdir_common)/usr/local
         endif
 
         ##################################################
