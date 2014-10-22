@@ -375,7 +375,7 @@ define install_common_binpkg_bits
   dh_link -p$(3) usr/bin/$(flavor)-$(4) usr/bin/$(flavor)
 
   install -d $(2)/usr/share/emacs/$(runtime_ver)/etc
-  cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC-$(runtime_ver).1 \
+  cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC \
 	$(2)/usr/share/emacs/$(runtime_ver)/etc/
 
   install -d $(2)/usr/share/man/man1
@@ -408,10 +408,10 @@ override_dh_auto_install: $(autogen_install_files)
 	  rm -r $(pkgdir_common)/usr/bin
 	  rm -r $(pkgdir_common)/usr/lib
 
-	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
-	    && test -f DOC-$(runtime_ver).*
-	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
-	    && rm DOC-$(runtime_ver).*
+	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
+	  && test -f DOC
+	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
+	  && rm DOC
 
 	  # lisp path directories
 	  install -d $(pkgdir_common)/etc/$(flavor)/site-start.d
