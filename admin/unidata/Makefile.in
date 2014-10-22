@@ -56,7 +56,7 @@ am__v_at_1 =
 
 .PHONY: all
 
-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
+all: ${unifiles} ${unidir}/charscript.el \
   ${unidir}/charprop.el
 
 ## Specify .elc as an order-only prereq so as to not needlessly rebuild
@@ -117,5 +117,5 @@ maintainer-clean: distclean
 ## change and it slows down bootstrap (a tiny bit).
 ## Cf leim/ja-dic (which is much slower).
 extraclean:
-	rm -f ${top_srcdir}/src/macuvs.h ${unidir}/charscript.el*
+	rm -f ${unidir}/charscript.el*
 	rm -f ${unifiles} ${unidir}/charprop.el
