@@ -313,9 +313,6 @@ confflags += --mandir=/usr/share/man
 confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
 
-# multiarch compatibility
-confflags += --with-crt-dir=/usr/lib/$(deb_host_multiarch)
-
 # x configure flags
 confflags_x := $(confflags) 
 confflags_x += --with-x=yes
