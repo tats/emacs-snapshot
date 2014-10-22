@@ -56,7 +56,7 @@ am__v_at_1 =
 
 .PHONY: all
 
-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
+all: ${unifiles} ${unidir}/charscript.el \
   ${unidir}/charprop.el
 
 ## Specify .elc as an order-only prereq so as to not needlessly rebuild
