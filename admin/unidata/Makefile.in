@@ -40,7 +40,7 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
 
 .PHONY: all
 
-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
+all: ${unifiles} ${unidir}/charscript.el \
   ${unidir}/charprop.el ${unidir}/emoji-zwj.el
 
 ## Specify .elc as an order-only prereq so as to not needlessly rebuild
