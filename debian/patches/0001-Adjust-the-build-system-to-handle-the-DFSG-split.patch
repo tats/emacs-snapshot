@@ -1,4 +1,4 @@
-From 3e90823b842631b17930f5c6b690c17bc1e47bb0 Mon Sep 17 00:00:00 2001
+From f7290fa33360779d3317615d74e6bbc3cb76aab0 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -10,44 +10,68 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- doc/misc/Makefile.in |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ doc/misc/Makefile.in | 30 ++----------------------------
+ 1 file changed, 2 insertions(+), 28 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index dfe633c..c936a23 100644
+index 4254ebe..41fd0da 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -43,7 +43,7 @@ MAKEINFO_OPTS = --force -I$(emacsdir)
- 
- INFO_TARGETS = ada-mode auth autotype bovine calc ccmode cl \
+@@ -65,7 +65,7 @@ DOCMISC_W32 = @DOCMISC_W32@
+ ## Info files to build and install on all platforms.
+ INFO_COMMON = ada-mode auth autotype bovine calc ccmode cl \
  	dbus dired-x ebrowse ede ediff edt eieio \
--	emacs-mime epa erc ert eshell eudc efaq \
-+	emacs-mime epa erc ert eshell eudc \
- 	flymake forms gnus emacs-gnutls htmlfontify idlwave info.info \
- 	mairix-el message mh-e newsticker nxml-mode \
+-	emacs-mime epa erc ert eshell eudc efaq eww \
++	emacs-mime epa erc ert eshell eudc eww \
+ 	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
+ 	mairix-el message mh-e newsticker nxml-mode octave-mode \
  	org pcl-cvs pgg rcirc remember reftex sasl \
-@@ -71,7 +71,6 @@ DVI_TARGETS = \
- 	ert.dvi \
- 	eshell.dvi \
- 	eudc.dvi \
--	faq.dvi \
- 	flymake.dvi \
- 	forms.dvi \
- 	gnus.dvi \
-@@ -127,7 +126,6 @@ PDF_TARGETS = \
- 	ert.pdf \
- 	eshell.pdf \
- 	eudc.pdf \
--	faq.pdf \
- 	flymake.pdf \
- 	forms.pdf \
- 	gnus.pdf \
-@@ -162,7 +160,7 @@ PDF_TARGETS = \
- 	wisent.pdf \
- 	woman.pdf
+@@ -78,7 +78,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
+ ## Info files to build on current platform.
+ ## This is all of them, even though they might not all get installed,
+ ## because the info files are pre-built in release tarfiles.
+-INFO_TARGETS = $(INFO_COMMON) efaq-w32
++INFO_TARGETS = $(INFO_COMMON)
  
--HTML_TARGETS = emacs-faq.html
-+HTML_TARGETS =
+ # There are some naming differences between the info targets and the other
+ # targets, so let's resolve them here.
+@@ -289,31 +289,6 @@ edt.pdf: $(edt_deps)
+ edt.html: $(edt_deps)
+ 	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/edt.texi
  
- TEXI2DVI = texi2dvi
- TEXI2PDF = texi2pdf
+-## No gfdl dependency.
+-efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
+-efaq : $(buildinfodir)/efaq$(INFO_EXT)
+-$(buildinfodir)/efaq$(INFO_EXT): $(efaq_deps)
+-	$(mkinfodir)
+-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq.texi
+-efaq.dvi: $(efaq_deps)
+-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq.texi
+-efaq.pdf: $(efaq_deps)
+-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq.texi
+-efaq.html: $(efaq_deps)
+-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq.texi
+-
+-efaq_w32_deps = ${srcdir}/efaq-w32.texi $(emacsdir)/emacsver.texi
+-efaq-w32 : $(buildinfodir)/efaq-w32$(INFO_EXT)
+-$(buildinfodir)/efaq-w32$(INFO_EXT): $(efaq_w32_deps)
+-	$(mkinfodir)
+-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq-w32.texi
+-efaq-w32.dvi: $(efaq_w32_deps)
+-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq-w32.texi
+-efaq-w32.pdf: $(efaq_w32_deps)
+-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq-w32.texi
+-efaq-w32.html: $(efaq_w32_deps)
+-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
+-
+ eieio_deps = ${srcdir}/eieio.texi ${gfdl}
+ eieio : $(buildinfodir)/eieio$(INFO_EXT)
+ $(buildinfodir)/eieio$(INFO_EXT): $(eieio_deps)
+@@ -862,7 +837,6 @@ mostlyclean:
+ 
+ clean: mostlyclean
+ 	rm -f $(DVI_TARGETS) $(HTML_TARGETS) $(PDF_TARGETS) $(PS_TARGETS)
+-	rm -f efaq-w32.dvi efaq-w32.html efaq-w32.pdf efaq-w32.ps
+ 	rm -f emacs-misc-${version}.tar*
+ 
+ distclean: clean
