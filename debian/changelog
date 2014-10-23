@@ -1,10 +1,10 @@
-emacs24 (24.4+1-2~1.gbpd99091) UNRELEASED; urgency=medium
+emacs24 (24.4+1-2) experimental; urgency=medium
 
-  ** SNAPSHOT build @d99091778da4f3be20307b419c945224ccf1a015 **
+  * Adjust update_autogen and make-info-dir for DFSG removals.
+    Change 0003-Remove-files-that-appear-to-be-incompatible-with-the.patch
+    accordingly.
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 22 Oct 2014 19:02:48 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 22 Oct 2014 19:38:20 -0500
 
 emacs24 (24.4+1-1) experimental; urgency=medium
 
