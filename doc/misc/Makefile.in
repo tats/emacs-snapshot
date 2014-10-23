@@ -60,7 +60,7 @@ MAKEINFO = @MAKEINFO@
 MAKEINFO_OPTS = --force -I$(emacsdir)
 
 # Debian: moved DFSG incompatible files to emacs*-common-non-dfsg
-# pacakge (see /usr/share/doc/emacs*-common/copyright).
+# package (see /usr/share/doc/emacs*-common/copyright).
 
 ## On MS Windows, efaq-w32; otherwise blank.
 DOCMISC_W32 = @DOCMISC_W32@

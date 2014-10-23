@@ -148,7 +148,7 @@ infodir=@infodir@
 # Info files not in the doc/misc directory (we get those via make echo-info).
 INFO_EXT=@INFO_EXT@
 # Debian: moved DFSG incompatible files to emacs*-common-non-dfsg
-# pacakge (see /usr/share/doc/emacs*-common/copyright).
+# package (see /usr/share/doc/emacs*-common/copyright).
 INFO_NONMISC=
 
 # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
