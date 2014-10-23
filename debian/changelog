@@ -1,10 +1,11 @@
-emacs24 (24.4+1-3~1.gbp798a00) UNRELEASED; urgency=medium
+emacs24 (24.4+1-3) experimental; urgency=medium
 
-  ** SNAPSHOT build @798a005677d4aac82cbea12b260119c450f16394 **
+  * Eliminate a race to create info/ during the build.  Add
+    0008-A-race-to-create-info-has-been-eliminated.patch with the
+    relevant changes.  Thanks to Paul Eggert <eggert@cs.ucla.edu> for
+    tracking down the problem and providing the fix.
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 22 Oct 2014 22:59:47 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 23 Oct 2014 11:13:21 -0500
 
 emacs24 (24.4+1-2) experimental; urgency=medium
 
