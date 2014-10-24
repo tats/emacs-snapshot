@@ -108,9 +108,9 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
 	cp debian/emacs-common-non-dfsg.README.00 \
 	  debian/emacs-common-non-dfsg.README.tmp
 	for p in $$($(quilt) series); do \
-	  debian/patch-to-news debian/patches/$$p \
-	    >> debian/emacs-common-non-dfsg.README.tmp; \
-	  echo >> debian/emacs-common-non-dfsg.README.tmp; \
+	  debian/patch-to-news "$$p" \
+	    >> debian/emacs-common-non-dfsg.README.tmp \
+	  && echo >> debian/emacs-common-non-dfsg.README.tmp; \
 	done
 	tail -n +2 \
 	  < debian/emacs-common-non-dfsg.README.01 \
