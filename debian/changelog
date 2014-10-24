@@ -1,10 +1,12 @@
-emacs24-non-dfsg (24.4+1-1~1.gbp505cb4) UNRELEASED; urgency=medium
+emacs24-non-dfsg (24.4+1-1) experimental; urgency=medium
 
-  ** SNAPSHOT build @505cb449393ca4945ec7a007fe5e4c3ba6b533d0 **
+  * Upgrade to upstream version 24.4.
 
-  * UNRELEASED
+  * Update debian/* for 24.4
 
- -- Rob Browning <rlb@defaultvalue.org>  Thu, 23 Oct 2014 17:16:15 -0500
+  * Fix patch-to-news: notice error; correct path.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 24 Oct 2014 11:37:52 -0500
 
 emacs24-non-dfsg (24.3+1-1) unstable; urgency=low
 
