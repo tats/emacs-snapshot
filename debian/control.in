@@ -97,7 +97,7 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: @DEB_FLAVOR@-common
 Architecture: all
-Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
+Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version}), cedet, eieio, speedbar
 Description: GNU Emacs editor's shared, architecture independent infrastructure
