@@ -99,7 +99,7 @@ Package: emacs24-common
 Architecture: all
 Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Suggests: emacs24-el, emacs24-common-non-dfsg
-Conflicts: emacs24-el (<< ${Source-Version}), cedet, eieio, speedbar
+Conflicts: emacs24-el (<< ${Source-Version}), cedet, eieio, speedbar, gnus-bonus-el
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
