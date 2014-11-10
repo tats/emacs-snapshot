@@ -1336,6 +1336,7 @@ the `--debug-init' option to view a complete error backtrace."
   (let (warned)
     (dolist (dir load-path)
       (and (not warned)
+	   (stringp dir)
 	   (string-match-p "/[._]emacs\\.d/?\\'" dir)
 	   (string-equal (file-name-as-directory (expand-file-name dir))
 			 (expand-file-name user-emacs-directory))
