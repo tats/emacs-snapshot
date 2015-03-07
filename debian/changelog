@@ -1,10 +1,14 @@
-emacs24 (24.4+1-5~1.gbp575f0c) UNRELEASED; urgency=medium
+emacs24 (24.4+1-5) unstable; urgency=medium
 
-  ** SNAPSHOT build @575f0c87feaf30810b4097146fbbb31e2dd1e992 **
+  * emacs24-common: conflict with obsolete gnus-bonus-el package.
+    Thanks to Hilko Bengen for reporting the problem. (Closes: 767949)
 
-  * UNRELEASED
+  * Add "Breaks: apel (<< 10.8+0.20120427-4)" to emacs24-common to fix
+    a byte-compilation problem with older versions of the package.
+    Thanks to Łukasz Stelmach for the report and Sébastien Villemot
+    for tracking down the correct version. (Closes: 775564)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 07 Mar 2015 13:07:18 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 07 Mar 2015 13:25:57 -0600
 
 emacs24 (24.4+1-4.1) unstable; urgency=medium
 
