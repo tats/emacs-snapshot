@@ -1,3 +1,12 @@
+emacs24 (24.4+1-4.1~1.gbp9ef378) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @9ef378268004eff0c61cb962729493d87dd744d2 **
+
+  * Non-maintainer upload.
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 07 Mar 2015 11:34:55 -0600
+
 emacs24 (24.4+1-4) unstable; urgency=medium
 
   * Update emacsen-common dependency as per policy.
