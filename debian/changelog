@@ -1,11 +1,10 @@
-emacs24 (24.4+1-4.1~1.gbp9ef378) UNRELEASED; urgency=medium
-
-  ** SNAPSHOT build @9ef378268004eff0c61cb962729493d87dd744d2 **
+emacs24 (24.4+1-4.1) unstable; urgency=medium
 
   * Non-maintainer upload.
-  * UNRELEASED
+  * Cherry-pick 0009-lisp-startup.el-command-line.patch to fix handling
+    nil elements in load-path (Closes: #768751)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 07 Mar 2015 11:34:55 -0600
+ -- Balint Reczey <balint@balintreczey.hu>  Tue, 09 Dec 2014 16:24:27 +0100
 
 emacs24 (24.4+1-4) unstable; urgency=medium
 
