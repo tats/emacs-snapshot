@@ -4,7 +4,7 @@ dnl 	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2014 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2015 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -22,7 +22,7 @@ dnl  You should have received a copy of the GNU General Public License
 dnl  along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.65)
-AC_INIT(emacs, 24.4)
+AC_INIT(emacs, 24.5)
 
 dnl We get MINGW64 with MSYS2
 if test "x$MSYSTEM" = "xMINGW32" -o "x$MSYSTEM" = "xMINGW64"
@@ -1841,6 +1841,9 @@ CM_OBJ="cm.o"
 XARGS_LIMIT=
 if test "${HAVE_W32}" = "yes"; then
   AC_DEFINE(HAVE_NTGUI, 1, [Define to use native MS Windows GUI.])
+  if test "$with_toolkit_scroll_bars" = "no"; then
+    AC_MSG_ERROR([Non-toolkit scroll bars are not implemented for w32 build.])
+  fi
   AC_CHECK_TOOL(WINDRES, [windres],
                 [AC_MSG_ERROR([No resource compiler found.])])
   W32_OBJ="w32fns.o w32menu.o w32reg.o w32font.o w32term.o"
@@ -3072,10 +3075,12 @@ if test "${opsys}" = "mingw32"; then
   AH_TEMPLATE(HAVE_JPEG, [Define to 1 if you have the jpeg library (-ljpeg).])dnl
   if test "${HAVE_JPEG}" = "yes"; then
     AC_DEFINE(HAVE_JPEG)
-    AC_EGREP_CPP([version= *(6[2-9]|[7-9][0-9])],
-        [#include <jpeglib.h>
-	 version=JPEG_LIB_VERSION
-],
+    AC_EGREP_CPP([version 6b or later],
+	[#include <jpeglib.h>
+	 #if JPEG_LIB_VERSION >= 62
+	 version 6b or later
+	 #endif
+	],
         [AC_DEFINE(HAVE_JPEG)],
         [AC_MSG_WARN([libjpeg found, but not version 6b or later])
         HAVE_JPEG=no])
@@ -3091,10 +3096,12 @@ elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes"; then
   AH_TEMPLATE(HAVE_JPEG, [Define to 1 if you have the jpeg library (-ljpeg).])dnl
   if test "${HAVE_JPEG}" = "yes"; then
     AC_DEFINE(HAVE_JPEG)
-    AC_EGREP_CPP([version= *(6[2-9]|[7-9][0-9])],
+    AC_EGREP_CPP([version 6b or later],
 	[#include <jpeglib.h>
-	 version=JPEG_LIB_VERSION
-],
+	 #if JPEG_LIB_VERSION >= 62
+	 version 6b or later
+	 #endif
+	],
 	[AC_DEFINE(HAVE_JPEG)],
 	[AC_MSG_WARN([libjpeg found, but not version 6b or later])
 	HAVE_JPEG=no])
@@ -4627,7 +4634,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2014 Free Software Foundation, Inc."
+copyright="Copyright (C) 2015 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)
@@ -4948,7 +4955,7 @@ AC_SUBST(WINDOW_SYSTEM_OBJ)
 
 AH_TOP([/* GNU Emacs site configuration template file.
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2014
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2015
   Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.

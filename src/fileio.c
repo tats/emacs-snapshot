@@ -1,6 +1,6 @@
 /* File IO for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-2014 Free Software Foundation, Inc.
+Copyright (C) 1985-1988, 1993-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -828,20 +828,16 @@ make_temp_name (Lisp_Object prefix, bool base64_p)
 
 DEFUN ("make-temp-name", Fmake_temp_name, Smake_temp_name, 1, 1, 0,
        doc: /* Generate temporary file name (string) starting with PREFIX (a string).
-The Emacs process number forms part of the result,
-so there is no danger of generating a name being used by another process.
+The Emacs process number forms part of the result, so there is no
+danger of generating a name being used by another Emacs process
+\(so long as only a single host can access the containing directory...).
 
-In addition, this function makes an attempt to choose a name
-which has no existing file.  To make this work,
-PREFIX should be an absolute file name.
+This function tries to choose a name that has no existing file.
+For this to work, PREFIX should be an absolute file name.
 
 There is a race condition between calling `make-temp-name' and creating the
-file which opens all kinds of security holes.  For that reason, you should
-probably use `make-temp-file' instead, except in three circumstances:
-
-* If you are creating the file in the user's home directory.
-* If you are creating a directory rather than an ordinary file.
-* If you are taking special precautions as `make-temp-file' does.  */)
+file, which opens all kinds of security holes.  For that reason, you should
+normally use `make-temp-file' instead.  */)
   (Lisp_Object prefix)
 {
   return make_temp_name (prefix, 0);
@@ -1166,7 +1162,7 @@ filesystem tree, not (expand-file-name ".."  dirname).  */)
 	      char newdir_utf8[MAX_UTF8_PATH];
 
 	      filename_from_ansi (newdir, newdir_utf8);
-	      tem = build_string (newdir_utf8);
+	      tem = make_unibyte_string (newdir_utf8, strlen (newdir_utf8));
 	    }
 	  else
 #endif
@@ -1200,7 +1196,7 @@ filesystem tree, not (expand-file-name ".."  dirname).  */)
 	      /* `getpwnam' may return a unibyte string, which will
 		 bite us since we expect the directory to be
 		 multibyte.  */
-	      tem = build_string (newdir);
+	      tem = make_unibyte_string (newdir, strlen (newdir));
 	      if (multibyte && !STRING_MULTIBYTE (tem))
 		{
 		  hdir = DECODE_FILE (tem);
@@ -4308,8 +4304,11 @@ by calling `format-decode', which see.  */)
       coding_system = CODING_ID_NAME (coding.id);
     }
   else if (inserted > 0)
-    adjust_after_insert (PT, PT_BYTE, PT + inserted, PT_BYTE + inserted,
-			 inserted);
+    {
+      invalidate_buffer_caches (current_buffer, PT, PT + inserted);
+      adjust_after_insert (PT, PT_BYTE, PT + inserted, PT_BYTE + inserted,
+			   inserted);
+    }
 
   /* Call after-change hooks for the inserted text, aside from the case
      of normal visiting (not with REPLACE), which is done in a new buffer

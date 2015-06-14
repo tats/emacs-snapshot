@@ -1,8 +1,12 @@
+2015-04-10  Nicolas Petton  <nicolas@petton.fr>
+
+	* Version 24.5 released.
+
 2014-10-20  Glenn Morris  <rgm@gnu.org>
 
 	* Version 24.4 released.
 
-2014-09-30  Bill Wohler	 <wohler@newt.com>
+2014-09-30  Bill Wohler  <wohler@newt.com>
 
 	Release MH-E version 8.6.
 
@@ -3668,7 +3672,7 @@
 	* ChangeLog.1: New file.  Contains old ChangeLog.
 
 
-	Copyright (C) 2005-2014 Free Software Foundation, Inc.
+	Copyright (C) 2005-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

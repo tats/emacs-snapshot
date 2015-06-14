@@ -1,6 +1,6 @@
 ;;; comint.el --- general command interpreter in a window stuff -*- lexical-binding: t -*-
 
-;; Copyright (C) 1988, 1990, 1992-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1988, 1990, 1992-2015 Free Software Foundation, Inc.
 
 ;; Author: Olin Shivers <shivers@cs.cmu.edu>
 ;;	Simon Marshall <simon@gnu.org>
@@ -1532,14 +1532,20 @@ the function `isearch-message'."
     ;; the initial comint prompt.
     (if (overlayp comint-history-isearch-message-overlay)
 	(move-overlay comint-history-isearch-message-overlay
-		      (save-excursion (forward-line 0) (point))
+		      (save-excursion
+			(goto-char (comint-line-beginning-position))
+			(forward-line 0)
+			(point))
                       (comint-line-beginning-position))
       (setq comint-history-isearch-message-overlay
-	    (make-overlay (save-excursion (forward-line 0) (point))
+	    (make-overlay (save-excursion
+			    (goto-char (comint-line-beginning-position))
+			    (forward-line 0)
+			    (point))
                           (comint-line-beginning-position)))
       (overlay-put comint-history-isearch-message-overlay 'evaporate t))
     (overlay-put comint-history-isearch-message-overlay
-		 'display (isearch-message-prefix c-q-hack ellipsis))
+		 'display (isearch-message-prefix ellipsis isearch-nonincremental))
     (if (and comint-input-ring-index (not ellipsis))
 	;; Display the current history index.
 	(message "History item: %d" (1+ comint-input-ring-index))
@@ -1775,7 +1781,10 @@ Similarly for Soar, Scheme, etc."
       (widen)
       (let* ((pmark (process-mark proc))
              (intxt (if (>= (point) (marker-position pmark))
-                        (progn (if comint-eol-on-send (end-of-line))
+                        (progn (if comint-eol-on-send
+				   (if comint-use-prompt-regexp
+				       (end-of-line)
+				     (goto-char (field-end))))
                                (buffer-substring pmark (point)))
                       (let ((copy (funcall comint-get-old-input)))
                         (goto-char pmark)
@@ -2206,7 +2215,10 @@ the current line with any initial string matching the regexp
              (null (get-char-property (setq bof (field-beginning)) 'field)))
 	(field-string-no-properties bof)
       (comint-bol)
-      (buffer-substring-no-properties (point) (line-end-position)))))
+      (buffer-substring-no-properties (point)
+				      (if comint-use-prompt-regexp
+					  (line-end-position)
+					(field-end))))))
 
 (defun comint-copy-old-input ()
   "Insert after prompt old input at point as new input to be edited.
@@ -2264,7 +2276,10 @@ a buffer local variable."
     ;; if there are two fields on a line, then the first one is the
     ;; prompt, and the second one is an input field, and is front-sticky
     ;; (as input fields should be).
-    (constrain-to-field (line-beginning-position) (line-end-position))))
+    (constrain-to-field (if (eq (field-at-pos (point)) 'output)
+                            (line-beginning-position)
+                          (field-beginning))
+                        (line-end-position))))
 
 (defun comint-bol (&optional arg)
   "Go to the beginning of line, then skip past the prompt, if any.

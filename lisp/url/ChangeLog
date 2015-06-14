@@ -1,3 +1,20 @@
+2015-04-10  Nicolas Petton  <nicolas@petton.fr>
+
+	* Version 24.5 released.
+
+2015-03-26  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* url-handlers.el (url-insert-file-contents): Call
+	after-insert-file-set-coding like insert-file-contents, to set
+	buffer-file-coding-system (bug#20010).  [Backport]
+
+2014-10-20  Glenn Morris  <rgm@gnu.org>
+
+	* url-vars.el (url-bug-address): Make into an obsolete alias.
+	* url-http.el (url-http-handle-authentication):
+	* url-news.el (url-news-fetch-message-id):
+	Use M-x report-emacs-bug in help messages.
+
 2014-10-20  Glenn Morris  <rgm@gnu.org>
 
 	* Version 24.4 released.
@@ -2945,7 +2962,8 @@
 ;; coding: utf-8
 ;; End:
 
-  Copyright (C) 1999, 2001-2002, 2004-2014 Free Software Foundation, Inc.
+  Copyright (C) 1999, 2001-2002, 2004-2015 Free Software Foundation,
+  Inc.
 
   This file is part of GNU Emacs.
 

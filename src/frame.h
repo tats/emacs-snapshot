@@ -1,5 +1,5 @@
 /* Define frame-object for GNU Emacs.
-   Copyright (C) 1993-1994, 1999-2014 Free Software Foundation, Inc.
+   Copyright (C) 1993-1994, 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1349,7 +1349,7 @@ x_set_bitmap_icon (struct frame *f)
 {
   Lisp_Object obj = assq_no_quit (Qicon_type, f->param_alist);
 
-  if (CONSP (obj))
+  if (CONSP (obj) && !NILP (XCDR (obj)))
     x_bitmap_icon (f, XCDR (obj));
 }
 
