@@ -1,3 +1,11 @@
+emacs24 (24.4+2-1~1.gbpa9dfbe) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @a9dfbefd0acf53a981c1a3f8bb1a9303af48f948 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Jun 2015 12:26:27 -0500
+
 emacs24 (24.4+1-5) unstable; urgency=medium
 
   * emacs24-common: conflict with obsolete gnus-bonus-el package.
