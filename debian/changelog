@@ -1,10 +1,15 @@
-emacs24 (24.4+2-1~1.gbpa9dfbe) UNRELEASED; urgency=medium
+emacs24 (24.5+1-1~1.gbpc27edf) UNRELEASED; urgency=medium
 
-  ** SNAPSHOT build @a9dfbefd0acf53a981c1a3f8bb1a9303af48f948 **
+  ** SNAPSHOT build @c27edf28854d31f1a9f46a1b54d64816d734ff5d **
 
   * UNRELEASED
+  * Adjust debian/changelog for UNRELEASED 24.4+2-1 development
+  * record new upstream branch
+  * merge deb/emacs24/d/sid/dpm-patched into deb/emacs24/d/sid/master.
+    Migrate from the old savannah.gnu.org bzr->git mirror to the new
+    official git repository.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Jun 2015 12:26:27 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Jun 2015 14:04:17 -0500
 
 emacs24 (24.4+1-5) unstable; urgency=medium
 
