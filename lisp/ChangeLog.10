@@ -19978,7 +19978,7 @@
 	(zone): Init `modeline-hidden-level' symbol property.
 	Use `zone-call' instead of `funcall'.
 
-	(zone-pgm-whack-chars): Use `make-string' (fix bug introduced in 1.7).
+	(zone-pgm-whack-chars): Use `make-string' (fix bug introduced in 2001-10-26T20:11:25Z!monnier@iro.umontreal.ca).
 
 	(zone-pgm-stress): Use `zone-hiding-modeline'.
 

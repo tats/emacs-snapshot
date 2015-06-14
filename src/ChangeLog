@@ -205,7 +205,7 @@
 
 	* dispnew.c (buffer_posn_from_coords): Fix an off-by-one error in
 	the reported row in the case of a window with a header line, by
-	improving on the fix committed in r106022
+	improving on the fix committed in 2011-10-08T10:58:50Z!eliz@gnu.org
 	eliz@gnu.org-20111008105850-ht4tvsayohvr1kjc.  (Bug#18384)
 
 2014-09-02  Paul Eggert  <eggert@cs.ucla.edu>
@@ -1751,7 +1751,7 @@
 
 2014-01-27  K. Handa  <handa@gnu.org>
 
-	Fix bug#16286 by a different method from revno:116158 (2014-01-26),
+	Fix bug#16286 by a different method from 2014-01-26T00:32:30Z!eggert@cs.ucla.edu,
 	to preserve the code detection behavior of 24.3.
 	* coding.h (struct coding_system): New member detected_utf8_bytes.
 	* coding.c (detect_coding_utf_8): Set coding->detected_utf8_bytes.
@@ -4714,7 +4714,7 @@
 
 	* image.c (GIFLIB_MAJOR, GIFLIB_MINOR, GIFLIB_RELEASE): Move back
 	after inclusion of gif_lib.h, thus fixing compiler warnings caused
-	by revision 114614 (commit of 2013-10-10).
+	by 2013-10-10T19:15:33Z!eggert@cs.ucla.edu.
 
 2013-10-11  Eli Zaretskii  <eliz@gnu.org>
 
@@ -8007,7 +8007,7 @@
 
 	* keyboard.c (kbd_buffer_get_event):
 	* w32term.c (x_focus_changed): Port FOCUS_(IN|OUT)_EVENT changes to W32.
-	Followup to revno:113431.
+	Followup to 2013-07-16T11:41:06Z!jan.h.d@swipnet.se.
 
 2013-07-18  Paul Eggert  <eggert@cs.ucla.edu>
 

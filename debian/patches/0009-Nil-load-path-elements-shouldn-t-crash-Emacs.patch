@@ -1,4 +1,4 @@
-From be3e084c88ddd5292f485fd59216d016fec6ba99 Mon Sep 17 00:00:00 2001
+From 4303525f58e56e4ea9cb7c9c5d8944f5122705fd Mon Sep 17 00:00:00 2001
 From: Glenn Morris <rgm@gnu.org>
 Date: Sun, 9 Nov 2014 23:12:37 -0800
 Subject: Nil load-path elements shouldn't crash Emacs
@@ -16,7 +16,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  2 files changed, 5 insertions(+)
 
 diff --git a/lisp/ChangeLog b/lisp/ChangeLog
-index 781b3ab..b162ebc 100644
+index 4c9b60e..334c73f 100644
 --- a/lisp/ChangeLog
 +++ b/lisp/ChangeLog
 @@ -1,3 +1,7 @@

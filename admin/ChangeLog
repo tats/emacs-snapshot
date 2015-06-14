@@ -1060,7 +1060,7 @@
 2011-07-07  Juanma Barranquero  <lekktu@gmail.com>
 
 	* unidata/makefile.w32-in (charprop-SH, charprop-CMD):
-	Duplicate change in Makefile.in (revno:105007).
+	Duplicate change in Makefile.in (2011-07-06T22:43:48Z!handa@m17n.org).
 
 2011-07-06  Kenichi Handa  <handa@m17n.org>
 

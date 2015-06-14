@@ -13008,7 +13008,7 @@
 2004-08-27  Jan Djärv  <jan.h.d@swipnet.se>
 
 	* xmenu.c (set_frame_menubar): Reintroduce inhibit_garbage_collection
-	from 1.233 so that strings from ENCODE_UTF_8 isn't GC:ed before used.
+	from 2002-07-15T00:01:34Z!raeburn@raeburn.org so that strings from ENCODE_UTF_8 isn't GC:ed before used.
 
 	* gtkutil.c (xg_create_frame_widgets): Compensate for tool bar when
 	tool bar items is 0.
@@ -19757,7 +19757,7 @@
 
 	* keymap.c (accessible_keymaps_1): Break cycles but without preventing
 	multiple occurrences of the same keymap under different prefixes.
-	(Faccessible_keymaps): Remove code redundant since rev 1.82.
+	(Faccessible_keymaps): Remove code redundant since 1994-08-03T07:39:00Z!rms@gnu.org.
 
 2003-03-16  Jason Rumney  <jasonr@gnu.org>
 

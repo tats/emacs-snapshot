@@ -12260,7 +12260,7 @@
 2006-02-24  Alan Mackenzie  <bug-cc-mode@gnu.org>
 
 	* progmodes/cc-mode.el:
-	[Supersedes patch to cc-engine.el V 1.45]
+	[Supersedes patch to cc-engine.el 2005-12-16T20:07:49Z!monnier@iro.umontreal.ca]
 	(c-after-change): Protect the match data with save-match-data.
 	It was getting corrupted by c-after-change-check-<>-operators.
 
@@ -18286,7 +18286,7 @@
 
 	* bookmark.el (bookmark-write-file): Don't visit the destination
 	file, just write the data to it using write-region.  This is
-	similar to revision 1.32 of saveplace.el, but with an additional
+	similar to saveplace.el at 2005-05-29T08:36:26Z!rms@gnu.org, but with an additional
 	change to avoid visiting the file in the first place.
 
 2005-11-12  Chong Yidong  <cyd@stupidchicken.com>
@@ -29666,7 +29666,7 @@
 2005-04-10  Karl Fogel  <kfogel@red-bean.com>
 
 	* bookmark.el (bookmark-write-file): Catch errors writing file.
-	This is the same change as revision 1.30 of saveplace.el.
+	This is the same change as saveplace.el at 2005-04-10T23:32:00Z!rms@gnu.org.
 
 2005-04-10  Richard M. Stallman  <rms@gnu.org>
 

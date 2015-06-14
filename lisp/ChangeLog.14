@@ -5336,7 +5336,7 @@
 2008-11-19  Karl Fogel  <kfogel@red-bean.com>
 
 	* bookmark.el (bookmark-jump-noselect): Move the deprecation
-	notice into the doc string, following up to revision 1.117.
+	notice into the doc string, following up to 2008-10-29T17:42:49Z!cyd@stupidchicken.com.
 
 2008-11-19  Lute Kamstra  <lute@gnu.org>
 
@@ -18498,7 +18498,7 @@
 	`bookmark-make-cell-function'.
 	(bookmark-make, bookmark-send-annotation): Update for above.
 	(bookmark-make-record-for-text-file):
-	Was `bookmark-make-cell-for-text-file'.  Fix doc string re rev 1.102.
+	Was `bookmark-make-cell-for-text-file'.  Fix doc string re 2008-03-07T05:00:18Z!monnier@iro.umontreal.ca.
 
 	* info.el: Adjust accordingly.
 	(Info-bookmark-make-record): Was `Info-bookmark-make-cell'.

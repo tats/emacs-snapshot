@@ -17760,7 +17760,7 @@
 2006-03-16  Reiner Steib  <Reiner.Steib@gmx.de>
 
 	* gmm-utils.el (gmm-image-load-path-for-library): Prefer user's
-	images in image-load-path.  [Sync with image.el, revision 1.60, in
+	images in image-load-path.  [Sync with image.el at 2006-03-16T16:55:26Z!wohler@newt.com, in
 	Emacs.]
 
 2006-03-15  Reiner Steib  <Reiner.Steib@gmx.de>
@@ -17768,7 +17768,7 @@
 	* gmm-utils.el (gmm-image-load-path-for-library): Pass value of
 	path rather than symbol.  Always return list of directories.
 	Guarantee that image directory comes first.  [Sync with image.el,
-	revision 1.59, in Emacs.]
+	, in Emacs2006-03-15T17:06:16Z!wohler@newt.com.]
 
 	* message.el (message-make-tool-bar): Adjust to new API of
 	`gmm-image-load-path-for-library'.
@@ -17876,7 +17876,7 @@
 	Simplify resetting gnus-article-browse-html-temp-list.
 
 	* gmm-utils.el (gmm-image-load-path-for-library): Sync with
-	mh-compat.el revision 1.9 in Emacs.  Rename `gmm-image-load-path'.
+	mh-compat.el at 2006-03-04T21:23:21Z!wohler@newt.com in Emacs.  Rename `gmm-image-load-path'.
 	Add example to docstring.  Rename local variables.  Move error
 	checks to default case in cond and simplify.
 

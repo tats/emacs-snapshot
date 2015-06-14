@@ -2073,7 +2073,7 @@
 	hooks are local hooks.
 
 	* org-agenda.el (org-agenda-mode): Use `org-add-hook' and merge
-	upstream change from Emacs revno r112320.
+	upstream change from Emacs 2013-04-18T00:12:33Z!monnier@iro.umontreal.ca.
 
 	* ob-core.el (org-babel-pop-to-session-maybe): Fix docstring.
 	(org-babel-pop-to-session-maybe): Use true function's name,
