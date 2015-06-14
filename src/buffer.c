@@ -1,6 +1,6 @@
 /* Buffer manipulation primitives for GNU Emacs.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2014 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1995, 1997-2015 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -6092,9 +6092,9 @@ from happening repeatedly and making Emacs nonfunctional.  */);
 	       doc: /* List of functions to call after each text change.
 Three arguments are passed to each function: the positions of
 the beginning and end of the range of changed text,
-and the length in bytes of the pre-change text replaced by that range.
+and the length in chars of the pre-change text replaced by that range.
 \(For an insertion, the pre-change length is zero;
-for a deletion, that length is the number of bytes deleted,
+for a deletion, that length is the number of chars deleted,
 and the post-change beginning and end are at the same place.)
 
 Buffer changes made while executing the `after-change-functions'
@@ -6242,6 +6242,7 @@ If the buffer has never been shown in a window, the value is nil.  */);
 See the command `transient-mark-mode' for a description of this minor mode.
 
 Non-nil also enables highlighting of the region whenever the mark is active.
+The region is highlighted with the `region' face.
 The variable `highlight-nonselected-windows' controls whether to highlight
 all windows or just the selected window.
 

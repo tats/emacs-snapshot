@@ -1,6 +1,6 @@
 ;;; smie.el --- Simple Minded Indentation Engine -*- lexical-binding: t -*-
 
-;; Copyright (C) 2010-2014 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2015 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: languages, lisp, internal, parsing, indentation
@@ -834,12 +834,12 @@ Possible return values:
 
 ;;; Miscellaneous commands using the precedence parser.
 
-(defun smie-backward-sexp-command (&optional n)
+(defun smie-backward-sexp-command (n)
   "Move backward through N logical elements."
   (interactive "^p")
   (smie-forward-sexp-command (- n)))
 
-(defun smie-forward-sexp-command (&optional n)
+(defun smie-forward-sexp-command (n)
   "Move forward through N logical elements."
   (interactive "^p")
   (let ((forw (> n 0))

@@ -5,5 +5,3 @@
 0005-Modify-the-output-of-version-to-indicate-Debian-modi.patch
 0006-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
 0007-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
-0008-A-race-to-create-info-has-been-eliminated.patch
-0009-Nil-load-path-elements-shouldn-t-crash-Emacs.patch

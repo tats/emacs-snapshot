@@ -1,6 +1,6 @@
 ;;; nnmh.el --- mhspool access for Gnus
 
-;; Copyright (C) 1995-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2015 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -259,12 +259,12 @@ as unread by Gnus.")
 					       &optional server force)
   (nnmh-possibly-change-directory newsgroup server)
   (let ((is-old t)
+	(dir nnmh-current-directory)
 	article rest mod-time)
     (nnheader-init-server-buffer)
 
     (while (and articles is-old)
-      (setq article (concat nnmh-current-directory
-			    (int-to-string (car articles))))
+      (setq article (concat dir (int-to-string (car articles))))
       (when (setq mod-time (nth 5 (file-attributes article)))
 	(if (and (nnmh-deletable-article-p newsgroup (car articles))
 		 (setq is-old

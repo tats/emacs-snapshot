@@ -1,6 +1,7 @@
 ;;; startup.el --- process Emacs shell arguments  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992, 1994-2015 Free Software Foundation,
+;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -1541,7 +1542,10 @@ Each element in the list should be a list of strings or pairs
 	      (title (with-temp-buffer
 		       (insert-file-contents
 			(expand-file-name tut tutorial-directory)
-			nil 0 256)
+			;; Read the entire file, to make sure any
+			;; coding cookies and other local variables
+			;; get acted upon.
+			nil)
 		       (search-forward ".")
 		       (buffer-substring (point-min) (1- (point))))))
 	 ;; If there is a specific tutorial for the current language

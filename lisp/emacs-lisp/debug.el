@@ -1,6 +1,6 @@
 ;;; debug.el --- debuggers and related commands for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1994, 2001-2014 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1994, 2001-2015 Free Software Foundation,
 ;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -193,8 +193,10 @@ first will be printed into the backtrace buffer."
 	       debugger-buffer
 	       `((display-buffer-reuse-window
 		  display-buffer-in-previous-window)
-		  . (,(when debugger-previous-window
-			`(previous-window . ,debugger-previous-window)))))
+		 . (,(when (and (window-live-p debugger-previous-window)
+				(frame-visible-p
+				 (window-frame debugger-previous-window)))
+		       `(previous-window . ,debugger-previous-window)))))
 	      (setq debugger-window (selected-window))
 	      (if (eq debugger-previous-window debugger-window)
 		  (when debugger-jumping-flag

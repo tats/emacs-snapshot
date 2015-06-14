@@ -1,6 +1,6 @@
 /* String search routines for GNU Emacs.
 
-Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2014 Free Software
+Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2015 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -731,6 +731,12 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
 					       start, &next_change);
 		if (result)
 		  {
+		    /* When the cache revalidation is deferred,
+		       next-change might point beyond ZV, which will
+		       cause assertion violation in CHAR_TO_BYTE below.
+		       Limit next_change to ZV to avoid that.  */
+		    if (next_change > ZV)
+		      next_change = ZV;
 		    start = next_change;
 		    lim1 = next_change = end;
 		  }

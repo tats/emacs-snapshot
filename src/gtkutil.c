@@ -1,6 +1,6 @@
 /* Functions for creating and updating GTK widgets.
 
-Copyright (C) 2003-2014 Free Software Foundation, Inc.
+Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -167,7 +167,9 @@ xg_display_open (char *display_name, Display **dpy)
 {
   GdkDisplay *gdpy;
 
+  unrequest_sigio ();  // See comment in x_display_ok, xterm.c.
   gdpy = gdk_display_open (display_name);
+  request_sigio ();
   if (!gdpy_def && gdpy)
     {
       gdpy_def = gdpy;
@@ -2103,7 +2105,7 @@ xg_get_font (struct frame *f, const char *default_name)
 	  args[8] = QCtype;
 	  args[9] = Qxft;
 
-	  font = Ffont_spec (8, args);
+	  font = Ffont_spec (10, args);
 
 	  pango_font_description_free (desc);
 	  dupstring (&x_last_font_name, name);
@@ -3570,7 +3572,9 @@ update_theme_scrollbar_width (void)
   gtk_widget_destroy (wscroll);
   g_object_unref (G_OBJECT (wscroll));
   w += 2*b;
+#ifndef HAVE_GTK3
   if (w < 16) w = 16;
+#endif
   scroll_bar_width_for_theme = w;
 }
 

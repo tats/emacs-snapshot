@@ -1,6 +1,6 @@
 /* Display generation from window structure and buffer text.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2014 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2015 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -1403,6 +1403,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   struct text_pos top;
   int visible_p = 0;
   struct buffer *old_buffer = NULL;
+  bool r2l = false;
 
   if (FRAME_INITIAL_P (XFRAME (WINDOW_FRAME (w))))
     return visible_p;
@@ -1688,6 +1689,8 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	  *rowh = max (0, (min (bottom_y, it.last_visible_y)
 			   - max (top_y, window_top_y)));
 	  *vpos = it.vpos;
+	  if (it.bidi_it.paragraph_dir == R2L)
+	    r2l = true;
 	}
     }
   else
@@ -1717,6 +1720,8 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			   - max (it2.current_y,
 				  WINDOW_HEADER_LINE_HEIGHT (w))));
 	  *vpos = it2.vpos;
+	  if (it2.bidi_it.paragraph_dir == R2L)
+	    r2l = true;
 	}
       else
 	bidi_unshelve_cache (it2data, 1);
@@ -1726,10 +1731,20 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   if (old_buffer)
     set_buffer_internal_1 (old_buffer);
 
-  if (visible_p && w->hscroll > 0)
-    *x -=
-      window_hscroll_limited (w, WINDOW_XFRAME (w))
-      * WINDOW_FRAME_COLUMN_WIDTH (w);
+  if (visible_p)
+    {
+      if (w->hscroll > 0)
+	*x -=
+	  window_hscroll_limited (w, WINDOW_XFRAME (w))
+	  * WINDOW_FRAME_COLUMN_WIDTH (w);
+      /* For lines in an R2L paragraph, we need to mirror the X pixel
+         coordinate wrt the text area.  For the reasons, see the
+         commentary in buffer_posn_from_coords and the explanation of
+         the geometry used by the move_it_* functions at the end of
+         the large commentary near the beginning of this file.  */
+      if (r2l)
+	*x = window_box_width (w, TEXT_AREA) - *x - 1;
+    }
 
 #if 0
   /* Debugging code.  */
@@ -3419,7 +3434,6 @@ handle_stop (struct it *it)
   it->dpvec = NULL;
   it->current.dpvec_index = -1;
   handle_overlay_change_p = !it->ignore_overlay_strings_at_pos_p;
-  it->ignore_overlay_strings_at_pos_p = 0;
   it->ellipsis_p = 0;
 
   /* Use face of preceding text for ellipsis (if invisible) */
@@ -3510,7 +3524,6 @@ handle_stop (struct it *it)
 		pop_it (it);
 	      else
 		{
-		  it->ignore_overlay_strings_at_pos_p = true;
 		  it->string_from_display_prop_p = 0;
 		  it->from_disp_prop_p = 0;
 		  handle_overlay_change_p = 0;
@@ -5617,6 +5630,12 @@ next_overlay_string (struct it *it)
       if (it->sp > 0 && STRINGP (it->string) && !SCHARS (it->string))
 	pop_it (it);
 
+      /* Since we've exhausted overlay strings at this buffer
+	 position, set the flag to ignore overlays until we move to
+	 another position.  The flag is reset in
+	 next_element_from_buffer.  */
+      it->ignore_overlay_strings_at_pos_p = true;
+
       /* If we're at the end of the buffer, record that we have
 	 processed the overlay strings there already, so that
 	 next_element_from_buffer doesn't try it again.  */
@@ -7322,27 +7341,15 @@ set_iterator_to_next (struct it *it, int reseat_p)
       else if (it->cmp_it.id >= 0)
 	{
 	  /* We are currently getting glyphs from a composition.  */
-	  int i;
-
 	  if (! it->bidi_p)
 	    {
 	      IT_CHARPOS (*it) += it->cmp_it.nchars;
 	      IT_BYTEPOS (*it) += it->cmp_it.nbytes;
-	      if (it->cmp_it.to < it->cmp_it.nglyphs)
-		{
-		  it->cmp_it.from = it->cmp_it.to;
-		}
-	      else
-		{
-		  it->cmp_it.id = -1;
-		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
-						IT_BYTEPOS (*it),
-						it->end_charpos, Qnil);
-		}
 	    }
-	  else if (! it->cmp_it.reversed_p)
+	  else
 	    {
-	      /* Composition created while scanning forward.  */
+	      int i;
+
 	      /* Update IT's char/byte positions to point to the first
 		 character of the next grapheme cluster, or to the
 		 character visually after the current composition.  */
@@ -7350,52 +7357,34 @@ set_iterator_to_next (struct it *it, int reseat_p)
 		bidi_move_to_visually_next (&it->bidi_it);
 	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_CHARPOS (*it) = it->bidi_it.charpos;
+	    }
 
-	      if (it->cmp_it.to < it->cmp_it.nglyphs)
-		{
-		  /* Proceed to the next grapheme cluster.  */
-		  it->cmp_it.from = it->cmp_it.to;
-		}
-	      else
-		{
-		  /* No more grapheme clusters in this composition.
-		     Find the next stop position.  */
-		  ptrdiff_t stop = it->end_charpos;
-		  if (it->bidi_it.scan_dir < 0)
-		    /* Now we are scanning backward and don't know
-		       where to stop.  */
-		    stop = -1;
-		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
-						IT_BYTEPOS (*it), stop, Qnil);
-		}
+	  if ((! it->bidi_p || ! it->cmp_it.reversed_p)
+	      && it->cmp_it.to < it->cmp_it.nglyphs)
+	    {
+	      /* Composition created while scanning forward.  Proceed
+		 to the next grapheme cluster.  */
+	      it->cmp_it.from = it->cmp_it.to;
+	    }
+	  else if ((it->bidi_p && it->cmp_it.reversed_p)
+		   && it->cmp_it.from > 0)
+	    {
+	      /* Composition created while scanning backward.  Proceed
+		 to the previous grapheme cluster.  */
+	      it->cmp_it.to = it->cmp_it.from;
 	    }
 	  else
 	    {
-	      /* Composition created while scanning backward.  */
-	      /* Update IT's char/byte positions to point to the last
-		 character of the previous grapheme cluster, or the
-		 character visually after the current composition.  */
-	      for (i = 0; i < it->cmp_it.nchars; i++)
-		bidi_move_to_visually_next (&it->bidi_it);
-	      IT_BYTEPOS (*it) = it->bidi_it.bytepos;
-	      IT_CHARPOS (*it) = it->bidi_it.charpos;
-	      if (it->cmp_it.from > 0)
-		{
-		  /* Proceed to the previous grapheme cluster.  */
-		  it->cmp_it.to = it->cmp_it.from;
-		}
-	      else
-		{
-		  /* No more grapheme clusters in this composition.
-		     Find the next stop position.  */
-		  ptrdiff_t stop = it->end_charpos;
-		  if (it->bidi_it.scan_dir < 0)
-		    /* Now we are scanning backward and don't know
-		       where to stop.  */
-		    stop = -1;
-		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
-						IT_BYTEPOS (*it), stop, Qnil);
-		}
+	      /* No more grapheme clusters in this composition.
+		 Find the next stop position.  */
+	      ptrdiff_t stop = it->end_charpos;
+
+	      if (it->bidi_it.scan_dir < 0)
+		/* Now we are scanning backward and don't know
+		   where to stop.  */
+		stop = -1;
+	      composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
+					    IT_BYTEPOS (*it), stop, Qnil);
 	    }
 	}
       else
@@ -7485,17 +7474,18 @@ set_iterator_to_next (struct it *it, int reseat_p)
 	    reseat_at_next_visible_line_start (it, 1);
 	  else if (it->dpvec_char_len > 0)
 	    {
-	      if (it->method == GET_FROM_STRING
-		  && it->current.overlay_string_index >= 0
-		  && it->n_overlay_strings > 0)
-		it->ignore_overlay_strings_at_pos_p = true;
 	      it->len = it->dpvec_char_len;
 	      set_iterator_to_next (it, reseat_p);
 	    }
 
 	  /* Maybe recheck faces after display vector.  */
 	  if (recheck_faces)
-	    it->stop_charpos = IT_CHARPOS (*it);
+	    {
+	      if (it->method == GET_FROM_STRING)
+		it->stop_charpos = IT_STRING_CHARPOS (*it);
+	      else
+		it->stop_charpos = IT_CHARPOS (*it);
+	    }
 	}
       break;
 
@@ -7524,61 +7514,63 @@ set_iterator_to_next (struct it *it, int reseat_p)
 	}
       if (it->cmp_it.id >= 0)
 	{
-	  int i;
-
+	  /* We are delivering display elements from a composition.
+	     Update the string position past the grapheme cluster
+	     we've just processed.  */
 	  if (! it->bidi_p)
 	    {
 	      IT_STRING_CHARPOS (*it) += it->cmp_it.nchars;
 	      IT_STRING_BYTEPOS (*it) += it->cmp_it.nbytes;
-	      if (it->cmp_it.to < it->cmp_it.nglyphs)
-		it->cmp_it.from = it->cmp_it.to;
-	      else
-		{
-		  it->cmp_it.id = -1;
-		  composition_compute_stop_pos (&it->cmp_it,
-						IT_STRING_CHARPOS (*it),
-						IT_STRING_BYTEPOS (*it),
-						it->end_charpos, it->string);
-		}
-	    }
-	  else if (! it->cmp_it.reversed_p)
-	    {
-	      for (i = 0; i < it->cmp_it.nchars; i++)
-		bidi_move_to_visually_next (&it->bidi_it);
-	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
-	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
-
-	      if (it->cmp_it.to < it->cmp_it.nglyphs)
-		it->cmp_it.from = it->cmp_it.to;
-	      else
-		{
-		  ptrdiff_t stop = it->end_charpos;
-		  if (it->bidi_it.scan_dir < 0)
-		    stop = -1;
-		  composition_compute_stop_pos (&it->cmp_it,
-						IT_STRING_CHARPOS (*it),
-						IT_STRING_BYTEPOS (*it), stop,
-						it->string);
-		}
 	    }
 	  else
 	    {
+	      int i;
+
 	      for (i = 0; i < it->cmp_it.nchars; i++)
 		bidi_move_to_visually_next (&it->bidi_it);
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
-	      if (it->cmp_it.from > 0)
-		it->cmp_it.to = it->cmp_it.from;
-	      else
+	    }
+
+	  /* Did we exhaust all the grapheme clusters of this
+	     composition?  */
+	  if ((! it->bidi_p || ! it->cmp_it.reversed_p)
+	      && (it->cmp_it.to < it->cmp_it.nglyphs))
+	    {
+	      /* Not all the grapheme clusters were processed yet;
+		 advance to the next cluster.  */
+	      it->cmp_it.from = it->cmp_it.to;
+	    }
+	  else if ((it->bidi_p && it->cmp_it.reversed_p)
+		   && it->cmp_it.from > 0)
+	    {
+	      /* Likewise: advance to the next cluster, but going in
+		 the reverse direction.  */
+	      it->cmp_it.to = it->cmp_it.from;
+	    }
+	  else
+	    {
+	      /* This composition was fully processed; find the next
+		 candidate place for checking for composed
+		 characters.  */
+	      /* Always limit string searches to the string length;
+		 any padding spaces are not part of the string, and
+		 there cannot be any compositions in that padding.  */
+	      ptrdiff_t stop = SCHARS (it->string);
+
+	      if (it->bidi_p && it->bidi_it.scan_dir < 0)
+		stop = -1;
+	      else if (it->end_charpos < stop)
 		{
-		  ptrdiff_t stop = it->end_charpos;
-		  if (it->bidi_it.scan_dir < 0)
-		    stop = -1;
-		  composition_compute_stop_pos (&it->cmp_it,
-						IT_STRING_CHARPOS (*it),
-						IT_STRING_BYTEPOS (*it), stop,
-						it->string);
+		  /* Cf. PRECISION in reseat_to_string: we might be
+		     limited in how many of the string characters we
+		     need to deliver.  */
+		  stop = it->end_charpos;
 		}
+	      composition_compute_stop_pos (&it->cmp_it,
+					    IT_STRING_CHARPOS (*it),
+					    IT_STRING_BYTEPOS (*it), stop,
+					    it->string);
 	    }
 	}
       else
@@ -7601,12 +7593,17 @@ set_iterator_to_next (struct it *it, int reseat_p)
 	      bidi_move_to_visually_next (&it->bidi_it);
 	      IT_STRING_BYTEPOS (*it) = it->bidi_it.bytepos;
 	      IT_STRING_CHARPOS (*it) = it->bidi_it.charpos;
+	      /* If the scan direction changes, we may need to update
+		 the place where to check for composed characters.  */
 	      if (prev_scan_dir != it->bidi_it.scan_dir)
 		{
-		  ptrdiff_t stop = it->end_charpos;
+		  ptrdiff_t stop = SCHARS (it->string);
 
 		  if (it->bidi_it.scan_dir < 0)
 		    stop = -1;
+		  else if (it->end_charpos < stop)
+		    stop = it->end_charpos;
+
 		  composition_compute_stop_pos (&it->cmp_it,
 						IT_STRING_CHARPOS (*it),
 						IT_STRING_BYTEPOS (*it), stop,
@@ -8105,7 +8102,6 @@ static int
 next_element_from_image (struct it *it)
 {
   it->what = IT_IMAGE;
-  it->ignore_overlay_strings_at_pos_p = 0;
   return 1;
 }
 
@@ -8275,6 +8271,7 @@ next_element_from_buffer (struct it *it)
 	     and handle the last stop_charpos that precedes our
 	     current position.  */
 	  handle_stop_backwards (it, it->stop_charpos);
+	  it->ignore_overlay_strings_at_pos_p = false;
 	  return GET_NEXT_DISPLAY_ELEMENT (it);
 	}
       else
@@ -8291,6 +8288,7 @@ next_element_from_buffer (struct it *it)
 		it->base_level_stop = it->stop_charpos;
 	    }
 	  handle_stop (it);
+	  it->ignore_overlay_strings_at_pos_p = false;
 	  return GET_NEXT_DISPLAY_ELEMENT (it);
 	}
     }
@@ -8318,6 +8316,7 @@ next_element_from_buffer (struct it *it)
 	}
       else
 	handle_stop_backwards (it, it->base_level_stop);
+      it->ignore_overlay_strings_at_pos_p = false;
       return GET_NEXT_DISPLAY_ELEMENT (it);
     }
   else
@@ -8326,6 +8325,10 @@ next_element_from_buffer (struct it *it)
 	 character from current_buffer.  */
       unsigned char *p;
       ptrdiff_t stop;
+
+      /* We moved to the next buffer position, so any info about
+	 previously seen overlays is no longer valid.  */
+      it->ignore_overlay_strings_at_pos_p = false;
 
       /* Maybe run the redisplay end trigger hook.  Performance note:
 	 This doesn't seem to cost measurable time.  */
@@ -8780,12 +8783,7 @@ move_it_in_display_line_to (struct it *it,
 			 doesn't fit on the line, e.g. a wide image.  */
 		      it->hpos == 0
 		      || (new_x == it->last_visible_x
-			  && FRAME_WINDOW_P (it->f)
-			  /* When word-wrap is ON and we have a valid
-			     wrap point, we don't allow the last glyph
-			     to "just barely fit" on the line.  */
-			  && (it->line_wrap != WORD_WRAP
-			      || wrap_it.sp < 0)))
+			  && FRAME_WINDOW_P (it->f)))
 		    {
 		      ++it->hpos;
 		      it->current_x = new_x;
@@ -8800,7 +8798,16 @@ move_it_in_display_line_to (struct it *it,
 			  if (BUFFER_POS_REACHED_P ())
 			    {
 			      if (it->line_wrap != WORD_WRAP
-				  || wrap_it.sp < 0)
+				  || wrap_it.sp < 0
+				  /* If we've just found whitespace to
+				     wrap, effectively ignore the
+				     previous wrap point -- it is no
+				     longer relevant, but we won't
+				     have an opportunity to update it,
+				     since we've reached the edge of
+				     this screen line.  */
+				  || (may_wrap
+				      && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
 				  it->hpos = hpos_before_this_char;
 				  it->current_x = x_before_this_char;
@@ -8852,7 +8859,8 @@ move_it_in_display_line_to (struct it *it,
 				}
 			      if (ITERATOR_AT_END_OF_LINE_P (it)
 				  && (it->line_wrap != WORD_WRAP
-				      || wrap_it.sp < 0))
+				      || wrap_it.sp < 0
+				      || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
 				  result = MOVE_NEWLINE_OR_CR;
 				  break;
@@ -8863,7 +8871,26 @@ move_it_in_display_line_to (struct it *it,
 		  else
 		    IT_RESET_X_ASCENT_DESCENT (it);
 
-		  if (wrap_it.sp >= 0)
+		  /* If the screen line ends with whitespace, and we
+		     are under word-wrap, don't use wrap_it: it is no
+		     longer relevant, but we won't have an opportunity
+		     to update it, since we are done with this screen
+		     line.  */
+		  if (may_wrap && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+		    {
+		      /* If we've found TO_X, go back there, as we now
+			 know the last word fits on this screen line.  */
+		      if ((op & MOVE_TO_X) && new_x == it->last_visible_x
+			  && atx_it.sp >= 0)
+			{
+			  RESTORE_IT (it, &atx_it, atx_data);
+			  atpos_it.sp = -1;
+			  atx_it.sp = -1;
+			  result = MOVE_X_REACHED;
+			  break;
+			}
+		    }
+		  else if (wrap_it.sp >= 0)
 		    {
 		      RESTORE_IT (it, &wrap_it, wrap_data);
 		      atpos_it.sp = -1;
@@ -9379,6 +9406,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       && it->current_x == it->last_visible_x - 1
       && it->c != '\n'
       && it->c != '\t'
+      && it->w->window_end_valid
       && it->vpos < it->w->window_end_vpos)
     {
       it->continuation_lines_width += it->current_x;
@@ -11779,12 +11807,6 @@ prepare_menu_bars (void)
 #ifdef HAVE_WINDOW_SYSTEM
 	  update_tool_bar (f, 0);
 #endif
-#ifdef HAVE_NS
-          if (windows_or_buffers_changed
-	      && FRAME_NS_P (f))
-            ns_set_doc_edited
-	      (f, Fbuffer_modified_p (XWINDOW (f->selected_window)->contents));
-#endif
 	  UNGCPRO;
 	}
 
@@ -14149,6 +14171,9 @@ redisplay_internal (void)
 #endif /* HAVE_WINDOW_SYSTEM */
 
  end_of_redisplay:
+#ifdef HAVE_NS
+  ns_set_doc_edited ();
+#endif
   if (interrupt_input && interrupts_deferred)
     request_sigio ();
 
@@ -15524,7 +15549,8 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp, int *scroll_ste
   /* Likewise there was a check whether window_end_vpos is nil or larger
      than the window.  Now window_end_vpos is int and so never nil, but
      let's leave eassert to check whether it fits in the window.  */
-  eassert (w->window_end_vpos < w->current_matrix->nrows);
+  eassert (!w->window_end_valid
+	   || w->window_end_vpos < w->current_matrix->nrows);
 
   /* Handle case where text has not changed, only point, and it has
      not moved off the frame.  */
@@ -15965,6 +15991,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   if (!just_this_one_p
       && REDISPLAY_SOME_P ()
       && !w->redisplay
+      && !w->update_mode_line
       && !f->redisplay
       && !buffer->text->redisplay
       && BUF_PT (buffer) == w->last_point)
@@ -16309,16 +16336,24 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
 	  set_cursor_from_row (w, row, w->desired_matrix, 0, 0, 0, 0);
 
-	  /* If we are highlighting the region, then we just changed
-	     the region, so redisplay to show it.  */
-	  /* FIXME: We need to (re)run pre-redisplay-function!  */
-	  /* if (markpos_of_region () >= 0)
+	  /* Re-run pre-redisplay-function so it can update the region
+	     according to the new position of point.  */
+	  /* Other than the cursor, w's redisplay is done so we can set its
+	     redisplay to false.  Also the buffer's redisplay can be set to
+	     false, since propagate_buffer_redisplay should have already
+	     propagated its info to `w' anyway.  */
+	  w->redisplay = false;
+	  XBUFFER (w->contents)->text->redisplay = false;
+	  safe__call1 (true, Vpre_redisplay_function, Fcons (window, Qnil));
+
+	  if (w->redisplay || XBUFFER (w->contents)->text->redisplay)
 	    {
+	      /* pre-redisplay-function made changes (e.g. move the region)
+		 that require another round of redisplay.  */
 	      clear_glyph_matrix (w->desired_matrix);
 	      if (!try_window (window, startp, 0))
 		goto need_larger_matrices;
 	    }
-	  */
 	}
       if (w->cursor.vpos < 0 || !cursor_row_fully_visible_p (w, 0, 0))
 	{
@@ -18180,6 +18215,21 @@ try_window_id (struct window *w)
   if (f->fonts_changed)
     return -1;
 
+  /* The redisplay iterations in display_line above could have
+     triggered font-lock, which could have done something that
+     invalidates IT->w window's end-point information, on which we
+     rely below.  E.g., one package, which will remain unnamed, used
+     to install a font-lock-fontify-region-function that called
+     bury-buffer, whose side effect is to switch the buffer displayed
+     by IT->w, and that predictably resets IT->w's window_end_valid
+     flag, which we already tested at the entry to this function.
+     Amply punish such packages/modes by giving up on this
+     optimization in those cases.  */
+  if (!w->window_end_valid)
+    {
+      clear_glyph_matrix (w->desired_matrix);
+      return -1;
+    }
 
   /* Compute differences in buffer positions, y-positions etc.  for
      lines reused at the bottom of the window.  Compute what we can
@@ -18750,7 +18800,10 @@ DEFUN ("dump-glyph-matrix", Fdump_glyph_matrix,
        doc: /* Dump the current matrix of the selected window to stderr.
 Shows contents of glyph row structures.  With non-nil
 parameter GLYPHS, dump glyphs as well.  If GLYPHS is 1 show
-glyphs in short form, otherwise show glyphs in long form.  */)
+glyphs in short form, otherwise show glyphs in long form.
+
+Interactively, no argument means show glyphs in short form;
+with numeric argument, its value is passed as the GLYPHS flag.  */)
   (Lisp_Object glyphs)
 {
   struct window *w = XWINDOW (selected_window);
@@ -18768,11 +18821,16 @@ glyphs in short form, otherwise show glyphs in long form.  */)
 
 
 DEFUN ("dump-frame-glyph-matrix", Fdump_frame_glyph_matrix,
-       Sdump_frame_glyph_matrix, 0, 0, "", doc: /* */)
+       Sdump_frame_glyph_matrix, 0, 0, "", doc: /* Dump the current glyph matrix of the selected frame to stderr.
+Only text-mode frames have frame glyph matrices.  */)
   (void)
 {
   struct frame *f = XFRAME (selected_frame);
-  dump_glyph_matrix (f->current_matrix, 1);
+
+  if (f->current_matrix)
+    dump_glyph_matrix (f->current_matrix, 1);
+  else
+    fprintf (stderr, "*** This frame doesn't have a frame glyph matrix ***\n");
   return Qnil;
 }
 
@@ -20364,7 +20422,8 @@ display_line (struct it *it)
 			{
 			  /* If line-wrap is on, check if a previous
 			     wrap point was found.  */
-			  if (wrap_row_used > 0
+			  if (!IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)
+			      && wrap_row_used > 0
 			      /* Even if there is a previous wrap
 				 point, continue the line here as
 				 usual, if (i) the previous character
@@ -20394,6 +20453,18 @@ display_line (struct it *it)
 				  row->continued_p = 0;
 				  row->exact_window_width_line_p = 1;
 				}
+			      /* If line-wrap is on, check if a
+				 previous wrap point was found.  */
+			      else if (wrap_row_used > 0
+				       /* Even if there is a previous wrap
+					  point, continue the line here as
+					  usual, if (i) the previous character
+					  was a space or tab AND (ii) the
+					  current character is not.  */
+				       && (!may_wrap
+					   || IT_DISPLAYING_WHITESPACE (it)))
+				goto back_to_wrap;
+
 			    }
 			}
 		      else if (it->bidi_p)
@@ -24926,13 +24997,16 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 	  else
 	    overlap_hl = DRAW_NORMAL_TEXT;
 
+	  if (hl != overlap_hl)
+	    clip_head = head;
 	  j = i;
 	  BUILD_GLYPH_STRINGS (j, start, h, t,
 			       overlap_hl, dummy_x, last_x);
 	  start = i;
 	  compute_overhangs_and_x (t, head->x, 1);
 	  prepend_glyph_string_lists (&head, &tail, h, t);
-	  clip_head = head;
+	  if (clip_head == NULL)
+	    clip_head = head;
 	}
 
       /* Prepend glyph strings for glyphs in front of the first glyph
@@ -24953,7 +25027,8 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 	  else
 	    overlap_hl = DRAW_NORMAL_TEXT;
 
-	  clip_head = head;
+	  if (hl == overlap_hl || clip_head == NULL)
+	    clip_head = head;
 	  BUILD_GLYPH_STRINGS (i, start, h, t,
 			       overlap_hl, dummy_x, last_x);
 	  for (s = h; s; s = s->next)
@@ -24977,13 +25052,16 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 	  else
 	    overlap_hl = DRAW_NORMAL_TEXT;
 
+	  if (hl != overlap_hl)
+	    clip_tail = tail;
 	  BUILD_GLYPH_STRINGS (end, i, h, t,
 			       overlap_hl, x, last_x);
 	  /* Because BUILD_GLYPH_STRINGS updates the first argument,
 	     we don't have `end = i;' here.  */
 	  compute_overhangs_and_x (h, tail->x + tail->width, 0);
 	  append_glyph_string_lists (&head, &tail, h, t);
-	  clip_tail = tail;
+	  if (clip_tail == NULL)
+	    clip_tail = tail;
 	}
 
       /* Append glyph strings for glyphs following the last glyph
@@ -25001,7 +25079,8 @@ draw_glyphs (struct window *w, int x, struct glyph_row *row,
 	  else
 	    overlap_hl = DRAW_NORMAL_TEXT;
 
-	  clip_tail = tail;
+	  if (hl == overlap_hl || clip_tail == NULL)
+	    clip_tail = tail;
 	  i++;			/* We must include the Ith glyph.  */
 	  BUILD_GLYPH_STRINGS (end, i, h, t,
 			       overlap_hl, x, last_x);
@@ -25377,6 +25456,15 @@ produce_image_glyph (struct it *it)
       enum glyph_row_area area = it->area;
 
       glyph = it->glyph_row->glyphs[area] + it->glyph_row->used[area];
+      if (it->glyph_row->reversed_p)
+	{
+	  struct glyph *g;
+
+	  /* Make room for the new glyph.  */
+	  for (g = glyph - 1; g >= it->glyph_row->glyphs[it->area]; g--)
+	    g[1] = *g;
+	  glyph = it->glyph_row->glyphs[it->area];
+	}
       if (glyph < it->glyph_row->glyphs[area + 1])
 	{
 	  glyph->charpos = CHARPOS (it->position);
@@ -27451,7 +27539,7 @@ erase_phys_cursor (struct window *w)
   /* Maybe clear the display under the cursor.  */
   if (w->phys_cursor_type == HOLLOW_BOX_CURSOR)
     {
-      int x, y, left_x;
+      int x, y;
       int header_line_height = WINDOW_HEADER_LINE_HEIGHT (w);
       int width;
 
@@ -27460,13 +27548,15 @@ erase_phys_cursor (struct window *w)
 	goto mark_cursor_off;
 
       width = cursor_glyph->pixel_width;
-      left_x = window_box_left_offset (w, TEXT_AREA);
       x = w->phys_cursor.x;
-      if (x < left_x)
-	width -= left_x - x;
+      if (x < 0)
+	{
+	  width += x;
+	  x = 0;
+	}
       width = min (width, window_box_width (w, TEXT_AREA) - x);
       y = WINDOW_TO_FRAME_PIXEL_Y (w, max (header_line_height, cursor_row->y));
-      x = WINDOW_TEXT_TO_FRAME_PIXEL_X (w, max (x, left_x));
+      x = WINDOW_TEXT_TO_FRAME_PIXEL_X (w, x);
 
       if (width > 0)
 	FRAME_RIF (f)->clear_frame_area (f, x, y, width, cursor_row->visible_height);

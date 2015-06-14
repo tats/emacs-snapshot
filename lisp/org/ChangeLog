@@ -1,19 +1,23 @@
+2015-04-10  Nicolas Petton  <nicolas@petton.fr>
+
+	* Version 24.5 released.
+
 2014-10-20  Glenn Morris  <rgm@gnu.org>
 
 	* Version 24.4 released.
 
 2014-10-12  Marco Wahl  <marcowahlsoft@gmail.com>
 
-        * org-agenda.el (org-get-entries-from-diary): Use
+	* org-agenda.el (org-get-entries-from-diary): Use
 	`diary-fancy-display' instead of the obsolete
 	`diary-display-hook'.
 
 2014-10-12  Nicolas Goaziou  <mail@nicolasgoaziou.fr>
 
-        * ox.el (org-export-async-start): Limit first argument to lambda
+	* ox.el (org-export-async-start): Limit first argument to lambda
 	expressions.
 
-        * ox-publish.el (org-publish, org-publish-all)
+	* ox-publish.el (org-publish, org-publish-all)
 	(org-publish-current-file): Replace `ignore', per limit stated
 	above.
 
@@ -13060,7 +13064,7 @@
 2012-01-03  Nicolas Goaziou  <n.goaziou@gmail.com>
 
 	* org.el (org-fontify-meta-lines-and-blocks-1):
-	Recognize "name" as a valid keyword that can preceed a block.
+	Recognize "name" as a valid keyword that can precede a block.
 
 2012-01-03  Eric Schulte  <schulte.eric@gmail.com>
 
@@ -25352,7 +25356,7 @@
 	(org-ascii-replace-entities): New function.
 
 2010-04-10  Carsten Dominik  <carsten.dominik@gmail.com>
-            Ulf Stegemann  <ulf@zeitform.de>
+	    Ulf Stegemann  <ulf@zeitform.de>
 
 	* org-entities.el: New file.
 
@@ -32784,7 +32788,7 @@
 ;; add-log-time-zone-rule: t
 ;; End:
 
-	Copyright (C) 2008-2014 Free Software Foundation, Inc.
+	Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

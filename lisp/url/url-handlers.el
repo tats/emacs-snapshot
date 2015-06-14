@@ -1,6 +1,6 @@
 ;;; url-handlers.el --- file-name-handler stuff for URL loading
 
-;; Copyright (C) 1996-1999, 2004-2014 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2004-2015 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
 
@@ -324,8 +324,13 @@ They count bytes from the beginning of the body."
         (unless (cadr size-and-charset)
           ;; If the headers don't specify any particular charset, use the
           ;; usual heuristic/rules that we apply to files.
-          (decode-coding-inserted-region start (point) url visit beg end replace))
-        (list url (car size-and-charset))))))
+          (decode-coding-inserted-region start (point) url
+                                         visit beg end replace))
+        (let ((inserted (car size-and-charset)))
+          (when (fboundp 'after-insert-file-set-coding)
+            (let ((insval (after-insert-file-set-coding inserted visit)))
+              (if insval (setq inserted insval))))
+          (list url inserted))))))
 
 (put 'insert-file-contents 'url-file-handlers 'url-insert-file-contents)
 

@@ -1,4 +1,4 @@
-From ad1401c4f2aa1e416a1aa9b2bfd2e9d4d69f7786 Mon Sep 17 00:00:00 2001
+From 861368ea768f8c458d08d5768536cec47bcccd16 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:25 -0500
 Subject: Adjust documentation references for Debian.
@@ -12,7 +12,7 @@ appropriate, etc.
  1 file changed, 5 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index eba9b94..c12b782 100644
+index 7d9e1f0..5e3b3b7 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
 @@ -14,6 +14,11 @@ and NEWS.1-17 for changes in older Emacs versions.
@@ -25,5 +25,5 @@ index eba9b94..c12b782 100644
 +Please see /usr/share/doc/emacs24-common/README.Debian.gz.
 +
  
- * Installation Changes in Emacs 24.4
+ * Changes in Emacs 24.5
  

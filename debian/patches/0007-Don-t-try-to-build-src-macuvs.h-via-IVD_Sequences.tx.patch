@@ -1,4 +1,4 @@
-From 62fd831f6126f948d0010474858f6f02bd761c88 Mon Sep 17 00:00:00 2001
+From 77abacb3b4d4bcb51bedf5d98881c069be402408 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Tue, 21 Oct 2014 19:10:17 -0500
 Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
@@ -10,7 +10,7 @@ over the licensing.
  1 file changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index 3074864..3ad81a9 100644
+index 9781cd5..c73e2b5 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
 @@ -33,12 +33,7 @@ emacs = "${EMACS}" -batch --no-site-file --no-site-lisp
@@ -21,7 +21,7 @@ index 3074864..3ad81a9 100644
 -
 -${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt
 -	${EMACS} -batch -l "${srcdir}/uvs.el" \
--	  --eval '(uvs-print-table-ivd "${srcdir}/IVD_Sequences.txt" "Adobe-Japan1")' \
+-	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
 -	  > $@
 +all: ${DSTDIR}/charprop.el
  

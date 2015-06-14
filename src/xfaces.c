@@ -1,6 +1,6 @@
 /* xfaces.c -- "Face" primitives.
 
-Copyright (C) 1993-1994, 1998-2014 Free Software Foundation, Inc.
+Copyright (C) 1993-1994, 1998-2015 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -5793,7 +5793,7 @@ map_tty_color (struct frame *f, struct face *face,
   if (STRINGP (color)
       && SCHARS (color)
       && CONSP (Vtty_defined_color_alist)
-      && (def = assq_no_quit (color, call1 (Qtty_color_alist, frame)),
+      && (def = assoc_no_quit (color, call1 (Qtty_color_alist, frame)),
 	  CONSP (def)))
     {
       /* Associations in tty-defined-color-alist are of the form

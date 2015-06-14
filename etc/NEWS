@@ -1,6 +1,6 @@
 GNU Emacs NEWS -- history of user-visible changes.
 
-Copyright (C) 2010-2014 Free Software Foundation, Inc.
+Copyright (C) 2010-2015 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 Please send Emacs bug reports to bug-gnu-emacs@gnu.org.
@@ -18,6 +18,47 @@ with a prefix argument or by typing C-u C-h C-n.
 * Debian specific changes to Emacs
 
 Please see /usr/share/doc/emacs24-common/README.Debian.gz.
+
+
+* Changes in Emacs 24.5
+
+** This is mainly a bug-fix release, but there are some other changes.
+
+** The default value of `history-length' has increased to 100.
+
+** The variable `redisplay-dont-pause' is obsolete.
+
+
+* Changes in Specialized Modes and Packages in Emacs 24.5
+
+** `call-process-shell-command' and `process-file-shell-command' no longer
+take "&rest args".
+
+** The option `browse-url-firefox-startup-arguments' no longer has an effect.
+
+** ERC
+
+*** New option `erc-rename-buffers'.
+
+*** New faces `erc-my-nick-prefix-face' and `erc-nick-prefix-face'.
+
+*** `erc-format-@nick' displays all user modes instead of only op and voice.
+
+*** The display of irc commands in the current buffer has been disabled.
+
+*** `erc-version' now follows the Emacs version.
+
+** Obsolete packages
+
+*** cc-compat.el
+
+*** crisp.el (moved to elpa.gnu.org)
+
+*** tpu-edt.el, ws-mode.el
+These emulations of old editors are believed to be no longer relevant
+ - contact emacs-devel@gnu.org if you disagree.
+
+*** vi.el, vip.el (try M-x viper instead)
 
 
 * Installation Changes in Emacs 24.4
@@ -3523,7 +3564,7 @@ frame or window as an Elisp object.
 
 *** New variable `completion-extra-properties' used to specify extra
 properties of the current completion:
-- :annotate-function, same as the old completion-annotate-function.
+- :annotation-function, same as the old completion-annotate-function.
 - :exit-function, function to call after completion took place.
 
 *** Functions on `completion-at-point-functions' can return any of the

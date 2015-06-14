@@ -1,6 +1,6 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2014 Free Software
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2015 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -2850,11 +2850,16 @@ Any other value means to ask for each directory."
 ;; to e.g. recursive-delete-file and put it somewhere else.
 (defun dired-delete-file (file &optional recursive trash) "\
 Delete FILE or directory (possibly recursively if optional RECURSIVE is true.)
-RECURSIVE determines what to do with a non-empty directory.  If RECURSIVE is:
-nil, do not delete.
-`always', delete recursively without asking.
-`top', ask for each directory at top level.
-Anything else, ask for each sub-directory."
+RECURSIVE determines what to do with a non-empty directory.  The effect of
+its possible values is:
+
+  nil           -- do not delete.
+  `always'      -- delete recursively without asking.
+  `top'         -- ask for each directory at top level.
+  Anything else -- ask for each sub-directory.
+
+TRASH non-nil means to trash the file instead of deleting, provided
+`delete-by-moving-to-trash' (which see) is non-nil."
   ;; This test is equivalent to
   ;; (and (file-directory-p fn) (not (file-symlink-p fn)))
   ;; but more efficient
@@ -3302,6 +3307,7 @@ As always, hidden subdirs are not affected."
 
 (defun dired-read-regexp (prompt &optional default history)
   "Read a regexp using `read-regexp'."
+  (declare (obsolete read-regexp "24.5"))
   (read-regexp prompt default (or history 'dired-regexp-history)))
 
 (defun dired-mark-files-regexp (regexp &optional marker-char)
@@ -3312,8 +3318,9 @@ A prefix argument means to unmark them instead.
 REGEXP is an Emacs regexp, not a shell wildcard.  Thus, use `\\.o$' for
 object files--just `.o' will mark more than you might think."
   (interactive
-   (list (dired-read-regexp (concat (if current-prefix-arg "Unmark" "Mark")
-				    " files (regexp): "))
+   (list (read-regexp (concat (if current-prefix-arg "Unmark" "Mark")
+                              " files (regexp): ")
+                      nil 'dired-regexp-history)
 	 (if current-prefix-arg ?\040)))
   (let ((dired-marker-char (or marker-char dired-marker-char)))
     (dired-mark-if
@@ -3328,8 +3335,9 @@ object files--just `.o' will mark more than you might think."
 A prefix argument means to unmark them instead.
 `.' and `..' are never marked."
   (interactive
-   (list (dired-read-regexp (concat (if current-prefix-arg "Unmark" "Mark")
-				    " files containing (regexp): "))
+   (list (read-regexp (concat (if current-prefix-arg "Unmark" "Mark")
+                              " files containing (regexp): ")
+                      nil 'dired-regexp-history)
 	 (if current-prefix-arg ?\040)))
   (let ((dired-marker-char (or marker-char dired-marker-char)))
     (dired-mark-if
@@ -3359,7 +3367,8 @@ A prefix argument means to unmark them instead.
 The match is against the non-directory part of the filename.  Use `^'
   and `$' to anchor matches.  Exclude subdirs by hiding them.
 `.' and `..' are never flagged."
-  (interactive (list (dired-read-regexp "Flag for deletion (regexp): ")))
+  (interactive (list (read-regexp "Flag for deletion (regexp): "
+                                  nil 'dired-regexp-history)))
   (dired-mark-files-regexp regexp dired-del-marker))
 
 (defun dired-mark-symlinks (unflag-p)
@@ -3879,7 +3888,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 
 ;;; Start of automatically extracted autoloads.
 
-;;;### (autoloads nil "dired-aux" "dired-aux.el" "1a8e2a4a9117ab3a2586aa001358d3fb")
+;;;### (autoloads nil "dired-aux" "dired-aux.el" "ff408a17776696840db60d57b10ec2f4")
 ;;; Generated autoloads from dired-aux.el
 
 (autoload 'dired-diff "dired-aux" "\
@@ -4382,7 +4391,7 @@ instead.
 
 ;;;***
 
-;;;### (autoloads nil "dired-x" "dired-x.el" "291bc6e869bf72c900604c45d40f45ed")
+;;;### (autoloads nil "dired-x" "dired-x.el" "d8d702a50887671b9128ba60bd9ebb8e")
 ;;; Generated autoloads from dired-x.el
 
 (autoload 'dired-jump "dired-x" "\

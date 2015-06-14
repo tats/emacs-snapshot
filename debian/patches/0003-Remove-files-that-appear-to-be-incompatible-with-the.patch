@@ -1,4 +1,4 @@
-From cc10190b64be9b875f102331b720fe192445c270 Mon Sep 17 00:00:00 2001
+From 14846bbc299bdcf3becfc2bdd00a9f062e34bf3f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG
@@ -31,7 +31,7 @@ Status: new
  6 files changed, 35 insertions(+), 747 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 103b035..e5d98d2 100644
+index 4987cf6..c8e3b0e 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -147,7 +147,9 @@ man1dir=$(mandir)/man1
@@ -45,7 +45,7 @@ index 103b035..e5d98d2 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -810,10 +812,7 @@ mostlyclean: FRC
+@@ -815,10 +817,7 @@ mostlyclean: FRC
  	cd lib      && $(MAKE) $(MFLAGS) mostlyclean
  	cd lib-src  && $(MAKE) $(MFLAGS) mostlyclean
  	cd nt       && $(MAKE) $(MFLAGS) mostlyclean
@@ -56,7 +56,7 @@ index 103b035..e5d98d2 100644
  
  ### `clean'
  ###      Delete all files from the current directory that are normally
-@@ -831,10 +830,7 @@ clean: FRC
+@@ -836,10 +835,7 @@ clean: FRC
  	cd lib      && $(MAKE) $(MFLAGS) clean
  	cd lib-src  && $(MAKE) $(MFLAGS) clean
  	cd nt       && $(MAKE) $(MFLAGS) clean
@@ -67,7 +67,7 @@ index 103b035..e5d98d2 100644
  	cd nextstep && $(MAKE) $(MFLAGS) clean
  
  ### `bootclean'
-@@ -857,10 +853,7 @@ distclean: FRC
+@@ -862,10 +858,7 @@ distclean: FRC
  	cd lib      && $(MAKE) $(MFLAGS) distclean
  	cd lib-src  && $(MAKE) $(MFLAGS) distclean
  	cd nt       && $(MAKE) $(MFLAGS) distclean
@@ -78,7 +78,7 @@ index 103b035..e5d98d2 100644
  	cd leim     && $(MAKE) $(MFLAGS) distclean
  	cd lisp     && $(MAKE) $(MFLAGS) distclean
  	cd nextstep && $(MAKE) $(MFLAGS) distclean
-@@ -879,10 +872,7 @@ bootstrap-clean: FRC
+@@ -884,10 +877,7 @@ bootstrap-clean: FRC
  	cd lib      && $(MAKE) $(MFLAGS) maintainer-clean
  	cd lib-src  && $(MAKE) $(MFLAGS) maintainer-clean
  	cd nt       && $(MAKE) $(MFLAGS) maintainer-clean
@@ -89,7 +89,7 @@ index 103b035..e5d98d2 100644
  	cd leim     && $(MAKE) $(MFLAGS) bootstrap-clean
  	cd lisp     && $(MAKE) $(MFLAGS) bootstrap-clean
  	cd nextstep && $(MAKE) $(MFLAGS) maintainer-clean
-@@ -943,11 +933,11 @@ check: all
+@@ -948,11 +938,11 @@ check: all
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -106,7 +106,7 @@ index 103b035..e5d98d2 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -970,9 +960,7 @@ info-dir: ${srcdir}/info/dir
+@@ -975,9 +965,7 @@ info-dir: ${srcdir}/info/dir
  ## the info-dir rule from running when not needed.
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  info_dir_deps = ${srcdir}/build-aux/dir_top \
@@ -117,7 +117,7 @@ index 103b035..e5d98d2 100644
  
  ## It would be much simpler if info/dir was only created in the
  ## installation location by the install-info rule, but we also
-@@ -987,14 +975,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+@@ -993,14 +981,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	(cd ${srcdir} && ./build-aux/make-info-dir $${thisdir}/$${tempfile}); \
  	${srcdir}/build-aux/move-if-change $${tempfile} ${srcdir}/info/dir
  
@@ -136,7 +136,7 @@ index 103b035..e5d98d2 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1012,14 +996,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1018,14 +1002,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -156,10 +156,10 @@ index 103b035..e5d98d2 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index b951196..0a06936 100755
+index 0513d07..5b3709d 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -249,8 +249,7 @@ info_dir ()
+@@ -263,8 +263,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -170,7 +170,7 @@ index b951196..0a06936 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/build-aux/make-info-dir b/build-aux/make-info-dir
-index 3f92738..ba74639 100755
+index 5b37cd6..f63c6c67 100755
 --- a/build-aux/make-info-dir
 +++ b/build-aux/make-info-dir
 @@ -76,8 +76,7 @@ for topic in "Texinfo documentation system" "Emacs" "Emacs lisp" \
@@ -184,10 +184,10 @@ index 3f92738..ba74639 100755
          ## FIXME do not ignore w32 if OS is w32.
          case $file in
 diff --git a/configure.ac b/configure.ac
-index 458648e..01b110c 100644
+index 4291453..bdc76bc 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5110,11 +5110,11 @@ dnl This will work, but you get a config.status that is not quite right
+@@ -5117,11 +5117,11 @@ dnl This will work, but you get a config.status that is not quite right
  dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
  dnl That doesn't have any obvious consequences for Emacs, but on the whole
  dnl it seems better to just live with the duplication.
@@ -203,10 +203,10 @@ index 458648e..01b110c 100644
  
  dnl test/ is not present in release tarfiles.
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 4254ebe..bf89361 100644
+index 1644833..6918775 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -59,18 +59,14 @@ INSTALL_DATA = @INSTALL_DATA@
+@@ -57,18 +57,14 @@ INSTALL_DATA = @INSTALL_DATA@
  MAKEINFO = @MAKEINFO@
  MAKEINFO_OPTS = --force -I$(emacsdir)
  
@@ -229,7 +229,7 @@ index 4254ebe..bf89361 100644
  
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
-@@ -133,162 +129,6 @@ ps: $(PS_TARGETS)
+@@ -131,162 +127,6 @@ ps: $(PS_TARGETS)
  
  # Note: "<" is not portable in ordinary make rules.
  
@@ -392,7 +392,7 @@ index 4254ebe..bf89361 100644
  ## No gfdl dependency.
  efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
  efaq : $(buildinfodir)/efaq$(INFO_EXT)
-@@ -314,544 +154,6 @@ efaq-w32.pdf: $(efaq_w32_deps)
+@@ -312,544 +152,6 @@ efaq-w32.pdf: $(efaq_w32_deps)
  efaq-w32.html: $(efaq_w32_deps)
  	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
  
@@ -938,10 +938,10 @@ index 4254ebe..bf89361 100644
  
  mostlyclean:
 diff --git a/lisp/help.el b/lisp/help.el
-index fa2a4f2..03f7e0b 100644
+index 80eb308..d009747 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -286,6 +286,14 @@ If that doesn't give a function, return nil."
+@@ -287,6 +287,14 @@ If that doesn't give a function, return nil."
    (goto-address-mode 1)
    (goto-char (point-min)))
  
@@ -956,7 +956,7 @@ index fa2a4f2..03f7e0b 100644
  (defun describe-distribution ()
    "Display info on how to obtain the latest version of GNU Emacs."
    (interactive)
-@@ -299,7 +307,7 @@ If that doesn't give a function, return nil."
+@@ -300,7 +308,7 @@ If that doesn't give a function, return nil."
  (defun describe-gnu-project ()
    "Display info on the GNU project."
    (interactive)
