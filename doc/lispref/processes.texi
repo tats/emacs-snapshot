@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2014 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2015 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Processes
@@ -63,6 +63,8 @@ Processes}.
 
 @node Subprocess Creation
 @section Functions that Create Subprocesses
+@cindex create subprocess
+@cindex process creation
 
   There are three primitives that create a new subprocess in which to run
 a program.  One of them, @code{start-process}, creates an asynchronous
@@ -501,17 +503,21 @@ inputinput@point{}
 @c It actually uses shell-command-switch, but no need to mention that here.
 @end defun
 
-@defun call-process-shell-command command &optional infile destination display &rest args
+@defun call-process-shell-command command &optional infile destination display
 This function executes the shell command @var{command} synchronously.
-The final arguments @var{args} are additional arguments to add at the
-end of @var{command}.  The other arguments are handled as in
-@code{call-process}.
+The arguments are handled as in @code{call-process}.  An old calling
+convention allowed to pass any number of additional arguments after
+@var{display}, which were concatenated to @var{command}; this is still
+supported, but strongly discouraged.
 @end defun
 
-@defun process-file-shell-command command &optional infile destination display &rest args
+@defun process-file-shell-command command &optional infile destination display
 This function is like @code{call-process-shell-command}, but uses
 @code{process-file} internally.  Depending on @code{default-directory},
-@var{command} can be executed also on remote hosts.
+@var{command} can be executed also on remote hosts.  An old calling
+convention allowed to pass any number of additional arguments after
+@var{display}, which were concatenated to @var{command}; this is still
+supported, but strongly discouraged.
 @end defun
 
 @defun shell-command-to-string command
@@ -734,6 +740,7 @@ happen sooner or later).
 
 @node Process Information
 @section Process Information
+@cindex process information
 
   Several functions return information about processes.
 
