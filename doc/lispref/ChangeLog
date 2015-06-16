@@ -4620,7 +4620,7 @@
 	(System Interface): Add @menu entry for "Dynamic Libraries".
 
 	* display.texi (Image Formats): Remove description of
-	image-library-alist.  (Renamed in revno 101949.)
+	image-library-alist.  (Renamed in 2010-10-13T14:50:06Z!lekktu@gmail.com.)
 
 2010-10-12  Glenn Morris  <rgm@gnu.org>
 

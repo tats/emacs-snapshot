@@ -1,4 +1,4 @@
-From f7290fa33360779d3317615d74e6bbc3cb76aab0 Mon Sep 17 00:00:00 2001
+From cc35bc50ccbda5bebf8b7384167ac5042964185d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
