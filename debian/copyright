@@ -4,14 +4,11 @@ This package is derived from the main Emacs packages which were
 debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
 00:05:45 -0600.
 
-The original source archive is emacs-24.4.tar.gz, and it
-can be found here for stable releases:
-
-  ftp://ftp.gnu.org:/gnu/emacs/
-
-and here for alpha pre-releases:
-
-  ftp://alpha.gnu.org:/gnu/emacs/pretest/
+The original source for this package can be found at
+git://git.savannah.gnu.org/emacs.git under the emacs-24.4 tag.
+That tag was used to create the Debian upstream archive
+(emacs24_24.5+1.orig.tar.bz2) after making adjustments to comply with
+the DFSG (see below).
 
 Please see
 /usr/share/doc/emacs24-common-non-dfsg/README.Debian.gz
@@ -43,24 +40,13 @@ Copyright:
   Documentation License (GFDL).  See the "GNU Free Documentation
   License" node in "info emacs-24/emacs".
 
-  etc/INTERVIEW contains the following statement:
-    Copyright (C) 1986 Richard Stallman.  Permission is granted to
-    make and distribute copies of this article as long as the
-    copyright and this notice appear on all copies.
-
-  etc/MOTIVATION contains the following statement:
-    [reprinted with permission of the author
-     from the Monday 19 January 1987 Boston Globe]
-       
   These files appear to only allow verbatim copying:
     etc/CENSORSHIP
     etc/GNU
     etc/LINUX-GNU
     etc/THE-GNU-PROJECT
     etc/WHY-FREE
-    etc/copying.paper
 
   These files appear to have no explicit copyright statement:
-    etc/COOKIES
     etc/DEVEL.HUMOR
     etc/JOKES
