@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2014 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2015 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Command Loop
@@ -144,6 +144,7 @@ Lisp code.
 @node Using Interactive
 @subsection Using @code{interactive}
 @cindex arguments, interactive entry
+@cindex interactive spec, using
 
   This section describes how to write the @code{interactive} form that
 makes a Lisp function an interactively-callable command, and how to
@@ -744,6 +745,8 @@ part of the prompt.
 
 @node Distinguish Interactive
 @section Distinguish Interactive Calls
+@cindex distinguish interactive calls
+@cindex is this call interactive
 
   Sometimes a command should display additional visual feedback (such
 as an informative message in the echo area) for interactive calls
@@ -832,6 +835,7 @@ Here is another example that contrasts direct and indirect calls to
 
 @node Command Loop Info
 @section Information from the Command Loop
+@cindex command loop variables
 
 The editor command loop sets several Lisp variables to keep status
 records for itself and for commands that are run.  With the exception of
@@ -1481,8 +1485,10 @@ prefix @samp{drag-}.  For example, dragging the mouse with button 2
 held down generates a @code{drag-mouse-2} event.  The second and third
 elements of the event give the starting and ending position of the
 drag, as mouse position lists (@pxref{Click Events}).  You can access
-the second element of any mouse event in the same way, with no need to
-distinguish drag events from others.
+the second element of any mouse event in the same way.  However, the
+drag event may end outside the boundaries of the frame that was
+initially selected.  In that case, the third element's position list
+contains that frame in place of a window.
 
 The @samp{drag-} prefix follows the modifier key prefixes such as
 @samp{C-} and @samp{M-}.
@@ -1627,7 +1633,10 @@ represented by lists that look like this:
 
 @noindent
 @var{position} is a mouse position list (@pxref{Click Events}),
-specifying the current position of the mouse cursor.
+specifying the current position of the mouse cursor.  As with the
+end-position of a drag event, this position list may represent a
+location outside the boundaries of the initially selected frame, in
+which case the list contains that frame in place of a window.
 
 The special form @code{track-mouse} enables generation of motion
 events within its body.  Outside of @code{track-mouse} forms, Emacs
@@ -1842,6 +1851,14 @@ into another window.  That produces a pair of events like these:
                    -453816))
 @end smallexample
 
+The frame with input focus might not take up the entire screen, and
+the user might move the mouse outside the scope of the frame. Inside
+the @code{track-mouse} special form, that produces an event like this:
+
+@smallexample
+(mouse-movement (#<frame *ielm* 0x102849a30> nil (563 . 205) 532301936))
+@end smallexample
+
 To handle a SIGUSR1 signal, define an interactive function, and
 bind it to the @code{signal usr1} event sequence:
 
@@ -1855,6 +1872,7 @@ bind it to the @code{signal usr1} event sequence:
 @node Classifying Events
 @subsection Classifying Events
 @cindex event type
+@cindex classifying events
 
   Every event has an @dfn{event type}, which classifies the event for
 key binding purposes.  For a keyboard event, the event type equals the
@@ -2005,7 +2023,9 @@ Events}); and @code{nil} otherwise.
 various parts of it:
 
 @defun posn-window position
-Return the window that @var{position} is in.
+Return the window that @var{position} is in.  If @var{position}
+represents a location outside the frame where the event was initiated,
+return that frame instead.
 @end defun
 
 @defun posn-area position
@@ -2061,7 +2081,13 @@ Return the actual row and column in @var{position}, as a cons cell
 @code{(@var{col} . @var{row})}.  The values are the actual row and
 column numbers in the window given by @var{position}.  @xref{Click
 Events}, for details.  The function returns @code{nil} if
-@var{position} does not include actual position values.
+@var{position} does not include actual position values; in that case
+@code{posn-col-row} can be used to get approximate values.
+
+Note that this function doesn't account for the visual width of
+characters on display, like the number of visual columns taken by a
+tab character or an image.  If you need the coordinates in canonical
+character units, use @code{posn-col-row} instead.
 @end defun
 
 @defun posn-string position
@@ -2083,8 +2109,9 @@ Return the image or string object in @var{position}, either
 @defun posn-object-x-y position
 Return the pixel-based x and y coordinates relative to the upper left
 corner of the object in @var{position} as a cons cell @code{(@var{dx}
-. @var{dy})}.  If the @var{position} is a buffer position, return the
-relative position in the character at that position.
+. @var{dy})}.  If the @var{position} is on buffer text, return the
+relative position of the buffer-text character closest to that
+position.
 @end defun
 
 @defun posn-object-width-height position
@@ -2580,6 +2607,9 @@ then continues to wait for a valid input character, or keyboard-quit.
 
 @node Event Mod
 @subsection Modifying and Translating Input Events
+@cindex modifiers of events
+@cindex translating input events
+@cindex event translation
 
   Emacs modifies every event it reads according to
 @code{extra-keyboard-modifiers}, then translates it through
@@ -2661,6 +2691,7 @@ at the level of @code{read-key-sequence}.
 
 @node Invoking the Input Method
 @subsection Invoking the Input Method
+@cindex invoking input method
 
   The event-reading functions invoke the current input method, if any
 (@pxref{Input Methods}).  If the value of @code{input-method-function}
@@ -2783,7 +2814,7 @@ most recently unread will be reread first.
 Events read from this list are not normally added to the current
 command's key sequence (as returned by, e.g., @code{this-command-keys}),
 as the events will already have been added once as they were read for
-the first time.  An element of the form @code{(@code{t} . @var{event})}
+the first time.  An element of the form @w{@code{(t . @var{event})}}
 forces @var{event} to be added to the current command's key sequence.
 @end defvar
 

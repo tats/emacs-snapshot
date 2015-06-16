@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 2004-2014 Free Software Foundation, Inc.
+@c Copyright (C) 2004-2015 Free Software Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @c
 @c This file is included either in emacs-xtra.texi (when producing the
@@ -352,7 +352,7 @@ long file name support, set the environment variable @env{LFN} to
 DOS programs to access long file names, so Emacs built for MS-DOS will
 only see their short 8+3 aliases.
 
-@cindex @env{HOME} directory under MS-DOS
+@cindex HOME directory under MS-DOS
   MS-DOS has no notion of home directory, so Emacs on MS-DOS pretends
 that the directory where it is installed is the value of the @env{HOME}
 environment variable.  That is, if your Emacs binary,
