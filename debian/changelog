@@ -1,15 +1,14 @@
-emacs24 (24.5+1-1~1.gbpc27edf) UNRELEASED; urgency=medium
+emacs24 (24.5+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @c27edf28854d31f1a9f46a1b54d64816d734ff5d **
+  * Merge upstream version 24.5 (shift from the bzr->git mirror to the
+    new official upstream git repository for the source).
+    Remove redundant patches:
+      0008-A-race-to-create-info-has-been-eliminated.patch
+      0009-Nil-load-path-elements-shouldn-t-crash-Emacs.patch
 
-  * UNRELEASED
-  * Adjust debian/changelog for UNRELEASED 24.4+2-1 development
-  * record new upstream branch
-  * merge deb/emacs24/d/sid/dpm-patched into deb/emacs24/d/sid/master.
-    Migrate from the old savannah.gnu.org bzr->git mirror to the new
-    official git repository.
+  * Update debian/copyright* for 24.5.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Jun 2015 14:04:17 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 17 Jun 2015 00:06:26 -0500
 
 emacs24 (24.4+1-5) unstable; urgency=medium
 
