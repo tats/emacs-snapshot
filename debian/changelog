@@ -1,15 +1,11 @@
-emacs24-non-dfsg (24.5+1-1~1.gbp3dc8ef) UNRELEASED; urgency=medium
+emacs24-non-dfsg (24.5+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @3dc8ef3201f37cf0c3ec991c5e9014d54de31ac7 **
+  * Upgrade to upstream version 24.5 (shift from the bzr->git mirror
+    to the new official upstream git repository for the source).
 
-  * UNRELEASED
-  * Adjust debian/changelog for UNRELEASED 24.4+2-1 development
-  * record new upstream branch
-  * merge deb/emacs24-non-dfsg/d/sid/dpm-patched into deb/emacs24-non-dfsg/d/sid/master.
-    Migrate from the old savannah.gnu.org bzr->git mirror to the new
-    official git repository.
+  * Update debian/copyright* for 24.5
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 15 Jun 2015 19:35:55 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 17 Jun 2015 00:00:09 -0500
 
 emacs24-non-dfsg (24.4+1-2) unstable; urgency=medium
 
