@@ -145,18 +145,15 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-common.prerm \
   debian/$(flavor)-nox.README.Debian \
   debian/$(flavor)-nox.lintian-overrides \
-  debian/$(flavor)-nox.menu \
   debian/$(flavor)-nox.postinst \
   debian/$(flavor)-nox.prerm \
   debian/$(flavor)-lucid.README.Debian \
   debian/$(flavor)-lucid.desktop \
   debian/$(flavor)-lucid.lintian-overrides \
-  debian/$(flavor)-lucid.menu \
   debian/$(flavor)-lucid.postinst \
   debian/$(flavor)-lucid.prerm \
   debian/$(flavor).README.Debian \
   debian/$(flavor).desktop \
-  debian/$(flavor).menu \
   debian/$(flavor).lintian-overrides \
   debian/$(flavor).postinst \
   debian/$(flavor).prerm
