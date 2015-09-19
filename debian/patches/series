@@ -6,3 +6,4 @@
 0006-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
 0007-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0008-Emacs-won-t-assume-grep-supports-GREP_OPTIONS.patch
+0009-Emacs-should-no-longer-hang-during-large-yanks.patch
