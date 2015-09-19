@@ -1,3 +1,11 @@
+emacs24 (24.5+1-2~1.gbp9ccbd2) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @9ccbd2c2ceea8c887946fa257e26ed44482a791d **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 19 Sep 2015 12:26:18 -0500
+
 emacs24 (24.5+1-1) unstable; urgency=medium
 
   * Merge upstream version 24.5 (shift from the bzr->git mirror to the
