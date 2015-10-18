@@ -10,3 +10,5 @@ Icon=@DEB_FLAVOR@
 Type=Application
 Terminal=false
 Categories=Utility;Development;TextEditor;
+StartupWMClass=Emacs
+Keywords=Text;Editor;
