@@ -7,7 +7,7 @@
 
 # Copyright 1994,1995 Ian Jackson
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
-# Copyright 1998-2013 Rob Browning <rlb@defaultvalue.org>
+# Copyright 1998-2015 Rob Browning <rlb@defaultvalue.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
 # Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
@@ -143,6 +143,7 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-common.lintian-overrides \
   debian/$(flavor)-common.postinst \
   debian/$(flavor)-common.prerm \
+  debian/$(flavor)-term.desktop \
   debian/$(flavor)-nox.README.Debian \
   debian/$(flavor)-nox.lintian-overrides \
   debian/$(flavor)-nox.postinst \
@@ -277,6 +278,9 @@ debian/$(flavor)-nox.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-lucid.%: debian/emacsVER.% debian/changelog
+	$(call deb_sub,$<,$@)
+
+debian/$(flavor)-term.desktop: debian/emacsVER-term.desktop debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-common.README.Debian: \
@@ -543,10 +547,12 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_x),$(pkgdir_x),$(flavor),x)
 
-          # install desktop entry
+          # install desktop entries
 	  install -d $(pkgdir_x)/usr/share/applications
 	  install -m 0644 \
-	    debian/$(flavor).desktop $(pkgdir_x)/usr/share/applications/
+	    debian/$(flavor).desktop \
+	    debian/$(flavor)-term.desktop \
+	    $(pkgdir_x)/usr/share/applications/
         endif
 
         ##################################################
@@ -555,6 +561,10 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call emacs_inst,build-nox,$(install_dir_nox))
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
+          # install desktop entry
+	  install -d $(pkgdir_x)/usr/share/applications
+	  install -m 0644 \
+	    debian/$(flavor)-term.desktop $(pkgdir_x)/usr/share/applications/
 	  rm -rf $(install_dir_nox)
         endif
 
@@ -565,10 +575,11 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
 
-          # install desktop entry
+          # install desktop entries
 	  install -d $(pkgdir_lucid)/usr/share/applications
 	  install -m 0644 \
 	    debian/$(flavor)-lucid.desktop \
+	    debian/$(flavor)-term.desktop \
 	    $(pkgdir_lucid)/usr/share/applications/
 	  rm -rf $(install_dir_lucid)
         endif
