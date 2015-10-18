@@ -1,3 +1,11 @@
+emacs24 (24.5+1-3~1.gbpfdeb09) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @fdeb093f82f061db29410cd4f71b3f434275dbef **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 18 Oct 2015 11:14:02 -0500
+
 emacs24 (24.5+1-2) unstable; urgency=medium
 
   [ Martin Račák ]
