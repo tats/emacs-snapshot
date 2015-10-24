@@ -1,10 +1,23 @@
-emacs24 (24.5+1-3~1.gbpfdeb09) UNRELEASED; urgency=medium
+emacs24 (24.5+1-3) unstable; urgency=medium
 
-  ** SNAPSHOT build @fdeb093f82f061db29410cd4f71b3f434275dbef **
+  * Split desktop file into term and non-term versions.  Thanks to
+    Norbert Preining <preining@logic.at> for reporting the
+    problem. (Closes: 799935)
 
-  * UNRELEASED
+  * Add upstream StartupWMClass/Keywords to *.desktop.  Copy them from
+    the upstream etc/emacs.desktop.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 18 Oct 2015 11:14:02 -0500
+  * Suggest ncurses-term, needed by term mode.  Thanks to Jorge Morais
+    for reporting the problem and era+debian@iki.fi for forwarding it
+    to Debian. (Closes: 790402)
+
+  * Remove redundant libtiff-dev dependency.
+
+  * emacs-common: recommend emacs-el.  Without it, important bits of
+    Emacs don't work (i.e. C-h f, etc.), and it's not likely to be a
+    significant burden these days.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 24 Oct 2015 14:38:04 -0500
 
 emacs24 (24.5+1-2) unstable; urgency=medium
 
