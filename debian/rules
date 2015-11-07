@@ -607,6 +607,24 @@ override_dh_strip:
 	dh_strip -p$(flavor)-nox --dbg-package=$(flavor)-nox-dbg
 	dh_strip
 
+# This won't be necessary once strip-nondeterminism is fixed.
+.PHONY: override_dh_strip_nondeterminism
+override_dh_strip_nondeterminism:
+	cp -a debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz \
+	  debian/elgz-canary
+	find debian/$(flavor)-el -name "*.el.gz" -printf "%T@ %p\0" \
+	  > debian/elgz-info
+	dh_strip_nondeterminism
+	set -eo pipefail; while read -r -d $$'\0' line; do \
+	  ts="$${line%% *}"; \
+	  path="$${line#* }"; \
+	  touch --date=@"$$ts" "$$path"; \
+	done < debian/elgz-info
+	test ! debian/elgz-canary -nt \
+	  debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz
+	test ! debian/elgz-canary -ot \
+	  debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz
+
 override_dh_testdir:
 	$(testdir)
 
@@ -629,6 +647,8 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/build-lucid \
 	  debian/build-nox \
 	  debian/build-x \
+	  debian/elgz-canary \
+	  debian/elgz-info \
 	  debian/emacsVER-common.README.00 \
 	  debian/emacsVER-common.README.01 \
 	  debian/install-lucid \
