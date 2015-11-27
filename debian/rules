@@ -610,20 +610,27 @@ override_dh_strip:
 # This won't be necessary once strip-nondeterminism is fixed.
 .PHONY: override_dh_strip_nondeterminism
 override_dh_strip_nondeterminism:
-	cp -a debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz \
-	  debian/elgz-canary
-	find debian/$(flavor)-el -name "*.el.gz" -printf "%T@ %p\0" \
-	  > debian/elgz-info
+	if grep "$(flavor)-el" <(dh_listpackages); then \
+	  cp -a debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz \
+	    debian/elgz-canary; \
+	fi
+	cd debian && \
+	find $$(dh_listpackages) -name "*.el.gz" -printf "%T@ %p\0" > elgz-info
 	dh_strip_nondeterminism
-	set -eo pipefail; while read -r -d $$'\0' line; do \
-	  ts="$${line%% *}"; \
-	  path="$${line#* }"; \
-	  touch --date=@"$$ts" "$$path"; \
-	done < debian/elgz-info
-	test ! debian/elgz-canary -nt \
-	  debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz
-	test ! debian/elgz-canary -ot \
-	  debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz
+	set -eo pipefail; \
+	  cd debian; \
+	  while read -r -d $$'\0' line; do \
+	    ts="$${line%% *}"; \
+	    path="$${line#* }"; \
+	    touch --date=@"$$ts" "$$path"; \
+	  done < elgz-info
+	if grep -q "$(flavor)-el" <(dh_listpackages); then \
+	  set -e; \
+	  test ! debian/elgz-canary -nt \
+	    debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz; \
+	  test ! debian/elgz-canary -ot \
+	    debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz; \
+	fi
 
 override_dh_testdir:
 	$(testdir)
