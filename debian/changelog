@@ -1,10 +1,13 @@
-emacs24 (24.5+1-5~1.gbpce18ff) UNRELEASED; urgency=medium
+emacs24 (24.5+1-5) unstable; urgency=medium
 
-  ** SNAPSHOT build @ce18ff7bb3f35bde9344a8346d07187bb7294ad1 **
+  * Only test timestamp preservation for $(flavor)-el.  Only check
+    el.gz timestamp preservation when $(flavor)-el is one of the
+    packages being built (so the canary file will actually be there),
+    but go ahead and fix up the timestamps across all packages.
+    Thanks to David Matthew Mattli <dmm@mattli.us> for reporting the
+    problem. (Closes: 805904)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 27 Nov 2015 12:41:31 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 27 Nov 2015 14:28:00 -0600
 
 emacs24 (24.5+1-4) unstable; urgency=medium
 
