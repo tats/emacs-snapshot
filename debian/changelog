@@ -1,3 +1,11 @@
+emacs24 (24.5+1-5~1.gbpce18ff) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @ce18ff7bb3f35bde9344a8346d07187bb7294ad1 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 27 Nov 2015 12:41:31 -0600
+
 emacs24 (24.5+1-4) unstable; urgency=medium
 
   * Ensure elc timestamps are newer than el files.  Since
