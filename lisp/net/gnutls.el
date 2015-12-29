@@ -189,12 +189,7 @@ here's a recent version of the list.
 It must be omitted, a number, or nil; if omitted or nil it
 defaults to GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT."
   (let* ((type (or type 'gnutls-x509pki))
-         (trustfiles (or trustfiles
-                         (delq nil
-                               (mapcar (lambda (f) (and f (file-exists-p f) f))
-                                       (if (functionp gnutls-trustfiles)
-                                           (funcall gnutls-trustfiles)
-                                         gnutls-trustfiles)))))
+         (trustfiles (or trustfiles (gnutls-trustfiles)))
          (priority-string (or priority-string
                               (cond
                                ((eq type 'gnutls-anon)
@@ -244,6 +239,14 @@ defaults to GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT."
       (signal 'gnutls-error (list process ret)))
 
     process))
+
+(defun gnutls-trustfiles ()
+  "Return a list of usable trustfiles."
+  (delq nil
+        (mapcar (lambda (f) (and f (file-exists-p f) f))
+                (if (functionp gnutls-trustfiles)
+                    (funcall gnutls-trustfiles)
+                  gnutls-trustfiles))))
 
 (declare-function gnutls-error-string "gnutls.c" (error))
 
