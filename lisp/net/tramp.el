@@ -73,6 +73,7 @@
   "Edit remote files with a combination of ssh, scp, etc."
   :group 'files
   :group 'comm
+  :link '(custom-manual "(tramp)Top")
   :version "22.1")
 
 ;; Maybe we need once a real Tramp mode, with key bindings etc.
@@ -306,46 +307,6 @@ started on the local host.  You should specify a remote host
 `localhost' or the name of the local host.  Another host name is
 useful only in combination with `tramp-default-proxies-alist'.")
 
-;;;###tramp-autoload
-(defcustom tramp-ssh-controlmaster-options
-  (let ((result "")
-	(case-fold-search t))
-    (ignore-errors
-      (when (executable-find "ssh")
-	(with-temp-buffer
-	  (call-process "ssh" nil t nil "-o" "ControlMaster")
-	  (goto-char (point-min))
-	  (when (search-forward-regexp "missing.+argument" nil t)
-	    (setq result "-o ControlMaster=auto")))
-	(unless (zerop (length result))
-	  (with-temp-buffer
-	    (call-process
-	     "ssh" nil t nil "-o" "ControlPath=%C" "host.does.not.exist")
-	    (goto-char (point-min))
-	    (if (search-forward-regexp "unknown.+key" nil t)
-		(setq result
-		      (concat result " -o ControlPath='tramp.%%r@%%h:%%p'"))
-	      (setq result (concat result " -o ControlPath='tramp.%%C'"))))
-	  (with-temp-buffer
-	    (call-process "ssh" nil t nil "-o" "ControlPersist")
-	    (goto-char (point-min))
-	    (when (search-forward-regexp "missing.+argument" nil t)
-	      (setq result (concat result " -o ControlPersist=no")))))))
-    result)
-    "Call ssh to detect whether it supports the Control* arguments.
-Return a string to be used in `tramp-methods'."
-    :group 'tramp
-    :version "24.5"
-    :type 'string)
-
-;;;###tramp-autoload
-(defcustom tramp-use-ssh-controlmaster-options
-  (not (zerop (length tramp-ssh-controlmaster-options)))
-  "Whether to use `tramp-ssh-controlmaster-options'."
-  :group 'tramp
-  :version "24.4"
-  :type 'boolean)
-
 (defcustom tramp-default-method
   ;; An external copy method seems to be preferred, because it performs
   ;; much better for large files, and it hasn't too serious delays
@@ -376,9 +337,7 @@ Return a string to be used in `tramp-methods'."
 	    (fboundp 'auth-source-search)
 	    ;; ssh-agent is running.
 	    (getenv "SSH_AUTH_SOCK")
-	    (getenv "SSH_AGENT_PID")
-	    ;; We could reuse the connection.
-	    (> (length tramp-ssh-controlmaster-options) 0))
+	    (getenv "SSH_AGENT_PID"))
 	"scp"
       "ssh"))
    ;; Fallback.
@@ -560,7 +519,7 @@ if you need to change this."
   :type 'string)
 
 (defcustom tramp-login-prompt-regexp
-  ".*ogin\\( .*\\)?: *"
+  ".*\\(user\\|login\\)\\( .*\\)?: *"
   "Regexp matching login-like prompts.
 The regexp should match at end of buffer.
 
@@ -2266,7 +2225,7 @@ Falls back to normal file name handler if no Tramp file name handler exists."
   "Load Tramp file name handler, and perform OPERATION."
   ;; Avoid recursive loading of tramp.el.  `temporary-file-directory'
   ;; does not exist in XEmacs, so we must use something else.
-  (let ((default-directory (or (symbol-value 'temporary-file-directory) "/")))
+  (let ((default-directory "/"))
     (load "tramp" nil t))
   (apply operation args)))
 
@@ -3240,7 +3199,7 @@ User is always nil."
       t)))
 
 (defun tramp-handle-make-symbolic-link
-  (filename linkname &optional ok-if-already-exists)
+  (filename linkname &optional _ok-if-already-exists)
   "Like `make-symbolic-link' for Tramp files."
   (with-parsed-tramp-file-name
       (if (tramp-tramp-file-p filename) filename linkname) nil
