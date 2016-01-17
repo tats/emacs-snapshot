@@ -7244,6 +7244,13 @@ gif_image_p (object)
 
 #endif /* HAVE_NTGUI */
 
+/* Giflib before 5.0 didn't define these macros.  */
+#ifndef GIFLIB_MAJOR
+#define GIFLIB_MAJOR 0
+#endif
+#ifndef GIFLIB_MINOR
+#define GIFLIB_MINOR 0
+#endif
 
 #ifdef HAVE_NTGUI
 
@@ -7350,7 +7357,11 @@ gif_load (f, img)
 	}
 
       /* Open the GIF file.  */
+#if GIFLIB_MAJOR < 5
       gif = fn_DGifOpenFileName (SDATA (file));
+#else
+      gif = fn_DGifOpenFileName (SDATA (file), NULL);
+#endif
       if (gif == NULL)
 	{
 	  image_error ("Cannot open `%s'", file, Qnil);
@@ -7366,7 +7377,11 @@ gif_load (f, img)
       memsrc.len = SBYTES (specified_data);
       memsrc.index = 0;
 
+#if GIFLIB_MAJOR < 5
       gif = fn_DGifOpen (&memsrc, gif_read_from_memory);
+#else
+      gif = fn_DGifOpen (&memsrc, gif_read_from_memory, NULL);
+#endif
       if (!gif)
 	{
 	  image_error ("Cannot open memory source `%s'", img->spec, Qnil);
@@ -7379,7 +7394,11 @@ gif_load (f, img)
   if (!check_image_size (f, gif->SWidth, gif->SHeight))
     {
       image_error ("Invalid image size (see `max-image-size')", Qnil, Qnil);
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
       fn_DGifCloseFile (gif);
+#else
+      fn_DGifCloseFile (gif, NULL);
+#endif
       UNGCPRO;
       return 0;
     }
@@ -7389,7 +7408,11 @@ gif_load (f, img)
   if (rc == GIF_ERROR)
     {
       image_error ("Error reading `%s'", img->spec, Qnil);
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
       fn_DGifCloseFile (gif);
+#else
+      fn_DGifCloseFile (gif, NULL);
+#endif
       UNGCPRO;
       return 0;
     }
@@ -7400,7 +7423,11 @@ gif_load (f, img)
     {
       image_error ("Invalid image number `%s' in image `%s'",
 		   image, img->spec);
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
       fn_DGifCloseFile (gif);
+#else
+      fn_DGifCloseFile (gif, NULL);
+#endif
       UNGCPRO;
       return 0;
     }
@@ -7422,7 +7449,11 @@ gif_load (f, img)
   if (!check_image_size (f, width, height))
     {
       image_error ("Invalid image size (see `max-image-size')", Qnil, Qnil);
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
       fn_DGifCloseFile (gif);
+#else
+      fn_DGifCloseFile (gif, NULL);
+#endif
       UNGCPRO;
       return 0;
     }
@@ -7430,7 +7461,11 @@ gif_load (f, img)
   /* Create the X image and pixmap.  */
   if (!x_create_x_image_and_pixmap (f, width, height, 0, &ximg, &img->pixmap))
     {
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
       fn_DGifCloseFile (gif);
+#else
+      fn_DGifCloseFile (gif, NULL);
+#endif
       UNGCPRO;
       return 0;
     }
@@ -7482,7 +7517,7 @@ gif_load (f, img)
      problems with bytes >= 0x80.  */
   raster = (unsigned char *) gif->SavedImages[ino].RasterBits;
 
-  if (gif->SavedImages[ino].ImageDesc.Interlace)
+  if (GIFLIB_MAJOR < 5 && gif->SavedImages[ino].ImageDesc.Interlace)
     {
       int pass;
       int row = interlace_start[0];
@@ -7537,7 +7572,11 @@ gif_load (f, img)
 				Fcons (make_number (gif->ImageCount),
 				       img->data.lisp_val));
 
+#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
   fn_DGifCloseFile (gif);
+#else
+  fn_DGifCloseFile (gif, NULL);
+#endif
 
   /* Maybe fill in the background field while we have ximg handy. */
   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
