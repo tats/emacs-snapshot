@@ -7,3 +7,13 @@
 0007-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0008-Emacs-won-t-assume-grep-supports-GREP_OPTIONS.patch
 0009-Emacs-should-no-longer-hang-during-large-yanks.patch
+0010-ELF-unexec-Correct-section-header-index.patch
+0011-ELF-unexec-Tidy-code.patch
+0012-ELF-unexec-Merge-Alpha-and-MIPS-COFF-debug-handling.patch
+0013-ELF-unexec-Symbol-table-patching.patch
+0014-ELF-unexec-_OBJC_-symbols-in-bss-sections.patch
+0015-ELF-unexec-R_-_NONE-relocs.patch
+0016-ELF-unexec-Drive-from-PT_LOAD-header-rather-than-sec.patch
+0017-ELF-unexec-Don-t-insert-a-new-section.patch
+0018-src-unexelf.c-NEW_PROGRAM_H-Remove-unused-macro-Bug-.patch
+0019-ELF-unexec-align-section-header.patch
