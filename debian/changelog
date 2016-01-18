@@ -1,3 +1,11 @@
+emacs24 (24.5+1-6~1.gbp6bc878) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @6bc8780a59222d7616f774852fe7ce39e27165b2 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Jan 2016 14:31:17 -0600
+
 emacs24 (24.5+1-5) unstable; urgency=medium
 
   * Only test timestamp preservation for $(flavor)-el.  Only check
