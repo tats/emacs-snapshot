@@ -1,10 +1,25 @@
-emacs24 (24.5+1-6~1.gbp6bc878) UNRELEASED; urgency=medium
+emacs24 (24.5+1-6) unstable; urgency=medium
 
-  ** SNAPSHOT build @6bc8780a59222d7616f774852fe7ce39e27165b2 **
+  * Fix a ppc64el, bss-related build problem.
+    Builds on ppc64el were failing like this:
+      emacs: Program segment above .bss in
+      /«BUILDDIR»/emacs24-24.5+1/debian/build-x/src/temacs
+    Add these upstream patches to fix the problem:
+      0010-ELF-unexec-Correct-section-header-index.patch
+      0011-ELF-unexec-Tidy-code.patch
+      0012-ELF-unexec-Merge-Alpha-and-MIPS-COFF-debug-handling.patch
+      0013-ELF-unexec-Symbol-table-patching.patch
+      0014-ELF-unexec-_OBJC_-symbols-in-bss-sections.patch
+      0015-ELF-unexec-R_-_NONE-relocs.patch
+      0016-ELF-unexec-Drive-from-PT_LOAD-header-rather-than-sec.patch
+      0017-ELF-unexec-Don-t-insert-a-new-section.patch
+      0018-src-unexelf.c-NEW_PROGRAM_H-Remove-unused-macro-Bug-.patch
+      0019-ELF-unexec-align-section-header.patch
+    Thanks to Paul Eggert <eggert@cs.ucla.edu> for help locating the set
+    of patches, and Esa Peuha <esa.peuha@gmail.com> for reporting the
+    problem. (Closes: 808347)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Jan 2016 14:31:17 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Jan 2016 17:58:10 -0600
 
 emacs24 (24.5+1-5) unstable; urgency=medium
 
