@@ -1,3 +1,11 @@
+emacs24-non-dfsg (24.5+1-2~1.gbp4bb2d9) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @4bb2d9b385ac661fe6b2138e4fb653a4c018e608 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Feb 2016 17:41:08 -0600
+
 emacs24-non-dfsg (24.5+1-1) unstable; urgency=medium
 
   * Upgrade to upstream version 24.5 (shift from the bzr->git mirror
