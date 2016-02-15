@@ -91,31 +91,41 @@ debian/%: debian/%.in debian/autogen.sed
 	sed -f debian/autogen.sed "$<" > "$@.tmp"
 	mv "$@.tmp" "$@"
 
-define gen_makefile
-  perl -p \
-    -e "s|\@top_srcdir\@|$(CURDIR)|go;" \
-    -e "s|\@SHELL\@|/bin/bash|go;" \
-    -e "s|\@srcdir\@|$(CURDIR)/$1|go;" \
-    -e "s|\@VPATH\@|$(CURDIR)/$1|go;" \
-    -e "s|\@MAKEINFO\@|makeinfo|go;" \
-    -e "s|\@MKDIR_P\@|mkdir -p|go;" \
-    -e "s|\@INFO_OPTS\@|--no-split|go;" \
-    -e "s|\@INFO_EXT\@|.info|go;" \
-    < $1/Makefile.in > $1/Makefile
-endef
+doc/%/Makefile: doc/%/Makefile.in debian/rules $(autogen_files)
+	sed \
+	  -e "s|@top_srcdir@|$(CURDIR)|g" \
+	  -e "s|@SHELL@|/bin/bash|g" \
+	  -e "s|@srcdir@|.|g" \
+	  -e "s|@MAKEINFO@|makeinfo|g" \
+	  -e "s|@MKDIR_P@|mkdir -p|g" \
+	  -e "s|@INFO_OPTS@|--no-split|g" \
+	  -e "s|@INFO_EXT@|.info|g" "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
-override_dh_auto_configure: $(autogen_files)
-	$(call gen_makefile,doc/emacs)
-	$(call gen_makefile,doc/lispintro)
-	$(call gen_makefile,doc/lispref)
-	$(call gen_makefile,doc/misc)
+doc_makefiles := \
+  doc/emacs/Makefile \
+  doc/lispintro/Makefile \
+  doc/lispref/Makefile \
+  doc/misc/Makefile
 
-override_dh_auto_build: $(autogen_files)
+override_dh_auto_configure: $(doc_makefiles)
+
+# This target just supports parallel builds
+.PHONY: debian/stamp/doc-%
+debian/stamp/doc-%: $(doc_makefiles)
+	$(MAKE) -C $(dir $(patsubst debian/stamp/doc-%,%,$@))
+
+# Only needed because parallel seems to be disabled in auto_build otherwise
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+  parallel := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+else
+  parallel := 1
+endif
+
+override_dh_auto_build: $(doc_makefiles)
 	rm -rf info && install -d info
-	$(MAKE) -C doc/emacs
-	$(MAKE) -C doc/lispintro
-	$(MAKE) -C doc/lispref
-	$(MAKE) -C doc/misc
+	$(MAKE) -j$(parallel) \
+	  -f debian/rules $(foreach m,$(doc_makefiles),debian/stamp/doc-$(m))
 
 pkg_infodir := $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
 
@@ -161,7 +171,6 @@ override_dh_testdir:
 
 override_dh_clean: $(persistent_autogen_files)
 	rm -rf \
-	  debian/*-stamp \
 	  debian/*.tmp \
 	  debian/emacs-common-non-dfsg.README.00 \
 	  debian/emacs-common-non-dfsg.README.01 \
@@ -170,6 +179,7 @@ override_dh_clean: $(persistent_autogen_files)
 	  doc/lispintro/Makefile \
 	  doc/lispref/Makefile \
 	  doc/misc/Makefile \
-	  info
-	rm -f debian/autogen.sed $(nonpersistent_autogen_files)
+	  info \
+	  debian/stamp
+	rm -f debian/autogen.sed $(doc_makefiles) $(nonpersistent_autogen_files)
 	dh_clean
