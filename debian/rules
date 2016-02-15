@@ -45,7 +45,11 @@ flavor := $(shell echo $(src_name) | sed 's/-non-dfsg$$//')
 
 # These files must always exist, i.e. can't ever be cleaned.
 persistent_autogen_files := debian/control debian/copyright
-nonpersistent_autogen_files := debian/$(flavor)-common-non-dfsg.README.Debian
+
+nonpersistent_autogen_files := \
+  debian/$(flavor)-common-non-dfsg.README.Debian \
+  debian/$(flavor)-common-non-dfsg.lintian-overrides
+
 autogen_files := $(persistent_autogen_files) $(nonpersistent_autogen_files)
 
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
@@ -88,6 +92,10 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
 	mv debian/emacs-common-non-dfsg.README.tmp $@
 
 debian/%: debian/%.in debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
+
+debian/$(flavor)-%: debian/emacs-%.in debian/autogen.sed
 	sed -f debian/autogen.sed "$<" > "$@.tmp"
 	mv "$@.tmp" "$@"
 
@@ -161,10 +169,6 @@ override_dh_auto_install: $(autogen_files)
 	  DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
 	    debian/mangle-info $(pkg_infodir)/$${f%.info}.info; \
 	done
-
-	install -d $(pkgdir_common)/usr/share/lintian/overrides
-	cp -a debian/emacs-common-non-dfsg.lintian-overrides \
-	  $(pkgdir_common)/usr/share/lintian/overrides/$(flavor)-common-non-dfsg
 
 override_dh_testdir:
 	dh_testdir debian/emacs-common-non-dfsg.README etc/THE-GNU-PROJECT
