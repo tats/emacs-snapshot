@@ -51,28 +51,17 @@ autogen_files := $(persistent_autogen_files) $(nonpersistent_autogen_files)
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
 common_etc_dir := $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc
 
-define deb_sub
-  perl -p \
-    -e "s|\@PKG_NAME\@|$(pkg_name)|go;" \
-    -e "s|\@MAJOR_VERSION\@|$(major_ver)|go;" \
-    -e "s|\@PACKAGE_VERSION\@|$(debian_ver)|go;" \
-    -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
-    -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
-    -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
-      < debian/$(1) > debian/$(2)
-endef
-
 %:
 	dh $@ --parallel
 
-.PHONY: check-vars
-check-vars:
-	@echo "upstream_ver: $(upstream_ver)"
-	@echo "runtime_ver: $(runtime_ver)"
-	@echo "debian_ver: $(debian_ver)"
-	@echo "debsrc_ver: $(debsrc_ver)"
-	@echo "major_ver: $(major_ver)"
-	@echo "flavor: $(flavor)"
+# For now, assumes there are no "|" characters in the expansions.
+debian/autogen.sed: debian/rules debian/changelog
+	echo 's|@MAJOR_VERSION@|$(major_ver)|g' >> '$@.tmp'
+	echo 's|@PACKAGE_VERSION@|$(debian_ver)|g' >> '$@.tmp'
+	echo 's|@UPSTREAM_VERSION@|$(upstream_ver)|g' >> '$@.tmp'
+	echo 's|@DEBSRC_VERSION@|$(debsrc_ver)|g' >> '$@.tmp'
+	echo 's|@DEB_FLAVOR@|$(flavor)|g' >> '$@.tmp'
+	mv '$@.tmp' '$@'
 
 .PHONY: debian-sync
 debian-sync: $(persistent_autogen_files)
@@ -98,8 +87,9 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
 	  >> debian/emacs-common-non-dfsg.README.tmp
 	mv debian/emacs-common-non-dfsg.README.tmp $@
 
-debian/%: debian/%.in debian/changelog debian/rules
-	$(call deb_sub,$(notdir $<),$(notdir $@))
+debian/%: debian/%.in debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
 
 define gen_makefile
   perl -p \
@@ -129,7 +119,6 @@ override_dh_auto_build: $(autogen_files)
 
 pkg_infodir := $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
 
-override_dh_auto_install: pkg_name := $(flavor)-common-non-dfsg
 override_dh_auto_install: $(autogen_files)
 	rm -rf $(pkgdir_common) && install -d $(pkgdir_common)
 
@@ -182,5 +171,5 @@ override_dh_clean: $(persistent_autogen_files)
 	  doc/lispref/Makefile \
 	  doc/misc/Makefile \
 	  info
-	rm -f $(nonpersistent_autogen_files)
+	rm -f debian/autogen.sed $(nonpersistent_autogen_files)
 	dh_clean
