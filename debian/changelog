@@ -1,3 +1,9 @@
+emacs24 (24.5+1-6~bpo8+1) jessie-backports; urgency=medium
+
+  * Rebuild for jessie-backports.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 19 Mar 2016 14:54:38 -0500
+
 emacs24 (24.5+1-6) unstable; urgency=medium
 
   * Fix a ppc64el, bss-related build problem.
