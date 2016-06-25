@@ -1,6 +1,7 @@
 *~
 .\#*
 /autogen.sed
+/debhelper-build-stamp
 /emacs-common-non-dfsg.README.00
 /emacs-common-non-dfsg.README.01
 /emacs24-common-non-dfsg
