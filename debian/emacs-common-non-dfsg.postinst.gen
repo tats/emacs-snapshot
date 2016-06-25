@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Expects the full list of uncompressed info files, including emacs.info
+
+set -ueo pipefail
+
+if test $# -eq 0; then
+    echo "No info file names provided" 1>&2
+    exit 1
+fi
+
+cat <<EOF
+#!/bin/sh
+
+set -e
+
+if [ "\$1" = configure ] ; then
+    update-alternatives \\
+        --install /usr/share/info/emacs.info.gz \\
+        emacs.info.gz \\
+EOF
+printf -- '        /usr/share/info/%q/emacs.info.gz \\\n' "$DEB_INFO_SUBDIR"
+printf -- '        %q \\\n' "$DEB_ALT_PRIORITY"
+
+first=true
+for f in "$@"; do
+  if [[ $f =~ /emacs.info$ ]]; then
+      continue
+  fi
+  if test $first; then
+      first=''
+      echo -ne '        '
+  else
+    echo -ne ' \\\n        '
+  fi
+  name="$(basename "$f" .gz)"
+  printf -- '--slave /usr/share/info/%q.gz %q.gz \\\n' "$name" "$name"
+  echo -n "        "
+  printf -- '        /usr/share/info/%q/%q.gz' "$DEB_INFO_SUBDIR" "$name"
+done
+
+cat <<EOF
+
+fi
+
+#DEBHELPER#
+EOF

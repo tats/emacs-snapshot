@@ -19,6 +19,10 @@
 
 SHELL := /bin/bash
 quilt := QUILT_PATCHES=debian/patches quilt
+pf := set -o pipefail
+
+# Must match emacs24{,-lucid,-nox} packages
+bin_priority := 27
 
 # For now we assume that emacs' versioning scheme is always
 # MAJOR.MINORtinyrev where MAJOR and MINOR are integers and tinyrev is
@@ -44,16 +48,23 @@ runtime_ver := $(shell echo $(upstream_ver) | sed 's/[^0-9]\+$$//')
 flavor := $(shell echo $(src_name) | sed 's/-non-dfsg$$//')
 
 # These files must always exist, i.e. can't ever be cleaned.
-persistent_autogen_files := debian/control debian/copyright
+persistent_autogen_install_files := debian/control debian/copyright
 
-nonpersistent_autogen_files := \
+transient_autogen_install_files := \
   debian/$(flavor)-common-non-dfsg.README.Debian \
   debian/$(flavor)-common-non-dfsg.lintian-overrides
 
-autogen_files := $(persistent_autogen_files) $(nonpersistent_autogen_files)
+autogen_install_files := \
+  $(persistent_autogen_install_files) $(transient_autogen_install_files)
+
+autogen_installdeb_files := $(addprefix debian/, \
+  $(flavor)-common-non-dfsg.postinst \
+  $(flavor)-common-non-dfsg.prerm)
 
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
-common_etc_dir := $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc
+
+etc_dir := /usr/share/emacs/$(runtime_ver)/etc
+etc_files := CENSORSHIP DEVEL.HUMOR GNU JOKES LINUX-GNU THE-GNU-PROJECT WHY-FREE
 
 %:
 	dh $@ --parallel
@@ -68,7 +79,7 @@ debian/autogen.sed: debian/rules debian/changelog
 	mv '$@.tmp' '$@'
 
 .PHONY: debian-sync
-debian-sync: $(persistent_autogen_files)
+debian-sync: $(persistent_autogen_install_files)
         # so dh pattern rule doesn't try to handle this target
 	true
 
@@ -76,9 +87,10 @@ debian/$(flavor)-common-non-dfsg.README.Debian: \
   debian/emacs-common-non-dfsg.README \
   debian/patches/*.patch debian/patches/series \
   debian/rules debian/patch-to-news
+	$(pf); \
 	cd debian && \
-	  csplit -s -f emacs-common-non-dfsg.README. \
-	  emacs-common-non-dfsg.README '/@@PATCH_LIST_HERE@@/'
+	  sed 's|@MAJOR_VERSION@|$(major_ver)|g' emacs-common-non-dfsg.README \
+	  | csplit -s -f emacs-common-non-dfsg.README. - '/@@PATCH_LIST_HERE@@/'
 	cp debian/emacs-common-non-dfsg.README.00 \
 	  debian/emacs-common-non-dfsg.README.tmp
 	for p in $$($(quilt) series); do \
@@ -99,7 +111,16 @@ debian/$(flavor)-%: debian/emacs-%.in debian/autogen.sed
 	sed -f debian/autogen.sed "$<" > "$@.tmp"
 	mv "$@.tmp" "$@"
 
-doc/%/Makefile: doc/%/Makefile.in debian/rules $(autogen_files)
+debian/$(flavor)-common-non-dfsg.postinst:
+	shopt -s nullglob; \
+	DEB_ALT_PRIORITY='$(bin_priority)' \
+	DEB_INFO_SUBDIR='emacs-$(major_ver)' \
+	debian/emacs-common-non-dfsg.postinst.gen \
+	  info/*.info info/*.info-[0-9] info/*.info-[0-9][0-9] \
+	    > '$@.tmp'
+	mv '$@.tmp' '$@'
+
+doc/%/Makefile: doc/%/Makefile.in debian/rules
 	sed \
 	  -e "s|@top_srcdir@|$(CURDIR)|g" \
 	  -e "s|@SHELL@|/bin/bash|g" \
@@ -135,45 +156,24 @@ override_dh_auto_build: $(doc_makefiles)
 	$(MAKE) -j$(parallel) \
 	  -f debian/rules $(foreach m,$(doc_makefiles),debian/stamp/doc-$(m))
 
+override_dh_auto_install: ; true
+
 pkg_infodir := $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
 
-override_dh_auto_install: $(autogen_files)
-	rm -rf $(pkgdir_common) && install -d $(pkgdir_common)
-
-        # info files
-	install -d $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
-	cp -a info/* $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/
-
-        # etc files
-	install -d $(common_etc_dir)
-	cp -a etc/* $(common_etc_dir)/
-	rm $(common_etc_dir)/COPYING
-
-	install -d $(pkgdir_common)/usr/share/doc/$(flavor)-common-non-dfsg
-
-        # Mangle info menu entries for subdir.
-	chmod 755 debian/mangle-info
-	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
-	  debian/mangle-info $(pkg_infodir)/eintr.info
-	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
-	  debian/mangle-info $(pkg_infodir)/emacs.info
-	DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
-	  debian/mangle-info $(pkg_infodir)/elisp.info
-        # Handle doc/misc files.
-	set -e; \
-	set -x; \
-	for f in $$(make -f doc/misc/Makefile -f debian/makefile-bit-doc-misc \
-	              echo-info-targets \
-	            | grep INFO_TARGETS= | cut -b 14-); \
-	do \
-	  DEBIAN_INFO_PREFIX=emacs-$(major_ver) \
-	    debian/mangle-info $(pkg_infodir)/$${f%.info}.info; \
-	done
+override_dh_install: $(autogen_install_files)
+	install -d $(pkg_infodir)
+	test -e info/emacs.info
+	shopt -s nullglob; \
+	  cp -a info/*.info info/*.info-[0-9] info/*.info-[0-9][0-9] \
+	    $(pkg_infodir)
+	install -d $(pkgdir_common)/$(etc_dir)
+	install $(addprefix etc/,$(etc_files)) $(pkgdir_common)/$(etc_dir)
+	dh_install
 
 override_dh_testdir:
 	dh_testdir debian/emacs-common-non-dfsg.README etc/THE-GNU-PROJECT
 
-override_dh_clean: $(persistent_autogen_files)
+override_dh_clean: $(persistent_autogen_install_files)
 	rm -rf \
 	  debian/*.tmp \
 	  debian/emacs-common-non-dfsg.README.00 \
@@ -185,5 +185,12 @@ override_dh_clean: $(persistent_autogen_files)
 	  doc/misc/Makefile \
 	  info \
 	  debian/stamp
-	rm -f debian/autogen.sed $(doc_makefiles) $(nonpersistent_autogen_files)
+	rm -f \
+	  $(autogen_installdeb_files) \
+	  $(doc_makefiles) \
+	  $(transient_autogen_install_files) \
+	  debian/autogen.sed
 	dh_clean
+
+override_dh_installdeb: $(autogen_installdeb_files)
+	dh_installdeb

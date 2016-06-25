@@ -1,5 +1,20 @@
 This file details the Debian specific changes to Emacs.
 
+* Since 24.5+1-1 the info pages have been managed by update-alternatives(1)
+
+This allows references from either Emacs or the standalone reader to
+reach the pages for the currently selected alternative.
+
+The info files for each version are installed in
+/usr/share/info/emacs-N, so you can prefer a particular version's
+pages by prepending that directory to your INFOPATH, e.g.:
+
+  INFOPATH=/usr/share/info/emacs-@MAJOR_VERSION@ info emacs
+
+This variable also affects Emacs.  For example:
+
+  INFOPATH=/usr/share/info/emacs-@MAJOR_VERSION@: emacs --eval '(info "emacs")'
+
 @@PATCH_LIST_HERE@@
 
 Local Variables:

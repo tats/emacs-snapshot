@@ -12,7 +12,9 @@ Priority: optional
 Architecture: all
 Depends: ${shlibs:Depends}, dpkg (>= 1.15.4) | install-info
 Conflicts: emacs22-common (<< 22.2)
-Replaces: emacs22-common (<< 22.2)
+Replaces: emacs22-common (<< 22.2),
+  texinfo-doc-nonfree (<< 6.1.0-1)
+Breaks: texinfo-doc-nonfree (<< 6.1.0-1)
 Description: GNU Emacs common non-DFSG items, including the core documentation
  This package includes the core Emacs documentation: the Emacs Info
  pages, the Emacs Lisp Reference Manual, and the Emacs Lisp Intro.
