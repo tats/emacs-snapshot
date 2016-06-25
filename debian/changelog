@@ -1,10 +1,29 @@
-emacs24-non-dfsg (24.5+1-2~1.gbp4bb2d9) UNRELEASED; urgency=medium
+emacs24-non-dfsg (24.5+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @4bb2d9b385ac661fe6b2138e4fb653a4c018e608 **
+  * debian/rules: get version via dpkg-parsechangelog.
 
-  * UNRELEASED
+  * Use debian/autogen.sed to generate debian/ files.  Create
+    debian/autogen.sed and use it to generate the relevant debian/
+    files, intead of perl and a make function.  That simplifies the
+    quoting, and makes it easy to see the replacements.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 14 Feb 2016 17:41:08 -0600
+  * debian/rules: if requested, build info in parallel.  Set up dummy
+    targets to allow building the separate top-level info page sets in
+    parallel (i.e. doc/emacs, doc/lispintro, etc.), and explicitly
+    specify a -jN to the sub-make based on the DEB_BUILD_OPTIONS
+    parallel setting.  Otherwise there's no parallelism.
+
+  * Let dh_lintian handle the overrides file.
+
+  * Handle info pages via update-alternatives.  Install the unmangled
+    info pages to /usr/share/info/emacs-24/ and register them in
+    /usr/share/info/ via update-alternatives.  See
+    debian/emacs-common-non-dfsg.README for more information.  Thanks
+    to Norbert Preining for helping evaluate the approach.
+
+  * debian/.gitignore: add debhelper-build-stamp.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 25 Jun 2016 15:26:03 -0500
 
 emacs24-non-dfsg (24.5+1-1) unstable; urgency=medium
 
