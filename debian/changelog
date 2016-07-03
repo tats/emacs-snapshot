@@ -1,3 +1,11 @@
+emacs24 (24.5+1-7~1.gbpc72acc) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @c72acc98bde1070fce4d5a50c716d1c3586c5fe5 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 03 Jul 2016 11:36:28 -0500
+
 emacs24 (24.5+1-6) unstable; urgency=medium
 
   * Fix a ppc64el, bss-related build problem.
