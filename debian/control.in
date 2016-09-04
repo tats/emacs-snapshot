@@ -102,7 +102,7 @@ Architecture: all
 Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Recommends: @DEB_FLAVOR@-el
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg, ncurses-term
-Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version}), cedet, eieio, speedbar, gnus-bonus-el
+Conflicts: @DEB_FLAVOR@-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
 Breaks: apel (<< 10.8+0.20120427-4)
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
