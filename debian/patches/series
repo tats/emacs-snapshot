@@ -17,3 +17,4 @@
 0017-ELF-unexec-Don-t-insert-a-new-section.patch
 0018-src-unexelf.c-NEW_PROGRAM_H-Remove-unused-macro-Bug-.patch
 0019-ELF-unexec-align-section-header.patch
+0020-Emacs-should-show-GTK-icons-again.patch
