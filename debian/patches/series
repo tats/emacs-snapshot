@@ -19,3 +19,4 @@
 0019-ELF-unexec-align-section-header.patch
 0020-Emacs-should-show-GTK-icons-again.patch
 0021-Emacs-should-work-with-gcc-5.2-and-newer.patch
+0022-Emacs-should-work-with-glibc-2.24-on-ppc64.patch
