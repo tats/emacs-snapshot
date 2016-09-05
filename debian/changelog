@@ -1,10 +1,24 @@
-emacs24 (24.5+1-7~1.gbpc72acc) UNRELEASED; urgency=medium
+emacs24 (24.5+1-7) unstable; urgency=medium
 
-  ** SNAPSHOT build @c72acc98bde1070fce4d5a50c716d1c3586c5fe5 **
+  * debian/control: make Source-Version source:Version.  Thanks to
+    Guillem Jover for reporting the problem. (Closes: 833215)
 
-  * UNRELEASED
+  * Restore GTK+ toolbar icons.
+    Add 0020-Emacs-should-show-GTK-icons-again.patch to include the relevant
+    upstream code.  Thanks to Juerg Haefliger for reporting the problem and
+    pointing out the relevant upstream commit. (Closes: 828000)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 03 Jul 2016 11:36:28 -0500
+  * Fix malloc handling with newer gcc (>= 5.2).
+    Add 0021-Emacs-should-work-with-gcc-5.2-and-newer.patch to incorporate
+    the relevant upstream code.  Thanks to Aurelien Jarno for reporting the
+    problem and backporting the fix.
+
+  * Support glibc 2.24.
+    Add 0022-Emacs-should-work-with-glibc-2.24-on-ppc64.patch to incorporate
+    the relevant upstream code. Thanks to Aurelien Jarno for reporting the
+    problem and backporting the fix. (Closes: 833727)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 05 Sep 2016 15:05:00 -0500
 
 emacs24 (24.5+1-6) unstable; urgency=medium
 
