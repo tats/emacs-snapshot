@@ -49,6 +49,17 @@ extern "C"
 
 #include <stddef.h>
 
+#undef malloc
+#undef realloc
+#undef calloc
+#undef aligned_alloc
+#undef free
+#define malloc gmalloc
+#define realloc grealloc
+#define calloc gcalloc
+#define aligned_alloc galigned_alloc
+#define free gfree
+#define malloc_info gmalloc_info
 
 /* Allocate SIZE bytes of memory.  */
 extern void *malloc (size_t size);
@@ -1745,6 +1756,42 @@ valloc (size_t size)
     pagesize = getpagesize ();
 
   return aligned_alloc (pagesize, size);
+}
+
+#undef malloc
+#undef realloc
+#undef calloc
+#undef aligned_alloc
+#undef free
+
+void *
+malloc (size_t size)
+{
+  return gmalloc (size);
+}
+
+void *
+calloc (size_t nmemb, size_t size)
+{
+  return gcalloc (nmemb, size);
+}
+
+void
+free (void *ptr)
+{
+  gfree (ptr);
+}
+
+void *
+aligned_alloc (size_t alignment, size_t size)
+{
+  return galigned_alloc (alignment, size);
+}
+
+void *
+realloc (void *ptr, size_t size)
+{
+  return grealloc (ptr, size);
 }
 
 #ifdef GC_MCHECK
