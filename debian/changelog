@@ -1,3 +1,11 @@
+emacs24-non-dfsg (25.1+1-1~1.gbp3c0d65) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @3c0d6578813cae13669f939ba43809c40ff6a219 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 26 Sep 2016 13:23:39 -0500
+
 emacs24-non-dfsg (24.5+1-2) unstable; urgency=medium
 
   * debian/rules: get version via dpkg-parsechangelog.
