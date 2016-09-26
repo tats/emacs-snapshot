@@ -1,3 +1,11 @@
+emacs24 (25.1+1-1~1.gbp435bf1) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @435bf12cae56a33d779c81aa69566bdeb0fb91a4 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 26 Sep 2016 13:23:13 -0500
+
 emacs24 (24.5+1-7) unstable; urgency=medium
 
   * debian/control: make Source-Version source:Version.  Thanks to
