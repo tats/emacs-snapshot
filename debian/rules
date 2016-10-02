@@ -466,17 +466,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
 	    usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
-	  # Install replacements for non-free files that can be reached
-	  # through C-h
-	  for f in THE-GNU-PROJECT; \
-	  do \
-	    sed \
-	      -e "s/@FILE@/$$f/g" \
-	      -e "s/@MAJOR_VERSION@/$(major_ver)/g" \
-	      $(CURDIR)/debian/missing-file.dfsg > \
-	      $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/$$f.dfsg ; \
-	  done
-
 	  $(pf); cd $(pkgdir_common) && \
 	    find -name "*.elc" | perl -pe 's/\.elc$$/\.el/o' | xargs rm -f
 
