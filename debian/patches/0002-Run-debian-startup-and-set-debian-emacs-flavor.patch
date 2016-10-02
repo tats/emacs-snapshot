@@ -1,35 +1,36 @@
-From 6be9262ff07aac839e1bb452ffdf7e2f52a69f21 Mon Sep 17 00:00:00 2001
+From ecc00816d05051eb7fa4d7dc5fc6c92a635e16cd Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
-Subject: Run debian-startup and set debian-emacs-flavor.
+Subject: Run debian-startup and set debian-emacs-flavor
 
 Emacs runs debian-startup and sets debian-emacs-flavor.
 
 * Emacs runs debian-startup during the startup process unless
   site-run-file is false.
 
-* The global variable debian-emacs-flavor is bound to 'emacs24.
-  Author: Rob Browning <rlb@defaultvalue.org>
+* The global variable debian-emacs-flavor is bound to 'emacs25.
+
+Author: Rob Browning <rlb@defaultvalue.org>
 ---
  lisp/startup.el | 21 +++++++++++++++++++--
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index c0c52f1..cf7f2e3 100644
+index 761e69e..ffd58fd 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -436,6 +436,10 @@ as a list.")
-                 (match-string 1 subdir) subdir))
-           "-pkg.el"))
+@@ -438,6 +438,10 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning
+   :type 'directory
+   :initialize #'custom-initialize-delay)
  
-+(defconst debian-emacs-flavor 'emacs24
++(defconst debian-emacs-flavor 'emacs25
 +  "A symbol representing the particular debian flavor of emacs running.
 +Something like 'emacs20, 'xemacs20, etc.")
 +
  (defun normal-top-level-add-subdirs-to-load-path ()
-   "Add all subdirectories of `default-directory' to `load-path'.
+   "Recursively add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -1066,8 +1070,21 @@ please check its value")
+@@ -1124,8 +1128,21 @@ please check its value")
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.

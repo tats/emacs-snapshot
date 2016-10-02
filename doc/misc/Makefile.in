@@ -1,6 +1,6 @@
 ### @configure_input@
 
-# Copyright (C) 1994, 1996-2015 Free Software Foundation, Inc.
+# Copyright (C) 1994, 1996-2016 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -19,14 +19,17 @@
 
 SHELL = @SHELL@
 
-# Where to find the source code.  $(srcdir) will be the man-aux
-# subdirectory of the source tree.  This is
-# set by the configure script's `--srcdir' option.
+# Where to find the source code.  $(srcdir) will be the doc/misc subdirectory
+# of the source tree.  This is set by configure's '--srcdir' option.
 srcdir=@srcdir@
 
 ## Where the output files go.
+## Note that all the Info targets build the Info files in srcdir.
+## There is no provision for Info files to exist in the build directory.
+## In a tarfile of Emacs, the Info files should be up to date.
 buildinfodir = $(srcdir)/../../info
-## Directory with emacsver.texi.
+
+## Directory with docstyle.texi and emacsver.texi.
 emacsdir = $(srcdir)/../emacs
 
 prefix = @prefix@
@@ -45,15 +48,16 @@ GZIP_PROG = @GZIP_PROG@
 
 HTML_OPTS = --no-split --html
 
-INFO_EXT=@INFO_EXT@
 # Options used only when making info output.
-INFO_OPTS=@INFO_OPTS@
+# (Note that idlwave, info used --nosplit even without the .info extension.)
+INFO_OPTS= --no-split
 
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 
 # The makeinfo program is part of the Texinfo distribution.
 # Use --force so that it generates output even if there are errors.
+# (TODO?  Why is this appropriate?)
 MAKEINFO = @MAKEINFO@
 MAKEINFO_OPTS = --force -I$(emacsdir)
 
@@ -88,21 +92,26 @@ TEXI2DVI = texi2dvi
 TEXI2PDF = texi2pdf
 DVIPS = dvips
 
-ENVADD = TEXINPUTS="$(srcdir):$(emacsdir):$(TEXINPUTS)" \
+# 'make' verbosity.
+AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+
+AM_V_GEN = $(am__v_GEN_@AM_V@)
+am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
+am__v_GEN_0 = @echo "  GEN     " $@;
+am__v_GEN_1 =
+
+ENVADD = $(AM_V_GEN)TEXINPUTS="$(srcdir):$(emacsdir):$(TEXINPUTS)" \
          MAKEINFO="$(MAKEINFO) $(MAKEINFO_OPTS)"
 
-mkinfodir = @${MKDIR_P} ${buildinfodir}
-
 gfdl = ${srcdir}/doclicense.texi
+style = ${emacsdir}/docstyle.texi
 
-.PHONY: info dvi html pdf ps echo-info
+.PHONY: info dvi html pdf ps echo-info $(INFO_TARGETS)
 ## Prevent implicit rule triggering for foo.info.
 .SUFFIXES:
 
-.SUFFIXES: .ps .dvi
-
-.dvi.ps:
-	$(DVIPS) -o $@ $<
+## Disable implicit rules.
+%.texi: ;
 
 # Default.
 info: $(INFO_TARGETS)
@@ -111,7 +120,7 @@ info: $(INFO_TARGETS)
 ## Base file names of output info files.
 echo-info:
 	@echo "$(INFO_INSTALL) " | \
-	  sed -e 's|[^ ]*/||g' -e 's/\.info//g' -e "s/  */$(INFO_EXT) /g"
+	  sed -e 's|[^ ]*/||g' -e 's/\.info//g' -e "s/  */.info /g"
 
 dvi: $(DVI_TARGETS)
 
@@ -121,60 +130,89 @@ pdf: $(PDF_TARGETS)
 
 ps: $(PS_TARGETS)
 
-# Note that all the Info targets build the Info files in srcdir.
-# There is no provision for Info files to exist in the build directory.
-# In a distribution of Emacs, the Info files should be up to date.
+${buildinfodir}:
+	${MKDIR_P} $@
 
-# Note: "<" is not portable in ordinary make rules.
+### The general case.
 
-## No gfdl dependency.
-efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
-efaq : $(buildinfodir)/efaq$(INFO_EXT)
-$(buildinfodir)/efaq$(INFO_EXT): $(efaq_deps)
-	$(mkinfodir)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq.texi
-efaq.dvi: $(efaq_deps)
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq.texi
-efaq.pdf: $(efaq_deps)
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq.texi
-efaq.html: $(efaq_deps)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq.texi
+EXTRA_OPTS =
 
-efaq_w32_deps = ${srcdir}/efaq-w32.texi $(emacsdir)/emacsver.texi
-efaq-w32 : $(buildinfodir)/efaq-w32$(INFO_EXT)
-$(buildinfodir)/efaq-w32$(INFO_EXT): $(efaq_w32_deps)
-	$(mkinfodir)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq-w32.texi
-efaq-w32.dvi: $(efaq_w32_deps)
-	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq-w32.texi
-efaq-w32.pdf: $(efaq_w32_deps)
-	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq-w32.texi
-efaq-w32.html: $(efaq_w32_deps)
-	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
+${buildinfodir}/%.info: ${srcdir}/%.texi ${gfdl} ${style} | ${buildinfodir}
+	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) $(EXTRA_OPTS) \
+	  -o $@ $<
 
-.PHONY: mostlyclean clean distclean maintainer-clean
+## The short aliases, eg efaq = $(buildinfodir)/efaq.info.
+define info_template
+ $(1): $$(buildinfodir)/$(1).info
+endef
+
+$(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_template,$(ifile))))
+
+
+%.dvi: ${srcdir}/%.texi ${gfdl} ${style}
+	$(ENVADD) $(TEXI2DVI) $<
+
+%.pdf: ${srcdir}/%.texi ${gfdl} ${style}
+	$(ENVADD) $(TEXI2PDF) $<
+
+%.html: ${srcdir}/%.texi ${gfdl} ${style}
+	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) $(EXTRA_OPTS) \
+	  -o $@ $<
+
+%.ps: %.dvi
+	$(DVIPS) -o $@ $<
+
+
+### The exceptions.
+
+## Extra dependencies.
+
+need_emacsver = efaq efaq-w32
+need_emacsver_prefix = $(addprefix ${buildinfodir}/,${need_emacsver})
+
+$(need_emacsver_prefix:=.info) $(need_emacsver:=.dvi) $(need_emacsver:=.pdf) $(need_emacsver:=.html) : ${emacsdir}/emacsver.texi
+
+
+## efaq, efaq_w32 do not depend on gfdl.
+## Maybe we can use .SECONDEXPANSION for this.
+${buildinfodir}/efaq%.info: ${srcdir}/efaq%.texi ${style} | ${buildinfodir}
+	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
+
+efaq%.dvi: ${srcdir}/efaq%.texi
+	$(ENVADD) $(TEXI2DVI) $<
+
+efaq%.pdf: ${srcdir}/efaq%.texi
+	$(ENVADD) $(TEXI2PDF) $<
+
+efaq%.html: ${srcdir}/efaq%.texi
+	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ $<
+
+
+.PHONY: mostlyclean clean distclean bootstrap-clean maintainer-clean
 
 mostlyclean:
 	rm -f *.aux *.log *.toc *.c[mp] *.c[mp]s *.fn *.fns \
 	  *.ky *.kys *.op *.ops *.p[gj] *.p[gj]s *.sc *.scs *.ss \
 	  *.t[gp] *.t[gp]s *.vr *.vrs
-	rm -f gnustmp.*
+	rm -f gnustmp*
 
 clean: mostlyclean
-	rm -f $(DVI_TARGETS) $(HTML_TARGETS) $(PDF_TARGETS) $(PS_TARGETS)
-	rm -f efaq-w32.dvi efaq-w32.html efaq-w32.pdf efaq-w32.ps
+	rm -f *.dvi *.html *.pdf *.ps
 
 distclean: clean
 	rm -f Makefile
 
 ## buildinfodir is relative to srcdir.
 infoclean:
-	cd $(buildinfodir); for file in $(INFO_TARGETS); do \
-	  file=`echo $${file} | sed 's/\.info$$//'`${INFO_EXT}; \
-	  rm -f $${file} $${file}-[1-9] $${file}-[1-9][0-9]; \
+	for file in $(INFO_TARGETS); do \
+	  file=`echo $${file} | sed 's/\.info$$//'`.info; \
+	  rm -f \
+	    $(buildinfodir)/$${file} \
+	    $(buildinfodir)/$${file}-[1-9] \
+	    $(buildinfodir)/$${file}-[1-9][0-9]; \
 	done
 
-maintainer-clean: distclean infoclean
+bootstrap-clean maintainer-clean: distclean infoclean
 
 .PHONY: install-dvi install-html install-pdf install-ps install-doc
 

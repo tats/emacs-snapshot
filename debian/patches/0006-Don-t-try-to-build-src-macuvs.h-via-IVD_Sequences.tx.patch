@@ -1,0 +1,42 @@
+From b5d8dc19b8431730ea9ab487e00069ac46192f44 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Tue, 21 Oct 2014 19:10:17 -0500
+Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
+
+These are OS X specific, and were removed for now, due to uncertainty
+over the licensing.
+---
+ admin/unidata/Makefile.in | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
+
+diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
+index d46420d..1a32a28 100644
+--- a/admin/unidata/Makefile.in
++++ b/admin/unidata/Makefile.in
+@@ -53,16 +53,7 @@ am__v_at_1 =
+ 
+ .PHONY: all unifiles
+ 
+-all: ${top_srcdir}/src/macuvs.h unifiles ${unidir}/charscript.el
+-
+-## Specify .elc as an order-only prereq so as to not needlessly rebuild
+-## target just because the .elc is missing.
+-## Same with charprop.el below.
+-${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
+-  ${srcdir}/uvs.elc
+-	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
+-	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
+-	  > $@
++all: unifiles ${unidir}/charscript.el
+ 
+ %.elc: %.el
+ 	$(AM_V_ELC)${emacs} -f batch-byte-compile $<
+@@ -122,7 +113,7 @@ maintainer-clean: distclean
+ ## change and it slows down bootstrap (a tiny bit).
+ ## Cf leim/ja-dic (which is much slower).
+ extraclean:
+-	rm -f ${top_srcdir}/src/macuvs.h ${unidir}/charscript.el*
++	rm -f ${unidir}/charscript.el*
+   ifneq (,$(wildcard $(unidir)/charprop.el))
+ 	cd $(unidir) && \
+ 	  rm -f `sed -n 's/^;; FILE: //p' < charprop.el` charprop.el

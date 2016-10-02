@@ -1,12 +1,12 @@
-/* Copyright (C) 1985-1988, 1990, 1992, 1999-2015 Free Software
+/* Copyright (C) 1985-1988, 1990, 1992, 1999-2016 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
 
 GNU Emacs is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
 
 GNU Emacs is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -254,7 +254,6 @@ unexec (const char *new_name, const char *old_name)
   ptrdiff_t old_bss_index;
   struct stat stat_buf;
   off_t old_file_size;
-  int mask;
 
   /* Open the old file, allocate a buffer of the right size, and read
      in the file contents.  */
@@ -356,7 +355,7 @@ unexec (const char *new_name, const char *old_name)
      the image of the new file.  Set pointers to various interesting
      objects.  */
 
-  new_file = emacs_open (new_name, O_RDWR | O_CREAT, 0666);
+  new_file = emacs_open (new_name, O_RDWR | O_CREAT, 0777);
   if (new_file < 0)
     fatal ("Can't creat (%s): %s", new_name, strerror (errno));
 
@@ -712,13 +711,4 @@ unexec (const char *new_name, const char *old_name)
 
   if (emacs_close (new_file) != 0)
     fatal ("Can't close (%s): %s", new_name, strerror (errno));
-
-  if (stat (new_name, &stat_buf) != 0)
-    fatal ("Can't stat (%s): %s", new_name, strerror (errno));
-
-  mask = umask (777);
-  umask (mask);
-  stat_buf.st_mode |= 0111 & ~mask;
-  if (chmod (new_name, stat_buf.st_mode) != 0)
-    fatal ("Can't chmod (%s): %s", new_name, strerror (errno));
 }
