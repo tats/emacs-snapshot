@@ -631,6 +631,7 @@ override_dh_fixperms:
 override_dh_clean: $(persistent_autogen_files)
 	rm -rf \
 	  aclocal.m4 \
+	  build-aux/ar-lib \
 	  build-aux/compile \
 	  build-aux/config.guess \
 	  build-aux/config.sub \
@@ -640,6 +641,7 @@ override_dh_clean: $(persistent_autogen_files)
 	  config.guess \
 	  config.sub \
 	  configure \
+	  doc/emacs/emacsver.texi \
 	  debian/*-stamp \
 	  debian/build-lucid \
 	  debian/build-nox \
@@ -651,6 +653,7 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/install-lucid \
 	  debian/install-nox \
 	  debian/install-x \
+	  etc/refcards/emacsver.tex \
 	  lib/Makefile.in \
 	  src/config.in \
 	  src/stamp-h1 src/stamp-h.in
