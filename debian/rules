@@ -108,14 +108,6 @@ CFLAGS += -Wall
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
 CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
 
-ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-  ifneq (,$(filter $(DEB_HOST_ARCH),ia64))
-    # Fix a problem with newer versions of gcc on ia64.
-    # See bugs #582439 and #679986.
-    CFLAGS += -O1
-  endif # eq ia64
-endif
-
 joblimit := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 ifeq (,$(joblimit))
   joblimit := 1
