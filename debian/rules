@@ -77,7 +77,7 @@ info_subdir := emacs-$(major_ver)
 ######################################################################
 # Customizable variables
 
-bin_priority := 27
+bin_priority := 28
 
 # This might also be something like 2006-09-09 for snapshots.
 menu_ver := $(major_ver)
