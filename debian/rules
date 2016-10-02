@@ -360,6 +360,11 @@ override_dh_auto_build: $(autogen_build_files)
 	$(call build_cmd,debian/build-nox)
 	$(call build_cmd,debian/build-lucid)
 
+override_dh_auto_test:
+	$(MAKE) -C debian/build-lucid check
+	$(MAKE) -C debian/build-nox check
+	$(MAKE) -C debian/build-x check
+
 define install_common_binpkg_bits
   # args: (1) srcdir (2) pkgdir (3) pkgname (4) bin-suffix
 
