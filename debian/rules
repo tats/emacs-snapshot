@@ -305,6 +305,7 @@ confflags += --infodir=/usr/share/info
 confflags += --mandir=/usr/share/man
 confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
+confflags += --with-sound=alsa
 
 # x configure flags
 confflags_x := $(confflags) 
