@@ -315,6 +315,7 @@ confflags_x += --with-x-toolkit=gtk3
 # change the assignment below to --without-toolkit-scroll-bars.  The
 # resulting emacsXY package will have the old scrollbars.
 confflags_x += --with-toolkit-scroll-bars
+confflags_x += --with-xwidgets
 
 # nox configure flags
 confflags_nox := $(confflags) 
