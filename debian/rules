@@ -586,7 +586,8 @@ override_dh_strip_nondeterminism:
 	    debian/elgz-canary; \
 	fi
 	cd debian && \
-	find $$(dh_listpackages) -name "*.el.gz" -printf "%T@ %p\0" > elgz-info
+	find $$(cd .. && dh_listpackages) \
+	  -name "*.el.gz" -printf "%T@ %p\0" > elgz-info
 	dh_strip_nondeterminism
 	set -eo pipefail; \
 	  cd debian; \
