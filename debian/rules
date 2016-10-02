@@ -294,7 +294,7 @@ debian/$(flavor)-common.README.Debian: \
 debian/setup-stamp:
 	$(testdir)
 	./autogen.sh
-	mkdir -p $(dir $@) && touch $@
+	touch $@
 
 # common configure flags
 confflags += --prefix=/usr
