@@ -582,7 +582,7 @@ override_dh_strip:
 .PHONY: override_dh_strip_nondeterminism
 override_dh_strip_nondeterminism:
 	if grep "$(flavor)-el" <(dh_listpackages); then \
-	  cp -a debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz \
+	  cp -a debian/$(flavor)-el/usr/share/emacs/$(runtime_ver)/lisp/version.el.gz \
 	    debian/elgz-canary; \
 	fi
 	cd debian && \
@@ -598,9 +598,9 @@ override_dh_strip_nondeterminism:
 	if grep -q "$(flavor)-el" <(dh_listpackages); then \
 	  set -e; \
 	  test ! debian/elgz-canary -nt \
-	    debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz; \
+	    debian/$(flavor)-el/usr/share/emacs/$(runtime_ver)/lisp/version.el.gz; \
 	  test ! debian/elgz-canary -ot \
-	    debian/emacs24-el/usr/share/emacs/24.5/lisp/version.el.gz; \
+	    debian/$(flavor)-el/usr/share/emacs/$(runtime_ver)/lisp/version.el.gz; \
 	fi
 
 override_dh_testdir:
