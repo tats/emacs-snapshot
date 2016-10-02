@@ -1,174 +1,731 @@
--*-text-*-
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Emacs
+Upstream-Contact: bug-gnu-emacs@gnu.org
+Upstream-Contact: emacs-devel@gnu.org
+Source: https://savannah.gnu.org/projects/emacs
+Comment:
+  This package was debianized by Rob Browning <rlb@defaultvalue.org>
+  on Tue, 16 Dec 1997 00:05:45 -0600.
 
-This package was debianized by Rob Browning <rlb@defaultvalue.org> on
-Tue, 16 Dec 1997 00:05:45 -0600.
+  The original source for this package can be found at
+  git://git.savannah.gnu.org/emacs.git under the
+  emacs-@UPSTREAM_VERSION@ tag.  That tag was used to create the
+  Debian upstream archive (@DEB_FLAVOR@_@DEBSRC_VERSION@.orig.tar.xz)
+  after making adjustments to comply with the DFSG (see below).
 
-The original source for this package can be found at
-git://git.savannah.gnu.org/emacs.git under the emacs-@UPSTREAM_VERSION@ tag.
-That tag was used to create the Debian upstream archive
-(@DEB_FLAVOR@_@DEBSRC_VERSION@.orig.tar.xz) after making adjustments to comply with
-the DFSG (see below).
+  Please see /usr/share/doc/@DEB_FLAVOR@-common/README.Debian.gz for a
+  description of the Debian specific differences from the upstream
+  version.
 
-Please see /usr/share/doc/@DEB_FLAVOR@-common/README.Debian.gz for a
-description of the Debian specific differences from the upstream
-version.
+  As mentioned there, some files (including some of the Emacs
+  documentation) have been removed from this package because their
+  licenses do not appear to satisfy the requirements of the Debian
+  Free Software Guidelines (DFSG).  See
+  http://www.debian.org/social_contract.
 
-As mentioned there, some files (including some of the Emacs
-documentation) have been removed from this package because their
-licenses do not appear to satisfy the requirements of the Debian Free
-Software Guidelines (DFSG).  See http://www.debian.org/social_contract.
+  In particular, some of the info pages are covered under the GNU Free
+  Documentation License (GFDL), which Debian has decided does not
+  satisfy the DFSG in cases where "Invariant Sections" are specified
+  (this includes front and back cover texts).  See this Debian General
+  Resolution on the topic: http://www.debian.org/vote/2006/vote_001.
 
-In particular, some of the info pages are covered under the GNU Free
-Documentation License (GFDL), which Debian has decided does not
-satisfy the DFSG in cases where "Invariant Sections" are specified
-(this includes front and back cover texts).  See this Debian General
-Resolution on the topic: http://www.debian.org/vote/2006/vote_001.
+  Some other files have been removed because their license only allows
+  verbatim copying, or because there was some other question.
 
-Some other files have been removed because their license only allows
-verbatim copying, or because there was some other question.
+  Please see the files themselves for the relevant Copyright dates.
 
-Copyright:
+Files: *
+License: GPL-3+
 
-  Emacs itself is licensed under the terms of the GNU General Public
-  License (GPL), Version 3.  See the file
-  /usr/share/common-licenses/GPL-3 for more information.
+Files: debian/rules
+License: GPL plus Ian
+  This file is licensed under the terms of the Gnu Public License.
+  With the one additional provision that Ian Jackson's name may not be
+  removed from the file.
 
-  doc/man/ebrowse.1 and doc/man/grep-changelog.1 are licensed as
-  follows:
+Files: doc/man/ebrowse.1
+License: manpage license
 
-    Copyright (C) 2008-2015 Free Software Foundation, Inc.
+Files: doc/man/emacs.1
+License: manpage license
 
-    Permission is granted to make and distribute verbatim copies of
-    this document provided the copyright notice and this permission
-    notice are preserved on all copies.
+Files: doc/man/etags.1
+License: manpage license
 
-    Permission is granted to copy and distribute modified versions of
-    this document under the conditions for verbatim copying, provided
-    that the entire resulting derived work is distributed under the
-    terms of a permission notice identical to this one.
+Files: doc/misc/efaq.texi
+License: efaq.texi license
+  This list of frequently asked questions about GNU Emacs with answers
+  (``FAQ'') may be translated into other languages, transformed into
+  other formats (e.g., Texinfo, Info, WWW, WAIS), and updated with new
+  information.
 
-    Permission is granted to copy and distribute translations of this
-    document into another language, under the above conditions for
-    modified versions, except that this permission notice may be
-    stated in a translation approved by the Free Software Foundation.
+  The same conditions apply to any derivative of the FAQ as apply to
+  the FAQ itself.  Every copy of the FAQ must include this notice or
+  an approved translation, information on who is currently maintaining
+  the FAQ and how to contact them (including their e-mail address),
+  and information on where the latest version of the FAQ is archived
+  (including FTP information).
 
-  doc/man/emacs.1 is licensed as follows:
+  The FAQ may be copied and redistributed under these conditions,
+  except that the FAQ may not be embedded in a larger literary work
+  unless that work itself allows free copying and redistribution.
 
-    Copyright (C) 1995, 1999-2015 Free Software Foundation, Inc.
+  [This version has been heavily edited since it was included in the
+  Emacs distribution.]
 
-    Permission is granted to make and distribute verbatim copies of
-    this document provided the copyright notice and this permission
-    notice are preserved on all copies.
+Files: doc/misc/efaq-w32.texi
+License: efaq-w32.texi license
+  This list of frequently asked questions about GNU Emacs on MS
+  Windows with answers (``FAQ'') may be translated into other
+  languages, transformed into other formats (e.g., Texinfo, Info,
+  WWW), and updated with new information.
 
-    Permission is granted to copy and distribute modified versions of
-    this document under the conditions for verbatim copying, provided
-    that the entire resulting derived work is distributed under the
-    terms of a permission notice identical to this one.
+  The same conditions apply to any derivative of the FAQ as apply to
+  the FAQ itself.  Every copy of the FAQ must include this notice or
+  an approved translation, information on who is currently maintaining
+  the FAQ and how to contact them (including their e-mail address),
+  and information on where the latest version of the FAQ is archived
+  (including FTP information).
 
-    Permission is granted to copy and distribute translations of this
-    document into another language, under the above conditions for
-    modified versions, except that this permission notice may be
-    stated in a translation approved by the Free Software Foundation.
+  The FAQ may be copied and redistributed under these conditions,
+  except that the FAQ may not be embedded in a larger literary work
+  unless that work itself allows free copying and redistribution.
 
-  doc/man/etags.1 is licensed as follows:
+Files:
+  etc/images/back-arrow.pbm
+  etc/images/back-arrow.xpm
+  etc/images/close.pbm
+  etc/images/close.xpm
+  etc/images/copy.pbm
+  etc/images/copy.xpm
+  etc/images/cut.pbm
+  etc/images/cut.xpm
+  etc/images/diropen.pbm
+  etc/images/diropen.xpm
+  etc/images/fwd-arrow.pbm
+  etc/images/fwd-arrow.xpm
+  etc/images/help.pbm
+  etc/images/help.xpm
+  etc/images/home.pbm
+  etc/images/home.xpm
+  etc/images/index.pbm
+  etc/images/index.xpm
+  etc/images/info.pbm
+  etc/images/info.pbm
+  etc/images/info.pbm
+  etc/images/info.xpm
+  etc/images/jump-to.pbm
+  etc/images/jump-to.xpm
+  etc/images/left-arrow.pbm
+  etc/images/left-arrow.xpm
+  etc/images/new.pbm
+  etc/images/new.xpm
+  etc/images/open.pbm
+  etc/images/open.xpm
+  etc/images/paste.pbm
+  etc/images/paste.xpm
+  etc/images/preferences.pbm
+  etc/images/preferences.xpm
+  etc/images/print.pbm
+  etc/images/print.xpm
+  etc/images/refresh.pbm
+  etc/images/refresh.xpm
+  etc/images/right-arrow.pbm
+  etc/images/right-arrow.xpm
+  etc/images/save.pbm
+  etc/images/save.xpm
+  etc/images/saveas.pbm
+  etc/images/saveas.xpm
+  etc/images/search.pbm
+  etc/images/search.xpm
+  etc/images/sort-ascending.pbm
+  etc/images/sort-ascending.xpm
+  etc/images/sort-descending.pbm
+  etc/images/sort-descending.xpm
+  etc/images/spell.pbm
+  etc/images/spell.xpm
+  etc/images/undo.pbm
+  etc/images/undo.xpm
+  etc/images/up-arrow.pbm
+  etc/images/up-arrow.xpm
+License: LGPL-2+
 
-    Copyright (C) 1992, 1999, 2001-2015 Free Software Foundation, Inc.
+Files:
+  etc/images/attach.pbm
+  etc/images/attach.xpm
+  etc/images/bookmark_add.pbm
+  etc/images/bookmark_add.xpm
+  etc/images/cancel.pbm
+  etc/images/cancel.xpm
+  etc/images/connect.pbm
+  etc/images/connect.xpm
+  etc/images/contact.pbm
+  etc/images/contact.xpm
+  etc/images/data-save.pbm
+  etc/images/data-save.xpm
+  etc/images/delete.pbm
+  etc/images/delete.xpm
+  etc/images/describe.pbm
+  etc/images/describe.xpm
+  etc/images/disconnect.pbm
+  etc/images/disconnect.xpm
+  etc/images/exit.pbm
+  etc/images/exit.xpm
+  etc/images/lock-broken.pbm
+  etc/images/lock-broken.xpm
+  etc/images/lock-ok.pbm
+  etc/images/lock-ok.xpm
+  etc/images/lock.pbm
+  etc/images/lock.xpm
+  etc/images/next-node.pbm
+  etc/images/next-node.xpm
+  etc/images/next-page.pbm
+  etc/images/next-page.xpm
+  etc/images/prev-node.pbm
+  etc/images/prev-node.xpm
+  etc/images/redo.pbm
+  etc/images/redo.xpm
+  etc/images/refresh.pbm
+  etc/images/refresh.xpm
+  etc/images/search-replace.pbm
+  etc/images/search-replace.xpm
+  etc/images/separator.pbm
+  etc/images/separator.xpm
+  etc/images/show.pbm
+  etc/images/show.xpm
+  etc/images/sort-ascending.pbm
+  etc/images/sort-ascending.xpm
+  etc/images/sort-column-ascending.pbm
+  etc/images/sort-column-ascending.xpm
+  etc/images/sort-criteria.pbm
+  etc/images/sort-criteria.xpm
+  etc/images/sort-descending.pbm
+  etc/images/sort-descending.xpm
+  etc/images/sort-row-ascending.pbm
+  etc/images/sort-row-ascending.xpm
+  etc/images/up-node.pbm
+  etc/images/up-node.xpm
+  etc/images/zoom-in.pbm
+  etc/images/zoom-in.xpm
+  etc/images/zoom-out.pbm
+  etc/images/zoom-out.xpm
+License: GPL-2+
 
-    Permission is granted to make and distribute verbatim copies of
-    this document provided the copyright notice and this permission
-    notice are preserved on all copies.
+Files: etc/images/low-color/*
+License: same as corresponding file in /etc/images
+  The images in the low-color/ subdirectory are low-color versions of
+  the files of the same name in etc/images directory, and are subject
+  to the same conditions.
 
-    Permission is granted to copy and distribute modified versions of
-    this document under the conditions for verbatim copying, provided
-    that the entire resulting derived work is distributed under the
-    terms of a permission notice identical to this one.
+Files:
+  etc/images/gnus/kill-group.pbm
+  etc/images/gnus/kill-group.xpm
+  etc/images/gnus/mail-send.xpm
+  etc/images/gnus/rot13.pbm
+  etc/images/gnus/rot13.xpm
+  etc/images/gnus/toggle-subscription.xpm
+License: GPL-2+
 
-    Permission is granted to copy and distribute translations of this
-    document into another language, under the above conditions for
-    modified versions, except that this permission notice may be
-    stated in a translation approved by the Free Software Foundation.
+Files:
+  etc/images/mail/compose.pbm
+  etc/images/mail/compose.xpm
+  etc/images/mail/copy.pbm
+  etc/images/mail/copy.xpm
+  etc/images/mail/flag-for-followup.pbm
+  etc/images/mail/flag-for-followup.xpm
+  etc/images/mail/forward.pbm
+  etc/images/mail/forward.xpm
+  etc/images/mail/inbox.pbm
+  etc/images/mail/inbox.xpm
+  etc/images/mail/move.pbm
+  etc/images/mail/move.xpm
+  etc/images/mail/not-spam.pbm
+  etc/images/mail/not-spam.xpm
+  etc/images/mail/outbox.pbm
+  etc/images/mail/outbox.xpm
+  etc/images/mail/preview.pbm
+  etc/images/mail/preview.xpm
+  etc/images/mail/repack.pbm
+  etc/images/mail/repack.xpm
+  etc/images/mail/reply-all.pbm
+  etc/images/mail/reply-all.xpm
+  etc/images/mail/reply-from.pbm
+  etc/images/mail/reply-from.xpm
+  etc/images/mail/reply-to.pbm
+  etc/images/mail/reply-to.xpm
+  etc/images/mail/reply.pbm
+  etc/images/mail/reply.xpm
+  etc/images/mail/save-draft.pbm
+  etc/images/mail/save-draft.xpm
+  etc/images/mail/save.xpm
+  etc/images/mail/send.pbm
+  etc/images/mail/send.xpm
+  etc/images/mail/spam.xpm
+License: GPL-2+
 
-  etc/publicsuffix.txt is licensed as follows:
+Files: etc/publicsuffix.txt
+License: MPL-2.0
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+File: lisp/obsolete/meese.el
+License: meese.el license
+  This is in the public domain on account of being distributed since
+  1985 or 1986 without a copyright notice.
 
-  doc/misc/efaq.texi is licensed as follows:
+  This file is part of GNU Emacs.
 
-    Copyright (C) 2001-2015 Free Software Foundation, Inc.
-    Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000 Reuven M. Lerner
-    Copyright (C) 1992, 1993 Steven Byrnes
-    Copyright (C) 1990, 1991, 1992 Joseph Brian Wells
+File: m4/gnulib-comp.m4
+License: gnulib-comp.m4 license
+  This file is free software; you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 3 of the License, or
+  (at your option) any later version.
 
-    This list of frequently asked questions about GNU Emacs with
-    answers (``FAQ'') may be translated into other languages,
-    transformed into other formats (e.g., Texinfo, Info, WWW, WAIS),
-    and updated with new information.
+  This file is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
 
-    The same conditions apply to any derivative of the FAQ as apply to
-    the FAQ itself.  Every copy of the FAQ must include this notice or
-    an approved translation, information on who is currently
-    maintaining the FAQ and how to contact them (including their
-    e-mail address), and information on where the latest version of
-    the FAQ is archived (including FTP information).
+  You should have received a copy of the GNU General Public License
+  along with this file.  If not, see <http://www.gnu.org/licenses/>.
 
-    The FAQ may be copied and redistributed under these conditions,
-    except that the FAQ may not be embedded in a larger literary work
-    unless that work itself allows free copying and redistribution.
+  As a special exception to the GNU General Public License, this file
+  may be distributed as part of a program that contains a
+  configuration script generated by Autoconf, under the same
+  distribution terms as the rest of that program.
 
-    [This version has been heavily edited since it was included in the
-    Emacs distribution.]
+File: m4/pkg.m4
+License: pkg.m4 license
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
 
-  doc/misc/efaq-w32.texi is licensed as follows:
+  This program is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
 
-    Copyright (C) 2008, 2010-2015 Free Software Foundation, Inc.
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+  02111-1307, USA.
 
-    This list of frequently asked questions about GNU Emacs on MS Windows
-    with answers (``FAQ'') may be translated into other languages,
-    transformed into other formats (e.g. Texinfo, Info, WWW), and updated
-    with new information.
+  As a special exception to the GNU General Public License, if you
+  distribute this file as part of a program that contains a
+  configuration script generated by Autoconf, you may include it under
+  the same distribution terms that you use for the rest of that
+  program.
 
-    The same conditions apply to any derivative of the FAQ as apply to
-    the FAQ itself.  Every copy of the FAQ must include this notice or
-    an approved translation, information on who is currently
-    maintaining the FAQ and how to contact them (including their
-    e-mail address), and information on where the latest version of
-    the FAQ is archived (including FTP information).
+File: m4/*
+License: m4 license
+  This file is free software; the Free Software Foundation gives
+  unlimited permission to copy and/or distribute it, with or without
+  modifications, as long as this notice is preserved.
 
-    The FAQ may be copied and redistributed under these conditions,
-    except that the FAQ may not be embedded in a larger literary work
-    unless that work itself allows free copying and redistribution.
+File: msdos/sedadmin.inp
+License: sedadmin.inp license
+  This file is part of GNU Emacs.
 
-  lisp/obsolete/meese.el is licensed as follows:
+  This file is free software; as a special exception, the author gives
+  unlimited permission to copy and/or distribute it, with or without
+  modifications, as long as this notice is preserved.
 
-    This is in the public domain on account of being distributed since
-    1985 or 1986 without a copyright notice.
+  This program is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-  msdos/sedadmin.inp is licensed as follows:
+File: nt/inc/dirent.h
+License: nt/inc/dirent.h license
+  The code here is forced by the interface, and is not subject to
+  copyright, constituting the only possible expression of the
+  algorithm in this format.
 
-    Copyright (C) 2014-2015 Free Software Foundation, Inc.
+License: MPL-2.0
+  Mozilla Public License Version 2.0
+  ==================================
 
-    This file is part of GNU Emacs.
+  1. Definitions
+  --------------
 
-    This file is free software; as a special exception, the author
-    gives unlimited permission to copy and/or distribute it, with or
-    without modifications, as long as this notice is preserved.
+  1.1. "Contributor"
+      means each individual or legal entity that creates, contributes to
+      the creation of, or owns Covered Software.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+  1.2. "Contributor Version"
+      means the combination of the Contributions of others (if any) used
+      by a Contributor and that particular Contributor's Contribution.
 
-  nt/inc/dirent.h is licensed as follows:
+  1.3. "Contribution"
+      means Covered Software of a particular Contributor.
 
-    The code here is forced by the interface, and is not subject to
-    copyright, constituting the only possible expression of the
-    algorithm in this format.
+  1.4. "Covered Software"
+      means Source Code Form to which the initial Contributor has attached
+      the notice in Exhibit A, the Executable Form of such Source Code
+      Form, and Modifications of such Source Code Form, in each case
+      including portions thereof.
 
-  All of the files in m4/ except gnulib-comp.m4 are licensed as
-  follows:
+  1.5. "Incompatible With Secondary Licenses"
+      means
 
-    Copyright (C) 2008-2015 Free Software Foundation, Inc.
-    This file is free software; the Free Software Foundation gives
-    unlimited permission to copy and/or distribute it, with or without
-    modifications, as long as this notice is preserved.
+      (a) that the initial Contributor has attached the notice described
+          in Exhibit B to the Covered Software; or
+
+      (b) that the Covered Software was made available under the terms of
+          version 1.1 or earlier of the License, but not also under the
+          terms of a Secondary License.
+
+  1.6. "Executable Form"
+      means any form of the work other than Source Code Form.
+
+  1.7. "Larger Work"
+      means a work that combines Covered Software with other material, in
+      a separate file or files, that is not Covered Software.
+
+  1.8. "License"
+      means this document.
+
+  1.9. "Licensable"
+      means having the right to grant, to the maximum extent possible,
+      whether at the time of the initial grant or subsequently, any and
+      all of the rights conveyed by this License.
+
+  1.10. "Modifications"
+      means any of the following:
+
+      (a) any file in Source Code Form that results from an addition to,
+          deletion from, or modification of the contents of Covered
+          Software; or
+
+      (b) any new file in Source Code Form that contains any Covered
+          Software.
+
+  1.11. "Patent Claims" of a Contributor
+      means any patent claim(s), including without limitation, method,
+      process, and apparatus claims, in any patent Licensable by such
+      Contributor that would be infringed, but for the grant of the
+      License, by the making, using, selling, offering for sale, having
+      made, import, or transfer of either its Contributions or its
+      Contributor Version.
+
+  1.12. "Secondary License"
+      means either the GNU General Public License, Version 2.0, the GNU
+      Lesser General Public License, Version 2.1, the GNU Affero General
+      Public License, Version 3.0, or any later versions of those
+      licenses.
+
+  1.13. "Source Code Form"
+      means the form of the work preferred for making modifications.
+
+  1.14. "You" (or "Your")
+      means an individual or a legal entity exercising rights under this
+      License. For legal entities, "You" includes any entity that
+      controls, is controlled by, or is under common control with You. For
+      purposes of this definition, "control" means (a) the power, direct
+      or indirect, to cause the direction or management of such entity,
+      whether by contract or otherwise, or (b) ownership of more than
+      fifty percent (50%) of the outstanding shares or beneficial
+      ownership of such entity.
+
+  2. License Grants and Conditions
+  --------------------------------
+
+  2.1. Grants
+
+  Each Contributor hereby grants You a world-wide, royalty-free,
+  non-exclusive license:
+
+  (a) under intellectual property rights (other than patent or trademark)
+      Licensable by such Contributor to use, reproduce, make available,
+      modify, display, perform, distribute, and otherwise exploit its
+      Contributions, either on an unmodified basis, with Modifications, or
+      as part of a Larger Work; and
+
+  (b) under Patent Claims of such Contributor to make, use, sell, offer
+      for sale, have made, import, and otherwise transfer either its
+      Contributions or its Contributor Version.
+
+  2.2. Effective Date
+
+  The licenses granted in Section 2.1 with respect to any Contribution
+  become effective for each Contribution on the date the Contributor first
+  distributes such Contribution.
+
+  2.3. Limitations on Grant Scope
+
+  The licenses granted in this Section 2 are the only rights granted under
+  this License. No additional rights or licenses will be implied from the
+  distribution or licensing of Covered Software under this License.
+  Notwithstanding Section 2.1(b) above, no patent license is granted by a
+  Contributor:
+
+  (a) for any code that a Contributor has removed from Covered Software;
+      or
+
+  (b) for infringements caused by: (i) Your and any other third party's
+      modifications of Covered Software, or (ii) the combination of its
+      Contributions with other software (except as part of its Contributor
+      Version); or
+
+  (c) under Patent Claims infringed by Covered Software in the absence of
+      its Contributions.
+
+  This License does not grant any rights in the trademarks, service marks,
+  or logos of any Contributor (except as may be necessary to comply with
+  the notice requirements in Section 3.4).
+
+  2.4. Subsequent Licenses
+
+  No Contributor makes additional grants as a result of Your choice to
+  distribute the Covered Software under a subsequent version of this
+  License (see Section 10.2) or under the terms of a Secondary License (if
+  permitted under the terms of Section 3.3).
+
+  2.5. Representation
+
+  Each Contributor represents that the Contributor believes its
+  Contributions are its original creation(s) or it has sufficient rights
+  to grant the rights to its Contributions conveyed by this License.
+
+  2.6. Fair Use
+
+  This License is not intended to limit any rights You have under
+  applicable copyright doctrines of fair use, fair dealing, or other
+  equivalents.
+
+  2.7. Conditions
+
+  Sections 3.1, 3.2, 3.3, and 3.4 are conditions of the licenses granted
+  in Section 2.1.
+
+  3. Responsibilities
+  -------------------
+
+  3.1. Distribution of Source Form
+
+  All distribution of Covered Software in Source Code Form, including any
+  Modifications that You create or to which You contribute, must be under
+  the terms of this License. You must inform recipients that the Source
+  Code Form of the Covered Software is governed by the terms of this
+  License, and how they can obtain a copy of this License. You may not
+  attempt to alter or restrict the recipients' rights in the Source Code
+  Form.
+
+  3.2. Distribution of Executable Form
+
+  If You distribute Covered Software in Executable Form then:
+
+  (a) such Covered Software must also be made available in Source Code
+      Form, as described in Section 3.1, and You must inform recipients of
+      the Executable Form how they can obtain a copy of such Source Code
+      Form by reasonable means in a timely manner, at a charge no more
+      than the cost of distribution to the recipient; and
+
+  (b) You may distribute such Executable Form under the terms of this
+      License, or sublicense it under different terms, provided that the
+      license for the Executable Form does not attempt to limit or alter
+      the recipients' rights in the Source Code Form under this License.
+
+  3.3. Distribution of a Larger Work
+
+  You may create and distribute a Larger Work under terms of Your choice,
+  provided that You also comply with the requirements of this License for
+  the Covered Software. If the Larger Work is a combination of Covered
+  Software with a work governed by one or more Secondary Licenses, and the
+  Covered Software is not Incompatible With Secondary Licenses, this
+  License permits You to additionally distribute such Covered Software
+  under the terms of such Secondary License(s), so that the recipient of
+  the Larger Work may, at their option, further distribute the Covered
+  Software under the terms of either this License or such Secondary
+  License(s).
+
+  3.4. Notices
+
+  You may not remove or alter the substance of any license notices
+  (including copyright notices, patent notices, disclaimers of warranty,
+  or limitations of liability) contained within the Source Code Form of
+  the Covered Software, except that You may alter any license notices to
+  the extent required to remedy known factual inaccuracies.
+
+  3.5. Application of Additional Terms
+
+  You may choose to offer, and to charge a fee for, warranty, support,
+  indemnity or liability obligations to one or more recipients of Covered
+  Software. However, You may do so only on Your own behalf, and not on
+  behalf of any Contributor. You must make it absolutely clear that any
+  such warranty, support, indemnity, or liability obligation is offered by
+  You alone, and You hereby agree to indemnify every Contributor for any
+  liability incurred by such Contributor as a result of warranty, support,
+  indemnity or liability terms You offer. You may include additional
+  disclaimers of warranty and limitations of liability specific to any
+  jurisdiction.
+
+  4. Inability to Comply Due to Statute or Regulation
+  ---------------------------------------------------
+
+  If it is impossible for You to comply with any of the terms of this
+  License with respect to some or all of the Covered Software due to
+  statute, judicial order, or regulation then You must: (a) comply with
+  the terms of this License to the maximum extent possible; and (b)
+  describe the limitations and the code they affect. Such description must
+  be placed in a text file included with all distributions of the Covered
+  Software under this License. Except to the extent prohibited by statute
+  or regulation, such description must be sufficiently detailed for a
+  recipient of ordinary skill to be able to understand it.
+
+  5. Termination
+  --------------
+
+  5.1. The rights granted under this License will terminate automatically
+  if You fail to comply with any of its terms. However, if You become
+  compliant, then the rights granted under this License from a particular
+  Contributor are reinstated (a) provisionally, unless and until such
+  Contributor explicitly and finally terminates Your grants, and (b) on an
+  ongoing basis, if such Contributor fails to notify You of the
+  non-compliance by some reasonable means prior to 60 days after You have
+  come back into compliance. Moreover, Your grants from a particular
+  Contributor are reinstated on an ongoing basis if such Contributor
+  notifies You of the non-compliance by some reasonable means, this is the
+  first time You have received notice of non-compliance with this License
+  from such Contributor, and You become compliant prior to 30 days after
+  Your receipt of the notice.
+
+  5.2. If You initiate litigation against any entity by asserting a patent
+  infringement claim (excluding declaratory judgment actions,
+  counter-claims, and cross-claims) alleging that a Contributor Version
+  directly or indirectly infringes any patent, then the rights granted to
+  You by any and all Contributors for the Covered Software under Section
+  2.1 of this License shall terminate.
+
+  5.3. In the event of termination under Sections 5.1 or 5.2 above, all
+  end user license agreements (excluding distributors and resellers) which
+  have been validly granted by You or Your distributors under this License
+  prior to termination shall survive termination.
+
+  ************************************************************************
+  *                                                                      *
+  *  6. Disclaimer of Warranty                                           *
+  *  -------------------------                                           *
+  *                                                                      *
+  *  Covered Software is provided under this License on an "as is"       *
+  *  basis, without warranty of any kind, either expressed, implied, or  *
+  *  statutory, including, without limitation, warranties that the       *
+  *  Covered Software is free of defects, merchantable, fit for a        *
+  *  particular purpose or non-infringing. The entire risk as to the     *
+  *  quality and performance of the Covered Software is with You.        *
+  *  Should any Covered Software prove defective in any respect, You     *
+  *  (not any Contributor) assume the cost of any necessary servicing,   *
+  *  repair, or correction. This disclaimer of warranty constitutes an   *
+  *  essential part of this License. No use of any Covered Software is   *
+  *  authorized under this License except under this disclaimer.         *
+  *                                                                      *
+  ************************************************************************
+
+  ************************************************************************
+  *                                                                      *
+  *  7. Limitation of Liability                                          *
+  *  --------------------------                                          *
+  *                                                                      *
+  *  Under no circumstances and under no legal theory, whether tort      *
+  *  (including negligence), contract, or otherwise, shall any           *
+  *  Contributor, or anyone who distributes Covered Software as          *
+  *  permitted above, be liable to You for any direct, indirect,         *
+  *  special, incidental, or consequential damages of any character      *
+  *  including, without limitation, damages for lost profits, loss of    *
+  *  goodwill, work stoppage, computer failure or malfunction, or any    *
+  *  and all other commercial damages or losses, even if such party      *
+  *  shall have been informed of the possibility of such damages. This   *
+  *  limitation of liability shall not apply to liability for death or   *
+  *  personal injury resulting from such party's negligence to the       *
+  *  extent applicable law prohibits such limitation. Some               *
+  *  jurisdictions do not allow the exclusion or limitation of           *
+  *  incidental or consequential damages, so this exclusion and          *
+  *  limitation may not apply to You.                                    *
+  *                                                                      *
+  ************************************************************************
+
+  8. Litigation
+  -------------
+
+  Any litigation relating to this License may be brought only in the
+  courts of a jurisdiction where the defendant maintains its principal
+  place of business and such litigation shall be governed by laws of that
+  jurisdiction, without reference to its conflict-of-law provisions.
+  Nothing in this Section shall prevent a party's ability to bring
+  cross-claims or counter-claims.
+
+  9. Miscellaneous
+  ----------------
+
+  This License represents the complete agreement concerning the subject
+  matter hereof. If any provision of this License is held to be
+  unenforceable, such provision shall be reformed only to the extent
+  necessary to make it enforceable. Any law or regulation which provides
+  that the language of a contract shall be construed against the drafter
+  shall not be used to construe this License against a Contributor.
+
+  10. Versions of the License
+  ---------------------------
+
+  10.1. New Versions
+
+  Mozilla Foundation is the license steward. Except as provided in Section
+  10.3, no one other than the license steward has the right to modify or
+  publish new versions of this License. Each version will be given a
+  distinguishing version number.
+
+  10.2. Effect of New Versions
+
+  You may distribute the Covered Software under the terms of the version
+  of the License under which You originally received the Covered Software,
+  or under the terms of any subsequent version published by the license
+  steward.
+
+  10.3. Modified Versions
+
+  If you create software not governed by this License, and you want to
+  create a new license for such software, you may create and use a
+  modified version of this License if you rename the license and remove
+  any references to the name of the license steward (except to note that
+  such modified license differs from this License).
+
+  10.4. Distributing Source Code Form that is Incompatible With Secondary
+  Licenses
+
+  If You choose to distribute Source Code Form that is Incompatible With
+  Secondary Licenses under the terms of this version of the License, the
+  notice described in Exhibit B of this License must be attached.
+
+  Exhibit A - Source Code Form License Notice
+  -------------------------------------------
+
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+  If it is not possible or desirable to put the notice in a particular
+  file, then You may include the notice in a location (such as a LICENSE
+  file in a relevant directory) where a recipient would be likely to look
+  for such a notice.
+
+  You may add additional accurate notices of copyright ownership.
+
+  Exhibit B - "Incompatible With Secondary Licenses" Notice
+  ---------------------------------------------------------
+
+    This Source Code Form is "Incompatible With Secondary Licenses", as
+    defined by the Mozilla Public License, v. 2.0.
+
+License: manpage license
+  Permission is granted to make and distribute verbatim copies of this
+  document provided the copyright notice and this permission notice
+  are preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of
+  this document under the conditions for verbatim copying, provided
+  that the entire resulting derived work is distributed under the
+  terms of a permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+  document into another language, under the above conditions for
+  modified versions, except that this permission notice may be stated
+  in a translation approved by the Free Software Foundation.
