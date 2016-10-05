@@ -1,4 +1,4 @@
-From 571a0c3b6053adeaaef06f27657b9376383d4e88 Mon Sep 17 00:00:00 2001
+From 4a22f529b3e5df27d13ea8840c7f92b39684ce46 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -10,14 +10,14 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- doc/misc/Makefile.in | 30 ++----------------------------
- 1 file changed, 2 insertions(+), 28 deletions(-)
+ doc/misc/Makefile.in | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 1644833..c889bbe 100644
+index 4dffeaf..fa6f41b 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -63,7 +63,7 @@ DOCMISC_W32 = @DOCMISC_W32@
+@@ -67,7 +67,7 @@ DOCMISC_W32 = @DOCMISC_W32@
  ## Info files to build and install on all platforms.
  INFO_COMMON = ada-mode auth autotype bovine calc ccmode cl \
  	dbus dired-x ebrowse ede ediff edt eieio \
@@ -26,7 +26,7 @@ index 1644833..c889bbe 100644
  	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
  	mairix-el message mh-e newsticker nxml-mode octave-mode \
  	org pcl-cvs pgg rcirc remember reftex sasl \
-@@ -76,7 +76,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
+@@ -80,7 +80,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
  ## Info files to build on current platform.
  ## This is all of them, even though they might not all get installed,
  ## because the info files are pre-built in release tarfiles.
@@ -35,43 +35,33 @@ index 1644833..c889bbe 100644
  
  # There are some naming differences between the info targets and the other
  # targets, so let's resolve them here.
-@@ -287,31 +287,6 @@ edt.pdf: $(edt_deps)
- edt.html: $(edt_deps)
- 	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/edt.texi
+@@ -174,7 +174,7 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
  
--## No gfdl dependency.
--efaq_deps = ${srcdir}/efaq.texi $(emacsdir)/emacsver.texi
--efaq : $(buildinfodir)/efaq$(INFO_EXT)
--$(buildinfodir)/efaq$(INFO_EXT): $(efaq_deps)
--	$(mkinfodir)
--	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq.texi
--efaq.dvi: $(efaq_deps)
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq.texi
--efaq.pdf: $(efaq_deps)
--	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq.texi
--efaq.html: $(efaq_deps)
--	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq.texi
+ ## Extra dependencies.
+ 
+-need_emacsver = calc cl dired-x efaq efaq-w32 erc ido reftex woman
++need_emacsver = calc cl dired-x erc ido reftex woman
+ need_emacsver_prefix = $(addprefix ${buildinfodir}/,${need_emacsver})
+ 
+ $(need_emacsver_prefix:=.info) $(need_emacsver:=.dvi) $(need_emacsver:=.pdf) $(need_emacsver:=.html) : ${emacsdir}/emacsver.texi
+@@ -189,20 +189,6 @@ ${buildinfodir}/ccmode.info: \
+   ${srcdir}/cc-mode.texi ${gfdl} ${style} | ${buildinfodir}
+ 	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
+ 
+-## efaq, efaq_w32 do not depend on gfdl.
+-## Maybe we can use .SECONDEXPANSION for this.
+-${buildinfodir}/efaq%.info: ${srcdir}/efaq%.texi ${style} | ${buildinfodir}
+-	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
 -
--efaq_w32_deps = ${srcdir}/efaq-w32.texi $(emacsdir)/emacsver.texi
--efaq-w32 : $(buildinfodir)/efaq-w32$(INFO_EXT)
--$(buildinfodir)/efaq-w32$(INFO_EXT): $(efaq_w32_deps)
--	$(mkinfodir)
--	$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ ${srcdir}/efaq-w32.texi
--efaq-w32.dvi: $(efaq_w32_deps)
--	$(ENVADD) $(TEXI2DVI) ${srcdir}/efaq-w32.texi
--efaq-w32.pdf: $(efaq_w32_deps)
--	$(ENVADD) $(TEXI2PDF) ${srcdir}/efaq-w32.texi
--efaq-w32.html: $(efaq_w32_deps)
--	$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ ${srcdir}/efaq-w32.texi
+-efaq%.dvi: ${srcdir}/efaq%.texi
+-	$(ENVADD) $(TEXI2DVI) $<
 -
- eieio_deps = ${srcdir}/eieio.texi ${gfdl}
- eieio : $(buildinfodir)/eieio$(INFO_EXT)
- $(buildinfodir)/eieio$(INFO_EXT): $(eieio_deps)
-@@ -860,7 +835,6 @@ mostlyclean:
+-efaq%.pdf: ${srcdir}/efaq%.texi
+-	$(ENVADD) $(TEXI2PDF) $<
+-
+-efaq%.html: ${srcdir}/efaq%.texi
+-	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ $<
+-
+ ${buildinfodir}/emacs-mime.info emacs-mime.html: EXTRA_OPTS = --enable-encoding
  
- clean: mostlyclean
- 	rm -f $(DVI_TARGETS) $(HTML_TARGETS) $(PDF_TARGETS) $(PS_TARGETS)
--	rm -f efaq-w32.dvi efaq-w32.html efaq-w32.pdf efaq-w32.ps
- 
- distclean: clean
- 	rm -f Makefile
+ gnus_deps = ${srcdir}/gnus.texi ${srcdir}/gnus-faq.texi ${gfdl} ${style}
