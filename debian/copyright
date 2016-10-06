@@ -1,52 +1,53 @@
--*-text-*-
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Emacs
+Upstream-Contact: bug-gnu-emacs@gnu.org
+Upstream-Contact: emacs-devel@gnu.org
+Source: https://savannah.gnu.org/projects/emacs
+Comment:
+  This package is derived from the main Emacs packages which were
+  debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
+  00:05:45 -0600.
 
-This package is derived from the main Emacs packages which were
-debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
-00:05:45 -0600.
+  The original source for this package can be found at
+  git://git.savannah.gnu.org/emacs.git under the emacs-25.1 tag.
+  That tag was used to create the Debian upstream archive
+  (emacs25_25.1+1.orig.tar.bz2) after making adjustments to comply with
+  the DFSG (see below).
 
-The original source for this package can be found at
-git://git.savannah.gnu.org/emacs.git under the emacs-25.1 tag.
-That tag was used to create the Debian upstream archive
-(emacs25_25.1+1.orig.tar.bz2) after making adjustments to comply with
-the DFSG (see below).
+  Please see
+  /usr/share/doc/emacs25-common-non-dfsg/README.Debian.gz
+  for a description of the Debian specific differences from the upstream
+  version.
 
-Please see
-/usr/share/doc/emacs25-common-non-dfsg/README.Debian.gz
-for a description of the Debian specific differences from the upstream
-version.
+  This package contains files which have been deemed unsuitable for
+  Debian main because their licenses do not appear to satisfy the
+  requirements of the Debian Free Software Guidelines (DFSG).  See
+  http://www.debian.org/social_contract.
 
-This package contains files which have been deemed unsuitable for
-Debian main because their licenses do not appear to satisfy the
-requirements of the Debian Free Software Guidelines (DFSG).  See
-http://www.debian.org/social_contract.
+  In particular, some of the info pages included in this package are
+  covered under the GNU Free Documentation License (GFDL), which Debian
+  has decided does not satisfy the DFSG in cases where "Invariant
+  Sections" are specified.  See this Debian General Resolution on the
+  topic: http://www.debian.org/vote/2006/vote_001.
 
-In particular, some of the info pages included in this package are
-covered under the GNU Free Documentation License (GFDL), which Debian
-has decided does not satisfy the DFSG in cases where "Invariant
-Sections" are specified.  See this Debian General Resolution on the
-topic: http://www.debian.org/vote/2006/vote_001.
+  Some other files are included here because their license only allows
+  verbatim copying, or because there was some other question regarding
+  their license.
 
-Some other files are included here because their license only allows
-verbatim copying, or because there was some other question regarding
-their license.
+  Please see the files themselves for the relevant Copyright dates.
 
-Copyright:
+Files: *
+License: GPL-3+
 
-  Emacs itself is licensed under the terms of the GNU General Public
-  License (GPL), Version 3.  See the file
-  /usr/share/common-licenses/GPL-3 for more information.
+Files: debian/rules
+License: GPL plus Ian
+  This file is licensed under the terms of the Gnu Public License.
+  With the one additional provision that Ian Jackson's name may not be
+  removed from the file.
 
-  In general, the info pages are covered under the GNU Free
-  Documentation License (GFDL).  See the "GNU Free Documentation
-  License" node in "info emacs-25/emacs".
+Files: *.texi
+License: GFDL-1.3+
 
-  These files appear to only allow verbatim copying:
-    etc/CENSORSHIP
-    etc/GNU
-    etc/LINUX-GNU
-    etc/THE-GNU-PROJECT
-    etc/WHY-FREE
-
-  These files appear to have no explicit copyright statement:
-    etc/DEVEL.HUMOR
-    etc/JOKES
+Files: etc/DEVEL.HUMOR etc/JOKES
+License:
+  These files appear to have no explicit copyright statement.
