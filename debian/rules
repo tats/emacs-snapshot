@@ -131,13 +131,16 @@ doc/%/Makefile: doc/%/Makefile.in debian/rules
 	  -e "s|@INFO_EXT@|.info|g" "$<" > "$@.tmp"
 	mv "$@.tmp" "$@"
 
+doc/emacs/emacsver.texi: doc/emacs/emacsver.texi.in
+	sed -e 's|@version@|$(upstream_ver)|g' "$^" > "$@"
+
 doc_makefiles := \
   doc/emacs/Makefile \
   doc/lispintro/Makefile \
   doc/lispref/Makefile \
   doc/misc/Makefile
 
-override_dh_auto_configure: $(doc_makefiles)
+override_dh_auto_configure: $(doc_makefiles) doc/emacs/emacsver.texi
 
 # This target just supports parallel builds
 .PHONY: debian/stamp/doc-%
