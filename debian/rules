@@ -22,7 +22,7 @@ quilt := QUILT_PATCHES=debian/patches quilt
 pf := set -o pipefail
 
 # Must match emacs24{,-lucid,-nox} packages
-bin_priority := 27
+bin_priority := 28
 
 # For now we assume that emacs' versioning scheme is always
 # MAJOR.MINORtinyrev where MAJOR and MINOR are integers and tinyrev is
