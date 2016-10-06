@@ -5,13 +5,13 @@ debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
 00:05:45 -0600.
 
 The original source for this package can be found at
-git://git.savannah.gnu.org/emacs.git under the emacs-24.5 tag.
+git://git.savannah.gnu.org/emacs.git under the emacs-25.1 tag.
 That tag was used to create the Debian upstream archive
-(emacs24_24.5+1.orig.tar.bz2) after making adjustments to comply with
+(emacs25_25.1+1.orig.tar.bz2) after making adjustments to comply with
 the DFSG (see below).
 
 Please see
-/usr/share/doc/emacs24-common-non-dfsg/README.Debian.gz
+/usr/share/doc/emacs25-common-non-dfsg/README.Debian.gz
 for a description of the Debian specific differences from the upstream
 version.
 
@@ -38,7 +38,7 @@ Copyright:
 
   In general, the info pages are covered under the GNU Free
   Documentation License (GFDL).  See the "GNU Free Documentation
-  License" node in "info emacs-24/emacs".
+  License" node in "info emacs-25/emacs".
 
   These files appear to only allow verbatim copying:
     etc/CENSORSHIP

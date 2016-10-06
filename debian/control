@@ -1,4 +1,4 @@
-Source: emacs24-non-dfsg
+Source: emacs25-non-dfsg
 Section: non-free/editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
@@ -6,7 +6,7 @@ Uploaders: Jerome Marant <jerome@debian.org>
 Build-Depends: texinfo, autotools-dev, dpkg-dev (>> 1.10.0), quilt, debhelper (>= 9)
 Standards-Version: 3.7.2
 
-Package: emacs24-common-non-dfsg
+Package: emacs25-common-non-dfsg
 Section: non-free/editors
 Priority: optional
 Architecture: all
