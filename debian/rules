@@ -64,7 +64,7 @@ autogen_installdeb_files := $(addprefix debian/, \
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
 
 etc_dir := /usr/share/emacs/$(runtime_ver)/etc
-etc_files := CENSORSHIP DEVEL.HUMOR GNU JOKES LINUX-GNU THE-GNU-PROJECT WHY-FREE
+etc_files := DEVEL.HUMOR JOKES
 
 %:
 	dh $@ --parallel
@@ -171,7 +171,7 @@ override_dh_install: $(autogen_install_files)
 	dh_install
 
 override_dh_testdir:
-	dh_testdir debian/emacs-common-non-dfsg.README etc/THE-GNU-PROJECT
+	dh_testdir debian/emacs-common-non-dfsg.README doc/emacs/emacs.texi
 
 override_dh_clean: $(persistent_autogen_install_files)
 	rm -rf \
