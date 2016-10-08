@@ -170,7 +170,8 @@ override_dh_install: $(autogen_install_files)
 	  cp -a info/*.info info/*.info-[0-9] info/*.info-[0-9][0-9] \
 	    $(pkg_infodir)
 	install -d $(pkgdir_common)/$(etc_dir)
-	install $(addprefix etc/,$(etc_files)) $(pkgdir_common)/$(etc_dir)
+	install --mode 0644 $(addprefix etc/,$(etc_files)) \
+	  $(pkgdir_common)/$(etc_dir)
 	dh_install
 
 override_dh_testdir:
