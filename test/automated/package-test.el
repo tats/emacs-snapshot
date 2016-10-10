@@ -149,6 +149,9 @@
                ,@body)))
 
        (when (file-directory-p package-test-user-dir)
+         (call-process "gpg-connect-agent" nil nil nil
+                       "--homedir" (concat package-test-user-dir "/gnupg")
+                       "killagent" "bye")
          (delete-directory package-test-user-dir t))
 
        (when (and (boundp 'package-test-archive-upload-base)

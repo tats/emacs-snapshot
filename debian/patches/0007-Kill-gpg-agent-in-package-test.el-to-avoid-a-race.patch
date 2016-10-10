@@ -1,0 +1,34 @@
+From bc0af6a40c371ff8f4eaecad134c1831a6d49e75 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 10 Oct 2016 17:35:56 -0500
+Subject: Kill gpg agent in package-test.el to avoid a race
+
+package-test.el should no longer fail during clean up.
+
+* Previously a delete-directories call raced with the gpg agent's own
+  cleanup process (presumably triggered by the first deletion of one of
+  the agent's sockets).  As a result, it looks like the agent could
+  delete one of its sockets after delete-directories had decided to
+  delete the socket, but before it made the attempt, causing an
+  exception.
+
+* To fix the problem, explicitly ask gpg-connect-agent to kill the agent
+  before attempting to delete the gnupg home directory.
+---
+ test/automated/package-test.el | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/test/automated/package-test.el b/test/automated/package-test.el
+index c4c856f..7120112 100644
+--- a/test/automated/package-test.el
++++ b/test/automated/package-test.el
+@@ -149,6 +149,9 @@ package-test-fake-contents-file
+                ,@body)))
+ 
+        (when (file-directory-p package-test-user-dir)
++         (call-process "gpg-connect-agent" nil nil nil
++                       "--homedir" (concat package-test-user-dir "/gnupg")
++                       "killagent" "bye")
+          (delete-directory package-test-user-dir t))
+ 
+        (when (and (boundp 'package-test-archive-upload-base)
