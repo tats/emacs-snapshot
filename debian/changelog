@@ -1,10 +1,72 @@
-emacs25 (25.1+1-1~1.gbp435bf1) UNRELEASED; urgency=medium
+emacs25 (25.1+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @435bf12cae56a33d779c81aa69566bdeb0fb91a4 **
+  * Merge upstream version 25.1.
+    Remove patches that are no longer needed:
+      0006-Look-for-NEWS-in-order-to-find-etc-rather-than-GNU.patch
+      0008-Emacs-won-t-assume-grep-supports-GREP_OPTIONS.patch
+      0009-Emacs-should-no-longer-hang-during-large-yanks.patch
+      0010-ELF-unexec-Correct-section-header-index.patch
+      0011-ELF-unexec-Tidy-code.patch
+      0012-ELF-unexec-Merge-Alpha-and-MIPS-COFF-debug-handling.patch
+      0013-ELF-unexec-Symbol-table-patching.patch
+      0014-ELF-unexec-_OBJC_-symbols-in-bss-sections.patch
+      0015-ELF-unexec-R_-_NONE-relocs.patch
+      0016-ELF-unexec-Drive-from-PT_LOAD-header-rather-than-sec.patch
+      0017-ELF-unexec-Don-t-insert-a-new-section.patch
+      0018-src-unexelf.c-NEW_PROGRAM_H-Remove-unused-macro-Bug-.patch
+      0019-ELF-unexec-align-section-header.patch
+      0020-Emacs-should-show-GTK-icons-again.patch
+      0021-Emacs-should-work-with-gcc-5.2-and-newer.patch
+      0022-Emacs-should-work-with-glibc-2.24-on-ppc64.patch
 
-  * UNRELEASED
+  * debian/upstream-version: update regex for 25.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 26 Sep 2016 13:23:13 -0500
+  * debian/.gitignore: update for 25.1.
+
+  * debian/changelog: change the package name to emacs25.
+
+  * debian/copyright.in: change source archive extension to xz.
+
+  * Update debian control and copyright for 25.1.
+
+  * Stop mangling info files.
+
+  * debian/rules: clean additional files for 25.1.
+
+  * Don't copy missing-file.dfsg to THE-GNU-PROJECT.  THE-GNU-PROJECT
+    is now compatible with the DFSG.  Remove missing-file.dfsg
+    entirely since it it no longer being used.
+
+  * Bump Debian alternatives priority to 28 for 25.1.
+
+  * Remove ia64 CFLAGS "-O1" workaround.
+
+  * Compute version in strip-nondeterminism fix.  Use $(runtime_ver)
+    and $(flavor) instead of 24.5 and emacs24.
+
+  * Fix dh_listpackages in strip-nondeterminism target.
+
+  * Set libmagick build-dep to libmagick++-6.q16-dev.
+
+  * debian/setup-stamp: remove redundant mkdir.
+
+  * Don't default to ALSA support; explicitly request it.
+
+  * Run tests in all three debian/ build trees.
+
+  * Enable xwidget (webkit) support for emacs25.
+
+  * Convert debian/copyright to 1.0; update for 25.1.  Explicitly
+    mention the unusual debian/rules copyright, which will be
+    addressed via #826347.
+
+  * Add dbus-x11 and procps build-deps for tests.
+
+  * Kill gpg agent in package-test.el to avoid a race.  Add
+    0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch to
+    incorporate the fix.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 10 Oct 2016 21:54:59 -0500
 
 emacs24 (24.5+1-7) unstable; urgency=medium
 
