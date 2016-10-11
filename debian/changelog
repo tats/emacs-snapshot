@@ -1,10 +1,25 @@
-emacs25-non-dfsg (25.1+1-1~1.gbp3c0d65) UNRELEASED; urgency=medium
+emacs25-non-dfsg (25.1+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @3c0d6578813cae13669f939ba43809c40ff6a219 **
+  * debian/changelog: change the package name to emacs25-non-dfsg.
 
-  * UNRELEASED
+  * Merge upstream version 25.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 26 Sep 2016 13:23:39 -0500
+  * debian: update control and copyright for 25.1.
+
+  * Bump the Debian alternatives priority to 28 for 25.1.
+
+  * Accommodate 25.1 DFSG content changes.  Several files have become
+    compatible with the DFSG.
+
+  * Generate doc/emacs/emacsver.texi from rules.
+
+  * Convert debian/copyright to 1.0; update for 25.1.  Explicitly
+    mention the unusual debian/rules copyright, which will be
+    addressed via #826347.
+
+  * Install etc/ files with mode 0644.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 10 Oct 2016 19:04:21 -0500
 
 emacs24-non-dfsg (24.5+1-2) unstable; urgency=medium
 
