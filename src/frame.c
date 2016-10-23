@@ -1067,6 +1067,10 @@ affects all frames on the same terminal device.  */)
 		  (t->display_info.tty->name
 		   ? build_string (t->display_info.tty->name)
 		   : Qnil));
+  /* On terminal frames the `minibuffer' frame parameter is always
+     virtually t.  Avoid that a different value in parms causes
+     complaints, see Bug#24758.  */
+  store_in_alist (&parms, Qminibuffer, Qt);
   Fmodify_frame_parameters (frame, parms);
 
   /* Make the frame face alist be frame-specific, so that each
@@ -1160,7 +1164,12 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
       if (FRAMEP (xfocus))
 	{
 	  focus = FRAME_FOCUS_FRAME (XFRAME (xfocus));
-	  if (FRAMEP (focus) && XFRAME (focus) == SELECTED_FRAME ())
+	  if ((FRAMEP (focus) && XFRAME (focus) == SELECTED_FRAME ())
+	      /* Redirect frame focus also when FRAME has its minibuffer
+		 window on the selected frame (see Bug#24500).  */
+	      || (NILP (focus)
+		  && EQ (FRAME_MINIBUF_WINDOW (XFRAME (frame)),
+			 sf->selected_window)))
 	    Fredirect_frame_focus (xfocus, frame);
 	}
     }
