@@ -1,3 +1,11 @@
+emacs25 (25.1+1-2~1.gbp6d2ad0) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @6d2ad06edb9167079909d89550c46c01104c0d34 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 23 Oct 2016 10:48:21 -0500
+
 emacs25 (25.1+1-1) unstable; urgency=medium
 
   * Merge upstream version 25.1.
