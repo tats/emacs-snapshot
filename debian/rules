@@ -619,7 +619,11 @@ override_dh_testdir:
 override_dh_fixperms:
 	dh_fixperms -X$(movemail_bin)
 
+override_dh_auto_clean: $(persistent_autogen_files)
+	true
+
 override_dh_clean: $(persistent_autogen_files)
+	dh_clean
 	rm -rf \
 	  aclocal.m4 \
 	  build-aux/ar-lib \
@@ -649,4 +653,3 @@ override_dh_clean: $(persistent_autogen_files)
 	  src/config.in \
 	  src/stamp-h1 src/stamp-h.in
 	rm -f $(nonpersistent_autogen_files)
-	dh_clean
