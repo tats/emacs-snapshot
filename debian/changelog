@@ -1,10 +1,31 @@
-emacs25 (25.1+1-2~1.gbp6d2ad0) UNRELEASED; urgency=medium
+emacs25 (25.1+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @6d2ad06edb9167079909d89550c46c01104c0d34 **
+  * Respect DEB_BUILD_OPTIONS=nocheck.  Thanks to David Bremner for
+    reporting the issue.
 
-  * UNRELEASED
+  * Don't dh_auto_clean, and run dh_clean first.  Since we don't build
+    in the source tree, we shouldn't clean there either, and let
+    dh_clean take care of its bits before we stomp around.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 23 Oct 2016 10:48:21 -0500
+  * Install emacs.appdata.xml as emacs25.appdata.xml.
+
+  * Drop emacs23 icons to avoid future path conflicts.  Thanks to
+    Tatsuya Kinoshita for reporting the problem. (Closes: 841687)
+
+  * Fix fix for package-test gpg-agent cleanup race.  Specify
+    --no-autostart so that we don't start an agent if one wasn't
+    already running when we're requesting shutdown, and delete the
+    test dir with "rm -rf" to avoid being affected by vanishing
+    sockets (sockets that gpg-agent may be deleting in parallel).
+
+  * Add gnupg-agent build-dep for package-test.
+
+  * Don't segfault if gcc expects -nopie instead of -no-pie.  Thanks
+    to Lucas Nussbaum and Aaron M. Ucko for reporting the problem, and
+    Sven Joachim for tracking down the upstream patch. (Closes:
+    841551)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 24 Oct 2016 13:10:40 -0500
 
 emacs25 (25.1+1-1) unstable; urgency=medium
 
