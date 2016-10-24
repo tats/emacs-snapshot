@@ -151,8 +151,12 @@
        (when (file-directory-p package-test-user-dir)
          (call-process "gpg-connect-agent" nil nil nil
                        "--homedir" (concat package-test-user-dir "/gnupg")
-                       "killagent" "bye")
-         (delete-directory package-test-user-dir t))
+                       "--no-autostart"
+                       "killagent" "/bye")
+         ;; Call "rm -rf" instead of delete-directory so that it won't
+         ;; choke if the gpg-agent sockets disappear during the
+         ;; recursive traversal.
+         (call-process "rm" nil nil nil "-r" package-test-user-dir))
 
        (when (and (boundp 'package-test-archive-upload-base)
                   (file-directory-p package-test-archive-upload-base))
