@@ -410,6 +410,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  rm -r $(pkgdir_common)/usr/bin
 	  rm -r $(pkgdir_common)/usr/lib
 
+	  cd $(pkgdir_common)/usr/share/appdata \
+	    && mv emacs.appdata.xml $(flavor).appdata.xml
+
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
 	  && test -f DOC
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
