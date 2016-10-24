@@ -438,6 +438,14 @@ override_dh_auto_install: $(autogen_install_files)
 	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
 	    && convert hicolor/32x32/apps/emacs.{png,xpm}
 
+	  # Remove emacs23 icon versions
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
+	    && rm hicolor/*/apps/emacs23.*
+	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
+	    && rm hicolor/*/mimetypes/emacs-document23.svg
+	  cd $(pkgdir_common)/usr/share/icons/hicolor/scalable/mimetypes \
+	    && rm emacs-document23.svg
+
 	  # Fixup image files in unversioned directories (version
 	  # unversioned images) and prepare for update-alternatives.
 	  cd $(pkgdir_common)/usr/share/icons/hicolor \
