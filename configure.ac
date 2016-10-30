@@ -2231,7 +2231,7 @@ fi
 
 use_mmap_for_buffers=no
 case "$opsys" in
-  cygwin|mingw32) use_mmap_for_buffers=yes ;;
+  mingw32) use_mmap_for_buffers=yes ;;
 esac
 
 AC_FUNC_MMAP
@@ -2630,8 +2630,8 @@ if test "$with_xwidgets" != "no"; then
   test "$USE_GTK_TOOLKIT" = "GTK3" && test "$window_system" != "none" ||
     AC_MSG_ERROR([xwidgets requested but gtk3 not used.])
 
-  WEBKIT_REQUIRED=1.4.0
-  WEBKIT_MODULES="webkitgtk-3.0 >= $WEBKIT_REQUIRED"
+  WEBKIT_REQUIRED=2.12
+  WEBKIT_MODULES="webkit2gtk-4.0 >= $WEBKIT_REQUIRED"
   EMACS_CHECK_MODULES([WEBKIT], [$WEBKIT_MODULES])
   HAVE_XWIDGETS=$HAVE_WEBKIT
   test $HAVE_XWIDGETS = yes ||
@@ -3711,6 +3711,24 @@ if test "${HAVE_X11}" = "yes"; then
 fi
 AC_SUBST(XFIXES_CFLAGS)
 AC_SUBST(XFIXES_LIBS)
+
+### Use Xdbe (-lXdbe) if available
+HAVE_XDBE=no
+if test "${HAVE_X11}" = "yes"; then
+  AC_CHECK_HEADER(X11/extensions/Xdbe.h,
+    [AC_CHECK_LIB(Xext, XdbeAllocateBackBufferName, HAVE_XDBE=yes)],
+    [],
+    [#include <X11/Xlib.h>
+    ])
+  if test $HAVE_XDBE = yes; then
+    XDBE_LIBS=-lXext
+  fi
+  if test $HAVE_XDBE = yes; then
+    AC_DEFINE(HAVE_XDBE, 1, [Define to 1 if you have the Xdbe extension.])
+  fi
+fi
+AC_SUBST(XDBE_CFLAGS)
+AC_SUBST(XDBE_LIBS)
 
 ### Use libxml (-lxml2) if available
 ### mingw32 doesn't use -lxml2, since it loads the library dynamically.

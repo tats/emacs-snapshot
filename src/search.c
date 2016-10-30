@@ -280,8 +280,10 @@ looking_at_1 (Lisp_Object string, bool posix)
   immediate_quit = 1;
   QUIT;			/* Do a pending quit right away, to avoid paradoxical behavior */
 
-  /* Get pointers and sizes of the two strings
-     that make up the visible portion of the buffer. */
+  /* Get pointers and sizes of the two strings that make up the
+     visible portion of the buffer.  Note that we can use pointers
+     here, unlike in search_buffer, because we only call re_match_2
+     once, after which we never use the pointers again.  */
 
   p1 = BEGV_ADDR;
   s1 = GPT_BYTE - BEGV_BYTE;
@@ -400,6 +402,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 		   (NILP (Vinhibit_changing_match_data)
 		    ? &search_regs : NULL));
   immediate_quit = 0;
+  re_match_object = Qnil;       /* Stop protecting string from GC.  */
 
   /* Set last_thing_searched only when match data is changed.  */
   if (NILP (Vinhibit_changing_match_data))
@@ -470,6 +473,7 @@ fast_string_match_internal (Lisp_Object regexp, Lisp_Object string,
 		   SBYTES (string), 0,
 		   SBYTES (string), 0);
   immediate_quit = 0;
+  re_match_object = Qnil;       /* Stop protecting string from GC.  */
   return val;
 }
 
@@ -557,6 +561,7 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
   len = re_match_2 (buf, (char *) p1, s1, (char *) p2, s2,
 		    pos_byte, NULL, limit_byte);
   immediate_quit = 0;
+  re_match_object = Qnil;       /* Stop protecting string from GC.  */
 
   return len;
 }
@@ -1171,8 +1176,8 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   if (RE && !(trivial_regexp_p (string) && NILP (Vsearch_spaces_regexp)))
     {
-      unsigned char *p1, *p2;
-      ptrdiff_t s1, s2;
+      unsigned char *base;
+      ptrdiff_t off1, off2, s1, s2;
       struct re_pattern_buffer *bufp;
 
       bufp = compile_pattern (string,
@@ -1186,16 +1191,19 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 				   can take too long. */
       QUIT;			/* Do a pending quit right away,
 				   to avoid paradoxical behavior */
-      /* Get pointers and sizes of the two strings
-	 that make up the visible portion of the buffer. */
+      /* Get offsets and sizes of the two strings that make up the
+         visible portion of the buffer.  We compute offsets instead of
+         pointers because re_search_2 may call malloc and therefore
+         change the buffer text address.  */
 
-      p1 = BEGV_ADDR;
+      base = current_buffer->text->beg;
+      off1 = BEGV_ADDR - base;
       s1 = GPT_BYTE - BEGV_BYTE;
-      p2 = GAP_END_ADDR;
+      off2 = GAP_END_ADDR - base;
       s2 = ZV_BYTE - GPT_BYTE;
       if (s1 < 0)
 	{
-	  p2 = p1;
+          off2 = off1;
 	  s2 = ZV_BYTE - BEGV_BYTE;
 	  s1 = 0;
 	}
@@ -1210,12 +1218,16 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	{
 	  ptrdiff_t val;
 
-	  val = re_search_2 (bufp, (char *) p1, s1, (char *) p2, s2,
+          val = re_search_2 (bufp,
+                             (char*) (base + off1), s1,
+                             (char*) (base + off2), s2,
 			     pos_byte - BEGV_BYTE, lim_byte - pos_byte,
 			     (NILP (Vinhibit_changing_match_data)
 			      ? &search_regs : &search_regs_1),
 			     /* Don't allow match past current point */
 			     pos_byte - BEGV_BYTE);
+	  /* Update 'base' due to possible relocation inside re_search_2.  */
+	  base = current_buffer->text->beg;
 	  if (val == -2)
 	    {
 	      matcher_overflow ();
@@ -1255,11 +1267,15 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	{
 	  ptrdiff_t val;
 
-	  val = re_search_2 (bufp, (char *) p1, s1, (char *) p2, s2,
-			     pos_byte - BEGV_BYTE, lim_byte - pos_byte,
+          val = re_search_2 (bufp,
+                             (char*) (base + off1), s1,
+                             (char*) (base + off2), s2,
+                             pos_byte - BEGV_BYTE, lim_byte - pos_byte,
 			     (NILP (Vinhibit_changing_match_data)
 			      ? &search_regs : &search_regs_1),
 			     lim_byte - BEGV_BYTE);
+	  /* Update 'base' due to possible relocation inside re_search_2.  */
+	  base = current_buffer->text->beg;
 	  if (val == -2)
 	    {
 	      matcher_overflow ();
@@ -1991,13 +2007,20 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
 	      cursor += dirlen - i - direction;	/* fix cursor */
 	      if (i + direction == 0)
 		{
-		  ptrdiff_t position, start, end;
+		  ptrdiff_t position, start, end, cursor_off;
 
 		  cursor -= direction;
 
 		  position = pos_byte + cursor - p2 + ((direction > 0)
 						       ? 1 - len_byte : 0);
+		  /* set_search_regs might call malloc, which could
+		     cause ralloc.c relocate buffer text.  We need to
+		     update pointers into buffer text due to that.  */
+		  cursor_off = cursor - p2;
 		  set_search_regs (position, len_byte);
+		  p_limit = BYTE_POS_ADDR (limit);
+		  p2 = BYTE_POS_ADDR (pos_byte);
+		  cursor = p2 + cursor_off;
 
 		  if (NILP (Vinhibit_changing_match_data))
 		    {
@@ -2617,6 +2640,7 @@ since only regular expressions have distinguished subexpressions.  */)
 	  const unsigned char *add_stuff = NULL;
 	  ptrdiff_t add_len = 0;
 	  ptrdiff_t idx = -1;
+	  ptrdiff_t begbyte;
 
 	  if (str_multibyte)
 	    {
@@ -2679,11 +2703,10 @@ since only regular expressions have distinguished subexpressions.  */)
 	     set up ADD_STUFF and ADD_LEN to point to it.  */
 	  if (idx >= 0)
 	    {
-	      ptrdiff_t begbyte = CHAR_TO_BYTE (search_regs.start[idx]);
+	      begbyte = CHAR_TO_BYTE (search_regs.start[idx]);
 	      add_len = CHAR_TO_BYTE (search_regs.end[idx]) - begbyte;
 	      if (search_regs.start[idx] < GPT && GPT < search_regs.end[idx])
 		move_gap_both (search_regs.start[idx], begbyte);
-	      add_stuff = BYTE_POS_ADDR (begbyte);
 	    }
 
 	  /* Now the stuff we want to add to SUBSTED
@@ -2695,6 +2718,11 @@ since only regular expressions have distinguished subexpressions.  */)
 	      xpalloc (substed, &substed_alloc_size,
 		       add_len - (substed_alloc_size - substed_len),
 		       STRING_BYTES_BOUND, 1);
+
+	  /* We compute this after the call to xpalloc, because that
+	     could cause buffer text be relocated when ralloc.c is used.  */
+	  if (idx >= 0)
+	    add_stuff = BYTE_POS_ADDR (begbyte);
 
 	  /* Now add to the end of SUBSTED.  */
 	  if (add_stuff)

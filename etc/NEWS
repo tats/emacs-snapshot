@@ -61,6 +61,17 @@ affected by this, as SGI stopped supporting IRIX in December 2013.
 
 * Changes in Emacs 26.1
 
++++
+** The new user variable 'electric-quote-chars' provides a list
+of curved quotes for 'electric-quote-mode', allowing user to choose
+the types of quotes to be used.
+
++++
+** Emacs now uses double buffering to reduce flicker when editing and
+resizing graphical Emacs frames on the X Window System.  This support
+requires the DOUBLE-BUFFER extension, which major X servers have
+supported for many years.
+
 ---
 The group 'wp', whose label was "text", is now deprecated.
 Use the new group 'text', which inherits from 'wp', instead.
@@ -477,6 +488,12 @@ See the 'vc-faces' customization group.
 This is done with the help of 'c-or-c++-mode' function which analyses
 contents of the buffer to determine whether it's a C or C++ source
 file.
+
+** Flymake
+
++++
+*** Emacs does no longer prompt the user before killing Flymake
+processes on exit.
 
 
 * New Modes and Packages in Emacs 26.1
