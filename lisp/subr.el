@@ -514,7 +514,8 @@ argument VECP, this copies vectors as well as conses."
 		(setq newcar (copy-tree (car tree) vecp)))
 	    (push newcar result))
 	  (setq tree (cdr tree)))
-	(nconc (nreverse result) tree))
+	(nconc (nreverse result)
+               (if (and vecp (vectorp tree)) (copy-tree tree vecp) tree)))
     (if (and vecp (vectorp tree))
 	(let ((i (length (setq tree (copy-sequence tree)))))
 	  (while (>= (setq i (1- i)) 0)
@@ -910,7 +911,7 @@ KEY is a string or vector representing a sequence of keystrokes."
 
 (defun substitute-key-definition (olddef newdef keymap &optional oldmap prefix)
   "Replace OLDDEF with NEWDEF for any keys in KEYMAP now defined as OLDDEF.
-In other words, OLDDEF is replaced with NEWDEF where ever it appears.
+In other words, OLDDEF is replaced with NEWDEF wherever it appears.
 Alternatively, if optional fourth argument OLDMAP is specified, we redefine
 in KEYMAP as NEWDEF those keys which are defined as OLDDEF in OLDMAP.
 
@@ -4562,8 +4563,10 @@ to deactivate this transient map, regardless of KEEP-PRED."
                         ;; exit C-u.
                         t)
                        ((eq t keep-pred)
-                        (eq this-command
-                            (lookup-key map (this-command-keys-vector))))
+                        (let ((mc (lookup-key map (this-command-keys-vector))))
+                          ;; If the key is unbound `this-command` is
+                          ;; nil and so is `mc`.
+                          (and mc (eq this-command mc))))
                        (t (funcall keep-pred)))
                 (funcall exitfun)))))
     (add-hook 'pre-command-hook clearfun)

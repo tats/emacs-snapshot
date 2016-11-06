@@ -1,4 +1,4 @@
-;;; shr.el --- Simple HTML Renderer
+;;; shr.el --- Simple HTML Renderer -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2016 Free Software Foundation, Inc.
 
@@ -1582,7 +1582,7 @@ The preference is a float determined from `shr-prefer-media-type'."
          (max-height (and edges
                           (truncate (* shr-max-image-proportion
                                        (- (nth 3 edges) (nth 1 edges))))))
-         svg image)
+         svg)
     (when (and max-width
                (> width max-width))
       (setq height (truncate (* (/ (float max-width) width) height))
@@ -1897,10 +1897,47 @@ The preference is a float determined from `shr-prefer-media-type'."
     (when (zerop shr-table-depth)
       (save-excursion
 	(shr-expand-alignments start (point)))
+      ;; Insert also non-td/th strings excluding comments and styles.
+      (save-restriction
+	(narrow-to-region (point) (point))
+	(insert (mapconcat #'identity
+			   (shr-collect-extra-strings-in-table dom)
+			   "\n"))
+	(shr-fill-lines (point-min) (point-max)))
       (dolist (elem (dom-by-tag dom 'object))
 	(shr-tag-object elem))
       (dolist (elem (dom-by-tag dom 'img))
 	(shr-tag-img elem)))))
+
+(defun shr-collect-extra-strings-in-table (dom &optional flags)
+  "Return extra strings in DOM of which the root is a table clause.
+FLAGS is a cons of two flags that control whether to collect strings."
+  ;; If and only if the cdr is not set, the car will be set to t when
+  ;; a <td> or a <th> clause is found in the children of DOM, and reset
+  ;; to nil when a <table> clause is found in the children of DOM.
+  ;; The cdr will be set to t when a <table> clause is found if the car
+  ;; is not set then, and will never be reset.
+  ;; This function collects strings if the car of FLAGS is not set.
+  (unless flags (setq flags (cons nil nil)))
+  (cl-loop for child in (dom-children dom)
+	   if (stringp child)
+	     when (and (not (car flags))
+		       (string-match "\\(?:[^\t\n\r ]+[\t\n\r ]+\\)*[^\t\n\r ]+"
+				     child))
+	       collect (match-string 0 child)
+	     end
+	   else
+	     unless (let ((tag (dom-tag child)))
+		      (or (memq tag '(comment style))
+			  (progn
+			    (cond ((memq tag '(td th))
+				   (unless (cdr flags) (setcar flags t)))
+				  ((eq tag 'table)
+				   (if (car flags)
+				       (unless (cdr flags) (setcar flags nil))
+				     (setcdr flags t))))
+			    nil)))
+	       append (shr-collect-extra-strings-in-table child flags)))
 
 (defun shr-insert-table (table widths)
   (let* ((collapse (equal (cdr (assq 'border-collapse shr-stylesheet))
@@ -1919,7 +1956,7 @@ The preference is a float determined from `shr-prefer-media-type'."
 		      (dolist (column row)
 			(setq max (max max (nth 2 column))))
 		      max)))
-	(dotimes (i (max height 1))
+	(dotimes (_ (max height 1))
 	  (shr-indent)
 	  (insert shr-table-vertical-line "\n"))
 	(dolist (column row)
@@ -1927,7 +1964,7 @@ The preference is a float determined from `shr-prefer-media-type'."
 	    (goto-char start)
 	    ;; Sum up all the widths from the column.  (There may be
 	    ;; more than one if this is a "colspan" column.)
-	    (dotimes (i (nth 4 column))
+	    (dotimes (_ (nth 4 column))
 	      ;; The colspan directive may be wrong and there may not be
 	      ;; that number of columns.
 	      (when (<= column-number (1- (length widths)))
@@ -1958,7 +1995,7 @@ The preference is a float determined from `shr-prefer-media-type'."
 		(forward-line 1))
 	      ;; Add blank lines at padding at the bottom of the TD,
 	      ;; possibly.
-	      (dotimes (i (- height (length lines)))
+	      (dotimes (_ (- height (length lines)))
 		(end-of-line)
 		(let ((start (point)))
 		  (insert (propertize " "
@@ -2140,7 +2177,7 @@ The preference is a float determined from `shr-prefer-media-type'."
 		      (push data tds)))))
 	      (when (and colspan
 			 (> colspan 1))
-		(dotimes (c (1- colspan))
+		(dotimes (_ (1- colspan))
 		  (setq i (1+ i))
 		  (push
 		   (if fill
