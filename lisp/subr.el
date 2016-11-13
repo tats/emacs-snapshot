@@ -1291,13 +1291,6 @@ be a list of the form returned by `event-start' and `event-end'."
 
 ;;;; Obsolescent names for functions.
 
-(define-obsolete-function-alias 'window-dot 'window-point "22.1")
-(define-obsolete-function-alias 'set-window-dot 'set-window-point "22.1")
-(define-obsolete-function-alias 'read-input 'read-string "22.1")
-(define-obsolete-function-alias 'show-buffer 'set-window-buffer "22.1")
-(define-obsolete-function-alias 'eval-current-buffer 'eval-buffer "22.1")
-(define-obsolete-function-alias 'string-to-int 'string-to-number "22.1")
-
 (make-obsolete 'forward-point "use (+ (point) N) instead." "23.1")
 (make-obsolete 'buffer-has-markers-at nil "24.3")
 
@@ -1306,18 +1299,6 @@ be a list of the form returned by `event-start' and `event-end'."
 (make-obsolete 'string-as-unibyte   "use `encode-coding-string'." "25.2")
 (make-obsolete 'string-to-multibyte "use `decode-coding-string'." "25.2")
 (make-obsolete 'string-as-multibyte "use `decode-coding-string'." "25.2")
-
-(defun insert-string (&rest args)
-  "Mocklisp-compatibility insert function.
-Like the function `insert' except that any argument that is a number
-is converted into a string by expressing it in decimal."
-  (declare (obsolete insert "22.1"))
-  (dolist (el args)
-    (insert (if (integerp el) (number-to-string el) el))))
-
-(defun makehash (&optional test)
-  (declare (obsolete make-hash-table "22.1"))
-  (make-hash-table :test (or test 'eql)))
 
 (defun log10 (x)
   "Return (log X 10), the log base 10 of X."
@@ -1338,45 +1319,6 @@ is converted into a string by expressing it in decimal."
 (set-advertised-calling-convention 'redirect-frame-focus '(frame focus-frame) "24.3")
 
 ;;;; Obsolescence declarations for variables, and aliases.
-
-;; Special "default-FOO" variables which contain the default value of
-;; the "FOO" variable are nasty.  Their implementation is brittle, and
-;; slows down several unrelated variable operations; furthermore, they
-;; can lead to really odd behavior if you decide to make them
-;; buffer-local.
-
-;; Not used at all in Emacs, last time I checked:
-(make-obsolete-variable 'default-mode-line-format
-                        "use (setq-default mode-line-format) or (default-value mode-line-format) instead"
-                        "23.2")
-(make-obsolete-variable 'default-header-line-format 'header-line-format "23.2")
-(make-obsolete-variable 'default-line-spacing 'line-spacing "23.2")
-(make-obsolete-variable 'default-abbrev-mode 'abbrev-mode "23.2")
-(make-obsolete-variable 'default-ctl-arrow 'ctl-arrow "23.2")
-(make-obsolete-variable 'default-truncate-lines 'truncate-lines "23.2")
-(make-obsolete-variable 'default-left-margin 'left-margin "23.2")
-(make-obsolete-variable 'default-tab-width 'tab-width "23.2")
-(make-obsolete-variable 'default-case-fold-search 'case-fold-search "23.2")
-(make-obsolete-variable 'default-left-margin-width 'left-margin-width "23.2")
-(make-obsolete-variable 'default-right-margin-width 'right-margin-width "23.2")
-(make-obsolete-variable 'default-left-fringe-width 'left-fringe-width "23.2")
-(make-obsolete-variable 'default-right-fringe-width 'right-fringe-width "23.2")
-(make-obsolete-variable 'default-fringes-outside-margins 'fringes-outside-margins "23.2")
-(make-obsolete-variable 'default-scroll-bar-width 'scroll-bar-width "23.2")
-(make-obsolete-variable 'default-vertical-scroll-bar 'vertical-scroll-bar "23.2")
-(make-obsolete-variable 'default-indicate-empty-lines 'indicate-empty-lines "23.2")
-(make-obsolete-variable 'default-indicate-buffer-boundaries 'indicate-buffer-boundaries "23.2")
-(make-obsolete-variable 'default-fringe-indicator-alist 'fringe-indicator-alist "23.2")
-(make-obsolete-variable 'default-fringe-cursor-alist 'fringe-cursor-alist "23.2")
-(make-obsolete-variable 'default-scroll-up-aggressively 'scroll-up-aggressively "23.2")
-(make-obsolete-variable 'default-scroll-down-aggressively 'scroll-down-aggressively "23.2")
-(make-obsolete-variable 'default-fill-column 'fill-column "23.2")
-(make-obsolete-variable 'default-cursor-type 'cursor-type "23.2")
-(make-obsolete-variable 'default-cursor-in-non-selected-windows 'cursor-in-non-selected-windows "23.2")
-(make-obsolete-variable 'default-buffer-file-coding-system 'buffer-file-coding-system "23.2")
-(make-obsolete-variable 'default-major-mode 'major-mode "23.2")
-(make-obsolete-variable 'default-enable-multibyte-characters
-      "use enable-multibyte-characters or set-buffer-multibyte instead" "23.2")
 
 (make-obsolete-variable 'define-key-rebound-commands nil "23.2")
 (make-obsolete-variable 'redisplay-end-trigger-functions 'jit-lock-register "23.1")
