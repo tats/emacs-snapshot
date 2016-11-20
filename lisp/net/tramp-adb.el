@@ -126,6 +126,7 @@ It is used for TCP/IP devices."
     (file-modes . tramp-handle-file-modes)
     (file-name-all-completions . tramp-adb-handle-file-name-all-completions)
     (file-name-as-directory . tramp-handle-file-name-as-directory)
+    (file-name-case-insensitive-p . tramp-handle-file-name-case-insensitive-p)
     (file-name-completion . tramp-handle-file-name-completion)
     (file-name-directory . tramp-handle-file-name-directory)
     (file-name-nondirectory . tramp-handle-file-name-nondirectory)
@@ -1242,6 +1243,9 @@ connection if a previous connection has died for some reason."
 		(goto-char (point-min))
 		(read (current-buffer)))
 	      ":" 'omit))
+
+	    ;; Set connection-local variables.
+	    (tramp-set-connection-local-variables vec)
 
 	    ;; Mark it as connected.
 	    (tramp-set-connection-property p "connected" t)))))))

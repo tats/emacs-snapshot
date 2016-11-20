@@ -44,6 +44,12 @@ hand the socket over to Emacs.  Emacs uses this socket to service
 emacsclient commands.  This new functionality can be disabled with the
 configure option '--disable-libsystemd'.
 
++++
+** A systemd user unit file is provided.  Use it in the standard way:
+systemctl --user enable emacs
+(If your Emacs is installed in a non-standard location, you may
+need to copy the emacs.service file to eg ~/.config/systemd/user/)
+
 ** New configure option '--disable-build-details' attempts to build an
 Emacs that is more likely to be reproducible; that is, if you build
 and install Emacs twice, the second Emacs is a copy of the first.
@@ -57,6 +63,12 @@ affected by this, as SGI stopped supporting IRIX in December 2013.
 
 
 * Startup Changes in Emacs 26.1
+
+** New option '--new-daemon'.  This is the same as '--daemon', except
+it runs in the foreground and does not fork.  This is intended for
+modern init systems such as systemd, which manage many of the traditional
+aspects of daemon behavior themselves.  '--old-daemon' is now an alias
+for '--daemon'.
 
 
 * Changes in Emacs 26.1
@@ -217,6 +229,11 @@ These local variables will thus not vanish on setting a major mode.
 ** A second dir-local file (.dir-locals-2.el) is now accepted.
 See the variable 'dir-locals-file-2' for more information.
 
++++
+** Connection-local variables can be used to specify local variables
+with a value depending on the connected remote server.  For details,
+see the node "Connection Local Variables" in the ELisp manual.
+
 ---
 ** International domain names (IDNA) are now encoded via the new
 puny.el library, so that one can visit web sites with non-ASCII URLs.
@@ -241,6 +258,9 @@ debug.el and edebug.el have been updated to heed to this variable.
 ** The new variable 'x-ctrl-keysym' has been added to the existing
 roster of X keysyms.  It can be used in combination with another
 variable of this kind to swap modifiers in Emacs.
+
+---
+** New input method: 'cyrillic-tuvan'.
 
 
 * Editing Changes in Emacs 26.1
@@ -536,7 +556,7 @@ variable.
 eval-current-buffer, string-to-int
 *** All the default-FOO variables that hold the default value of the
 FOO variable.  Use 'default-value' and 'setq-default' to access and
-change FOO, repectively.  The exhaustive list of removed variables is:
+change FOO, respectively.  The exhaustive list of removed variables is:
 'default-mode-line-format', 'default-header-line-format',
 'default-line-spacing', 'default-abbrev-mode', 'default-ctl-arrow',
 'default-truncate-lines', 'default-left-margin', 'default-tab-width',
@@ -668,6 +688,9 @@ OFFSET is a count of seconds east of Universal Time, and the string
 ABBR is a time zone abbreviation.  The affected functions are
 'current-time-string', 'current-time-zone', 'decode-time',
 'format-time-string', and 'set-time-zone-rule'.
+
++++
+** 'format-time-string' now formats "%q" to the calendar quarter.
 
 ** New built-in function 'mapcan' which avoids unnecessary consing (and garbage
 collection).

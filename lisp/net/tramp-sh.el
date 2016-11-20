@@ -518,6 +518,7 @@ The string is used in `tramp-methods'.")
 ;; FreeBSD: /usr/bin:/bin:/usr/sbin:/sbin: - beware trailing ":"!
 ;; Darwin: /usr/bin:/bin:/usr/sbin:/sbin
 ;; IRIX64: /usr/bin
+;; QNAP QTS: ---
 ;;;###tramp-autoload
 (defcustom tramp-remote-path
   '(tramp-default-remote-path "/bin" "/usr/bin" "/sbin" "/usr/sbin"
@@ -1026,6 +1027,7 @@ of command line.")
     (file-modes . tramp-handle-file-modes)
     (file-name-all-completions . tramp-sh-handle-file-name-all-completions)
     (file-name-as-directory . tramp-handle-file-name-as-directory)
+    (file-name-case-insensitive-p . tramp-handle-file-name-case-insensitive-p)
     (file-name-completion . tramp-handle-file-name-completion)
     (file-name-directory . tramp-handle-file-name-directory)
     (file-name-nondirectory . tramp-handle-file-name-nondirectory)
@@ -1291,7 +1293,7 @@ target of the symlink differ."
 		 res-uid res-gid res-size res-symlink-target)
     (tramp-message vec 5 "file attributes with ls: %s" localname)
     ;; We cannot send all three commands combined, it could exceed
-    ;; NAME_MAX or PATH_MAX.  Happened on Mac OS X, for example.
+    ;; NAME_MAX or PATH_MAX.  Happened on macOS, for example.
     (when (or (tramp-send-command-and-check
                vec
                (format "%s %s"
@@ -4121,7 +4123,7 @@ process to set up.  VEC specifies the connection."
 	(goto-char (point-min))
 	(when (search-forward "\r" nil t)
 	  (setq cs-decode (coding-system-change-eol-conversion cs-decode 'dos)))
-	;; Special setting for Mac OS X.
+	;; Special setting for macOS.
 	(when (and (string-match "^Darwin" uname)
 		   (memq 'utf-8-hfs (coding-system-list)))
 	  (setq cs-decode 'utf-8-hfs
@@ -4176,7 +4178,7 @@ process to set up.  VEC specifies the connection."
 	(tramp-send-command vec "stty tabs" t)
       (tramp-send-command vec "stty tab0" t))
 
-    ;; Set utf8 encoding.  Needed for Mac OS X, for example.  This is
+    ;; Set utf8 encoding.  Needed for macOS, for example.  This is
     ;; non-POSIX, so we must expect errors on some systems.
     (tramp-send-command vec "stty iutf8 2>/dev/null" t)
 
@@ -4917,6 +4919,9 @@ connection if a previous connection has died for some reason."
 		  ;; Next hop.
 		  (setq options ""
 			target-alist (cdr target-alist)))
+
+		;; Set connection-local variables.
+		(tramp-set-connection-local-variables vec)
 
 		;; Make initial shell settings.
 		(tramp-open-connection-setup-interactive-shell p vec)

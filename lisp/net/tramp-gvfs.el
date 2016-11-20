@@ -480,6 +480,7 @@ Every entry is a list (NAME ADDRESS).")
     (file-modes . tramp-handle-file-modes)
     (file-name-all-completions . tramp-gvfs-handle-file-name-all-completions)
     (file-name-as-directory . tramp-handle-file-name-as-directory)
+    (file-name-case-insensitive-p . tramp-handle-file-name-case-insensitive-p)
     (file-name-completion . tramp-handle-file-name-completion)
     (file-name-directory . tramp-handle-file-name-directory)
     (file-name-nondirectory . tramp-handle-file-name-nondirectory)
@@ -1722,6 +1723,9 @@ connection if a previous connection has died for some reason."
 	(when (string-equal
 	       (tramp-get-file-property vec "/" "fuse-mountpoint" "") "/")
 	  (tramp-error vec 'file-error "FUSE mount denied"))
+
+	;; Set connection-local variables.
+	(tramp-set-connection-local-variables vec)
 
 	;; Mark it as connected.
 	(tramp-set-connection-property

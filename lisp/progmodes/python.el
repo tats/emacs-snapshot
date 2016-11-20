@@ -2436,7 +2436,7 @@ banner and the initial prompt are received separately."
 (defun python-shell-comint-end-of-output-p (output)
   "Return non-nil if OUTPUT is ends with input prompt."
   (string-match
-   ;; XXX: It seems on OSX an extra carriage return is attached
+   ;; XXX: It seems on macOS an extra carriage return is attached
    ;; at the end of output, this handles that too.
    (concat
     "\r?\n?"
@@ -4040,7 +4040,7 @@ be added to `python-mode-skeleton-abbrev-table'."
   "Abbrev table for Python mode."
   :parents (list python-mode-skeleton-abbrev-table))
 
-(defmacro python-define-auxiliary-skeleton (name doc &optional &rest skel)
+(defmacro python-define-auxiliary-skeleton (name &optional doc &rest skel)
   "Define a `python-mode' auxiliary skeleton using NAME DOC and SKEL.
 The skeleton will be bound to python-skeleton-NAME."
   (declare (indent 2))
@@ -4060,11 +4060,11 @@ The skeleton will be bound to python-skeleton-NAME."
          (signal 'quit t))
        ,@skel)))
 
-(python-define-auxiliary-skeleton else nil)
+(python-define-auxiliary-skeleton else)
 
-(python-define-auxiliary-skeleton except nil)
+(python-define-auxiliary-skeleton except)
 
-(python-define-auxiliary-skeleton finally nil)
+(python-define-auxiliary-skeleton finally)
 
 (python-skeleton-define if nil
   "Condition: "
@@ -5170,7 +5170,7 @@ returned as is."
   (add-to-list
    'hs-special-modes-alist
    `(python-mode
-     "\\s-*\\(?:def\\|class\\)\\>"
+     "\\s-*\\_<\\(?:def\\|class\\)\\_>"
      ;; Use the empty string as end regexp so it doesn't default to
      ;; "\\s)".  This way parens at end of defun are properly hidden.
      ""

@@ -255,6 +255,11 @@ pair of the form (KEY VALUE).  The following KEYs are defined:
     In general, the global default value shall be used, but for
     some methods, like \"su\" or \"sudo\", a shorter timeout
     might be desirable.
+  * `tramp-case-insensitive'
+    Whether the remote file system handles file names case insensitive.
+    Only a non-nil value counts, the default value nil means to
+    perform further checks on the remote host.  See
+    `tramp-connection-properties' for a way to overwrite this.
 
 What does all this mean?  Well, you should specify `tramp-login-program'
 for all methods; this program is used to log in to the remote site.  Then,
@@ -976,7 +981,7 @@ this variable to be set as well."
   :require 'tramp)
 
 ;; Logging in to a remote host normally requires obtaining a pty.  But
-;; Emacs on MacOS X has process-connection-type set to nil by default,
+;; Emacs on macOS has process-connection-type set to nil by default,
 ;; so on those systems Tramp doesn't obtain a pty.  Here, we allow
 ;; for an override of the system default.
 (defcustom tramp-process-connection-type t
@@ -1337,6 +1342,15 @@ from the default one."
 In case a second asynchronous communication has been started, it is different
 from the default one."
   (get-process (tramp-get-connection-name vec)))
+
+(defun tramp-set-connection-local-variables (vec)
+  "Set connection-local variables in the connection buffer used for VEC.
+If connection-local variables are not supported by this Emacs
+version, the function does nothing."
+  ;; `tramp-get-connection-buffer' sets proper `default-directory'."
+  (with-current-buffer (tramp-get-connection-buffer vec)
+    ;; `hack-connection-local-variables-apply' exists since Emacs 26.1.
+    (tramp-compat-funcall 'hack-connection-local-variables-apply)))
 
 (defun tramp-debug-buffer-name (vec)
   "A name for the debug buffer for VEC."
@@ -1921,7 +1935,9 @@ ARGS are the arguments OPERATION has been called with."
 	      unhandled-file-name-directory vc-registered
 	      ;; Emacs 24+ only.
 	      file-acl file-notify-add-watch file-selinux-context
-	      set-file-acl set-file-selinux-context))
+	      set-file-acl set-file-selinux-context
+	      ;; Emacs 26+ only.
+	      file-name-case-insensitive-p))
     (if (file-name-absolute-p (nth 0 args))
 	(nth 0 args)
       (expand-file-name (nth 0 args))))
@@ -2877,6 +2893,51 @@ User is always nil."
        (tramp-run-real-handler
 	'file-name-as-directory (list (or (tramp-file-name-localname v) ""))))
      (tramp-file-name-hop v))))
+
+(defun tramp-handle-file-name-case-insensitive-p (filename)
+  "Like `file-name-case-insensitive-p' for Tramp files."
+  ;; We make it a connection property, assuming that all file systems
+  ;; on the remote host behave similar.  This might be wrong for
+  ;; mounted NFS directories or SMB/AFP shares; such more granular
+  ;; tests will be added in case they are needed.
+  (setq filename (expand-file-name filename))
+  (with-parsed-tramp-file-name filename nil
+    (or ;; Maybe there is a default value.
+     (tramp-get-method-parameter v 'tramp-case-insensitive)
+
+     ;; There isn't. So we must check, in case there's a connection already.
+     (and (tramp-connectable-p filename)
+          (with-tramp-connection-property v "case-insensitive"
+            ;; The idea is to compare a file with lower case letters
+            ;; with the same file with upper case letters.
+            (let ((candidate (directory-file-name filename))
+                  tmpfile)
+              ;; Check, whether we find an existing file with lower case
+              ;; letters.  This avoids us to create a temporary file.
+              (while (and (string-match
+                           "[a-z]" (file-remote-p candidate 'localname))
+                          (not (file-exists-p candidate)))
+                (setq candidate
+                      (directory-file-name (file-name-directory candidate))))
+              ;; Nothing found, so we must use a temporary file for
+              ;; comparison.  `make-nearby-temp-file' is added to
+              ;; Emacs 26+ like `file-name-case-insensitive-p', so
+              ;; there is no compatibility problem calling it.
+              (unless
+                  (string-match "[a-z]" (file-remote-p candidate 'localname))
+                (setq tmpfile
+                      (let ((default-directory (file-name-directory filename)))
+                        (tramp-compat-funcall 'make-nearby-temp-file "tramp."))
+                      candidate tmpfile))
+              ;; Check for the existence of the same file with upper
+              ;; case letters.
+              (unwind-protect
+                  (file-exists-p
+                   (concat
+                    (file-remote-p candidate)
+                    (upcase (file-remote-p candidate 'localname))))
+                ;; Cleanup.
+                (when tmpfile (delete-file tmpfile)))))))))
 
 (defun tramp-handle-file-name-completion
   (filename directory &optional predicate)
@@ -4323,13 +4384,6 @@ Only works for Bourne-like shells."
 ;; * Better error checking.  At least whenever we see something
 ;;   strange when doing zerop, we should kill the process and start
 ;;   again.  (Greg Stark)
-;;
-;; * Implement a general server-local-variable mechanism, as there are
-;;   probably other variables that need different values for different
-;;   servers too.  The user could then configure a variable (such as
-;;   tramp-server-local-variable-alist) to define any such variables
-;;   that they need to, which would then be let bound as appropriate
-;;   in tramp functions.  (Jason Rumney)
 ;;
 ;; * Make shadowfile.el grok Tramp filenames.  (Bug#4526, Bug#4846)
 ;;
