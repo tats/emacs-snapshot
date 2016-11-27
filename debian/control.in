@@ -33,16 +33,6 @@ Description: GNU Emacs editor (with Lucid GUI support)
  https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
  information.
 
-Package: @DEB_FLAVOR@-lucid-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: @DEB_FLAVOR@-lucid-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for @DEB_FLAVOR@-lucid
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the @DEB_FLAVOR@-lucid
- package.
-
 Package: @DEB_FLAVOR@-nox
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
@@ -54,16 +44,6 @@ Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
  and provides only a text terminal interface.
-
-Package: @DEB_FLAVOR@-nox-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: @DEB_FLAVOR@-nox-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for @DEB_FLAVOR@-nox
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the @DEB_FLAVOR@-nox
- package.
 
 Package: @DEB_FLAVOR@
 Architecture: any
@@ -77,15 +57,6 @@ Description: GNU Emacs editor (with GTK+ GUI support)
  package contains a version of Emacs with a graphical user interface
  based on GTK+ (instead of the Lucid toolkit provided by the
  @DEB_FLAVOR@-lucid package).
-
-Package: @DEB_FLAVOR@-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: @DEB_FLAVOR@-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for @DEB_FLAVOR@
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the @DEB_FLAVOR@ package.
 
 Package: @DEB_FLAVOR@-bin-common
 Architecture: any
