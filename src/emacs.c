@@ -130,11 +130,13 @@ Lisp_Object Vlibrary_cache;
    on subsequent starts.  */
 bool initialized;
 
+#ifndef CANNOT_DUMP
 /* Set to true if this instance of Emacs might dump.  */
-#ifndef DOUG_LEA_MALLOC
+# ifndef DOUG_LEA_MALLOC
 static
-#endif
+# endif
 bool might_dump;
+#endif
 
 #ifdef DARWIN_OS
 extern void unexec_init_emacs_zone (void);
@@ -157,7 +159,7 @@ bool display_arg;
    Tells GC how to save a copy of the stack.  */
 char *stack_bottom;
 
-#ifdef GNU_LINUX
+#if defined GNU_LINUX && !defined CANNOT_DUMP
 /* The gap between BSS end and heap start as far as we can tell.  */
 static uprintmax_t heap_bss_diff;
 #endif
@@ -196,7 +198,7 @@ int daemon_type;
 #ifndef WINDOWSNT
 /* Pipe used to send exit notification to the background daemon parent at
    startup.  On Windows, we use a kernel event instead.  */
-int daemon_pipe[2];
+static int daemon_pipe[2];
 #else
 HANDLE w32_daemon_event;
 #endif
@@ -712,14 +714,14 @@ main (int argc, char **argv)
 
 #ifndef CANNOT_DUMP
   might_dump = !initialized;
-#endif
 
-#ifdef GNU_LINUX
+# ifdef GNU_LINUX
   if (!initialized)
     {
       char *heap_start = my_heap_start ();
       heap_bss_diff = heap_start - max (my_endbss, my_endbss_static);
     }
+# endif
 #endif
 
 #if defined WINDOWSNT || defined HAVE_NTGUI
@@ -2122,7 +2124,7 @@ You must run Emacs in batch mode in order to dump it.  */)
   if (!might_dump)
     error ("Emacs can be dumped only once");
 
-#ifdef GNU_LINUX
+#if defined GNU_LINUX && !defined CANNOT_DUMP
 
   /* Warn if the gap between BSS end and heap start is larger than this.  */
 # define MAX_HEAP_BSS_DIFF (1024*1024)

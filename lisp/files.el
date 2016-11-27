@@ -1128,6 +1128,12 @@ consecutive checks.  For example:
 		   :format "Do not use file name cache older then %v seconds"
 		   :value 10)))
 
+(defun file-local-name (file)
+  "Return the local name component of FILE.
+It returns a file name which can be used directly as argument of
+`process-file', `start-file-process', or `shell-command'."
+  (or (file-remote-p file 'localname) file))
+
 (defun file-local-copy (file)
   "Copy the file FILE into a temporary file on this machine.
 Returns the name of the local copy, or nil, if FILE is directly
@@ -3244,7 +3250,7 @@ return as the symbol specifying the mode."
 	       nil)
 	      ((looking-at "[ \t]*\\([^ \t\n\r:;]+\\)\\([ \t]*-\\*-\\)")
 	       ;; Simple form: "-*- MODENAME -*-".
-	       (if (memq handle-mode '(nil t))
+	       (if (eq handle-mode t)
 		   (intern (concat (match-string 1) "-mode"))))
 	      (t
 	       ;; Hairy form: '-*-' [ <variable> ':' <value> ';' ]* '-*-'
@@ -6212,9 +6218,7 @@ default directory.  However, if FULL is non-nil, they are absolute."
 	   ;; This can be more than one dir
 	   ;; if DIRPART contains wildcards.
 	   (dirs (if (and dirpart
-			  (string-match "[[*?]"
-					(or (file-remote-p dirpart 'localname)
-					    dirpart)))
+			  (string-match "[[*?]" (file-local-name dirpart)))
 		     (mapcar 'file-name-as-directory
 			     (file-expand-wildcards (directory-file-name dirpart)))
 		   (list dirpart)))
