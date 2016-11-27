@@ -97,9 +97,9 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: emacs-snapshot-common
 Architecture: all
-Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
+Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
 Suggests: emacs-snapshot-el, emacs-snapshot-common-non-dfsg
-Conflicts: emacs-snapshot-el (<< ${Source-Version}), cedet, eieio, speedbar
+Conflicts: emacs-snapshot-el (<< ${source:Version}), cedet, eieio, speedbar
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
