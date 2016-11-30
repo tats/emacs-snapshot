@@ -343,7 +343,10 @@ define cfg_tree
   rm -rf $(1)
   mkdir $(1)
   cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') "$(1)"
-  cd $(1) && CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" ./configure $(confflags) $(2)
+  cd $(1) && \
+    CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" \
+    REL_ALLOC=no \
+      ./configure $(confflags) $(2)
 endef
 
 define build_cmd
