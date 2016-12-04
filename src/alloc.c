@@ -3201,7 +3201,7 @@ cleanup_vector (struct Lisp_Vector *vector)
       && ((vector->header.size & PSEUDOVECTOR_SIZE_MASK)
 	  == FONT_OBJECT_MAX))
     {
-      struct font_driver *drv = ((struct font *) vector)->driver;
+      struct font_driver const *drv = ((struct font *) vector)->driver;
 
       /* The font driver might sometimes be NULL, e.g. if Emacs was
 	 interrupted before it had time to set it up.  */
@@ -3567,7 +3567,7 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   set_symbol_next (val, NULL);
   p->gcmarkbit = false;
   p->interned = SYMBOL_UNINTERNED;
-  p->constant = 0;
+  p->trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->declared_special = false;
   p->pinned = false;
 }

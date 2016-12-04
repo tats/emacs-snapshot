@@ -83,6 +83,12 @@ of curved quotes for 'electric-quote-mode', allowing user to choose
 the types of quotes to be used.
 
 +++
+** The new user variable 'dired-omit-case-fold' allows the user to
+customize the case-sensitivity of dired-omit-mode.  It defaults to
+the same sensitivity as that of the filesystem for the corresponding
+dired buffer.
+
++++
 ** Emacs now uses double buffering to reduce flicker when editing and
 resizing graphical Emacs frames on the X Window System.  This support
 requires the DOUBLE-BUFFER extension, which major X servers have
@@ -610,6 +616,10 @@ function 'check-declare-errmsg' has been removed.
 
 * Lisp Changes in Emacs 26.1
 
+** New variable 'while-no-input-ignore-events' which allow
+setting which special events 'while-no-input' should ignore.
+It is a list of symbols.
+
 ** New function 'undo-amalgamate-change-group' to get rid of
 undo-boundaries between two states.
 
@@ -704,6 +714,11 @@ two objects are 'eq' ('eql'), then the result of 'sxhash-eq'
 ** Function 'sxhash' has been renamed to 'sxhash-equal' for
 consistency with the new functions.  For compatibility, 'sxhash'
 remains as an alias to 'sxhash-equal'.
+
++++
+** New function `add-variable-watcher' can be used to call a function
+when a symbol's value is changed.  This is used to implement the new
+debugger command `debug-on-variable-change'.
 
 +++
 ** Time conversion functions that accept a time zone rule argument now
