@@ -1146,7 +1146,9 @@ target of the symlink differ."
      (tramp-make-tramp-file-name
       method user host
       (with-tramp-file-property v localname "file-truename"
-	(let ((result nil))			; result steps in reverse order
+	(let ((result nil)			; result steps in reverse order
+	      (quoted (tramp-compat-file-name-quoted-p localname))
+	      (localname (tramp-compat-file-name-unquote localname)))
 	  (tramp-message v 4 "Finding true name for `%s'" filename)
 	  (cond
 	   ;; Use GNU readlink --canonicalize-missing where available.
@@ -1241,6 +1243,7 @@ target of the symlink differ."
 		(when (string= "" result)
 		  (setq result "/")))))
 
+	  (when quoted (setq result (tramp-compat-file-name-quote result)))
 	  (tramp-message v 4 "True name of `%s' is `%s'" localname result)
 	  result))))
 
@@ -2412,10 +2415,10 @@ The method used must be an out-of-band method."
 			'identity)
 		      (if t1
 			  (tramp-make-copy-program-file-name v)
-			(shell-quote-argument filename)))
+			(tramp-unquote-shell-quote-argument filename)))
 	      target (if t2
 			 (tramp-make-copy-program-file-name v)
-		       (shell-quote-argument newname)))
+		       (tramp-unquote-shell-quote-argument newname)))
 
 	;; Check for host and port number.  We cannot use
 	;; `tramp-file-name-port', because this returns also
@@ -5163,7 +5166,8 @@ Return ATTR."
   (let ((method (tramp-file-name-method vec))
 	(user (tramp-file-name-user vec))
 	(host (tramp-file-name-real-host vec))
-	(localname (directory-file-name (tramp-file-name-localname vec))))
+	(localname (tramp-compat-file-name-unquote
+		    (directory-file-name (tramp-file-name-localname vec)))))
     (when (string-match tramp-ipv6-regexp host)
       (setq host (format "[%s]" host)))
     (unless (string-match "ftp$" method)
@@ -5172,8 +5176,8 @@ Return ATTR."
      ((tramp-get-method-parameter vec 'tramp-remote-copy-program)
       localname)
      ((not (zerop (length user)))
-      (shell-quote-argument (format "%s@%s:%s" user host localname)))
-     (t (shell-quote-argument (format "%s:%s" host localname))))))
+      (tramp-shell-quote-argument (format "%s@%s:%s" user host localname)))
+     (t (tramp-shell-quote-argument (format "%s:%s" host localname))))))
 
 (defun tramp-method-out-of-band-p (vec size)
   "Return t if this is an out-of-band method, nil otherwise."

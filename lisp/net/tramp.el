@@ -1239,9 +1239,9 @@ localname (file name on remote host) and hop.  If NODEFAULT is
 non-nil, the file name parts are not expanded to their default
 values."
   (save-match-data
+    (unless (tramp-tramp-file-p name)
+      (tramp-compat-user-error nil "Not a Tramp file name: \"%s\"" name))
     (let ((match (string-match (nth 0 tramp-file-name-structure) name)))
-      (unless match
-	(tramp-compat-user-error nil "Not a Tramp file name: \"%s\"" name))
       (let ((method    (match-string (nth 1 tramp-file-name-structure) name))
 	    (user      (match-string (nth 2 tramp-file-name-structure) name))
 	    (host      (match-string (nth 3 tramp-file-name-structure) name))
@@ -3323,20 +3323,23 @@ User is always nil."
 (defun tramp-handle-substitute-in-file-name (filename)
   "Like `substitute-in-file-name' for Tramp files.
 \"//\" and \"/~\" substitute only in the local filename part."
-  ;; First, we must replace environment variables.
-  (setq filename (tramp-replace-environment-variables filename))
-  (with-parsed-tramp-file-name filename nil
-    ;; Ignore in LOCALNAME everything before "//" or "/~".
-    (when (and (stringp localname) (string-match ".+?/\\(/\\|~\\)" localname))
-      (setq filename
-	    (concat (file-remote-p filename)
-		    (replace-match "\\1" nil nil localname)))
-      ;; "/m:h:~" does not work for completion.  We use "/m:h:~/".
-      (when (string-match "~$" filename)
-	(setq filename (concat filename "/"))))
-    ;; We do not want to replace environment variables, again.
-    (let (process-environment)
-      (tramp-run-real-handler 'substitute-in-file-name (list filename)))))
+  ;; Check, whether the local part is a quoted file name.
+  (if (tramp-compat-file-name-quoted-p filename)
+      filename
+    ;; First, we must replace environment variables.
+    (setq filename (tramp-replace-environment-variables filename))
+    (with-parsed-tramp-file-name filename nil
+      ;; Ignore in LOCALNAME everything before "//" or "/~".
+      (when (and (stringp localname) (string-match ".+?/\\(/\\|~\\)" localname))
+	(setq filename
+	      (concat (file-remote-p filename)
+		      (replace-match "\\1" nil nil localname)))
+	;; "/m:h:~" does not work for completion.  We use "/m:h:~/".
+	(when (string-match "~$" filename)
+	  (setq filename (concat filename "/"))))
+      ;; We do not want to replace environment variables, again.
+      (let (process-environment)
+	(tramp-run-real-handler 'substitute-in-file-name (list filename))))))
 
 (defun tramp-handle-set-visited-file-modtime (&optional time-list)
   "Like `set-visited-file-modtime' for Tramp files."
@@ -4009,16 +4012,17 @@ be granted."
 
 (defun tramp-get-remote-tmpdir (vec)
   "Return directory for temporary files on the remote host identified by VEC."
-  (let ((dir (tramp-make-tramp-file-name
-	      (tramp-file-name-method vec)
-	      (tramp-file-name-user vec)
-	      (tramp-file-name-host vec)
-	      (or (tramp-get-method-parameter vec 'tramp-tmpdir) "/tmp"))))
-    (with-tramp-connection-property vec "tmpdir"
+  (with-tramp-connection-property vec "tmpdir"
+    (let ((dir (tramp-make-tramp-file-name
+		(tramp-file-name-method vec)
+		(tramp-file-name-user vec)
+		(tramp-file-name-host vec)
+		(or (tramp-get-method-parameter vec 'tramp-tmpdir) "/tmp")
+		(tramp-file-name-hop vec))))
       (or (and (file-directory-p dir) (file-writable-p dir)
 	       (file-remote-p dir 'localname))
-	  (tramp-error vec 'file-error "Directory %s not accessible" dir)))
-    dir))
+	  (tramp-error vec 'file-error "Directory %s not accessible" dir))
+      dir)))
 
 ;;;###tramp-autoload
 (defun tramp-make-tramp-temp-file (vec)
@@ -4080,7 +4084,7 @@ this file, if that variable is non-nil."
 	       ("|" . "__")
 	       ("[" . "_l")
 	       ("]" . "_r"))
-	     (buffer-file-name))
+	     (tramp-compat-file-name-unquote (buffer-file-name)))
 	    tramp-auto-save-directory))))
     ;; Run plain `make-auto-save-file-name'.
     (tramp-run-real-handler 'make-auto-save-file-name nil)))
@@ -4268,17 +4272,10 @@ Invokes `password-read' if available, `read-passwd' else."
        'auth-source-forget-user-or-password "password" host method))
     (password-cache-remove (tramp-make-tramp-file-name method user host ""))))
 
-;; Snarfed code from time-date.el and parse-time.el
+;; Snarfed code from time-date.el.
 
 (defconst tramp-half-a-year '(241 17024)
 "Evaluated by \"(days-to-time 183)\".")
-
-(defconst tramp-parse-time-months
-  '(("jan" . 1) ("feb" . 2) ("mar" . 3)
-    ("apr" . 4) ("may" . 5) ("jun" . 6)
-    ("jul" . 7) ("aug" . 8) ("sep" . 9)
-    ("oct" . 10) ("nov" . 11) ("dec" . 12))
-  "Alist mapping month names to integers.")
 
 ;;;###tramp-autoload
 (defun tramp-time-diff (t1 t2)
@@ -4286,6 +4283,10 @@ Invokes `password-read' if available, `read-passwd' else."
 T1 and T2 are time values (as returned by `current-time' for example)."
   ;; Starting with Emacs 25.1, we could change this to use `time-subtract'.
   (float-time (tramp-compat-funcall 'subtract-time t1 t2)))
+
+(defun tramp-unquote-shell-quote-argument (s)
+  "Remove quotation prefix \"/:\" from string S, and quote it then for shell."
+  (shell-quote-argument (tramp-compat-file-name-unquote s)))
 
 ;; Currently (as of Emacs 20.5), the function `shell-quote-argument'
 ;; does not deal well with newline characters.  Newline is replaced by
@@ -4318,7 +4319,7 @@ T1 and T2 are time values (as returned by `current-time' for example)."
 Only works for Bourne-like shells."
   (let ((system-type 'not-windows))
     (save-match-data
-      (let ((result (shell-quote-argument s))
+      (let ((result (tramp-unquote-shell-quote-argument s))
 	    (nl (regexp-quote (format "\\%s" tramp-rsh-end-of-line))))
 	(when (and (>= (length result) 2)
 		   (string= (substring result 0 2) "\\~"))

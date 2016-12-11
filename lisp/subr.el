@@ -1879,7 +1879,7 @@ definition, variable definition, or face definition only."
 	   (autoloadp (symbol-function symbol)))
       (nth 1 (symbol-function symbol))
     (let ((files load-history)
-	  file)
+	  file match)
       (while files
 	(if (if type
 		(if (eq type 'defvar)
@@ -1890,7 +1890,8 @@ definition, variable definition, or face definition only."
 	      ;; We accept all types, so look for variable def
 	      ;; and then for any other kind.
 	      (or (member symbol (cdr (car files)))
-		  (rassq symbol (cdr (car files)))))
+		  (and (setq match (rassq symbol (cdr (car files))))
+		       (not (eq 'require (car match))))))
 	    (setq file (car (car files)) files nil))
 	(setq files (cdr files)))
       file)))
@@ -4950,6 +4951,20 @@ as a list.")
             (if (string-match "\\([^.].*?\\)-\\([0-9]+\\(?:[.][0-9]+\\|\\(?:pre\\|beta\\|alpha\\)[0-9]+\\)*\\)" subdir)
                 (match-string 1 subdir) subdir))
           "-pkg.el"))
+
+
+;;; Thread support.
+
+(defmacro with-mutex (mutex &rest body)
+  "Invoke BODY with MUTEX held, releasing MUTEX when done.
+This is the simplest safe way to acquire and release a mutex."
+  (declare (indent 1) (debug t))
+  (let ((sym (make-symbol "mutex")))
+    `(let ((,sym ,mutex))
+       (mutex-lock ,sym)
+       (unwind-protect
+	   (progn ,@body)
+	 (mutex-unlock ,sym)))))
 
 
 ;;; Misc.

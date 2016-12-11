@@ -51,20 +51,21 @@ when it has unsaved changes."
   nil
   "Alist of abbreviations for file directories.
 A list of elements of the form (FROM . TO), each meaning to replace
-FROM with TO when it appears in a directory name.  This replacement is
-done when setting up the default directory of a newly visited file.
+a match for FROM with TO when a directory name matches FROM.  This
+replacement is done when setting up the default directory of a
+newly visited file buffer.
 
-FROM is matched against directory names anchored at the first
-character, so it should start with a \"\\\\\\=`\", or, if directory
-names cannot have embedded newlines, with a \"^\".
+FROM is a regexp that is matched against directory names anchored at
+the first character, so it should start with a \"\\\\\\=`\", or, if
+directory names cannot have embedded newlines, with a \"^\".
 
 FROM and TO should be equivalent names, which refer to the
-same directory.  Do not use `~' in the TO strings;
-they should be ordinary absolute directory names.
+same directory.  TO should be an absolute directory name.
+Do not use `~' in the TO strings.
 
 Use this feature when you have directories which you normally refer to
 via absolute symbolic links.  Make TO the name of the link, and FROM
-the name it is linked to."
+a regexp matching the name it is linked to."
   :type '(repeat (cons :format "%v"
 		       :value ("\\`" . "")
 		       (regexp :tag "From")
@@ -1604,7 +1605,7 @@ file names with wildcards."
 
 (defun find-file--read-only (fun filename wildcards)
   (unless (or (and wildcards find-file-wildcards
-		   (not (string-match "\\`/:" filename))
+		   (not (file-name-quoted-p filename))
 		   (string-match "[[*?]" filename))
 	      (file-exists-p filename))
     (error "%s does not exist" filename))
@@ -1784,7 +1785,8 @@ Choose the buffer's name using `generate-new-buffer-name'."
 (make-obsolete-variable 'automount-dir-prefix 'directory-abbrev-alist "24.3")
 
 (defvar abbreviated-home-dir nil
-  "The user's homedir abbreviated according to `directory-abbrev-alist'.")
+  "Regexp matching the user's homedir at the beginning of file name.
+The value includes abbreviation according to `directory-abbrev-alist'.")
 
 (defun abbreviate-file-name (filename)
   "Return a version of FILENAME shortened using `directory-abbrev-alist'.
@@ -1815,8 +1817,23 @@ home directory is a root directory) and removes automounter prefixes
       (or abbreviated-home-dir
 	  (setq abbreviated-home-dir
 		(let ((abbreviated-home-dir "$foo"))
-		  (concat "\\`" (abbreviate-file-name (expand-file-name "~"))
-			  "\\(/\\|\\'\\)"))))
+                  (setq abbreviated-home-dir
+                        (concat "\\`"
+                                (abbreviate-file-name (expand-file-name "~"))
+                                "\\(/\\|\\'\\)"))
+                  ;; Depending on whether default-directory does or
+                  ;; doesn't include non-ASCII characters, the value
+                  ;; of abbreviated-home-dir could be multibyte or
+                  ;; unibyte.  In the latter case, we need to decode
+                  ;; it.  Note that this function is called for the
+                  ;; first time (from startup.el) when
+                  ;; locale-coding-system is already set up.
+                  (if (multibyte-string-p abbreviated-home-dir)
+                      abbreviated-home-dir
+                    (decode-coding-string abbreviated-home-dir
+                                          (if (eq system-type 'windows-nt)
+                                              'utf-8
+                                            locale-coding-system))))))
 
       ;; If FILENAME starts with the abbreviated homedir,
       ;; make it start with `~' instead.
@@ -1968,7 +1985,7 @@ the various files."
 	  (error "%s is a directory" filename))
     (if (and wildcards
 	     find-file-wildcards
-	     (not (string-match "\\`/:" filename))
+	     (not (file-name-quoted-p filename))
 	     (string-match "[[*?]" filename))
 	(let ((files (condition-case nil
 			 (file-expand-wildcards filename t)
@@ -6927,6 +6944,28 @@ only these files will be asked to be saved."
          (apply operation arguments)))
       (_
        (apply operation arguments)))))
+
+(defsubst file-name-quoted-p (name)
+  "Whether NAME is quoted with prefix \"/:\".
+If NAME is a remote file name, check the local part of NAME."
+  (string-prefix-p "/:" (file-local-name name)))
+
+(defsubst file-name-quote (name)
+  "Add the quotation prefix \"/:\" to file NAME.
+If NAME is a remote file name, the local part of NAME is quoted.
+If NAME is already a quoted file name, NAME is returned unchanged."
+  (if (file-name-quoted-p name)
+      name
+    (concat (file-remote-p name) "/:" (file-local-name name))))
+
+(defsubst file-name-unquote (name)
+  "Remove quotation prefix \"/:\" from file NAME, if any.
+If NAME is a remote file name, the local part of NAME is unquoted."
+  (let ((localname (file-local-name name)))
+    (when (file-name-quoted-p localname)
+      (setq
+       localname (if (= (length localname) 2) "/" (substring localname 2))))
+    (concat (file-remote-p name) localname)))
 
 ;; Symbolic modes and read-file-modes.
 

@@ -602,6 +602,11 @@ is called on the entire buffer (rather than an active region)."
   :group 'editing
   :version "24.3")
 
+(defun region-modifiable-p (start end)
+  "Return non-nil if the region contains no read-only text."
+  (and (not (get-text-property start 'read-only))
+       (eq end (next-single-property-change start 'read-only nil end))))
+
 (defun delete-trailing-whitespace (&optional start end)
   "Delete trailing whitespace between START and END.
 If called interactively, START and END are the start/end of the
@@ -631,7 +636,9 @@ buffer if the variable `delete-trailing-lines' is non-nil."
           ;; Treating \n as non-whitespace makes things easier.
           (modify-syntax-entry ?\n "_")
           (while (re-search-forward "\\s-+$" end-marker t)
-            (delete-region (match-beginning 0) (match-end 0))))
+            (let ((b (match-beginning 0)) (e (match-end 0)))
+              (when (region-modifiable-p b e)
+                (delete-region b e)))))
         (if end
             (set-marker end-marker nil)
           ;; Delete trailing empty lines.
@@ -639,6 +646,7 @@ buffer if the variable `delete-trailing-lines' is non-nil."
                ;; Really the end of buffer.
                (= (goto-char (point-max)) (1+ (buffer-size)))
                (<= (skip-chars-backward "\n") -2)
+               (region-modifiable-p (1+ (point)) (point-max))
                (delete-region (1+ (point)) (point-max)))))))
   ;; Return nil for the benefit of `write-file-functions'.
   nil)
@@ -701,7 +709,7 @@ for numeric input."
   (let ((message-log-max nil)
 	(help-events (delq nil (mapcar (lambda (c) (unless (characterp c) c))
 				       help-event-list)))
-	done (first t) (code 0) translated)
+	done (first t) (code 0) char translated)
     (while (not done)
       (let ((inhibit-quit first)
 	    ;; Don't let C-h or other help chars get the help
@@ -713,15 +721,21 @@ for numeric input."
 or the octal character code.
 RET terminates the character code and is discarded;
 any other non-digit terminates the character code and is then used as input."))
-	(setq translated (read-key (and prompt (format "%s-" prompt))))
+	(setq char (read-event (and prompt (format "%s-" prompt)) t))
 	(if inhibit-quit (setq quit-flag nil)))
+      ;; Translate TAB key into control-I ASCII character, and so on.
+      ;; Note: `read-char' does it using the `ascii-character' property.
+      ;; We tried using read-key instead, but that disables the keystroke
+      ;; echo produced by 'C-q', see bug#24635.
+      (let ((translation (lookup-key local-function-key-map (vector char))))
+	(setq translated (if (arrayp translation)
+			     (aref translation 0)
+			   char)))
       (if (integerp translated)
 	  (setq translated (char-resolve-modifiers translated)))
       (cond ((null translated))
 	    ((not (integerp translated))
-	     (setq unread-command-events
-                   (nconc (listify-key-sequence (this-single-command-raw-keys))
-                          unread-command-events)
+	     (setq unread-command-events (list char)
 		   done t))
 	    ((/= (logand translated ?\M-\^@) 0)
 	     ;; Turn a meta-character into a character with the 0200 bit set.
@@ -740,9 +754,7 @@ any other non-digit terminates the character code and is then used as input."))
 	    ((and (not first) (eq translated ?\C-m))
 	     (setq done t))
 	    ((not first)
-	     (setq unread-command-events
-                   (nconc (listify-key-sequence (this-single-command-raw-keys))
-                          unread-command-events)
+	     (setq unread-command-events (list char)
 		   done t))
 	    (t (setq code translated
 		     done t)))
@@ -6952,13 +6964,18 @@ With argument ARG, do this that many times."
   (kill-word (- arg)))
 
 (defun current-word (&optional strict really-word)
-  "Return the symbol or word that point is on (or a nearby one) as a string.
+  "Return the word at or near point, as a string.
 The return value includes no text properties.
-If optional arg STRICT is non-nil, return nil unless point is within
-or adjacent to a symbol or word.  In all cases the value can be nil
-if there is no word nearby.
-The function, belying its name, normally finds a symbol.
-If optional arg REALLY-WORD is non-nil, it finds just a word."
+
+If optional arg STRICT is non-nil, return nil unless point is
+within or adjacent to a word, otherwise look for a word within
+point's line.  If there is no word anywhere on point's line, the
+value is nil regardless of STRICT.
+
+By default, this function treats as a single word any sequence of
+characters that have either word or symbol syntax.  If optional
+arg REALLY-WORD is non-nil, only characters of word syntax can
+constitute a word."
   (save-excursion
     (let* ((oldpoint (point)) (start (point)) (end (point))
 	   (syntaxes (if really-word "w" "w_"))

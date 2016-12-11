@@ -155,10 +155,6 @@ bool running_asynch_code;
 bool display_arg;
 #endif
 
-/* An address near the bottom of the stack.
-   Tells GC how to save a copy of the stack.  */
-char *stack_bottom;
-
 #if defined GNU_LINUX && !defined CANNOT_DUMP
 /* The gap between BSS end and heap start as far as we can tell.  */
 static uprintmax_t heap_bss_diff;
@@ -670,7 +666,6 @@ close_output_streams (void)
 int
 main (int argc, char **argv)
 {
-  Lisp_Object dummy;
   char stack_bottom_variable;
   bool do_initial_setlocale;
   bool dumping;
@@ -686,7 +681,8 @@ main (int argc, char **argv)
   /* If we use --chdir, this records the original directory.  */
   char *original_pwd = 0;
 
-  stack_base = &dummy;
+  /* Record (approximately) where the stack begins.  */
+  stack_bottom = &stack_bottom_variable;
 
   dumping = !initialized && (strcmp (argv[argc - 1], "dump") == 0
 			     || strcmp (argv[argc - 1], "bootstrap") == 0);
@@ -734,6 +730,9 @@ main (int argc, char **argv)
      to have non-stub implementations of APIs we need to convert file
      names between UTF-8 and the system's ANSI codepage.  */
   maybe_load_unicows_dll ();
+  /* Initialize the codepage for file names, needed to decode
+     non-ASCII file names during startup.  */
+  w32_init_file_name_codepage ();
 #endif
   /* This has to be done before module_init is called below, so that
      the latter could use the thread ID of the main thread.  */
@@ -877,9 +876,6 @@ main (int argc, char **argv)
       re_max_failures = lim < extra ? 0 : min (lim - extra, SIZE_MAX) / ratio;
     }
 #endif /* HAVE_SETRLIMIT and RLIMIT_STACK and not CYGWIN */
-
-  /* Record (approximately) where the stack begins.  */
-  stack_bottom = &stack_bottom_variable;
 
   clearerr (stdin);
 
@@ -1194,6 +1190,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   if (!initialized)
     {
       init_alloc_once ();
+      init_threads_once ();
       init_obarray ();
       init_eval_once ();
       init_charset_once ();
@@ -1240,6 +1237,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
     }
 
   init_alloc ();
+  init_threads ();
 
   if (do_initial_setlocale)
     {
@@ -1582,6 +1580,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif /* HAVE_W32NOTIFY */
 #endif /* WINDOWSNT */
 
+      syms_of_threads ();
       syms_of_profiler ();
 
       keys_of_casefiddle ();

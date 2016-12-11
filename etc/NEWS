@@ -74,6 +74,19 @@ for '--daemon'.
 * Changes in Emacs 26.1
 
 +++
+** Emacs now provides a limited form of concurrency with Lisp threads.
+Concurrency in Emacs Lisp is "mostly cooperative", meaning that
+Emacs will only switch execution between threads at well-defined
+times: when Emacs waits for input, during blocking operations related
+to threads (such as mutex locking), or when the current thread
+explicitly yields.  Global variables are shared among all threads, but
+a 'let' binding is thread-local.  Each thread also has its own current
+buffer and its own match data.
+
+See the chapter "Threads" in the ELisp manual for full documentation
+of these facilities.
+
++++
 ** The new function 'file-name-case-insensitive-p' tests whether a
 given file is on a case-insensitive filesystem.
 
@@ -267,6 +280,12 @@ variable of this kind to swap modifiers in Emacs.
 
 ---
 ** New input methods: 'cyrillic-tuvan', 'polish-prefix'.
+
++++
+** File name quoting by adding the prefix "/:" is now possible for the
+local part of a remote file name.  Thus, if you have a directory named
+"/~" on the remote host "foo", you can prevent it from being
+substituted by a home directory by writing it as "/foo:/:/~/file".
 
 
 * Editing Changes in Emacs 26.1
@@ -741,6 +760,11 @@ can be used for creation of temporary files of remote or mounted directories.
 +++
 ** The new function 'file-local-name' can be used to specify arguments
 of remote processes.
+
++++
+** The new functions 'file-name-quote', 'file-name-unquote' and
+'file-name-quoted-p' can be used to quote / unquote file names with
+the prefix "/:".
 
 +++
 ** The new error 'file-missing', a subcategory of 'file-error', is now

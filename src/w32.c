@@ -272,7 +272,7 @@ static BOOL WINAPI revert_to_self (void);
 static int sys_access (const char *, int);
 extern void *e_malloc (size_t);
 extern int sys_select (int, SELECT_TYPE *, SELECT_TYPE *, SELECT_TYPE *,
-		       struct timespec *, void *);
+		       const struct timespec *, const sigset_t *);
 extern int sys_dup (int);
 
 
@@ -1509,6 +1509,16 @@ w32_valid_pointer_p (void *p, int size)
 /* Current codepage for encoding file names.  */
 static int file_name_codepage;
 
+/* Initialize the codepage used for decoding file names.  This is
+   needed to undo the value recorded during dumping, which might not
+   be correct when we run the dumped Emacs.  */
+void
+w32_init_file_name_codepage (void)
+{
+  file_name_codepage = CP_ACP;
+  w32_ansi_code_page = CP_ACP;
+}
+
 /* Produce a Windows ANSI codepage suitable for encoding file names.
    Return the information about that codepage in CP_INFO.  */
 int
@@ -1525,12 +1535,13 @@ codepage_for_filenames (CPINFO *cp_info)
   if (NILP (current_encoding))
     current_encoding = Vdefault_file_name_coding_system;
 
-  if (!EQ (last_file_name_encoding, current_encoding))
+  if (!EQ (last_file_name_encoding, current_encoding)
+      || NILP (last_file_name_encoding))
     {
       /* Default to the current ANSI codepage.  */
       file_name_codepage = w32_ansi_code_page;
 
-      if (NILP (current_encoding))
+      if (!NILP (current_encoding))
 	{
 	  char *cpname = SSDATA (SYMBOL_NAME (current_encoding));
 	  char *cp = NULL, *end;
@@ -1559,6 +1570,9 @@ codepage_for_filenames (CPINFO *cp_info)
 	  if (!GetCPInfo (file_name_codepage, &cp))
 	    emacs_abort ();
 	}
+
+      /* Cache the new value.  */
+      last_file_name_encoding = current_encoding;
     }
   if (cp_info)
     *cp_info = cp;
