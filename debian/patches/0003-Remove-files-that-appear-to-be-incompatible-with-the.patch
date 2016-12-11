@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2351537..e1b72e6 100644
+index 2fead76..d13971a 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
@@ -134,10 +134,10 @@ index f27bfe0..ee0cd42 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 2d116de..3262c89 100644
+index 5aaf006..9f8f734 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5380,11 +5380,11 @@ dnl This will work, but you get a config.status that is not quite right
+@@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
  dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
  dnl That doesn't have any obvious consequences for Emacs, but on the whole
  dnl it seems better to just live with the duplication.
@@ -152,7 +152,7 @@ index 2d116de..3262c89 100644
         leim/Makefile nextstep/Makefile nt/Makefile])
  
  dnl test/ is not present in release tarfiles.
-@@ -5436,15 +5436,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5454,15 +5454,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
