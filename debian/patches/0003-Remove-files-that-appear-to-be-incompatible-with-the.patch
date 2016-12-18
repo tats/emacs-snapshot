@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2fead76..d13971a 100644
+index d7e30a8..12f6ffb 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
@@ -120,7 +120,7 @@ index 2fead76..d13971a 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index f27bfe0..ee0cd42 100755
+index 98be4ed..1f7251e 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -269,8 +269,7 @@ info_dir ()
