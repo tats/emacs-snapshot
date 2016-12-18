@@ -105,7 +105,9 @@ deb_host_multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
 CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 CFLAGS += -Wall
+CFLAGS += -fno-PIE
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
+LDFLAGS += -no-pie
 CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
 
 ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
