@@ -1,11 +1,10 @@
-emacs24 (24.5+1-7.1~1.gbp435bf1) UNRELEASED; urgency=medium
-
-  ** SNAPSHOT build @435bf12cae56a33d779c81aa69566bdeb0fb91a4 **
+emacs24 (24.5+1-7.1) unstable; urgency=medium
 
   * Non-maintainer upload.
-  * UNRELEASED
+  * Disable building with PIE which is now the default (Closes: #837421)
+  * Add Breaks: oneliner-el (<= 0.3.6-7.1) (Closes: #754892)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 22 Jan 2017 12:21:01 -0600
+ -- Balint Reczey <balint@balintreczey.hu>  Sun, 18 Dec 2016 16:07:54 +0100
 
 emacs24 (24.5+1-7) unstable; urgency=medium
 
