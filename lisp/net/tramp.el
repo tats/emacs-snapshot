@@ -1146,6 +1146,11 @@ entry does not exist, return nil."
 	       (string-to-number (match-string 2 host)))
 	  (tramp-get-method-parameter vec 'tramp-default-port)))))
 
+;; The localname can be quoted with "/:".  Extract this.
+(defun tramp-file-name-unquote-localname (vec)
+  "Return unquoted localname component of VEC."
+  (tramp-compat-file-name-unquote (tramp-file-name-localname vec)))
+
 ;;;###tramp-autoload
 (defun tramp-tramp-file-p (name)
   "Return t if NAME is a string with Tramp file name syntax."
@@ -1686,9 +1691,13 @@ locally on a remote file name.  When the local system is a W32 system
 but the remote system is Unix, this introduces a superfluous drive
 letter into the file name.  This function removes it."
   (save-match-data
-    (if (string-match "\\`[a-zA-Z]:/" name)
-	(replace-match "/" nil t name)
-      name)))
+    (funcall
+     (if (tramp-compat-file-name-quoted-p name)
+	 'tramp-compat-file-name-quote 'identity)
+     (let ((name (tramp-compat-file-name-unquote name)))
+       (if (string-match "\\`[a-zA-Z]:/" name)
+	   (replace-match "/" nil t name)
+	 name)))))
 
 ;;; Config Manipulation Functions:
 
@@ -2910,7 +2919,9 @@ User is always nil."
           (with-tramp-connection-property v "case-insensitive"
             ;; The idea is to compare a file with lower case letters
             ;; with the same file with upper case letters.
-            (let ((candidate (directory-file-name filename))
+            (let ((candidate
+		   (tramp-compat-file-name-unquote
+		    (directory-file-name filename)))
                   tmpfile)
               ;; Check, whether we find an existing file with lower case
               ;; letters.  This avoids us to create a temporary file.

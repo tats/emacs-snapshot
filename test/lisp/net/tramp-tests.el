@@ -682,8 +682,8 @@ handled properly.  BODY shall not contain a timeout."
     (expand-file-name "/method:host:/:/path/../file") "/method:host:/:/file"))
   (should
    (string-equal
-    (expand-file-name "/method:host:/:~/path/./file")
-    "/method:host:/:~/path/file")))
+    (expand-file-name "/method:host:/:/~/path/./file")
+    "/method:host:/:/~/path/file")))
 
 (ert-deftest tramp-test06-directory-file-name ()
   "Check `directory-file-name'.
@@ -2102,6 +2102,12 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 This requires restrictions of file name syntax."
   (tramp-adb-file-name-p tramp-test-temporary-file-directory))
 
+(defun tramp--test-docker-p ()
+  "Check, whether the docker method is used.
+This does not support some special file names."
+  (string-equal
+   "docker" (file-remote-p tramp-test-temporary-file-directory 'method)))
+
 (defun tramp--test-ftp-p ()
   "Check, whether an FTP-like method is used.
 This does not support globbing characters in file names (yet)."
@@ -2113,6 +2119,14 @@ This does not support globbing characters in file names (yet)."
   "Check, whether the remote host runs a GVFS based method.
 This requires restrictions of file name syntax."
   (tramp-gvfs-file-name-p tramp-test-temporary-file-directory))
+
+(defun tramp--test-hpux-p ()
+  "Check, whether the remote host runs HP-UX.
+Several special characters do not work properly there."
+  ;; We must refill the cache.  `file-truename' does it.
+  (with-parsed-tramp-file-name
+      (file-truename tramp-test-temporary-file-directory) nil
+    (string-match "^HP-UX" (tramp-get-connection-property v "uname" ""))))
 
 (defun tramp--test-rsync-p ()
   "Check, whether the rsync method is used.
@@ -2126,23 +2140,28 @@ This does not support special file names."
    (tramp-find-foreign-file-name-handler tramp-test-temporary-file-directory)
    'tramp-sh-file-name-handler))
 
-(defun tramp--test-smb-or-windows-nt-p ()
+(defun tramp--test-windows-nt-and-batch ()
+  "Check, whether the locale host runs MS Windows in batch mode.
+This does not support scpecial characters."
+  (and (eq system-type 'windows-nt) noninteractive))
+
+(defun tramp--test-windows-nt-and-pscp-psftp-p ()
+  "Check, whether the locale host runs MS Windows, and ps{cp,ftp} is used.
+This does not support utf8 based file transfer."
+  (and (eq system-type 'windows-nt)
+       (string-match
+	(regexp-opt '("pscp" "psftp"))
+	(file-remote-p tramp-test-temporary-file-directory 'method))))
+
+(defun tramp--test-windows-nt-or-smb-p ()
   "Check, whether the locale or remote host runs MS Windows.
 This requires restrictions of file name syntax."
   (or (eq system-type 'windows-nt)
       (tramp-smb-file-name-p tramp-test-temporary-file-directory)))
 
-(defun tramp--test-hpux-p ()
-  "Check, whether the remote host runs HP-UX.
-Several special characters do not work properly there."
-  ;; We must refill the cache.  `file-truename' does it.
-  (with-parsed-tramp-file-name
-      (file-truename tramp-test-temporary-file-directory) nil
-    (string-match "^HP-UX" (tramp-get-connection-property v "uname" ""))))
-
 (defun tramp--test-check-files (&rest files)
   "Run a simple but comprehensive test over every file in FILES."
-  (dolist (quoted '(if tramp--test-expensive-test '(nil t) '(nil)))
+  (dolist (quoted (if tramp--test-expensive-test '(nil t) '(nil)))
     ;; We must use `file-truename' for the temporary directory,
     ;; because it could be located on a symlinked directory.  This
     ;; would let the test fail.
@@ -2150,11 +2169,25 @@ Several special characters do not work properly there."
 	    (file-truename tramp-test-temporary-file-directory))
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name 'local quoted))
-	   (files (delq nil files)))
+	   (files (delq nil files))
+	   (process-environment process-environment))
       (unwind-protect
 	  (progn
+	    ;; Add environment variables.
+	    (dolist (elt files)
+	      ;; The check command (heredoc file) does not support
+	      ;; environment variables with leading spaces.
+	      (let* ((elt (replace-regexp-in-string "^\\s-+" "" elt))
+		     (envvar (concat "VAR_" (upcase (md5 elt)))))
+		(setenv envvar elt)))
+
+	    ;; We force a reconnect, in order to have a clean environment.
+	    (tramp-cleanup-connection
+	     (tramp-dissect-file-name tramp-test-temporary-file-directory)
+	     'keep-debug 'keep-password)
 	    (make-directory tmp-name1)
 	    (make-directory tmp-name2)
+
 	    (dolist (elt files)
 	      (let* ((file1 (expand-file-name elt tmp-name1))
 		     (file2 (expand-file-name elt tmp-name2))
@@ -2277,7 +2310,34 @@ Several special characters do not work properly there."
 		(delete-file file2)
 		(should-not (file-exists-p file2))
 		(delete-directory file1)
-		(should-not (file-exists-p file1)))))
+		(should-not (file-exists-p file1))))
+
+	    ;; Check, that environment variables are set correctly.
+	    (when (and tramp--test-expensive-test (tramp--test-sh-p))
+	      (dolist (elt process-environment)
+		(when (string-match "^VAR_" elt)
+		  (let* ((default-directory tramp-test-temporary-file-directory)
+			 (shell-file-name "/bin/sh")
+			 (heredoc (md5 (current-time-string)))
+			 (envvar (car (split-string elt "=" t)))
+			 (file1 (tramp-compat-file-name-unquote
+				 (expand-file-name "bar" tmp-name1))))
+		    ;; Cleanup.
+		    (ignore-errors (delete-file file1))
+		    ;; Save the variable in a file.  The echo command
+		    ;; does not work properly, it suppresses leading/
+		    ;; trailing spaces as well as tabs.
+		    (shell-command-to-string
+		     (format
+		      "cat <<%s >%s\n$%s\n%s"
+		      heredoc (file-remote-p file1 'localname) envvar heredoc))
+		    (with-temp-buffer
+		      (insert-file-contents file1)
+		      (should
+		       (string-equal
+			(buffer-string) (concat (getenv envvar) "\n"))))
+		    (delete-file file1)
+		    (should-not (file-exists-p file1)))))))
 
 	;; Cleanup.
 	(ignore-errors (delete-directory tmp-name1 'recursive))
@@ -2291,9 +2351,11 @@ Several special characters do not work properly there."
   ;; interpreted as a path separator, preventing "\t" from being
   ;; expanded to <TAB>.
   (tramp--test-check-files
-   (if (or (tramp--test-gvfs-p) (tramp--test-smb-or-windows-nt-p))
+   (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
        "foo bar baz"
-     (if (or (tramp--test-adb-p) (eq system-type 'cygwin))
+     (if (or (tramp--test-adb-p)
+	     (tramp--test-docker-p)
+	     (eq system-type 'cygwin))
 	 " foo bar baz "
        " foo\tbar baz\t"))
    "$foo$bar$$baz$"
@@ -2302,23 +2364,23 @@ Several special characters do not work properly there."
    "&foo&bar&baz&"
    (unless (or (tramp--test-ftp-p)
 	       (tramp--test-gvfs-p)
-	       (tramp--test-smb-or-windows-nt-p))
+	       (tramp--test-windows-nt-or-smb-p))
      "?foo?bar?baz?")
    (unless (or (tramp--test-ftp-p)
 	       (tramp--test-gvfs-p)
-	       (tramp--test-smb-or-windows-nt-p))
+	       (tramp--test-windows-nt-or-smb-p))
      "*foo*bar*baz*")
-   (if (or (tramp--test-gvfs-p) (tramp--test-smb-or-windows-nt-p))
+   (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
        "'foo'bar'baz'"
      "'foo\"bar'baz\"")
    "#foo~bar#baz~"
-   (if (or (tramp--test-gvfs-p) (tramp--test-smb-or-windows-nt-p))
+   (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
        "!foo!bar!baz!"
      "!foo|bar!baz|")
-   (if (or (tramp--test-gvfs-p) (tramp--test-smb-or-windows-nt-p))
+   (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
        ";foo;bar;baz;"
      ":foo;bar:baz;")
-   (unless (or (tramp--test-gvfs-p) (tramp--test-smb-or-windows-nt-p))
+   (unless (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
      "<foo>bar<baz>")
    "(foo)bar(baz)"
    (unless (or (tramp--test-ftp-p) (tramp--test-gvfs-p)) "[foo]bar[baz]")
@@ -2329,6 +2391,7 @@ Several special characters do not work properly there."
   "Check special characters in file names."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
 
   (tramp--test-special-characters))
 
@@ -2337,7 +2400,9 @@ Several special characters do not work properly there."
 Use the `stat' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
 
@@ -2353,7 +2418,9 @@ Use the `stat' command."
 Use the `perl' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
 
@@ -2372,7 +2439,10 @@ Use the `perl' command."
 Use the `ls' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-batch)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
 
   (let ((tramp-connection-properties
 	 (append
@@ -2404,7 +2474,10 @@ Use the `ls' command."
 (ert-deftest tramp-test34-utf8 ()
   "Check UTF8 encoding in file names and file contents."
   (skip-unless (tramp--test-enabled))
+  (skip-unless (not (tramp--test-docker-p)))
   (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-batch)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
 
   (tramp--test-utf8))
 
@@ -2413,7 +2486,11 @@ Use the `ls' command."
 Use the `stat' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-batch)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
 
@@ -2429,7 +2506,11 @@ Use the `stat' command."
 Use the `perl' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-batch)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
 
@@ -2448,7 +2529,11 @@ Use the `perl' command."
 Use the `ls' command."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (and (tramp--test-sh-p) (not (tramp--test-rsync-p))))
+  (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-rsync-p)))
+  (skip-unless (not (tramp--test-windows-nt-and-batch)))
+  (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
 
   (let ((tramp-connection-properties
 	 (append

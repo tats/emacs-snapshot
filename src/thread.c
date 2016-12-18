@@ -55,7 +55,6 @@ release_global_lock (void)
 static void
 post_acquire_global_lock (struct thread_state *self)
 {
-  Lisp_Object buffer;
   struct thread_state *prev_thread = current_thread;
 
   /* Do this early on, so that code below could signal errors (e.g.,
@@ -71,14 +70,19 @@ post_acquire_global_lock (struct thread_state *self)
       if (prev_thread != NULL)
 	unbind_for_thread_switch (prev_thread);
       rebind_for_thread_switch ();
+
+       /* Set the new thread's current buffer.  This needs to be done
+	  even if it is the same buffer as that of the previous thread,
+	  because of thread-local bindings.  */
+      set_buffer_internal_2 (current_buffer);
     }
 
-  /* We need special handling to re-set the buffer.  */
-  XSETBUFFER (buffer, self->m_current_buffer);
-  self->m_current_buffer = 0;
-  set_buffer_internal (XBUFFER (buffer));
-
-  if (!NILP (current_thread->error_symbol))
+   /* We could have been signaled while waiting to grab the global lock
+      for the first time since this thread was created, in which case
+      we didn't yet have the opportunity to set up the handlers.  Delay
+      raising the signal in that case (it will be actually raised when
+      the thread comes here after acquiring the lock the next time).  */
+  if (!NILP (current_thread->error_symbol) && handlerlist)
     {
       Lisp_Object sym = current_thread->error_symbol;
       Lisp_Object data = current_thread->error_data;
@@ -623,16 +627,15 @@ run_thread (void *state)
 
   acquire_global_lock (self);
 
-  { /* Put a dummy catcher at top-level so that handlerlist is never NULL.
-       This is important since handlerlist->nextfree holds the freelist
-       which would otherwise leak every time we unwind back to top-level.   */
-    handlerlist_sentinel = xzalloc (sizeof (struct handler));
-    handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-    struct handler *c = push_handler (Qunbound, CATCHER);
-    eassert (c == handlerlist_sentinel);
-    handlerlist_sentinel->nextfree = NULL;
-    handlerlist_sentinel->next = NULL;
-  }
+  /* Put a dummy catcher at top-level so that handlerlist is never NULL.
+     This is important since handlerlist->nextfree holds the freelist
+     which would otherwise leak every time we unwind back to top-level.   */
+  handlerlist_sentinel = xzalloc (sizeof (struct handler));
+  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
+  struct handler *c = push_handler (Qunbound, CATCHER);
+  eassert (c == handlerlist_sentinel);
+  handlerlist_sentinel->nextfree = NULL;
+  handlerlist_sentinel->next = NULL;
 
   /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, do_nothing);

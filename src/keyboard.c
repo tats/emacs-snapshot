@@ -148,9 +148,6 @@ static Lisp_Object regular_top_level_message;
 
 static sys_jmp_buf getcjmp;
 
-/* True while doing kbd input.  */
-bool waiting_for_input;
-
 /* True while displaying for echoing.   Delays C-g throwing.  */
 
 static bool echoing;

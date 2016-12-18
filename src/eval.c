@@ -1968,6 +1968,28 @@ it defines a macro.  */)
   if (!CONSP (fundef) || !EQ (Qautoload, XCAR (fundef)))
     return fundef;
 
+  /* In the special case that we are generating ldefs-boot-auto.el,
+     then be noisy about the autoload. */
+  if( generating_ldefs_boot )
+    {
+      fprintf(stderr, "(autoload '");
+      Fprin1(funname,Qexternal_debugging_output);
+      fprintf(stderr, " ");
+      Fprin1(Fcar (Fcdr (fundef)),Qexternal_debugging_output);
+      fprintf(stderr, " nil nil ");
+
+      Lisp_Object kind = Fnth (make_number (4), fundef);
+      if (! (EQ (kind, Qt) || EQ (kind, Qmacro)))
+        {
+          fprintf(stderr, "nil");
+        }
+      else
+        {
+          fprintf(stderr, "t");
+        }
+      fprintf(stderr, ")\n");
+    }
+
   if (EQ (macro_only, Qmacro))
     {
       Lisp_Object kind = Fnth (make_number (4), fundef);
@@ -3197,7 +3219,7 @@ let_shadows_global_binding_p (Lisp_Object symbol)
 
 static void
 do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
-	     Lisp_Object value)
+             Lisp_Object value, enum Set_Internal_Bind bindflag)
 {
   switch (sym->redirect)
     {
@@ -3205,19 +3227,19 @@ do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
       if (!sym->trapped_write)
 	SET_SYMBOL_VAL (sym, value);
       else
-	set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
+        set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
       break;
 
     case SYMBOL_FORWARDED:
       if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
 	  && specpdl_kind (bind) == SPECPDL_LET_DEFAULT)
 	{
-	  Fset_default (specpdl_symbol (bind), value);
+          set_default_internal (specpdl_symbol (bind), value, bindflag);
 	  return;
 	}
       /* FALLTHROUGH */
     case SYMBOL_LOCALIZED:
-      set_internal (specpdl_symbol (bind), value, Qnil, SET_INTERNAL_BIND);
+      set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
       break;
 
     default:
@@ -3258,7 +3280,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
       specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
       specpdl_ptr->let.saved_value = Qnil;
       grow_specpdl ();
-      do_specbind (sym, specpdl_ptr - 1, value);
+      do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
       break;
     case SYMBOL_LOCALIZED:
       if (SYMBOL_BLV (sym)->frame_local)
@@ -3291,7 +3313,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 	      {
 		specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
 		grow_specpdl ();
-		do_specbind (sym, specpdl_ptr - 1, value);
+                do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
 		return;
 	      }
 	  }
@@ -3299,7 +3321,7 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 	  specpdl_ptr->let.kind = SPECPDL_LET;
 
 	grow_specpdl ();
-	do_specbind (sym, specpdl_ptr - 1, value);
+        do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
 	break;
       }
     default: emacs_abort ();
@@ -3354,23 +3376,16 @@ rebind_for_thread_switch (void)
 	{
 	  Lisp_Object value = specpdl_saved_value (bind);
 	  Lisp_Object sym = specpdl_symbol (bind);
-	  bool was_trapped =
-	    SYMBOLP (sym)
-	    && XSYMBOL (sym)->trapped_write == SYMBOL_TRAPPED_WRITE;
-	  /* FIXME: This is not clean, and if do_specbind signals an
-	     error, the symbol will be left untrapped.  */
-	  if (was_trapped)
-	    XSYMBOL (sym)->trapped_write = SYMBOL_UNTRAPPED_WRITE;
 	  bind->let.saved_value = Qnil;
-	  do_specbind (XSYMBOL (sym), bind, value);
-	  if (was_trapped)
-	    XSYMBOL (sym)->trapped_write = SYMBOL_TRAPPED_WRITE;
+          do_specbind (XSYMBOL (sym), bind, value,
+                       SET_INTERNAL_THREAD_SWITCH);
 	}
     }
 }
 
 static void
-do_one_unbind (union specbinding *this_binding, bool unwinding)
+do_one_unbind (union specbinding *this_binding, bool unwinding,
+               enum Set_Internal_Bind bindflag)
 {
   eassert (unwinding || this_binding->kind >= SPECPDL_LET);
   switch (this_binding->kind)
@@ -3399,7 +3414,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding)
 	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
 	    else
 	      set_internal (sym, specpdl_old_value (this_binding),
-			    Qnil, SET_INTERNAL_UNBIND);
+                            Qnil, bindflag);
 	    break;
 	  }
 	else
@@ -3409,8 +3424,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding)
 	  }
       }
     case SPECPDL_LET_DEFAULT:
-      Fset_default (specpdl_symbol (this_binding),
-		    specpdl_old_value (this_binding));
+      set_default_internal (specpdl_symbol (this_binding),
+                            specpdl_old_value (this_binding),
+                            bindflag);
       break;
     case SPECPDL_LET_LOCAL:
       {
@@ -3422,7 +3438,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding)
 	/* If this was a local binding, reset the value in the appropriate
 	   buffer, but only if that buffer's binding still exists.  */
 	if (!NILP (Flocal_variable_p (symbol, where)))
-	  set_internal (symbol, old_value, where, SET_INTERNAL_UNBIND);
+          set_internal (symbol, old_value, where, bindflag);
       }
       break;
     }
@@ -3496,7 +3512,7 @@ unbind_to (ptrdiff_t count, Lisp_Object value)
       union specbinding this_binding;
       this_binding = *--specpdl_ptr;
 
-      do_one_unbind (&this_binding, true);
+      do_one_unbind (&this_binding, true, SET_INTERNAL_UNBIND);
     }
 
   if (NILP (Vquit_flag) && !NILP (quitf))
@@ -3515,17 +3531,8 @@ unbind_for_thread_switch (struct thread_state *thr)
       if ((--bind)->kind >= SPECPDL_LET)
 	{
 	  Lisp_Object sym = specpdl_symbol (bind);
-	  bool was_trapped =
-	    SYMBOLP (sym)
-	    && XSYMBOL (sym)->trapped_write == SYMBOL_TRAPPED_WRITE;
 	  bind->let.saved_value = find_symbol_value (sym);
-	  /* FIXME: This is not clean, and if do_one_unbind signals an
-	     error, the symbol will be left untrapped.  */
-	  if (was_trapped)
-	    XSYMBOL (sym)->trapped_write = SYMBOL_UNTRAPPED_WRITE;
-	  do_one_unbind (bind, false);
-	  if (was_trapped)
-	    XSYMBOL (sym)->trapped_write = SYMBOL_TRAPPED_WRITE;
+          do_one_unbind (bind, false, SET_INTERNAL_THREAD_SWITCH);
 	}
     }
 }
@@ -3541,87 +3548,29 @@ context where binding is lexical by default.  */)
 }
 
 
-DEFUN ("backtrace-debug", Fbacktrace_debug, Sbacktrace_debug, 2, 2, 0,
-       doc: /* Set the debug-on-exit flag of eval frame LEVEL levels down to FLAG.
-The debugger is entered when that frame exits, if the flag is non-nil.  */)
-  (Lisp_Object level, Lisp_Object flag)
-{
-  union specbinding *pdl = backtrace_top ();
-  register EMACS_INT i;
-
-  CHECK_NUMBER (level);
-
-  for (i = 0; backtrace_p (pdl) && i < XINT (level); i++)
-    pdl = backtrace_next (pdl);
-
-  if (backtrace_p (pdl))
-    set_backtrace_debug_on_exit (pdl, !NILP (flag));
-
-  return flag;
-}
-
-DEFUN ("backtrace", Fbacktrace, Sbacktrace, 0, 0, "",
-       doc: /* Print a trace of Lisp function calls currently active.
-Output stream used is value of `standard-output'.  */)
-  (void)
-{
-  union specbinding *pdl = backtrace_top ();
-  Lisp_Object tem;
-  Lisp_Object old_print_level = Vprint_level;
-
-  if (NILP (Vprint_level))
-    XSETFASTINT (Vprint_level, 8);
-
-  while (backtrace_p (pdl))
-    {
-      write_string (backtrace_debug_on_exit (pdl) ? "* " : "  ");
-      if (backtrace_nargs (pdl) == UNEVALLED)
-	{
-	  Fprin1 (Fcons (backtrace_function (pdl), *backtrace_args (pdl)),
-		  Qnil);
-	  write_string ("\n");
-	}
-      else
-	{
-	  tem = backtrace_function (pdl);
-	  if (debugger_stack_frame_as_list)
-	    write_string ("(");
-	  Fprin1 (tem, Qnil);	/* This can QUIT.  */
-	  if (!debugger_stack_frame_as_list)
-	    write_string ("(");
-	  {
-	    ptrdiff_t i;
-	    for (i = 0; i < backtrace_nargs (pdl); i++)
-	      {
-		if (i || debugger_stack_frame_as_list)
-		  write_string(" ");
-		Fprin1 (backtrace_args (pdl)[i], Qnil);
-	      }
-	  }
-	  write_string (")\n");
-	}
-      pdl = backtrace_next (pdl);
-    }
-
-  Vprint_level = old_print_level;
-  return Qnil;
-}
-
 static union specbinding *
-get_backtrace_frame (Lisp_Object nframes, Lisp_Object base)
+get_backtrace_starting_at (Lisp_Object base)
 {
   union specbinding *pdl = backtrace_top ();
-  register EMACS_INT i;
-
-  CHECK_NATNUM (nframes);
 
   if (!NILP (base))
     { /* Skip up to `base'.  */
       base = Findirect_function (base, Qt);
       while (backtrace_p (pdl)
-	     && !EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
-	pdl = backtrace_next (pdl);
+             && !EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
+        pdl = backtrace_next (pdl);
     }
+
+  return pdl;
+}
+
+static union specbinding *
+get_backtrace_frame (Lisp_Object nframes, Lisp_Object base)
+{
+  register EMACS_INT i;
+
+  CHECK_NATNUM (nframes);
+  union specbinding *pdl = get_backtrace_starting_at (base);
 
   /* Find the frame requested.  */
   for (i = XFASTINT (nframes); i > 0 && backtrace_p (pdl); i--)
@@ -3630,33 +3579,71 @@ get_backtrace_frame (Lisp_Object nframes, Lisp_Object base)
   return pdl;
 }
 
-DEFUN ("backtrace-frame", Fbacktrace_frame, Sbacktrace_frame, 1, 2, NULL,
-       doc: /* Return the function and arguments NFRAMES up from current execution point.
-If that frame has not evaluated the arguments yet (or is a special form),
-the value is (nil FUNCTION ARG-FORMS...).
-If that frame has evaluated its arguments and called its function already,
-the value is (t FUNCTION ARG-VALUES...).
-A &rest arg is represented as the tail of the list ARG-VALUES.
-FUNCTION is whatever was supplied as car of evaluated list,
-or a lambda expression for macro calls.
-If NFRAMES is more than the number of frames, the value is nil.
-If BASE is non-nil, it should be a function and NFRAMES counts from its
-nearest activation frame.  */)
-  (Lisp_Object nframes, Lisp_Object base)
+static Lisp_Object
+backtrace_frame_apply (Lisp_Object function, union specbinding *pdl)
 {
-  union specbinding *pdl = get_backtrace_frame (nframes, base);
-
   if (!backtrace_p (pdl))
     return Qnil;
+
+  Lisp_Object flags = Qnil;
+  if (backtrace_debug_on_exit (pdl))
+    flags = Fcons (QCdebug_on_exit, Fcons (Qt, Qnil));
+
   if (backtrace_nargs (pdl) == UNEVALLED)
-    return Fcons (Qnil,
-		  Fcons (backtrace_function (pdl), *backtrace_args (pdl)));
+    return call4 (function, Qnil, backtrace_function (pdl), *backtrace_args (pdl), flags);
   else
     {
       Lisp_Object tem = Flist (backtrace_nargs (pdl), backtrace_args (pdl));
-
-      return Fcons (Qt, Fcons (backtrace_function (pdl), tem));
+      return call4 (function, Qt, backtrace_function (pdl), tem, flags);
     }
+}
+
+DEFUN ("backtrace-debug", Fbacktrace_debug, Sbacktrace_debug, 2, 2, 0,
+       doc: /* Set the debug-on-exit flag of eval frame LEVEL levels down to FLAG.
+The debugger is entered when that frame exits, if the flag is non-nil.  */)
+  (Lisp_Object level, Lisp_Object flag)
+{
+  CHECK_NUMBER (level);
+  union specbinding *pdl = get_backtrace_frame(level, Qnil);
+
+  if (backtrace_p (pdl))
+    set_backtrace_debug_on_exit (pdl, !NILP (flag));
+
+  return flag;
+}
+
+DEFUN ("mapbacktrace", Fmapbacktrace, Smapbacktrace, 1, 2, 0,
+       doc: /* Call FUNCTION for each frame in backtrace.
+If BASE is non-nil, it should be a function and iteration will start
+from its nearest activation frame.
+FUNCTION is called with 4 arguments: EVALD, FUNC, ARGS, and FLAGS.  If
+a frame has not evaluated its arguments yet or is a special form,
+EVALD is nil and ARGS is a list of forms.  If a frame has evaluated
+its arguments and called its function already, EVALD is t and ARGS is
+a list of values.
+FLAGS is a plist of properties of the current frame: currently, the
+only supported property is :debug-on-exit.  `mapbacktrace' always
+returns nil.  */)
+     (Lisp_Object function, Lisp_Object base)
+{
+  union specbinding *pdl = get_backtrace_starting_at (base);
+
+  while (backtrace_p (pdl))
+    {
+      backtrace_frame_apply (function, pdl);
+      pdl = backtrace_next (pdl);
+    }
+
+  return Qnil;
+}
+
+DEFUN ("backtrace-frame--internal", Fbacktrace_frame_internal,
+       Sbacktrace_frame_internal, 3, 3, NULL,
+       doc: /* Call FUNCTION on stack frame NFRAMES away from BASE.
+Return the result of FUNCTION, or nil if no matching frame could be found. */)
+     (Lisp_Object function, Lisp_Object nframes, Lisp_Object base)
+{
+  return backtrace_frame_apply (function, get_backtrace_frame (nframes, base));
 }
 
 /* For backtrace-eval, we want to temporarily unwind the last few elements of
@@ -4114,8 +4101,9 @@ alist of active lexical bindings.  */);
   defsubr (&Srun_hook_wrapped);
   defsubr (&Sfetch_bytecode);
   defsubr (&Sbacktrace_debug);
-  defsubr (&Sbacktrace);
-  defsubr (&Sbacktrace_frame);
+  DEFSYM (QCdebug_on_exit, ":debug-on-exit");
+  defsubr (&Smapbacktrace);
+  defsubr (&Sbacktrace_frame_internal);
   defsubr (&Sbacktrace_eval);
   defsubr (&Sbacktrace__locals);
   defsubr (&Sspecial_variable_p);

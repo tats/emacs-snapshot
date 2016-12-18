@@ -74,6 +74,10 @@ for '--daemon'.
 * Changes in Emacs 26.1
 
 +++
+** The new function 'mapbacktrace' applies a function to all frames of
+the current stack trace.
+
++++
 ** Emacs now provides a limited form of concurrency with Lisp threads.
 Concurrency in Emacs Lisp is "mostly cooperative", meaning that
 Emacs will only switch execution between threads at well-defined
@@ -451,6 +455,12 @@ details.
 +++
 *** New setf-able function to access and set image parameters is
 provided: 'image-property'.
+
+---
+*** New commands 'image-scroll-left' and 'image-scroll-right'
+for 'image-mode' that complement 'image-scroll-up' and
+'image-scroll-down': they have the same prefix arg behavior and stop
+at image boundaries.
 
 ---
 ** The default 'Info-default-directory-list' no longer checks some obsolete

@@ -2227,14 +2227,8 @@ the uid and gid from FILENAME."
 			    v 'file-error
 			    "Unknown operation `%s', must be `copy' or `rename'"
 			    op))))
-	     (localname1
-	      (if t1
-		  (file-remote-p filename 'localname)
-		filename))
-	     (localname2
-	      (if t2
-		  (file-remote-p newname 'localname)
-		newname))
+	     (localname1 (if t1 (file-remote-p filename 'localname) filename))
+	     (localname2 (if t2 (file-remote-p newname 'localname) newname))
 	     (prefix (file-remote-p (if t1 filename newname)))
              cmd-result)
 
@@ -2324,11 +2318,9 @@ the uid and gid from FILENAME."
 		     (t2
 		      (if (eq op 'copy)
 			  (copy-file
-			   localname1 tmpfile t
-			   keep-date preserve-uid-gid)
+			   localname1 tmpfile t keep-date preserve-uid-gid)
 			(tramp-run-real-handler
-			 'rename-file
-			 (list localname1 tmpfile t)))
+			 'rename-file (list localname1 tmpfile t)))
 		      ;; We must change the ownership as local user.
 		      ;; Since this does not work reliable, we also
 		      ;; give read permissions.
@@ -4209,10 +4201,11 @@ process to set up.  VEC specifies the connection."
       (when vars
 	(tramp-send-command
 	 vec
-	 (format "while read var val; do export $var=$val; done <<'%s'\n%s\n%s"
-		 tramp-end-of-heredoc
-		 (mapconcat 'identity vars "\n")
-		 tramp-end-of-heredoc)
+	 (format
+	  "while read var val; do export $var=\"$val\"; done <<'%s'\n%s\n%s"
+	  tramp-end-of-heredoc
+	  (mapconcat 'identity vars "\n")
+	  tramp-end-of-heredoc)
 	 t))
       (when unset
 	(tramp-send-command
@@ -5166,8 +5159,8 @@ Return ATTR."
   (let ((method (tramp-file-name-method vec))
 	(user (tramp-file-name-user vec))
 	(host (tramp-file-name-real-host vec))
-	(localname (tramp-compat-file-name-unquote
-		    (directory-file-name (tramp-file-name-localname vec)))))
+	(localname
+	 (directory-file-name (tramp-file-name-unquote-localname vec))))
     (when (string-match tramp-ipv6-regexp host)
       (setq host (format "[%s]" host)))
     (unless (string-match "ftp$" method)
@@ -5176,8 +5169,8 @@ Return ATTR."
      ((tramp-get-method-parameter vec 'tramp-remote-copy-program)
       localname)
      ((not (zerop (length user)))
-      (tramp-shell-quote-argument (format "%s@%s:%s" user host localname)))
-     (t (tramp-shell-quote-argument (format "%s:%s" host localname))))))
+      (format "%s@%s:%s" user host (shell-quote-argument localname)))
+     (t (format "%s:%s" host (shell-quote-argument localname))))))
 
 (defun tramp-method-out-of-band-p (vec size)
   "Return t if this is an out-of-band method, nil otherwise."

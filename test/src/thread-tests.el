@@ -209,5 +209,39 @@
      (string= "hi bob"
 	      (condition-name (make-condition-variable (make-mutex)
 						       "hi bob")))))
+(defun call-error ()
+  "Call `error'."
+  (error "Error is called"))
+
+;; This signals an error internally; the error should be caught.
+(defun thread-custom ()
+  (defcustom thread-custom-face 'highlight
+    "Face used for thread customizations."
+    :type 'face
+    :group 'widget-faces))
+
+(ert-deftest thread-errors ()
+  "Test what happens when a thread signals an error."
+    (should (threadp (make-thread #'call-error "call-error")))
+    (should (threadp (make-thread #'thread-custom "thread-custom"))))
+
+(ert-deftest thread-sticky-point ()
+  "Test bug #25165 with point movement in cloned buffer."
+  (with-temp-buffer
+    (insert "Lorem ipsum dolor sit amet, consectetur adipiscing elit.")
+    (goto-char (point-min))
+    (clone-indirect-buffer nil nil)
+    (forward-char 20)
+    (sit-for 1)
+    (should (= (point) 21))))
+
+(ert-deftest thread-signal-early ()
+  "Test signaling a thread as soon as it is started by the OS."
+  (let ((thread
+         (make-thread #'(lambda ()
+                          (while t (thread-yield))))))
+    (thread-signal thread 'error nil)
+    (sit-for 1)
+    (should-not (thread-alive-p thread))))
 
 ;;; threads.el ends here
