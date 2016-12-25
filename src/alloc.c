@@ -5883,8 +5883,6 @@ garbage_collect_1 (void *end)
 
   gc_sweep ();
 
-  unmark_threads ();
-
   /* Clear the mark bits that we set in certain root slots.  */
   VECTOR_UNMARK (&buffer_defaults);
   VECTOR_UNMARK (&buffer_local_symbols);
@@ -6406,7 +6404,7 @@ mark_object (Lisp_Object arg)
 
 #ifdef GC_CHECK_MARKED_OBJECTS
 	m = mem_find (po);
-	if (m == MEM_NIL && !SUBRP (obj))
+	if (m == MEM_NIL && !SUBRP (obj) && !primary_thread_p (po))
 	  emacs_abort ();
 #endif /* GC_CHECK_MARKED_OBJECTS */
 
@@ -6416,7 +6414,9 @@ mark_object (Lisp_Object arg)
 	else
 	  pvectype = PVEC_NORMAL_VECTOR;
 
-	if (pvectype != PVEC_SUBR && pvectype != PVEC_BUFFER)
+	if (pvectype != PVEC_SUBR
+	    && pvectype != PVEC_BUFFER
+	    && !primary_thread_p (po))
 	  CHECK_LIVE (live_vector_p);
 
 	switch (pvectype)

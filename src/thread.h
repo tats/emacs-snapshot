@@ -48,7 +48,7 @@ struct thread_state
   /* The thread's function.  */
   Lisp_Object function;
 
-  /* If non-nil, this thread has been signalled.  */
+  /* If non-nil, this thread has been signaled.  */
   Lisp_Object error_symbol;
   Lisp_Object error_data;
 
@@ -56,14 +56,7 @@ struct thread_state
      waiting on.  */
   Lisp_Object event_object;
 
-  /* m_byte_stack_list must be the first non-lisp field.  */
-  /* A list of currently active byte-code execution value stacks.
-     Fbyte_code adds an entry to the head of this list before it starts
-     processing byte-code, and it removed the entry again when it is
-     done.  Signalling an error truncates the list.  */
-  struct byte_stack *m_byte_stack_list;
-#define byte_stack_list (current_thread->m_byte_stack_list)
-
+  /* m_stack_bottom must be the first non-Lisp field.  */
   /* An address near the bottom of the stack.
      Tells GC how to save a copy of the stack.  */
   char *m_stack_bottom;
@@ -171,6 +164,13 @@ struct thread_state
      interrupter should broadcast to this condition.  */
   sys_cond_t *wait_condvar;
 
+  /* This thread might have released the global lock.  If so, this is
+     non-zero.  When a thread runs outside thread_select with this
+     flag non-zero, it means it has been interrupted by SIGINT while
+     in thread_select, and didn't have a chance of acquiring the lock.
+     It must do so ASAP.  */
+  int not_holding_lock;
+
   /* Threads are kept on a linked list.  */
   struct thread_state *next_thread;
 };
@@ -220,14 +220,15 @@ struct Lisp_CondVar
 
 extern struct thread_state *current_thread;
 
-extern void unmark_threads (void);
 extern void finalize_one_thread (struct thread_state *state);
 extern void finalize_one_mutex (struct Lisp_Mutex *);
 extern void finalize_one_condvar (struct Lisp_CondVar *);
+extern void maybe_reacquire_global_lock (void);
 
 extern void init_threads_once (void);
 extern void init_threads (void);
 extern void syms_of_threads (void);
+extern bool primary_thread_p (void *);
 
 typedef int select_func (int, fd_set *, fd_set *, fd_set *,
 			 const struct timespec *, const sigset_t *);

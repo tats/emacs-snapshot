@@ -1837,19 +1837,19 @@ INLINE Lisp_Object
 INLINE struct Lisp_Symbol *
 SYMBOL_ALIAS (struct Lisp_Symbol *sym)
 {
-  eassert (sym->redirect == SYMBOL_VARALIAS);
+  eassume (sym->redirect == SYMBOL_VARALIAS && sym->val.alias);
   return sym->val.alias;
 }
 INLINE struct Lisp_Buffer_Local_Value *
 SYMBOL_BLV (struct Lisp_Symbol *sym)
 {
-  eassert (sym->redirect == SYMBOL_LOCALIZED);
+  eassume (sym->redirect == SYMBOL_LOCALIZED && sym->val.blv);
   return sym->val.blv;
 }
 INLINE union Lisp_Fwd *
 SYMBOL_FWD (struct Lisp_Symbol *sym)
 {
-  eassert (sym->redirect == SYMBOL_FORWARDED);
+  eassume (sym->redirect == SYMBOL_FORWARDED && sym->val.fwd);
   return sym->val.fwd;
 }
 
@@ -1862,19 +1862,19 @@ INLINE void
 INLINE void
 SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
 {
-  eassert (sym->redirect == SYMBOL_VARALIAS);
+  eassume (sym->redirect == SYMBOL_VARALIAS && v);
   sym->val.alias = v;
 }
 INLINE void
 SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
 {
-  eassert (sym->redirect == SYMBOL_LOCALIZED);
+  eassume (sym->redirect == SYMBOL_LOCALIZED && v);
   sym->val.blv = v;
 }
 INLINE void
 SET_SYMBOL_FWD (struct Lisp_Symbol *sym, union Lisp_Fwd *v)
 {
-  eassert (sym->redirect == SYMBOL_FORWARDED);
+  eassume (sym->redirect == SYMBOL_FORWARDED && v);
   sym->val.fwd = v;
 }
 
@@ -2466,7 +2466,7 @@ struct Lisp_Buffer_Objfwd
   };
 
 /* struct Lisp_Buffer_Local_Value is used in a symbol value cell when
-   the symbol has buffer-local or frame-local bindings.  (Exception:
+   the symbol has buffer-local bindings.  (Exception:
    some buffer-local variables are built-in, with their values stored
    in the buffer structure itself.  They are handled differently,
    using struct Lisp_Buffer_Objfwd.)
@@ -2494,9 +2494,6 @@ struct Lisp_Buffer_Local_Value
     /* True means that merely setting the variable creates a local
        binding for the current buffer.  */
     bool_bf local_if_set : 1;
-    /* True means this variable can have frame-local bindings, otherwise, it is
-       can have buffer-local bindings.  The two cannot be combined.  */
-    bool_bf frame_local : 1;
     /* True means that the binding now loaded was found.
        Presumably equivalent to (defcell!=valcell).  */
     bool_bf found : 1;
@@ -3285,7 +3282,6 @@ struct handler
   ptrdiff_t pdlcount;
   int poll_suppress_count;
   int interrupt_input_blocked;
-  struct byte_stack *byte_stack;
 };
 
 extern Lisp_Object memory_signal_data;
@@ -3384,7 +3380,7 @@ make_symbol_constant (Lisp_Object sym)
   XSYMBOL (sym)->trapped_write = SYMBOL_NOWRITE;
 }
 
-/* Buffer-local (also frame-local) variable access functions.  */
+/* Buffer-local variable access functions.  */
 
 INLINE int
 blv_found (struct Lisp_Buffer_Local_Value *blv)
@@ -4333,7 +4329,6 @@ extern int read_bytecode_char (bool);
 
 /* Defined in bytecode.c.  */
 extern void syms_of_bytecode (void);
-extern void relocate_byte_stack (struct byte_stack *);
 extern Lisp_Object exec_byte_code (Lisp_Object, Lisp_Object, Lisp_Object,
 				   Lisp_Object, ptrdiff_t, Lisp_Object *);
 extern Lisp_Object get_byte_code_arity (Lisp_Object);

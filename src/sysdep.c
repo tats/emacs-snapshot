@@ -144,11 +144,16 @@ static const int baud_convert[] =
 bool
 disable_address_randomization (void)
 {
-  bool disabled = false;
   int pers = personality (0xffffffff);
-  disabled = (! (pers & ADDR_NO_RANDOMIZE)
-	      && 0 <= personality (pers | ADDR_NO_RANDOMIZE));
-  return disabled;
+  if (pers < 0)
+    return false;
+  int desired_pers = pers | ADDR_NO_RANDOMIZE;
+
+  /* Call 'personality' twice, to detect buggy platforms like WSL
+     where 'personality' always returns 0.  */
+  return (pers != desired_pers
+	  && personality (desired_pers) == pers
+	  && personality (0xffffffff) == desired_pers);
 }
 #endif
 
@@ -761,6 +766,23 @@ block_child_signal (sigset_t *oldset)
 
 void
 unblock_child_signal (sigset_t const *oldset)
+{
+  pthread_sigmask (SIG_SETMASK, oldset, 0);
+}
+
+/* Block SIGINT.  */
+void
+block_interrupt_signal (sigset_t *oldset)
+{
+  sigset_t blocked;
+  sigemptyset (&blocked);
+  sigaddset (&blocked, SIGINT);
+  pthread_sigmask (SIG_BLOCK, &blocked, oldset);
+}
+
+/* Restore previously saved signal mask.  */
+void
+restore_signal_mask (sigset_t const *oldset)
 {
   pthread_sigmask (SIG_SETMASK, oldset, 0);
 }

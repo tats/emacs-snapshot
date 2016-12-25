@@ -551,23 +551,7 @@ next hunk if TRY-HARDER is non-nil; otherwise signal an error."
 
 ;; Define diff-{hunk,file}-{prev,next}
 (easy-mmode-define-navigation
- diff--internal-hunk diff-hunk-header-re "hunk" diff-end-of-hunk diff-restrict-view
- (when diff-auto-refine-mode
-   (unless (prog1 diff--auto-refine-data
-             (setq diff--auto-refine-data
-                   (cons (current-buffer) (point-marker))))
-     (run-at-time 0.0 nil
-                  (lambda ()
-                    (when diff--auto-refine-data
-                      (let ((buffer (car diff--auto-refine-data))
-                            (point (cdr diff--auto-refine-data)))
-                        (setq diff--auto-refine-data nil)
-                        (with-local-quit
-                          (when (buffer-live-p buffer)
-                            (with-current-buffer buffer
-                              (save-excursion
-                                (goto-char point)
-                                (diff-refine-hunk))))))))))))
+ diff--internal-hunk diff-hunk-header-re "hunk" diff-end-of-hunk diff-restrict-view)
 
 (easy-mmode-define-navigation
  diff--internal-file diff-file-header-re "file" diff-end-of-file)
@@ -605,7 +589,26 @@ to the NEXT marker."
 
       (when (not (looking-at header-re))
         (goto-char start)
-        (user-error (format "No %s" what))))))
+        (user-error (format "No %s" what)))
+
+      ;; We successfully moved to the next/prev hunk/file. Apply the
+      ;; auto-refinement if needed
+      (when diff-auto-refine-mode
+        (unless (prog1 diff--auto-refine-data
+                  (setq diff--auto-refine-data
+                        (cons (current-buffer) (point-marker))))
+          (run-at-time 0.0 nil
+                       (lambda ()
+                         (when diff--auto-refine-data
+                           (let ((buffer (car diff--auto-refine-data))
+                                 (point (cdr diff--auto-refine-data)))
+                             (setq diff--auto-refine-data nil)
+                             (with-local-quit
+                               (when (buffer-live-p buffer)
+                                 (with-current-buffer buffer
+                                   (save-excursion
+                                     (goto-char point)
+                                     (diff-refine-hunk))))))))))))))
 
 ;; These functions all take a skip-hunk-start argument which controls
 ;; whether we skip pre-hunk-start text or not.  In interactive uses we
@@ -768,7 +771,7 @@ data such as \"Index: ...\" and such."
         (setq prevfile nextfile))
     (if (and previndex (numberp prevfile) (< previndex prevfile))
         (setq prevfile previndex))
-    (if (and (numberp prevfile) (<= prevfile start))
+    (if (numberp prevfile)
           (progn
             (goto-char prevfile)
             ;; Now skip backward over the leading junk we may have before the
@@ -1884,7 +1887,7 @@ With a prefix argument, REVERSE the hunk."
       ;; Advance to the next hunk with skip-hunk-start set to t
       ;; because we want the behavior of moving to the next logical
       ;; hunk, not the original behavior where were would sometimes
-      ;; stay on the curent hunk.  This is the behavior we get when
+      ;; stay on the current hunk.  This is the behavior we get when
       ;; navigating through hunks interactively, and we want it when
       ;; applying hunks too (see http://debbugs.gnu.org/17544).
       (when diff-advance-after-apply-hunk

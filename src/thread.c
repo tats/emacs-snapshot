@@ -24,6 +24,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "process.h"
 #include "coding.h"
+#include "syssignal.h"
 
 static struct thread_state primary_thread;
 
@@ -98,6 +99,23 @@ acquire_global_lock (struct thread_state *self)
 {
   sys_mutex_lock (&global_lock);
   post_acquire_global_lock (self);
+}
+
+/* This is called from keyboard.c when it detects that SIGINT
+   interrupted thread_select before the current thread could acquire
+   the lock.  We must acquire the lock to prevent a thread from
+   running without holding the global lock, and to avoid repeated
+   calls to sys_mutex_unlock, which invokes undefined behavior.  */
+void
+maybe_reacquire_global_lock (void)
+{
+  if (current_thread->not_holding_lock)
+    {
+      struct thread_state *self = current_thread;
+
+      acquire_global_lock (self);
+      current_thread->not_holding_lock = 0;
+    }
 }
 
 
@@ -239,7 +257,7 @@ If the current thread already owns MUTEX, increment the count and
 return.
 Otherwise, if no thread owns MUTEX, make the current thread own it.
 Otherwise, block until MUTEX is available, or until the current thread
-is signalled using `thread-signal'.
+is signaled using `thread-signal'.
 Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   (Lisp_Object mutex)
 {
@@ -345,8 +363,7 @@ condition_wait_callback (void *arg)
   XSETCONDVAR (cond, cvar);
   self->event_object = cond;
   saved_count = lisp_mutex_unlock_for_wait (&mutex->mutex);
-  /* If we were signalled while unlocking, we skip the wait, but we
-     still must reacquire our lock.  */
+  /* If signaled while unlocking, skip the wait but reacquire the lock.  */
   if (NILP (self->error_symbol))
     {
       self->wait_condvar = &cvar->cond;
@@ -366,7 +383,7 @@ The mutex associated with COND must be held when this is called.
 It is an error if it is not held.
 
 This releases the mutex and waits for COND to be notified or for
-this thread to be signalled with `thread-signal'.  When
+this thread to be signaled with `thread-signal'.  When
 `condition-wait' returns, COND's mutex will again be locked by
 this thread.  */)
   (Lisp_Object cond)
@@ -386,7 +403,7 @@ this thread.  */)
   return Qnil;
 }
 
-/* Used to communicate argumnets to condition_notify_callback.  */
+/* Used to communicate arguments to condition_notify_callback.  */
 struct notify_args
 {
   struct Lisp_CondVar *cvar;
@@ -493,11 +510,20 @@ really_call_select (void *arg)
 {
   struct select_args *sa = arg;
   struct thread_state *self = current_thread;
+  sigset_t oldset;
 
+  block_interrupt_signal (&oldset);
+  self->not_holding_lock = 1;
   release_global_lock ();
+  restore_signal_mask (&oldset);
+
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
+
+  block_interrupt_signal (&oldset);
   acquire_global_lock (self);
+  self->not_holding_lock = 0;
+  restore_signal_mask (&oldset);
 }
 
 int
@@ -569,16 +595,6 @@ mark_threads (void)
   flush_stack_call_func (mark_threads_callback, NULL);
 }
 
-void
-unmark_threads (void)
-{
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
-    if (iter->m_byte_stack_list)
-      relocate_byte_stack (iter->m_byte_stack_list);
-}
-
 
 
 static void
@@ -617,12 +633,14 @@ do_nothing (Lisp_Object whatever)
 static void *
 run_thread (void *state)
 {
-  char stack_pos;
+  /* Make sure stack_top and m_stack_bottom are properly aligned as GC
+     expects.  */
+  max_align_t stack_pos;
+
   struct thread_state *self = state;
   struct thread_state **iter;
 
-  self->m_stack_bottom = &stack_pos;
-  self->stack_top = &stack_pos;
+  self->m_stack_bottom = self->stack_top = (char *) &stack_pos;
   self->thread_id = sys_thread_self ();
 
   acquire_global_lock (self);
@@ -688,7 +706,7 @@ If NAME is given, it must be a string; it names the new thread.  */)
   struct thread_state *new_thread;
   Lisp_Object result;
   const char *c_name = NULL;
-  size_t offset = offsetof (struct thread_state, m_byte_stack_list);
+  size_t offset = offsetof (struct thread_state, m_stack_bottom);
 
   /* Can't start a thread in temacs.  */
   if (!initialized)
@@ -697,7 +715,7 @@ If NAME is given, it must be a string; it names the new thread.  */)
   if (!NILP (name))
     CHECK_STRING (name);
 
-  new_thread = ALLOCATE_PSEUDOVECTOR (struct thread_state, m_byte_stack_list,
+  new_thread = ALLOCATE_PSEUDOVECTOR (struct thread_state, m_stack_bottom,
 				      PVEC_THREAD);
   memset ((char *) new_thread + offset, 0,
 	  sizeof (struct thread_state) - offset);
@@ -787,7 +805,7 @@ or `thread-join' in the target thread.  */)
   if (tstate == current_thread)
     Fsignal (error_symbol, data);
 
-  /* What to do if thread is already signalled?  */
+  /* What to do if thread is already signaled?  */
   /* What if error_symbol is Qnil?  */
   tstate->error_symbol = error_symbol;
   tstate->error_data = data;
@@ -912,7 +930,7 @@ static void
 init_primary_thread (void)
 {
   primary_thread.header.size
-    = PSEUDOVECSIZE (struct thread_state, m_byte_stack_list);
+    = PSEUDOVECSIZE (struct thread_state, m_stack_bottom);
   XSETPVECTYPE (&primary_thread, PVEC_THREAD);
   primary_thread.m_last_thing_searched = Qnil;
   primary_thread.m_saved_last_thing_searched = Qnil;
@@ -921,6 +939,12 @@ init_primary_thread (void)
   primary_thread.error_symbol = Qnil;
   primary_thread.error_data = Qnil;
   primary_thread.event_object = Qnil;
+}
+
+bool
+primary_thread_p (void *ptr)
+{
+  return (ptr == &primary_thread) ? true : false;
 }
 
 void

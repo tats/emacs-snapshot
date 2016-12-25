@@ -1290,8 +1290,8 @@ aspell is used along with Emacs).")
         (cl-pushnew (if (cadr adict) ;; Do not touch hunspell uninitialized entries
                         (list
                          (nth 0 adict)   ; dict name
-                         "[[:alpha:]]"   ; casechars
-                         "[^[:alpha:]]"  ; not-casechars
+                         (nth 1 adict)   ; casechars
+                         (nth 2 adict)   ; not-casechars
                          (nth 3 adict)   ; otherchars
                          (nth 4 adict)   ; many-otherchars-p
                          (nth 5 adict)   ; ispell-args
@@ -3338,7 +3338,10 @@ Returns the sum SHIFT due to changes in word replacements."
 	  ;; Markers can move with highlighting!  This destroys
 	  ;; end of region markers line-end and ispell-region-end
 	  (let ((word-start
-		 (copy-marker (+ ispell-start (car (cdr poss)))))
+                 ;; There is a -1 offset here as the string is escaped
+                 ;; with '^' to prevent us accidentally sending any
+                 ;; ispell commands.
+		 (copy-marker (+ ispell-start -1 (car (cdr poss)))))
 		(word-len (length (car poss)))
 		(line-end (copy-marker ispell-end))
 		(line-start (copy-marker ispell-start))
