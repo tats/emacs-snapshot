@@ -2,6 +2,12 @@ emacs-snapshot (2:20170101+emacs-25.1-127609-geb3416016b4-1) unstable; urgency=m
 
   * New snapshot
 
+ -- Dima Kogan <dima@secretsauce.net>  Sun, 01 Jan 2017 11:54:07 -0800
+
+emacs-snapshot (2:20170101+emacs-25.1-127609-geb3416016b4-1) unstable; urgency=medium
+
+  * New snapshot
+
  -- Dima Kogan <dima@secretsauce.net>  Sun, 01 Jan 2017 11:28:26 -0800
 
 emacs-snapshot (2:20161225+emacs-25.1-127510-ge5ef59b-1) unstable; urgency=medium
