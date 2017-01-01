@@ -1,6 +1,6 @@
 ;;; ffap.el --- find file (or url) at point
 
-;; Copyright (C) 1995-1997, 2000-2016 Free Software Foundation, Inc.
+;; Copyright (C) 1995-1997, 2000-2017 Free Software Foundation, Inc.
 
 ;; Author: Michelangelo Grigni <mic@mathcs.emory.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -32,7 +32,7 @@
 ;; (`ffap-require-prefix' swaps these behaviors).  This is useful for
 ;; following references in situations such as mail or news buffers,
 ;; README's, MANIFEST's, and so on.  Submit bugs or suggestions with
-;; M-x ffap-bug.
+;; M-x report-emacs-bug.
 ;;
 ;; For the default installation, add this line to your init file:
 ;;
@@ -162,8 +162,12 @@ schemes (e.g. \"ftp\"); in that case, only convert those URLs."
   :group 'ffap
   :version "24.3")
 
-(defcustom ffap-lax-url nil
-  "If non-nil, allow lax URL matching."
+(defcustom ffap-lax-url t
+  "If non-nil, allow lax URL matching.
+The default non-nil value might produce false URLs in C++ code
+with symbols like \"std::find\".  On the other hand, setting
+this to nil will disable recognition of URLs that are not
+well-formed, such as \"user@host\" or \"<user@host>\"."
   :type 'boolean
   :group 'ffap
   :version "25.1")
@@ -202,6 +206,11 @@ Sensible values are nil, \"news\", or \"mailto\"."
 		 ;; string -- possible, but not really useful
 		 )
   :group 'ffap)
+
+(defvar ffap-max-region-length 1024
+  "Maximum active region length.
+When the region is active and larger than this value,
+`ffap-string-at-point' returns an empty string.")
 
 
 ;;; Peanut Gallery (More User Variables):
@@ -1101,8 +1110,10 @@ MODE (defaults to value of `major-mode') is a symbol used to look up
 string syntax parameters in `ffap-string-at-point-mode-alist'.
 If MODE is not found, we use `file' instead of MODE.
 If the region is active, return a string from the region.
-Sets the variable `ffap-string-at-point' and the variable
-`ffap-string-at-point-region'."
+Set the variable `ffap-string-at-point' and the variable
+`ffap-string-at-point-region'.
+When the region is active and larger than `ffap-max-region-length',
+return an empty string, and set `ffap-string-at-point-region' to '(1 1)."
   (let* ((args
 	  (cdr
 	   (or (assq (or mode major-mode) ffap-string-at-point-mode-alist)
@@ -1119,11 +1130,15 @@ Sets the variable `ffap-string-at-point' and the variable
 		(save-excursion
 		  (skip-chars-forward (car args))
 		  (skip-chars-backward (nth 2 args) pt)
-		  (point)))))
-    (setq ffap-string-at-point
-	  (buffer-substring-no-properties
-	   (setcar ffap-string-at-point-region beg)
-	   (setcar (cdr ffap-string-at-point-region) end)))))
+		  (point))))
+         (region-len (- (max beg end) (min beg end))))
+    (if (and (natnump ffap-max-region-length)
+             (< region-len ffap-max-region-length)) ; Bug#25243.
+        (setf ffap-string-at-point-region (list beg end)
+              ffap-string-at-point
+              (buffer-substring-no-properties beg end))
+      (setf ffap-string-at-point-region (list 1 1)
+            ffap-string-at-point ""))))
 
 (defun ffap-string-around ()
   ;; Sometimes useful to decide how to treat a string.

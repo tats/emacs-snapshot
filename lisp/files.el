@@ -1,6 +1,6 @@
 ;;; files.el --- file input and output commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1992-2016 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1992-2017 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -716,13 +716,13 @@ The path separator is colon in GNU and GNU-like systems."
     ;; (which will lead to the use of B/a).
     (minibuffer-with-setup-hook
         (lambda ()
-          (setq minibuffer-completion-table
-                (apply-partially #'locate-file-completion-table
-                                 cd-path nil))
-          (setq minibuffer-completion-predicate
-                (lambda (dir)
-                  (locate-file dir cd-path nil
-                               (lambda (f) (and (file-directory-p f) 'dir-ok))))))
+          (setq-local minibuffer-completion-table
+		      (apply-partially #'locate-file-completion-table
+				       cd-path nil))
+          (setq-local minibuffer-completion-predicate
+		      (lambda (dir)
+			(locate-file dir cd-path nil
+				     (lambda (f) (and (file-directory-p f) 'dir-ok))))))
       (unless cd-path
         (setq cd-path (or (parse-colon-path (getenv "CDPATH"))
                           (list "./"))))

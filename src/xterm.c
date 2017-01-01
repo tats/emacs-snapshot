@@ -1,6 +1,6 @@
 /* X Communication module for terminals which understand the X protocol.
 
-Copyright (C) 1989, 1993-2016 Free Software Foundation, Inc.
+Copyright (C) 1989, 1993-2017 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -12761,6 +12761,13 @@ x_initialize (void)
 
   /* Try to use interrupt input; if we can't, then start polling.  */
   Fset_input_interrupt_mode (Qt);
+
+#if THREADS_ENABLED
+  /* This must be called before any other Xlib routines.  */
+  if (XInitThreads () == 0)
+    fprintf (stderr,
+	     "Warning: An error occurred initializing X11 thread support!\n");
+#endif
 
 #ifdef USE_X_TOOLKIT
   XtToolkitInitialize ();

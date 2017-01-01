@@ -1,6 +1,6 @@
 /* Fully extensible Emacs, running on Unix, intended for GNU.
 
-Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2016 Free Software
+Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2017 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -26,7 +26,6 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <sys/types.h>
 #include <sys/file.h>
 #include <unistd.h>
 
@@ -739,8 +738,6 @@ main (int argc, char **argv)
      non-ASCII file names during startup.  */
   w32_init_file_name_codepage ();
 #endif
-  /* This has to be done before module_init is called below, so that
-     the latter could use the thread ID of the main thread.  */
   w32_init_main_thread ();
 #endif
 
@@ -757,10 +754,6 @@ main (int argc, char **argv)
 
   init_standard_fds ();
   atexit (close_output_streams);
-
-#ifdef HAVE_MODULES
-  module_init ();
-#endif
 
   sort_args (argc, argv);
   argc = 0;

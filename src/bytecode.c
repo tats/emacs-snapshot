@@ -1,5 +1,5 @@
 /* Execution of byte code produced by bytecomp.el.
-   Copyright (C) 1985-1988, 1993, 2000-2016 Free Software Foundation,
+   Copyright (C) 1985-1988, 1993, 2000-2017 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -809,7 +809,7 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	  {
 	    Lisp_Object handler = POP;
 	    /* Support for a function here is new in 24.4.  */
-	    record_unwind_protect (FUNCTIONP (handler) ? bcall0 : unwind_body,
+	    record_unwind_protect (FUNCTIONP (handler) ? bcall0 : prog_ignore,
 				   handler);
 	    NEXT;
 	  }
