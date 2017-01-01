@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index d7e30a8..12f6ffb 100644
+index 3cb1f5e2ab6..72367fbb445 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
@@ -120,7 +120,7 @@ index d7e30a8..12f6ffb 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 98be4ed..1f7251e 100755
+index 32dfbec866d..27f78962589 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -269,8 +269,7 @@ info_dir ()
@@ -134,10 +134,10 @@ index 98be4ed..1f7251e 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index cd6c689..876eeff 100644
+index ce386f6c6c8..25a9ede372d 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
+@@ -5401,11 +5401,11 @@ dnl This will work, but you get a config.status that is not quite right
  dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
  dnl That doesn't have any obvious consequences for Emacs, but on the whole
  dnl it seems better to just live with the duplication.
@@ -152,7 +152,7 @@ index cd6c689..876eeff 100644
         leim/Makefile nextstep/Makefile nt/Makefile])
  
  dnl test/ is not present in release tarfiles.
-@@ -5454,15 +5454,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5457,15 +5457,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -169,7 +169,7 @@ index cd6c689..876eeff 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index eca74a0..ed15024 100644
+index 8ff823200ad..24aeb1c4067 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA = @INSTALL_DATA@
@@ -196,7 +196,7 @@ index eca74a0..ed15024 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index b848566..7a8a58c 100644
+index d3aaa1e251d..672da8eb8d3 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file
