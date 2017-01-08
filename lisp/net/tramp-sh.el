@@ -4655,7 +4655,11 @@ connection if a previous connection has died for some reason."
 
 	  ;; If `non-essential' is non-nil, don't reopen a new connection.
 	  ;; This variable has been introduced with Emacs 24.1.
-	  (when (and (boundp 'non-essential) (symbol-value 'non-essential))
+	  ;; We check this for the process related to
+	  ;; `tramp-buffer-name'; otherwise `start-file-process'
+	  ;; wouldn't run ever when `non-essential' is non-nil.
+	  (when (and (boundp 'non-essential) (symbol-value 'non-essential)
+		     (null (get-process (tramp-buffer-name vec))))
 	    (throw 'non-essential 'non-essential))
 
 	  (with-tramp-progress-reporter
@@ -5409,8 +5413,13 @@ Nonexistent directories are removed from spec."
   "Determine remote `gvfs-monitor-dir' command."
   (with-tramp-connection-property vec "gvfs-monitor-dir"
     (tramp-message vec 5 "Finding a suitable `gvfs-monitor-dir' command")
-    (tramp-find-executable
-     vec "gvfs-monitor-dir" (tramp-get-remote-path vec) t t)))
+    ;; We distinguish "gvfs-monitor-dir.exe" from cygwin in order to
+    ;; establish better timeouts in filenotify-tests.el.  Any better
+    ;; distinction approach would be welcome!
+    (or (tramp-find-executable
+	 vec "gvfs-monitor-dir.exe" (tramp-get-remote-path vec) t t)
+	(tramp-find-executable
+	 vec "gvfs-monitor-dir" (tramp-get-remote-path vec) t t))))
 
 (defun tramp-get-remote-inotifywait (vec)
   "Determine remote `inotifywait' command."

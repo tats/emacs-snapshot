@@ -220,8 +220,16 @@ Please report any problems with this script to bug-gnu-emacs@gnu.org .'
   fi
 
   echo 'Your system has the required tools.'
-  echo "Running 'autoreconf -fi -I m4' ..."
 
+  ## Create nt/gnulib.mk if it doesn't exist, as autoreconf will need it.
+  if test ! -f nt/gnulib.mk; then
+      echo 'Inferring nt/gnulib.mk from lib/gnulib.mk ...'
+      metascript='/^[^#]/s|^.*$|/^## begin  *gnulib module &/,/^## end  *gnulib module &/d|p'
+      script=`sed -n "$metascript" nt/gnulib-modules-to-delete.cfg` || exit
+      sed "$script" lib/gnulib.mk > nt/gnulib.mk || exit
+  fi
+
+  echo "Running 'autoreconf -fi -I m4' ..."
 
   ## Let autoreconf figure out what, if anything, needs doing.
   ## Use autoreconf's -f option in case autoreconf itself has changed.
