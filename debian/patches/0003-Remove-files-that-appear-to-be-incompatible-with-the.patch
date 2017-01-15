@@ -29,10 +29,10 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2e205d88c42..8d696a784be 100644
+index 60f30b993a3..329003ffb07 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
+@@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,7 +43,7 @@ index 2e205d88c42..8d696a784be 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -838,8 +840,7 @@ endef
+@@ -835,8 +837,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 2e205d88c42..8d696a784be 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -969,11 +970,11 @@ check check-maybe check-expensive: have-tests all
+@@ -966,11 +967,11 @@ check check-maybe check-expensive: have-tests all
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 2e205d88c42..8d696a784be 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -994,9 +995,7 @@ info-dir: ${srcdir}/info/dir
+@@ -991,9 +992,7 @@ info-dir: ${srcdir}/info/dir
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index 2e205d88c42..8d696a784be 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1021,14 +1020,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+@@ -1018,14 +1017,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	) >$$tempfile && \
  	${srcdir}/build-aux/move-if-change $${tempfile} ${srcdir}/info/dir
  
@@ -100,7 +100,7 @@ index 2e205d88c42..8d696a784be 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1046,14 +1041,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1043,14 +1038,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -134,10 +134,10 @@ index 32dfbec866d..27f78962589 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 262f367f2c9..0115ca90bf2 100644
+index dcba7eb2c24..d8e785ee403 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5412,11 +5412,11 @@ dnl This will work, but you get a config.status that is not quite right
+@@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
  dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
  dnl That doesn't have any obvious consequences for Emacs, but on the whole
  dnl it seems better to just live with the duplication.
@@ -152,7 +152,7 @@ index 262f367f2c9..0115ca90bf2 100644
         leim/Makefile nextstep/Makefile nt/Makefile])
  
  dnl test/ is not present in release tarfiles.
-@@ -5468,15 +5468,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5454,15 +5454,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
