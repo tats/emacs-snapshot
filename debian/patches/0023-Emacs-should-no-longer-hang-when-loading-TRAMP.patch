@@ -1,0 +1,349 @@
+From 95bb76711c2b6fa889d47d59b4173949e9a57200 Mon Sep 17 00:00:00 2001
+From: Sean Whitton <spwhitton@spwhitton.name>
+Date: Sun, 10 Jan 2016 12:16:33 -0700
+Subject: Emacs should no longer hang when loading TRAMP
+
+Patch adapted from upstream repository commits 28caedba and 508049aa by
+Michael Albinus.
+
+Origin: backport,
+ commit:28caedba0f5c387d9c8e8fc8de26b5399afeb68b
+ commit:508049aae95c42a3e6fe989ff403bf7cb6f88433
+Bug: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=20015
+Bug-Debian: https://bugs.debian.org/810640
+Forwarded: not-needed
+---
+ lisp/net/tramp-adb.el  |  2 ++
+ lisp/net/tramp-gvfs.el |  2 ++
+ lisp/net/tramp-sh.el   | 81 +++++++++++++++++++++++++++++++++++++++++++++-----
+ lisp/net/tramp-smb.el  |  6 ++++
+ lisp/net/tramp.el      | 51 ++++---------------------------
+ 5 files changed, 89 insertions(+), 53 deletions(-)
+
+diff --git a/lisp/net/tramp-adb.el b/lisp/net/tramp-adb.el
+index f5e2019..cf1e05e 100644
+--- a/lisp/net/tramp-adb.el
++++ b/lisp/net/tramp-adb.el
+@@ -38,6 +38,7 @@
+ ;; Pacify byte-compiler.
+ (defvar directory-sep-char)
+ 
++;;;###tramp-autoload
+ (defcustom tramp-adb-program "adb"
+   "Name of the Android Debug Bridge program."
+   :group 'tramp
+@@ -48,6 +49,7 @@
+ (defconst tramp-adb-method "adb"
+   "*When this method name is used, forward all calls to Android Debug Bridge.")
+ 
++;;;###tramp-autoload
+ (defcustom tramp-adb-prompt
+   "^\\(?:[[:digit:]]*|?\\)?\\(?:[[:alnum:]]*@[[:alnum:]]*[^#\\$]*\\)?[#\\$][[:space:]]"
+   "Regexp used as prompt in almquist shell."
+diff --git a/lisp/net/tramp-gvfs.el b/lisp/net/tramp-gvfs.el
+index 1ea52eb..5988a28 100644
+--- a/lisp/net/tramp-gvfs.el
++++ b/lisp/net/tramp-gvfs.el
+@@ -127,6 +127,7 @@
+ ;;;###tramp-autoload
+ (add-to-list 'tramp-default-user-alist '("\\`synce\\'" nil nil))
+ 
++;;;###tramp-autoload
+ (defcustom tramp-gvfs-zeroconf-domain "local"
+   "Zeroconf domain to be used for discovering services, like host names."
+   :group 'tramp
+@@ -374,6 +375,7 @@ It has been changed in GVFS 1.14.")
+ ;;   </signal>
+ ;; </interface>
+ 
++;;;###tramp-autoload
+ (defcustom tramp-bluez-discover-devices-timeout 60
+   "Defines seconds since last bluetooth device discovery before rescanning.
+ A value of 0 would require an immediate discovery during hostname
+diff --git a/lisp/net/tramp-sh.el b/lisp/net/tramp-sh.el
+index bd7aec9..0e30bfe 100644
+--- a/lisp/net/tramp-sh.el
++++ b/lisp/net/tramp-sh.el
+@@ -40,6 +40,7 @@
+ (defvar vc-git-program)
+ (defvar vc-hg-program)
+ 
++;;;###tramp-autoload
+ (defcustom tramp-inline-compress-start-size 4096
+   "The minimum size of compressing where inline transfer.
+ When inline transfer, compress transferred data of file
+@@ -48,6 +49,7 @@ If it is nil, no compression at all will be applied."
+   :group 'tramp
+   :type '(choice (const nil) integer))
+ 
++;;;###tramp-autoload
+ (defcustom tramp-copy-size-limit 10240
+   "The maximum file size where inline copying is preferred over an \
+ out-of-the-band copy.
+@@ -87,6 +89,27 @@ detected as prompt when being sent on echoing hosts, therefore.")
+ (defconst tramp-end-of-heredoc (md5 tramp-end-of-output)
+   "String used to recognize end of heredoc strings.")
+ 
++;;;###tramp-autoload
++(defcustom tramp-use-ssh-controlmaster-options t
++  "Whether to use `tramp-ssh-controlmaster-options'."
++  :group 'tramp
++  :version "24.4"
++  :type 'boolean)
++
++(defvar tramp-ssh-controlmaster-options nil
++  "Which ssh Control* arguments to use.
++
++If it is a string, it should have the form
++\"-o ControlMaster=auto -o ControlPath='tramp.%%r@%%h:%%p'
++-o ControlPersist=no\".  Percent characters in the ControlPath
++spec must be doubled, because the string is used as format string.
++
++Otherwise, it will be auto-detected by Tramp, if
++`tramp-use-ssh-controlmaster-options' is non-nil.  The value
++depends on the installed local ssh version.
++
++The string is used in `tramp-methods'.")
++
+ ;; Initialize `tramp-methods' with the supported methods.
+ ;;;###tramp-autoload
+ (add-to-list 'tramp-methods
+@@ -471,6 +494,7 @@ not be set here. Instead, it should be set via `tramp-remote-path'."
+   :version "24.4"
+   :type '(repeat string))
+ 
++;;;###tramp-autoload
+ (defcustom tramp-sh-extra-args '(("/bash\\'" . "-norc -noprofile"))
+   "Alist specifying extra arguments to pass to the remote shell.
+ Entries are (REGEXP . ARGS) where REGEXP is a regular expression
+@@ -2331,10 +2355,7 @@ The method used must be an out-of-band method."
+ 	      spec (format-spec-make
+ 		    ?t (tramp-get-connection-property
+ 			(tramp-get-connection-process v) "temp-file" ""))
+-	      options (format-spec
+-		       (if tramp-use-ssh-controlmaster-options
+-			   tramp-ssh-controlmaster-options "")
+-		       spec)
++	      options (format-spec (tramp-ssh-controlmaster-options v) spec)
+ 	      spec (format-spec-make
+ 		    ?h host ?u user ?p port ?r listener ?c options
+ 		    ?k (if keep-date " " ""))
+@@ -4496,7 +4517,7 @@ Gateway hops are already opened."
+ 
+     ;; In case the host name is not used for the remote shell
+     ;; command, the user could be misguided by applying a random
+-    ;; hostname.
++    ;; host name.
+     (let* ((v (car target-alist))
+ 	   (method (tramp-file-name-method v))
+ 	   (host (tramp-file-name-host v)))
+@@ -4518,6 +4539,53 @@ Gateway hops are already opened."
+     ;; Result.
+     target-alist))
+ 
++(defun tramp-ssh-controlmaster-options (vec)
++  "Return the Control* arguments of the local ssh."
++  (cond
++   ;; No options to be computed.
++   ((or (null tramp-use-ssh-controlmaster-options)
++	(null (assoc "%c" (tramp-get-method-parameter
++			   (tramp-file-name-method vec) 'tramp-login-args))))
++    "")
++
++   ;; There is already a value to be used.
++   ((stringp tramp-ssh-controlmaster-options) tramp-ssh-controlmaster-options)
++
++   ;; Determine the options.
++   (t (setq tramp-ssh-controlmaster-options "")
++      (let ((case-fold-search t))
++	(ignore-errors
++	  (when (executable-find "ssh")
++	    (with-temp-buffer
++	      (tramp-call-process vec "ssh" nil t nil "-o" "ControlMaster")
++	      (goto-char (point-min))
++	      (when (search-forward-regexp "missing.+argument" nil t)
++		(setq tramp-ssh-controlmaster-options "-o ControlMaster=auto")))
++	    (unless (zerop (length tramp-ssh-controlmaster-options))
++	      (with-temp-buffer
++		;; When we use a non-existing host name, we could run
++		;; into DNS timeouts.  So we use "localhost" with an
++		;; improper port, expecting nobody runs sshd on the
++		;; telnet port.
++		(tramp-call-process
++		 vec "ssh" nil t nil
++		 "-p" "23" "-o" "ControlPath=%C" "localhost")
++		(goto-char (point-min))
++		(setq tramp-ssh-controlmaster-options
++		      (if (search-forward-regexp "unknown.+key" nil t)
++			  (concat tramp-ssh-controlmaster-options
++				  " -o ControlPath='tramp.%%r@%%h:%%p'")
++			(concat tramp-ssh-controlmaster-options
++				" -o ControlPath='tramp.%%C'"))))
++	      (with-temp-buffer
++		(tramp-call-process vec "ssh" nil t nil "-o" "ControlPersist")
++		(goto-char (point-min))
++		(when (search-forward-regexp "missing.+argument" nil t)
++		  (setq tramp-ssh-controlmaster-options
++			(concat tramp-ssh-controlmaster-options
++				" -o ControlPersist=no"))))))))
++      tramp-ssh-controlmaster-options)))
++
+ (defun tramp-maybe-open-connection (vec)
+   "Maybe open a connection VEC.
+ Does not do anything if a connection is already open, but re-opens the
+@@ -4593,8 +4661,7 @@ connection if a previous connection has died for some reason."
+ 	      (let* ((target-alist (tramp-compute-multi-hops vec))
+ 		     ;; We will apply `tramp-ssh-controlmaster-options'
+ 		     ;; only for the first hop.
+-		     (options (if tramp-use-ssh-controlmaster-options
+-				  tramp-ssh-controlmaster-options ""))
++		     (options (tramp-ssh-controlmaster-options vec))
+ 		     (process-connection-type tramp-process-connection-type)
+ 		     (process-adaptive-read-buffering nil)
+ 		     (coding-system-for-read nil)
+diff --git a/lisp/net/tramp-smb.el b/lisp/net/tramp-smb.el
+index d5fe17f..14360b9 100644
+--- a/lisp/net/tramp-smb.el
++++ b/lisp/net/tramp-smb.el
+@@ -70,17 +70,20 @@
+     tramp-smb-method
+     '((tramp-parse-netrc "~/.netrc"))))
+ 
++;;;###tramp-autoload
+ (defcustom tramp-smb-program "smbclient"
+   "Name of SMB client to run."
+   :group 'tramp
+   :type 'string)
+ 
++;;;###tramp-autoload
+ (defcustom tramp-smb-acl-program "smbcacls"
+   "Name of SMB acls to run."
+   :group 'tramp
+   :type 'string
+   :version "24.4")
+ 
++;;;###tramp-autoload
+ (defcustom tramp-smb-conf "/dev/null"
+   "Path of the smb.conf file.
+ If it is nil, no smb.conf will be added to the `tramp-smb-program'
+@@ -280,6 +283,7 @@ See `tramp-actions-before-shell' for more info.")
+ Operations not mentioned here will be handled by the default Emacs primitives.")
+ 
+ ;; Options for remote processes via winexe.
++;;;###tramp-autoload
+ (defcustom tramp-smb-winexe-program "winexe"
+   "Name of winexe client to run.
+ If it isn't found in the local $PATH, the absolute path of winexe
+@@ -288,6 +292,7 @@ shall be given.  This is needed for remote processes."
+   :type 'string
+   :version "24.3")
+ 
++;;;###tramp-autoload
+ (defcustom tramp-smb-winexe-shell-command "powershell.exe"
+   "Shell to be used for processes on remote machines.
+ This must be Powershell V2 compatible."
+@@ -295,6 +300,7 @@ This must be Powershell V2 compatible."
+   :type 'string
+   :version "24.3")
+ 
++;;;###tramp-autoload
+ (defcustom tramp-smb-winexe-shell-command-switch "-file -"
+   "Command switch used together with `tramp-smb-winexe-shell-command'.
+ This can be used to disable echo etc."
+diff --git a/lisp/net/tramp.el b/lisp/net/tramp.el
+index 79242a4..10bb769 100644
+--- a/lisp/net/tramp.el
++++ b/lisp/net/tramp.el
+@@ -73,6 +73,7 @@
+   "Edit remote files with a combination of ssh, scp, etc."
+   :group 'files
+   :group 'comm
++  :link '(custom-manual "(tramp)Top")
+   :version "22.1")
+ 
+ ;; Maybe we need once a real Tramp mode, with key bindings etc.
+@@ -306,46 +307,6 @@ started on the local host.  You should specify a remote host
+ `localhost' or the name of the local host.  Another host name is
+ useful only in combination with `tramp-default-proxies-alist'.")
+ 
+-;;;###tramp-autoload
+-(defcustom tramp-ssh-controlmaster-options
+-  (let ((result "")
+-	(case-fold-search t))
+-    (ignore-errors
+-      (when (executable-find "ssh")
+-	(with-temp-buffer
+-	  (call-process "ssh" nil t nil "-o" "ControlMaster")
+-	  (goto-char (point-min))
+-	  (when (search-forward-regexp "missing.+argument" nil t)
+-	    (setq result "-o ControlMaster=auto")))
+-	(unless (zerop (length result))
+-	  (with-temp-buffer
+-	    (call-process
+-	     "ssh" nil t nil "-o" "ControlPath=%C" "host.does.not.exist")
+-	    (goto-char (point-min))
+-	    (if (search-forward-regexp "unknown.+key" nil t)
+-		(setq result
+-		      (concat result " -o ControlPath='tramp.%%r@%%h:%%p'"))
+-	      (setq result (concat result " -o ControlPath='tramp.%%C'"))))
+-	  (with-temp-buffer
+-	    (call-process "ssh" nil t nil "-o" "ControlPersist")
+-	    (goto-char (point-min))
+-	    (when (search-forward-regexp "missing.+argument" nil t)
+-	      (setq result (concat result " -o ControlPersist=no")))))))
+-    result)
+-    "Call ssh to detect whether it supports the Control* arguments.
+-Return a string to be used in `tramp-methods'."
+-    :group 'tramp
+-    :version "24.5"
+-    :type 'string)
+-
+-;;;###tramp-autoload
+-(defcustom tramp-use-ssh-controlmaster-options
+-  (not (zerop (length tramp-ssh-controlmaster-options)))
+-  "Whether to use `tramp-ssh-controlmaster-options'."
+-  :group 'tramp
+-  :version "24.4"
+-  :type 'boolean)
+-
+ (defcustom tramp-default-method
+   ;; An external copy method seems to be preferred, because it performs
+   ;; much better for large files, and it hasn't too serious delays
+@@ -376,9 +337,7 @@ Return a string to be used in `tramp-methods'."
+ 	    (fboundp 'auth-source-search)
+ 	    ;; ssh-agent is running.
+ 	    (getenv "SSH_AUTH_SOCK")
+-	    (getenv "SSH_AGENT_PID")
+-	    ;; We could reuse the connection.
+-	    (> (length tramp-ssh-controlmaster-options) 0))
++	    (getenv "SSH_AGENT_PID"))
+ 	"scp"
+       "ssh"))
+    ;; Fallback.
+@@ -560,7 +519,7 @@ if you need to change this."
+   :type 'string)
+ 
+ (defcustom tramp-login-prompt-regexp
+-  ".*ogin\\( .*\\)?: *"
++  ".*\\(user\\|login\\)\\( .*\\)?: *"
+   "Regexp matching login-like prompts.
+ The regexp should match at end of buffer.
+ 
+@@ -2266,7 +2225,7 @@ Falls back to normal file name handler if no Tramp file name handler exists."
+   "Load Tramp file name handler, and perform OPERATION."
+   ;; Avoid recursive loading of tramp.el.  `temporary-file-directory'
+   ;; does not exist in XEmacs, so we must use something else.
+-  (let ((default-directory (or (symbol-value 'temporary-file-directory) "/")))
++  (let ((default-directory "/"))
+     (load "tramp" nil t))
+   (apply operation args)))
+ 
+@@ -3240,7 +3199,7 @@ User is always nil."
+       t)))
+ 
+ (defun tramp-handle-make-symbolic-link
+-  (filename linkname &optional ok-if-already-exists)
++  (filename linkname &optional _ok-if-already-exists)
+   "Like `make-symbolic-link' for Tramp files."
+   (with-parsed-tramp-file-name
+       (if (tramp-tramp-file-p filename) filename linkname) nil
