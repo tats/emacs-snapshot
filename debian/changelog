@@ -1,10 +1,14 @@
-emacs24 (24.5+1-8~1.gbpfda95f) UNRELEASED; urgency=medium
+emacs24 (24.5+1-8) unstable; urgency=medium
 
-  ** SNAPSHOT build @fda95fec191a19838c0b508543de7815bcf11479 **
+  * Configure with REL_ALLOC=no to fix crashes.  Thanks to Santiago
+    Vila for reporting the problem, and Sean Whitton for helping test
+    the fix. (Closes: 849775)
 
-  * UNRELEASED
+  * Backport upstream fix for TRAMP hang on startup.  Thanks to Sean
+    Whitton for tracking down, backporting and testing the
+    fix. (Closes: 810640)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 22 Jan 2017 12:55:42 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 22 Jan 2017 14:32:37 -0600
 
 emacs24 (24.5+1-7.1) unstable; urgency=medium
 
