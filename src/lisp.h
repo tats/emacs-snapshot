@@ -3119,34 +3119,25 @@ struct handler
 
 extern Lisp_Object memory_signal_data;
 
-/* Check quit-flag and quit if it is non-nil.
-   Typing C-g does not directly cause a quit; it only sets Vquit_flag.
-   So the program needs to do QUIT at times when it is safe to quit.
-   Every loop that might run for a long time or might not exit
-   ought to do QUIT at least once, at a safe place.
-   Unless that is impossible, of course.
-   But it is very desirable to avoid creating loops where QUIT is impossible.
+/* Check quit-flag and quit if it is non-nil.  Typing C-g does not
+   directly cause a quit; it only sets Vquit_flag.  So the program
+   needs to call maybe_quit at times when it is safe to quit.  Every
+   loop that might run for a long time or might not exit ought to call
+   maybe_quit at least once, at a safe place.  Unless that is
+   impossible, of course.  But it is very desirable to avoid creating
+   loops where maybe_quit is impossible.
 
-   Exception: if you set immediate_quit to true,
-   then the handler that responds to the C-g does the quit itself.
-   This is a good thing to do around a loop that has no side effects
-   and (in particular) cannot call arbitrary Lisp code.
+   Exception: if you set immediate_quit, the handler that responds to
+   the C-g does the quit itself.  This is a good thing to do around a
+   loop that has no side effects and (in particular) cannot call
+   arbitrary Lisp code.
 
    If quit-flag is set to `kill-emacs' the SIGINT handler has received
-   a request to exit Emacs when it is safe to do.  */
+   a request to exit Emacs when it is safe to do.
 
-extern void process_pending_signals (void);
-extern bool volatile pending_signals;
+   When not quitting, process any pending signals.  */
 
-extern void process_quit_flag (void);
-#define QUIT						\
-  do {							\
-    if (!NILP (Vquit_flag) && NILP (Vinhibit_quit))	\
-      process_quit_flag ();				\
-    else if (pending_signals)				\
-      process_pending_signals ();			\
-  } while (false)
-
+extern void maybe_quit (void);
 
 /* True if ought to quit now.  */
 
