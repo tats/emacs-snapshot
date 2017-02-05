@@ -12,7 +12,7 @@ lisp/info.el to include /usr/share/info/emacs-MAJORVERSION before
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/info.el b/lisp/info.el
-index e32b6b35632..e7e6dffb65d 100644
+index 0cfcec32f82..fabf0105234 100644
 --- a/lisp/info.el
 +++ b/lisp/info.el
 @@ -209,7 +209,8 @@ Info-default-directory-list
