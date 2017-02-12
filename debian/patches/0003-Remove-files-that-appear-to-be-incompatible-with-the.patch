@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 60f30b993a3..329003ffb07 100644
+index 807a40a2844..f3a37ff7357 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
@@ -81,9 +81,9 @@ index 60f30b993a3..329003ffb07 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1018,14 +1017,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
- 	) >$$tempfile && \
- 	${srcdir}/build-aux/move-if-change $${tempfile} ${srcdir}/info/dir
+@@ -1016,14 +1015,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+ 	) >$@.tmp
+ 	mv $@.tmp $@
  
 -INSTALL_DVI = install-emacs-dvi install-lispref-dvi \
 -	install-lispintro-dvi install-misc-dvi
@@ -100,7 +100,7 @@ index 60f30b993a3..329003ffb07 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1043,14 +1038,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1041,14 +1036,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
