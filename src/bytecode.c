@@ -267,6 +267,8 @@ DEFINE (Bstack_set,  0262)						\
 DEFINE (Bstack_set2, 0263)						\
 DEFINE (BdiscardN,   0266)						\
 									\
+DEFINE (Bswitch, 0267)                                                  \
+                                                                        \
 DEFINE (Bconstant, 0300)
 
 enum byte_code_op
@@ -1410,6 +1412,48 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	    }
 	  DISCARD (op);
 	  NEXT;
+
+        CASE (Bswitch):
+          {
+            /* TODO: Perhaps introduce another byte-code for switch when the
+	       number of cases is less, which uses a simple vector for linear
+	       search as the jump table.  */
+            Lisp_Object jmp_table = POP;
+	    if (BYTE_CODE_SAFE && !HASH_TABLE_P (jmp_table))
+	      emacs_abort ();
+            Lisp_Object v1 = POP;
+            ptrdiff_t i;
+            struct Lisp_Hash_Table *h = XHASH_TABLE (jmp_table);
+
+            /* h->count is a faster approximation for HASH_TABLE_SIZE (h)
+               here. */
+            if (h->count <= 5)
+              { /* Do a linear search if there are not many cases
+                   FIXME: 5 is arbitrarily chosen.  */
+                Lisp_Object hash_code = h->test.cmpfn
+                  ? make_number (h->test.hashfn (&h->test, v1)) : Qnil;
+
+                for (i = h->count; 0 <= --i; )
+                  if (EQ (v1, HASH_KEY (h, i))
+                      || (h->test.cmpfn
+                          && EQ (hash_code, HASH_HASH (h, i))
+                          && h->test.cmpfn (&h->test, v1, HASH_KEY (h, i))))
+                    break;
+
+              }
+            else
+              i = hash_lookup (h, v1, NULL);
+
+	    if (i >= 0)
+	      {
+		Lisp_Object val = HASH_VALUE (h, i);
+		if (BYTE_CODE_SAFE && !INTEGERP (val))
+		  emacs_abort ();
+		op = XINT (val);
+		goto op_branch;
+	      }
+          }
+          NEXT;
 
 	CASE_DEFAULT
 	CASE (Bconstant):

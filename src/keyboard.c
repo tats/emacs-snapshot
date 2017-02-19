@@ -5421,26 +5421,26 @@ make_lispy_event (struct input_event *event)
            not.  And Control+Shift+s should produce C-S-s whether
            caps-lock is on or not.  */
         if (event->modifiers & ~shift_modifier)
-        {
+	  {
             /* This is a key chord: some non-shift modifier is
                depressed.  */
 
             if (uppercasep (c) &&
                 !(event->modifiers & shift_modifier))
-            {
+	      {
                 /* Got a capital letter without a shift.  The caps
                    lock is on.   Un-capitalize the letter.  */
                 c = downcase (c);
-            }
+	      }
             else if (lowercasep (c) &&
                      (event->modifiers & shift_modifier))
-            {
+	      {
                 /* Got a lower-case letter even though shift is
                    depressed.  The caps lock is on.  Capitalize the
                    letter.  */
                 c = upcase (c);
-            }
-        }
+	      }
+	  }
 
 	if (event->kind == ASCII_KEYSTROKE_EVENT)
 	  {
@@ -9642,21 +9642,25 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
 	 use the corresponding lower-case letter instead.  */
       if (NILP (current_binding)
 	  && /* indec.start >= t && fkey.start >= t && */ keytran.start >= t
-	  && INTEGERP (key)
-	  && ((CHARACTERP (make_number (XINT (key) & ~CHAR_MODIFIER_MASK))
-	       && uppercasep (XINT (key) & ~CHAR_MODIFIER_MASK))
-	      || (XINT (key) & shift_modifier)))
+	  && INTEGERP (key))
 	{
 	  Lisp_Object new_key;
+	  EMACS_INT k = XINT (key);
+
+	  if (k & shift_modifier)
+	    XSETINT (new_key, k & ~shift_modifier);
+	  else if (CHARACTERP (make_number (k & ~CHAR_MODIFIER_MASK)))
+	    {
+	      int dc = downcase (k & ~CHAR_MODIFIER_MASK);
+	      if (dc == (k & ~CHAR_MODIFIER_MASK))
+		goto not_upcase;
+	      XSETINT (new_key, dc | (k & CHAR_MODIFIER_MASK));
+	    }
+	  else
+	    goto not_upcase;
 
 	  original_uppercase = key;
 	  original_uppercase_position = t - 1;
-
-	  if (XINT (key) & shift_modifier)
-	    XSETINT (new_key, XINT (key) & ~shift_modifier);
-	  else
-	    XSETINT (new_key, (downcase (XINT (key) & ~CHAR_MODIFIER_MASK)
-			       | (XINT (key) & CHAR_MODIFIER_MASK)));
 
 	  /* We have to do this unconditionally, regardless of whether
 	     the lower-case char is defined in the keymaps, because they
@@ -9668,6 +9672,7 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
 	  goto replay_sequence;
 	}
 
+    not_upcase:
       if (NILP (current_binding)
 	  && help_char_p (EVENT_HEAD (key)) && t > 1)
 	    {
@@ -10015,7 +10020,7 @@ Internal use only.  */)
   int key0 = SREF (keys, 0);
 
   /* Kludge alert: this makes M-x be in the form expected by
-     novice.el.  Any better ideas?  */
+     novice.el.  (248 is \370, a.k.a. "Meta-x".)  Any better ideas?  */
   if (key0 == 248)
     add_command_key (make_number ('x' | meta_modifier));
   else

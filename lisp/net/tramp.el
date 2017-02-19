@@ -2021,6 +2021,10 @@ Falls back to normal file name handler if no Tramp file name handler exists."
     (if (and tramp-mode (tramp-tramp-file-p filename))
 	(save-match-data
 	  (let* ((filename (tramp-replace-environment-variables filename))
+                 (non-essential
+                  (and non-essential
+                       (string-match
+                        tramp-completion-file-name-regexp filename)))
 		 (completion (tramp-completion-mode-p))
 		 (foreign
 		  (tramp-find-foreign-file-name-handler
@@ -2133,41 +2137,34 @@ preventing reentrant calls of Tramp.")
 Together with `tramp-locked', this implements a locking mechanism
 preventing reentrant calls of Tramp.")
 
-;; Avoid recursive loading of tramp.el.
+;; Avoid recursive loading of tramp.el.  If `non-essential' is
+;; non-nil, we must load tramp.el, in order to get the real definition
+;; of `tramp-completion-file-name-handler'.
 ;;;###autoload(defun tramp-completion-file-name-handler (operation &rest args)
-;;;###autoload  (tramp-completion-run-real-handler operation args))
+;;;###autoload  (if (tramp-completion-mode-p)
+;;;###autoload      (apply 'tramp-autoload-file-name-handler operation args)
+;;;###autoload    (tramp-completion-run-real-handler operation args)))
 
 (defun tramp-completion-file-name-handler (operation &rest args)
   "Invoke Tramp file name completion handler.
 Falls back to normal file name handler if no Tramp file name handler exists."
   (let ((fn (assoc operation tramp-completion-file-name-handler-alist)))
-    (if (and
-	 ;; When `tramp-mode' is not enabled, we don't do anything.
-         fn tramp-mode (tramp-completion-mode-p)
-         ;; For other syntaxes than `sep', the regexp matches many common
-         ;; situations where the user doesn't actually want to use Tramp.
-         ;; So to avoid autoloading Tramp after typing just "/s", we
-         ;; disable this part of the completion, unless the user implicitly
-         ;; indicated his interest in using a fancier completion system.
-         (or (eq tramp-syntax 'sep)
-             (featurep 'tramp) ;; If it's loaded, we may as well use it.
-	     ;; `partial-completion-mode' is obsoleted with Emacs 24.1.
-             (and (boundp 'partial-completion-mode)
-		  (symbol-value 'partial-completion-mode))
-             ;; FIXME: These may have been loaded even if the user never
-             ;; intended to use them.
-             (featurep 'ido)
-             (featurep 'icicles)))
+    (if (and fn tramp-mode (tramp-completion-mode-p))
 	(save-match-data (apply (cdr fn) args))
       (tramp-completion-run-real-handler operation args))))
 
 ;;;###autoload
 (progn (defun tramp-autoload-file-name-handler (operation &rest args)
   "Load Tramp file name handler, and perform OPERATION."
-  ;; Avoid recursive loading of tramp.el.
-  (let ((default-directory temporary-file-directory))
-    (load "tramp" nil t))
-  (apply operation args)))
+  (if (and
+       ;; Do not load tramp.el just for "/".
+       (not (and (stringp (car args)) (string-equal (car args) "/")))
+       ;; Avoid recursive loading of tramp.el.
+       (let ((default-directory temporary-file-directory))
+        (and (null load-in-progress) (load "tramp" 'noerror 'nomessage))))
+      (apply operation args)
+    ;; tramp.el not needed or not available for loading, fall back.
+    (tramp-completion-run-real-handler operation args))))
 
 ;; `tramp-autoload-file-name-handler' must be registered before
 ;; evaluation of site-start and init files, because there might exist
@@ -2275,20 +2272,13 @@ should never be set globally, the intention is to let-bind it.")
 ;; Tramp file name syntax. Maybe another variable should be introduced
 ;; overwriting this check in such cases. Or we change Tramp file name
 ;; syntax in order to avoid ambiguities.
-(defun tramp-completion-mode-p ()
+;;;###autoload
+(progn (defun tramp-completion-mode-p ()
   "Check, whether method / user name / host name completion is active."
   (or
    ;; Signal from outside.  `non-essential' has been introduced in Emacs 24.
    (and (boundp 'non-essential) (symbol-value 'non-essential))
-   tramp-completion-mode
-   (equal last-input-event 'tab)
-   (and (natnump last-input-event)
-	(or
-	 ;; ?\t has event-modifier 'control.
-	 (equal last-input-event ?\t)
-	 (and (not (event-modifiers last-input-event))
-	      (or (equal last-input-event ?\?)
-		  (equal last-input-event ?\ )))))))
+   tramp-completion-mode)))
 
 (defun tramp-connectable-p (filename)
   "Check, whether it is possible to connect the remote host w/o side-effects.
@@ -2303,18 +2293,12 @@ not in completion mode."
 
 (defun tramp-completion-handle-expand-file-name (name &optional dir)
   "Like `expand-file-name' for Tramp files."
-  (if (tramp-completion-mode-p)
-      (progn
-	;; If DIR is not given, use `default-directory' or "/".
-	(setq dir (or dir default-directory "/"))
-	;; Unless NAME is absolute, concat DIR and NAME.
-	(unless (file-name-absolute-p name)
-	  (setq name (concat (file-name-as-directory dir) name)))
-	;; Return NAME.
-	name)
-
-    (tramp-completion-run-real-handler
-     'expand-file-name (list name dir))))
+  ;; If DIR is not given, use `default-directory' or "/".
+  (setq dir (or dir default-directory "/"))
+  (cond
+   ((file-name-absolute-p name) name)
+   ((zerop (length name)) dir)
+   (t (concat (file-name-as-directory dir) name))))
 
 ;; Method, host name and user name completion.
 ;; `tramp-completion-dissect-file-name' returns a list of
@@ -2401,11 +2385,11 @@ not in completion mode."
 	      (tramp-connectable-p (expand-file-name filename directory)))
      (lambda (x) (funcall predicate (expand-file-name (car x) directory))))))
 
-;; I misuse a little bit the tramp-file-name structure in order to handle
-;; completion possibilities for partial methods / user names / host names.
-;; Return value is a list of tramp-file-name structures according to possible
-;; completions. If "localname" is non-nil it means there
-;; shouldn't be a completion anymore.
+;; I misuse a little bit the tramp-file-name structure in order to
+;; handle completion possibilities for partial methods / user names /
+;; host names.  Return value is a list of tramp-file-name structures
+;; according to possible completions. If "localname" is non-nil it
+;; means there shouldn't be a completion anymore.
 
 ;; Expected results:
 

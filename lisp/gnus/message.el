@@ -64,9 +64,6 @@
   :group 'mail
   :group 'news)
 
-(put 'user-mail-address 'custom-type 'string)
-(put 'user-full-name 'custom-type 'string)
-
 (defgroup message-various nil
   "Various Message Variables."
   :link '(custom-manual "(message)Various Message Variables")
@@ -1358,7 +1355,7 @@ If nil, you might be asked to input the charset."
 (defcustom message-dont-reply-to-names mail-dont-reply-to-names
   "Addresses to prune when doing wide replies.
 This can be a regexp, a list of regexps or a predicate function.
-Also, a value of nil means exclude your own user name only.
+Also, a value of nil means exclude `user-mail-address' only.
 
 If a function email is passed as the argument."
   :version "24.3"
