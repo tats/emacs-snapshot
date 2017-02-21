@@ -11,7 +11,7 @@ appropriate, etc.
  1 file changed, 4 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index cba4e4d9a8c..c51a0dcafbd 100644
+index 143e4655def..a21918f995c 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
 @@ -28,6 +28,10 @@ reduce confusion with the standalone CC Mode 5.33 (available from
