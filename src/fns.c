@@ -3676,7 +3676,7 @@ allocate_hash_table (void)
 Lisp_Object
 make_hash_table (struct hash_table_test test,
 		 Lisp_Object size, Lisp_Object rehash_size,
-		 float rehash_threshold, Lisp_Object weak,
+		 double rehash_threshold, Lisp_Object weak,
                  bool pure)
 {
   struct Lisp_Hash_Table *h;
@@ -4390,7 +4390,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object test, size, rehash_size, weak;
-  float rehash_threshold;
+  double rehash_threshold;
   bool pure;
   struct hash_table_test testdesc;
   ptrdiff_t i;
@@ -4445,9 +4445,8 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
 
   /* Look for `:rehash-threshold THRESHOLD'.  */
   i = get_key_arg (QCrehash_threshold, nargs, args, used);
-  rehash_threshold =
-    i ? (FLOATP (args[i]) ? XFLOAT_DATA (args[i]) : -1.0)
-    : DEFAULT_REHASH_THRESHOLD;
+  rehash_threshold = (!i ? DEFAULT_REHASH_THRESHOLD
+		      : FLOATP (args[i]) ? XFLOAT_DATA (args[i]) : 0);
   if (! (0 < rehash_threshold && rehash_threshold <= 1))
     signal_error ("Invalid hash table rehash threshold", args[i]);
 

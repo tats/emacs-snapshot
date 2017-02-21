@@ -1998,13 +1998,13 @@ struct Lisp_Hash_Table
   /* Number of key/value entries in the table.  */
   ptrdiff_t count;
 
-  /* Non-nil if the table can be purecopied.  The table cannot be
+  /* True if the table can be purecopied.  The table cannot be
      changed afterwards.  */
-  bool_bf pure : 1;
+  bool pure;
 
-  /* Resize hash table when number of entries/ table size is >= this
-     ratio, a float.  */
-  float rehash_threshold;
+  /* Resize hash table when number of entries / table size is >= this
+     ratio.  */
+  double rehash_threshold;
 
   /* Vector of keys and values.  The key of item I is found at index
      2 * I, the value is found at index 2 * I + 1.
@@ -3363,7 +3363,7 @@ EMACS_UINT hash_string (char const *, ptrdiff_t);
 EMACS_UINT sxhash (Lisp_Object, int);
 Lisp_Object make_hash_table (struct hash_table_test test,
 		             Lisp_Object size, Lisp_Object rehash_size,
-		             float rehash_threshold, Lisp_Object weak,
+		             double rehash_threshold, Lisp_Object weak,
                              bool pure);
 ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, EMACS_UINT *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
