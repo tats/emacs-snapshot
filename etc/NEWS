@@ -321,6 +321,10 @@ substituted by a home directory by writing it as "/foo:/:/~/file".
 settings of 'scroll-margin' up to half the window size, instead of
 always restricting the margin to a quarter of the window.
 
++++
+** Emacsclient has a new option -u/--suppress-output.  The option
+suppresses display of return values from the server process.
+
 
 * Editing Changes in Emacs 26.1
 
@@ -704,6 +708,10 @@ string is computed dynamically based on 'url-privacy-level'.
 colorful faces to make it more obvious to the user what the state is.
 See the 'vc-faces' customization group.
 
++++
+*** 'vc-dir-mode' now binds 'vc-log-outgoing' to 'O'; and has various
+branch-related commands on a keymap bound to 'B'.
+
 ** CC mode
 
 *** Opening a .h file will turn C or C++ mode depending on language used.
@@ -902,6 +910,10 @@ two objects are 'eq' ('eql'), then the result of 'sxhash-eq'
 ** Function 'sxhash' has been renamed to 'sxhash-equal' for
 consistency with the new functions.  For compatibility, 'sxhash'
 remains as an alias to 'sxhash-equal'.
+
++++
+** 'make-hash-table' now defaults to a rehash threshold of 0.8125
+instead of 0.8, to avoid rounding glitches.
 
 +++
 ** New function 'add-variable-watcher' can be used to call a function

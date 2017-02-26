@@ -1969,24 +1969,18 @@ struct Lisp_Hash_Table
      weakness of the table.  */
   Lisp_Object weak;
 
-  /* When the table is resized, and this is an integer, compute the
-     new size by adding this to the old size.  If a float, compute the
-     new size by multiplying the old size with this factor.  */
-  Lisp_Object rehash_size;
-
   /* Vector of hash codes.  If hash[I] is nil, this means that the
      I-th entry is unused.  */
   Lisp_Object hash;
 
   /* Vector used to chain entries.  If entry I is free, next[I] is the
      entry number of the next free item.  If entry I is non-free,
-     next[I] is the index of the next entry in the collision chain.  */
+     next[I] is the index of the next entry in the collision chain,
+     or -1 if there is such entry.  */
   Lisp_Object next;
 
-  /* Index of first free entry in free list.  */
-  Lisp_Object next_free;
-
-  /* Bucket vector.  A non-nil entry is the index of the first item in
+  /* Bucket vector.  An entry of -1 indicates no item is present,
+     and a nonnegative entry is the index of the first item in
      a collision chain.  This vector's size can be larger than the
      hash table size to reduce collisions.  */
   Lisp_Object index;
@@ -1998,13 +1992,23 @@ struct Lisp_Hash_Table
   /* Number of key/value entries in the table.  */
   ptrdiff_t count;
 
+  /* Index of first free entry in free list, or -1 if none.  */
+  ptrdiff_t next_free;
+
   /* True if the table can be purecopied.  The table cannot be
      changed afterwards.  */
   bool pure;
 
   /* Resize hash table when number of entries / table size is >= this
      ratio.  */
-  double rehash_threshold;
+  float rehash_threshold;
+
+  /* Used when the table is resized.  If equal to a negative integer,
+     the user rehash-size is the integer -REHASH_SIZE, and the new
+     size is the old size plus -REHASH_SIZE.  If positive, the user
+     rehash-size is the floating-point value REHASH_SIZE + 1, and the
+     new size is the old size times REHASH_SIZE + 1.  */
+  float rehash_size;
 
   /* Vector of keys and values.  The key of item I is found at index
      2 * I, the value is found at index 2 * I + 1.
@@ -2050,27 +2054,11 @@ HASH_VALUE (struct Lisp_Hash_Table *h, ptrdiff_t idx)
   return AREF (h->key_and_value, 2 * idx + 1);
 }
 
-/* Value is the index of the next entry following the one at IDX
-   in hash table H.  */
-INLINE Lisp_Object
-HASH_NEXT (struct Lisp_Hash_Table *h, ptrdiff_t idx)
-{
-  return AREF (h->next, idx);
-}
-
 /* Value is the hash code computed for entry IDX in hash table H.  */
 INLINE Lisp_Object
 HASH_HASH (struct Lisp_Hash_Table *h, ptrdiff_t idx)
 {
   return AREF (h->hash, idx);
-}
-
-/* Value is the index of the element in hash table H that is the
-   start of the collision list at index IDX in the index vector of H.  */
-INLINE Lisp_Object
-HASH_INDEX (struct Lisp_Hash_Table *h, ptrdiff_t idx)
-{
-  return AREF (h->index, idx);
 }
 
 /* Value is the size of hash table H.  */
@@ -2088,11 +2076,11 @@ enum DEFAULT_HASH_SIZE { DEFAULT_HASH_SIZE = 65 };
    value gives the ratio of current entries in the hash table and the
    size of the hash table.  */
 
-static double const DEFAULT_REHASH_THRESHOLD = 0.8;
+static float const DEFAULT_REHASH_THRESHOLD = 0.8125;
 
-/* Default factor by which to increase the size of a hash table.  */
+/* Default factor by which to increase the size of a hash table, minus 1.  */
 
-static double const DEFAULT_REHASH_SIZE = 1.5;
+static float const DEFAULT_REHASH_SIZE = 1.5 - 1;
 
 /* Combine two integers X and Y for hashing.  The result might not fit
    into a Lisp integer.  */
@@ -3361,10 +3349,8 @@ extern Lisp_Object larger_vector (Lisp_Object, ptrdiff_t, ptrdiff_t);
 extern void sweep_weak_hash_tables (void);
 EMACS_UINT hash_string (char const *, ptrdiff_t);
 EMACS_UINT sxhash (Lisp_Object, int);
-Lisp_Object make_hash_table (struct hash_table_test test,
-		             Lisp_Object size, Lisp_Object rehash_size,
-		             double rehash_threshold, Lisp_Object weak,
-                             bool pure);
+Lisp_Object make_hash_table (struct hash_table_test, EMACS_INT, float, float,
+			     Lisp_Object, bool);
 ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, EMACS_UINT *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
 		    EMACS_UINT);

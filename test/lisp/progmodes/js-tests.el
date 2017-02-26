@@ -118,6 +118,28 @@ if (!/[ (:,='\"]/.test(value)) {
       ;; implementation not recognizing the comment example.
       (should-not (syntax-ppss-context (syntax-ppss))))))
 
+(ert-deftest js-mode-indentation-error ()
+  (with-temp-buffer
+    (js-mode)
+    ;; The bug previously was that requesting re-indentation on the
+    ;; "{" line here threw an exception.
+    (insert "const TESTS = [\n{")
+    (js-indent-line)
+    ;; Any success is ok here.
+    (should t)))
+
+(ert-deftest js-mode-doc-comment-face ()
+  (dolist (test '(("/*" "*/" font-lock-comment-face)
+                  ("//" "\n" font-lock-comment-face)
+                  ("/**" "*/" font-lock-doc-face)
+                  ("\"" "\"" font-lock-string-face)))
+    (with-temp-buffer
+      (js-mode)
+      (insert (car test) " he")
+      (save-excursion (insert "llo " (cadr test)))
+      (font-lock-ensure)
+      (should (eq (get-text-property (point) 'face) (caddr test))))))
+
 (provide 'js-tests)
 
 ;;; js-tests.el ends here

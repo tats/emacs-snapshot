@@ -13336,7 +13336,7 @@ overlay_arrow_in_current_buffer_p (void)
    has changed.  */
 
 static bool
-overlay_arrows_changed_p (void)
+overlay_arrows_changed_p (bool set_redisplay)
 {
   Lisp_Object vlist;
 
@@ -13356,7 +13356,12 @@ overlay_arrows_changed_p (void)
 		Fget (var, Qlast_arrow_position))
 	  || ! (pstr = overlay_arrow_string_or_property (var),
 		EQ (pstr, Fget (var, Qlast_arrow_string))))
-	return true;
+	{
+	  if (set_redisplay)
+	    bset_redisplay (XMARKER (val)->buffer);
+	  else
+	    return true;
+	}
     }
   return false;
 }
@@ -13781,10 +13786,9 @@ redisplay_internal (void)
 
   /* If specs for an arrow have changed, do thorough redisplay
      to ensure we remove any arrow that should no longer exist.  */
-  if (overlay_arrows_changed_p ())
-    /* Apparently, this is the only case where we update other windows,
-       without updating other mode-lines.  */
-    windows_or_buffers_changed = 49;
+  /* Apparently, this is the only case where we update other windows,
+     without updating other mode-lines.  */
+  overlay_arrows_changed_p (true);
 
   consider_all_windows_p = (update_mode_lines
 			    || windows_or_buffers_changed);
@@ -17376,21 +17380,27 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
 	return 0;
     }
 
+  /* Save the character position of 'it' before we call
+     'start_display' again.  */
+  ptrdiff_t it_charpos = IT_CHARPOS (it);
+
   /* Don't let the cursor end in the scroll margins.  */
   if ((flags & TRY_WINDOW_CHECK_MARGINS)
       && !MINI_WINDOW_P (w))
     {
       int this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
+      start_display (&it, w, pos);
 
       if ((w->cursor.y >= 0	/* not vscrolled */
 	   && w->cursor.y < this_scroll_margin
 	   && CHARPOS (pos) > BEGV
-	   && IT_CHARPOS (it) < ZV)
+           && it_charpos < ZV)
 	  /* rms: considering make_cursor_line_fully_visible_p here
 	     seems to give wrong results.  We don't want to recenter
 	     when the last line is partly visible, we want to allow
 	     that case to be handled in the usual way.  */
-	  || w->cursor.y > it.last_visible_y - this_scroll_margin - 1)
+          || w->cursor.y > (it.last_visible_y - partial_line_height (&it)
+                            - this_scroll_margin - 1))
 	{
 	  w->cursor.vpos = -1;
 	  clear_glyph_matrix (w->desired_matrix);
@@ -17399,7 +17409,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
     }
 
   /* If bottom moved off end of frame, change mode line percentage.  */
-  if (w->window_end_pos <= 0 && Z != IT_CHARPOS (it))
+  if (w->window_end_pos <= 0 && Z != it_charpos)
     w->update_mode_line = true;
 
   /* Set window_end_pos to the offset of the last character displayed
@@ -18282,7 +18292,7 @@ try_window_id (struct window *w)
 
   /* Can't use this if overlay arrow position and/or string have
      changed.  */
-  if (overlay_arrows_changed_p ())
+  if (overlay_arrows_changed_p (false))
     GIVE_UP (12);
 
   /* When word-wrap is on, adding a space to the first word of a
@@ -20723,6 +20733,12 @@ display_line (struct it *it)
 	    }
 
 	  it->continuation_lines_width = 0;
+	  /* Reset those iterator values set from display property
+	     values.  This is for the case when the display property
+	     ends at ZV, and is not a replacing property, so pop_it is
+	     not called.  */
+	  it->font_height = Qnil;
+	  it->voffset = 0;
 	  row->ends_at_zv_p = true;
 	  /* A row that displays right-to-left text must always have
 	     its last face extended all the way to the end of line,
@@ -20909,6 +20925,8 @@ display_line (struct it *it)
 				{
 				  row->exact_window_width_line_p = true;
 				  it->continuation_lines_width = 0;
+				  it->font_height = Qnil;
+				  it->voffset = 0;
 				  row->continued_p = false;
 				  row->ends_at_zv_p = true;
 				}
@@ -21226,6 +21244,8 @@ display_line (struct it *it)
 	      if (!get_next_display_element (it))
 		{
 		  it->continuation_lines_width = 0;
+		  it->font_height = Qnil;
+		  it->voffset = 0;
 		  row->ends_at_zv_p = true;
 		  row->exact_window_width_line_p = true;
 		  break;

@@ -1,4 +1,4 @@
-;;; dunnet.el --- text adventure for Emacs
+;;; dunnet.el --- text adventure for Emacs -*- lexical-binding: t -*-
 
 ;; Copyright (C) 1992-1993, 2001-2017 Free Software Foundation, Inc.
 
@@ -27,10 +27,6 @@
 ;; This game can be run in batch mode.  To do this, use:
 ;;    emacs -batch -l dunnet
 
-;;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-;;;  The log file should be set for your system, and it must
-;;;  be writable by all.
-
 ;;; Code:
 
 (defgroup dunnet nil
@@ -38,8 +34,13 @@
   :prefix "dun-"
   :group 'games)
 
-(defcustom dun-log-file "/usr/local/dunnet.score"
+;; Cf gamegrid.  dunnet normally runs in batch mode, where
+;; locate-user-emacs-file doesn't create directories.
+(defcustom dun-log-file (expand-file-name "dunnet-scores"
+					  (let (noninteractive)
+					    (locate-user-emacs-file "games/")))
   "Name of file to store score information for dunnet."
+  :version "26.1"
   :type 'file
   :group 'dunnet)
 
@@ -1135,6 +1136,9 @@ treasures for points?" "4" "four")
 
 (defconst dun-combination (prin1-to-string (+ 100 (random 899))))
 
+(defvar dun-line nil)
+(defvar dun-line-list nil)
+
 
 ;;;; Mode definitions for interactive mode
 
@@ -1156,7 +1160,7 @@ treasures for points?" "4" "four")
           (setq line (downcase (buffer-substring beg (point))))
           (princ line)
           (if (eq (dun-vparse dun-ignore dun-verblist line) -1)
-              (dun-mprinc "I don't understand that.\n")))
+              (dun-mprincl "I don't understand that.")))
     (goto-char (point-max))
     (dun-mprinc "\n")))
   (dun-messages))
@@ -1200,8 +1204,7 @@ treasures for points?" "4" "four")
                   (> room 0))
 	     (not (string= dun-mode "long")))
 	nil
-      (dun-mprinc (car (nth (abs room) dun-rooms)))
-      (dun-mprinc "\n"))
+      (dun-mprincl (car (nth (abs room) dun-rooms))))
     (when (and (not (string= dun-mode "long"))
                (not (member (abs room) dun-visited)))
       (setq dun-visited (append (list (abs room)) dun-visited)))
@@ -1216,8 +1219,7 @@ treasures for points?" "4" "four")
       (when (and (= xobjs obj-jar) dun-jar)
         (dun-mprincl "The jar contains:")
         (dolist (x dun-jar)
-          (dun-mprinc "     ")
-          (dun-mprincl (car (nth x dun-objects))))))
+          (dun-mprincl "     " (car (nth x dun-objects))))))
     (if (and (member obj-bus (nth dun-current-room dun-room-objects)) dun-inbus)
 	(dun-mprincl "You are on the bus."))))
 
@@ -1308,8 +1310,7 @@ disk bursts into flames, and disintegrates.")
 ;;; as we must also print what is in it.
 
 (defun dun-inven (_args)
-  (dun-mprinc "You currently have:")
-  (dun-mprinc "\n")
+  (dun-mprincl "You currently have:")
   (dolist (curobj dun-inventory)
     (if curobj
 	(progn
@@ -1318,8 +1319,7 @@ disk bursts into flames, and disintegrates.")
 	      (progn
 		(dun-mprincl "The jar contains:")
 		(dolist (x dun-jar)
-		  (dun-mprinc "     ")
-		  (dun-mprincl (cadr (nth x dun-objects))))))))))
+		  (dun-mprincl "     " (cadr (nth x dun-objects))))))))))
 
 (defun dun-shake (obj)
   (let ((objnum (dun-objnum-from-args-std obj)))
@@ -1327,10 +1327,8 @@ disk bursts into flames, and disintegrates.")
       (cond
        ((member objnum dun-inventory)
         ;; If shaking anything will do anything, put here.
-        (dun-mprinc "Shaking ")
-        (dun-mprinc (downcase (cadr (nth objnum dun-objects))))
-        (dun-mprinc " seems to have no effect.")
-        (dun-mprinc "\n"))
+        (dun-mprinc "Shaking " (downcase (cadr (nth objnum dun-objects))))
+        (dun-mprincl " seems to have no effect."))
        ((and (not (member objnum (nth dun-current-room dun-room-silents)))
              (not (member objnum (nth dun-current-room dun-room-objects))))
         (dun-mprincl "I don't see that here."))
@@ -1441,8 +1439,7 @@ For an explosive time, go to Fourth St. and Vermont.")
 		(if (and (>= x 0) (not (= x obj-special)))
 		    (progn
 		      (setq gotsome t)
-		      (dun-mprinc (cadr (nth x dun-objects)))
-		      (dun-mprinc ": ")
+		      (dun-mprinc (cadr (nth x dun-objects)) ": ")
 		      (dun-take-object x))))
 	      (if (not gotsome)
 		  (dun-mprincl "Nothing to take."))))
@@ -1688,7 +1685,7 @@ just try dropping it."))
   (if (or (not (car args))
 	  (eq (dun-doverb dun-ignore dun-verblist (car args)
 			  (cdr (cdr args))) -1))
-      (dun-mprinc "I don't understand where you want me to go.\n")))
+      (dun-mprincl "I don't understand where you want me to go.")))
 
 ;;; Uses the dungeon-map to figure out where we are going.  If the
 ;;; requested direction yields 255, we know something special is
@@ -1708,7 +1705,7 @@ body.")
     (let (newroom)
       (setq newroom (nth dir (nth dun-current-room dungeon-map)))
       (if (eq newroom -1)
-	  (dun-mprinc "You can't go that way.\n")
+	  (dun-mprincl "You can't go that way.")
 	(if (eq newroom 255)
 	    (dun-special-move dir)
 	  (setq dun-room -1)
@@ -1931,9 +1928,7 @@ disk bursts into flames, and disintegrates.")
                (member objnum (nth dun-current-room dun-room-silents))))
       (dun-mprincl "I don't see that here."))
      ((not (member objnum (list obj-button obj-switch)))
-      (dun-mprinc "You can't ")
-      (dun-mprinc (car line-list))
-      (dun-mprincl " that."))
+      (dun-mprincl "You can't " (car dun-line-list) " that."))
      ((= objnum obj-button)
       (dun-mprincl
 "As you press the button, you notice a passageway open up, but
@@ -1965,11 +1960,9 @@ to swim.")
   (if (not dun-endgame)
       (let (total)
 	(setq total (dun-reg-score))
-	(dun-mprinc "You have scored ")
-	(dun-mprinc total)
-	(dun-mprincl " out of a possible 90 points.") total)
-    (dun-mprinc "You have scored ")
-    (dun-mprinc (dun-endgame-score))
+	(dun-mprincl "You have scored " total " out of a possible 90 points.")
+        total)
+    (dun-mprinc "You have scored " (dun-endgame-score))
     (dun-mprincl " endgame points out of a possible 110.")
     (if (= (dun-endgame-score) 110)
 	(dun-mprincl
@@ -1995,7 +1988,7 @@ or more clues in here):
   If this happens, your score will decrease, and in many cases you can never
   get credit for it again.
 
-- You can save your game with the ‘save’ command, and use restore it
+- You can save your game with the ‘save’ command, and restore it
   with the ‘restore’ command.
 
 - There are no limits on lengths of object names.
@@ -2246,13 +2239,13 @@ for a moment, then straighten yourself up.
 
 (defun dun-vparse (ignore verblist line)
   (dun-mprinc "\n")
-  (setq line-list (dun-listify-string (concat line " ")))
-  (dun-doverb ignore verblist (car line-list) (cdr line-list)))
+  (setq dun-line-list (dun-listify-string (concat line " ")))
+  (dun-doverb ignore verblist (car dun-line-list) (cdr dun-line-list)))
 
 (defun dun-parse2 (ignore verblist line)
   (dun-mprinc "\n")
-  (setq line-list (dun-listify-string2 (concat line " ")))
-  (dun-doverb ignore verblist (car line-list) (cdr line-list)))
+  (setq dun-line-list (dun-listify-string2 (concat line " ")))
+  (dun-doverb ignore verblist (car dun-line-list) (cdr dun-line-list)))
 
 ;;; Read a line, in window mode
 
@@ -2263,17 +2256,19 @@ for a moment, then straighten yourself up.
 
 ;;; Insert something into the window buffer
 
-(defun dun-minsert (string)
-  (if (stringp string)
-      (insert string)
-    (insert (prin1-to-string string))))
+(defun dun-minsert (&rest args)
+  (dolist (arg args)
+    (if (stringp arg)
+        (insert arg)
+      (insert (prin1-to-string arg)))))
 
 ;;; Print something out, in window mode
 
-(defun dun-mprinc (string)
-  (if (stringp string)
-      (insert string)
-    (insert (prin1-to-string string))))
+(defun dun-mprinc (&rest args)
+  (dolist (arg args)
+    (if (stringp arg)
+        (insert arg)
+      (insert (prin1-to-string arg)))))
 
 ;;; In window mode, keep screen from jumping by keeping last line at
 ;;; the bottom of the screen.
@@ -2286,14 +2281,14 @@ for a moment, then straighten yourself up.
 
 ;;; Insert something into the buffer, followed by newline.
 
-(defun dun-minsertl (string)
-  (dun-minsert string)
+(defun dun-minsertl (&rest args)
+  (apply #'dun-minsert args)
   (dun-minsert "\n"))
 
 ;;; Print something, followed by a newline.
 
-(defun dun-mprincl (string)
-  (dun-mprinc string)
+(defun dun-mprincl (&rest args)
+  (apply #'dun-mprinc args)
   (dun-mprinc "\n"))
 
 ;;; Function which will get an object number given the list of
@@ -2406,13 +2401,13 @@ for a moment, then straighten yourself up.
     (if (and (not (= beg (point)))
 	     (string= "$" (buffer-substring (- beg 2) (- beg 1))))
 	(progn
-	  (setq line (downcase (buffer-substring beg (point))))
-	  (princ line)
-	  (if (eq (dun-parse2 nil dun-unix-verbs line) -1)
+	  (setq dun-line (downcase (buffer-substring beg (point))))
+	  (princ dun-line)
+	  (if (eq (dun-parse2 nil dun-unix-verbs dun-line) -1)
 	      (progn
-		(if (setq esign (string-match "=" line))
-		    (dun-doassign line esign)
-		  (dun-mprinc (car line-list))
+		(if (setq esign (string-match "=" dun-line))
+		    (dun-doassign dun-line esign)
+		  (dun-mprinc (car dun-line-list))
 		  (dun-mprincl ": not found.")))))
       (goto-char (point-max))
       (dun-mprinc "\n"))
@@ -3052,9 +3047,7 @@ File not found")))
 
 (defun dun-save-val (varname)
   (let ((value (symbol-value (intern varname))))
-    (dun-minsert "(setq ")
-    (dun-minsert varname)
-    (dun-minsert " ")
+    (dun-minsert "(setq " varname " ")
     (if (or (listp value)
 	    (symbolp value))
 	(dun-minsert "'"))
@@ -3076,40 +3069,33 @@ File not found")))
 	(setq dun-room 0)))))
 
 
+;; See gamegrid-add-score; but that only handles a single integer score.
 (defun dun-do-logfile (type how)
   (let (ferror)
     (with-temp-buffer
       (condition-case err
-          (insert-file-contents dun-log-file)
+          (if (file-exists-p dun-log-file)
+	      (insert-file-contents dun-log-file)
+	    (let ((dir (file-name-directory dun-log-file)))
+	      (if dir (make-directory dir t))))
         (error
          (setq ferror t)
          (dun-mprincl (error-message-string err))))
       (when (null ferror)
         (goto-char (point-max))
-        (dun-minsert (current-time-string))
-        (dun-minsert " ")
-        (dun-minsert (user-login-name))
-        (dun-minsert " ")
+        (dun-minsert (current-time-string) " " (user-login-name) " ")
         (if (eq type 'save)
             (dun-minsert "saved ")
           (if (= (dun-endgame-score) 110)
               (dun-minsert "won ")
             (if (not how)
                 (dun-minsert "quit ")
-              (dun-minsert "killed by ")
-              (dun-minsert how)
-              (dun-minsert " "))))
-        (dun-minsert "at ")
-        (dun-minsert (cadr (nth (abs dun-room) dun-rooms)))
-        (dun-minsert ". score: ")
+              (dun-minsert "killed by " how " "))))
+        (dun-minsert "at " (cadr (nth (abs dun-room) dun-rooms)) ". score: ")
         (if (> (dun-endgame-score) 0)
             (dun-minsert (+ 90 (dun-endgame-score)))
           (dun-minsert (dun-reg-score)))
-        (dun-minsert " saves: ")
-        (dun-minsert dun-numsaves)
-        (dun-minsert " commands: ")
-        (dun-minsert dun-numcmds)
-        (dun-minsert "\n")
+        (dun-minsertl " saves: " dun-numsaves " commands: " dun-numcmds)
         (write-region 1 (point-max) dun-log-file nil 1)))))
 
 
@@ -3118,27 +3104,27 @@ File not found")))
 ;;;; be run in batch mode.
 
 
-(defun dun-batch-mprinc (arg)
-   (if (stringp arg)
-       (send-string-to-terminal arg)
-     (send-string-to-terminal (prin1-to-string arg))))
+(defun dun-batch-mprinc (&rest args)
+  (dolist (arg args)
+    (if (stringp arg)
+        (send-string-to-terminal arg)
+      (send-string-to-terminal (prin1-to-string arg)))))
 
 
-(defun dun-batch-mprincl (arg)
-   (if (stringp arg)
-       (progn
-           (send-string-to-terminal arg)
-           (send-string-to-terminal "\n"))
-     (send-string-to-terminal (prin1-to-string arg))
-     (send-string-to-terminal "\n")))
+(defun dun-batch-mprincl (&rest args)
+  (dolist (arg args)
+    (if (stringp arg)
+        (send-string-to-terminal arg)
+      (send-string-to-terminal (prin1-to-string arg))))
+  (send-string-to-terminal "\n"))
 
 (defun dun-batch-parse (ignore verblist line)
-  (setq line-list (dun-listify-string (concat line " ")))
-  (dun-doverb ignore verblist (car line-list) (cdr line-list)))
+  (setq dun-line-list (dun-listify-string (concat line " ")))
+  (dun-doverb ignore verblist (car dun-line-list) (cdr dun-line-list)))
 
 (defun dun-batch-parse2 (ignore verblist line)
-  (setq line-list (dun-listify-string2 (concat line " ")))
-  (dun-doverb ignore verblist (car line-list) (cdr line-list)))
+  (setq dun-line-list (dun-listify-string2 (concat line " ")))
+  (dun-doverb ignore verblist (car dun-line-list) (cdr dun-line-list)))
 
 (defun dun-batch-read-line ()
   (read-from-minibuffer "" nil dungeon-batch-map))
@@ -3155,8 +3141,8 @@ File not found")))
 		(dun-describe-room dun-current-room)
 		(setq dun-room dun-current-room)))
 	  (dun-mprinc ">")
-	  (setq line (downcase (dun-read-line)))
-	  (if (eq (dun-vparse dun-ignore dun-verblist line) -1)
+	  (setq dun-line (downcase (dun-read-line)))
+	  (if (eq (dun-vparse dun-ignore dun-verblist dun-line) -1)
 	      (dun-mprinc "I don't understand that.\n"))))))
 
 (defun dun-batch-dos-interface ()
@@ -3164,8 +3150,8 @@ File not found")))
   (setq dungeon-mode 'dos)
   (while (eq dungeon-mode 'dos)
     (dun-dos-prompt)
-    (setq line (downcase (dun-read-line)))
-    (if (eq (dun-parse2 nil dun-dos-verbs line) -1)
+    (setq dun-line (downcase (dun-read-line)))
+    (if (eq (dun-parse2 nil dun-dos-verbs dun-line) -1)
 	(progn
 	  (sleep-for 1)
 	  (dun-mprincl "Bad command or file name"))))
@@ -3179,12 +3165,12 @@ File not found")))
 	  (setq dungeon-mode 'unix)
 	  (while (eq dungeon-mode 'unix)
 	    (dun-mprinc "$ ")
-	    (setq line (downcase (dun-read-line)))
-	    (if (eq (dun-parse2 nil dun-unix-verbs line) -1)
+	    (setq dun-line (downcase (dun-read-line)))
+	    (if (eq (dun-parse2 nil dun-unix-verbs dun-line) -1)
 		(let (esign)
-		  (if (setq esign (string-match "=" line))
-		      (dun-doassign line esign)
-		    (dun-mprinc (car line-list))
+		  (if (setq esign (string-match "=" dun-line))
+		      (dun-doassign dun-line esign)
+		    (dun-mprinc (car dun-line-list))
 		    (dun-mprincl ": not found.")))))
 	  (goto-char (point-max))
 	  (dun-mprinc "\n"))))
@@ -3215,7 +3201,7 @@ File not found")))
 (provide 'dunnet)
 
 ;; Local Variables:
-;; byte-compile-warnings: (not free-vars lexical)
+;; byte-compile-warnings: (not free-vars)
 ;; End:
 
 ;;; dunnet.el ends here
