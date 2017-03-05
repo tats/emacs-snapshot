@@ -2158,10 +2158,8 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, int depth, bool props,
     {
     case Lisp_Float:
       {
-	double d1, d2;
-
-	d1 = extract_float (o1);
-	d2 = extract_float (o2);
+	double d1 = XFLOAT_DATA (o1);
+	double d2 = XFLOAT_DATA (o2);
 	/* If d is a NaN, then d != d. Two NaNs should be `equal' even
 	   though they are not =.  */
 	return d1 == d2 || (d1 != d1 && d2 != d2);
@@ -4939,8 +4937,7 @@ If BINARY is non-nil, returns a string in binary form.  */)
 DEFUN ("buffer-hash", Fbuffer_hash, Sbuffer_hash, 0, 1, 0,
        doc: /* Return a hash of the contents of BUFFER-OR-NAME.
 This hash is performed on the raw internal format of the buffer,
-disregarding any coding systems.
-If nil, use the current buffer." */ )
+disregarding any coding systems.  If nil, use the current buffer.  */ )
   (Lisp_Object buffer_or_name)
 {
   Lisp_Object buffer;

@@ -394,6 +394,9 @@ added: 'C-c C-s C-m C-m'.
 ** Ibuffer
 
 ---
+*** New command 'ibuffer-jump'.
+
+---
 *** New filter commands 'ibuffer-filter-by-basename',
 'ibuffer-filter-by-file-extension', 'ibuffer-filter-by-directory',
 'ibuffer-filter-by-starred-name', 'ibuffer-filter-by-modified'
@@ -898,6 +901,24 @@ other than GNU/Linux.
 interpreting consecutive runs of numerical characters as numbers, and
 compares their numerical values.  According to this predicate,
 "foo2.png" is smaller than "foo12.png".
+
+---
+** Numeric comparisons and 'logb' no longer return incorrect answers
+due to internal rounding errors.  For example, (< most-positive-fixnum
+(+ 1.0 most-positive-fixnum)) now correctly returns t on 64-bit hosts.
+
+---
+** On hosts like GNU/Linux x86-64 where a 'long double' fraction
+contains at least EMACS_INT_WIDTH - 3 bits, 'format' no longer returns
+incorrect answers due to internal rounding errors when formatting
+Emacs integers with %e, %f, or %g conversions.  For example, on these
+hosts (eql N (string-to-number (format "%.0f" N))) now returns t for
+all Emacs integers N.
+
+---
+** Calls that accept floating-point integers (for use on hosts with
+limited integer range) now signal an error if arguments are not
+integral.  For example (decode-char 'ascii 0.5) now signals an error.
 
 +++
 ** The new function 'char-from-name' converts a Unicode name string

@@ -11058,7 +11058,7 @@ resize_mini_window (struct window *w, bool exact_p)
 
       /* Compute the max. number of lines specified by the user.  */
       if (FLOATP (Vmax_mini_window_height))
-	max_height = XFLOATINT (Vmax_mini_window_height) * total_height;
+	max_height = XFLOAT_DATA (Vmax_mini_window_height) * total_height;
       else if (INTEGERP (Vmax_mini_window_height))
 	max_height = XINT (Vmax_mini_window_height) * unit;
       else
@@ -13338,12 +13338,15 @@ overlay_arrow_in_current_buffer_p (void)
 
 
 /* Return true if any overlay_arrows have moved or overlay-arrow-string
-   has changed.  */
+   has changed.
+   If SET_REDISPLAY is true, additionally, set the `redisplay' bit in those
+   buffers that are affected.  */
 
 static bool
 overlay_arrows_changed_p (bool set_redisplay)
 {
   Lisp_Object vlist;
+  bool changed = false;
 
   for (vlist = Voverlay_arrow_variable_list;
        CONSP (vlist);
@@ -13358,19 +13361,25 @@ overlay_arrows_changed_p (bool set_redisplay)
       if (!MARKERP (val))
 	continue;
       if (! EQ (COERCE_MARKER (val),
+                /* FIXME: Don't we have a problem, using such a global
+                 * "last-position" if the variable is buffer-local?  */
 		Fget (var, Qlast_arrow_position))
 	  || ! (pstr = overlay_arrow_string_or_property (var),
 		EQ (pstr, Fget (var, Qlast_arrow_string))))
 	{
 	  struct buffer *buf = XMARKER (val)->buffer;
 
-	  if (set_redisplay && buf)
-	    bset_redisplay (buf);
+	  if (set_redisplay)
+            {
+              if (buf)
+	        bset_redisplay (buf);
+              changed = true;
+            }
 	  else
 	    return true;
 	}
     }
-  return false;
+  return changed;
 }
 
 /* Mark overlay arrows to be updated on next redisplay.  */
@@ -13392,6 +13401,8 @@ update_overlay_arrows (int up_to_date)
       if (up_to_date > 0)
 	{
 	  Lisp_Object val = find_symbol_value (var);
+          if (!MARKERP (val))
+	    continue;
 	  Fput (var, Qlast_arrow_position,
 		COERCE_MARKER (val));
 	  Fput (var, Qlast_arrow_string,
@@ -30428,11 +30439,13 @@ note_mouse_highlight (struct frame *f, int x, int y)
 	     no need to do that again.  */
 	  if (!NILP (overlay) && EQ (overlay, hlinfo->mouse_face_overlay))
 	    goto check_help_echo;
-	  hlinfo->mouse_face_overlay = overlay;
 
 	  /* Clear the display of the old active region, if any.  */
 	  if (clear_mouse_face (hlinfo))
 	    cursor = No_Cursor;
+
+	  /* Record the overlay, if any, to be highlighted.  */
+	  hlinfo->mouse_face_overlay = overlay;
 
 	  /* If no overlay applies, get a text property.  */
 	  if (NILP (overlay))

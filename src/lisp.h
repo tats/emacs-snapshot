@@ -80,19 +80,19 @@ DEFINE_GDB_SYMBOL_END (GCTYPEBITS)
 # elif INTPTR_MAX <= INT_MAX && !defined WIDE_EMACS_INT
 typedef int EMACS_INT;
 typedef unsigned int EMACS_UINT;
-enum { EMACS_INT_WIDTH = INT_WIDTH };
+enum { EMACS_INT_WIDTH = INT_WIDTH, EMACS_UINT_WIDTH = UINT_WIDTH };
 #  define EMACS_INT_MAX INT_MAX
 #  define pI ""
 # elif INTPTR_MAX <= LONG_MAX && !defined WIDE_EMACS_INT
 typedef long int EMACS_INT;
 typedef unsigned long EMACS_UINT;
-enum { EMACS_INT_WIDTH = LONG_WIDTH };
+enum { EMACS_INT_WIDTH = LONG_WIDTH, EMACS_UINT_WIDTH = ULONG_WIDTH };
 #  define EMACS_INT_MAX LONG_MAX
 #  define pI "l"
 # elif INTPTR_MAX <= LLONG_MAX
 typedef long long int EMACS_INT;
 typedef unsigned long long int EMACS_UINT;
-enum { EMACS_INT_WIDTH = LLONG_WIDTH };
+enum { EMACS_INT_WIDTH = LLONG_WIDTH, EMACS_UINT_WIDTH = ULLONG_WIDTH };
 #  define EMACS_INT_MAX LLONG_MAX
 #  ifdef __MINGW32__
 #   define pI "I64"
@@ -1031,9 +1031,7 @@ INLINE bool
   return lisp_h_EQ (x, y);
 }
 
-/* Value is true if I doesn't fit into a Lisp fixnum.  It is
-   written this way so that it also works if I is of unsigned
-   type or if I is a NaN.  */
+/* True if the possibly-unsigned integer I doesn't fit in a Lisp fixnum.  */
 
 #define FIXNUM_OVERFLOW_P(i) \
   (! ((0 <= (i) || MOST_NEGATIVE_FIXNUM <= (i)) && (i) <= MOST_POSITIVE_FIXNUM))
@@ -2808,7 +2806,7 @@ CHECK_NATNUM (Lisp_Object x)
 INLINE double
 XFLOATINT (Lisp_Object n)
 {
-  return extract_float (n);
+  return FLOATP (n) ? XFLOAT_DATA (n) : XINT (n);
 }
 
 INLINE void
@@ -4374,8 +4372,8 @@ extern void init_system_name (void);
    because 'abs' is reserved by the C standard.  */
 #define eabs(x)         ((x) < 0 ? -(x) : (x))
 
-/* Return a fixnum or float, depending on whether VAL fits in a Lisp
-   fixnum.  */
+/* Return a fixnum or float, depending on whether the integer VAL fits
+   in a Lisp fixnum.  */
 
 #define make_fixnum_or_float(val) \
    (FIXNUM_OVERFLOW_P (val) ? make_float (val) : make_number (val))

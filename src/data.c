@@ -1110,10 +1110,8 @@ store_symval_forwarding (union Lisp_Fwd *valcontents, register Lisp_Object newva
 		else if ((prop = Fget (predicate, Qrange), !NILP (prop)))
 		  {
 		    Lisp_Object min = XCAR (prop), max = XCDR (prop);
-
-		    if (!NUMBERP (newval)
-			|| !NILP (arithcompare (newval, min, ARITH_LESS))
-			|| !NILP (arithcompare (newval, max, ARITH_GRTR)))
+		    if (! NUMBERP (newval)
+			|| NILP (CALLN (Fleq, min, newval, max)))
 		      wrong_range (min, max, newval);
 		  }
 		else if (FUNCTIONP (predicate))
@@ -2392,68 +2390,90 @@ bool-vector.  IDX starts at 0.  */)
 /* Arithmetic functions */
 
 Lisp_Object
-arithcompare (Lisp_Object num1, Lisp_Object num2, enum Arith_Comparison comparison)
+arithcompare (Lisp_Object num1, Lisp_Object num2,
+	      enum Arith_Comparison comparison)
 {
-  double f1 = 0, f2 = 0;
-  bool floatp = 0;
+  double f1, f2;
+  EMACS_INT i1, i2;
+  bool fneq;
+  bool test;
 
   CHECK_NUMBER_OR_FLOAT_COERCE_MARKER (num1);
   CHECK_NUMBER_OR_FLOAT_COERCE_MARKER (num2);
 
-  if (FLOATP (num1) || FLOATP (num2))
+  /* If either arg is floating point, set F1 and F2 to the 'double'
+     approximations of the two arguments.  Regardless, set I1 and I2
+     to integers that break ties if the floating point comparison is
+     either not done or reports equality.  */
+
+  if (FLOATP (num1))
     {
-      floatp = 1;
-      f1 = (FLOATP (num1)) ? XFLOAT_DATA (num1) : XINT (num1);
-      f2 = (FLOATP (num2)) ? XFLOAT_DATA (num2) : XINT (num2);
+      f1 = XFLOAT_DATA (num1);
+      if (FLOATP (num2))
+	{
+	  i1 = i2 = 0;
+	  f2 = XFLOAT_DATA (num2);
+	}
+      else
+	i1 = f2 = i2 = XINT (num2);
+      fneq = f1 != f2;
+    }
+  else
+    {
+      i1 = XINT (num1);
+      if (FLOATP (num2))
+	{
+	  i2 = f1 = i1;
+	  f2 = XFLOAT_DATA (num2);
+	  fneq = f1 != f2;
+	}
+      else
+	{
+	  i2 = XINT (num2);
+	  fneq = false;
+	}
     }
 
   switch (comparison)
     {
     case ARITH_EQUAL:
-      if (floatp ? f1 == f2 : XINT (num1) == XINT (num2))
-	return Qt;
-      return Qnil;
+      test = !fneq && i1 == i2;
+      break;
 
     case ARITH_NOTEQUAL:
-      if (floatp ? f1 != f2 : XINT (num1) != XINT (num2))
-	return Qt;
-      return Qnil;
+      test = fneq || i1 != i2;
+      break;
 
     case ARITH_LESS:
-      if (floatp ? f1 < f2 : XINT (num1) < XINT (num2))
-	return Qt;
-      return Qnil;
+      test = fneq ? f1 < f2 : i1 < i2;
+      break;
 
     case ARITH_LESS_OR_EQUAL:
-      if (floatp ? f1 <= f2 : XINT (num1) <= XINT (num2))
-	return Qt;
-      return Qnil;
+      test = fneq ? f1 <= f2 : i1 <= i2;
+      break;
 
     case ARITH_GRTR:
-      if (floatp ? f1 > f2 : XINT (num1) > XINT (num2))
-	return Qt;
-      return Qnil;
+      test = fneq ? f1 > f2 : i1 > i2;
+      break;
 
     case ARITH_GRTR_OR_EQUAL:
-      if (floatp ? f1 >= f2 : XINT (num1) >= XINT (num2))
-	return Qt;
-      return Qnil;
+      test = fneq ? f1 >= f2 : i1 >= i2;
+      break;
 
     default:
-      emacs_abort ();
+      eassume (false);
     }
+
+  return test ? Qt : Qnil;
 }
 
 static Lisp_Object
 arithcompare_driver (ptrdiff_t nargs, Lisp_Object *args,
                      enum Arith_Comparison comparison)
 {
-  ptrdiff_t argnum;
-  for (argnum = 1; argnum < nargs; ++argnum)
-    {
-      if (EQ (Qnil, arithcompare (args[argnum - 1], args[argnum], comparison)))
-        return Qnil;
-    }
+  for (ptrdiff_t i = 1; i < nargs; i++)
+    if (NILP (arithcompare (args[i - 1], args[i], comparison)))
+      return Qnil;
   return Qt;
 }
 
@@ -2532,12 +2552,13 @@ uintbig_to_lisp (uintmax_t i)
 }
 
 /* Convert the cons-of-integers, integer, or float value C to an
-   unsigned value with maximum value MAX.  Signal an error if C does not
-   have a valid format or is out of range.  */
+   unsigned value with maximum value MAX, where MAX is one less than a
+   power of 2.  Signal an error if C does not have a valid format or
+   is out of range.  */
 uintmax_t
 cons_to_unsigned (Lisp_Object c, uintmax_t max)
 {
-  bool valid = 0;
+  bool valid = false;
   uintmax_t val;
   if (INTEGERP (c))
     {
@@ -2547,11 +2568,10 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
   else if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
-      if (0 <= d
-	  && d < (max == UINTMAX_MAX ? (double) UINTMAX_MAX + 1 : max + 1))
+      if (0 <= d && d < 1.0 + max)
 	{
 	  val = d;
-	  valid = 1;
+	  valid = val == d;
 	}
     }
   else if (CONSP (c) && NATNUMP (XCAR (c)))
@@ -2565,7 +2585,7 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
 	{
 	  uintmax_t mid = XFASTINT (XCAR (rest));
 	  val = top << 24 << 16 | mid << 16 | XFASTINT (XCDR (rest));
-	  valid = 1;
+	  valid = true;
 	}
       else if (top <= UINTMAX_MAX >> 16)
 	{
@@ -2574,37 +2594,38 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
 	  if (NATNUMP (rest) && XFASTINT (rest) < 1 << 16)
 	    {
 	      val = top << 16 | XFASTINT (rest);
-	      valid = 1;
+	      valid = true;
 	    }
 	}
     }
 
   if (! (valid && val <= max))
-    error ("Not an in-range integer, float, or cons of integers");
+    error ("Not an in-range integer, integral float, or cons of integers");
   return val;
 }
 
 /* Convert the cons-of-integers, integer, or float value C to a signed
-   value with extrema MIN and MAX.  Signal an error if C does not have
-   a valid format or is out of range.  */
+   value with extrema MIN and MAX.  MAX should be one less than a
+   power of 2, and MIN should be zero or the negative of a power of 2.
+   Signal an error if C does not have a valid format or is out of
+   range.  */
 intmax_t
 cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 {
-  bool valid = 0;
+  bool valid = false;
   intmax_t val;
   if (INTEGERP (c))
     {
       val = XINT (c);
-      valid = 1;
+      valid = true;
     }
   else if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
-      if (min <= d
-	  && d < (max == INTMAX_MAX ? (double) INTMAX_MAX + 1 : max + 1))
+      if (min <= d && d < 1.0 + max)
 	{
 	  val = d;
-	  valid = 1;
+	  valid = val == d;
 	}
     }
   else if (CONSP (c) && INTEGERP (XCAR (c)))
@@ -2618,7 +2639,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 	{
 	  intmax_t mid = XFASTINT (XCAR (rest));
 	  val = top << 24 << 16 | mid << 16 | XFASTINT (XCDR (rest));
-	  valid = 1;
+	  valid = true;
 	}
       else if (INTMAX_MIN >> 16 <= top && top <= INTMAX_MAX >> 16)
 	{
@@ -2627,13 +2648,13 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 	  if (NATNUMP (rest) && XFASTINT (rest) < 1 << 16)
 	    {
 	      val = top << 16 | XFASTINT (rest);
-	      valid = 1;
+	      valid = true;
 	    }
 	}
     }
 
   if (! (valid && min <= val && val <= max))
-    error ("Not an in-range integer, float, or cons of integers");
+    error ("Not an in-range integer, integral float, or cons of integers");
   return val;
 }
 

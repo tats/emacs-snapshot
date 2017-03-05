@@ -548,7 +548,8 @@ x_update_window_begin (struct window *w)
   /* Hide the system caret during an update.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      SendMessage (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0);
+      SendMessageTimeout (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0,
+			  0, 6000, NULL);
     }
 
   w->output_cursor = w->cursor;
@@ -714,7 +715,8 @@ x_update_window_end (struct window *w, bool cursor_on_p,
      x_update_window_begin.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      SendMessage (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0);
+      SendMessageTimeout (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0,
+			  0, 6000, NULL);
     }
 }
 
@@ -2498,18 +2500,27 @@ x_draw_glyph_string (struct glyph_string *s)
       if (s->face->strike_through_p
           && !FONT_TEXTMETRIC (s->font).tmStruckOut)
         {
+	  /* Y-coordinate and height of the glyph string's first
+	     glyph.  We cannot use s->y and s->height because those
+	     could be larger if there are taller display elements
+	     (e.g., characters displayed with a larger font) in the
+	     same glyph row.  */
+	  int glyph_y = s->ybase - s->first_glyph->ascent;
+	  int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
+	  /* Strike-through width and offset from the glyph string's
+	     top edge.  */
           unsigned long h = 1;
-          unsigned long dy = (s->height - h) / 2;
+          unsigned long dy = (glyph_height - h) / 2;
 
           if (s->face->strike_through_color_defaulted_p)
             {
-              w32_fill_area (s->f, s->hdc, s->gc->foreground, s->x, s->y + dy,
-                             s->width, h);
+              w32_fill_area (s->f, s->hdc, s->gc->foreground, s->x,
+			     glyph_y + dy, s->width, h);
             }
           else
             {
               w32_fill_area (s->f, s->hdc, s->face->strike_through_color, s->x,
-                             s->y + dy, s->width, h);
+                             glyph_y + dy, s->width, h);
             }
         }
 
@@ -3668,8 +3679,8 @@ static BOOL
 my_show_window (struct frame *f, HWND hwnd, int how)
 {
 #ifndef ATTACH_THREADS
-  return SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
-		      (WPARAM) hwnd, (LPARAM) how);
+  return SendMessageTimeout (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
+			     (WPARAM) hwnd, (LPARAM) how, 0, 6000, NULL);
 #else
   return ShowWindow (hwnd, how);
 #endif
@@ -3687,7 +3698,8 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
   pos.cx = cx;
   pos.cy = cy;
   pos.flags = flags;
-  SendMessage (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0);
+  SendMessageTimeout (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0,
+		      0, 6000, NULL);
 #else
   SetWindowPos (hwnd, hwndAfter, x, y, cx, cy, flags);
 #endif
@@ -3697,29 +3709,31 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
 static void
 my_set_focus (struct frame * f, HWND hwnd)
 {
-  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
-	       (WPARAM) hwnd, 0);
+  SendMessageTimeout (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
+		      (WPARAM) hwnd, 0, 0, 6000, NULL);
 }
 #endif
 
 static void
 my_set_foreground_window (HWND hwnd)
 {
-  SendMessage (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0);
+  SendMessageTimeout (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0,
+		      0, 6000, NULL);
 }
 
 
 static void
 my_destroy_window (struct frame * f, HWND hwnd)
 {
-  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
-	       (WPARAM) hwnd, 0);
+  SendMessageTimeout (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
+		      (WPARAM) hwnd, 0, 0, 6000, NULL);
 }
 
 static void
 my_bring_window_to_top (HWND hwnd)
 {
-  SendMessage (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0);
+  SendMessageTimeout (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0,
+		      0, 6000, NULL);
 }
 
 /* Create a scroll bar and return the scroll bar vector for it.  W is
@@ -6538,7 +6552,8 @@ x_iconify_frame (struct frame *f)
   x_set_bitmap_icon (f);
 
   /* Simulate the user minimizing the frame.  */
-  SendMessage (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0);
+  SendMessageTimeout (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0,
+		      0, 6000, NULL);
 
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, true);
