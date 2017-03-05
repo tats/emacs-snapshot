@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2cc41feb462..e0159cc8c1b 100644
+index a7b122f5188..29e4176644d 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
@@ -134,7 +134,7 @@ index 32dfbec866d..27f78962589 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index dcba7eb2c24..d8e785ee403 100644
+index 6926076fadc..2429b27989f 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
