@@ -29,7 +29,7 @@ Status: new
  5 files changed, 34 insertions(+), 49 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index a7b122f5188..29e4176644d 100644
+index 82fb91fd9cd..11a1388203c 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
@@ -120,10 +120,10 @@ index a7b122f5188..29e4176644d 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 32dfbec866d..27f78962589 100755
+index 73141f8ccea..e2962c53601 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -269,8 +269,7 @@ info_dir ()
+@@ -271,8 +271,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,7 +134,7 @@ index 32dfbec866d..27f78962589 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 6926076fadc..2429b27989f 100644
+index ba944e6cebd..46cb11b52df 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
