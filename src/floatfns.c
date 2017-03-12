@@ -47,13 +47,12 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <count-leading-zeros.h>
 
-/* 'isfinite' and 'isnan' cause build failures on Solaris 10 with the
-   bundled GCC in c99 mode.  Work around the bugs with simple
-   implementations that are good enough.  */
-#undef isfinite
-#define isfinite(x) ((x) - (x) == 0)
-#undef isnan
-#define isnan(x) ((x) != (x))
+#ifndef isfinite
+# define isfinite(x) ((x) - (x) == 0)
+#endif
+#ifndef isnan
+# define isnan(x) ((x) != (x))
+#endif
 
 /* Check that X is a floating point number.  */
 
@@ -147,7 +146,12 @@ DEFUN ("isnan", Fisnan, Sisnan, 1, 1, 0,
   return isnan (XFLOAT_DATA (x)) ? Qt : Qnil;
 }
 
-#ifdef HAVE_COPYSIGN
+/* Although the substitute does not work on NaNs, it is good enough
+   for platforms lacking the signbit macro.  */
+#ifndef signbit
+# define signbit(x) ((x) < 0 || (IEEE_FLOATING_POINT && !(x) && 1 / (x) < 0))
+#endif
+
 DEFUN ("copysign", Fcopysign, Scopysign, 2, 2, 0,
        doc: /* Copy sign of X2 to value of X1, and return the result.
 Cause an error if X1 or X2 is not a float.  */)
@@ -161,9 +165,10 @@ Cause an error if X1 or X2 is not a float.  */)
   f1 = XFLOAT_DATA (x1);
   f2 = XFLOAT_DATA (x2);
 
-  return make_float (copysign (f1, f2));
+  /* Use signbit instead of copysign, to avoid calling make_float when
+     the result is X1.  */
+  return signbit (f1) != signbit (f2) ? make_float (-f1) : x1;
 }
-#endif
 
 DEFUN ("frexp", Ffrexp, Sfrexp, 1, 1, 0,
        doc: /* Get significand and exponent of a floating point number.
@@ -504,17 +509,19 @@ DEFUN ("fceiling", Ffceiling, Sfceiling, 1, 1, 0,
 \(Round toward +inf.)  */)
   (Lisp_Object arg)
 {
-  double d = extract_float (arg);
+  CHECK_FLOAT (arg);
+  double d = XFLOAT_DATA (arg);
   d = ceil (d);
   return make_float (d);
 }
 
 DEFUN ("ffloor", Fffloor, Sffloor, 1, 1, 0,
        doc: /* Return the largest integer no greater than ARG, as a float.
-\(Round towards -inf.)  */)
+\(Round toward -inf.)  */)
   (Lisp_Object arg)
 {
-  double d = extract_float (arg);
+  CHECK_FLOAT (arg);
+  double d = XFLOAT_DATA (arg);
   d = floor (d);
   return make_float (d);
 }
@@ -523,17 +530,19 @@ DEFUN ("fround", Ffround, Sfround, 1, 1, 0,
        doc: /* Return the nearest integer to ARG, as a float.  */)
   (Lisp_Object arg)
 {
-  double d = extract_float (arg);
+  CHECK_FLOAT (arg);
+  double d = XFLOAT_DATA (arg);
   d = emacs_rint (d);
   return make_float (d);
 }
 
 DEFUN ("ftruncate", Fftruncate, Sftruncate, 1, 1, 0,
        doc: /* Truncate a floating point number to an integral float value.
-Rounds the value toward zero.  */)
+\(Round toward zero.)  */)
   (Lisp_Object arg)
 {
-  double d = extract_float (arg);
+  CHECK_FLOAT (arg);
+  double d = XFLOAT_DATA (arg);
   d = emacs_trunc (d);
   return make_float (d);
 }
@@ -548,9 +557,7 @@ syms_of_floatfns (void)
   defsubr (&Ssin);
   defsubr (&Stan);
   defsubr (&Sisnan);
-#ifdef HAVE_COPYSIGN
   defsubr (&Scopysign);
-#endif
   defsubr (&Sfrexp);
   defsubr (&Sldexp);
   defsubr (&Sfceiling);

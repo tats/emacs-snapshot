@@ -143,21 +143,19 @@
 (load "button")
 
 ;; We don't want to store loaddefs.el in the repository because it is
-;; a generated file; but it is required in order to compile the lisp
-;; files.  When bootstrapping, we cannot generate loaddefs.el until an
-;; emacs binary has been built.  We therefore support the build with
-;; two files, ldefs-boot-manual.el and ldefs-boot-auto.el, which
-;; contain the autoloads that are actually called during bootstrap.
-;; These do not need to be updated as often as the real loaddefs.el
-;; would.  Bootstrap should always work with ldefs-boot-manual.el.
-;; Therefore, Whenever a new autoload cookie gets added that is
-;; necessary during bootstrapping, ldefs-boot-auto.el should be
-;; updated using the "generate-ldefs-boot" make target.
-;; autogen/update_autogen can be used to periodically update
-;; ldefs-boot.
+;; a generated file; but it is required in order to compile the lisp files.
+;; When bootstrapping, we cannot generate loaddefs.el until an
+;; emacs binary has been built.  We therefore compromise and keep
+;; ldefs-boot.el in the repository.  This does not need to be updated
+;; as often as the real loaddefs.el would.  Bootstrap should always
+;; work with ldefs-boot.el.  Therefore, whenever a new autoload cookie
+;; gets added that is necessary during bootstrapping, ldefs-boot.el
+;; should be updated by overwriting it with an up-to-date copy of
+;; loaddefs.el that is not corrupted by local changes.
+;; admin/update_autogen can be used to update ldefs-boot.el periodically.
 (condition-case nil (load "loaddefs.el")
   ;; In case loaddefs hasn't been generated yet.
-  (file-error (load "ldefs-boot-manual.el")))
+  (file-error (load "ldefs-boot.el")))
 
 (let ((new (make-hash-table :test 'equal)))
   ;; Now that loaddefs has populated definition-prefixes, purify its contents.
@@ -230,11 +228,8 @@
 (load "jit-lock")
 
 (load "mouse")
-
-(unless (equal (member "bootstrap" command-line-args) '("bootstrap"))
-  (if (boundp 'x-toolkit-scroll-bars)
-      (load "scroll-bar")))
-
+(if (boundp 'x-toolkit-scroll-bars)
+    (load "scroll-bar"))
 (load "select")
 (load "emacs-lisp/timer")
 (load "isearch")
@@ -256,62 +251,61 @@
 (load "emacs-lisp/tabulated-list")
 (load "buff-menu")
 
-(unless (equal (member "bootstrap" command-line-args) '("bootstrap"))
-  (if (fboundp 'x-create-frame)
-      (progn
-        (load "fringe")
-        ;; Needed by `imagemagick-register-types'
-        (load "emacs-lisp/regexp-opt")
-        (load "image")
-        (load "international/fontset")
-        (load "dnd")
-        (load "tool-bar")))
+(if (fboundp 'x-create-frame)
+    (progn
+      (load "fringe")
+      ;; Needed by `imagemagick-register-types'
+      (load "emacs-lisp/regexp-opt")
+      (load "image")
+      (load "international/fontset")
+      (load "dnd")
+      (load "tool-bar")))
 
-  (if (featurep 'dynamic-setting)
-      (load "dynamic-setting"))
+(if (featurep 'dynamic-setting)
+    (load "dynamic-setting"))
 
-  (if (featurep 'x)
-      (progn
-        (load "x-dnd")
-        (load "term/common-win")
-        (load "term/x-win")))
+(if (featurep 'x)
+    (progn
+      (load "x-dnd")
+      (load "term/common-win")
+      (load "term/x-win")))
 
-  (if (or (eq system-type 'windows-nt)
-          (featurep 'w32))
-      (progn
-        (load "term/common-win")
-        (load "w32-vars")
-        (load "term/w32-win")
-        (load "disp-table")
-        (when (eq system-type 'windows-nt)
-          (load "w32-fns")
-          (load "ls-lisp")
-          (load "dos-w32"))))
-  (if (eq system-type 'ms-dos)
-      (progn
-        (load "dos-w32")
-        (load "dos-fns")
-        (load "dos-vars")
-        ;; Don't load term/common-win: it isn't appropriate for the `pc'
-        ;; ``window system'', which generally behaves like a terminal.
-        (load "term/internal")
-        (load "term/pc-win")
+(if (or (eq system-type 'windows-nt)
+        (featurep 'w32))
+    (progn
+      (load "term/common-win")
+      (load "w32-vars")
+      (load "term/w32-win")
+      (load "disp-table")
+      (when (eq system-type 'windows-nt)
+        (load "w32-fns")
         (load "ls-lisp")
-        (load "disp-table"))) ; needed to setup ibm-pc char set, see internal.el
-  (if (featurep 'ns)
-      (progn
-        (load "term/common-win")
-        ;; Don't load ucs-normalize.el unless uni-*.el files were
-        ;; already produced, because it needs uni-*.el files that might
-        ;; not be built early enough during bootstrap.
-        (when (load-history-filename-element "charprop\\.el")
-          (load "international/mule-util")
-          (load "international/ucs-normalize")
-          (load "term/ns-win"))))
-  (if (fboundp 'x-create-frame)
-      ;; Do it after loading term/foo-win.el since the value of the
-      ;; mouse-wheel-*-event vars depends on those files being loaded or not.
-      (load "mwheel")))
+        (load "dos-w32"))))
+(if (eq system-type 'ms-dos)
+    (progn
+      (load "dos-w32")
+      (load "dos-fns")
+      (load "dos-vars")
+      ;; Don't load term/common-win: it isn't appropriate for the `pc'
+      ;; ``window system'', which generally behaves like a terminal.
+      (load "term/internal")
+      (load "term/pc-win")
+      (load "ls-lisp")
+      (load "disp-table"))) ; needed to setup ibm-pc char set, see internal.el
+(if (featurep 'ns)
+    (progn
+      (load "term/common-win")
+      ;; Don't load ucs-normalize.el unless uni-*.el files were
+      ;; already produced, because it needs uni-*.el files that might
+      ;; not be built early enough during bootstrap.
+      (when (load-history-filename-element "charprop\\.el")
+        (load "international/mule-util")
+        (load "international/ucs-normalize")
+        (load "term/ns-win"))))
+(if (fboundp 'x-create-frame)
+    ;; Do it after loading term/foo-win.el since the value of the
+    ;; mouse-wheel-*-event vars depends on those files being loaded or not.
+    (load "mwheel"))
 ;; Preload some constants and floating point functions.
 (load "emacs-lisp/float-sup")
 
@@ -321,10 +315,8 @@
 (load "electric")
 (load "emacs-lisp/eldoc")
 (load "cus-start") ;Late to reduce customize-rogue (needs loaddefs.el anyway)
-
-(unless (equal (member "bootstrap" command-line-args) '("bootstrap"))
-  (if (not (eq system-type 'ms-dos))
-      (load "tooltip")))
+(if (not (eq system-type 'ms-dos))
+    (load "tooltip"))
 
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.

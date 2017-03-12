@@ -19,6 +19,8 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
+
+#include <math.h>
 #include <stdio.h>
 
 #include <byteswap.h>
@@ -2402,9 +2404,11 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
   CHECK_NUMBER_OR_FLOAT_COERCE_MARKER (num2);
 
   /* If either arg is floating point, set F1 and F2 to the 'double'
-     approximations of the two arguments.  Regardless, set I1 and I2
-     to integers that break ties if the floating point comparison is
-     either not done or reports equality.  */
+     approximations of the two arguments, and set FNEQ if floating-point
+     comparison reports that F1 is not equal to F2, possibly because F1
+     or F2 is a NaN.  Regardless, set I1 and I2 to integers that break
+     ties if the floating-point comparison is either not done or reports
+     equality.  */
 
   if (FLOATP (num1))
     {
@@ -2415,7 +2419,17 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
 	  f2 = XFLOAT_DATA (num2);
 	}
       else
-	i1 = f2 = i2 = XINT (num2);
+	{
+	  /* Compare a float NUM1 to an integer NUM2 by converting the
+	     integer I2 (i.e., NUM2) to the double F2 (a conversion that
+	     can round on some platforms, if I2 is large enough), and then
+	     converting F2 back to the integer I1 (a conversion that is
+	     always exact), so that I1 exactly equals ((double) NUM2).  If
+	     floating-point comparison reports a tie, NUM1 = F1 = F2 = I1
+	     (exactly) so I1 - I2 = NUM1 - NUM2 (exactly), so comparing I1
+	     to I2 will break the tie correctly.  */
+	  i1 = f2 = i2 = XINT (num2);
+	}
       fneq = f1 != f2;
     }
   else
@@ -2423,6 +2437,8 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
       i1 = XINT (num1);
       if (FLOATP (num2))
 	{
+	  /* Compare an integer NUM1 to a float NUM2.  This is the
+	     converse of comparing float to integer (see above).  */
 	  i2 = f1 = i1;
 	  f2 = XFLOAT_DATA (num2);
 	  fneq = f1 != f2;
@@ -2562,13 +2578,13 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
   uintmax_t val;
   if (INTEGERP (c))
     {
-      valid = 0 <= XINT (c);
+      valid = XINT (c) >= 0;
       val = XINT (c);
     }
   else if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
-      if (0 <= d && d < 1.0 + max)
+      if (d >= 0 && d < 1.0 + max)
 	{
 	  val = d;
 	  valid = val == d;
@@ -2622,7 +2638,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
   else if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
-      if (min <= d && d < 1.0 + max)
+      if (d >= min && d < 1.0 + max)
 	{
 	  val = d;
 	  valid = val == d;
@@ -2632,7 +2648,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
     {
       intmax_t top = XINT (XCAR (c));
       Lisp_Object rest = XCDR (c);
-      if (INTMAX_MIN >> 24 >> 16 <= top && top <= INTMAX_MAX >> 24 >> 16
+      if (top >= INTMAX_MIN >> 24 >> 16 && top <= INTMAX_MAX >> 24 >> 16
 	  && CONSP (rest)
 	  && NATNUMP (XCAR (rest)) && XFASTINT (XCAR (rest)) < 1 << 24
 	  && NATNUMP (XCDR (rest)) && XFASTINT (XCDR (rest)) < 1 << 16)
@@ -2641,7 +2657,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 	  val = top << 24 << 16 | mid << 16 | XFASTINT (XCDR (rest));
 	  valid = true;
 	}
-      else if (INTMAX_MIN >> 16 <= top && top <= INTMAX_MAX >> 16)
+      else if (top >= INTMAX_MIN >> 16 && top <= INTMAX_MAX >> 16)
 	{
 	  if (CONSP (rest))
 	    rest = XCAR (rest);
@@ -2698,7 +2714,7 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
   else
     {
       CHECK_NUMBER (base);
-      if (! (2 <= XINT (base) && XINT (base) <= 16))
+      if (! (XINT (base) >= 2 && XINT (base) <= 16))
 	xsignal1 (Qargs_out_of_range, base);
       b = XINT (base);
     }
@@ -2719,9 +2735,7 @@ enum arithop
     Adiv,
     Alogand,
     Alogior,
-    Alogxor,
-    Amax,
-    Amin
+    Alogxor
   };
 
 static Lisp_Object float_arith_driver (double, ptrdiff_t, enum arithop,
@@ -2807,14 +2821,6 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
 	case Alogxor:
 	  accum ^= next;
 	  break;
-	case Amax:
-	  if (!argnum || next > accum)
-	    accum = next;
-	  break;
-	case Amin:
-	  if (!argnum || next < accum)
-	    accum = next;
-	  break;
 	}
     }
 
@@ -2822,8 +2828,9 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
   return val;
 }
 
-#undef isnan
-#define isnan(x) ((x) != (x))
+#ifndef isnan
+# define isnan(x) ((x) != (x))
+#endif
 
 static Lisp_Object
 float_arith_driver (double accum, ptrdiff_t argnum, enum arithop code,
@@ -2871,14 +2878,6 @@ float_arith_driver (double accum, ptrdiff_t argnum, enum arithop code,
 	case Alogior:
 	case Alogxor:
 	  wrong_type_argument (Qinteger_or_marker_p, val);
-	case Amax:
-	  if (!argnum || isnan (next) || next > accum)
-	    accum = next;
-	  break;
-	case Amin:
-	  if (!argnum || isnan (next) || next < accum)
-	    accum = next;
-	  break;
 	}
     }
 
@@ -2975,13 +2974,31 @@ Both X and Y must be numbers or markers.  */)
   return val;
 }
 
+static Lisp_Object
+minmax_driver (ptrdiff_t nargs, Lisp_Object *args,
+	       enum Arith_Comparison comparison)
+{
+  eassume (0 < nargs);
+  Lisp_Object accum;
+  for (ptrdiff_t argnum = 0; argnum < nargs; argnum++)
+    {
+      Lisp_Object val = args[argnum];
+      CHECK_NUMBER_OR_FLOAT_COERCE_MARKER (val);
+      if (argnum == 0 || !NILP (arithcompare (val, accum, comparison)))
+	accum = val;
+      else if (FLOATP (accum) && isnan (XFLOAT_DATA (accum)))
+	return accum;
+    }
+  return accum;
+}
+
 DEFUN ("max", Fmax, Smax, 1, MANY, 0,
        doc: /* Return largest of all the arguments (which must be numbers or markers).
 The value is always a number; markers are converted to numbers.
 usage: (max NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  return arith_driver (Amax, nargs, args);
+  return minmax_driver (nargs, args, ARITH_GRTR);
 }
 
 DEFUN ("min", Fmin, Smin, 1, MANY, 0,
@@ -2990,7 +3007,7 @@ The value is always a number; markers are converted to numbers.
 usage: (min NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  return arith_driver (Amin, nargs, args);
+  return minmax_driver (nargs, args, ARITH_LESS);
 }
 
 DEFUN ("logand", Flogand, Slogand, 0, MANY, 0,

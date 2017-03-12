@@ -3636,9 +3636,11 @@ x_draw_glyph_string (struct glyph_string *s)
                 }
               else
                 {
+		  struct font *font = font_for_underline_metrics (s);
+
                   /* Get the underline thickness.  Default is 1 pixel.  */
-                  if (s->font && s->font->underline_thickness > 0)
-                    thickness = s->font->underline_thickness;
+                  if (font && font->underline_thickness > 0)
+                    thickness = font->underline_thickness;
                   else
                     thickness = 1;
                   if (x_underline_at_descent_line)
@@ -3654,10 +3656,10 @@ x_draw_glyph_string (struct glyph_string *s)
                          ROUND(x) = floor (x + 0.5)  */
 
                       if (x_use_underline_position_properties
-                          && s->font && s->font->underline_position >= 0)
-                        position = s->font->underline_position;
-                      else if (s->font)
-                        position = (s->font->descent + 1) / 2;
+                          && font && font->underline_position >= 0)
+                        position = font->underline_position;
+                      else if (font)
+                        position = (font->descent + 1) / 2;
                       else
                         position = underline_minimum_offset;
                     }
@@ -11669,20 +11671,21 @@ x_check_font (struct frame *f, struct font *font)
 
 #ifdef USE_X_TOOLKIT
 static XrmOptionDescRec emacs_options[] = {
-  {"-geometry",	".geometry", XrmoptionSepArg, NULL},
-  {"-iconic",	".iconic", XrmoptionNoArg, (XtPointer) "yes"},
+  {(char *) "-geometry", (char *) ".geometry", XrmoptionSepArg, NULL},
+  {(char *) "-iconic", (char *) ".iconic", XrmoptionNoArg, (XtPointer) "yes"},
 
-  {"-internal-border-width", "*EmacsScreen.internalBorderWidth",
-     XrmoptionSepArg, NULL},
-  {"-ib",	"*EmacsScreen.internalBorderWidth", XrmoptionSepArg, NULL},
-
-  {"-T",	"*EmacsShell.title", XrmoptionSepArg, (XtPointer) NULL},
-  {"-wn",	"*EmacsShell.title", XrmoptionSepArg, (XtPointer) NULL},
-  {"-title",	"*EmacsShell.title", XrmoptionSepArg, (XtPointer) NULL},
-  {"-iconname",	"*EmacsShell.iconName", XrmoptionSepArg, (XtPointer) NULL},
-  {"-in",	"*EmacsShell.iconName", XrmoptionSepArg, (XtPointer) NULL},
-  {"-mc",	"*pointerColor", XrmoptionSepArg, (XtPointer) NULL},
-  {"-cr",	"*cursorColor", XrmoptionSepArg, (XtPointer) NULL}
+  {(char *) "-internal-border-width",
+   (char *) "*EmacsScreen.internalBorderWidth", XrmoptionSepArg, NULL},
+  {(char *) "-ib", (char *) "*EmacsScreen.internalBorderWidth",
+   XrmoptionSepArg, NULL},
+  {(char *) "-T", (char *) "*EmacsShell.title", XrmoptionSepArg, NULL},
+  {(char *) "-wn", (char *) "*EmacsShell.title", XrmoptionSepArg, NULL},
+  {(char *) "-title", (char *) "*EmacsShell.title", XrmoptionSepArg, NULL},
+  {(char *) "-iconname", (char *) "*EmacsShell.iconName",
+   XrmoptionSepArg, NULL},
+  {(char *) "-in", (char *) "*EmacsShell.iconName", XrmoptionSepArg, NULL},
+  {(char *) "-mc", (char *) "*pointerColor", XrmoptionSepArg, NULL},
+  {(char *) "-cr", (char *) "*cursorColor", XrmoptionSepArg, NULL}
 };
 
 /* Whether atimer for Xt timeouts is activated or not.  */
@@ -12000,11 +12003,11 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     int argc = 0;
     char *argv[3];
 
-    argv[0] = "";
+    argv[0] = (char *) "";
     argc = 1;
     if (xrm_option)
       {
-	argv[argc++] = "-xrm";
+	argv[argc++] = (char *) "-xrm";
 	argv[argc++] = xrm_option;
       }
     turn_on_atimers (false);
@@ -12382,7 +12385,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     dpy = dpyinfo->display;
     d.addr = (XPointer)&dpy;
     d.size = sizeof (Display *);
-    fr.addr = XtDefaultFont;
+    fr.addr = (char *) XtDefaultFont;
     fr.size = sizeof (XtDefaultFont);
     to.size = sizeof (Font *);
     to.addr = (XPointer)&font;

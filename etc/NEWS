@@ -742,6 +742,12 @@ processes on exit.
 * Incompatible Lisp Changes in Emacs 26.1
 
 +++
+** Certain cond/pcase/cl-case forms are now compiled using a faster jump
+table implementation. This uses a new bytecode op `switch', which isn't
+compatible with previous Emacs versions. This functionality can be disabled
+by setting `byte-compile-cond-use-jump-table' to nil.
+
++++
 ** Resizing a frame no longer runs 'window-configuration-change-hook'.
 Put your function on 'window-size-change-functions' instead.
 
@@ -802,6 +808,13 @@ function 'check-declare-errmsg' has been removed.
 Unicode horizontal whitespace as defined in the Unicode Technical
 Standard #18.  If you only want to match space and tab, use [ \t]
 instead.
+
++++
+** 'min' and 'max' no longer round their results.  Formerly, they
+returned a floating-point value if any argument was floating-point,
+which was sometimes numerically incorrect.  For example, on a 64-bit
+host (max 1e16 10000000000000001) now returns its second argument
+instead of its first.
 
 
 * Lisp Changes in Emacs 26.1
@@ -906,6 +919,12 @@ compares their numerical values.  According to this predicate,
 ** Numeric comparisons and 'logb' no longer return incorrect answers
 due to internal rounding errors.  For example, (< most-positive-fixnum
 (+ 1.0 most-positive-fixnum)) now correctly returns t on 64-bit hosts.
+
+---
+** The functions 'ffloor', 'fceiling', 'ftruncate' and 'fround' now
+accept only floating-point arguments, as per their documentation.
+Formerly, they quietly accepted integer arguments and sometimes
+returned nonsensical answers, e.g., (< N (ffloor N)) could return t.
 
 ---
 ** On hosts like GNU/Linux x86-64 where a 'long double' fraction

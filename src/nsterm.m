@@ -3043,11 +3043,8 @@ ns_draw_text_decoration (struct glyph_string *s, struct face *face,
             }
           else
             {
-              struct font *font;
-              unsigned long descent;
-
-              font=s->font;
-              descent = s->y + s->height - s->ybase;
+	      struct font *font = font_for_underline_metrics (s);
+              unsigned long descent = s->y + s->height - s->ybase;
 
               /* Use underline thickness of font, defaulting to 1. */
               thickness = (font && font->underline_thickness > 0)
@@ -4111,6 +4108,9 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
   struct input_event event;
   char c;
 
+  NSDate *timeout_date = nil;
+  NSEvent *ns_event;
+
   NSTRACE_WHEN (NSTRACE_GROUP_EVENTS, "ns_select");
 
 #ifdef HAVE_NATIVE_FS
@@ -4168,70 +4168,69 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
       /* Inform fd_handler that select should be called */
       c = 'g';
       emacs_write_sig (selfds[1], &c, 1);
+
+      /* We rely on fd_handler timing out to cause
+         nextEventMatchingMask below to return, so set it's timeout to
+         an unreasonably long time. */
+      timeout_date = [NSDate distantFuture];
     }
   else if (nr == 0 && timeout)
     {
-      /* No file descriptor, just a timeout, no need to wake fd_handler  */
+      /* No file descriptor, just a timeout, no need to wake
+         fd_handler. Set nextEventMatchingMask timeout. */
       double time = timespectod (*timeout);
-      timed_entry = [[NSTimer scheduledTimerWithTimeInterval: time
-                                                      target: NSApp
-                                                    selector:
-                                  @selector (timeout_handler:)
-                                                    userInfo: 0
-                                                     repeats: NO]
-                      retain];
-    }
-  else /* No timeout and no file descriptors, can this happen?  */
-    {
-      /* Send appdefined so we exit from the loop */
-      ns_send_appdefined (-1);
+      timeout_date = [NSDate dateWithTimeIntervalSinceNow: time];
     }
 
-  block_input ();
-  ns_init_events (&event);
+  /* Listen for a new NSEvent. */
+  ns_event = [NSApp nextEventMatchingMask: NSEventMaskAny
+                                untilDate: timeout_date
+                                   inMode: NSDefaultRunLoopMode
+                                  dequeue: NO];
 
-  [NSApp run];
-
-  ns_finish_events ();
   if (nr > 0 && readfds)
     {
       c = 's';
       emacs_write_sig (selfds[1], &c, 1);
     }
-  unblock_input ();
 
-  t = last_appdefined_event_data;
-
-  if (t != NO_APPDEFINED_DATA)
+  if (ns_event != nil)
     {
-      last_appdefined_event_data = NO_APPDEFINED_DATA;
+      if ([ns_event type] == NSEventTypeApplicationDefined)
+        {
+          if ([ns_event data1] < 0)
+            {
+              /* The NX_APPDEFINED event we received was a timeout. */
+              result = 0;
+            }
+          else
+            {
+              /* Received back from select () in fd_handler; copy the results */
+              pthread_mutex_lock (&select_mutex);
+              if (readfds) *readfds = select_readfds;
+              if (writefds) *writefds = select_writefds;
+              pthread_mutex_unlock (&select_mutex);
+              result = [ns_event data1];
+            }
 
-      if (t == -2)
-        {
-          /* The NX_APPDEFINED event we received was a timeout. */
-          result = 0;
-        }
-      else if (t == -1)
-        {
-          /* The NX_APPDEFINED event we received was the result of
-             at least one real input event arriving.  */
-          errno = EINTR;
-          result = -1;
+          /* Remove the NX_APPDEFINED event from the queue as it's no
+             longer needed. */
+          [NSApp nextEventMatchingMask: NSEventMaskAny
+                             untilDate: nil
+                                inMode: NSDefaultRunLoopMode
+                               dequeue: YES];
         }
       else
         {
-          /* Received back from select () in fd_handler; copy the results */
-          pthread_mutex_lock (&select_mutex);
-          if (readfds) *readfds = select_readfds;
-          if (writefds) *writefds = select_writefds;
-          pthread_mutex_unlock (&select_mutex);
-          result = t;
+          /* A real NSEvent came in. */
+          errno = EINTR;
+          result = -1;
         }
     }
   else
     {
-      errno = EINTR;
-      result = -1;
+      /* Reading from the NSEvent queue timed out. */
+      result = 0;
     }
 
   return result;

@@ -1,4 +1,4 @@
-;;; floatfn-tests.el --- tests for floating point operations
+;;; floatfns-tests.el --- tests for floating point operations
 
 ;; Copyright 2017 Free Software Foundation, Inc.
 
@@ -27,5 +27,11 @@
 
 (ert-deftest logb-extreme-fixnum ()
   (should (= (logb most-negative-fixnum) (1+ (logb most-positive-fixnum)))))
+
+(ert-deftest fround-fixnum ()
+  (should-error (ffloor 0) :type 'wrong-type-argument)
+  (should-error (fceiling 0) :type 'wrong-type-argument)
+  (should-error (ftruncate 0) :type 'wrong-type-argument)
+  (should-error (fround 0) :type 'wrong-type-argument))
 
 (provide 'floatfns-tests)
