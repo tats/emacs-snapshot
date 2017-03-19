@@ -26,14 +26,6 @@
 # Built by 'autogen.sh'.
 /aclocal.m4
 /configure
-build-aux/ar-lib
-build-aux/compile
-build-aux/config.guess
-build-aux/config.sub
-build-aux/depcomp
-build-aux/install-sh
-build-aux/missing
-lib/Makefile.in
 src/config.in
 
 # Built by 'configure'.
@@ -52,14 +44,13 @@ makefile
 /config.status
 /configure.lineno
 /conftest*
+lib/gnulib.mk
 src/config.h
 src/epaths.h
 
 # C-level sources built by 'make'.
 lib/alloca.h
-lib/arg-nonnull.h
 lib/byteswap.h
-lib/c++defs.h
 lib/dirent.h
 lib/errno.h
 lib/execinfo.h
@@ -76,7 +67,6 @@ lib/string.h
 lib/sys/
 lib/time.h
 lib/unistd.h
-lib/warn-on-use.h
 src/buildobj.h
 src/globals.h
 src/lisp.mk
@@ -131,8 +121,6 @@ deps/
 *.stamp
 stamp_BLD
 src/gl-stamp
-src/stamp-h.in
-src/stamp-h1
 
 # Object files and debugging.
 *.a
@@ -274,7 +262,7 @@ etc/emacs.tmpdesktop
 # Microsoft-related builds and installations.
 *.in-h
 _*
-!build-aux/snippet/_Noreturn.h
+!lib/_Noreturn.h
 /bin/
 /BIN/
 /data/
@@ -288,6 +276,5 @@ lib/SYS/
 /site-lisp/
 nt/emacs.rc
 nt/emacsclient.rc
-nt/gnulib.mk
 src/gdb.ini
 /var/

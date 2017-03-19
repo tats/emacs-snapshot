@@ -624,16 +624,11 @@ $(oldXMenudir)/libXMenu11.a: FORCE
 FORCE:
 .PHONY: FORCE
 
-ACLOCAL_INPUTS = $(top_srcdir)/configure.ac $(top_srcdir)/m4/*.m4
-AUTOCONF_INPUTS = $(top_srcdir)/configure.ac $(top_srcdir)/aclocal.m4
-$(top_srcdir)/aclocal.m4: $(ACLOCAL_INPUTS)
-$(top_srcdir)/configure config.in: $(AUTOCONF_INPUTS)
 .PRECIOUS: ../config.status Makefile
-../config.status: $(top_srcdir)/configure $(top_srcdir)/lisp/version.el
+../config.status: $(top_srcdir)/configure.ac $(top_srcdir)/m4/*.m4
+	$(MAKE) -C .. $(notdir $@)
 Makefile: ../config.status $(srcdir)/Makefile.in
-$(top_srcdir)/aclocal.m4 $(top_srcdir)/configure config.in ../config.status \
-  Makefile:
-	$(MAKE) -C .. am--refresh
+	$(MAKE) -C .. src/$@
 
 doc.o: buildobj.h
 
@@ -662,7 +657,7 @@ clean: mostlyclean
 ## It should remove all files generated during a compilation/bootstrap,
 ## but not things like config.status or TAGS.
 bootstrap-clean: clean
-	rm -f epaths.h config.h config.stamp stamp-h1
+	rm -f epaths.h config.h config.stamp
 	if test -f ./.gdbinit; then \
 	  mv ./.gdbinit ./.gdbinit.save; \
 	  if test -f "$(srcdir)/.gdbinit"; then rm -f ./.gdbinit.save; \

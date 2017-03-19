@@ -37,6 +37,12 @@ Use 'configure --with-gnutls=no' to build even when GnuTLS is missing.
 ** GnuTLS version 2.12.2 or later is now required, instead of merely
 version 2.6.6 or later.
 
+** The new option 'configure --with-mailutils' causes Emacs to rely on
+GNU Mailutils 'movemail' to retrieve email.  By default, the Emacs
+build procedure continues to build and install a limited and insecure
+'movemail' substitute.  Although --with-mailutils is recommended, it
+is not yet the default due to backward-compatibility concerns.
+
 ** The new option 'configure --enable-gcc-warnings=warn-only' causes
 GCC to issue warnings without stopping the build.  This behavior is
 now the default in developer builds.  As before, use
@@ -64,6 +70,11 @@ Deterministic builds omit the build date from the output of the
 emacs-version and erc-cmd-SV functions, and the leave the following
 variables nil: emacs-build-system, emacs-build-time,
 erc-emacs-build-time.
+
+** The configure option '--with-gameuser' now defaults to 'no',
+as this appears to be the most common configuration in practice.
+When it is 'no', the shared game directory and the auxiliary program
+update-game-score are no longer needed and are not installed.
 
 ** Emacs no longer works on IRIX.  We expect that Emacs users are not
 affected by this, as SGI stopped supporting IRIX in December 2013.
@@ -361,6 +372,11 @@ words where first character is upper rather than title case, e.g.,
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
 
++++
+*** The ancestor buffer is shown by default in 3way merges.
+A new option ediff-show-ancestor and a new toggle
+ediff-toggle-show-ancestor.
+
 ** TeX: Add luatex and xetex as alternatives to pdftex
 
 ** Electric-Buffer-menu
@@ -623,6 +639,14 @@ while in non-'visual-line-mode' it will move the point to the indented
 header's value.
 
 ** Tramp
+
++++
+*** The method part of remote file names is mandatory now.  A valid
+remote file name starts with "/method:host:" or "/method:user@host:".
+
++++
+*** The new pseudo method "-" is a marker for the default method.
+"/-::" is the shortest remote file name then.
 
 +++
 *** New connection method "sg", which supports editing files under a
