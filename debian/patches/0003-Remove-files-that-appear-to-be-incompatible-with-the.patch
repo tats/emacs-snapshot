@@ -23,16 +23,16 @@ Status: new
 ---
  Makefile.in          | 45 ++++++++++++++++++---------------------------
  admin/update_autogen |  3 +--
- configure.ac         | 15 +++------------
+ configure.ac         | 11 +----------
  doc/misc/Makefile.in | 12 ++++--------
  lisp/help.el         |  8 ++++++++
- 5 files changed, 34 insertions(+), 49 deletions(-)
+ 5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 82fb91fd9cd..11a1388203c 100644
+index cf8ff84212f..c2c079b3fbe 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
+@@ -157,7 +157,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,7 +43,7 @@ index 82fb91fd9cd..11a1388203c 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -840,8 +842,7 @@ endef
+@@ -815,8 +817,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 82fb91fd9cd..11a1388203c 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -971,11 +972,11 @@ check check-maybe check-expensive: have-tests all
+@@ -947,11 +948,11 @@ check check-maybe check-expensive: have-tests all
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 82fb91fd9cd..11a1388203c 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -996,9 +997,7 @@ info-dir: ${srcdir}/info/dir
+@@ -972,9 +973,7 @@ info-dir: ${srcdir}/info/dir
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index 82fb91fd9cd..11a1388203c 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1021,14 +1020,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+@@ -997,14 +996,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	) >$@.tmp
  	mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index 82fb91fd9cd..11a1388203c 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1046,14 +1041,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1022,14 +1017,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -120,10 +120,10 @@ index 82fb91fd9cd..11a1388203c 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 73141f8ccea..e2962c53601 100755
+index 898432eae60..d82fded22b5 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -271,8 +271,7 @@ info_dir ()
+@@ -269,8 +269,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,25 +134,19 @@ index 73141f8ccea..e2962c53601 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index ba944e6cebd..46cb11b52df 100644
+index b922dc473d6..d6ea5bd5c98 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5398,11 +5398,11 @@ dnl This will work, but you get a config.status that is not quite right
- dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
- dnl That doesn't have any obvious consequences for Emacs, but on the whole
- dnl it seems better to just live with the duplication.
--SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile"
-+SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/misc/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile"
+@@ -5398,7 +5398,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
+ AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
- AC_CONFIG_FILES([Makefile lib/Makefile lib-src/Makefile oldXMenu/Makefile \
--       doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile \
--       doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile \
-+       doc/misc/Makefile \
-+       src/Makefile lwlib/Makefile lisp/Makefile \
-        leim/Makefile nextstep/Makefile nt/Makefile])
+ m4_define([subdir_makefiles],
+-  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile])
++  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/misc/Makefile src/Makefile lwlib/Makefile])
+ SUBDIR_MAKEFILES="subdir_makefiles"
+ AC_CONFIG_FILES(subdir_makefiles)
  
- dnl test/ is not present in release tarfiles.
-@@ -5454,15 +5454,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5451,15 +5451,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
