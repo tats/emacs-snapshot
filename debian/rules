@@ -603,10 +603,6 @@ override_dh_fixperms:
 override_dh_clean: $(persistent_autogen_files)
 	rm -rf \
 	  aclocal.m4 \
-	  build-aux/compile \
-	  build-aux/config.guess \
-	  build-aux/depcomp \
-	  build-aux/missing \
 	  config.guess \
 	  config.sub \
 	  configure \
@@ -619,7 +615,6 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/install-lucid \
 	  debian/install-nox \
 	  debian/install-x \
-	  src/config.in \
-	  src/stamp-h1 src/stamp-h.in
+	 	  src/stamp-h1 src/stamp-h.in
 	rm -f $(nonpersistent_autogen_files)
 	dh_clean
