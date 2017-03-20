@@ -341,6 +341,7 @@ define cfg_tree
   rm -rf $(1)
   mkdir $(1)
   cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') "$(1)"
+  cp -r build-aux $1
   cd $(1) && CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" ./configure $(confflags) $(2)
 endef
 
@@ -604,9 +605,7 @@ override_dh_clean: $(persistent_autogen_files)
 	  aclocal.m4 \
 	  build-aux/compile \
 	  build-aux/config.guess \
-	  build-aux/config.sub \
 	  build-aux/depcomp \
-	  build-aux/install-sh \
 	  build-aux/missing \
 	  config.guess \
 	  config.sub \
@@ -620,7 +619,6 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/install-lucid \
 	  debian/install-nox \
 	  debian/install-x \
-	  lib/Makefile.in \
 	  src/config.in \
 	  src/stamp-h1 src/stamp-h.in
 	rm -f $(nonpersistent_autogen_files)
