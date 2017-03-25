@@ -33,16 +33,6 @@ Description: GNU Emacs editor (with Lucid GUI support)
  https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
  information.
 
-Package: emacs-snapshot-lucid-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: emacs-snapshot-lucid-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-snapshot-lucid
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-snapshot-lucid
- package.
-
 Package: emacs-snapshot-nox
 Architecture: any
 Depends: emacs-snapshot-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
@@ -54,16 +44,6 @@ Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
  and provides only a text terminal interface.
-
-Package: emacs-snapshot-nox-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: emacs-snapshot-nox-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-snapshot-nox
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-snapshot-nox
- package.
 
 Package: emacs-snapshot
 Architecture: any
@@ -77,15 +57,6 @@ Description: GNU Emacs editor (with GTK+ GUI support)
  package contains a version of Emacs with a graphical user interface
  based on GTK+ (instead of the Lucid toolkit provided by the
  emacs-snapshot-lucid package).
-
-Package: emacs-snapshot-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: emacs-snapshot-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-snapshot
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-snapshot package.
 
 Package: emacs-snapshot-bin-common
 Architecture: any
