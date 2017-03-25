@@ -1,4 +1,4 @@
-;;; tramp.el --- Transparent Remote Access, Multiple Protocol
+;;; tramp.el --- Transparent Remote Access, Multiple Protocol  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1998-2017 Free Software Foundation, Inc.
 
@@ -60,7 +60,10 @@
 ;; Pacify byte-compiler.
 (eval-when-compile
   (require 'cl))
+(defvar auto-save-file-name-transforms)
 (defvar eshell-path-env)
+(defvar ls-lisp-use-insert-directory-program)
+(defvar outline-regexp)
 
 ;;; User Customizable Internal Variables:
 
@@ -1052,8 +1055,7 @@ means to use always cached values for the directory contents."
 
 ;;;###autoload
 (defconst tramp-completion-file-name-handler-alist
-  '(;(expand-file-name . tramp-completion-handle-expand-file-name)
-    (file-name-all-completions
+  '((file-name-all-completions
      . tramp-completion-handle-file-name-all-completions)
     (file-name-completion . tramp-completion-handle-file-name-completion))
   "Alist of completion handler functions.
@@ -1373,8 +1375,6 @@ Point must be at the beginning of a header line.
 
 The outline level is equal to the verbosity of the Tramp message."
   (1+ (string-to-number (match-string 1))))
-
-(defvar outline-regexp)
 
 (defun tramp-get-debug-buffer (vec)
   "Get the debug buffer for VEC."
@@ -1871,13 +1871,12 @@ temporary file names.  If `file-coding-system-alist' contains an
 expression, which matches more than the file name suffix, the
 coding system might not be determined.  This function repairs it."
   (let (result)
-    (dolist (elt file-coding-system-alist result)
+    (dolist (elt file-coding-system-alist (nreverse result))
       (when (and (consp elt) (string-match (car elt) filename))
 	;; We found a matching entry in `file-coding-system-alist'.
 	;; So we add a similar entry, but with the temporary file name
 	;; as regexp.
-	(add-to-list
-	 'result (cons (regexp-quote tmpname) (cdr elt)) 'append)))))
+	(push (cons (regexp-quote tmpname) (cdr elt)) result)))))
 
 ;;;###autoload
 (progn (defun tramp-run-real-handler (operation args)
@@ -2113,20 +2112,7 @@ preventing reentrant calls of Tramp.")
 Together with `tramp-locked', this implements a locking mechanism
 preventing reentrant calls of Tramp.")
 
-;; Avoid recursive loading of tramp.el.
-;; FIXME: This must go better.  Checking for `operation' is wrong.
-;;;###autoload(defun tramp-completion-file-name-handler (operation &rest args)
-;;;###autoload  (let ((fn
-;;;###autoload         (assoc
-;;;###autoload          operation tramp-completion-file-name-handler-alist)))
-;;;###autoload    (if (and
-;;;###autoload         tramp-mode fn (null load-in-progress)
-;;;###autoload         (member
-;;;###autoload          operation
-;;;###autoload          '(file-name-all-completions file-name-completion)))
-;;;###autoload        (apply 'tramp-autoload-file-name-handler operation args)
-;;;###autoload      (tramp-run-real-handler operation args))))
-
+;;;###autoload
 (defun tramp-completion-file-name-handler (operation &rest args)
   "Invoke Tramp file name completion handler.
 Falls back to normal file name handler if no Tramp file name handler exists."
@@ -2134,6 +2120,11 @@ Falls back to normal file name handler if no Tramp file name handler exists."
     (if (and fn tramp-mode)
 	(save-match-data (apply (cdr fn) args))
       (tramp-run-real-handler operation args))))
+
+;; Mark `operations' the handler is responsible for.
+;;;###autoload
+(put 'tramp-completion-file-name-handler 'operations
+     (mapcar 'car tramp-completion-file-name-handler-alist))
 
 ;;;###autoload
 (progn (defun tramp-autoload-file-name-handler (operation &rest args)
@@ -2258,15 +2249,6 @@ not in completion mode."
 	      (tramp-get-connection-process
 	       (tramp-dissect-file-name filename)))))))
 
-(defun tramp-completion-handle-expand-file-name (name &optional dir)
-  "Like `expand-file-name' for Tramp files."
-  ;; If DIR is not given, use `default-directory' or "/".
-  (setq dir (or dir default-directory "/"))
-  (cond
-   ((file-name-absolute-p name) name)
-   ((zerop (length name)) dir)
-   (t (concat (file-name-as-directory dir) name))))
-
 ;; Method, host name and user name completion.
 ;; `tramp-completion-dissect-file-name' returns a list of
 ;; tramp-file-name structures. For all of them we return possible completions.
@@ -2328,9 +2310,9 @@ not in completion mode."
       (when elt
 	(string-match tramp-prefix-regexp elt)
 	(setq elt (replace-match (concat tramp-prefix-format hop) nil nil elt))
-	(add-to-list
-	 'result1
-	 (substring elt (length (tramp-drop-volume-letter directory))))))
+	(push
+	 (substring elt (length (tramp-drop-volume-letter directory)))
+	 result1)))
 
     ;; Complete local parts.
     (append
@@ -2954,8 +2936,6 @@ User is always nil."
 		tramp-backup-directory-alist)
 	     backup-directory-alist)))
       (tramp-run-real-handler 'find-backup-file-name (list filename)))))
-
-(defvar ls-lisp-use-insert-directory-program)
 
 (defun tramp-handle-insert-directory
   (filename switches &optional wildcard full-directory-p)
