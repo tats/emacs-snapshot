@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index cf8ff84212f..c2c079b3fbe 100644
+index 06909c34445..e645e77b44b 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -157,7 +157,9 @@ man1dir=
@@ -134,10 +134,10 @@ index 898432eae60..d82fded22b5 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 9937a6cce91..118725f1a1a 100644
+index bd8f7650cc4..9dbe46b5128 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5403,7 +5403,7 @@ AC_DEFUN
+@@ -5413,7 +5413,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 9937a6cce91..118725f1a1a 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5456,15 +5456,6 @@ m4_define
+@@ -5466,15 +5466,6 @@ m4_define
  fi
  ])
  
