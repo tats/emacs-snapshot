@@ -981,6 +981,7 @@ here-document, otherwise the command could exceed maximum length
 of command line.")
 
 ;; New handlers should be added here.
+;;;###tramp-autoload
 (defconst tramp-sh-file-name-handler-alist
   '(;; `access-file' performed by default handler.
     (add-name-to-file . tramp-sh-handle-add-name-to-file)
@@ -1053,11 +1054,6 @@ of command line.")
     (write-region . tramp-sh-handle-write-region))
   "Alist of handler functions.
 Operations not mentioned here will be handled by the normal Emacs functions.")
-
-;; This must be the last entry, because `identity' always matches.
-;;;###tramp-autoload
-(add-to-list 'tramp-foreign-file-name-handler-alist
-	     '(identity . tramp-sh-file-name-handler) 'append)
 
 ;;; File Name Handler Functions:
 
@@ -3536,6 +3532,11 @@ Fall back to normal file name handler if no Tramp handler exists."
 		(tramp-run-real-handler operation args)))))
       (setq tramp-locked tl))))
 
+;; This must be the last entry, because `identity' always matches.
+;;;###tramp-autoload
+(tramp-register-foreign-file-name-handler
+ 'identity 'tramp-sh-file-name-handler 'append)
+
 (defun tramp-vc-file-name-handler (operation &rest args)
   "Invoke special file name handler, which collects files to be handled."
   (save-match-data
@@ -5221,7 +5222,7 @@ Nonexistent directories are removed from spec."
   "Determine remote locale, supporting UTF8 if possible."
   (with-tramp-connection-property vec "locale"
     (tramp-send-command vec "locale -a")
-    (let ((candidates '("en_US.utf8" "C.utf8" "en_US.UTF-8"))
+    (let ((candidates '("en_US.utf8" "C.utf8" "en_US.UTF-8" "C.UTF-8"))
 	  locale)
       (with-current-buffer (tramp-get-connection-buffer vec)
 	(while candidates

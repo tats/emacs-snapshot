@@ -28,6 +28,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'subr-x)
 
 (defconst file-notify--library
   (cond
@@ -52,6 +53,7 @@ could use another implementation.")
   callback)
 
 (defun file-notify--watch-absolute-filename (watch)
+  "Return the absolute filename observed by WATCH."
   (if (file-notify--watch-filename watch)
       (expand-file-name
        (file-notify--watch-filename watch)
@@ -154,9 +156,9 @@ EVENT is the cadr of the event in `file-notify-handle-event'
           ;; Send pending event, if it doesn't match.
           (when (and file-notify--pending-event
                      ;; The cookie doesn't match.
-                     (not (eq (file-notify--event-cookie
-                               (car file-notify--pending-event))
-                              (file-notify--event-cookie event)))
+                     (not (equal (file-notify--event-cookie
+                                  (car file-notify--pending-event))
+                                 (file-notify--event-cookie event)))
                      (or
                       ;; inotify.
                       (and (eq (nth 1 (car file-notify--pending-event))
@@ -204,7 +206,7 @@ EVENT is the cadr of the event in `file-notify-handle-event'
                                 (car file-notify--pending-event)))
                     ;; If the source is handled by another watch, we
                     ;; must fire the rename event there as well.
-                    (when (not (equal desc (caar file-notify--pending-event)))
+                    (unless (equal desc (caar file-notify--pending-event))
                       (setq pending-event
                             `((,(caar file-notify--pending-event)
                                renamed ,file ,file1)
@@ -214,9 +216,6 @@ EVENT is the cadr of the event in `file-notify-handle-event'
 
           ;; Apply pending callback.
           (when pending-event
-            (setcar
-             (car pending-event)
-             (caar pending-event))
             (funcall (cadr pending-event) (car pending-event))
             (setq pending-event nil))
 
@@ -423,7 +422,7 @@ DESCRIPTOR should be an object returned by `file-notify-add-watch'."
 ;;   (This may be the desired behaviour.)
 ;; * Watching a file in a already watched directory
 ;;   If the file is created and *then* a watch is added to that file, the
-;;   watch might receive events which occured prior to it being created,
+;;   watch might receive events which occurred prior to it being created,
 ;;   due to the way events are propagated during idle time.  Note: This
 ;;   may be perfectly acceptable.
 
