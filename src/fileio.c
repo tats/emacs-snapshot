@@ -5150,13 +5150,16 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
     }
 
   if (!auto_saving && !noninteractive)
-    message_with_string ((NUMBERP (append)
-			  ? "Updated %s"
-			  : ! NILP (append)
-			  ? "Added to %s"
-			  : "Wrote %s"),
-			 visit_file, 1);
-
+    {
+      AUTO_STRING (format, NUMBERP (append)
+                   ? "Updated `%s' (%d characters)"
+                   : ! NILP (append)
+                   ? "Added to `%s' (%d characters)"
+                   : "Wrote `%s' (%d characters)");
+      EMACS_INT nchars = (STRINGP (start) ? SCHARS (start)
+			  : XINT (end) - XINT (start));
+      CALLN (Fmessage, format, visit_file, make_number (nchars));
+    }
   return Qnil;
 }
 

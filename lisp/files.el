@@ -2429,7 +2429,7 @@ since only a single case-insensitive search through the alist is made."
    (lambda (elt)
      (cons (purecopy (car elt)) (cdr elt)))
    `(;; do this first, so that .html.pl is Polish html, not Perl
-     ("\\.[sx]?html?\\(\\.[a-zA-Z_]+\\)?\\'" . html-mode)
+     ("\\.[sx]?html?\\(\\.[a-zA-Z_]+\\)?\\'" . mhtml-mode)
      ("\\.svgz?\\'" . image-mode)
      ("\\.svgz?\\'" . xml-mode)
      ("\\.x[bp]m\\'" . image-mode)
@@ -2791,8 +2791,8 @@ If FUNCTION is nil, then it is not called.  (That is a way of saying
 		comment-re "*"
 		"\\(?:!DOCTYPE[ \t\r\n]+[^>]*>[ \t\r\n]*<[ \t\r\n]*" comment-re "*\\)?"
 		"[Hh][Tt][Mm][Ll]"))
-     . html-mode)
-    ("<!DOCTYPE[ \t\r\n]+[Hh][Tt][Mm][Ll]" . html-mode)
+     . mhtml-mode)
+    ("<!DOCTYPE[ \t\r\n]+[Hh][Tt][Mm][Ll]" . mhtml-mode)
     ;; These two must come after html, because they are more general:
     ("<\\?xml " . xml-mode)
     (,(let* ((incomment-re "\\(?:[^-]\\|-[^-]\\)")
@@ -6915,7 +6915,15 @@ only these files will be asked to be saved."
 (defun file-name-non-special (operation &rest arguments)
   (let ((file-name-handler-alist nil)
 	(default-directory
-	  (if (eq operation 'insert-directory)
+          ;; Some operations respect file name handlers in
+          ;; `default-directory'.  Because core function like
+          ;; `call-process' don't care about file name handlers in
+          ;; `default-directory', we here have to resolve the
+          ;; directory into a local one.  For `process-file',
+          ;; `start-file-process', and `shell-command', this fixes
+          ;; Bug#25949.
+	  (if (memq operation '(insert-directory process-file start-file-process
+                                                 shell-command))
 	      (directory-file-name
 	       (expand-file-name
 		(unhandled-file-name-directory default-directory)))

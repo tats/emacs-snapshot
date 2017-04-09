@@ -90,6 +90,11 @@ required capabilities are found in terminfo.  See the FAQ node
 
 * Changes in Emacs 26.1
 
++++
+** The functions write-region, append-to-file, and the like now output
+the number of characters added in addition to the name of the file
+affected.
+
 ** The variable 'emacs-version' no longer includes the build number.
 This is now stored separately in a new variable, 'emacs-build-number'.
 
@@ -355,12 +360,22 @@ same as in modes where the character is not whitespace.
 Instead of only checking the modification time, Emacs now also checks
 the file's actual content before prompting the user.
 
-** Title case characters are properly converted to upper case.
-'upcase', 'upcase-region' et al. convert title case characters (such
-as the single character "ǲ") into their upper case form (such as "Ǳ").
-As a downside, 'capitalize' and 'upcase-initials' produce awkward
-words where first character is upper rather than title case, e.g.,
-"Ǆungla" instead of "ǅungla".
+** Various casing improvements.
+
+*** 'upcase', 'upcase-region' et al. convert title case characters
+(such as ǲ) into their upper case form (such as Ǳ).
+
+*** 'capitalize', 'upcase-initials' et al. make use of title-case forms
+of initial characters (correctly producing for example ǅungla instead
+of incorrect Ǆungla).
+
+*** Characters which turn into multiple ones when cased are correctly handled.
+For example, ﬁ ligature is converted to FI when upper cased.
+
+*** Greek small sigma is correctly handled when at the end of the word.
+Strings such as ΌΣΟΣ are now correctly converted to Όσος when
+capitalized instead of incorrect Όσοσ (compare lowercase sigma at the
+end of the word).
 
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
@@ -753,6 +768,13 @@ processes on exit.
 
 ** New library 'xdg' with utilities for some XDG standards and specs.
 
+** HTML
+
++++
+*** A new submode of 'html-mode', 'mhtml-mode', is now the default
+    mode for *.html files.  This mode handles indentation,
+    fontification, and commenting for embedded JavaScript and CSS.
+
 
 * Incompatible Lisp Changes in Emacs 26.1
 
@@ -763,9 +785,9 @@ similarly but it doesn't prepend a '.'.
 
 +++
 ** Certain cond/pcase/cl-case forms are now compiled using a faster jump
-table implementation. This uses a new bytecode op `switch', which isn't
+table implementation. This uses a new bytecode op 'switch', which isn't
 compatible with previous Emacs versions. This functionality can be disabled
-by setting `byte-compile-cond-use-jump-table' to nil.
+by setting 'byte-compile-cond-use-jump-table' to nil.
 
 +++
 ** Resizing a frame no longer runs 'window-configuration-change-hook'.
@@ -838,6 +860,12 @@ instead of its first.
 
 
 * Lisp Changes in Emacs 26.1
+
++++
+** Emacs now supports records for user-defined types, via the new
+functions 'make-record', 'record', and 'recordp'.  Records are now
+used internally to represent cl-defstruct and defclass instances, for
+example.
 
 +++
 ** 'save-some-buffers' now uses 'save-some-buffers-default-predicate'
@@ -1057,6 +1085,10 @@ its window gets deleted by 'delete-other-windows'.
 +++
 *** New command 'window-swap-states' swaps the states of two live
 windows.
+
++++
+*** New error type 'user-search-failed' like 'search-failed' but
+avoids debugger like 'user-error'.
 
 
 * Changes in Emacs 26.1 on Non-Free Operating Systems

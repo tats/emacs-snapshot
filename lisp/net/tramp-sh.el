@@ -3411,7 +3411,10 @@ the result will be a local, non-Tramp, file name."
         (when need-chown
           (tramp-set-file-uid-gid filename uid gid))
 	(when (or (eq visit t) (null visit) (stringp visit))
-	  (tramp-message v 0 "Wrote %s" filename))
+          (tramp-message v 0 "Wrote `%s' (%d characters)" filename
+                         (cond ((null start) (buffer-size))
+                               ((stringp start) (length start))
+                               (t (- end start)))))
 	(run-hooks 'tramp-handle-write-region-hook)))))
 
 (defvar tramp-vc-registered-file-names nil
@@ -3445,7 +3448,7 @@ the result will be a local, non-Tramp, file name."
 	(let (tramp-vc-registered-file-names
 	      (remote-file-name-inhibit-cache (current-time))
 	      (file-name-handler-alist
-	       `((,tramp-file-name-regexp . tramp-vc-file-name-handler))))
+	       `((,(tramp-file-name-regexp) . tramp-vc-file-name-handler))))
 
 	  ;; Here we collect only file names, which need an operation.
 	  (ignore-errors (tramp-run-real-handler 'vc-registered (list file)))
@@ -4482,7 +4485,7 @@ Goes through the list `tramp-inline-compress-commands'."
       (let ((user (tramp-file-name-user item))
 	    (host (tramp-file-name-host item))
 	    (proxy (concat
-		    tramp-prefix-format proxy tramp-postfix-host-format)))
+		    (tramp-prefix-format) proxy (tramp-postfix-host-format))))
 	(tramp-message
 	 vec 5 "Add proxy (\"%s\" \"%s\" \"%s\")"
 	 (and (stringp host) (regexp-quote host))
