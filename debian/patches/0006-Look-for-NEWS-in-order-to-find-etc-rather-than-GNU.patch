@@ -19,7 +19,7 @@ Status: Debian specific
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/callproc.c b/src/callproc.c
-index 6328ba8..78b707b 100644
+index 6328ba8349c..78b707bab9d 100644
 --- a/src/callproc.c
 +++ b/src/callproc.c
 @@ -1633,13 +1633,13 @@ init_callproc (void)

@@ -54,7 +54,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  7 files changed, 155 insertions(+), 378 deletions(-)
 
 diff --git a/lisp/ChangeLog b/lisp/ChangeLog
-index 7345c6a..102461e 100644
+index 7345c6ac5b5..102461ebc88 100644
 --- a/lisp/ChangeLog
 +++ b/lisp/ChangeLog
 @@ -1,3 +1,9 @@
@@ -68,7 +68,7 @@ index 7345c6a..102461e 100644
  
  	* Version 24.5 released.
 diff --git a/lisp/term/x-win.el b/lisp/term/x-win.el
-index ca0ae3b..7a41d32 100644
+index ca0ae3bd9e2..7a41d328542 100644
 --- a/lisp/term/x-win.el
 +++ b/lisp/term/x-win.el
 @@ -1475,47 +1475,47 @@ This returns an error if any Emacs frames are X frames, or always under W32."
@@ -172,7 +172,7 @@ index ca0ae3b..7a41d32 100644
  
  (defcustom icon-map-list '(x-gtk-stock-map)
 diff --git a/src/ChangeLog b/src/ChangeLog
-index f95a763..1ad3dfe 100644
+index f95a7631737..1ad3dfe1fe5 100644
 --- a/src/ChangeLog
 +++ b/src/ChangeLog
 @@ -1,3 +1,34 @@
@@ -211,7 +211,7 @@ index f95a763..1ad3dfe 100644
  
  	* Version 24.5 released.
 diff --git a/src/gtkutil.c b/src/gtkutil.c
-index eddd2b5..68709ed 100644
+index eddd2b535db..68709edfbc2 100644
 --- a/src/gtkutil.c
 +++ b/src/gtkutil.c
 @@ -92,6 +92,16 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
@@ -869,7 +869,7 @@ index eddd2b5..68709ed 100644
      xg_menu_item_cb_list.prev = xg_menu_item_cb_list.next = 0;
  
 diff --git a/src/gtkutil.h b/src/gtkutil.h
-index 5176be6..37d2900 100644
+index 5176be61f86..37d290069c1 100644
 --- a/src/gtkutil.h
 +++ b/src/gtkutil.h
 @@ -107,8 +107,6 @@ extern void xg_update_frame_menubar (struct frame *f);
@@ -882,7 +882,7 @@ index 5176be6..37d2900 100644
  
  extern void xg_create_scroll_bar (struct frame *f,
 diff --git a/src/xmenu.c b/src/xmenu.c
-index 53683c7..77fc4ef 100644
+index 53683c708f1..77fc4ef2956 100644
 --- a/src/xmenu.c
 +++ b/src/xmenu.c
 @@ -793,12 +793,6 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
@@ -899,7 +899,7 @@ index 53683c7..77fc4ef 100644
      {
        /* Make a widget-value tree representing the entire menu trees.  */
 diff --git a/src/xterm.h b/src/xterm.h
-index 4683a4c..1fb3f0a 100644
+index 4683a4c7877..1fb3f0aad9e 100644
 --- a/src/xterm.h
 +++ b/src/xterm.h
 @@ -491,10 +491,6 @@ struct x_output

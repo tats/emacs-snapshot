@@ -24,7 +24,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  2 files changed, 21 insertions(+), 10 deletions(-)
 
 diff --git a/lisp/ChangeLog b/lisp/ChangeLog
-index eb31d5f..7345c6a 100644
+index eb31d5fc2fe..7345c6ac5b5 100644
 --- a/lisp/ChangeLog
 +++ b/lisp/ChangeLog
 @@ -1165,6 +1165,16 @@
@@ -45,7 +45,7 @@ index eb31d5f..7345c6a 100644
  
  	* image.el (image-multi-frame-p): Fix thinko - do not force
 diff --git a/lisp/progmodes/grep.el b/lisp/progmodes/grep.el
-index d4caf48..0e8c214 100644
+index d4caf48e089..0e8c214aafb 100644
 --- a/lisp/progmodes/grep.el
 +++ b/lisp/progmodes/grep.el
 @@ -77,11 +77,10 @@ in grep buffers, so if you have globally disabled font-lock-mode,

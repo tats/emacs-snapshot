@@ -1,0 +1,54 @@
+From 9ca1f6e83aa65507f6f6c178821d5079ddc88bb5 Mon Sep 17 00:00:00 2001
+From: Lars Ingebrigtsen <larsi@gnus.org>
+Date: Tue, 29 Dec 2015 14:39:53 +0100
+Subject: Refactor out gnutls-trustfiles
+
+Emacs should now specify a TLS trustfile.
+
+This upstream patch has been added [1/2]:
+
+  Refactor out gnutls-trustfiles
+
+  * lisp/net/gnutls.el (gnutls-trustfiles): Refactor out for reuse by tls.el.
+
+Origin: backport, commit:1ba1e35fbed820ec9d9e1dafbe150f88f29342d8
+Bug: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=19284
+Bug-Debian: https://bugs.debian.org/816063
+Forwarded: not-needed
+---
+ lisp/net/gnutls.el | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/lisp/net/gnutls.el b/lisp/net/gnutls.el
+index 0593c1f29e3..de0b1b3d08f 100644
+--- a/lisp/net/gnutls.el
++++ b/lisp/net/gnutls.el
+@@ -189,12 +189,7 @@ here's a recent version of the list.
+ It must be omitted, a number, or nil; if omitted or nil it
+ defaults to GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT."
+   (let* ((type (or type 'gnutls-x509pki))
+-         (trustfiles (or trustfiles
+-                         (delq nil
+-                               (mapcar (lambda (f) (and f (file-exists-p f) f))
+-                                       (if (functionp gnutls-trustfiles)
+-                                           (funcall gnutls-trustfiles)
+-                                         gnutls-trustfiles)))))
++         (trustfiles (or trustfiles (gnutls-trustfiles)))
+          (priority-string (or priority-string
+                               (cond
+                                ((eq type 'gnutls-anon)
+@@ -245,6 +240,14 @@ defaults to GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT."
+ 
+     process))
+ 
++(defun gnutls-trustfiles ()
++  "Return a list of usable trustfiles."
++  (delq nil
++        (mapcar (lambda (f) (and f (file-exists-p f) f))
++                (if (functionp gnutls-trustfiles)
++                    (funcall gnutls-trustfiles)
++                  gnutls-trustfiles))))
++
+ (declare-function gnutls-error-string "gnutls.c" (error))
+ 
+ (defun gnutls-message-maybe (doit format &rest params)

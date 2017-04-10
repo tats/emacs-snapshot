@@ -30,7 +30,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  3 files changed, 26 insertions(+), 26 deletions(-)
 
 diff --git a/admin/CPP-DEFINES b/admin/CPP-DEFINES
-index e475b42..ef35513 100644
+index e475b422500..ef355135d8a 100644
 --- a/admin/CPP-DEFINES
 +++ b/admin/CPP-DEFINES
 @@ -244,7 +244,7 @@ HAVE_NET_IF_DL_H
@@ -43,7 +43,7 @@ index e475b42..ef35513 100644
  HAVE_PNG_H
  HAVE_POSIX_MEMALIGN
 diff --git a/configure.ac b/configure.ac
-index bdc76bc..18387d8 100644
+index bdc76bca3db..18387d84ec5 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -1478,15 +1478,17 @@ AC_CHECK_HEADERS_ONCE(
@@ -74,7 +74,7 @@ index bdc76bc..18387d8 100644
  
  dnl On Solaris 8 there's a compilation warning for term.h because
 diff --git a/src/emacs.c b/src/emacs.c
-index b5d3ab4..eda439a 100644
+index b5d3ab46a00..eda439ac6b1 100644
 --- a/src/emacs.c
 +++ b/src/emacs.c
 @@ -99,7 +99,7 @@ extern void moncontrol (int mode);

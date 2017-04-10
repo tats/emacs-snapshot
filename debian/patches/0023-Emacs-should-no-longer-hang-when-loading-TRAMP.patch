@@ -21,7 +21,7 @@ Forwarded: not-needed
  5 files changed, 89 insertions(+), 53 deletions(-)
 
 diff --git a/lisp/net/tramp-adb.el b/lisp/net/tramp-adb.el
-index f5e2019..cf1e05e 100644
+index f5e201985f9..cf1e05e4d65 100644
 --- a/lisp/net/tramp-adb.el
 +++ b/lisp/net/tramp-adb.el
 @@ -38,6 +38,7 @@
@@ -41,7 +41,7 @@ index f5e2019..cf1e05e 100644
    "^\\(?:[[:digit:]]*|?\\)?\\(?:[[:alnum:]]*@[[:alnum:]]*[^#\\$]*\\)?[#\\$][[:space:]]"
    "Regexp used as prompt in almquist shell."
 diff --git a/lisp/net/tramp-gvfs.el b/lisp/net/tramp-gvfs.el
-index 1ea52eb..5988a28 100644
+index 1ea52eb670d..5988a284c6e 100644
 --- a/lisp/net/tramp-gvfs.el
 +++ b/lisp/net/tramp-gvfs.el
 @@ -127,6 +127,7 @@
@@ -61,7 +61,7 @@ index 1ea52eb..5988a28 100644
    "Defines seconds since last bluetooth device discovery before rescanning.
  A value of 0 would require an immediate discovery during hostname
 diff --git a/lisp/net/tramp-sh.el b/lisp/net/tramp-sh.el
-index bd7aec9..0e30bfe 100644
+index bd7aec98f79..0e30bfe08ed 100644
 --- a/lisp/net/tramp-sh.el
 +++ b/lisp/net/tramp-sh.el
 @@ -40,6 +40,7 @@
@@ -202,7 +202,7 @@ index bd7aec9..0e30bfe 100644
  		     (process-adaptive-read-buffering nil)
  		     (coding-system-for-read nil)
 diff --git a/lisp/net/tramp-smb.el b/lisp/net/tramp-smb.el
-index d5fe17f..14360b9 100644
+index d5fe17f0939..14360b96fe6 100644
 --- a/lisp/net/tramp-smb.el
 +++ b/lisp/net/tramp-smb.el
 @@ -70,17 +70,20 @@
@@ -251,7 +251,7 @@ index d5fe17f..14360b9 100644
    "Command switch used together with `tramp-smb-winexe-shell-command'.
  This can be used to disable echo etc."
 diff --git a/lisp/net/tramp.el b/lisp/net/tramp.el
-index 79242a4..10bb769 100644
+index 79242a46755..10bb76983aa 100644
 --- a/lisp/net/tramp.el
 +++ b/lisp/net/tramp.el
 @@ -73,6 +73,7 @@

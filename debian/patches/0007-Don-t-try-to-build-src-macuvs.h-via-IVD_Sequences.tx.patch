@@ -10,7 +10,7 @@ over the licensing.
  1 file changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index 9781cd5..c73e2b5 100644
+index 9781cd5f273..c73e2b58f31 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
 @@ -33,12 +33,7 @@ emacs = "${EMACS}" -batch --no-site-file --no-site-lisp

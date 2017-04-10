@@ -24,7 +24,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 47 insertions(+)
 
 diff --git a/src/gmalloc.c b/src/gmalloc.c
-index cfd39be..9f93b62 100644
+index cfd39be2bb3..9f93b62df93 100644
 --- a/src/gmalloc.c
 +++ b/src/gmalloc.c
 @@ -49,6 +49,17 @@ extern "C"

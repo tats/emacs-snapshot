@@ -38,7 +38,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  4 files changed, 2 insertions(+), 13 deletions(-)
 
 diff --git a/src/dispextern.h b/src/dispextern.h
-index 239c442..cf3d1ec 100644
+index 239c4425646..cf3d1ecaf9c 100644
 --- a/src/dispextern.h
 +++ b/src/dispextern.h
 @@ -3349,7 +3349,6 @@ void unrequest_sigio (void);
@@ -50,7 +50,7 @@ index 239c442..cf3d1ec 100644
  /* Defined in xfaces.c.  */
  
 diff --git a/src/emacs.c b/src/emacs.c
-index 9b78a70..b5d3ab4 100644
+index 9b78a70428e..b5d3ab46a00 100644
 --- a/src/emacs.c
 +++ b/src/emacs.c
 @@ -2028,7 +2028,6 @@ shut_down_emacs (int sig, Lisp_Object stuff)
@@ -62,7 +62,7 @@ index 9b78a70..b5d3ab4 100644
    /* Do this only if terminating normally, we want glyph matrices
       etc. in a core dump.  */
 diff --git a/src/keyboard.c b/src/keyboard.c
-index 945019e..77af44a 100644
+index 945019e8418..77af44a7d46 100644
 --- a/src/keyboard.c
 +++ b/src/keyboard.c
 @@ -3663,8 +3663,7 @@ kbd_buffer_store_event_hold (register struct input_event *event,
@@ -84,7 +84,7 @@ index 945019e..77af44a 100644
      }
  #endif	/* subprocesses */
 diff --git a/src/sysdep.c b/src/sysdep.c
-index 01692c2..4b4801d 100644
+index 01692c2d214..4b4801d58c9 100644
 --- a/src/sysdep.c
 +++ b/src/sysdep.c
 @@ -649,15 +649,6 @@ unrequest_sigio (void)

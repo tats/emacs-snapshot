@@ -27,7 +27,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c
-index f2462d1..c69be0d 100644
+index f2462d1e85e..c69be0dfdc0 100644
 --- a/src/unexelf.c
 +++ b/src/unexelf.c
 @@ -247,7 +247,7 @@ unexec (const char *new_name, const char *old_name)

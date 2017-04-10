@@ -28,7 +28,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c
-index 59e2725..d4a36f8 100644
+index 59e2725ba20..d4a36f84cb1 100644
 --- a/src/unexelf.c
 +++ b/src/unexelf.c
 @@ -1016,12 +1016,12 @@ temacs:

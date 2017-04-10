@@ -21,3 +21,6 @@
 0021-Emacs-should-work-with-gcc-5.2-and-newer.patch
 0022-Emacs-should-work-with-glibc-2.24-on-ppc64.patch
 0023-Emacs-should-no-longer-hang-when-loading-TRAMP.patch
+0024-Remove-insecure-from-gnutls-cli-invocation.patch
+0025-Refactor-out-gnutls-trustfiles.patch
+0026-Make-tls.el-use-trustfiles-by-default.patch

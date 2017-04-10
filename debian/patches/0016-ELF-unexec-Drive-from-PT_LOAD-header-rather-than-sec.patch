@@ -48,7 +48,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 77 insertions(+), 213 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c
-index 1d9387e..c659f3e 100644
+index 1d9387e534c..c659f3ed280 100644
 --- a/src/unexelf.c
 +++ b/src/unexelf.c
 @@ -535,29 +535,6 @@ verify ((! TYPE_SIGNED (ElfW (Half))

@@ -18,7 +18,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c
-index 9279c76..f2462d1 100644
+index 9279c760d6f..f2462d1e85e 100644
 --- a/src/unexelf.c
 +++ b/src/unexelf.c
 @@ -208,8 +208,6 @@ entry_address (void *section_h, ptrdiff_t idx, ptrdiff_t entsize)

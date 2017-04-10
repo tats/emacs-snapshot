@@ -41,7 +41,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 50 insertions(+), 474 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c
-index c659f3e..9279c76 100644
+index c659f3ed280..9279c760d6f 100644
 --- a/src/unexelf.c
 +++ b/src/unexelf.c
 @@ -40,347 +40,6 @@ what you give them.   Help stamp out software-hoarding!  */

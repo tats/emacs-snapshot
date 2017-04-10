@@ -31,7 +31,7 @@ Status: new
  6 files changed, 35 insertions(+), 747 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 4987cf6..c8e3b0e 100644
+index 4987cf6bd4c..c8e3b0e8eb8 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -147,7 +147,9 @@ man1dir=$(mandir)/man1
@@ -156,7 +156,7 @@ index 4987cf6..c8e3b0e 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 0513d07..5b3709d 100755
+index 0513d078db1..5b3709dac2d 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -263,8 +263,7 @@ info_dir ()
@@ -170,7 +170,7 @@ index 0513d07..5b3709d 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/build-aux/make-info-dir b/build-aux/make-info-dir
-index 5b37cd6..f63c6c67 100755
+index 5b37cd6fd0f..f63c6c672d0 100755
 --- a/build-aux/make-info-dir
 +++ b/build-aux/make-info-dir
 @@ -76,8 +76,7 @@ for topic in "Texinfo documentation system" "Emacs" "Emacs lisp" \
@@ -184,7 +184,7 @@ index 5b37cd6..f63c6c67 100755
          ## FIXME do not ignore w32 if OS is w32.
          case $file in
 diff --git a/configure.ac b/configure.ac
-index 4291453..bdc76bc 100644
+index 4291453535b..bdc76bca3db 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5117,11 +5117,11 @@ dnl This will work, but you get a config.status that is not quite right
@@ -203,7 +203,7 @@ index 4291453..bdc76bc 100644
  
  dnl test/ is not present in release tarfiles.
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 1644833..6918775 100644
+index 1644833d2b9..69187750d1d 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -57,18 +57,14 @@ INSTALL_DATA = @INSTALL_DATA@
@@ -938,7 +938,7 @@ index 1644833..6918775 100644
  
  mostlyclean:
 diff --git a/lisp/help.el b/lisp/help.el
-index 80eb308..d009747 100644
+index 80eb308f67b..d0097472a1d 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -287,6 +287,14 @@ If that doesn't give a function, return nil."
