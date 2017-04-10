@@ -1,3 +1,11 @@
+emacs24 (24.5+1-9~1.gbpdd1226) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @dd1226a77cbf3af36e7a52a2675d21a6885da6b7 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Apr 2017 21:25:35 -0500
+
 emacs24 (24.5+1-8) unstable; urgency=medium
 
   * Configure with REL_ALLOC=no to fix crashes.  Thanks to Santiago
