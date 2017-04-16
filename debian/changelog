@@ -1,10 +1,20 @@
-emacs24 (24.5+1-9~1.gbpdd1226) UNRELEASED; urgency=medium
+emacs24 (24.5+1-9) unstable; urgency=medium
 
-  ** SNAPSHOT build @dd1226a77cbf3af36e7a52a2675d21a6885da6b7 **
+  * Improve gnutls security.  Remove --insecure and specify a trustfile.
+    Add these upstream patches to fix the problem:
+      0024-Remove-insecure-from-gnutls-cli-invocation.patch
+      0025-Refactor-out-gnutls-trustfiles.patch
+      0026-Make-tls.el-use-trustfiles-by-default.patch
+    Partially addresses #816063.
 
-  * UNRELEASED
+  * Stop using libgnutls.  Add a dependency on gnutls-cli, configure
+    --without-gnutls, and remove the corresponding build dependency so
+    the patches that were just added to improve SSL security will take
+    effect by default.  Thanks to Nathaniel Smith for reporting the
+    problem and Antoine Beaupre for providing code to reproduce
+    it. (Closes: 816063)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 09 Apr 2017 21:25:35 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 16 Apr 2017 10:07:37 -0500
 
 emacs24 (24.5+1-8) unstable; urgency=medium
 
