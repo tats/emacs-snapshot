@@ -1,3 +1,11 @@
+emacs24 (24.5+1-10~1.gbp322d13) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @322d1326f1f02ff02c8294ae457be63ba3421503 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 16 Apr 2017 11:59:32 -0500
+
 emacs24 (24.5+1-9) unstable; urgency=medium
 
   * Improve gnutls security.  Remove --insecure and specify a trustfile.
