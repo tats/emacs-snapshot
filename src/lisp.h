@@ -1369,6 +1369,10 @@ SBYTES (Lisp_Object string)
 INLINE void
 STRING_SET_CHARS (Lisp_Object string, ptrdiff_t newsize)
 {
+  /* This function cannot change the size of data allocated for the
+     string when it was created.  */
+  eassert ((STRING_MULTIBYTE (string) && newsize <= SBYTES (string))
+	   || (!STRING_MULTIBYTE (string) && newsize == SCHARS (string)));
   XSTRING (string)->size = newsize;
 }
 
@@ -1399,6 +1403,12 @@ ASIZE (Lisp_Object array)
   ptrdiff_t size = XVECTOR (array)->header.size;
   eassume (0 <= size);
   return size;
+}
+
+INLINE ptrdiff_t
+PVSIZE (Lisp_Object pv)
+{
+  return ASIZE (pv) & PSEUDOVECTOR_SIZE_MASK;
 }
 
 INLINE bool
