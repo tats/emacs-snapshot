@@ -25,3 +25,5 @@
 0025-Refactor-out-gnutls-trustfiles.patch
 0026-Make-tls.el-use-trustfiles-by-default.patch
 0027-Emacs-shouldn-t-segfault-when-gcc-expects-nopie.patch
+0028-IMAP-connections-no-longer-use-openssl-s_client.patch
+0029-openssl-s_client-is-no-longer-a-default-for-ssl-conn.patch
