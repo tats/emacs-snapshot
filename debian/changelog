@@ -1,10 +1,21 @@
-emacs24 (24.5+1-10~1.gbp322d13) UNRELEASED; urgency=medium
+emacs24 (24.5+1-10) unstable; urgency=medium
 
-  ** SNAPSHOT build @322d1326f1f02ff02c8294ae457be63ba3421503 **
+  * Don't segfault if gcc expects -nopie instead of -no-pie.
+    Add 0027-Emacs-shouldn-t-segfault-when-gcc-expects-nopie.patch, a
+    backport from emacs25 (that closed #841551) to fix the problem.
+    Thanks to Lucas Nussbaum and Aaron M. Ucko for reporting the
+    problem, and Sven Joachim for tracking down the upstream patch.
 
-  * UNRELEASED
+  * Don't offer/use openssl s_client by default: "s_client is a debug
+    tool, it does not set up a secure connection, it ignores all
+    errors and just continues.  It also doesn't do checks it should be
+    doing.  This is all documented behaviour." -- Kurt Roeckx
+    Add these patches to fix the problem:
+      0028-IMAP-connections-no-longer-use-openssl-s_client.patch
+      0029-openssl-s_client-is-no-longer-a-default-for-ssl-conn.patch
+    Thanks to Kurt Roeckx for reporting the issue. (Closes: #766397)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 16 Apr 2017 11:59:32 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 22 Apr 2017 12:33:05 -0500
 
 emacs24 (24.5+1-9) unstable; urgency=medium
 
