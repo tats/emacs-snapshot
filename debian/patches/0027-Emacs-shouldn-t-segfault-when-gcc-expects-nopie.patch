@@ -1,0 +1,56 @@
+From c91f2fca460e04c1d47ec1b5db1ca3b8130b95f8 Mon Sep 17 00:00:00 2001
+From: Paul Eggert <eggert@cs.ucla.edu>
+Date: Sun, 16 Oct 2016 16:25:47 -0700
+Subject: Emacs shouldn't segfault when gcc expects -nopie
+
+This upstream patch has been added:
+
+  Port to Ubuntu 16.10, which needs gcc -nopie
+
+  * configure.ac (emacs_cv_prog_cc_no_pie): Rename from
+  emacs_cv_prog_cc_nopie.  All usages changed.  Check for -no-pie in
+  preference to -nopie (Bug#24682).  Backport from master.
+
+Origin: upstream, commit: 99892eeec8990884ef38601f14038ec6dc227741
+Bug: https://debbugs.gnu.org/24682
+Bug-Debian: https://bugs.debian.org/841551
+---
+ configure.ac | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 18387d84ec5..222b195a828 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -4918,6 +4918,31 @@ case "$opsys" in
+   *) LD_SWITCH_SYSTEM_TEMACS= ;;
+ esac
+ 
++# -no-pie or -nopie fixes a temacs segfault on Gentoo, OpenBSD,
++# Ubuntu, and other systems with "hardened" GCC configurations for
++# some reason (Bug#18784).  We don't know why this works, but not
++# segfaulting is better than segfaulting.  Use ac_c_werror_flag=yes
++# when trying the option, otherwise clang keeps warning that it does
++# not understand it, and pre-4.6 GCC has a similar problem
++# (Bug#20338).  Prefer -no-pie to -nopie, as -no-pie is the
++# spelling used by GCC 6.1.0 and later (Bug#24682).
++AC_CACHE_CHECK(
++  [for $CC option to disable position independent executables],
++  [emacs_cv_prog_cc_no_pie],
++  [emacs_save_c_werror_flag=$ac_c_werror_flag
++   emacs_save_LDFLAGS=$LDFLAGS
++   ac_c_werror_flag=yes
++   for emacs_cv_prog_cc_no_pie in -no-pie -nopie no; do
++     test $emacs_cv_prog_cc_no_pie = no && break
++     LDFLAGS="$emacs_save_LDFLAGS $emacs_cv_prog_cc_no_pie"
++     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [break])
++   done
++   ac_c_werror_flag=$emacs_save_c_werror_flag
++   LDFLAGS=$emacs_save_LDFLAGS])
++if test "$emacs_cv_prog_cc_no_pie" != no; then
++  LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS $emacs_cv_prog_cc_no_pie"
++fi
++
+ if test x$ac_enable_profiling != x ; then
+   case $opsys in
+     *freebsd | gnu-linux) ;;
