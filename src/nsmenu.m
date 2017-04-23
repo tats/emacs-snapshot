@@ -995,8 +995,6 @@ free_frame_tool_bar (struct frame *f)
   block_input ();
   view->wait_for_tool_bar = NO;
 
-  FRAME_TOOLBAR_HEIGHT (f) = 0;
-
   /* Note: This trigger an animation, which calls windowDidResize
      repeatedly. */
   f->output_data.ns->in_animation = 1;
@@ -1014,7 +1012,6 @@ update_frame_tool_bar (struct frame *f)
 {
   int i, k = 0;
   EmacsView *view = FRAME_NS_VIEW (f);
-  NSWindow *window = [view window];
   EmacsToolbar *toolbar = [view toolbar];
   int oldh;
 
@@ -1128,12 +1125,6 @@ update_frame_tool_bar (struct frame *f)
       [newDict release];
     }
 #endif
-
-  FRAME_TOOLBAR_HEIGHT (f) =
-    NSHeight ([window frameRectForContentRect: NSMakeRect (0, 0, 0, 0)])
-    - FRAME_NS_TITLEBAR_HEIGHT (f);
-  if (FRAME_TOOLBAR_HEIGHT (f) < 0) // happens if frame is fullscreen.
-    FRAME_TOOLBAR_HEIGHT (f) = 0;
 
   if (oldh != FRAME_TOOLBAR_HEIGHT (f))
     [view updateFrameSize:YES];

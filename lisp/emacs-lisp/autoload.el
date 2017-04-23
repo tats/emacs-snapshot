@@ -164,7 +164,8 @@ expression, in which case we want to handle forms differently."
      ((and (memq car '(easy-mmode-define-global-mode define-global-minor-mode
                        define-globalized-minor-mode defun defmacro
 		       easy-mmode-define-minor-mode define-minor-mode
-                       define-inline cl-defun cl-defmacro cl-defgeneric))
+                       define-inline cl-defun cl-defmacro cl-defgeneric
+                       pcase-defmacro))
            (macrop car)
 	   (setq expand (let ((load-file-name file)) (macroexpand form)))
 	   (memq (car expand) '(progn prog1 defalias)))
@@ -546,7 +547,9 @@ Don't try to split prefixes that are already longer than that.")
     ;; "cc-helper" and "c-mode", you'll get "c" in the root prefixes.
     (dolist (pair (prog1 prefixes (setq prefixes nil)))
       (let ((s (car pair)))
-        (if (or (> (length s) 2)                  ;Long enough!
+        (if (or (and (> (length s) 2)   ; Long enough!
+                     ;; But don't use "def" from deffoo-pkg-thing.
+                     (not (string= "def" s)))
                 (string-match ".[[:punct:]]\\'" s) ;A real (tho short) prefix?
                 (radix-tree-lookup (cdr pair) "")) ;Nothing to expand!
             (push pair prefixes) ;Keep it as is.
@@ -595,7 +598,8 @@ Don't try to split prefixes that are already longer than that.")
               (lambda (x)
                 (let ((prefix (car x)))
                   (if (or (> (length prefix) 2) ;Long enough!
-                          (string-match ".[[:punct:]]\\'" prefix))
+                          (and (eq (length prefix) 2)
+                               (string-match "[[:punct:]]" prefix)))
                       prefix
                     ;; Some packages really don't follow the rules.
                     ;; Drop the most egregious cases such as the

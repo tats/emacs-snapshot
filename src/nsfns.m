@@ -972,12 +972,16 @@ frame_parm_handler ns_frame_parm_handlers[] =
   0, /* x_set_sticky */
   0, /* x_set_tool_bar_position */
   0, /* x_set_inhibit_double_buffering */
-  0, /* x_set_undecorated */
-  0, /* x_set_parent_frame */
+#ifdef NS_IMPL_COCOA
+  x_set_undecorated,
+#else
+  0, /*x_set_undecorated */
+#endif
+  x_set_parent_frame,
   0, /* x_set_skip_taskbar */
   0, /* x_set_no_focus_on_map */
-  0, /* x_set_no_accept_focus */
-  0, /* x_set_z_group */
+  x_set_no_accept_focus,
+  x_set_z_group, /* x_set_z_group */
   0, /* x_set_override_redirect */
 };
 
@@ -1087,7 +1091,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   ptrdiff_t count = specpdl_ptr - specpdl;
   Lisp_Object display;
   struct ns_display_info *dpyinfo = NULL;
-  Lisp_Object parent;
+  Lisp_Object parent, parent_frame;
   struct kboard *kb;
   static int desc_ctr = 1;
   int x_width = 0, x_height = 0;
@@ -1265,6 +1269,27 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, 1,
 		     Qx_create_frame_1);
 
+  tem = x_get_arg (dpyinfo, parms, Qundecorated, NULL, NULL, RES_TYPE_BOOLEAN);
+  FRAME_UNDECORATED (f) = !NILP (tem) && !EQ (tem, Qunbound);
+  store_frame_param (f, Qundecorated, FRAME_UNDECORATED (f) ? Qt : Qnil);
+
+  parent_frame = x_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
+			    RES_TYPE_SYMBOL);
+  /* Accept parent-frame iff parent-id was not specified.  */
+  if (!NILP (parent)
+      || EQ (parent_frame, Qunbound)
+      || NILP (parent_frame)
+      || !FRAMEP (parent_frame)
+      || !FRAME_LIVE_P (XFRAME (parent_frame)))
+    parent_frame = Qnil;
+
+  fset_parent_frame (f, parent_frame);
+  store_frame_param (f, Qparent_frame, parent_frame);
+
+  x_default_parameter (f, parms, Qz_group, Qnil, NULL, NULL, RES_TYPE_SYMBOL);
+  x_default_parameter (f, parms, Qno_accept_focus, Qnil,
+                       NULL, NULL, RES_TYPE_BOOLEAN);
+
   /* The resources controlling the menu-bar and tool-bar are
      processed specially at startup, and reflected in the mode
      variables; ignore them here.  */
@@ -1405,6 +1430,86 @@ x_focus_frame (struct frame *f, bool noactivate)
     }
 }
 
+static BOOL
+ns_window_is_ancestor (NSWindow *win, NSWindow *candidate)
+/* Test whether CANDIDATE is an ancestor window of WIN. */
+{
+  if (candidate == NULL)
+    return NO;
+  else if (win == candidate)
+    return YES;
+  else
+    return ns_window_is_ancestor(win, [candidate parentWindow]);
+}
+
+DEFUN ("ns-frame-list-z-order", Fns_frame_list_z_order,
+       Sns_frame_list_z_order, 0, 1, 0,
+       doc: /* Return list of Emacs' frames, in Z (stacking) order.
+The optional argument TERMINAL specifies which display to ask about.
+TERMINAL should be either a frame or a display name (a string).  If
+omitted or nil, that stands for the selected frame's display.  Return
+nil if TERMINAL contains no Emacs frame.
+
+As a special case, if TERMINAL is non-nil and specifies a live frame,
+return the child frames of that frame in Z (stacking) order.
+
+Frames are listed from topmost (first) to bottommost (last).  */)
+  (Lisp_Object terminal)
+{
+  Lisp_Object frames = Qnil;
+  NSWindow *parent = nil;
+
+  if (FRAMEP (terminal) && FRAME_LIVE_P (XFRAME (terminal)))
+    parent = [FRAME_NS_VIEW (XFRAME (terminal)) window];
+  else if (!NILP (terminal))
+    return Qnil;
+
+  for (NSWindow *win in [[NSApp orderedWindows] reverseObjectEnumerator])
+    {
+      Lisp_Object frame;
+
+      /* Check against [win parentWindow] so that it doesn't match itself. */
+      if (parent == nil || ns_window_is_ancestor (parent, [win parentWindow]))
+        {
+          XSETFRAME (frame, ((EmacsView *)[win delegate])->emacsframe);
+          frames = Fcons(frame, frames);
+        }
+    }
+
+  return frames;
+}
+
+DEFUN ("ns-frame-restack", Fns_frame_restack, Sns_frame_restack, 2, 3, 0,
+       doc: /* Restack FRAME1 below FRAME2.
+This means that if both frames are visible and the display areas of
+these frames overlap, FRAME2 (partially) obscures FRAME1.  If optional
+third argument ABOVE is non-nil, restack FRAME1 above FRAME2.  This
+means that if both frames are visible and the display areas of these
+frames overlap, FRAME1 (partially) obscures FRAME2.
+
+Some window managers may refuse to restack windows.  */)
+     (Lisp_Object frame1, Lisp_Object frame2, Lisp_Object above)
+{
+  struct frame *f1 = decode_live_frame (frame1);
+  struct frame *f2 = decode_live_frame (frame2);
+
+  if (FRAME_NS_VIEW (f1) && FRAME_NS_VIEW (f2))
+    {
+      NSWindow *window = [FRAME_NS_VIEW (f1) window];
+      NSInteger window2 = [[FRAME_NS_VIEW (f2) window] windowNumber];
+      NSWindowOrderingMode flag = NILP (above) ? NSWindowBelow : NSWindowAbove;
+
+      [window orderWindow: flag
+               relativeTo: window2];
+
+      return Qt;
+    }
+  else
+    {
+      error ("Cannot restack frames");
+      return Qnil;
+    }
+}
 
 DEFUN ("ns-popup-font-panel", Fns_popup_font_panel, Sns_popup_font_panel,
        0, 1, "",
@@ -3134,6 +3239,8 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sns_display_monitor_attributes_list);
   defsubr (&Sns_frame_geometry);
   defsubr (&Sns_frame_edges);
+  defsubr (&Sns_frame_list_z_order);
+  defsubr (&Sns_frame_restack);
   defsubr (&Sx_display_mm_width);
   defsubr (&Sx_display_mm_height);
   defsubr (&Sx_display_screens);
