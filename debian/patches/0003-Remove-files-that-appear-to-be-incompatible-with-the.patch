@@ -30,7 +30,7 @@ Status: new
  5 files changed, 39 insertions(+), 79 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index b212c91..89584ed 100644
+index b212c914e56..89584ed6166 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
@@ -120,7 +120,7 @@ index b212c91..89584ed 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 82ad622..7bca0d6 100755
+index 82ad622c64e..7bca0d67e0d 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -269,8 +269,7 @@ info_dir ()
@@ -134,7 +134,7 @@ index 82ad622..7bca0d6 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index cd4d1c0..eeaa79d 100644
+index cd4d1c0f8e0..eeaa79d1788 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5389,11 +5389,11 @@ dnl This will work, but you get a config.status that is not quite right
@@ -173,7 +173,7 @@ index cd4d1c0..eeaa79d 100644
  dnl If we give this the more natural name, etc/refcards/emacsver.texi,
  dnl then a directory etc/refcards is created in the build directory,
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 4dffeaf..9d144cc 100644
+index 4dffeafb1d2..9d144cc4528 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA = @INSTALL_DATA@
@@ -257,7 +257,7 @@ index 4dffeaf..9d144cc 100644
  .PHONY: mostlyclean clean distclean bootstrap-clean maintainer-clean
  
 diff --git a/lisp/help.el b/lisp/help.el
-index 57f358b..69a45ef 100644
+index 57f358b9a72..69a45effab5 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file

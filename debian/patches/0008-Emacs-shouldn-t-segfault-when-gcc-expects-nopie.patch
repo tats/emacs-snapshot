@@ -19,7 +19,7 @@ Bug-Debian: https://bugs.debian.org/841551
  1 file changed, 18 insertions(+), 14 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index eeaa79d..95502ee 100644
+index eeaa79d1788..95502ee3b90 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5159,25 +5159,29 @@ case "$opsys" in

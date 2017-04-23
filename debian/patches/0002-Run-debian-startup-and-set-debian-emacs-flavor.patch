@@ -16,7 +16,7 @@ Author: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 761e69e..ffd58fd 100644
+index 761e69e03b1..ffd58fd5f6d 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
 @@ -438,6 +438,10 @@ tutorial-directory

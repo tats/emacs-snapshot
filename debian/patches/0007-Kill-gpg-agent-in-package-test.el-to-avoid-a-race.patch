@@ -20,7 +20,7 @@ package-test.el should no longer fail during clean up.
  1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/test/automated/package-test.el b/test/automated/package-test.el
-index c4c856f..d071958 100644
+index c4c856f3031..d0719588c89 100644
 --- a/test/automated/package-test.el
 +++ b/test/automated/package-test.el
 @@ -149,7 +149,14 @@ package-test-fake-contents-file
