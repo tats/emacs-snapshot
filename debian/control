@@ -105,6 +105,7 @@ Recommends: emacs24-el
 Suggests: emacs24-el, emacs24-common-non-dfsg, ncurses-term
 Conflicts: emacs24-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
 Breaks: apel (<< 10.8+0.20120427-4),
+        mell (<= 1.0.0-7),
         oneliner-el (<= 0.3.6-7.1)
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
