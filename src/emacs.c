@@ -723,6 +723,27 @@ main (int argc, char **argv)
   stack_base = &dummy;
 #endif
 
+#if defined HAVE_PERSONALITY_ADDR_NO_RANDOMIZE && defined __PPC64__
+  /* This code partly duplicates the HAVE_PERSONALITY_LINUX32 code
+     below.  This duplication is planned to be fixed in a later
+     Emacs release.  */
+# define ADD_NO_RANDOMIZE 0x0040000
+  int pers = personality (0xffffffff);
+  if (! (pers & ADD_NO_RANDOMIZE)
+      && 0 <= personality (pers | ADD_NO_RANDOMIZE))
+    {
+      /* Address randomization was enabled, but is now disabled.
+	 Re-execute Emacs to get a clean slate.  */
+      execvp (argv[0], argv);
+
+      /* If the exec fails, warn the user and then try without a
+	 clean slate.  */
+      perror (argv[0]);
+    }
+# undef ADD_NO_RANDOMIZE
+#endif
+
+
 #ifdef G_SLICE_ALWAYS_MALLOC
   /* This is used by the Cygwin build.  It's not needed starting with
      cygwin-1.7.24, but it doesn't do any harm.  */

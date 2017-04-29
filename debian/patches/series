@@ -27,3 +27,4 @@
 0027-Emacs-shouldn-t-segfault-when-gcc-expects-nopie.patch
 0028-IMAP-connections-no-longer-use-openssl-s_client.patch
 0029-openssl-s_client-is-no-longer-a-default-for-ssl-conn.patch
+0030-Emacs-should-really-work-with-glibc-2.24-on-ppc64.patch

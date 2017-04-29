@@ -1,0 +1,59 @@
+From d1daaa0d464b4610e0f74553c5a91d1e5193c2ab Mon Sep 17 00:00:00 2001
+From: Paul Eggert <eggert@cs.ucla.edu>
+Date: Tue, 19 Jul 2016 15:23:14 +0200
+Subject: Emacs should (really) work with glibc 2.24 on ppc64
+
+Apparently the earlier fix in 3a838494fc769f1ae39adf20325869331f0c300d
+("Emacs should work with glibc 2.24 on ppc64") was incomplete.
+
+This patch, backported to Debian/Ubuntu by Iain Lane
+<iain.lane@canonical.com>, has been added to address a remaining
+memory exhaustion problem:
+
+  Backport from master (Bug#24033).
+  Inspired by a suggestion by Florian Weimer in:
+  https://sourceware.org/ml/libc-alpha/2016-07/msg00425.html
+  * src/emacs.c (main) [__PPC64__]:
+  Special case for __PPC64__, which needs ASLR disabled in
+  dumped Emacs too.
+
+Origin: backport, commit: ff3fc21e24edffccce0d42065833e852a6792bd2
+Bug-Debian: http://bugs.debian.org/861032
+Bug-Debian: http://bugs.debian.org/854799
+Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ src/emacs.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/src/emacs.c b/src/emacs.c
+index eda439ac6b1..64d7e315c94 100644
+--- a/src/emacs.c
++++ b/src/emacs.c
+@@ -723,6 +723,27 @@ main (int argc, char **argv)
+   stack_base = &dummy;
+ #endif
+ 
++#if defined HAVE_PERSONALITY_ADDR_NO_RANDOMIZE && defined __PPC64__
++  /* This code partly duplicates the HAVE_PERSONALITY_LINUX32 code
++     below.  This duplication is planned to be fixed in a later
++     Emacs release.  */
++# define ADD_NO_RANDOMIZE 0x0040000
++  int pers = personality (0xffffffff);
++  if (! (pers & ADD_NO_RANDOMIZE)
++      && 0 <= personality (pers | ADD_NO_RANDOMIZE))
++    {
++      /* Address randomization was enabled, but is now disabled.
++	 Re-execute Emacs to get a clean slate.  */
++      execvp (argv[0], argv);
++
++      /* If the exec fails, warn the user and then try without a
++	 clean slate.  */
++      perror (argv[0]);
++    }
++# undef ADD_NO_RANDOMIZE
++#endif
++
++
+ #ifdef G_SLICE_ALWAYS_MALLOC
+   /* This is used by the Cygwin build.  It's not needed starting with
+      cygwin-1.7.24, but it doesn't do any harm.  */
