@@ -1,10 +1,23 @@
-emacs24 (24.5+1-11~1.gbpadbb66) UNRELEASED; urgency=medium
+emacs24 (24.5+1-11) unstable; urgency=medium
 
-  ** SNAPSHOT build @adbb66f4ba96b14106381a4fef66c6d0685c9143 **
+  * emacs-common: add "Breaks: mell (<= 1.0.0-7)".  Apparently it was
+    removed from the archive in 2011 and can no longer install.
+    Thanks to Andreas Beckmann for reporting the problem.
+    (Closes: 860858)
 
-  * UNRELEASED
+  * emacs-common: add "Breaks: prom-mew (<= 2.00+3.2am01-1)".
+    Apparently it was removed from the archive in 2009 and can no
+    longer install.  Thanks to Andreas Beckmann for reporting the
+    problem. (Closes: 851604)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 29 Apr 2017 09:22:31 -0500
+  * Add additional fix for memory exhaustion on ppc64el.  Add
+    0030-Emacs-should-really-work-with-glibc-2.24-on-ppc64.patch to
+    augment the previous fix for memory exhaustion on ppc64(el).
+    Thanks to Adrian Bunk and Iain Lane for reporting the problem and
+    Iain Lane for backporting and providing the fix.
+    (Closes: 854799, 861032)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 29 Apr 2017 10:23:47 -0500
 
 emacs24 (24.5+1-10) unstable; urgency=medium
 
