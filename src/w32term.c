@@ -3464,25 +3464,25 @@ w32_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	  f1 = dpyinfo->last_mouse_frame;
 	else
 	  {
-	    /* Try to check for a child window first.  */
-	    HWND wfp = ChildWindowFromPoint (wfp, pt);
+	    HWND wfp = WindowFromPoint (pt);
 
 	    if (wfp)
 	      {
-		struct frame *f2 = x_any_window_to_frame (dpyinfo, wfp);
+		f1 = x_any_window_to_frame (dpyinfo, wfp);
+		if (f1)
+		  {
+		    HWND cwfp = ChildWindowFromPoint (wfp, pt);
 
-		/* If f2 is one of our frames, make sure it's a child
-		   frame (Bug#26615, maybe).  */
-		if (f2 && FRAME_PARENT_FRAME (f2))
-		  f1 = f2;
-	      }
+		    if (cwfp)
+		      {
+			struct frame *f2 = x_any_window_to_frame (dpyinfo, cwfp);
 
-	    if (!f1)
-	      {
-		/* Check for a top-level window second.  */
-		wfp = WindowFromPoint (pt);
-		if (wfp)
-		  f1 = x_any_window_to_frame (dpyinfo, wfp);
+			/* If a child window was found, make sure that its
+			   frame is a child frame (Bug#26615, maybe).  */
+			if (f2 && FRAME_PARENT_FRAME (f2))
+			  f1 = f2;
+		      }
+		  }
 	      }
 	  }
 
@@ -5110,7 +5110,7 @@ w32_read_socket (struct terminal *terminal,
 	case WM_MOVE:
 	  f = x_window_to_frame (dpyinfo, msg.msg.hwnd);
 
-	  if (f && !FRAME_ICONIFIED_P (f))
+	  if (f && FRAME_VISIBLE_P (f) && !FRAME_ICONIFIED_P(f))
 	    {
 	      x_real_positions (f, &f->left_pos, &f->top_pos);
 	      inev.kind = MOVE_FRAME_EVENT;

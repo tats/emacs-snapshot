@@ -59,8 +59,11 @@
 ;; This is because PATH_DUMPLOADSEARCH is just "../lisp".
 (if (or (equal (member "bootstrap" command-line-args) '("bootstrap"))
 	;; FIXME this is irritatingly fragile.
-	(equal (nth 4 command-line-args) "unidata-gen.el")
-	(equal (nth 7 command-line-args) "unidata-gen-files")
+	(and (stringp (nth 4 command-line-args))
+	     (string-match "^unidata-gen\\(\\.elc?\\)?$"
+			   (nth 4 command-line-args)))
+	(member (nth 7 command-line-args) '("unidata-gen-file"
+					    "unidata-gen-charprop"))
 	(if (fboundp 'dump-emacs)
 	    (string-match "src/bootstrap-emacs" (nth 0 command-line-args))
 	  t))
@@ -181,7 +184,8 @@
 (load "case-table")
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.
-(if (load "international/charprop.el" t)
+(load "international/charprop.el" t)
+(if (featurep 'charprop)
     (setq redisplay--inhibit-bidi nil))
 (load "international/characters")
 (load "composite")
@@ -299,7 +303,7 @@
       ;; Don't load ucs-normalize.el unless uni-*.el files were
       ;; already produced, because it needs uni-*.el files that might
       ;; not be built early enough during bootstrap.
-      (when (load-history-filename-element "charprop\\.el")
+      (when (featurep 'charprop)
         (load "international/mule-util")
         (load "international/ucs-normalize")
         (load "term/ns-win"))))
