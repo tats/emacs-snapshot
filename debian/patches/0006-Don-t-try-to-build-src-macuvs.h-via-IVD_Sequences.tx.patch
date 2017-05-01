@@ -9,15 +9,16 @@ over the licensing.
  1 file changed, 2 insertions(+), 7 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index f58303b6d76..31604dcd220 100644
+index 5cc43bc3718..11ad6c7015b 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -53,16 +53,11 @@ am__v_at_1 =
+@@ -56,17 +56,12 @@ am__v_at_1 =
  
- .PHONY: all unifiles
+ .PHONY: all
  
--all: ${top_srcdir}/src/macuvs.h unifiles ${unidir}/charscript.el
-+all: unifiles ${unidir}/charscript.el
+-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
++all: ${unifiles} ${unidir}/charscript.el \
+   ${unidir}/charprop.el
  
  ## Specify .elc as an order-only prereq so as to not needlessly rebuild
  ## target just because the .elc is missing.
@@ -30,12 +31,11 @@ index f58303b6d76..31604dcd220 100644
  
  %.elc: %.el
  	$(AM_V_ELC)${emacs} -f batch-byte-compile $<
-@@ -122,7 +117,7 @@ maintainer-clean:
+@@ -117,6 +112,6 @@ maintainer-clean:
  ## change and it slows down bootstrap (a tiny bit).
  ## Cf leim/ja-dic (which is much slower).
  extraclean:
 -	rm -f ${top_srcdir}/src/macuvs.h ${unidir}/charscript.el*
 +	rm -f ${unidir}/charscript.el*
-   ifneq (,$(wildcard $(unidir)/charprop.el))
- 	cd $(unidir) && \
- 	  rm -f `sed -n 's/^;; FILE: //p' < charprop.el` charprop.el
+ 	rm -f ${unifiles} ${unidir}/charprop.el
+ 
