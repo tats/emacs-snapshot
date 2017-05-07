@@ -166,24 +166,19 @@ file name, and return the name of the compiled file."
 	(funcall handler 'byte-compiler-base-file-name filename)
       filename)))
 
-(or (fboundp 'byte-compile-dest-file)
-    ;; The user may want to redefine this along with emacs-lisp-file-regexp,
-    ;; so only define it if it is undefined.
-    ;; Note - redefining this function is obsolete as of 23.2.
-    ;; Customize byte-compile-dest-file-function instead.
-    (defun byte-compile-dest-file (filename)
-      "Convert an Emacs Lisp source file name to a compiled file name.
+(defun byte-compile-dest-file (filename)
+  "Convert an Emacs Lisp source file name to a compiled file name.
 If `byte-compile-dest-file-function' is non-nil, uses that
 function to do the work.  Otherwise, if FILENAME matches
 `emacs-lisp-file-regexp' (by default, files with the extension `.el'),
 adds `c' to it; otherwise adds `.elc'."
-      (if byte-compile-dest-file-function
-	  (funcall byte-compile-dest-file-function filename)
-	(setq filename (file-name-sans-versions
-			(byte-compiler-base-file-name filename)))
-	(cond ((string-match emacs-lisp-file-regexp filename)
-	       (concat (substring filename 0 (match-beginning 0)) ".elc"))
-	      (t (concat filename ".elc"))))))
+  (if byte-compile-dest-file-function
+      (funcall byte-compile-dest-file-function filename)
+    (setq filename (file-name-sans-versions
+		    (byte-compiler-base-file-name filename)))
+    (cond ((string-match emacs-lisp-file-regexp filename)
+	   (concat (substring filename 0 (match-beginning 0)) ".elc"))
+	  (t (concat filename ".elc")))))
 
 ;; This can be the 'byte-compile property of any symbol.
 (autoload 'byte-compile-inline-expand "byte-opt")
@@ -2027,12 +2022,19 @@ With argument ARG, insert value in current buffer after the form."
 	  (setq byte-compile-read-position (point)
 		byte-compile-last-position byte-compile-read-position)
 	  (let* ((old-style-backquotes nil)
+                 (lread--unescaped-character-literals nil)
                  (form (read inbuffer)))
             ;; Warn about the use of old-style backquotes.
             (when old-style-backquotes
               (byte-compile-warn "!! The file uses old-style backquotes !!
 This functionality has been obsolete for more than 10 years already
 and will be removed soon.  See (elisp)Backquote in the manual."))
+            (when lread--unescaped-character-literals
+              (byte-compile-warn
+               "unescaped character literals %s detected!"
+               (mapconcat #'string
+                          (sort lread--unescaped-character-literals #'<)
+                          ", ")))
 	    (byte-compile-toplevel-file-form form)))
 	;; Compile pending forms at end of file.
 	(byte-compile-flush-pending)

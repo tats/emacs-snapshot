@@ -59,6 +59,34 @@
 (ert-deftest mod-test-sum-docstring ()
   (should (string= (documentation 'mod-test-sum) "Return A + B")))
 
+(ert-deftest module-function-object ()
+  "Extract and test the implementation of a module function.
+This test needs to be changed whenever the implementation
+changes."
+  (let ((func (symbol-function #'mod-test-sum)))
+    (should (consp func))
+    (should (equal (length func) 4))
+    (should (equal (nth 0 func) 'lambda))
+    (should (equal (nth 1 func) '(&rest args)))
+    (should (equal (nth 2 func) "Return A + B"))
+    (let ((body (nth 3 func)))
+      (should (consp body))
+      (should (equal (length body) 4))
+      (should (equal (nth 0 body) #'apply))
+      (should (equal (nth 1 body) '#'internal--module-call))
+      (should (equal (nth 3 body) 'args))
+      (let ((obj (nth 2 body)))
+        (should (equal (type-of obj) 'module-function))
+        (should (string-match-p
+                 (rx (or "#<module function Fmod_test_sum from "
+                         ;; MS-Windows doesn't allow us to get the
+                         ;; function name, only the address.
+                         (and "#<module function at 0x"
+                              (one-or-more hex-digit)
+                              " from "))
+                     (* nonl) "mod-test" (* nonl) ">")
+                 (prin1-to-string obj)))))))
+
 ;;
 ;; Non-local exists (throw, signal).
 ;;

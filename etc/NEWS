@@ -42,6 +42,9 @@ now the default in developer builds.  As before, use
 '--disable-gcc-warnings' to suppress GCC's warnings, and
 '--enable-gcc-warnings' to stop the build if GCC issues warnings.
 
+** When GCC warnings are enabled, '--enable-check-lisp-object-type' is
+now enabled by default when configuring.
+
 +++
 ** The Emacs server now has socket-launching support.  This allows
 socket based activation, where an external process like systemd can
@@ -91,9 +94,9 @@ required capabilities are found in terminfo.  See the FAQ node
 * Changes in Emacs 26.1
 
 +++
-** The functions write-region, append-to-file, and the like now output
-the number of characters added in addition to the name of the file
-affected.
+** The functions write-region, append-to-file, and the like now also
+output the number of characters added in addition to the name of the
+file affected, if the new variable 'write-region-verbose' is non-nil.
 
 ** The variable 'emacs-version' no longer includes the build number.
 This is now stored separately in a new variable, 'emacs-build-number'.
@@ -140,8 +143,8 @@ you can disable the feature by adding
 
   '(inhibit-double-buffering . t)
 
-to default-frame-parameters.  Or inject this parameter into the
-selected frame by evaluating this form:
+to default-frame-alist.  Or inject this parameter into the selected
+frame by evaluating this form:
 
   (modify-frame-parameters nil '((inhibit-double-buffering . t)))
 
@@ -393,7 +396,7 @@ procedure and therefore obeys saving hooks.
 * Changes in Specialized Modes and Packages in Emacs 26.1
 
 *** Info menu and index completion uses substring completion by default.
-This can be customized via the `info-menu` category in
+This can be customized via the info-menu category in
 completion-category-override.
 
 +++
@@ -732,6 +735,11 @@ pseudo-element, with the default being guessed from context).  By
 default the information is looked up on the Mozilla Developer Network,
 but this can be customized using 'css-lookup-url-format'.
 
+---
+*** CSS colors are fontified using the color they represent as the
+background.  For instance, #ff0000 would be fontified with a red
+background.
+
 +++
 ** Emacs now supports character name escape sequences in character and
 string literals.  The syntax variants \N{character name} and
@@ -890,6 +898,9 @@ instead of its first.
 
 
 * Lisp Changes in Emacs 26.1
+
+** New function 'seq-set-equal-p' to check if SEQUENCE1 and SEQUENCE2
+contain the same elements, regardless of the order.
 
 +++
 ** Emacs now supports records for user-defined types, via the new

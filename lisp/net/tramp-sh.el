@@ -2517,6 +2517,7 @@ The method used must be an out-of-band method."
 			     command))))
 		  (tramp-message orig-vec 6 "%s" command)
 		  (tramp-set-connection-property p "vector" orig-vec)
+		  (process-put p 'adjust-window-size-function 'ignore)
 		  (set-process-query-on-exit-flag p nil)
 
 		  ;; We must adapt `tramp-local-end-of-line' for
@@ -2566,7 +2567,7 @@ The method used must be an out-of-band method."
 		 (tramp-shell-quote-argument localname))
        "Couldn't make directory %s" dir))))
 
-(defun tramp-sh-handle-delete-directory (directory &optional recursive)
+(defun tramp-sh-handle-delete-directory (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
   (setq directory (expand-file-name directory))
   (with-parsed-tramp-file-name directory nil
@@ -2574,7 +2575,8 @@ The method used must be an out-of-band method."
     (tramp-flush-directory-property v localname)
     (tramp-barf-unless-okay
      v (format "cd / && %s %s"
-	       (if recursive "rm -rf" "rmdir")
+	       (or (and trash (tramp-get-remote-trash v))
+		   (if recursive "rm -rf" "rmdir"))
 	       (tramp-shell-quote-argument localname))
      "Couldn't delete %s" directory)))
 
@@ -4718,6 +4720,7 @@ connection if a previous connection has died for some reason."
 		;; Set sentinel and query flag.
 		(tramp-set-connection-property p "vector" vec)
 		(set-process-sentinel p 'tramp-process-sentinel)
+		(process-put p 'adjust-window-size-function 'ignore)
 		(set-process-query-on-exit-flag p nil)
 		(setq tramp-current-connection
 		      (cons (butlast (append vec nil) 2) (current-time))
@@ -5394,10 +5397,12 @@ Nonexistent directories are removed from spec."
 	result))))
 
 (defun tramp-get-remote-trash (vec)
-  "Determine remote `trash' command."
-  (with-tramp-connection-property vec "trash"
-    (tramp-message vec 5 "Finding a suitable `trash' command")
-    (tramp-find-executable vec "trash" (tramp-get-remote-path vec))))
+  "Determine remote `trash' command.
+This command is returned only if `delete-by-moving-to-trash' is non-nil."
+  (and delete-by-moving-to-trash
+       (with-tramp-connection-property vec "trash"
+	 (tramp-message vec 5 "Finding a suitable `trash' command")
+	 (tramp-find-executable vec "trash" (tramp-get-remote-path vec)))))
 
 (defun tramp-get-remote-touch (vec)
   "Determine remote `touch' command."

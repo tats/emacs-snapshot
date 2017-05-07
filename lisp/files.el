@@ -5477,7 +5477,7 @@ RECURSIVE if DIRECTORY is nonempty."
   (let ((handler (find-file-name-handler directory 'delete-directory)))
     (cond
      (handler
-      (funcall handler 'delete-directory directory recursive))
+      (funcall handler 'delete-directory directory recursive trash))
      ((and delete-by-moving-to-trash trash)
       ;; Only move non-empty dir to trash if recursive deletion was
       ;; requested.  This mimics the non-`delete-by-moving-to-trash'
@@ -7031,8 +7031,18 @@ only these files will be asked to be saved."
            (when (and visit buffer-file-name)
              (setq buffer-file-name (concat "/:" buffer-file-name))))))
       (`unquote-then-quote
-       (let ((buffer-file-name (substring buffer-file-name 2)))
-         (apply operation arguments)))
+       ;; We can't use `cl-letf' with `(buffer-local-value)' here
+       ;; because it wouldn't work during bootstrapping.
+       (let ((buffer (current-buffer)))
+         ;; `unquote-then-quote' is only used for the
+         ;; `verify-visited-file-modtime' action, which takes a buffer
+         ;; as only optional argument.
+         (with-current-buffer (or (car arguments) buffer)
+           (let ((buffer-file-name (substring buffer-file-name 2)))
+             ;; Make sure to hide the temporary buffer change from the
+             ;; underlying operation.
+             (with-current-buffer buffer
+               (apply operation arguments))))))
       (_
        (apply operation arguments)))))
 
