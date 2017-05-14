@@ -619,7 +619,8 @@ is no information where to trace the message.")
     (tramp-message tramp-gvfs-dbus-event-vector 10 "%S" event)
     (tramp-error tramp-gvfs-dbus-event-vector 'file-error "%s" (cadr err))))
 
-;; `dbus-event-error-hooks' has been renamed to `dbus-event-error-functions'.
+;; `dbus-event-error-hooks' has been renamed to
+;; `dbus-event-error-functions' in Emacs 24.3.
 (add-hook
  (if (boundp 'dbus-event-error-functions)
      'dbus-event-error-functions 'dbus-event-error-hooks)
@@ -1224,10 +1225,7 @@ file-notify events."
 
     ;; The end.
     (when (or (eq visit t) (null visit) (stringp visit))
-      (tramp-message v 0 "Wrote `%s' (%d characters)" filename
-                     (cond ((null start) (buffer-size))
-                           ((stringp start) (length start))
-                           (t (- end start)))))
+      (tramp-message v 0 "Wrote %s" filename))
     (run-hooks 'tramp-handle-write-region-hook)))
 
 

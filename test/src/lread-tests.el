@@ -140,6 +140,28 @@ literals (Bug#20852)."
     (should (equal (lread-tests--last-message)
                    (concat (format-message "Loading `%s': " file-name)
                            "unescaped character literals "
-                           "\", (, ), ;, [, ] detected!")))))
+                           "`?\"', `?(', `?)', `?;', `?[', `?]' detected!")))))
+
+(ert-deftest lread-test-bug26837 ()
+  "Test for http://debbugs.gnu.org/26837 ."
+  (let ((load-path (cons
+                    (file-name-as-directory
+                     (expand-file-name "data" (getenv "EMACS_TEST_DIRECTORY")))
+                    load-path)))
+    (load "somelib" nil t)
+    (should (string-suffix-p "/somelib.el" (caar load-history)))
+    (load "somelib2" nil t)
+    (should (string-suffix-p "/somelib2.el" (caar load-history)))
+    (load "somelib" nil t)
+    (should (string-suffix-p "/somelib.el" (caar load-history)))))
+
+(ert-deftest lread-tests--old-style-backquotes ()
+  "Check that loading warns about old-style backquotes."
+  (lread-tests--with-temp-file file-name
+    (write-region "(` (a b))" nil file-name)
+    (should (equal (load file-name nil :nomessage :nosuffix) t))
+    (should (equal (lread-tests--last-message)
+                   (concat (format-message "Loading `%s': " file-name)
+                           "old-style backquotes detected!")))))
 
 ;;; lread-tests.el ends here

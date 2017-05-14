@@ -533,9 +533,8 @@ This regexp must match both `tramp-initial-end-of-output' and
 (defcustom tramp-password-prompt-regexp
   (format "^.*\\(%s\\).*:\^@? *"
 	  ;; `password-word-equivalents' has been introduced with Emacs 24.4.
-	  (if (boundp 'password-word-equivalents)
-	      (regexp-opt (symbol-value 'password-word-equivalents))
-	    "password\\|passphrase"))
+          (regexp-opt (or (bound-and-true-p password-word-equivalents)
+                          '("password" "passphrase"))))
   "Regexp matching password-like prompts.
 The regexp should match at end of buffer.
 
@@ -684,7 +683,7 @@ Do not change the value by `setq', it must be changed only by
   :set (lambda (symbol value)
 	 ;; Check allowed values.
 	 (unless (memq value (tramp-syntax-values))
-	   (user-error "Wrong `tramp-syntax' %s" tramp-syntax))
+	   (tramp-compat-user-error "Wrong `tramp-syntax' %s" tramp-syntax))
          ;; Cleanup existing buffers.
          (unless (eq (symbol-value symbol) value)
            (tramp-cleanup-all-buffers))
@@ -2197,9 +2196,6 @@ Falls back to normal file name handler if no Tramp file name handler exists."
   (add-to-list 'file-name-handler-alist
 	       (cons tramp-initial-file-name-regexp 'tramp-file-name-handler))
   (put 'tramp-file-name-handler 'safe-magic t)
-  ;; Mark `operations' the handler is responsible for.  It's a short list ...
-  (put 'tramp-file-name-handler 'operations
-       '(file-name-all-completions file-name-completion file-remote-p))
 
   (add-to-list 'file-name-handler-alist
 	       (cons tramp-initial-completion-file-name-regexp
@@ -2217,7 +2213,9 @@ Falls back to normal file name handler if no Tramp file name handler exists."
   ;; Remove autoloaded handlers from file name handler alist.  Useful,
   ;; if `tramp-syntax' has been changed.
   (dolist (fnh '(tramp-file-name-handler
-		 tramp-completion-file-name-handler))
+		 tramp-completion-file-name-handler
+		 ;; This is autoloaded in Emacs 24 & 25.
+		 tramp-autoload-file-name-handler))
     (let ((a1 (rassq fnh file-name-handler-alist)))
       (setq file-name-handler-alist (delq a1 file-name-handler-alist))))
 
@@ -2257,7 +2255,7 @@ Add operations defined in `HANDLER-alist' to `tramp-file-name-handler'."
   ;; Mark `operations' the handler is responsible for.
   (put 'tramp-file-name-handler
        'operations
-       (cl-delete-duplicates
+       (delete-dups
         (append
          (get 'tramp-file-name-handler 'operations)
          (mapcar
@@ -2305,7 +2303,7 @@ Add operations defined in `HANDLER-alist' to `tramp-file-name-handler'."
   "Check, whether method / user name / host name completion is active."
   (or
    ;; Signal from outside.  `non-essential' has been introduced in Emacs 24.
-   (and (boundp 'non-essential) (symbol-value 'non-essential))
+   (bound-and-true-p non-essential)
    ;; This variable has been obsoleted in Emacs 26.
    tramp-completion-mode))
 

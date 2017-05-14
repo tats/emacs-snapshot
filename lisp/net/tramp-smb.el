@@ -1945,8 +1945,7 @@ If ARGUMENT is non-nil, use it as argument for
 		(error
 		 (with-current-buffer (tramp-get-connection-buffer vec)
 		   (goto-char (point-min))
-		   (if (and (boundp 'auth-sources)
-			    (symbol-value 'auth-sources)
+		   (if (and (bound-and-true-p auth-sources)
 			    (search-forward-regexp
 			     tramp-smb-wrong-passwd-regexp nil t))
 		       ;; Disable `auth-source' and `password-cache'.

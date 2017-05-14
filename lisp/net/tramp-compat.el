@@ -197,10 +197,7 @@ Add the extension of F, if existing."
       (tramp-compat-funcall 'delete-file filename trash)
     ;; This Emacs version does not support the TRASH flag.
     (wrong-number-of-arguments
-     (let ((delete-by-moving-to-trash
-	    (and (boundp 'delete-by-moving-to-trash)
-		 (symbol-value 'delete-by-moving-to-trash)
-		 trash)))
+     (let ((delete-by-moving-to-trash (and delete-by-moving-to-trash trash)))
        (delete-file filename)))))
 
 ;; RECURSIVE has been introduced with Emacs 23.2.  TRASH has been
@@ -386,6 +383,12 @@ If NAME is a remote file name, the local part of NAME is unquoted."
   (cond ((eq tramp-syntax 'ftp) 'default)
 	((eq tramp-syntax 'sep) 'separate)
 	(t tramp-syntax)))
+
+;; Older Emacsen keep incompatible autoloaded values of `tramp-syntax'.
+(eval-after-load 'tramp
+  '(unless
+       (memq tramp-syntax (tramp-compat-funcall (quote tramp-syntax-values)))
+     (tramp-change-syntax (tramp-compat-tramp-syntax))))
 
 (provide 'tramp-compat)
 

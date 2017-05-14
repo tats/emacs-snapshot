@@ -93,11 +93,6 @@ required capabilities are found in terminfo.  See the FAQ node
 
 * Changes in Emacs 26.1
 
-+++
-** The functions write-region, append-to-file, and the like now also
-output the number of characters added in addition to the name of the
-file affected, if the new variable 'write-region-verbose' is non-nil.
-
 ** The variable 'emacs-version' no longer includes the build number.
 This is now stored separately in a new variable, 'emacs-build-number'.
 
@@ -343,8 +338,24 @@ want to reverse the direction of the scroll, customize
 ** Emacsclient has a new option -u/--suppress-output.  The option
 suppresses display of return values from the server process.
 
+---
+** New user option 'dig-program-options' and extended functionality
+for DNS-querying functions 'nslookup-host', 'dns-lookup-host',
+and 'run-dig'.  Each function now accepts an optional name server
+argument interactively (with a prefix argument) and non-interactively.
+
 
 * Editing Changes in Emacs 26.1
+
++++
+** New variable 'column-number-indicator-zero-based'.
+Traditionally, in Column Number mode, the displayed column number
+counts from zero starting at the left margin of the window.  This
+behavior is now controlled by 'column-number-indicator-zero-based'.
+If you would prefer for the displayed column number to count from one,
+you may set this variable to nil.  (Behind the scenes, there is now a
+new mode line construct, '%C', which operates exactly as '%c' does
+except that it counts from one.)
 
 +++
 ** Two new user options 'list-matching-lines-jump-to-current-line' and
@@ -391,6 +402,15 @@ manner via the new mode 'auto-save-visited-mode'.  Unlike
 'auto-save-visited-file-name', this mode uses the normal saving
 procedure and therefore obeys saving hooks.
 'auto-save-visited-file-name' is now obsolete.
+
++++
+** New behavior of 'mark-defun' implemented
+Prefix argument selects that many (or that many more) defuns.
+Negative prefix arg flips the direction of selection.  Also,
+'mark-defun' between defuns correctly selects N following defuns (or
+-N previous for negative arguments).  Finally, comments preceding the
+defun are selected unless they are separated from the defun by a blank
+line.
 
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
@@ -817,6 +837,8 @@ processes on exit.
 mode for *.html files.  This mode handles indentation,
 fontification, and commenting for embedded JavaScript and CSS.
 
+** New minor mode 'pixel-scroll-mode' provides smooth pixel-level scrolling.
+
 
 * Incompatible Lisp Changes in Emacs 26.1
 
@@ -895,6 +917,11 @@ returned a floating-point value if any argument was floating-point,
 which was sometimes numerically incorrect.  For example, on a 64-bit
 host (max 1e16 10000000000000001) now returns its second argument
 instead of its first.
+
++++
+** The variable 'old-style-backquotes' has been made internal and
+renamed to 'lread--old-style-backquotes'.  No user code should use
+this variable.
 
 
 * Lisp Changes in Emacs 26.1
