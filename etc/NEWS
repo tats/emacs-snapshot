@@ -344,6 +344,21 @@ for DNS-querying functions 'nslookup-host', 'dns-lookup-host',
 and 'run-dig'.  Each function now accepts an optional name server
 argument interactively (with a prefix argument) and non-interactively.
 
++++
+** Emacsclient has a new option -T/--tramp.
+This helps with using a local Emacs session as the server for a remote
+emacsclient.  With appropriate setup, one can now set the EDITOR
+environment variable on a remote machine to emacsclient, and
+use the local Emacs to edit remote files via Tramp.  See the node
+"emacsclient Options" in the user manual for the details.
+
++++
+** The new variable 'eval-expression-print-maximum-character' prevents
+large integers from being displayed as characters.
+
+** Two new commands for finding the source code of Emacs Lisp
+libraries: 'find-library-other-window' and 'find-library-other-frame'.
+
 
 * Editing Changes in Emacs 26.1
 
@@ -356,6 +371,12 @@ If you would prefer for the displayed column number to count from one,
 you may set this variable to nil.  (Behind the scenes, there is now a
 new mode line construct, '%C', which operates exactly as '%c' does
 except that it counts from one.)
+
+** New single-line horizontal scrolling mode.
+The 'auto-hscroll-mode' variable can now have a new special value,
+'current-line', which causes only the line where the cursor is
+displayed to be horizontally scrolled when lines are truncated on
+display and point moves outside the left or right window margin.
 
 +++
 ** Two new user options 'list-matching-lines-jump-to-current-line' and
@@ -414,6 +435,8 @@ line.
 
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
+
+*** smerge-refine-regions can refine regions in separate buffers
 
 *** Info menu and index completion uses substring completion by default.
 This can be customized via the info-menu category in
@@ -923,6 +946,12 @@ instead of its first.
 renamed to 'lread--old-style-backquotes'.  No user code should use
 this variable.
 
++++
+** Module functions are now implemented slightly differently; in
+particular, the function 'internal--module-call' has been removed.
+Code that depends on undocumented internals of the module system might
+break.
+
 
 * Lisp Changes in Emacs 26.1
 
@@ -1291,6 +1320,9 @@ attached to the receiving process, the call is typically ignored.
 This is in contrast to the default action on POSIX Systems, where it
 causes the receiving process to terminate with a core dump if no
 debugger has been attached to it.
+
+** `set-mouse-position' and `set-mouse-absolute-pixel-position' work
+on macOS.
 
 
 ----------------------------------------------------------------------

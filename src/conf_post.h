@@ -244,6 +244,12 @@ extern int emacs_setenv_TZ (char const *);
 # define ATTRIBUTE_FORMAT(spec) /* empty */
 #endif
 
+#if GNUC_PREREQ (7, 0, 0)
+# define FALLTHROUGH __attribute__ ((__fallthrough__))
+#else
+# define FALLTHROUGH ((void) 0)
+#endif
+
 #if GNUC_PREREQ (4, 4, 0) && defined __GLIBC_MINOR__
 # define PRINTF_ARCHETYPE __gnu_printf__
 #elif GNUC_PREREQ (4, 4, 0) && defined __MINGW32__
@@ -256,6 +262,20 @@ extern int emacs_setenv_TZ (char const *);
 
 #define ATTRIBUTE_CONST _GL_ATTRIBUTE_CONST
 #define ATTRIBUTE_UNUSED _GL_UNUSED
+
+#if GNUC_PREREQ (3, 3, 0)
+# define ATTRIBUTE_MAY_ALIAS __attribute__ ((__may_alias__))
+#else
+# define ATTRIBUTE_MAY_ALIAS
+#endif
+
+/* Declare NAME to be a pointer to an object of type TYPE, initialized
+   to the address ADDR, which may be of a different type.  Accesses
+   via NAME may alias with other accesses with the traditional
+   behavior, even if options like gcc -fstrict-aliasing are used.  */
+
+#define DECLARE_POINTER_ALIAS(name, type, addr) \
+  type ATTRIBUTE_MAY_ALIAS *name = (type *) (addr)
 
 #if 3 <= __GNUC__
 # define ATTRIBUTE_MALLOC __attribute__ ((__malloc__))
@@ -294,6 +314,12 @@ extern int emacs_setenv_TZ (char const *);
     __attribute__ ((no_address_safety_analysis)) ADDRESS_SANITIZER_WORKAROUND
 #else
 # define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
+
+/* gcc -fsanitize=address does not work with vfork in Fedora 25 x86-64.
+   For now, assume that this problem occurs on all platforms.  */
+#if ADDRESS_SANITIZER && !defined vfork
+# define vfork fork
 #endif
 
 /* Some versions of GNU/Linux define noinline in their headers.  */

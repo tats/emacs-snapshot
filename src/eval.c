@@ -2261,7 +2261,7 @@ eval_sub (Lisp_Object form)
 	    }
 	}
     }
-  else if (COMPILEDP (fun))
+  else if (COMPILEDP (fun) || MODULE_FUNCTIONP (fun))
     return apply_lambda (fun, original_args, count);
   else
     {
@@ -2687,7 +2687,7 @@ FUNCTIONP (Lisp_Object object)
 
   if (SUBRP (object))
     return XSUBR (object)->max_args != UNEVALLED;
-  else if (COMPILEDP (object))
+  else if (COMPILEDP (object) || MODULE_FUNCTIONP (object))
     return true;
   else if (CONSP (object))
     {
@@ -2742,7 +2742,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
 
   if (SUBRP (fun))
     val = funcall_subr (XSUBR (fun), numargs, args + 1);
-  else if (COMPILEDP (fun))
+  else if (COMPILEDP (fun) || MODULE_FUNCTIONP (fun))
     val = funcall_lambda (fun, numargs, args + 1);
   else
     {
@@ -2892,7 +2892,8 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, ptrdiff_t count)
 
 /* Apply a Lisp function FUN to the NARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.
-   FUN must be either a lambda-expression or a compiled-code object.  */
+   FUN must be either a lambda-expression, a compiled-code object,
+   or a module function.  */
 
 static Lisp_Object
 funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
@@ -2949,6 +2950,10 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	}
       lexenv = Qnil;
     }
+#ifdef HAVE_MODULES
+  else if (MODULE_FUNCTIONP (fun))
+    return funcall_module (XMODULE_FUNCTION (fun), nargs, arg_vector);
+#endif
   else
     emacs_abort ();
 
@@ -3060,6 +3065,10 @@ function with `&rest' args, or `unevalled' for a special form.  */)
     result = Fsubr_arity (function);
   else if (COMPILEDP (function))
     result = lambda_arity (function);
+#ifdef HAVE_MODULES
+  else if (MODULE_FUNCTIONP (function))
+    result = module_function_arity (XMODULE_FUNCTION (function));
+#endif
   else
     {
       if (NILP (function))
@@ -3212,7 +3221,7 @@ do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
           set_default_internal (specpdl_symbol (bind), value, bindflag);
 	  return;
 	}
-      /* FALLTHROUGH */
+      FALLTHROUGH;
     case SYMBOL_LOCALIZED:
       set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
       break;
@@ -3390,12 +3399,10 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
                             Qnil, bindflag);
 	    break;
 	  }
-	else
-	  { /* FALLTHROUGH!!
-	       NOTE: we only ever come here if make_local_foo was used for
-	       the first time on this var within this let.  */
-	  }
       }
+      /* Come here only if make_local_foo was used for the first time
+	 on this var within this let.  */
+      FALLTHROUGH;
     case SPECPDL_LET_DEFAULT:
       set_default_internal (specpdl_symbol (this_binding),
                             specpdl_old_value (this_binding),
@@ -3676,12 +3683,10 @@ backtrace_eval_unrewind (int distance)
 		SET_SYMBOL_VAL (XSYMBOL (sym), old_value);
 		break;
 	      }
-	    else
-	      { /* FALLTHROUGH!!
-		   NOTE: we only ever come here if make_local_foo was used for
-		   the first time on this var within this let.  */
-	      }
 	  }
+	  /* Come here only if make_local_foo was used for the first
+	     time on this var within this let.  */
+	  FALLTHROUGH;
 	case SPECPDL_LET_DEFAULT:
 	  {
 	    Lisp_Object sym = specpdl_symbol (tmp);
@@ -3837,7 +3842,7 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET_LOCAL:
 	  mark_object (specpdl_where (pdl));
-	  /* Fall through.  */
+	  FALLTHROUGH;
 	case SPECPDL_LET:
 	  mark_object (specpdl_symbol (pdl));
 	  mark_object (specpdl_old_value (pdl));

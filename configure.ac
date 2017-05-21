@@ -921,6 +921,8 @@ AS_IF([test $gl_gcc_warnings = no],
     [gl_WARN_ADD([-Werror], [WERROR_CFLAGS])])
   AC_SUBST([WERROR_CFLAGS])
 
+  nw="$nw -Wduplicated-branches"    # Too many false alarms
+  nw="$nw -Wformat-overflow=2"      # False alarms due to GCC bug 80776
   nw="$nw -Wsystem-headers"         # Don't let system headers trigger warnings
   nw="$nw -Woverlength-strings"     # Not a problem these days
   nw="$nw -Wformat-nonliteral"      # we do this a lot
@@ -961,6 +963,8 @@ AS_IF([test $gl_gcc_warnings = no],
 
   if test $emacs_cv_clang = yes; then
     nw="$nw -Wcast-align"
+    nw="$nw -Wdouble-promotion"
+    nw="$nw -Wmissing-braces"
   fi
 
   # This causes too much noise in the MinGW build
@@ -5023,9 +5027,11 @@ else
 fi
 AC_SUBST(LIBX_OTHER)
 
+HAVE_OLDXMENU=no
 if test "$HAVE_GTK" = yes || test "$HAVE_X11" != yes; then
   LIBXMENU=
 elif test "$USE_X_TOOLKIT" = none; then
+  HAVE_OLDXMENU=yes
   LIBXMENU='$(oldXMenudir)/libXMenu11.a'
   AUTODEPEND_PARENTS="$AUTODEPEND_PARENTS oldXMenu"
 else
@@ -5298,7 +5304,7 @@ optsep=
 emacs_config_features=
 for opt in XAW3D XPM JPEG TIFF GIF PNG RSVG CAIRO IMAGEMAGICK SOUND GPM DBUS \
   GCONF GSETTINGS NOTIFY ACL LIBSELINUX GNUTLS LIBXML2 FREETYPE M17N_FLT \
-  LIBOTF XFT ZLIB TOOLKIT_SCROLL_BARS X_TOOLKIT X11 NS MODULES \
+  LIBOTF XFT ZLIB TOOLKIT_SCROLL_BARS X_TOOLKIT OLDXMENU X11 NS MODULES \
   XWIDGETS LIBSYSTEMD CANNOT_DUMP; do
 
     case $opt in

@@ -233,8 +233,6 @@ for example, (type-of 1) returns `integer'.  */)
         case Lisp_Misc_Finalizer:
           return Qfinalizer;
 #ifdef HAVE_MODULES
-        case Lisp_Misc_Module_Function:
-          return Qmodule_function;
 	case Lisp_Misc_User_Ptr:
 	  return Quser_ptr;
 #endif
@@ -278,6 +276,8 @@ for example, (type-of 1) returns `integer'.  */)
             else
               return t;
           }
+        case PVEC_MODULE_FUNCTION:
+          return Qmodule_function;
         /* "Impossible" cases.  */
         case PVEC_XWIDGET:
         case PVEC_OTHER:
@@ -492,6 +492,14 @@ DEFUN ("byte-code-function-p", Fbyte_code_function_p, Sbyte_code_function_p,
   if (COMPILEDP (object))
     return Qt;
   return Qnil;
+}
+
+DEFUN ("module-function-p", Fmodule_function_p, Smodule_function_p, 1, 1, NULL,
+       doc: /* Return t if OBJECT is a function loaded from a dynamic module.  */
+       attributes: const)
+  (Lisp_Object object)
+{
+  return MODULE_FUNCTIONP (object) ? Qt : Qnil;
 }
 
 DEFUN ("char-or-string-p", Fchar_or_string_p, Schar_or_string_p, 1, 1, 0,
@@ -2153,7 +2161,7 @@ If the current binding is global (the default), the value is nil.  */)
 	else if (!BUFFER_OBJFWDP (valcontents))
 	  return Qnil;
       }
-      /* FALLTHROUGH */
+      FALLTHROUGH;
     case SYMBOL_LOCALIZED:
       /* For a local variable, record both the symbol and which
 	 buffer's or frame's value we are saving.  */
@@ -3066,9 +3074,12 @@ usage: (logxor &rest INTS-OR-MARKERS)  */)
 }
 
 static Lisp_Object
-ash_lsh_impl (register Lisp_Object value, Lisp_Object count, bool lsh)
+ash_lsh_impl (Lisp_Object value, Lisp_Object count, bool lsh)
 {
-  register Lisp_Object val;
+  /* This code assumes that signed right shifts are arithmetic.  */
+  verify ((EMACS_INT) -1 >> 1 == -1);
+
+  Lisp_Object val;
 
   CHECK_NUMBER (value);
   CHECK_NUMBER (count);
@@ -3076,12 +3087,12 @@ ash_lsh_impl (register Lisp_Object value, Lisp_Object count, bool lsh)
   if (XINT (count) >= EMACS_INT_WIDTH)
     XSETINT (val, 0);
   else if (XINT (count) > 0)
-    XSETINT (val, XUINT (value) << XFASTINT (count));
+    XSETINT (val, XUINT (value) << XINT (count));
   else if (XINT (count) <= -EMACS_INT_WIDTH)
     XSETINT (val, lsh ? 0 : XINT (value) < 0 ? -1 : 0);
   else
-    XSETINT (val, lsh ? XUINT (value) >> -XINT (count) : \
-                        XINT (value) >> -XINT (count));
+    XSETINT (val, (lsh ? XUINT (value) >> -XINT (count)
+		   : XINT (value) >> -XINT (count)));
   return val;
 }
 
@@ -3790,6 +3801,7 @@ syms_of_data (void)
   defsubr (&Smarkerp);
   defsubr (&Ssubrp);
   defsubr (&Sbyte_code_function_p);
+  defsubr (&Smodule_function_p);
   defsubr (&Schar_or_string_p);
   defsubr (&Sthreadp);
   defsubr (&Smutexp);

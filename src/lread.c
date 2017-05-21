@@ -960,10 +960,10 @@ load_warn_unescaped_character_literals (Lisp_Object file)
 {
   if (NILP (Vlread_unescaped_character_literals)) return;
   CHECK_CONS (Vlread_unescaped_character_literals);
-  AUTO_STRING (format,
-               "Loading `%s': unescaped character literals %s detected!");
-  AUTO_STRING (separator, ", ");
-  AUTO_STRING (inner_format, "`?%c'");
+  Lisp_Object format =
+    build_string ("Loading `%s': unescaped character literals %s detected!");
+  Lisp_Object separator = build_string (", ");
+  Lisp_Object inner_format = build_string ("`?%c'");
   CALLN (Fmessage,
          format, file,
          Fmapconcat (list3 (Qlambda, list1 (Qchar),
@@ -2309,6 +2309,7 @@ read_escape (Lisp_Object readcharfun, bool stringp)
       c = READCHAR;
       if (c != '-')
 	error ("Invalid escape character syntax");
+      FALLTHROUGH;
     case '^':
       c = READCHAR;
       if (c == '\\')
@@ -2399,6 +2400,7 @@ read_escape (Lisp_Object readcharfun, bool stringp)
     case 'U':
       /* Post-Unicode-2.0: Up to eight hex chars.  */
       unicode_hex_count = 8;
+      FALLTHROUGH;
     case 'u':
 
       /* A Unicode escape.  We only permit them in strings and characters,
@@ -3278,11 +3280,11 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	    *pch = c;
 	    return Qnil;
 	  }
-
-	/* Otherwise, we fall through!  Note that the atom-reading loop
-	   below will now loop at least once, assuring that we will not
-	   try to UNREAD two characters in a row.  */
       }
+      /* The atom-reading loop below will now loop at least once,
+	 assuring that we will not try to UNREAD two characters in a
+	 row.  */
+      FALLTHROUGH;
     default:
     default_label:
       if (c <= 040) goto retry;

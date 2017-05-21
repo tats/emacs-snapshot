@@ -81,10 +81,8 @@ static Lisp_Object styled_format (ptrdiff_t, Lisp_Object *, bool);
 
 enum { tzeqlen = sizeof "TZ=" - 1 };
 
-/* Time zones equivalent to current local time, to wall clock time,
-   and to UTC, respectively.  */
+/* Time zones equivalent to current local time and to UTC, respectively.  */
 static timezone_t local_tz;
-static timezone_t wall_clock_tz;
 static timezone_t const utc_tz = 0;
 
 /* The cached value of Vsystem_name.  This is used only to compare it
@@ -269,7 +267,6 @@ init_editfns (bool dumping)
 
   /* Set the time zone rule now, so that the call to putenv is done
      before multiple threads are active.  */
-  wall_clock_tz = xtzalloc (0);
   tzlookup (tz ? build_string (tz) : Qwall, true);
 
   pw = getpwuid (getuid ());
@@ -1595,10 +1592,10 @@ time_arith (Lisp_Object a, Lisp_Object b,
     {
     default:
       val = Fcons (make_number (t.ps), val);
-      /* Fall through.  */
+      FALLTHROUGH;
     case 3:
       val = Fcons (make_number (t.us), val);
-      /* Fall through.  */
+      FALLTHROUGH;
     case 2:
       val = Fcons (make_number (t.lo), val);
       val = Fcons (make_number (t.hi), val);
@@ -4072,8 +4069,8 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    }
 
 	  /* Ignore flags when sprintf ignores them.  */
-	  space_flag &= ~ plus_flag;
-	  zero_flag &= ~ minus_flag;
+	  space_flag &= ! plus_flag;
+	  zero_flag &= ! minus_flag;
 
 	  char *num_end;
 	  uintmax_t raw_field_width = strtoumax (format, &num_end, 10);
@@ -4311,7 +4308,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  {
 		    memcpy (f, pMd, pMlen);
 		    f += pMlen;
-		    zero_flag &= ~ precision_given;
+		    zero_flag &= ! precision_given;
 		  }
 		*f++ = conversion;
 		*f = '\0';

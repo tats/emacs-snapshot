@@ -2760,6 +2760,7 @@ compute_tip_xy (struct frame *f,
   EmacsView *view = FRAME_NS_VIEW (f);
   struct ns_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   NSPoint pt;
+  NSScreen *screen;
 
   /* Start with user-specified or mouse position.  */
   left = Fcdr (Fassq (Qleft, parms));
@@ -2794,13 +2795,25 @@ compute_tip_xy (struct frame *f,
 	      - height);
     }
 
+  /* Find the screen that pt is on. */
+  for (screen in [NSScreen screens])
+#ifdef NS_IMPL_COCOA
+    if (CGRectContainsPoint ([screen frame], pt))
+#else
+    if (pt.x >= screen.frame.origin.x
+        && pt.x < screen.frame.origin.x + screen.frame.size.width
+        && pt.y >= screen.frame.origin.y
+        && pt.y < screen.frame.origin.y + screen.frame.size.height)
+#endif
+      break;
+
   /* Ensure in bounds.  (Note, screen origin = lower left.) */
   if (INTEGERP (left) || INTEGERP (right))
     *root_x = pt.x;
-  else if (pt.x + XINT (dx) <= 0)
-    *root_x = 0; /* Can happen for negative dx */
+  else if (pt.x + XINT (dx) <= screen.frame.origin.x)
+    *root_x = screen.frame.origin.x; /* Can happen for negative dx */
   else if (pt.x + XINT (dx) + width
-	   <= x_display_pixel_width (FRAME_DISPLAY_INFO (f)))
+	   <= screen.frame.origin.x + screen.frame.size.width)
     /* It fits to the right of the pointer.  */
     *root_x = pt.x + XINT (dx);
   else if (width + XINT (dx) <= pt.x)
@@ -2808,20 +2821,20 @@ compute_tip_xy (struct frame *f,
     *root_x = pt.x - width - XINT (dx);
   else
     /* Put it left justified on the screen -- it ought to fit that way.  */
-    *root_x = 0;
+    *root_x = screen.frame.origin.x;
 
   if (INTEGERP (top) || INTEGERP (bottom))
     *root_y = pt.y;
-  else if (pt.y - XINT (dy) - height >= 0)
+  else if (pt.y - XINT (dy) - height >= screen.frame.origin.y)
     /* It fits below the pointer.  */
     *root_y = pt.y - height - XINT (dy);
   else if (pt.y + XINT (dy) + height
-	   <= x_display_pixel_height (FRAME_DISPLAY_INFO (f)))
+	   <= screen.frame.origin.y + screen.frame.size.height)
     /* It fits above the pointer */
       *root_y = pt.y + XINT (dy);
   else
     /* Put it on the top.  */
-    *root_y = x_display_pixel_height (FRAME_DISPLAY_INFO (f)) - height;
+    *root_y = screen.frame.origin.y + screen.frame.size.height - height;
 }
 
 
@@ -3053,6 +3066,44 @@ menu bar or tool bar of FRAME.  */)
 				 : Qnative_edges));
 }
 
+DEFUN ("ns-set-mouse-absolute-pixel-position",
+       Fns_set_mouse_absolute_pixel_position,
+       Sns_set_mouse_absolute_pixel_position, 2, 2, 0,
+       doc: /* Move mouse pointer to absolute pixel position (X, Y).
+The coordinates X and Y are interpreted in pixels relative to a position
+\(0, 0) of the selected frame's display.  */)
+       (Lisp_Object x, Lisp_Object y)
+{
+  struct frame *f = SELECTED_FRAME ();
+  EmacsView *view = FRAME_NS_VIEW (f);
+  NSScreen *screen = [[view window] screen];
+  NSRect screen_frame = [screen frame];
+  int mouse_x, mouse_y;
+
+  NSScreen *primary_screen = [[NSScreen screens] objectAtIndex:0];
+  NSRect primary_screen_frame = [primary_screen frame];
+  CGFloat primary_screen_height = primary_screen_frame.size.height;
+
+  if (FRAME_INITIAL_P (f) || !FRAME_NS_P (f))
+    return Qnil;
+
+  CHECK_TYPE_RANGED_INTEGER (int, x);
+  CHECK_TYPE_RANGED_INTEGER (int, y);
+
+  mouse_x = screen_frame.origin.x + XINT (x);
+
+  if (screen == primary_screen)
+    mouse_y = screen_frame.origin.y + XINT (y);
+  else
+    mouse_y = (primary_screen_height - screen_frame.size.height
+               - screen_frame.origin.y) + XINT (y);
+
+  CGPoint mouse_pos = CGPointMake(mouse_x, mouse_y);
+  CGWarpMouseCursorPosition (mouse_pos);
+
+  return Qnil;
+}
+
 /* ==========================================================================
 
     Class implementations
@@ -3241,6 +3292,7 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sns_frame_edges);
   defsubr (&Sns_frame_list_z_order);
   defsubr (&Sns_frame_restack);
+  defsubr (&Sns_set_mouse_absolute_pixel_position);
   defsubr (&Sx_display_mm_width);
   defsubr (&Sx_display_mm_height);
   defsubr (&Sx_display_screens);

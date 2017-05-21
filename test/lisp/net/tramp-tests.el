@@ -45,7 +45,6 @@
 (require 'vc-git)
 (require 'vc-hg)
 
-(declare-function tramp-change-syntax "tramp-cmds")
 (declare-function tramp-find-executable "tramp-sh")
 (declare-function tramp-get-remote-path "tramp-sh")
 (declare-function tramp-get-remote-stat "tramp-sh")
@@ -1616,6 +1615,28 @@ handled properly.  BODY shall not contain a timeout."
     (expand-file-name "/method:host:/:/~/path/./file")
     "/method:host:/:/~/path/file")))
 
+;; The following test is inspired by Bug#26911.  It is rather a bug in
+;; `expand-file-name', and it fails for all Emacs versions.  Test
+;; added for later, when it is fixed.
+(ert-deftest tramp-test05-expand-file-name-relative ()
+  "Check `expand-file-name'."
+  ;; Mark as failed until bug has been fixed.
+  :expected-result :failed
+  (skip-unless (tramp--test-enabled))
+  ;; File names with a share behave differently.
+  (when (tramp--test-afp-or-smb-p)
+    (setf (ert-test-expected-result-type
+	   (ert-get-test 'tramp-test05-expand-file-name-relative))
+	  :passed))
+
+  (should
+   (string-equal
+    (let ((default-directory
+	    (concat
+	     (file-remote-p tramp-test-temporary-file-directory) "/path")))
+      (expand-file-name ".." "./"))
+    (concat (file-remote-p tramp-test-temporary-file-directory) "/"))))
+
 (ert-deftest tramp-test06-directory-file-name ()
   "Check `directory-file-name'.
 This checks also `file-name-as-directory', `file-name-directory',
@@ -1745,10 +1766,22 @@ This checks also `file-name-as-directory', `file-name-directory',
     (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
       (unwind-protect
 	  (progn
-            ;; Write buffer.
+            ;; Write buffer.  Use absolute and relative file name.
 	    (with-temp-buffer
 	      (insert "foo")
 	      (write-region nil nil tmp-name))
+	    (with-temp-buffer
+	      (insert-file-contents tmp-name)
+	      (should (string-equal (buffer-string) "foo")))
+	    (delete-file tmp-name)
+	    (with-temp-buffer
+	      (insert "foo")
+	      (should-not (file-exists-p tmp-name))
+	      (let ((default-directory (file-name-directory tmp-name)))
+		(should-not (file-exists-p (file-name-nondirectory tmp-name)))
+		(write-region nil nil (file-name-nondirectory tmp-name))
+		(should (file-exists-p (file-name-nondirectory tmp-name))))
+	      (should (file-exists-p tmp-name)))
 	    (with-temp-buffer
 	      (insert-file-contents tmp-name)
 	      (should (string-equal (buffer-string) "foo")))
@@ -3194,6 +3227,13 @@ This requires restrictions of file name syntax."
   (or (eq system-type 'windows-nt)
       (tramp-smb-file-name-p tramp-test-temporary-file-directory)))
 
+(defun tramp--test-afp-or-smb-p ()
+  "Check, whether the afp or smb method is used.
+This requires an additional share name."
+  (or (string-equal
+       "afp" (file-remote-p tramp-test-temporary-file-directory 'method))
+      (tramp-smb-file-name-p tramp-test-temporary-file-directory)))
+
 (defun tramp--test-check-files (&rest files)
   "Run a simple but comprehensive test over every file in FILES."
   ;; TODO: The quoted case does not work.
@@ -3682,6 +3722,8 @@ Since it unloads Tramp, it shall be the last test to run."
   ;; Mark as failed until all symbols are unbound.
   :expected-result (if (featurep 'tramp) :failed :passed)
   :tags '(:expensive-test)
+  (skip-unless noninteractive)
+
   (when (featurep 'tramp)
     (unload-feature 'tramp 'force)
     ;; No Tramp feature must be left.
@@ -3721,6 +3763,7 @@ Since it unloads Tramp, it shall be the last test to run."
 ;; * set-file-selinux-context
 
 ;; * Work on skipped tests.  Make a comment, when it is impossible.
+;; * Fix `tramp-test05-expand-file-name-relative' in `expand-file-name'.
 ;; * Fix `tramp-test06-directory-file-name' for `ftp'.
 ;; * Fix `tramp-test27-start-file-process' on MS Windows (`process-send-eof'?).
 ;; * Fix Bug#16928.  Set expected error of `tramp-test36-asynchronous-requests'.
