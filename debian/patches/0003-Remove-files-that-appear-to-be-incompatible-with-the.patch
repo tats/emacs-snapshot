@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index a31d416bd74..f6b437d5509 100644
+index a31d416..f6b437d 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -157,7 +157,9 @@ man1dir=
@@ -120,10 +120,10 @@ index a31d416bd74..f6b437d5509 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 898432eae60..d82fded22b5 100755
+index 9393ab0..914f85c 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -269,8 +269,7 @@ info_dir ()
+@@ -271,8 +271,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,10 +134,10 @@ index 898432eae60..d82fded22b5 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index d6b8001858f..39553d7a06c 100644
+index 12e44d9..c40a22f 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5414,7 +5414,7 @@ AC_DEFUN
+@@ -5420,7 +5420,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index d6b8001858f..39553d7a06c 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5467,15 +5467,6 @@ m4_define
+@@ -5473,15 +5473,6 @@ m4_define
  fi
  ])
  
@@ -163,7 +163,7 @@ index d6b8001858f..39553d7a06c 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 8ff823200ad..24aeb1c4067 100644
+index 8ff8232..24aeb1c 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -190,7 +190,7 @@ index 8ff823200ad..24aeb1c4067 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 26be3b0e07f..a56c149086d 100644
+index 361ab2a..d0ef55d 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file
