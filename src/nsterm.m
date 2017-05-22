@@ -1317,7 +1317,7 @@ ns_clip_to_row (struct window *w, struct glyph_row *row,
 
 @implementation EmacsBell
 
-- (id)init;
+- (id)init
 {
   NSTRACE ("[EmacsBell init]");
   if ((self = [super init]))
@@ -4247,7 +4247,6 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
         }
       else
         {
-          ptrdiff_t specpdl_count = SPECPDL_INDEX ();
           /* Run and wait for events.  We must always send one NX_APPDEFINED event
              to ourself, otherwise [NXApp run] will never exit.  */
           send_appdefined = YES;
@@ -4262,6 +4261,8 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
       q_event_ptr = NULL;
       unblock_input ();
     }
+  else
+    return -1;
 
   return nevents;
 }
@@ -6529,7 +6530,7 @@ not_in_argv (NSString *arg)
   return NO;
 }
 
-- (void) updateFrameSize: (BOOL) delay;
+- (void) updateFrameSize: (BOOL) delay
 {
   NSWindow *window = [self window];
   NSRect wr = [window frame];
@@ -6847,7 +6848,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- (void)setFrame:(NSRect)frameRect;
+- (void)setFrame:(NSRect)frameRect
 {
   NSTRACE ("[EmacsView setFrame:" NSTRACE_FMT_RECT "]",
            NSTRACE_ARG_RECT (frameRect));
@@ -6896,7 +6897,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- initFrameFromEmacs: (struct frame *)f
+- (instancetype) initFrameFromEmacs: (struct frame *)f
 {
   NSRect r, wr;
   Lisp_Object tem;
@@ -7023,7 +7024,7 @@ not_in_argv (NSString *arg)
   [self allocateGState];
 #endif
   [NSApp registerServicesMenuSendTypes: ns_send_types
-                           returnTypes: nil];
+                           returnTypes: [NSArray array]];
 
   /* macOS Sierra automatically enables tabbed windows.  We can't
      allow this to be enabled until it's available on a Free system.
@@ -7626,7 +7627,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- menuDown: sender
+- (instancetype)menuDown: sender
 {
   NSTRACE ("[EmacsView menuDown:]");
   if (context_menu_value == -1)
@@ -7651,7 +7652,7 @@ not_in_argv (NSString *arg)
 
 
 /* this gets called on toolbar button click */
-- toolbarClicked: (id)item
+- (instancetype)toolbarClicked: (id)item
 {
   NSEvent *theEvent;
   int idx = [item tag] * TOOL_BAR_ITEM_NSLOTS;
@@ -7677,7 +7678,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- toggleToolbar: (id)sender
+- (instancetype)toggleToolbar: (id)sender
 {
   NSTRACE ("[EmacsView toggleToolbar:]");
 
@@ -7905,7 +7906,7 @@ not_in_argv (NSString *arg)
    (gives a miniaturized version of the window); currently we use the latter for
    frames whose active buffer doesn't correspond to any file
    (e.g., '*scratch*') */
-- setMiniwindowImage: (BOOL) setMini
+- (instancetype)setMiniwindowImage: (BOOL) setMini
 {
   id image = [[self window] miniwindowImage];
   NSTRACE ("[EmacsView setMiniwindowImage:%d]", setMini);
@@ -8257,7 +8258,7 @@ not_in_argv (NSString *arg)
   return r;
 }
 
-- initFrame: (NSRect )r window: (Lisp_Object)nwin
+- (instancetype)initFrame: (NSRect )r window: (Lisp_Object)nwin
 {
   NSTRACE ("[EmacsScroller initFrame: window:]");
 
@@ -8341,7 +8342,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- condemn
+- (instancetype)condemn
 {
   NSTRACE ("[EmacsScroller condemn]");
   condemned =YES;
@@ -8349,7 +8350,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- reprieve
+- (instancetype)reprieve
 {
   NSTRACE ("[EmacsScroller reprieve]");
   condemned =NO;
@@ -8404,7 +8405,7 @@ not_in_argv (NSString *arg)
 }
 
 
-- setPosition: (int)position portion: (int)portion whole: (int)whole
+- (instancetype)setPosition: (int)position portion: (int)portion whole: (int)whole
 {
   NSTRACE ("[EmacsScroller setPosition:portion:whole:]");
 
@@ -8483,7 +8484,7 @@ not_in_argv (NSString *arg)
 
 
 /* called manually thru timer to implement repeated button action w/hold-down */
-- repeatScroll: (NSTimer *)scrollEntry
+- (instancetype)repeatScroll: (NSTimer *)scrollEntry
 {
   NSEvent *e = [[self window] currentEvent];
   NSPoint p =  [[self window] mouseLocationOutsideOfEventStream];
@@ -8602,7 +8603,7 @@ not_in_argv (NSString *arg)
                                  modifierFlags: [e modifierFlags]
                                      timestamp: [e timestamp]
                                   windowNumber: [e windowNumber]
-                                       context: [e context]
+                                       context: nil
                                    eventNumber: [e eventNumber]
                                     clickCount: [e clickCount]
                                       pressure: [e pressure]];

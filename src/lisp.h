@@ -3887,15 +3887,23 @@ extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
 
+/* Defined in unexmacosx.c.  */
+#if defined DARWIN_OS && !defined CANNOT_DUMP
+extern void unexec_init_emacs_zone (void);
+extern void *unexec_malloc (size_t);
+extern void *unexec_realloc (void *, size_t);
+extern void unexec_free (void *);
+#endif
+
 #include "emacs-module.h"
 
 /* Function prototype for the module Lisp functions.  */
 typedef emacs_value (*emacs_subr) (emacs_env *, ptrdiff_t,
 				   emacs_value [], void *);
 
-/* Function environments.  */
+/* Module function.  */
 
-/* A function environment is an auxiliary structure used by
+/* A function environment is an auxiliary structure returned by
    `module_make_function' to store information about a module
    function.  It is stored in a pseudovector.  Its members correspond
    to the arguments given to `module_make_function'.  */
