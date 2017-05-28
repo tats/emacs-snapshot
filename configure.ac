@@ -986,6 +986,7 @@ AS_IF([test $gl_gcc_warnings = no],
 
   # More things that clang is unduly picky about.
   if test $emacs_cv_clang = yes; then
+    gl_WARN_ADD([-Wno-missing-braces])
     gl_WARN_ADD([-Wno-tautological-compare])
     gl_WARN_ADD([-Wno-tautological-constant-out-of-range-compare])
   fi
@@ -1978,6 +1979,25 @@ AC_SUBST(INSTALL_ARCH_INDEP_EXTRA)
 AC_SUBST(ns_self_contained)
 AC_SUBST(NS_OBJ)
 AC_SUBST(NS_OBJC_OBJ)
+
+if test "${HAVE_NS}" = yes; then
+  AC_CACHE_CHECK(
+    [if the Objective C compiler supports instancetype],
+    [emacs_cv_objc_instancetype],
+    [AC_LANG_PUSH([Objective C])
+     AC_COMPILE_IFELSE(
+       [AC_LANG_SOURCE([[@interface Test
+                          + (instancetype)test;
+                          @end]])],
+       emacs_cv_objc_instancetype=yes,
+       emacs_cv_objc_instancetype=no)
+     AC_LANG_POP([Objective C])])
+
+  if test x$emacs_cv_objc_instancetype = xyes ; then
+    AC_DEFINE(NATIVE_OBJC_INSTANCETYPE, 1,
+              [Define if ObjC compiler supports instancetype natively.])
+  fi
+fi
 
 HAVE_W32=no
 W32_OBJ=

@@ -32,7 +32,6 @@
 
 ;; Pacify byte-compiler.
 (eval-when-compile
-  (require 'cl)
   (require 'custom))
 (defvar ange-ftp-ftp-name-arg)
 (defvar ange-ftp-ftp-name-res)
@@ -145,7 +144,7 @@ pass to the OPERATION."
        ((memq operation '(file-directory-p file-exists-p))
 	(if (apply 'ange-ftp-hook-function operation args)
 	    (let ((v (tramp-dissect-file-name (car args) t)))
-	      (aset v 0 tramp-ftp-method)
+	      (setf (tramp-file-name-method v) tramp-ftp-method)
 	      (tramp-set-connection-property v "started" t))
 	  nil))
 

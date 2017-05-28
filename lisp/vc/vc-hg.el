@@ -1302,6 +1302,8 @@ REV is the revision to check out into WORKFILE."
 
 (autoload 'vc-do-async-command "vc-dispatcher")
 (autoload 'log-view-get-marked "log-view")
+(defvar compilation-directory)
+(defvar compilation-arguments)  ; defined in compile.el
 
 (defun vc-hg--pushpull (command prompt &optional obsolete)
   "Run COMMAND (a string; either push or pull) on the current Hg branch.
@@ -1344,7 +1346,15 @@ commands, which only operated on marked files."
             (vc-compilation-mode 'hg)
             (setq-local compile-command
                         (concat hg-program " " command " "
-                                (if args (mapconcat 'identity args " ") "")))))
+                                (if args (mapconcat 'identity args " ") "")))
+            (setq-local compilation-directory root)
+            ;; Either set `compilation-buffer-name-function' locally to nil
+            ;; or use `compilation-arguments' to set `name-function'.
+            ;; See `compilation-buffer-name'.
+            (setq-local compilation-arguments
+                        (list compile-command nil
+                              (lambda (_name-of-mode) buffer)
+                              nil))))
 	(vc-set-async-update buffer)))))
 
 (defun vc-hg-pull (prompt)

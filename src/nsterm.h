@@ -356,6 +356,12 @@ char const * nstrace_fullscreen_type_name (int);
 #endif
 
 
+/* If the compiler doesn't support instancetype, map it to id. */
+#ifndef NATIVE_OBJC_INSTANCETYPE
+typedef id instancetype;
+#endif
+
+
 /* ==========================================================================
 
    NSColor, EmacsColor category.
@@ -1290,8 +1296,14 @@ extern char gnustep_base_version[];  /* version tracking */
 #define NSWindowStyleMaskMiniaturizable    NSMiniaturizableWindowMask
 #define NSWindowStyleMaskResizable         NSResizableWindowMask
 #define NSWindowStyleMaskTitled            NSTitledWindowMask
+#define NSWindowStyleMaskUtilityWindow     NSUtilityWindowMask
 #define NSAlertStyleCritical               NSCriticalAlertStyle
 #define NSControlSizeRegular               NSRegularControlSize
+
+/* And adds NSWindowStyleMask. */
+#ifdef __OBJC__
+typedef NSUInteger NSWindowStyleMask;
+#endif
 #endif
 
 #endif	/* HAVE_NS */

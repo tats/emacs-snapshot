@@ -31,7 +31,6 @@
 
 ;; Pacify byte-compiler.
 (eval-when-compile
-  (require 'cl)
   (require 'dired))
 
 (declare-function dired-remove-file "dired-aux")
@@ -1122,7 +1121,7 @@ target of the symlink differ."
    "%s%s"
    (with-parsed-tramp-file-name (expand-file-name filename) nil
      (tramp-make-tramp-file-name
-      method user host
+      method user domain host port
       (with-tramp-file-property v localname "file-truename"
 	(let ((result nil)			; result steps in reverse order
 	      (quoted (tramp-compat-file-name-quoted-p localname))
@@ -1174,7 +1173,7 @@ target of the symlink differ."
 			(tramp-compat-file-attribute-type
 			 (file-attributes
 			  (tramp-make-tramp-file-name
-			   method user host
+			   method user domain host port
 			   (mapconcat 'identity
 				      (append '("")
 					      (reverse result)
@@ -1304,13 +1303,7 @@ target of the symlink differ."
         (when (> (buffer-size) 0)
           (goto-char (point-min))
           ;; ... inode
-          (setq res-inode
-                (condition-case err
-                    (read (current-buffer))
-                  ;; This error happens in Emacs 23.  Starting with
-                  ;; Emacs 24, a large integer will be converted into
-                  ;; a float automatically during `read'.
-                  (overflow-error (string-to-number (cadr err)))))
+          (setq res-inode (read (current-buffer)))
           ;; ... file mode flags
           (setq res-filemodes (symbol-name (read (current-buffer))))
           ;; ... number links
@@ -1557,7 +1550,7 @@ be non-negative integers."
 	      (gid (or (and (natnump gid) gid) (tramp-get-local-gid 'integer))))
 	  (tramp-call-process
 	   nil "chown" nil nil nil
-	   (format "%d:%d" uid gid) (tramp-shell-quote-argument filename)))))))
+	   (format "%d:%d" uid gid) (shell-quote-argument filename)))))))
 
 (defun tramp-remote-selinux-p (vec)
   "Check, whether SELINUX is enabled on the remote host."
@@ -1951,27 +1944,17 @@ tramp-sh-handle-file-name-all-completions: internal error accessing `%s': `%s'"
   (filename newname &optional ok-if-already-exists keep-date
    preserve-uid-gid preserve-extended-attributes)
   "Like `copy-file' for Tramp files."
-  (setq filename (expand-file-name filename))
-  (setq newname (expand-file-name newname))
-  (cond
-   ;; At least one file a Tramp file?
-   ((or (tramp-tramp-file-p filename)
-	(tramp-tramp-file-p newname))
-    (tramp-do-copy-or-rename-file
-     'copy filename newname ok-if-already-exists keep-date
-     preserve-uid-gid preserve-extended-attributes))
-   ;; Compat section.  PRESERVE-EXTENDED-ATTRIBUTES has been
-   ;; introduced with Emacs 24.1 (as PRESERVE-SELINUX-CONTEXT), and
-   ;; renamed in Emacs 24.3.
-   (preserve-extended-attributes
+  (setq filename (expand-file-name filename)
+	newname (expand-file-name newname))
+  (if (or (tramp-tramp-file-p filename)
+	  (tramp-tramp-file-p newname))
+      (tramp-do-copy-or-rename-file
+       'copy filename newname ok-if-already-exists keep-date
+       preserve-uid-gid preserve-extended-attributes)
     (tramp-run-real-handler
      'copy-file
      (list filename newname ok-if-already-exists keep-date
-	   preserve-uid-gid preserve-extended-attributes)))
-   (t
-    (tramp-run-real-handler
-     'copy-file
-     (list filename newname ok-if-already-exists keep-date preserve-uid-gid)))))
+	   preserve-uid-gid preserve-extended-attributes))))
 
 (defun tramp-sh-handle-copy-directory
   (dirname newname &optional keep-date parents copy-contents)
@@ -2335,7 +2318,7 @@ The method used must be an out-of-band method."
   (let* ((t1 (tramp-tramp-file-p filename))
 	 (t2 (tramp-tramp-file-p newname))
 	 (orig-vec (tramp-dissect-file-name (if t1 filename newname)))
-	 copy-program copy-args copy-env copy-keep-date port listener spec
+	 copy-program copy-args copy-env copy-keep-date listener spec
 	 options source target remote-copy-program remote-copy-args)
 
     (with-parsed-tramp-file-name (if t1 filename newname) nil
@@ -2368,7 +2351,7 @@ The method used must be an out-of-band method."
 	      tramp-current-user (or (tramp-file-name-user v)
 				     (tramp-get-connection-property
 				      v "login-as" nil))
-	      tramp-current-host (tramp-file-name-real-host v))
+	      tramp-current-host (tramp-file-name-host v))
 
 	;; Check which ones of source and target are Tramp files.
 	(setq source (funcall
@@ -2382,10 +2365,6 @@ The method used must be an out-of-band method."
 	      target (if t2
 			 (tramp-make-copy-program-file-name v)
 		       (tramp-unquote-shell-quote-argument newname)))
-
-	;; Check for host and port number.
-	(setq host (tramp-file-name-real-host v)
-	      port (tramp-file-name-port v))
 
 	;; Check for user.  There might be an interactive setting.
 	(setq user (or (tramp-file-name-user v)
@@ -2809,7 +2788,7 @@ the result will be a local, non-Tramp, file name."
       ;; be problems with UNC shares or Cygwin mounts.
       (let ((default-directory (tramp-compat-temporary-file-directory)))
 	(tramp-make-tramp-file-name
-	 method user host
+	 method user domain host port
 	 (tramp-drop-volume-letter
 	  (tramp-run-real-handler
 	   'expand-file-name (list localname)))
@@ -2819,7 +2798,7 @@ the result will be a local, non-Tramp, file name."
 
 (defun tramp-process-sentinel (proc event)
   "Flush file caches."
-  (unless (tramp-compat-process-live-p proc)
+  (unless (process-live-p proc)
     (let ((vec (tramp-get-connection-property proc "vector" nil)))
       (when vec
 	(tramp-message vec 5 "Sentinel called: `%S' `%s'" proc event)
@@ -2861,7 +2840,9 @@ the result will be a local, non-Tramp, file name."
 			   (tramp-make-tramp-file-name
 			    (tramp-file-name-method v)
 			    (tramp-file-name-user v)
+			    (tramp-file-name-domain v)
 			    (tramp-file-name-host v)
+			    (tramp-file-name-port v)
 			    (tramp-file-name-localname v))
 			   tramp-initial-end-of-output))
 	   ;; We use as environment the difference to toplevel
@@ -2999,7 +2980,8 @@ the result will be a local, non-Tramp, file name."
 	    (setq input (with-parsed-tramp-file-name infile nil localname))
 	  ;; INFILE must be copied to remote host.
 	  (setq input (tramp-make-tramp-temp-file v)
-		tmpinput (tramp-make-tramp-file-name method user host input))
+		tmpinput
+		(tramp-make-tramp-file-name method user domain host port input))
 	  (copy-file infile tmpinput t)))
       (when input (setq command (format "%s <%s" command input)))
 
@@ -3033,7 +3015,7 @@ the result will be a local, non-Tramp, file name."
 	    ;; file must be deleted after execution.
 	    (setq stderr (tramp-make-tramp-temp-file v)
 		  tmpstderr (tramp-make-tramp-file-name
-			     method user host stderr))))
+			     method user domain host port stderr))))
 	 ;; stderr to be discarded.
 	 ((null (cadr destination))
 	  (setq stderr "/dev/null"))))
@@ -3630,7 +3612,7 @@ Fall back to normal file name handler if no Tramp handler exists."
 	;; There might be an error if the monitor is not supported.
 	;; Give the filter a chance to read the output.
 	(tramp-accept-process-output p 1)
-	(unless (tramp-compat-process-live-p p)
+	(unless (process-live-p p)
 	  (tramp-error
 	   v 'file-notify-error "Monitoring not supported for `%s'" file-name))
 	p))))
@@ -3675,13 +3657,13 @@ file-notify events."
 	       (when file1 (concat remote-prefix file1)))))
 	(setq string (replace-match "" nil nil string))
 	;; Remove watch when file or directory to be watched is deleted.
-	(when (and (member (caadr object) '(moved deleted))
+	(when (and (member (cl-caadr object) '(moved deleted))
 		   (string-equal file (process-get proc 'watch-name)))
 	  (delete-process proc))
 	;; Usually, we would add an Emacs event now.  Unfortunately,
 	;; `unread-command-events' does not accept several events at
 	;; once.  Therefore, we apply the handler directly.
-	(when (member (caadr object) events)
+	(when (member (cl-caadr object) events)
 	  (tramp-compat-funcall
 	   'file-notify-handle-event
 	   `(file-notify ,object file-notify-callback)))))
@@ -3715,12 +3697,12 @@ file-notify events."
 	       (split-string (match-string 1 line) "," 'omit))
 	      (match-string 3 line))))
 	;; Remove watch when file or directory to be watched is deleted.
-	(when (member (caadr object) '(move-self delete-self ignored))
+	(when (member (cl-caadr object) '(move-self delete-self ignored))
 	  (delete-process proc))
 	;; Usually, we would add an Emacs event now.  Unfortunately,
 	;; `unread-command-events' does not accept several events at
 	;; once.  Therefore, we apply the handler directly.
-	(when (member (caadr object) events)
+	(when (member (cl-caadr object) events)
 	  (tramp-compat-funcall
 	   'file-notify-handle-event
 	   `(file-notify ,object file-notify-callback)))))))
@@ -4622,9 +4604,9 @@ connection if a previous connection has died for some reason."
 
     ;; If Tramp opens the same connection within a short time frame,
     ;; there is a problem.  We shall signal this.
-    (unless (or (tramp-compat-process-live-p p)
-		(not (equal (butlast (append vec nil) 2)
-			    (car tramp-current-connection)))
+    (unless (or (process-live-p p)
+		(not (tramp-file-name-equal-p
+		      vec (car tramp-current-connection)))
 		(> (tramp-time-diff
 		    (current-time) (cdr tramp-current-connection))
 		   (or tramp-connection-min-time-diff 0)))
@@ -4643,9 +4625,9 @@ connection if a previous connection has died for some reason."
 		       (tramp-get-connection-property
 			p "last-cmd-time" '(0 0 0)))
 		      60)
-		   (tramp-compat-process-live-p p))
+		   (process-live-p p))
 	  (tramp-send-command vec "echo are you awake" t t)
-	  (unless (and (tramp-compat-process-live-p p)
+	  (unless (and (process-live-p p)
 		       (tramp-wait-for-output p 10))
 	    ;; The error will be caught locally.
 	    (tramp-error vec 'file-error "Awake did fail")))
@@ -4655,7 +4637,7 @@ connection if a previous connection has died for some reason."
 
     ;; New connection must be opened.
     (condition-case err
-	(unless (tramp-compat-process-live-p p)
+	(unless (process-live-p p)
 
 	  ;; During completion, don't reopen a new connection.  We
 	  ;; check this for the process related to
@@ -4721,8 +4703,7 @@ connection if a previous connection has died for some reason."
 		(set-process-sentinel p 'tramp-process-sentinel)
 		(process-put p 'adjust-window-size-function 'ignore)
 		(set-process-query-on-exit-flag p nil)
-		(setq tramp-current-connection
-		      (cons (butlast (append vec nil) 2) (current-time))
+		(setq tramp-current-connection (cons vec (current-time))
 		      tramp-current-host (system-name))
 
 		(tramp-message
@@ -5104,7 +5085,7 @@ Return ATTR."
   "Create a file name suitable for `scp', `pscp', or `nc' and workalikes."
   (let ((method (tramp-file-name-method vec))
 	(user (tramp-file-name-user vec))
-	(host (tramp-file-name-real-host vec))
+	(host (tramp-file-name-host vec))
 	(localname
 	 (directory-file-name (tramp-file-name-unquote-localname vec))))
     (when (string-match tramp-ipv6-regexp host)
@@ -5218,7 +5199,9 @@ Nonexistent directories are removed from spec."
 	    (tramp-make-tramp-file-name
 	     (tramp-file-name-method vec)
 	     (tramp-file-name-user vec)
+	     (tramp-file-name-domain vec)
 	     (tramp-file-name-host vec)
+	     (tramp-file-name-port vec)
 	     x))
 	   x))
 	remote-path)))))
@@ -5636,14 +5619,14 @@ function cell is returned to be applied on a buffer."
 		 (let ((coding-system-for-write 'binary)
 		       (coding-system-for-read 'binary))
 		   (apply
-		    'tramp-call-process-region ,vec (point-min) (point-max)
+		    'tramp-call-process-region ',vec (point-min) (point-max)
 		    (car (split-string ,compress)) t t nil
 		    (cdr (split-string ,compress)))))
 	    `(lambda (beg end)
 	       (let ((coding-system-for-write 'binary)
 		     (coding-system-for-read 'binary))
 		 (apply
-		  'tramp-call-process-region ,vec beg end
+		  'tramp-call-process-region ',vec beg end
 		  (car (split-string ,compress)) t t nil
 		  (cdr (split-string ,compress))))
 	       (,coding (point-min) (point-max)))))
