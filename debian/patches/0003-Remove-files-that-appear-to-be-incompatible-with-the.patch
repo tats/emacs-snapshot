@@ -120,10 +120,10 @@ index a31d416..f6b437d 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 9393ab0..914f85c 100755
+index ba4ed00..6ba7788 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -271,8 +271,7 @@ info_dir ()
+@@ -259,8 +259,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
