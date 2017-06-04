@@ -78,10 +78,11 @@ affected by this, as SGI stopped supporting IRIX in December 2013.
 
 * Startup Changes in Emacs 26.1
 
-** New option '--new-daemon'.  This is the same as '--daemon', except
++++
+** New option '--fg-daemon'.  This is the same as '--daemon', except
 it runs in the foreground and does not fork.  This is intended for
 modern init systems such as systemd, which manage many of the traditional
-aspects of daemon behavior themselves.  '--old-daemon' is now an alias
+aspects of daemon behavior themselves.  '--bg-daemon' is now an alias
 for '--daemon'.
 
 +++
@@ -363,6 +364,13 @@ large integers from being displayed as characters.
 ** Two new commands for finding the source code of Emacs Lisp
 libraries: 'find-library-other-window' and 'find-library-other-frame'.
 
++++
+** The new variable 'display-raw-bytes-as-hex' allows to change the
+display of raw bytes from octal to hex.
+
+** You can now provide explicit field numbers in format specifiers.
+For example, '(format "%2$s %1$s" "X" "Y")' produces "Y X".
+
 
 * Editing Changes in Emacs 26.1
 
@@ -376,6 +384,7 @@ you may set this variable to nil.  (Behind the scenes, there is now a
 new mode line construct, '%C', which operates exactly as '%c' does
 except that it counts from one.)
 
++++
 ** New single-line horizontal scrolling mode.
 The 'auto-hscroll-mode' variable can now have a new special value,
 'current-line', which causes only the line where the cursor is

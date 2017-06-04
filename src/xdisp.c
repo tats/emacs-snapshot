@@ -2890,8 +2890,19 @@ init_iterator (struct it *it, struct window *w,
     }
   else
     {
+      /* When hscrolling only the current line, don't apply the
+	 hscroll here, it will be applied by display_line when it gets
+	 to laying out the line showing point.  However, if the
+	 window's min_hscroll is positive, the user specified a lower
+	 bound for automatic hscrolling, so they expect the
+	 non-current lines to obey that hscroll amount.  */
       if (hscrolling_current_line_p (w))
-	it->first_visible_x = 0;
+	{
+	  if (w->min_hscroll > 0)
+	    it->first_visible_x = w->min_hscroll * FRAME_COLUMN_WIDTH (it->f);
+	  else
+	    it->first_visible_x = 0;
+	}
       else
 	it->first_visible_x =
 	  window_hscroll_limited (w, it->f) * FRAME_COLUMN_WIDTH (it->f);
@@ -7044,7 +7055,7 @@ get_next_display_element (struct it *it)
 	     translated too.
 
 	     Non-printable characters and raw-byte characters are also
-	     translated to octal form.  */
+	     translated to octal or hexadecimal form.  */
 	  if (((c < ' ' || c == 127) /* ASCII control chars.  */
 	       ? (it->area != TEXT_AREA
 		  /* In mode line, treat \n, \t like other crl chars.  */
@@ -7151,9 +7162,12 @@ get_next_display_element (struct it *it)
 		int len, i;
 
 		if (CHAR_BYTE8_P (c))
-		  /* Display \200 instead of \17777600.  */
+		  /* Display \200 or \x80 instead of \17777600.  */
 		  c = CHAR_TO_BYTE8 (c);
-		len = sprintf (str, "%03o", c + 0u);
+		const char *format_string = display_raw_bytes_as_hex
+					    ? "x%02x"
+					    : "%03o";
+		len = sprintf (str, format_string, c + 0u);
 
 		XSETINT (it->ctl_chars[0], escape_glyph);
 		for (i = 0; i < len; i++)
@@ -13099,7 +13113,9 @@ hscroll_window_tree (Lisp_Object window)
 		     that doesn't need to be hscrolled.  If we omit
 		     this condition, the line from which we move will
 		     remain hscrolled.  */
-		  || (hscl && w->hscroll && !cursor_row->truncated_on_left_p)))
+		  || (hscl
+		      && w->hscroll != w->min_hscroll
+		      && !cursor_row->truncated_on_left_p)))
 	    {
 	      struct it it;
 	      ptrdiff_t hscroll;
@@ -13648,6 +13664,14 @@ redisplay_internal (void)
   enum { MAX_HSCROLL_RETRIES = 16 };
   int hscroll_retries = 0;
 
+  /* Limit the number of retries for when frame(s) become garbaged as
+     result of redisplaying them.  Some packages set various redisplay
+     hooks, such as window-scroll-functions, to run Lisp that always
+     calls APIs which cause the frame's garbaged flag to become set,
+     so we loop indefinitely.  */
+  enum {MAX_GARBAGED_FRAME_RETRIES = 2 };
+  int garbaged_frame_retries = 0;
+
   /* True means redisplay has to consider all windows on all
      frames.  False, only selected_window is considered.  */
   bool consider_all_windows_p;
@@ -14194,7 +14218,8 @@ redisplay_internal (void)
                      garbage.  We have to start over.  These cases
                      should be rare, so going all the way back to the
                      top of redisplay should be good enough.  */
-                  if (FRAME_GARBAGED_P (f))
+                  if (FRAME_GARBAGED_P (f)
+		      && garbaged_frame_retries++ < MAX_GARBAGED_FRAME_RETRIES)
                     goto retry;
 
 #if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
@@ -20708,9 +20733,12 @@ display_line (struct it *it, int cursor_vpos)
   recenter_overlay_lists (current_buffer, IT_CHARPOS (*it));
 
   /* If we are going to display the cursor's line, account for the
-     hscroll of that line.  */
+     hscroll of that line.  We subtract the window's min_hscroll,
+     because that was already accounted for in init_iterator.  */
   if (hscroll_this_line)
-    x_incr = window_hscroll_limited (it->w, it->f) * FRAME_COLUMN_WIDTH (it->f);
+    x_incr =
+      (window_hscroll_limited (it->w, it->f) - it->w->min_hscroll)
+      * FRAME_COLUMN_WIDTH (it->f);
 
   /* Move over display elements that are not visible because we are
      hscrolled.  This may stop at an x-position < first_visible_x
@@ -23992,21 +24020,18 @@ decode_mode_spec (struct window *w, register int c, int field_width,
         ptrdiff_t botpos = BUF_Z (b) - w->window_end_pos;
         ptrdiff_t begv = BUF_BEGV (b);
         ptrdiff_t zv = BUF_ZV (b);
+        int top_perc, bot_perc;
 
         if ((toppos <= begv) && (zv <= botpos))
           return "All   ";
 
-        if (toppos <= begv)
-          strcpy (decode_mode_spec_buf, "0-");
-        else
-          sprintf (decode_mode_spec_buf, "%d-",
-                   percent99 (toppos - begv, zv - begv));
+        top_perc = toppos <= begv ? 0 : percent99 (toppos - begv, zv - begv);
+        bot_perc = zv <= botpos ? 100 : percent99 (botpos - begv, zv - begv);
 
-        if (zv <= botpos)
-          strcat (decode_mode_spec_buf, "100%");
+        if (top_perc == bot_perc)
+          sprintf (decode_mode_spec_buf, "%d%%", top_perc);
         else
-          sprintf (&decode_mode_spec_buf [strlen (decode_mode_spec_buf)],
-                   "%d%%", percent99 (botpos - begv, zv - begv));
+          sprintf (decode_mode_spec_buf, "%d-%d%%", top_perc, bot_perc);
 
         return decode_mode_spec_buf;
       }
@@ -28768,7 +28793,6 @@ display_and_set_cursor (struct window *w, bool on,
      be in the midst of changing its size, and x and y may be off the
      window.  */
   if (! FRAME_VISIBLE_P (f)
-      || FRAME_GARBAGED_P (f)
       || vpos >= w->current_matrix->nrows
       || hpos >= w->current_matrix->matrix_w)
     return;
@@ -28783,6 +28807,26 @@ display_and_set_cursor (struct window *w, bool on,
   if (!glyph_row->enabled_p)
     {
       w->phys_cursor_on_p = false;
+      return;
+    }
+
+  /* A frame might be marked garbaged even though its cursor position
+     is correct, and will not change upon subsequent redisplay.  This
+     happens in some rare situations, like toggling the sort order in
+     Dired windows.  We've already established that VPOS is valid, so
+     it shouldn't do any harm to record the cursor position, as we are
+     going to return without acting on it anyway.  Otherwise, expose
+     events might come in and call update_window_cursor, which will
+     blindly use outdated values in w->phys_cursor.  */
+  if (FRAME_GARBAGED_P (f))
+    {
+      if (on)
+	{
+	  w->phys_cursor.x = x;
+	  w->phys_cursor.y = glyph_row->y;
+	  w->phys_cursor.hpos = hpos;
+	  w->phys_cursor.vpos = vpos;
+	}
       return;
     }
 
@@ -32209,6 +32253,13 @@ display table takes effect; in this case, Emacs does not consult
   /* Initialize to t, since we need to disable reordering until
      loadup.el successfully loads charprop.el.  */
   redisplay__inhibit_bidi = true;
+
+  DEFVAR_BOOL ("display-raw-bytes-as-hex", display_raw_bytes_as_hex,
+    doc: /* Non-nil means display raw bytes in hexadecimal format.
+The default is to use octal format (\200) whereas hexadecimal (\x80)
+may be more familar to users.  */);
+  display_raw_bytes_as_hex = false;
+
 }
 
 
