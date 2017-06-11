@@ -1474,7 +1474,10 @@ process_quit_flag (void)
    If quit-flag is set to `kill-emacs' the SIGINT handler has received
    a request to exit Emacs when it is safe to do.
 
-   When not quitting, process any pending signals.  */
+   When not quitting, process any pending signals.
+
+   If you change this function, also adapt module_should_quit in
+   emacs-module.c.  */
 
 void
 maybe_quit (void)
@@ -2952,7 +2955,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
     }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
-    return funcall_module (XMODULE_FUNCTION (fun), nargs, arg_vector);
+    return funcall_module (fun, nargs, arg_vector);
 #endif
   else
     emacs_abort ();
@@ -3610,8 +3613,12 @@ returns nil.  */)
 
   while (backtrace_p (pdl))
     {
+      ptrdiff_t i = pdl - specpdl;
       backtrace_frame_apply (function, pdl);
-      pdl = backtrace_next (pdl);
+      /* Beware! PDL is no longer valid here because FUNCTION might
+         have caused grow_specpdl to reallocate pdlvec.  We must use
+         the saved index, cf. Bug#27258.  */
+      pdl = backtrace_next (&specpdl[i]);
     }
 
   return Qnil;
