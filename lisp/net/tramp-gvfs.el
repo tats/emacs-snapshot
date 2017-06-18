@@ -805,7 +805,7 @@ file names."
       (unless (tramp-run-real-handler 'file-name-absolute-p (list localname))
 	(setq localname (concat "/" localname)))
       ;; We do not pass "/..".
-      (if (string-match "^\\(afp\\|smb\\)$" method)
+      (if (string-match "^\\(afp\\|davs?\\|smb\\)$" method)
 	  (when (string-match "^/[^/]+\\(/\\.\\./?\\)" localname)
 	    (setq localname (replace-match "/" t t localname 1)))
 	(when (string-match "^/\\.\\./?" localname)
@@ -886,10 +886,9 @@ file names."
   (setq filename (directory-file-name (expand-file-name filename)))
   (with-parsed-tramp-file-name filename nil
     (setq localname (tramp-compat-file-name-unquote localname))
-    (if (or
-	 (and (string-match "^\\(afp\\|smb\\)$" method)
-	      (string-match "^/?\\([^/]+\\)$" localname))
-	 (string-equal localname "/"))
+    (if (or (and (string-match "^\\(afp\\|davs?\\|smb\\)$" method)
+		 (string-match "^/?\\([^/]+\\)$" localname))
+	    (string-equal localname "/"))
 	(tramp-gvfs-get-root-attributes filename)
       (assoc
        (file-name-nondirectory filename)
@@ -1300,9 +1299,12 @@ ADDRESS can have the form \"xx:xx:xx:xx:xx:xx\" or \"[xx:xx:xx:xx:xx:xx]\"."
 	  (unless (tramp-get-connection-property l "first-password-request" nil)
 	    (tramp-clear-passwd l))
 
+	  ;; Set variables for computing the prompt for reading password.
 	  (setq tramp-current-method l-method
 		tramp-current-user user
+		tramp-current-domain l-domain
 		tramp-current-host l-host
+		tramp-current-port l-port
 		password (tramp-read-passwd
 			  (tramp-get-connection-process l) pw-prompt))
 
@@ -1326,36 +1328,50 @@ ADDRESS can have the form \"xx:xx:xx:xx:xx:xx\" or \"[xx:xx:xx:xx:xx:xx]\"."
   "Implementation for the \"org.gtk.vfs.MountOperation.askQuestion\" method."
   (save-window-excursion
     (let ((enable-recursive-minibuffers t)
-	  choice)
+	  (use-dialog-box (and use-dialog-box (null noninteractive)))
+	  result)
 
-      (condition-case nil
-	  (with-parsed-tramp-file-name
-	      (tramp-gvfs-file-name (dbus-event-path-name last-input-event)) nil
-	    (tramp-message v 6 "%S %S" message choices)
+      (with-parsed-tramp-file-name
+	  (tramp-gvfs-file-name (dbus-event-path-name last-input-event)) nil
+	(tramp-message v 6 "%S %S" message choices)
 
-	    ;; In theory, there can be several choices.  Until now,
-	    ;; there is only the question whether to accept an unknown
-	    ;; host signature.
-	    (with-temp-buffer
-	      ;; Preserve message for `progress-reporter'.
-	      (with-temp-message ""
-		(insert message)
-		(pop-to-buffer (current-buffer))
-		(setq choice (if (yes-or-no-p (concat (car choices) " ")) 0 1))
-		(tramp-message v 6 "%d" choice)))
+	(setq result
+	      (condition-case nil
+		  (list
+		   t ;; handled.
+		   nil ;; no abort of D-Bus.
+		   (with-tramp-connection-property
+		       (tramp-get-connection-process v) message
+		     ;; In theory, there can be several choices.
+		     ;; Until now, there is only the question whether
+		     ;; to accept an unknown host signature.
+		     (with-temp-buffer
+		       ;; Preserve message for `progress-reporter'.
+		       (with-temp-message ""
+			 (insert message)
+			 (goto-char (point-max))
+			 (if noninteractive
+			     (message "%s" message)
+			   (pop-to-buffer (current-buffer)))
+			 (if (yes-or-no-p
+			      (concat
+			       (buffer-substring
+				(line-beginning-position) (point))
+			       " "))
+			     0 1)))))
 
-	    ;; When the choice is "no", we set a dummy fuse-mountpoint
-	    ;; in order to leave the timeout.
-	    (unless (zerop choice)
-	      (tramp-set-file-property v "/" "fuse-mountpoint" "/"))
+		;; When QUIT is raised, we shall return this
+		;; information to D-Bus.
+		(quit (list nil t 1))))
 
-	    (list
-	     t ;; handled.
-	     nil ;; no abort of D-Bus.
-	     choice))
+	(tramp-message v 6 "%s" result)
 
-	;; When QUIT is raised, we shall return this information to D-Bus.
-	(quit (list nil t 0))))))
+	;; When the choice is "no", we set a dummy fuse-mountpoint in
+	;; order to leave the timeout.
+	(unless (zerop (cl-caddr result))
+	  (tramp-set-file-property v "/" "fuse-mountpoint" "/"))
+
+	result))))
 
 (defun tramp-gvfs-handler-mounted-unmounted (mount-info)
   "Signal handler for the \"org.gtk.vfs.MountTracker.mounted\" and
@@ -1638,6 +1654,10 @@ connection if a previous connection has died for some reason."
 		 (string-equal localname "/"))
 	(tramp-error vec 'file-error "Filename must contain an AFP volume"))
 
+      (when (and (string-match method "davs?")
+		 (string-equal localname "/"))
+	(tramp-error vec 'file-error "Filename must contain a WebDAV share"))
+
       (when (and (string-equal method "smb")
 		 (string-equal localname "/"))
 	(tramp-error vec 'file-error "Filename must contain a Windows share"))
@@ -1649,10 +1669,10 @@ connection if a previous connection has died for some reason."
 	    (format "Opening connection for %s@%s using %s" user host method))
 
 	;; Enable `auth-source'.
-	(tramp-set-connection-property vec "first-password-request" t)
+	(tramp-set-connection-property
+	 vec "first-password-request" tramp-cache-read-persistent-data)
 
-	;; There will be a callback of "askPassword" when a password is
-	;; needed.
+	;; There will be a callback of "askPassword" when a password is needed.
 	(dbus-register-method
 	 :session dbus-service-emacs object-path
 	 tramp-gvfs-interface-mountoperation "askPassword"
@@ -1673,7 +1693,7 @@ connection if a previous connection has died for some reason."
 	 'tramp-gvfs-handler-askquestion)
 
 	;; The call must be asynchronously, because of the "askPassword"
-	;; or "askQuestion"callbacks.
+	;; or "askQuestion" callbacks.
 	(if (string-match "(so)$" tramp-gvfs-mountlocation-signature)
 	    (with-tramp-dbus-call-method vec nil
 	      :session tramp-gvfs-service-daemon tramp-gvfs-path-mounttracker

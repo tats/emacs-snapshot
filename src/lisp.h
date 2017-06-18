@@ -466,9 +466,6 @@ enum Lisp_Misc_Type
 #ifdef HAVE_MODULES
     Lisp_Misc_User_Ptr,
 #endif
-    /* Currently floats are not a misc type,
-       but let's define this in case we want to change that.  */
-    Lisp_Misc_Float,
     /* This is not a type code.  It is for range checking.  */
     Lisp_Misc_Limit
   };
@@ -3925,16 +3922,6 @@ struct Lisp_Module_Function
   void *data;
 };
 
-INLINE struct Lisp_Module_Function *
-allocate_module_function (void)
-{
-  return ALLOCATE_PSEUDOVECTOR (struct Lisp_Module_Function,
-                                /* Name of the first field to be
-                                   ignored by GC.  */
-                                min_arity,
-                                PVEC_MODULE_FUNCTION);
-}
-
 INLINE bool
 MODULE_FUNCTIONP (Lisp_Object o)
 {
@@ -3948,9 +3935,6 @@ XMODULE_FUNCTION (Lisp_Object o)
   return XUNTAG (o, Lisp_Vectorlike);
 }
 
-#define XSET_MODULE_FUNCTION(var, ptr)                  \
-  (XSETPSEUDOVECTOR (var, ptr, PVEC_MODULE_FUNCTION))
-
 #ifdef HAVE_MODULES
 /* Defined in alloc.c.  */
 extern Lisp_Object make_user_ptr (void (*finalizer) (void *), void *p);
@@ -3959,6 +3943,7 @@ extern Lisp_Object make_user_ptr (void (*finalizer) (void *), void *p);
 extern Lisp_Object funcall_module (Lisp_Object, ptrdiff_t, Lisp_Object *);
 extern Lisp_Object module_function_arity (const struct Lisp_Module_Function *);
 extern void mark_modules (void);
+extern void init_module_assertions (bool);
 extern void syms_of_module (void);
 #endif
 

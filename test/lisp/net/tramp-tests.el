@@ -75,6 +75,7 @@
 
 (setq password-cache-expiry nil
       tramp-verbose 0
+      tramp-cache-read-persistent-data t ;; For auth-sources.
       tramp-copy-size-limit nil
       tramp-message-show-message nil
       tramp-persistency-file-name nil)
@@ -2501,6 +2502,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     (let ((method (file-remote-p tramp-test-temporary-file-directory 'method))
 	  (host (file-remote-p tramp-test-temporary-file-directory 'host))
           (orig-syntax tramp-syntax))
+      (when (and (stringp host) (string-match tramp-host-with-port-regexp host))
+	(setq host (match-string 1 host)))
 
       (unwind-protect
           (dolist
@@ -3759,7 +3762,29 @@ process sentinels.  They shall not disturb each other."
 	(mapconcat 'shell-quote-argument load-path " -L ")
 	(shell-quote-argument code)))))))
 
-(ert-deftest tramp-test38-unload ()
+(ert-deftest tramp-test38-remote-load-path ()
+  "Check that Tramp autoloads its packages with remote `load-path'."
+  ;; `tramp-cleanup-all-connections' is autoloaded from tramp-cmds.el.
+  ;; It shall still work, when a remote file name is in the
+  ;; `load-path'.
+  (let ((code
+	 "(let ((force-load-messages t)\
+		(load-path (cons \"/foo:bar:\" load-path)))\
+	    (tramp-cleanup-all-connections))"))
+    (should
+     (string-match
+      (format
+       "Loading %s"
+       (expand-file-name
+	"tramp-cmds" (file-name-directory (locate-library "tramp"))))
+      (shell-command-to-string
+       (format
+	"%s -batch -Q -L %s -l tramp-sh --eval %s"
+	(expand-file-name invocation-name invocation-directory)
+	(mapconcat 'shell-quote-argument load-path " -L ")
+	(shell-quote-argument code)))))))
+
+(ert-deftest tramp-test39-unload ()
   "Check that Tramp and its subpackages unload completely.
 Since it unloads Tramp, it shall be the last test to run."
   ;; Mark as failed until all symbols are unbound.

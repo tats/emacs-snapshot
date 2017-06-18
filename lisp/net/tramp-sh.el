@@ -1543,9 +1543,8 @@ be non-negative integers."
 		  (tramp-shell-quote-argument localname))))))
 
       ;; We handle also the local part, because there doesn't exist
-      ;; `set-file-uid-gid'.  On W32 "chown" might not work.  We add a
-      ;; timeout for this.
-      (with-timeout (5 nil)
+      ;; `set-file-uid-gid'.  On W32 "chown" does not work.
+      (unless (memq system-type '(ms-dos windows-nt))
 	(let ((uid (or (and (natnump uid) uid) (tramp-get-local-uid 'integer)))
 	      (gid (or (and (natnump gid) gid) (tramp-get-local-gid 'integer))))
 	  (tramp-call-process
@@ -2345,13 +2344,14 @@ The method used must be an out-of-band method."
 		     (expand-file-name ".." tmpfile) 'recursive)
 		  (delete-file tmpfile)))))
 
-	;; Set variables for computing the prompt for reading
-	;; password.
+	;; Set variables for computing the prompt for reading password.
 	(setq tramp-current-method (tramp-file-name-method v)
 	      tramp-current-user (or (tramp-file-name-user v)
 				     (tramp-get-connection-property
 				      v "login-as" nil))
-	      tramp-current-host (tramp-file-name-host v))
+	      tramp-current-domain (tramp-file-name-domain v)
+	      tramp-current-host (tramp-file-name-host v)
+	      tramp-current-port (tramp-file-name-port v))
 
 	;; Check which ones of source and target are Tramp files.
 	(setq source (funcall
@@ -4425,7 +4425,8 @@ Goes through the list `tramp-inline-compress-commands'."
 		 (if (memq system-type '(windows-nt))
 		     "echo %s | \"%s\" | \"%s\""
 		   "echo %s | %s | %s")
-		 magic compress decompress) nil nil))
+		 magic compress decompress)
+		nil nil))
 	    (throw 'next nil))
 	  (tramp-message
 	   vec 5
@@ -4719,6 +4720,7 @@ connection if a previous connection has died for some reason."
 		  (let* ((hop (car target-alist))
 			 (l-method (tramp-file-name-method hop))
 			 (l-user (tramp-file-name-user hop))
+			 (l-domain (tramp-file-name-domain hop))
 			 (l-host (tramp-file-name-host hop))
 			 (l-port (tramp-file-name-port hop))
 			 (login-program
@@ -4764,7 +4766,9 @@ connection if a previous connection has died for some reason."
 		    ;; reading password.
 		    (setq tramp-current-method l-method
 			  tramp-current-user   l-user
-			  tramp-current-host   l-host)
+			  tramp-current-domain l-domain
+			  tramp-current-host   l-host
+			  tramp-current-port   l-port)
 
 		    ;; Add login environment.
 		    (when login-env

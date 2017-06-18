@@ -2075,7 +2075,7 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 		      ;; are already loaded.  This results in
 		      ;; recursive loading.  Therefore, we load the
 		      ;; Tramp packages locally.
-		      (when (and (listp sf) (eq (car sf) 'autoload))
+		      (when (autoloadp sf)
 			(let ((default-directory
 				(tramp-compat-temporary-file-directory)))
 			  (load (cadr sf) 'noerror 'nomessage)))
@@ -2209,6 +2209,31 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 
 ;;;###autoload
 (tramp-register-autoload-file-name-handlers)
+
+(defun tramp-use-absolute-autoload-file-names ()
+  "Change Tramp autoload objects to use absolute file names.
+This avoids problems during autoload, when `load-path' contains
+remote file names."
+  ;; We expect all other Tramp files in the same directory as tramp.el.
+  (let* ((dir (expand-file-name (file-name-directory (locate-library "tramp"))))
+	 (files-regexp
+	  (format
+	   "^%s$"
+	   (regexp-opt
+	    (mapcar
+	     'file-name-sans-extension
+	     (directory-files dir nil "^tramp.+\\.elc?$"))
+	    'paren))))
+    (mapatoms
+     (lambda (atom)
+       (when (and (functionp atom)
+		  (autoloadp (symbol-function atom))
+		  (string-match files-regexp (cadr (symbol-function atom))))
+	 (ignore-errors
+	   (setf (cadr (symbol-function atom))
+		 (expand-file-name (cadr (symbol-function atom)) dir))))))))
+
+(eval-after-load 'tramp (tramp-use-absolute-autoload-file-names))
 
 (defun tramp-register-file-name-handlers ()
   "Add Tramp file name handlers to `file-name-handler-alist'."
@@ -2876,7 +2901,7 @@ User is always nil."
      (tramp-get-method-parameter v 'tramp-case-insensitive)
 
      ;; There isn't. So we must check, in case there's a connection already.
-     (and (tramp-connectable-p filename)
+     (and (file-remote-p filename nil 'connected)
           (with-tramp-connection-property v "case-insensitive"
 	    (ignore-errors
 	      (with-tramp-progress-reporter v 5 "Checking case-insensitive"
@@ -3550,14 +3575,14 @@ The terminal type can be configured with `tramp-terminal-type'."
 PROC and VEC indicate the remote connection to be used.  POS, if
 set, is the starting point of the region to be deleted in the
 connection buffer."
-  ;; Enable `auth-source'.  We must use tramp-current-* variables in
-  ;; case we have several hops.
+  ;; Enable `auth-source', unless "emacs -Q" has been called.  We must
+  ;; use `tramp-current-*' variables in case we have several hops.
   (tramp-set-connection-property
-   (tramp-dissect-file-name
-    (tramp-make-tramp-file-name
-     tramp-current-method tramp-current-user tramp-current-domain
-     tramp-current-host tramp-current-port ""))
-   "first-password-request" t)
+   (make-tramp-file-name
+    :method tramp-current-method :user tramp-current-user
+    :domain tramp-current-domain :host tramp-current-host
+    :port tramp-current-port)
+   "first-password-request" tramp-cache-read-persistent-data)
   (save-restriction
     (with-tramp-progress-reporter
 	proc 3 "Waiting for prompts from remote shell"
@@ -4233,8 +4258,19 @@ Invokes `password-read' if available, `read-passwd' else."
 			    (auth-source-search
 			     :max 1
 			     (and tramp-current-user :user)
-			     tramp-current-user
-			     :host tramp-current-host
+			     (if tramp-current-domain
+				 (format
+				  "%s%s%s"
+				  tramp-current-user tramp-prefix-domain-format
+				  tramp-current-domain)
+			       tramp-current-user)
+			     :host
+			     (if tramp-current-port
+				 (format
+				  "%s%s%s"
+				  tramp-current-host tramp-prefix-port-format
+				  tramp-current-port)
+			       tramp-current-host)
 			     :port tramp-current-method
 			     :require
 			     (cons
@@ -4260,8 +4296,10 @@ Invokes `password-read' if available, `read-passwd' else."
   (let ((method (tramp-file-name-method vec))
 	(user (tramp-file-name-user vec))
 	(domain (tramp-file-name-domain vec))
+	(user-domain (tramp-file-name-user-domain vec))
 	(host (tramp-file-name-host vec))
 	(port (tramp-file-name-port vec))
+	(host-port (tramp-file-name-host-port vec))
 	(hop (tramp-file-name-hop vec)))
     (when hop
       ;; Clear also the passwords of the hops.
@@ -4273,7 +4311,8 @@ Invokes `password-read' if available, `read-passwd' else."
 	  (concat tramp-postfix-hop-regexp "$")
 	  (tramp-postfix-host-format) hop)))))
     (auth-source-forget
-     `(:max 1 ,(and user :user) ,user :host ,host :port ,method))
+     `(:max 1 ,(and user-domain :user) ,user-domain
+       :host ,host-port :port ,method))
     (password-cache-remove
      (tramp-make-tramp-file-name method user domain host port ""))))
 

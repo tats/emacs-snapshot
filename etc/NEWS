@@ -85,6 +85,12 @@ modern init systems such as systemd, which manage many of the traditional
 aspects of daemon behavior themselves.  '--bg-daemon' is now an alias
 for '--daemon'.
 
+** New option '--module-assertions'.  If the user supplies this
+option, Emacs will perform expensive correctness checks when dealing
+with dynamic modules.  This is intended for module authors that wish
+to verify that their module conforms to the module requirements.  The
+option makes Emacs abort if a module-related assertion triggers.
+
 +++
 ** Emacs now supports 24-bit colors on capable text terminals
 Terminal is automatically initialized to use 24-bit colors if the
@@ -455,6 +461,12 @@ Negative prefix arg flips the direction of selection.  Also,
 -N previous for negative arguments).  Finally, comments preceding the
 defun are selected unless they are separated from the defun by a blank
 line.
+
+** New command 'replace-buffer-contents'.
+This command replaces the contents of the accessible portion of the
+current buffer with the contents of the accessible portion of a
+different buffer while keeping point, mark, markers, and text
+properties as intact as possible.
 
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
@@ -926,6 +938,7 @@ of not providing replacement pairs via the history.
 *** make-variable-frame-local.  Variables cannot be frame-local any more.
 *** From subr.el: window-dot, set-window-dot, read-input, show-buffer,
 eval-current-buffer, string-to-int
+*** icomplete-prospects-length.
 *** All the default-FOO variables that hold the default value of the
 FOO variable.  Use 'default-value' and 'setq-default' to access and
 change FOO, respectively.  The exhaustive list of removed variables is:
