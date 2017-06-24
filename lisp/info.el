@@ -1,6 +1,6 @@
 ;; info.el --- Info package for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992-2016 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992-2017 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: help
@@ -367,17 +367,17 @@ with wrapping around the current Info node."
   ;; Try to obey obsolete Info-fontify settings.
   (unless (and (boundp 'Info-fontify) (null Info-fontify))
     '(turn-on-font-lock))
-  "Hooks run when `Info-mode' is called."
+  "Hook run when activating Info Mode."
   :type 'hook
   :group 'info)
 
 (defcustom Info-selection-hook nil
-  "Hooks run when `Info-select-node' is called."
+  "Hook run when an Info node is selected as the current node."
   :type 'hook
   :group 'info)
 
 (defvar Info-edit-mode-hook nil
-  "Hooks run when `Info-edit-mode' is called.")
+  "Hook run when `Info-edit-mode' is activated.")
 
 (make-obsolete-variable 'Info-edit-mode-hook
 			"editing Info nodes by hand is not recommended." "24.4")
@@ -4236,9 +4236,12 @@ With a zero prefix arg, put the name inside a function call to `info'."
   "Syntax table used in `Info-mode'.")
 
 (defface Info-quoted
-  '((t :family "courier"))
+  '((t :inherit fixed-pitch-serif))
   "Face used for quoted elements.")
 
+;; We deliberately fontify only ‘..’ quoting, and not `..', because
+;; the former can be done much more reliably, i.e. without risking
+;; false positives.
 (defvar Info-mode-font-lock-keywords
   '(("‘\\([^’]*\\)’" (1 'Info-quoted))))
 

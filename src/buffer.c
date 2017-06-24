@@ -1,6 +1,6 @@
 /* Buffer manipulation primitives for GNU Emacs.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2016 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1995, 1997-2017 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -874,7 +874,7 @@ drop_overlay (struct buffer *b, struct Lisp_Overlay *ov)
 
 }
 
-/* Delete all overlays of B and reset it's overlay lists.  */
+/* Delete all overlays of B and reset its overlay lists.  */
 
 void
 delete_all_overlays (struct buffer *b)
@@ -1693,7 +1693,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
   if (EQ (buffer, XWINDOW (minibuf_window)->contents))
     return Qnil;
 
-  /* When we kill an ordinary buffer which shares it's buffer text
+  /* When we kill an ordinary buffer which shares its buffer text
      with indirect buffer(s), we must kill indirect buffer(s) too.
      We do it at this stage so nothing terrible happens if they
      ask questions or their hooks get errors.  */
@@ -5754,7 +5754,9 @@ visual lines rather than logical lines.  See the documentation of
   DEFVAR_PER_BUFFER ("default-directory", &BVAR (current_buffer, directory),
 		     Qstringp,
 		     doc: /* Name of default directory of current buffer.
-To interactively change the default directory, use command `cd'.  */);
+It should be a directory name (as opposed to a directory file-name).
+On GNU and Unix systems, directory names end in a slash `/'.
+To interactively change the default directory, use command `cd'. */);
 
   DEFVAR_PER_BUFFER ("auto-fill-function", &BVAR (current_buffer, auto_fill_function),
 		     Qnil,

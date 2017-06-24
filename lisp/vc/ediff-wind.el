@@ -1,6 +1,6 @@
 ;;; ediff-wind.el --- window manipulation utilities
 
-;; Copyright (C) 1994-1997, 2000-2016 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1997, 2000-2017 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: ediff
@@ -556,7 +556,7 @@ into icons, regardless of the window manager."
     (if (and (window-live-p wind-A)
 	     (null use-same-frame) ; implies wind-A is suitable
 	     (null use-same-frame-for-AB))
-	(progn ; bug A on its own
+	(progn ; buf A on its own
 	  ;; buffer buf-A is seen in live wind-A
 	  (select-window wind-A)
 	  (delete-other-windows)

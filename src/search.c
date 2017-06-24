@@ -1,6 +1,6 @@
 /* String search routines for GNU Emacs.
 
-Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2016 Free Software
+Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2017 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -308,12 +308,20 @@ looking_at_1 (Lisp_Object string, bool posix)
 
   re_match_object = Qnil;
 
+#ifdef REL_ALLOC
+  /* Prevent ralloc.c from relocating the current buffer while
+     searching it.  */
+  r_alloc_inhibit_buffer_relocation (1);
+#endif
   i = re_match_2 (bufp, (char *) p1, s1, (char *) p2, s2,
 		  PT_BYTE - BEGV_BYTE,
 		  (NILP (Vinhibit_changing_match_data)
 		   ? &search_regs : NULL),
 		  ZV_BYTE - BEGV_BYTE);
   immediate_quit = 0;
+#ifdef REL_ALLOC
+  r_alloc_inhibit_buffer_relocation (0);
+#endif
 
   if (i == -2)
     matcher_overflow ();
@@ -561,8 +569,16 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   buf = compile_pattern (regexp, 0, Qnil, 0, multibyte);
   immediate_quit = 1;
+#ifdef REL_ALLOC
+  /* Prevent ralloc.c from relocating the current buffer while
+     searching it.  */
+  r_alloc_inhibit_buffer_relocation (1);
+#endif
   len = re_match_2 (buf, (char *) p1, s1, (char *) p2, s2,
 		    pos_byte, NULL, limit_byte);
+#ifdef REL_ALLOC
+  r_alloc_inhibit_buffer_relocation (0);
+#endif
   immediate_quit = 0;
 
   return len;
@@ -1213,6 +1229,12 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	}
       re_match_object = Qnil;
 
+#ifdef REL_ALLOC
+  /* Prevent ralloc.c from relocating the current buffer while
+     searching it.  */
+  r_alloc_inhibit_buffer_relocation (1);
+#endif
+
       while (n < 0)
 	{
 	  ptrdiff_t val;
@@ -1254,6 +1276,9 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	  else
 	    {
 	      immediate_quit = 0;
+#ifdef REL_ALLOC
+              r_alloc_inhibit_buffer_relocation (0);
+#endif
 	      return (n);
 	    }
 	  n++;
@@ -1296,11 +1321,17 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	  else
 	    {
 	      immediate_quit = 0;
+#ifdef REL_ALLOC
+              r_alloc_inhibit_buffer_relocation (0);
+#endif
 	      return (0 - n);
 	    }
 	  n--;
 	}
       immediate_quit = 0;
+#ifdef REL_ALLOC
+      r_alloc_inhibit_buffer_relocation (0);
+#endif
       return (pos);
     }
   else				/* non-RE case */
@@ -1999,12 +2030,26 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
 	      if (i + direction == 0)
 		{
 		  ptrdiff_t position, start, end;
+#ifdef REL_ALLOC
+		  ptrdiff_t cursor_off;
+#endif
 
 		  cursor -= direction;
 
 		  position = pos_byte + cursor - p2 + ((direction > 0)
 						       ? 1 - len_byte : 0);
+#ifdef REL_ALLOC
+		  /* set_search_regs might call malloc, which could
+		     cause ralloc.c relocate buffer text.  We need to
+		     update pointers into buffer text due to that.  */
+		  cursor_off = cursor - p2;
+#endif
 		  set_search_regs (position, len_byte);
+#ifdef REL_ALLOC
+		  p_limit = BYTE_POS_ADDR (limit);
+		  p2 = BYTE_POS_ADDR (pos_byte);
+		  cursor = p2 + cursor_off;
+#endif
 
 		  if (NILP (Vinhibit_changing_match_data))
 		    {
@@ -2212,26 +2257,12 @@ See also the functions `match-beginning', `match-end' and `replace-match'.  */)
 
 DEFUN ("re-search-backward", Fre_search_backward, Sre_search_backward, 1, 4,
        "sRE search backward: ",
-       doc: /* Search backward from point for match for regular expression REGEXP.
-Set point to the beginning of the occurrence found, and return point.
-An optional second argument bounds the search; it is a buffer position.
-  The match found must not begin before that position.  A value of nil
-  means search to the beginning of the accessible portion of the buffer.
-Optional third argument, if t, means if fail just return nil (no error).
-  If not nil and not t, position at limit of search and return nil.
-Optional fourth argument COUNT, if a positive number, means to search
-  for COUNT successive occurrences.  If COUNT is negative, search
-  forward, instead of backward, for -COUNT occurrences.  A value of
-  nil means the same as 1.
-With COUNT positive, the match found is the COUNTth to last one (or
-  last, if COUNT is 1 or nil) in the buffer located entirely before
-  the origin of the search; correspondingly with COUNT negative.
+       doc: /* Search backward from point for regular expression REGEXP.
+This function is almost identical to `re-search-forward', except that
+by default it searches backward instead of forward, and the sign of
+COUNT also indicates exactly the opposite searching direction.
 
-Search case-sensitivity is determined by the value of the variable
-`case-fold-search', which see.
-
-See also the functions `match-beginning', `match-end', `match-string',
-and `replace-match'.  */)
+See `re-search-forward' for details.  */)
   (Lisp_Object regexp, Lisp_Object bound, Lisp_Object noerror, Lisp_Object count)
 {
   return search_command (regexp, bound, noerror, count, -1, 1, 0);
@@ -2241,18 +2272,22 @@ DEFUN ("re-search-forward", Fre_search_forward, Sre_search_forward, 1, 4,
        "sRE search: ",
        doc: /* Search forward from point for regular expression REGEXP.
 Set point to the end of the occurrence found, and return point.
-An optional second argument bounds the search; it is a buffer position.
-  The match found must not end after that position.  A value of nil
-  means search to the end of the accessible portion of the buffer.
-Optional third argument, if t, means if fail just return nil (no error).
-  If not nil and not t, move to limit of search and return nil.
-Optional fourth argument COUNT, if a positive number, means to search
-  for COUNT successive occurrences.  If COUNT is negative, search
-  backward, instead of forward, for -COUNT occurrences.  A value of
-  nil means the same as 1.
-With COUNT positive, the match found is the COUNTth one (or first,
-  if COUNT is 1 or nil) in the buffer located entirely after the
-  origin of the search; correspondingly with COUNT negative.
+The optional second argument BOUND is a buffer position that bounds
+  the search.  The match found must not end after that position.  A
+  value of nil means search to the end of the accessible portion of
+  the buffer.
+The optional third argument NOERROR indicates how errors are handled
+  when the search fails.  If it is nil or omitted, emit an error; if
+  it is t, simply return nil and do nothing; if it is neither nil nor
+  t, move to the limit of search and return nil.
+The optional fourth argument COUNT is a number that indicates the
+  search direction and the number of occurrences to search for.  If it
+  is positive, search forward for COUNT successive occurrences; if it
+  is negative, search backward, instead of forward, for -COUNT
+  occurrences.  A value of nil means the same as 1.
+With COUNT positive/negative, the match found is the COUNTth/-COUNTth
+  one in the buffer located entirely after/before the origin of the
+  search.
 
 Search case-sensitivity is determined by the value of the variable
 `case-fold-search', which see.
@@ -2624,6 +2659,7 @@ since only regular expressions have distinguished subexpressions.  */)
 	  const unsigned char *add_stuff = NULL;
 	  ptrdiff_t add_len = 0;
 	  ptrdiff_t idx = -1;
+	  ptrdiff_t begbyte;
 
 	  if (str_multibyte)
 	    {
@@ -2686,11 +2722,10 @@ since only regular expressions have distinguished subexpressions.  */)
 	     set up ADD_STUFF and ADD_LEN to point to it.  */
 	  if (idx >= 0)
 	    {
-	      ptrdiff_t begbyte = CHAR_TO_BYTE (search_regs.start[idx]);
+	      begbyte = CHAR_TO_BYTE (search_regs.start[idx]);
 	      add_len = CHAR_TO_BYTE (search_regs.end[idx]) - begbyte;
 	      if (search_regs.start[idx] < GPT && GPT < search_regs.end[idx])
 		move_gap_both (search_regs.start[idx], begbyte);
-	      add_stuff = BYTE_POS_ADDR (begbyte);
 	    }
 
 	  /* Now the stuff we want to add to SUBSTED
@@ -2702,6 +2737,11 @@ since only regular expressions have distinguished subexpressions.  */)
 	      xpalloc (substed, &substed_alloc_size,
 		       add_len - (substed_alloc_size - substed_len),
 		       STRING_BYTES_BOUND, 1);
+
+	  /* We compute this after the call to xpalloc, because that
+	     could cause buffer text be relocated when ralloc.c is used.  */
+	  if (idx >= 0)
+	    add_stuff = BYTE_POS_ADDR (begbyte);
 
 	  /* Now add to the end of SUBSTED.  */
 	  if (add_stuff)
@@ -3396,6 +3436,7 @@ or other such regexp constructs are not replaced with this.
 A value of nil (which is the normal value) means treat spaces literally.  */);
   Vsearch_spaces_regexp = Qnil;
 
+  DEFSYM (Qinhibit_changing_match_data, "inhibit-changing-match-data");
   DEFVAR_LISP ("inhibit-changing-match-data", Vinhibit_changing_match_data,
       doc: /* Internal use only.
 If non-nil, the primitive searching and matching functions

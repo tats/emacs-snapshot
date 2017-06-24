@@ -1,6 +1,6 @@
 ;;; python.el --- Python's flying circus support for Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 2003-2016 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2017 Free Software Foundation, Inc.
 
 ;; Author: Fabián E. Gallina <fgallina@gnu.org>
 ;; URL: https://github.com/fgallina/python.el
@@ -2414,7 +2414,7 @@ banner and the initial prompt are received separately."
 (defun python-shell-comint-end-of-output-p (output)
   "Return non-nil if OUTPUT is ends with input prompt."
   (string-match
-   ;; XXX: It seems on OSX an extra carriage return is attached
+   ;; XXX: It seems on macOS an extra carriage return is attached
    ;; at the end of output, this handles that too.
    (concat
     "\r?\n?"
@@ -2826,8 +2826,7 @@ of `error' with a user-friendly message."
   (or (python-shell-get-process)
       (if interactivep
           (user-error
-           "Start a Python process first with `%s' or `%s'."
-           (substitute-command-keys "\\[run-python]")
+           "Start a Python process first with `M-x run-python' or `%s'."
            ;; Get the binding.
            (key-description
             (where-is-internal
@@ -3256,8 +3255,10 @@ the full statement in the case of imports."
   "Completion string code must work for (i)pdb.")
 
 (defcustom python-shell-completion-native-disabled-interpreters
-  ;; PyPy's readline cannot handle some escape sequences yet.
-  (list "pypy")
+  ;; PyPy's readline cannot handle some escape sequences yet.  Native
+  ;; completion was found to be non-functional for IPython (see
+  ;; Bug#25067).
+  (list "pypy" "ipython")
   "List of disabled interpreters.
 When a match is found, native completion is disabled."
   :version "25.1"
@@ -3296,7 +3297,7 @@ When a match is found, native completion is disabled."
          python-shell-completion-native-try-output-timeout))
     (python-shell-completion-native-get-completions
      (get-buffer-process (current-buffer))
-     nil "")))
+     nil "_")))
 
 (defun python-shell-completion-native-setup ()
   "Try to setup native completion, return non-nil on success."
@@ -3451,7 +3452,7 @@ With argument MSG show activation/deactivation message."
            :warning
            (concat
             "Your `python-shell-interpreter' doesn't seem to "
-            "support readline, yet `python-shell-completion-native' "
+            "support readline, yet `python-shell-completion-native-enable' "
             (format "was t and %S is not part of the "
                     (file-name-nondirectory python-shell-interpreter))
             "`python-shell-completion-native-disabled-interpreters' "
@@ -4865,12 +4866,19 @@ point's current `syntax-ppss'."
              ;; Allow up to two consecutive docstrings only.
              (>=
               2
-              (progn
+              (let (last-backward-sexp-point)
                 (while (save-excursion
                          (python-nav-backward-sexp)
                          (setq backward-sexp-point (point))
                          (and (= indentation (current-indentation))
-                              (not (bobp)) ; Prevent infloop.
+                              ;; Make sure we're always moving point.
+                              ;; If we get stuck in the same position
+                              ;; on consecutive loop iterations,
+                              ;; bail out.
+                              (prog1 (not (eql last-backward-sexp-point
+                                               backward-sexp-point))
+                                (setq last-backward-sexp-point
+                                      backward-sexp-point))
                               (looking-at-p
                                (concat "[uU]?[rR]?"
                                        (python-rx string-delimiter)))))
@@ -5136,7 +5144,7 @@ returned as is."
   (add-to-list
    'hs-special-modes-alist
    `(python-mode
-     "\\s-*\\(?:def\\|class\\)\\>"
+     "\\s-*\\_<\\(?:def\\|class\\)\\_>"
      ;; Use the empty string as end regexp so it doesn't default to
      ;; "\\s)".  This way parens at end of defun are properly hidden.
      ""
