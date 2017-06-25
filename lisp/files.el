@@ -591,13 +591,14 @@ settings being applied, but still respect file-local ones.")
 ;; ignore.  So AFAICS the only reason this variable exists is for a
 ;; minor convenience feature for handling of an obsolete Rmail file format.
 (defvar local-enable-local-variables t
-  "Like `enable-local-variables' but meant for buffer-local bindings.
+  "Like `enable-local-variables', except for major mode in a -*- line.
 The meaningful values are nil and non-nil.  The default is non-nil.
-If a major mode sets this to nil, buffer-locally, then any local
-variables list in a file visited in that mode will be ignored.
+It should be set in a buffer-local fashion.
 
-This variable does not affect the use of major modes specified
-in a -*- line.")
+Setting this to nil has the same effect as setting `enable-local-variables'
+to nil, except that it does not ignore any mode: setting in a -*- line.
+Unless this difference matters to you, you should set `enable-local-variables'
+instead of this variable.")
 
 (defcustom enable-local-eval 'maybe
   "Control processing of the \"variable\" `eval' in a file's local variables.
@@ -6076,16 +6077,18 @@ specifies the list of buffers to kill, asking for approval for each one."
 	   (kill-buffer-ask buffer)))
     (setq list (cdr list))))
 
-(defun kill-matching-buffers (regexp &optional internal-too)
+(defun kill-matching-buffers (regexp &optional internal-too no-ask)
   "Kill buffers whose name matches the specified REGEXP.
-The optional second argument indicates whether to kill internal buffers too."
+Ignores buffers whose name starts with a space, unless optional
+prefix argument INTERNAL-TOO is non-nil.  Asks before killing
+each buffer, unless NO-ASK is non-nil."
   (interactive "sKill buffers matching this regular expression: \nP")
   (dolist (buffer (buffer-list))
     (let ((name (buffer-name buffer)))
       (when (and name (not (string-equal name ""))
                  (or internal-too (/= (aref name 0) ?\s))
                  (string-match regexp name))
-        (kill-buffer-ask buffer)))))
+        (funcall (if no-ask 'kill-buffer 'kill-buffer-ask) buffer)))))
 
 
 (defun rename-auto-save-file ()

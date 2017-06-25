@@ -471,6 +471,8 @@ properties as intact as possible.
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
 
+*** html2text is now marked obsolete.
+
 *** smerge-refine-regions can refine regions in separate buffers
 
 *** Info menu and index completion uses substring completion by default.
@@ -754,6 +756,9 @@ header's value.
 *** The new variable 'package-gnupghome-dir' has been added to control
 where the GnuPG home directory (used for signature verification) is
 located and whether GnuPG's option "--homedir" is used or not.
+
+---
+*** Deleting a package no longer respects 'delete-by-moving-to-trash'.
 
 ** Tramp
 
