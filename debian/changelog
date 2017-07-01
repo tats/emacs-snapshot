@@ -1,10 +1,10 @@
-emacs25 (25.2+1-1~1.gbp4b9e7e) UNRELEASED; urgency=medium
+emacs25 (25.2+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @4b9e7e71a77ea4cc09081b8de8faf58c534e81bb **
+  * Merge upstream version 25.2.
 
-  * UNRELEASED
+  * Update debian/ for 25.2.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 Jul 2017 14:30:04 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 Jul 2017 14:35:18 -0500
 
 emacs25 (25.1+1-4) unstable; urgency=medium
 
