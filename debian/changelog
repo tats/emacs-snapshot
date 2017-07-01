@@ -1,3 +1,11 @@
+emacs25-non-dfsg (25.2+1-1~1.gbpda2f37) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @da2f37af3f5aa2af3a24dfb15f983adc47253f55 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 01 Jul 2017 16:57:39 -0500
+
 emacs25-non-dfsg (25.1+1-1) unstable; urgency=medium
 
   * debian/changelog: change the package name to emacs25-non-dfsg.
