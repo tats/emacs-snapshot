@@ -1,6 +1,6 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2016 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2017 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -1165,7 +1165,7 @@ The major browsing mode used is essentially the standard Man mode.
 Choose the filename for the man page using completion, based on the
 topic selected from the directories specified in `woman-manpath' and
 `woman-path'.  The directory expansions and topics are cached for
-speed, but a non-nil interactive argument forces the caches to be
+speed.  With a prefix argument, force the caches to be
 updated (e.g. to re-interpret the current directory).
 
 Used non-interactively, arguments are optional: if given then TOPIC

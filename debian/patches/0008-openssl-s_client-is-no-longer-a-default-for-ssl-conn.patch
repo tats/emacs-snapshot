@@ -1,4 +1,4 @@
-From e2c4be1ad5de241d44d9f8a3ffec5a0663028838 Mon Sep 17 00:00:00 2001
+From 148e25aece584e7b96dbbdfc0d2e9975a44b617e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 22 Apr 2017 12:02:00 -0500
 Subject: openssl s_client is no longer a default for ssl connections
@@ -13,7 +13,7 @@ Bug-Debian: https://bugs.debian.org/766397
  1 file changed, 5 insertions(+), 10 deletions(-)
 
 diff --git a/lisp/net/tls.el b/lisp/net/tls.el
-index f1219fdddbd..92a1a1306a1 100644
+index 2273d1345d5..91a3f0b5739 100644
 --- a/lisp/net/tls.el
 +++ b/lisp/net/tls.el
 @@ -78,8 +78,7 @@ tls-end-of-info

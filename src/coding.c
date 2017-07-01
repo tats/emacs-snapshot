@@ -1,5 +1,5 @@
 /* Coding system handler (conversion, detection, etc).
-   Copyright (C) 2001-2016 Free Software Foundation, Inc.
+   Copyright (C) 2001-2017 Free Software Foundation, Inc.
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
      2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
@@ -122,7 +122,7 @@ END-OF-LINE FORMAT
   How text end-of-line is encoded depends on operating system.  For
   instance, Unix's format is just one byte of LF (line-feed) code,
   whereas DOS's format is two-byte sequence of `carriage-return' and
-  `line-feed' codes.  MacOS's format is usually one byte of
+  `line-feed' codes.  Classic Mac OS's format is usually one byte of
   `carriage-return'.
 
   Since text character encoding and end-of-line encoding are
@@ -9391,8 +9391,8 @@ When called from a program, takes four arguments:
         START, END, CODING-SYSTEM and DESTINATION.
 START and END are buffer positions.
 
-Optional 4th arguments DESTINATION specifies where the encoded text goes.
-If nil, the region between START and END is replace by the encoded text.
+Optional 4th argument DESTINATION specifies where the encoded text goes.
+If nil, the region between START and END is replaced by the encoded text.
 If buffer, the encoded text is inserted in that buffer after point (point
 does not move).
 In those cases, the length of the encoded text is returned.

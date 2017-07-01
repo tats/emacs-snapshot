@@ -1,4 +1,4 @@
-From c7e8cdc2eee113bf6d49f25c1ef6d9ef02f8f94b Mon Sep 17 00:00:00 2001
+From 3456bf7e394316db2cde7522f233cf5b2d5dda83 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 10 Oct 2016 17:35:56 -0500
 Subject: Kill gpg agent in package-test.el to avoid a race
@@ -20,7 +20,7 @@ package-test.el should no longer fail during clean up.
  1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/test/automated/package-test.el b/test/automated/package-test.el
-index c4c856f3031..d0719588c89 100644
+index 637a94bb330..05272736881 100644
 --- a/test/automated/package-test.el
 +++ b/test/automated/package-test.el
 @@ -149,7 +149,14 @@ package-test-fake-contents-file

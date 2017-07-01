@@ -1,6 +1,6 @@
 /* Generic frame functions.
 
-Copyright (C) 1993-1995, 1997, 1999-2016 Free Software Foundation, Inc.
+Copyright (C) 1993-1995, 1997, 1999-2017 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1308,7 +1308,7 @@ candidate_frame (Lisp_Object candidate, Lisp_Object frame, Lisp_Object minibuf)
 		     FRAME_FOCUS_FRAME (c)))
 	    return candidate;
 	}
-      else if (XFASTINT (minibuf) == 0)
+      else if (INTEGERP (minibuf) && XINT (minibuf) == 0)
 	{
 	  if (FRAME_VISIBLE_P (c) || FRAME_ICONIFIED_P (c))
 	    return candidate;
@@ -4001,7 +4001,7 @@ x_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       else if (INTEGERP (item))
 	{
 	  EMACS_INT ialpha = XINT (item);
-	  if (! (0 <= ialpha && alpha <= 100))
+	  if (! (0 <= ialpha && ialpha <= 100))
 	    args_out_of_range (make_number (0), make_number (100));
 	  alpha = ialpha / 100.0;
 	}
@@ -5088,7 +5088,7 @@ Setting this variable does not affect existing frames, only new ones.  */);
 	       doc: /* Default position of vertical scroll bars on this window-system.  */);
 #ifdef HAVE_WINDOW_SYSTEM
 #if defined (HAVE_NTGUI) || defined (NS_IMPL_COCOA) || (defined (USE_GTK) && defined (USE_TOOLKIT_SCROLL_BARS))
-  /* MS-Windows, Mac OS X, and GTK have scroll bars on the right by
+  /* MS-Windows, macOS, and GTK have scroll bars on the right by
      default.  */
   Vdefault_frame_scroll_bars = Qright;
 #else

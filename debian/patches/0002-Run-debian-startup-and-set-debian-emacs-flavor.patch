@@ -1,4 +1,4 @@
-From ecc00816d05051eb7fa4d7dc5fc6c92a635e16cd Mon Sep 17 00:00:00 2001
+From ae16c941cd1b1cfae352136af9db2d698f5e4388 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor
@@ -16,7 +16,7 @@ Author: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 761e69e03b1..ffd58fd5f6d 100644
+index 2855e7c31ca..b0df4f59d0c 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
 @@ -438,6 +438,10 @@ tutorial-directory

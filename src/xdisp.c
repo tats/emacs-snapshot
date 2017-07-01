@@ -1,6 +1,6 @@
 /* Display generation from window structure and buffer text.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2016 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2017 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -6298,9 +6298,10 @@ forward_to_next_line_start (struct it *it, bool *skipped_p,
 	}
       else
 	{
-	  while (get_next_display_element (it)
-		 && !newline_found_p)
+	  while (!newline_found_p)
 	    {
+	      if (!get_next_display_element (it))
+		break;
 	      newline_found_p = ITERATOR_AT_END_OF_LINE_P (it);
 	      if (newline_found_p && it->bidi_p && bidi_it_prev)
 		*bidi_it_prev = it->bidi_it;
@@ -8805,6 +8806,8 @@ move_it_in_display_line_to (struct it *it,
 			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
 			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))
 		{
+		  bool moved_forward = false;
+
 		  if (/* IT->hpos == 0 means the very first glyph
 			 doesn't fit on the line, e.g. a wide image.  */
 		      it->hpos == 0
@@ -8823,16 +8826,37 @@ move_it_in_display_line_to (struct it *it,
 			     now that we know it fits in this row.  */
 			  if (BUFFER_POS_REACHED_P ())
 			    {
+			      bool can_wrap = true;
+
+			      /* If we are at a whitespace character
+				 that barely fits on this screen line,
+				 but the next character is also
+				 whitespace, we cannot wrap here.  */
+			      if (it->line_wrap == WORD_WRAP
+				  && wrap_it.sp >= 0
+				  && may_wrap
+				  && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+				{
+				  struct it tem_it;
+				  void *tem_data = NULL;
+
+				  SAVE_IT (tem_it, *it, tem_data);
+				  set_iterator_to_next (it, true);
+				  if (get_next_display_element (it)
+				      && IT_DISPLAYING_WHITESPACE (it))
+				    can_wrap = false;
+				  RESTORE_IT (it, &tem_it, tem_data);
+				}
 			      if (it->line_wrap != WORD_WRAP
 				  || wrap_it.sp < 0
-				  /* If we've just found whitespace to
-				     wrap, effectively ignore the
-				     previous wrap point -- it is no
-				     longer relevant, but we won't
-				     have an opportunity to update it,
-				     since we've reached the edge of
-				     this screen line.  */
-				  || (may_wrap
+				  /* If we've just found whitespace
+				     where we can wrap, effectively
+				     ignore the previous wrap point --
+				     it is no longer relevant, but we
+				     won't have an opportunity to
+				     update it, since we've reached
+				     the edge of this screen line.  */
+				  || (may_wrap && can_wrap
 				      && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
 				  it->hpos = hpos_before_this_char;
@@ -8875,6 +8899,7 @@ move_it_in_display_line_to (struct it *it,
 				  result = MOVE_POS_MATCH_OR_ZV;
 				  break;
 				}
+			      moved_forward = true;
 			      if (BUFFER_POS_REACHED_P ())
 				{
 				  if (ITERATOR_AT_END_OF_LINE_P (it))
@@ -8902,7 +8927,14 @@ move_it_in_display_line_to (struct it *it,
 		     longer relevant, but we won't have an opportunity
 		     to update it, since we are done with this screen
 		     line.  */
-		  if (may_wrap && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+		  if (may_wrap && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)
+		      /* If the character after the one which set the
+			 may_wrap flag is also whitespace, we can't
+			 wrap here, since the screen line cannot be
+			 wrapped in the middle of whitespace.
+			 Therefore, wrap_it _is_ relevant in that
+			 case.  */
+		      && !(moved_forward && IT_DISPLAYING_WHITESPACE (it)))
 		    {
 		      /* If we've found TO_X, go back there, as we now
 			 know the last word fits on this screen line.  */
@@ -9083,9 +9115,18 @@ move_it_in_display_line_to (struct it *it,
 
 #undef BUFFER_POS_REACHED_P
 
-  /* If we scanned beyond to_pos and didn't find a point to wrap at,
-     restore the saved iterator.  */
-  if (atpos_it.sp >= 0)
+  /* If we scanned beyond TO_POS, restore the saved iterator either to
+     the wrap point (if found), or to atpos/atx location.  We decide which
+     data to use to restore the saved iterator state by their X coordinates,
+     since buffer positions might increase non-monotonically with screen
+     coordinates due to bidi reordering.  */
+  if (result == MOVE_LINE_CONTINUED
+      && it->line_wrap == WORD_WRAP
+      && wrap_it.sp >= 0
+      && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
+	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
+    RESTORE_IT (it, &wrap_it, wrap_data);
+  else if (atpos_it.sp >= 0)
     RESTORE_IT (it, &atpos_it, atpos_data);
   else if (atx_it.sp >= 0)
     RESTORE_IT (it, &atx_it, atx_data);
@@ -10429,9 +10470,12 @@ message_with_string (const char *m, Lisp_Object string, bool log)
 /* Dump an informative message to the minibuf.  If M is 0, clear out
    any existing message, and let the mini-buffer text show through.
 
-   The message must be safe ASCII and the format must not contain ` or
-   '.  If your message and format do not fit into this category,
-   convert your arguments to Lisp objects and use Fmessage instead.  */
+   The message must be safe ASCII (because when Emacs is
+   non-interactive the message is sent straight to stderr without
+   encoding first) and the format must not contain ` or ' (because
+   this function does not account for `text-quoting-style').  If your
+   message and format do not fit into this category, convert your
+   arguments to Lisp objects and use Fmessage instead.  */
 
 static void ATTRIBUTE_FORMAT_PRINTF (1, 0)
 vmessage (const char *m, va_list ap)
@@ -10489,6 +10533,7 @@ vmessage (const char *m, va_list ap)
     }
 }
 
+/* See vmessage for restrictions on the text of the message.  */
 void
 message (const char *m, ...)
 {
@@ -24420,7 +24465,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	    }
 	  if (FRAME_WINDOW_P (it->f) && valid_xwidget_spec_p (prop))
 	    {
-              // TODO: Don't return dummy size.
+              /* TODO: Don't return dummy size.  */
               return OK_PIXELS (100);
             }
 #endif
@@ -28446,8 +28491,7 @@ display_and_set_cursor (struct window *w, bool on,
     }
 
   glyph = NULL;
-  if (!glyph_row->exact_window_width_line_p
-      || (0 <= hpos && hpos < glyph_row->used[TEXT_AREA]))
+  if (0 <= hpos && hpos < glyph_row->used[TEXT_AREA])
     glyph = glyph_row->glyphs[TEXT_AREA] + hpos;
 
   eassert (input_blocked_p ());
