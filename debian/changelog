@@ -1,3 +1,11 @@
+emacs25 (25.2+1-2~1.gbpa489cc) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @a489cca4f8c3e10ac385e679614bf629cec68ab8 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 04 Jul 2017 10:35:03 -0500
+
 emacs25 (25.2+1-1) unstable; urgency=medium
 
   * Merge upstream version 25.2.
