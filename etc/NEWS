@@ -129,6 +129,22 @@ given file is on a case-insensitive filesystem.
 of curved quotes for 'electric-quote-mode', allowing user to choose
 the types of quotes to be used.
 
+** The new user option 'electric-quote-context-sensitive' makes
+'electric-quote-mode' context sensitive.  If it is non-nil, you can
+type an ASCII apostrophe to insert an opening or closing quote,
+depending on context.  Emacs will replace the apostrophe by an opening
+quote character at the beginning of the buffer, the beginning of a
+line, after a whitespace character, and after an opening parenthesis;
+and it will replace the apostrophe by a closing quote character in all
+other cases.
+
+** The new variable 'electric-quote-inhibit-functions' controls when
+to disable electric quoting based on context.  Major modes can add
+functions to this list; Emacs will temporarily disable
+'electric-quote-mode' whenever any of the functions returns non-nil.
+This can be used by major modes that derive from 'text-mode' but allow
+inline code segments, such as 'markdown-mode'.
+
 +++
 ** The new user variable 'dired-omit-case-fold' allows the user to
 customize the case-sensitivity of dired-omit-mode.  It defaults to
@@ -389,6 +405,60 @@ display of raw bytes from octal to hex.
 ** You can now provide explicit field numbers in format specifiers.
 For example, '(format "%2$s %1$s" "X" "Y")' produces "Y X".
 
+** 'comment-indent-function' values may now return a cons to specify a
+range of indentation.
+
++++
+** Emacs now supports optional display of line numbers in the buffer.
+This is similar to what linum-mode provides, but much faster and
+doesn't usurp the display margin for the line numbers.  Customize the
+buffer-local variable 'display-line-numbers' to activate this optional
+display.  If set to t, Emacs will display the number of each line
+before the line.  If set to 'relative', Emacs will display the line
+number relative to the line showing point, with that line's number
+displayed as absolute.  If set to 'visual', Emacs will display a
+relative number for every screen line, i.e. it will count screen lines
+rather than buffer lines.  The default is nil, which doesn't display
+the line numbers.
+
+In 'relative' and 'visual' modes, the variable
+'display-line-numbers-current-absolute' controls what number is
+displayed for the line showing point.  By default, this variable's
+value is t, which means display the absolute line number for the line
+showing point.  Customizing this variable to a nil value will cause
+Emacs to show zero instead, which preserves horizontal space of the
+window in large buffers.
+
+Line numbers are not displayed at all in minibuffer windows and in
+tooltips, as they are not useful there.
+
+The new face 'line-number' is used to display the line numbers.  The
+new face 'line-number-current-line' can be customized to display the
+current line's number differently from all the other line numbers; by
+default these two faces are identical.
+
+You can also customize the new variable 'display-line-number-width' to
+specify a fixed minimal with of the area allocated to line-number
+display.  The default is nil, meaning that Emacs will dynamically
+calculate the area width, enlarging or shrinking it as needed.
+Setting it to a non-negative integer specifies that as the minimal
+width; selecting a value  that is large enough to display all line
+numbers in a buffer will then keep the line-number display area of
+constant width at all times, if that is desired.
+
+Lisp programs can disable line-number display for a particular screen
+line by putting the 'display-line-numbers-disable' text property or
+overlay property on the first character of that screen line.  This is
+intended for add-on packages that need a finer control of the display.
+
+Lisp programs that need to know how much screen estate is used up for
+line-number display in a window can use the new function
+'line-number-display-width'.
+
+Linum mode and all similar packages are henceforth becoming obsolete.
+Users and developers are encouraged to switch to this new feature
+instead.
+
 
 * Editing Changes in Emacs 26.1
 
@@ -482,6 +552,10 @@ properties as intact as possible.
 
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
+
+** Dired
+You can now use '`?`' in 'dired-do-shell-command'; as ' ? ', it gets replaced
+by the current file name.
 
 *** html2text is now marked obsolete.
 
@@ -656,6 +730,13 @@ replaced by the real images asynchronously, which will also now
 respect width/height HTML specs (unless they specify widths/heights
 bigger than the current window).
 
+---
+*** The 'w' command on links is now 'shr-maybe-probe-and-copy-url'.
+'shr-copy-url' now only copies the url at point; users who wish to
+avoid accidentally accessing remote links may rebind 'w' and 'u' in
+'eww-link-keymap' to it.
+
+
 ** Ido
 
 *** The commands 'find-alternate-file-other-window',
@@ -812,8 +893,15 @@ initialization files.
 ---
 ** 'auto-revert-use-notify' is set back to t in 'global-auto-revert-mode'.
 
+** JS mode
+
 ---
-** JS mode now sets 'comment-multi-line' to t.
+*** JS mode now sets 'comment-multi-line' to t.
+
+---
+*** New variable 'js-indent-align-list-continuation', when set to nil,
+will not align continuations of bracketed lists, but will indent them
+by the fixed width 'js-indent-level'.
 
 ** CSS mode
 
@@ -1200,6 +1288,13 @@ or its files before 'delete-directory' gets to them.
 +++
 *** New error type 'user-search-failed' like 'search-failed' but
 avoids debugger like 'user-error'.
+
++++
+** The function 'line-number-at-pos' now takes a second optional
+argument 'absolute'. If this parameter is nil, the default, this
+function keeps on returning the line number taking potential narrowing
+into account. If this parameter is non-nil, the function ignores
+narrowing and returns the absolute line number.
 
 ** Changes in Frame- and Window- Handling
 

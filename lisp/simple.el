@@ -1270,18 +1270,25 @@ and the greater of them is not at the start of a line."
 		done)))
 	(- (buffer-size) (forward-line (buffer-size)))))))
 
-(defun line-number-at-pos (&optional pos)
-  "Return (narrowed) buffer line number at position POS.
+(defun line-number-at-pos (&optional pos absolute)
+  "Return buffer line number at position POS.
 If POS is nil, use current buffer location.
-Counting starts at (point-min), so the value refers
-to the contents of the accessible portion of the buffer."
-  (let ((opoint (or pos (point))) start)
-    (save-excursion
-      (goto-char (point-min))
-      (setq start (point))
-      (goto-char opoint)
-      (forward-line 0)
-      (1+ (count-lines start (point))))))
+
+If ABSOLUTE is nil, the default, counting starts
+at (point-min), so the value refers to the contents of the
+accessible portion of the (potentially narrowed) buffer.  If
+ABSOLUTE is non-nil, ignore any narrowing and return the
+absolute line number."
+  (save-restriction
+    (when absolute
+      (widen))
+    (let ((opoint (or pos (point))) start)
+      (save-excursion
+        (goto-char (point-min))
+        (setq start (point))
+        (goto-char opoint)
+        (forward-line 0)
+        (1+ (count-lines start (point)))))))
 
 (defun what-cursor-position (&optional detail)
   "Print info on cursor position (on screen and within buffer).
@@ -5935,6 +5942,10 @@ columns by which window is scrolled from left margin.
 When the `track-eol' feature is doing its job, the value is
 `most-positive-fixnum'.")
 
+(defvar last--line-number-width 0
+  "Last value of width used for displaying line numbers.
+Used internally by `line-move-visual'.")
+
 (defcustom line-move-ignore-invisible t
   "Non-nil means commands that move by lines ignore invisible newlines.
 When this option is non-nil, \\[next-line], \\[previous-line], \\[move-end-of-line], and \\[move-beginning-of-line] behave
@@ -6205,6 +6216,7 @@ not vscroll."
 If NOERROR, don't signal an error if we can't move that many lines."
   (let ((opoint (point))
 	(hscroll (window-hscroll))
+        (lnum-width (line-number-display-width t))
 	target-hscroll)
     ;; Check if the previous command was a line-motion command, or if
     ;; we were called from some other command.
@@ -6212,9 +6224,19 @@ If NOERROR, don't signal an error if we can't move that many lines."
 	     (memq last-command `(next-line previous-line ,this-command)))
 	;; If so, there's no need to reset `temporary-goal-column',
 	;; but we may need to hscroll.
-	(if (or (/= (cdr temporary-goal-column) hscroll)
-		(>  (cdr temporary-goal-column) 0))
-	    (setq target-hscroll (cdr temporary-goal-column)))
+        (progn
+          (if (or (/= (cdr temporary-goal-column) hscroll)
+                  (>  (cdr temporary-goal-column) 0))
+              (setq target-hscroll (cdr temporary-goal-column)))
+          ;; Update the COLUMN part of temporary-goal-column if the
+          ;; line-number display changed its width since the last
+          ;; time.
+          (setq temporary-goal-column
+                (cons (+ (car temporary-goal-column)
+                         (/ (float (- lnum-width last--line-number-width))
+                            (frame-char-width)))
+                      (cdr temporary-goal-column)))
+          (setq last--line-number-width lnum-width))
       ;; Otherwise, we should reset `temporary-goal-column'.
       (let ((posn (posn-at-point))
 	    x-pos)

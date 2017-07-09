@@ -776,8 +776,6 @@ If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
 			    version package))))))
     output))
 
-(defvar cl-print-compiled-button)
-
 ;;;###autoload
 (defun describe-variable (variable &optional buffer frame)
   "Display the full documentation of VARIABLE (a symbol).
@@ -858,8 +856,7 @@ it is displayed along with the global value."
 		      (print-rep
 		       (let ((rep
 			      (let ((print-quoted t)
-                                    (print-circle t)
-                                    (cl-print-compiled-button t))
+                                    (print-circle t))
 				(cl-prin1-to-string val))))
 			 (if (and (symbolp val) (not (booleanp val)))
 			     (format-message "`%s'" rep)
@@ -1274,14 +1271,14 @@ BUFFER should be a buffer or a buffer name."
   (insert-file-contents file)
   (let (notfirst)
     (while (search-forward "" nil 'move)
-      (if (looking-at "S")
+      (if (= (following-char) ?S)
           (delete-region (1- (point)) (line-end-position))
         (delete-char -1)
         (if notfirst
             (insert "\n.DE\n")
           (setq notfirst t))
         (insert "\n.SH ")
-        (insert (if (looking-at "F") "Function " "Variable "))
+        (insert (if (= (following-char) ?F) "Function " "Variable "))
         (delete-char 1)
         (forward-line 1)
         (insert ".DS L\n"))))
@@ -1307,7 +1304,7 @@ BUFFER should be a buffer or a buffer name."
         (forward-char 1))
       (goto-char (point-min))
       (while (search-forward "" nil t)
-        (unless (looking-at "S")
+        (when (/= (following-char) ?S)
           (setq type (char-after)
                 name (buffer-substring (1+ (point)) (line-end-position))
                 doc (buffer-substring (line-beginning-position 2)

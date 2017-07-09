@@ -927,7 +927,7 @@ Note that the style variables are always made local to the buffer."
       (c-clear-char-property-with-value
        m-beg (point) 'syntax-table '(1)))))
 
-(defun c-extend-region-for-CPP (beg end)
+(defun c-extend-region-for-CPP (_beg _end)
   ;; Adjust `c-new-BEG', `c-new-END' respectively to the beginning and end of
   ;; any preprocessor construct they may be in.
   ;;
@@ -951,7 +951,7 @@ Note that the style variables are always made local to the buffer."
   (when (> (point) c-new-END)
     (setq c-new-END (min (point) (c-determine-+ve-limit 500 c-new-END)))))
 
-(defun c-depropertize-new-text (beg end old-len)
+(defun c-depropertize-new-text (beg end _old-len)
   ;; Remove from the new text in (BEG END) any and all text properties which
   ;; might interfere with CC Mode's proper working.
   ;;
@@ -970,7 +970,7 @@ Note that the style variables are always made local to the buffer."
       (c-clear-char-properties beg end 'c-type)
       (c-clear-char-properties beg end 'c-awk-NL-prop))))
 
-(defun c-extend-font-lock-region-for-macros (begg endd old-len)
+(defun c-extend-font-lock-region-for-macros (_begg endd _old-len)
   ;; Extend the region (c-new-BEG c-new-END) to cover all (possibly changed)
   ;; preprocessor macros; The return value has no significance.
   ;;
@@ -1015,7 +1015,7 @@ Note that the style variables are always made local to the buffer."
 	      t)
 	     (t nil)))))))
 
-(defun c-neutralize-syntax-in-and-mark-CPP (begg endd old-len)
+(defun c-neutralize-syntax-in-and-mark-CPP (_begg _endd _old-len)
   ;; (i) "Neutralize" every preprocessor line wholly or partially in the
   ;; changed region.  "Restore" lines which were CPP lines before the change
   ;; and are no longer so.
@@ -1113,18 +1113,22 @@ Note that the style variables are always made local to the buffer."
 (defun c-quoted-number-head-before-point ()
   ;; Return non-nil when the head of a possibly quoted number is found
   ;; immediately before point.  The value returned in this case is the buffer
-  ;; position of the start of the head.
+  ;; position of the start of the head.  That position is also in
+  ;; (match-beginning 0).
   (when c-has-quoted-numbers
     (save-excursion
       (let ((here (point))
-	    )
+	    found)
 	(skip-chars-backward "0-9a-fA-F'")
 	(if (and (memq (char-before) '(?x ?X))
 		 (eq (char-before (1- (point))) ?0))
 	    (backward-char 2))
-	(while (and (search-forward-regexp c-maybe-quoted-number-head here t)
-		    (< (match-end 0) here)))
-	(and (eq (match-end 0) here) (match-beginning 0))))))
+	(while
+	    (and
+	     (setq found
+		   (search-forward-regexp c-maybe-quoted-number-head here t))
+	     (< found here)))
+	(and (eq found here) (match-beginning 0))))))
 
 (defconst c-maybe-quoted-number-tail
   (concat
@@ -1141,7 +1145,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 (defun c-quoted-number-tail-after-point ()
   ;; Return non-nil when a proper tail of a possibly quoted number is found
   ;; immediately after point.  The value returned in this case is the buffer
-  ;; position of the end of the tail.
+  ;; position of the end of the tail.  That position is also in (match-end 0).
   (when c-has-quoted-numbers
     (and (looking-at c-maybe-quoted-number-tail)
 	 (match-end 0))))
@@ -1193,8 +1197,8 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   ;;
   ;; This function is called exclusively as a before-change function via the
   ;; variable `c-get-state-before-change-functions'.
-  (c-save-buffer-state (p-limit limits found)
-    ;; Special consideraton for deleting \ from '\''.
+  (c-save-buffer-state (p-limit found)
+    ;; Special consideration for deleting \ from '\''.
     (if (and (> end beg)
 	     (eq (char-before end) ?\\)
 	     (<= c-new-END end))
@@ -1262,7 +1266,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
        'c-digit-separator t
        ?'))))
 
-(defun c-parse-quotes-after-change (beg end old-len)
+(defun c-parse-quotes-after-change (_beg _end _old-len)
   ;; This function applies syntax-table properties (value '(1)) and
   ;; c-digit-separator properties as needed to 's within the range (c-new-BEG
   ;; c-new-END).  This operation is performed even within strings and
@@ -1270,7 +1274,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   ;;
   ;; This function is called exclusively as an after-change function via the
   ;; variable `c-before-font-lock-functions'.
-  (c-save-buffer-state (p-limit limits num-beg num-end clear-from-BEG-to)
+  (c-save-buffer-state (num-beg num-end)
     ;; Apply the needed syntax-table and c-digit-separator text properties to
     ;; quotes.
     (goto-char c-new-BEG)
