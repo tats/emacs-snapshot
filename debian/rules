@@ -32,10 +32,9 @@ pf := set -o pipefail
 
 # (You might imagine that a VPATH build would allow us to avoid having
 #  to copy the entire source tree for each of the three builds, but it
-#  turns out that without additional complexity, VPATH builds will
-#  cause diff bloat.  That's because the emacs build process doesn't
-#  completely respect the .elc files; some are modified in srcdir, not
-#  builddir.)
+#  turns out that the emacs build process doesn't entirely respect the
+#  VPATH and modifies all kinds of files in the srcdir (e.g. *.elc,
+#  *.map, etc.).
 
 # The official upstream version defined by AC_INIT in configure.in.
 upstream_ver := $(shell debian/upstream-version)
@@ -291,11 +290,6 @@ debian/$(flavor)-common.README.Debian: \
 	  >> debian/emacsVER-common.README.tmp
 	mv debian/emacsVER-common.README.tmp $@
 
-debian/setup-stamp:
-	$(testdir)
-	./autogen.sh
-	touch $@
-
 # common configure flags
 confflags += --prefix=/usr
 confflags += --sharedstatedir=/var/lib
@@ -331,13 +325,10 @@ confflags_lucid += --without-gconf
 confflags_lucid += --without-gsettings
 
 define cfg_tree
-  rm -rf $(1)
-  mkdir $(1)
-  cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') "$(1)"
   cd $(1) && \
     CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" \
     REL_ALLOC=no \
-      ./configure $(confflags) $(2)
+      $(CURDIR)/debian/build-src/configure $(confflags) $(2)
 endef
 
 define build_cmd
@@ -348,17 +339,29 @@ define build_cmd
   ldd $(1)/lib-src/movemail | grep liblockfile
 endef
 
-override_dh_auto_configure: debian/setup-stamp
-        # Can't use dh --with autotools_dev because it only works if
-        # you haven't removed the config.sub and config.guess files
-        # from the source tree.
-	cp -a /usr/share/misc/config.guess .
-	cp -a /usr/share/misc/config.sub .
+# Don't mess with the source tree (we build in debian/build-*)
+override_dh_update_autotools_config:
+override_dh_autoreconf:
+override_dh_auto_configure:
+
+debian/stamp-configured: $(autogen_build_files)
+        # If the deps for this target change, start over
+	rm -rf debian/build-src debian/build-x debian/build-lucid debian/build-nox
+	mkdir debian/build-src
+	cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') debian/build-src
+	cp -a /usr/share/misc/config.guess /usr/share/misc/config.sub \
+	  debian/build-src
+	cd debian/build-src && ./autogen.sh
+	mkdir debian/build-lucid debian/build-nox debian/build-x
+        # Create one VPATH build per-flavor
 	$(call cfg_tree,debian/build-x,$(confflags_x))
 	$(call cfg_tree,debian/build-nox,$(confflags_nox))
 	$(call cfg_tree,debian/build-lucid,$(confflags_lucid))
+	touch $@
 
-override_dh_auto_build: $(autogen_build_files)
+override_dh_auto_build: debian/stamp-configured
+        # The first build will bootstrap build-src, which will speed
+        # the remaining builds.
 	$(call build_cmd,debian/build-x)
 	$(call build_cmd,debian/build-nox)
 	$(call build_cmd,debian/build-lucid)
@@ -638,21 +641,10 @@ override_dh_auto_clean: $(persistent_autogen_files)
 override_dh_clean: $(persistent_autogen_files)
 	dh_clean
 	rm -rf \
-	  aclocal.m4 \
-	  build-aux/ar-lib \
-	  build-aux/compile \
-	  build-aux/config.guess \
-	  build-aux/config.sub \
-	  build-aux/depcomp \
-	  build-aux/install-sh \
-	  build-aux/missing \
-	  config.guess \
-	  config.sub \
-	  configure \
-	  doc/emacs/emacsver.texi \
-	  debian/*-stamp \
+	  debian/stamp-* \
 	  debian/build-lucid \
 	  debian/build-nox \
+	  debian/build-src \
 	  debian/build-x \
 	  debian/elgz-canary \
 	  debian/elgz-info \
@@ -660,9 +652,5 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/emacsVER-common.README.01 \
 	  debian/install-lucid \
 	  debian/install-nox \
-	  debian/install-x \
-	  etc/refcards/emacsver.tex \
-	  lib/Makefile.in \
-	  src/config.in \
-	  src/stamp-h1 src/stamp-h.in
+	  debian/install-x
 	rm -f $(nonpersistent_autogen_files)
