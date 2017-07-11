@@ -1,10 +1,21 @@
-emacs25 (25.2+1-2~1.gbpa489cc) UNRELEASED; urgency=medium
+emacs25 (25.2+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @a489cca4f8c3e10ac385e679614bf629cec68ab8 **
+  * emacsXY-common: directly depend on install-info.  Since Emacs
+    qualifies as an info reader (Debian Policy 12.2).  This should
+    make sure the info index is correctly created/updated at install
+    time.  Thanks to Francesco Potortì and NIIBE Yutaka for reporting
+    the problem. (Closes: 850808, 863359)
 
-  * UNRELEASED
+  * Build all flavors from common build-src via VPATH.  Instead of
+    building each flavor from scratch in a completely independent
+    debian/build-FLAVOR directory, create debian/build-src and then
+    configure each build-FLAVOR via VPATH.  Then the first flavor
+    built will handle all of the common bootstrapping, and subsequent
+    flavors will build much more quickly.
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 04 Jul 2017 10:35:03 -0500
+  * Migrate to debhelper 10.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 11 Jul 2017 15:46:35 -0500
 
 emacs25 (25.2+1-1) unstable; urgency=medium
 
