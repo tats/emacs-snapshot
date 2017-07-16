@@ -17655,6 +17655,9 @@ try_window_reusing_current_matrix (struct window *w)
   if (w->vscroll || MATRIX_ROW_PARTIALLY_VISIBLE_P (w, start_row))
     return false;
 
+  /* Clear the desired matrix for the display below.  */
+  clear_glyph_matrix (w->desired_matrix);
+
   /* Give up if line numbers are being displayed, because reusing the
      current matrix might use the wrong width for line-number
      display.  */
@@ -17666,9 +17669,6 @@ try_window_reusing_current_matrix (struct window *w)
   SET_TEXT_POS_FROM_MARKER (new_start, w->start);
   start = start_row->minpos;
   start_vpos = MATRIX_ROW_VPOS (start_row, w->current_matrix);
-
-  /* Clear the desired matrix for the display below.  */
-  clear_glyph_matrix (w->desired_matrix);
 
   if (CHARPOS (new_start) <= CHARPOS (start))
     {
@@ -20823,7 +20823,6 @@ maybe_produce_line_number (struct it *it)
   ptrdiff_t start_from, bytepos;
   ptrdiff_t this_line;
   bool first_time = false;
-  ptrdiff_t beg = display_line_numbers_widen ? BEG : BEGV;
   ptrdiff_t beg_byte = display_line_numbers_widen ? BEG_BYTE : BEGV_BYTE;
   ptrdiff_t z_byte = display_line_numbers_widen ? Z_BYTE : ZV_BYTE;
   void *itdata = bidi_shelve_cache ();
@@ -20834,8 +20833,21 @@ maybe_produce_line_number (struct it *it)
     {
       if (!last_line)
 	{
-	  /* FIXME: Maybe reuse the data in it->w->base_line_number.  */
-	  start_from = beg;
+	  /* If possible, reuse data cached by line-number-mode.  */
+	  if (it->w->base_line_number > 0
+	      && it->w->base_line_pos > 0
+	      && it->w->base_line_pos <= IT_CHARPOS (*it)
+	      /* line-number-mode always displays narrowed line
+		 numbers, so we cannot use its data if the user wants
+		 line numbers that disregard narrowing.  */
+	      && !(display_line_numbers_widen
+		   && (BEG_BYTE != BEGV_BYTE || Z_BYTE != ZV_BYTE)))
+	    {
+	      start_from = CHAR_TO_BYTE (it->w->base_line_pos);
+	      last_line = it->w->base_line_number - 1;
+	    }
+	  else
+	    start_from = beg_byte;
 	  if (!it->lnum_bytepos)
 	    first_time = true;
 	}
@@ -20845,7 +20857,7 @@ maybe_produce_line_number (struct it *it)
       /* Paranoia: what if someone changes the narrowing since the
 	 last time display_line was called?  Shouldn't really happen,
 	 but who knows what some crazy Lisp invoked by :eval could do?  */
-      if (!(beg_byte <= start_from && start_from < z_byte))
+      if (!(beg_byte <= start_from && start_from <= z_byte))
 	{
 	  last_line = 0;
 	  start_from = beg_byte;
@@ -20892,8 +20904,8 @@ maybe_produce_line_number (struct it *it)
   /* Compute the required width if needed.  */
   if (!it->lnum_width)
     {
-      if (NATNUMP (Vdisplay_line_number_width))
-	it->lnum_width = XFASTINT (Vdisplay_line_number_width);
+      if (NATNUMP (Vdisplay_line_numbers_width))
+	it->lnum_width = XFASTINT (Vdisplay_line_numbers_width);
 
       /* Max line number to be displayed cannot be more than the one
 	 corresponding to the last row of the desired matrix.  */
@@ -20996,6 +21008,8 @@ maybe_produce_line_number (struct it *it)
   struct glyph *e = g + scratch_glyph_row.used[TEXT_AREA];
   struct glyph *p = it->glyph_row ? it->glyph_row->glyphs[TEXT_AREA] : NULL;
   short *u = it->glyph_row ? &it->glyph_row->used[TEXT_AREA] : NULL;
+
+  eassert (it->glyph_row == NULL || it->glyph_row->used[TEXT_AREA] == 0);
 
   for ( ; g < e; g++)
     {
@@ -23302,7 +23316,7 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		    props = oprops;
 		  }
 
-		aelt = Fassoc (elt, mode_line_proptrans_alist);
+		aelt = Fassoc (elt, mode_line_proptrans_alist, Qnil);
 		if (! NILP (aelt) && !NILP (Fequal (props, XCDR (aelt))))
 		  {
 		    /* AELT is what we want.  Move it to the front
@@ -28776,7 +28790,7 @@ set_frame_cursor_types (struct frame *f, Lisp_Object arg)
 
   /* By default, set up the blink-off state depending on the on-state.  */
 
-  tem = Fassoc (arg, Vblink_cursor_alist);
+  tem = Fassoc (arg, Vblink_cursor_alist, Qnil);
   if (!NILP (tem))
     {
       FRAME_BLINK_OFF_CURSOR (f)
@@ -28914,7 +28928,7 @@ get_window_cursor_type (struct window *w, struct glyph *glyph, int *width,
   /* Cursor is blinked off, so determine how to "toggle" it.  */
 
   /* First look for an entry matching the buffer's cursor-type in blink-cursor-alist.  */
-  if ((alt_cursor = Fassoc (BVAR (b, cursor_type), Vblink_cursor_alist), !NILP (alt_cursor)))
+  if ((alt_cursor = Fassoc (BVAR (b, cursor_type), Vblink_cursor_alist, Qnil), !NILP (alt_cursor)))
     return get_specified_cursor_type (XCDR (alt_cursor), width);
 
   /* Then see if frame has specified a specific blink off cursor type.  */
@@ -32674,30 +32688,38 @@ To add a prefix to continuation lines, use `wrap-prefix'.  */);
 
   DEFVAR_LISP ("display-line-numbers", Vdisplay_line_numbers,
     doc: /* Non-nil means display line numbers.
-By default, line numbers are displayed before each non-continuation
-line that displays buffer text, i.e. after each newline that came
-from buffer text.  However, if the value is `visual', every screen
-line will have a number.
+If the value is t, display the absolute number of each line of a buffer
+shown in a window.  Absolute line numbers count from the beginning of
+the current narrowing, or from buffer beginning.  If the value is
+`relative', display for each line not containing the window's point its
+relative number instead, i.e. the number of the line relative to the
+line showing the window's point.
+
+In either case, line numbers are displayed at the beginning of each
+non-continuation line that displays buffer text, i.e. after each newline
+character that comes from the buffer.  The value `visual' is like
+`relative' but counts screen lines instead of buffer lines.  In practice
+this means that continuation lines count as well when calculating the
+relative number of a line.
 
 Lisp programs can disable display of a line number of a particular
-screen line by putting the `display-line-numbers-disable' text
-property or overlay property on the first visible character of
-that line.  */);
+buffer line by putting the `display-line-numbers-disable' text property
+or overlay property on the first visible character of that line.  */);
   Vdisplay_line_numbers = Qnil;
   DEFSYM (Qdisplay_line_numbers, "display-line-numbers");
   Fmake_variable_buffer_local (Qdisplay_line_numbers);
   DEFSYM (Qrelative, "relative");
   DEFSYM (Qvisual, "visual");
 
-  DEFVAR_LISP ("display-line-number-width", Vdisplay_line_number_width,
+  DEFVAR_LISP ("display-line-numbers-width", Vdisplay_line_numbers_width,
     doc: /* Minimum width of space reserved for line number display.
 A positive number means reserve that many columns for line numbers,
 even if the actual number needs less space.
 The default value of nil means compute the space dynamically.
 Any other value is treated as nil.  */);
-  Vdisplay_line_number_width = Qnil;
-  DEFSYM (Qdisplay_line_number_width, "display-line-number-width");
-  Fmake_variable_buffer_local (Qdisplay_line_number_width);
+  Vdisplay_line_numbers_width = Qnil;
+  DEFSYM (Qdisplay_line_numbers_width, "display-line-number-width");
+  Fmake_variable_buffer_local (Qdisplay_line_numbers_width);
 
   DEFVAR_LISP ("display-line-numbers-current-absolute",
 	       Vdisplay_line_numbers_current_absolute,
