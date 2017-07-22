@@ -367,7 +367,7 @@ override_dh_auto_build: debian/stamp-configured
 	$(call build_cmd,debian/build-lucid)
 
 override_dh_auto_test:
-  ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+  ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) -C debian/build-lucid check
 	$(MAKE) -C debian/build-nox check
 	$(MAKE) -C debian/build-x check
