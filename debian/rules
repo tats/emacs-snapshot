@@ -300,6 +300,7 @@ confflags += --mandir=/usr/share/man
 confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
 confflags += --with-sound=alsa
+confflags += --without-gconf
 
 # x configure flags
 confflags_x := $(confflags) 
@@ -313,7 +314,6 @@ confflags_x += --with-toolkit-scroll-bars
 # nox configure flags
 confflags_nox := $(confflags) 
 confflags_nox += --with-x=no
-confflags_nox += --without-gconf
 confflags_nox += --without-gsettings
 
 # lucid configure flags
@@ -321,7 +321,6 @@ confflags_lucid := $(confflags)
 confflags_lucid += --with-x=yes
 confflags_lucid += --with-x-toolkit=lucid
 confflags_lucid += --with-toolkit-scroll-bars
-confflags_lucid += --without-gconf
 confflags_lucid += --without-gsettings
 
 define cfg_tree
