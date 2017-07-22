@@ -1,3 +1,11 @@
+emacs25-non-dfsg (25.2+1-2~1.gbp1b467a) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @1b467a91336cfab5d3105a4d970e5bc31b76e903 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 22 Jul 2017 10:50:43 -0500
+
 emacs25-non-dfsg (25.2+1-1) unstable; urgency=medium
 
   * Merge upstream version 25.2
