@@ -97,6 +97,10 @@ Terminal is automatically initialized to use 24-bit colors if the
 required capabilities are found in terminfo.  See the FAQ node
 "Colors on a TTY" for more information.
 
++++
+** Emacs now obeys the X resource "scrollBar" at startup.
+The effect is similar to that of "toolBar" resource on the tool bar.
+
 
 * Changes in Emacs 26.1
 
@@ -105,6 +109,16 @@ required capabilities are found in terminfo.  See the FAQ node
 This argument, when non-nil, is used for comparison instead of
 'equal'.
 
+---
+** New variable 'executable-prefix-env' for inserting magic signatures.
+This variable affects the format of the interpreter magic number
+inserted by 'executable-set-magic'.  If non-nil, the magic number now
+takes the form "#!/usr/bin/env interpreter", otherwise the value
+determined by 'executable-prefix', which is by default
+"#!/path/to/interpreter".  By default, 'executable-prefix-env' is nil,
+so the default behavior is not changed.
+
++++
 ** The variable 'emacs-version' no longer includes the build number.
 This is now stored separately in a new variable, 'emacs-build-number'.
 
@@ -424,13 +438,18 @@ range of indentation.
 This is similar to what linum-mode provides, but much faster and
 doesn't usurp the display margin for the line numbers.  Customize the
 buffer-local variable 'display-line-numbers' to activate this optional
-display.  If set to t, Emacs will display the number of each line
-before the line.  If set to 'relative', Emacs will display the line
-number relative to the line showing point, with that line's number
-displayed as absolute.  If set to 'visual', Emacs will display a
-relative number for every screen line, i.e. it will count screen lines
-rather than buffer lines.  The default is nil, which doesn't display
-the line numbers.
+display.  Alternatively, you can use the `display-line-numbers-mode'
+minor mode or the global `global-display-line-numbers-mode'.  When
+using these modes, customize `display-line-numbers-type' with the same
+value as you would use with `display-line-numbers'.
+
+If `display-line-numbers' is set to t, Emacs will display the number
+of each line before the line.  If set to 'relative', Emacs will
+display the line number relative to the line showing point, with that
+line's number displayed as absolute.  If set to 'visual', Emacs will
+display a relative number for every screen line, i.e. it will count
+screen lines rather than buffer lines.  The default is nil, which
+doesn't display the line numbers.
 
 In 'relative' and 'visual' modes, the variable
 'display-line-numbers-current-absolute' controls what number is
@@ -448,14 +467,23 @@ new face 'line-number-current-line' can be customized to display the
 current line's number differently from all the other line numbers; by
 default these two faces are identical.
 
-You can also customize the new variable 'display-line-numbers-width' to
-specify a fixed minimal with of the area allocated to line-number
-display.  The default is nil, meaning that Emacs will dynamically
-calculate the area width, enlarging or shrinking it as needed.
-Setting it to a non-negative integer specifies that as the minimal
-width; selecting a value  that is large enough to display all line
-numbers in a buffer will then keep the line-number display area of
-constant width at all times, if that is desired.
+You can also customize the new buffer-local variable
+'display-line-numbers-width' to specify a fixed minimal with of the
+area allocated to line-number display.  The default is nil, meaning
+that Emacs will dynamically calculate the area width, enlarging or
+shrinking it as needed.  Setting it to a non-negative integer
+specifies that as the minimal width; selecting a value that is large
+enough to display all line numbers in a buffer will then keep the
+line-number display area of constant width at all times, if that is
+desired.
+
+When using `display-line-numbers-mode', you can customize the variable
+`display-line-numbers-grow-only' to a non-nil value; this means that
+Emacs may grow the above area width dynamically, but never shrink it.
+Under this mode, customizing the variable
+`display-line-numbers-width-start' to a non-nil value will cause Emacs
+to set `display-line-numbers-width' to the minimum width necessary to
+display all line numbers in the current buffer when first visiting it.
 
 Lisp programs can disable line-number display for a particular screen
 line by putting the 'display-line-numbers-disable' text property or
@@ -561,11 +589,19 @@ current buffer with the contents of the accessible portion of a
 different buffer while keeping point, mark, markers, and text
 properties as intact as possible.
 
++++
+** More user control of reordering bidirectional text for display.
+The two new variables, 'bidi-paragraph-start-re' and
+'bidi-paragraph-separate-re', allow customization of what exactly are
+paragraphs, for the purposes of bidirectional display.
+
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
 
 ** Dired
-You can now use '`?`' in 'dired-do-shell-command'; as ' ? ', it gets replaced
+
++++
+*** You can now use '`?`' in 'dired-do-shell-command'; as ' ? ', it gets replaced
 by the current file name.
 
 *** html2text is now marked obsolete.
@@ -698,6 +734,18 @@ this is controlled by the 'wdired-create-parent-directories' variable.
 +++
 *** 'W' is now bound to 'browse-url-of-dired-file', and is useful for
 viewing HTML files and the like.
+
+** Grep
+
+---
+*** Grep commands will now use GNU grep's '--null' option if
+available, which allows distinguishing the filename from contents if
+they contain colons.  This can be controlled by the new custom option
+'grep-use-null-filename-separator'.
+
+*** The grep/rgrep/lgrep functions will now ask about saving files
+before running.  This is controlled by the 'grep-save-buffers'
+variable.
 
 ** Edebug
 
@@ -1047,10 +1095,6 @@ things like forward-word in readline work.
 ** hideshow mode got four key bindings that are analogous to outline
 mode bindings: 'C-c @ C-a', 'C-c @ C-t', 'C-c @ C-d', and 'C-c @ C-e.'
 
-** The grep/rgrep/lgrep functions will now ask about saving files
-before running.  This is controlled by the 'grep-save-buffers'
-variable.
-
 ---
 ** Customizable variable 'query-replace-from-to-separator'
 now doesn't propertize the string value of the separator.
@@ -1110,6 +1154,10 @@ instead of its first.
 renamed to 'lread--old-style-backquotes'.  No user code should use
 this variable.
 
+** To avoid confusion caused by "smart quotes", the reader no longer
+accepts Lisp symbols which begin with the following quotation
+characters: ‘’‛“”‟〞＂＇, unless they are escaped with backslash.
+
 +++
 ** Module functions are now implemented slightly differently; in
 particular, the function 'internal--module-call' has been removed.
@@ -1118,6 +1166,9 @@ break.
 
 
 * Lisp Changes in Emacs 26.1
+
++++
+** New optional argument TESTFN in 'alist-get', 'map-elt' and 'map-put'.
 
 ** New function 'seq-set-equal-p' to check if SEQUENCE1 and SEQUENCE2
 contain the same elements, regardless of the order.

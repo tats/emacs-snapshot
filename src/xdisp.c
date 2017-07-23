@@ -1326,6 +1326,15 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   if (charpos >= 0 && CHARPOS (top) > charpos)
     return visible_p;
 
+  /* Some Lisp hook could call us in the middle of redisplaying this
+     very window.  If, by some bad luck, we are retrying redisplay
+     because we found that the mode-line height and/or header-line
+     height needs to be updated, the assignment of mode_line_height
+     and header_line_height below could disrupt that, due to the
+     selected/nonselected window dance during mode-line display, and
+     we could infloop.  Avoid that.  */
+  int prev_mode_line_height = w->mode_line_height;
+  int prev_header_line_height = w->header_line_height;
   /* Compute exact mode line heights.  */
   if (window_wants_mode_line (w))
     {
@@ -1671,6 +1680,10 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   else
     fprintf (stderr, "-pv pt=%d vs=%d\n", charpos, w->vscroll);
 #endif
+
+  /* Restore potentially overwritten values.  */
+  w->mode_line_height = prev_mode_line_height;
+  w->header_line_height = prev_header_line_height;
 
   return visible_p;
 }
@@ -8618,6 +8631,7 @@ move_it_in_display_line_to (struct it *it,
   ptrdiff_t closest_pos UNINIT;
   ptrdiff_t prev_pos = IT_CHARPOS (*it);
   bool saw_smaller_pos = prev_pos < to_charpos;
+  bool line_number_pending = false;
 
   /* Don't produce glyphs in produce_glyphs.  */
   saved_glyph_row = it->glyph_row;
@@ -8669,9 +8683,13 @@ move_it_in_display_line_to (struct it *it,
   if (it->hpos == 0)
     {
       /* If line numbers are being displayed, produce a line number.  */
-      if (should_produce_line_number (it)
-	  && it->current_x == it->first_visible_x)
-	maybe_produce_line_number (it);
+      if (should_produce_line_number (it))
+	{
+	  if (it->current_x == it->first_visible_x)
+	    maybe_produce_line_number (it);
+	  else
+	    line_number_pending = true;
+	}
       /* If there's a line-/wrap-prefix, handle it.  */
       if (it->method == GET_FROM_BUFFER)
 	handle_line_prefix (it);
@@ -9042,6 +9060,15 @@ move_it_in_display_line_to (struct it *it,
 
 	      if (new_x > it->first_visible_x)
 		{
+		  /* If we have reached the visible portion of the
+		     screen line, produce the line number if needed.  */
+		  if (line_number_pending)
+		    {
+		      line_number_pending = false;
+		      it->current_x = it->first_visible_x;
+		      maybe_produce_line_number (it);
+		      it->current_x += new_x - it->first_visible_x;
+		    }
 		  /* Glyph is visible.  Increment number of glyphs that
 		     would be displayed.  */
 		  ++it->hpos;
@@ -28082,7 +28109,7 @@ x_produce_glyphs (struct it *it)
 	      /* If the distance from the current position to the next tab
 		 stop is less than a space character width, use the
 		 tab stop after that.  */
-	      if (next_tab_x - x0 < font->space_width)
+	      if (next_tab_x - x < font->space_width)
 		next_tab_x += tab_width;
 	      if (!NILP (Vdisplay_line_numbers) && x0 >= it->lnum_pixel_width)
 		next_tab_x += (it->lnum_pixel_width
@@ -32718,7 +32745,7 @@ even if the actual number needs less space.
 The default value of nil means compute the space dynamically.
 Any other value is treated as nil.  */);
   Vdisplay_line_numbers_width = Qnil;
-  DEFSYM (Qdisplay_line_numbers_width, "display-line-number-width");
+  DEFSYM (Qdisplay_line_numbers_width, "display-line-numbers-width");
   Fmake_variable_buffer_local (Qdisplay_line_numbers_width);
 
   DEFVAR_LISP ("display-line-numbers-current-absolute",

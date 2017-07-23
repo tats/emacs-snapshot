@@ -21,7 +21,7 @@
 (require 'ert)
 (require 'dired)
 (require 'nadvice)
-
+(require 'ls-lisp)
 
 (ert-deftest dired-autoload ()
   "Tests to see whether dired-x has been autoloaded"
@@ -84,17 +84,89 @@
       (advice-remove 'dired-query "advice-dired-query")
       (advice-remove 'completing-read "advice-completing-read"))))
 
+(ert-deftest dired-test-bug27243 ()
+  "Test for http://debbugs.gnu.org/27243 ."
+  (let ((test-dir (make-temp-file "test-dir-" t))
+        (dired-auto-revert-buffer t))
+    (with-current-buffer (find-file-noselect test-dir)
+      (make-directory "test-subdir"))
+    (dired test-dir)
+    (unwind-protect
+        (let ((buf (current-buffer))
+              (pt1 (point))
+              (test-file (concat (file-name-as-directory "test-subdir")
+                                 "test-file")))
+          (write-region "Test" nil test-file nil 'silent nil 'excl)
+          ;; Sanity check: point should now be on the subdirectory.
+          (should (equal (dired-file-name-at-point)
+                         (concat (file-name-as-directory test-dir)
+                                 (file-name-as-directory "test-subdir"))))
+          (dired-find-file)
+          (let ((pt2 (point)))          ; Point is on test-file.
+            (switch-to-buffer buf)
+            ;; Sanity check: point should now be back on the subdirectory.
+            (should (eq (point) pt1))
+            ;; Case 1: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27243#5
+            (dired-find-file)
+            (should (eq (point) pt2))
+            ;; Case 2: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27243#28
+            (dired test-dir)
+            (should (eq (point) pt1))))
+      (delete-directory test-dir t))))
+
 (ert-deftest dired-test-bug27693 ()
   "Test for http://debbugs.gnu.org/27693 ."
-  (require 'ls-lisp)
-  (let ((size "")
-	ls-lisp-use-insert-directory-program)
-    (dired (list (expand-file-name "lisp" source-directory) "simple.el" "subr.el"))
-    (setq size (number-to-string
-                (file-attribute-size
-                 (file-attributes (dired-get-filename)))))
-    (search-backward-regexp size nil t)
-    (should (looking-back "[[:space:]]" (1- (point))))))
+  (let ((dir (expand-file-name "lisp" source-directory))
+        (size "")
+        ls-lisp-use-insert-directory-program buf)
+    (unwind-protect
+        (progn
+          (setq buf (dired (list dir "simple.el" "subr.el"))
+                size (number-to-string
+                      (file-attribute-size
+                       (file-attributes (dired-get-filename)))))
+          (search-backward-regexp size nil t)
+          (should (looking-back "[[:space:]]" (1- (point)))))
+      (when (buffer-live-p buf) (kill-buffer buf)))))
+
+(ert-deftest dired-test-bug7131 ()
+  "Test for http://debbugs.gnu.org/7131 ."
+  (let* ((dir (expand-file-name "lisp" source-directory))
+         (buf (dired dir)))
+    (unwind-protect
+        (progn
+          (setq buf (dired (list dir "simple.el")))
+          (dired-toggle-marks)
+          (should-not (cdr (dired-get-marked-files)))
+          (kill-buffer buf)
+          (setq buf (dired (list dir "simple.el"))
+                buf (dired dir))
+          (dired-toggle-marks)
+          (should (cdr (dired-get-marked-files))))
+      (when (buffer-live-p buf) (kill-buffer buf)))))
+
+(ert-deftest dired-test-bug27762 ()
+  "Test for http://debbugs.gnu.org/27762 ."
+  :expected-result :failed
+  (let* ((dir source-directory)
+         (default-directory dir)
+         (files (mapcar (lambda (f) (concat "src/" f))
+                        (directory-files
+                         (expand-file-name "src") nil "\\.*\\.c\\'")))
+         ls-lisp-use-insert-directory-program buf)
+    (unwind-protect
+        (let ((file1 "src/cygw32.c")
+              (file2 "src/atimer.c"))
+          (setq buf (dired (nconc (list dir) files)))
+          (dired-goto-file (expand-file-name file2 default-directory))
+          (should-not (looking-at "^   -")) ; Must be 2 spaces not 3.
+          (setq files (cons file1 (delete file1 files)))
+          (kill-buffer buf)
+          (setq buf (dired (nconc (list dir) files)))
+          (should (looking-at "src"))
+          (next-line) ; File names must be aligned.
+          (should (looking-at "src")))
+      (when (buffer-live-p buf) (kill-buffer buf)))))
 
 (provide 'dired-tests)
 ;; dired-tests.el ends here

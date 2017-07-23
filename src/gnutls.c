@@ -1854,10 +1854,18 @@ The alist key is the cipher name. */)
 
 #ifdef HAVE_GNUTLS3_CIPHER
   const gnutls_cipher_algorithm_t *gciphers = gnutls_cipher_list ();
-  for (ptrdiff_t pos = 0; gciphers[pos] != GNUTLS_CIPHER_NULL; pos++)
+  for (ptrdiff_t pos = 0; gciphers[pos] != 0; pos++)
     {
       gnutls_cipher_algorithm_t gca = gciphers[pos];
-      Lisp_Object cipher_symbol = intern (gnutls_cipher_get_name (gca));
+      if (gca == GNUTLS_CIPHER_NULL)
+	continue;
+      char const *cipher_name = gnutls_cipher_get_name (gca);
+      if (!cipher_name)
+	continue;
+
+      /* A symbol representing the GnuTLS cipher.  */
+      Lisp_Object cipher_symbol = intern (cipher_name);
+
       ptrdiff_t cipher_tag_size = gnutls_cipher_get_tag_size (gca);
 
       Lisp_Object cp
@@ -1947,23 +1955,18 @@ gnutls_symmetric_aead (bool encrypting, gnutls_cipher_algorithm_t gca,
 	 (acipher, vdata, vsize, aead_auth_data, aead_auth_size,
 	  cipher_tag_size, idata, isize, storage, &storage_length));
 
-  if (ret < GNUTLS_E_SUCCESS)
-    {
-      memset (storage, 0, storage_length);
-      SAFE_FREE ();
-      gnutls_aead_cipher_deinit (acipher);
-      if (encrypting)
-	error ("GnuTLS AEAD cipher %s encryption failed: %s",
-	       gnutls_cipher_get_name (gca), emacs_gnutls_strerror (ret));
-      else
-	error ("GnuTLS AEAD cipher %s decryption failed: %s",
-	       gnutls_cipher_get_name (gca), emacs_gnutls_strerror (ret));
-    }
-
+  Lisp_Object output;
+  if (GNUTLS_E_SUCCESS <= ret)
+    output = make_unibyte_string (storage, storage_length);
+  explicit_bzero (storage, storage_length);
   gnutls_aead_cipher_deinit (acipher);
 
-  Lisp_Object output = make_unibyte_string (storage, storage_length);
-  memset (storage, 0, storage_length);
+  if (ret < GNUTLS_E_SUCCESS)
+    error ((encrypting
+	    ? "GnuTLS AEAD cipher %s encryption failed: %s"
+	    : "GnuTLS AEAD cipher %s decryption failed: %s"),
+	   gnutls_cipher_get_name (gca), emacs_gnutls_strerror (ret));
+
   SAFE_FREE ();
   return list2 (output, actual_iv);
 #else
@@ -2184,9 +2187,10 @@ name. */)
     {
       const gnutls_mac_algorithm_t gma = macs[pos];
 
-      const char *name = gnutls_mac_get_name (gma);
+      /* A symbol representing the GnuTLS MAC algorithm.  */
+      Lisp_Object gma_symbol = intern (gnutls_mac_get_name (gma));
 
-      Lisp_Object mp = listn (CONSTYPE_HEAP, 11, intern (name),
+      Lisp_Object mp = listn (CONSTYPE_HEAP, 11, gma_symbol,
 			      QCmac_algorithm_id, make_number (gma),
 			      QCtype, Qgnutls_type_mac_algorithm,
 
@@ -2220,9 +2224,10 @@ method name. */)
     {
       const gnutls_digest_algorithm_t gda = digests[pos];
 
-      const char *name = gnutls_digest_get_name (gda);
+      /* A symbol representing the GnuTLS digest algorithm.  */
+      Lisp_Object gda_symbol = intern (gnutls_digest_get_name (gda));
 
-      Lisp_Object mp = listn (CONSTYPE_HEAP, 7, intern (name),
+      Lisp_Object mp = listn (CONSTYPE_HEAP, 7, gda_symbol,
 			      QCdigest_algorithm_id, make_number (gda),
 			      QCtype, Qgnutls_type_digest_algorithm,
 
@@ -2414,6 +2419,8 @@ GnuTLS AEAD ciphers     : the list will contain `AEAD-ciphers'.  */)
 {
   Lisp_Object capabilities = Qnil;
 
+#ifdef HAVE_GNUTLS
+
 # ifdef HAVE_GNUTLS3
   capabilities = Fcons (intern("gnutls3"), capabilities);
 
@@ -2449,7 +2456,11 @@ GnuTLS AEAD ciphers     : the list will contain `AEAD-ciphers'.  */)
 
   return capabilities;
 
-#endif
+#endif /* WINDOWSNT */
+
+#else  /* !HAVE_GNUTLS */
+  return Qnil;
+#endif	/* HAVE_GNUTLS */
 }
 
 void

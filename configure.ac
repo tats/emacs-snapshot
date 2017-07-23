@@ -352,7 +352,8 @@ OPTION_DEFAULT_OFF([w32], [use native MS Windows GUI in a Cygwin build])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_ON([dbus],[don't compile with D-Bus support])
-OPTION_DEFAULT_ON([gconf],[don't compile with GConf support])
+AC_ARG_WITH([gconf],[AS_HELP_STRING([--with-gconf],
+[compile with Gconf support (Gsettings replaces this)])],[],[with_gconf=maybe])
 OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
@@ -2775,6 +2776,7 @@ if test "${HAVE_X11}" = "yes" && test "${with_gsettings}" = "yes"; then
         AC_DEFINE(HAVE_GSETTINGS, 1, [Define to 1 if using GSettings.])
 	SETTINGS_CFLAGS="$GSETTINGS_CFLAGS"
 	SETTINGS_LIBS="$GSETTINGS_LIBS"
+	test "$with_gconf" = "yes" || with_gconf=no
       fi
       CFLAGS=$old_CFLAGS
       LIBS=$old_LIBS
@@ -2784,7 +2786,7 @@ fi
 dnl GConf has been tested under GNU/Linux only.
 dnl The version is really arbitrary, it is about the same age as Gtk+ 2.6.
 HAVE_GCONF=no
-if test "${HAVE_X11}" = "yes" && test "${with_gconf}" = "yes"; then
+if test "${HAVE_X11}" = "yes" && test "${with_gconf}" != "no"; then
    EMACS_CHECK_MODULES([GCONF], [gconf-2.0 >= 2.13])
    if test "$HAVE_GCONF" = yes; then
       AC_DEFINE(HAVE_GCONF, 1, [Define to 1 if using GConf.])
@@ -3557,27 +3559,22 @@ AC_SUBST(LIBZ)
 LIBMODULES=
 HAVE_MODULES=no
 MODULES_OBJ=
-MODULES_SUFFIX=
+case $opsys in
+  cygwin|mingw32) MODULES_SUFFIX=".dll" ;;
+  *) MODULES_SUFFIX=".so" ;;
+esac
 if test "${with_modules}" != "no"; then
   case $opsys in
     gnu|gnu-linux)
       LIBMODULES="-ldl"
-      MODULES_SUFFIX=".so"
       HAVE_MODULES=yes
       ;;
-    cygwin|mingw32)
-      MODULES_SUFFIX=".dll"
-      HAVE_MODULES=yes
-      ;;
-    darwin)
-      MODULES_SUFFIX=".so"
+    cygwin|mingw32|darwin)
       HAVE_MODULES=yes
       ;;
     *)
       # BSD systems have dlopen in libc.
-      AC_CHECK_FUNC([dlopen],
-        [MODULES_SUFFIX=".so"
-         HAVE_MODULES=yes])
+      AC_CHECK_FUNC([dlopen], [HAVE_MODULES=yes])
       ;;
   esac
 
