@@ -6823,7 +6823,7 @@ sweep_symbols (void)
   symbol_free_list = NULL;
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    lispsym[i].gcmarkbit = 0;
+    lispsym[i].s.gcmarkbit = 0;
 
   for (sblk = symbol_block; sblk; sblk = *sprev)
     {
