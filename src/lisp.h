@@ -1110,7 +1110,7 @@ make_lisp_symbol (struct Lisp_Symbol *sym)
 INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
-  return make_lisp_symbol (lispsym + index);
+  return make_lisp_symbol (&lispsym[index].s);
 }
 
 #define XSETINT(a, b) ((a) = make_number (b))
