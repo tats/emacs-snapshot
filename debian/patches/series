@@ -6,3 +6,4 @@
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Don-t-provide-openssl-s_client-as-an-option-for-ssl-.patch
+0009-A-memory-alignment-problem-causing-m68k-failures-has.patch
