@@ -312,7 +312,8 @@
 (defun xref-elisp-test-run (xrefs expected-xrefs)
   (should (= (length xrefs) (length expected-xrefs)))
   (while xrefs
-    (let* ((xref (pop xrefs))
+    (let* ((real-xref (pop xrefs))
+           (xref (clone real-xref))
            (expected (pop expected-xrefs))
            (expected-xref (or (when (consp expected) (car expected)) expected))
            (expected-source (when (consp expected) (cdr expected)))
@@ -329,6 +330,9 @@
               (file-truename (xref-elisp-location-file
                               (xref-item-location expected-xref)))))
 
+      (setf (oref xref location)
+            (copy-xref-elisp-location (oref xref location)))
+
       ;; Downcase the filenames for case-insensitive file systems.
       (when xref--case-insensitive
         (setf (xref-elisp-location-file (xref-item-location xref))
@@ -340,7 +344,7 @@
 
       (should (equal xref expected-xref))
 
-      (xref--goto-location (xref-item-location xref))
+      (xref--goto-location (xref-item-location real-xref))
       (back-to-indentation)
       (should (looking-at (or expected-source
                               (xref-elisp-test-descr-to-target expected)))))
