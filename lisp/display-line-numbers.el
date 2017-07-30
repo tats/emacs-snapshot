@@ -90,14 +90,16 @@ the mode is on, set `display-line-numbers' directly."
     (remove-hook 'pre-command-hook #'display-line-numbers-update-width t)
     (setq display-line-numbers nil)))
 
+(defun display-line-numbers--turn-on ()
+  "Turn on `display-line-numbers-mode'."
+  (unless (or (minibufferp)
+              ;; taken from linum.el
+              (and (daemonp) (null (frame-parameter nil 'client))))
+    (display-line-numbers-mode)))
+
 ;;;###autoload
 (define-globalized-minor-mode global-display-line-numbers-mode
-  display-line-numbers-mode
-  (lambda ()
-    (unless (or (minibufferp)
-                ;; taken from linum.el
-                (and (daemonp) (null (frame-parameter nil 'client))))
-      (display-line-numbers-mode))))
+  display-line-numbers-mode display-line-numbers--turn-on)
 
 (provide 'display-line-numbers)
 

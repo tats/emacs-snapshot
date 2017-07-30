@@ -149,6 +149,7 @@ handled properly.  BODY shall not contain a timeout."
 	 (debug-ignored-errors
 	  (cons "^make-symbolic-link not supported$" debug-ignored-errors))
 	 inhibit-message)
+     (message "tramp--test-instrument-test-case %s" tramp-verbose)
      (unwind-protect
 	 (let ((tramp--test-instrument-test-case-p t)) ,@body)
        ;; Unwind forms.
@@ -3680,6 +3681,10 @@ Use the `ls' command."
 	  tramp-connection-properties)))
     (tramp--test-utf8)))
 
+(defun tramp--test-timeout-handler ()
+  (interactive)
+  (ert-fail (format "`%s' timed out" (ert-test-name (ert-running-test)))))
+
 ;; This test is inspired by Bug#16928.
 (ert-deftest tramp-test36-asynchronous-requests ()
   "Check parallel asynchronous requests.
@@ -3689,10 +3694,15 @@ process sentinels.  They shall not disturb each other."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
 
-  ;; This test could be blocked on hydra.
-  (with-timeout
-      (300 (ert-fail "`tramp-test36-asynchronous-requests' timed out"))
-    (let* ((tmp-name (tramp--test-make-temp-name))
+  ;; This test could be blocked on hydra.  So we set a timeout of 300
+  ;; seconds, and we send a SIGUSR1 signal after 300 seconds.
+  (with-timeout (300 (tramp--test-timeout-handler))
+    (define-key special-event-map [sigusr1] 'tramp--test-timeout-handler)
+    (let* ((watchdog
+            (start-process
+             "*watchdog*" nil shell-file-name shell-command-switch
+             (format "sleep 300; kill -USR1 %d" (emacs-pid))))
+           (tmp-name (tramp--test-make-temp-name))
            (default-directory tmp-name)
            ;; Do not cache Tramp properties.
            (remote-file-name-inhibit-cache t)
@@ -3805,6 +3815,8 @@ process sentinels.  They shall not disturb each other."
                   ;; Regular operation.
                   (tramp--test-message
                    "Trace 3 action %d %s %s" count buf (current-time-string))
+                  ;; Give the watchdog a chance.
+                  (read-event nil nil 0.01)
                   (if (= count 2)
                       (if (= (length buffers) 1)
                           (tramp--test-instrument-test-case 10
@@ -3820,8 +3832,7 @@ process sentinels.  They shall not disturb each other."
             ;; Checks.  All process output shall exists in the
             ;; respective buffers.  All created files shall be
             ;; deleted.
-            (tramp--test-message
-             "Check %s" (current-time-string))
+            (tramp--test-message "Check %s" (current-time-string))
             (dolist (buf buffers)
               (with-current-buffer buf
                 (should (string-equal (format "%s\n" buf) (buffer-string)))))
@@ -3830,6 +3841,8 @@ process sentinels.  They shall not disturb each other."
               tmp-name nil directory-files-no-dot-files-regexp)))
 
         ;; Cleanup.
+        (define-key special-event-map [sigusr1] 'ignore)
+        (ignore-errors (quit-process watchdog))
         (dolist (buf buffers)
           (ignore-errors (delete-process (get-buffer-process buf)))
           (ignore-errors (kill-buffer buf)))
@@ -3906,6 +3919,14 @@ Since it unloads Tramp, it shall be the last test to run."
 	    (not (string-match "^tramp--?test" (symbol-name x)))
 	    (not (string-match "unload-hook$" (symbol-name x)))
 	    (ert-fail (format "`%s' still bound" x)))))
+    ;; The defstruct `tramp-file-name' and all its internal functions
+    ;; shall be purged.
+    (should-not (cl--find-class 'tramp-file-name))
+    (mapatoms
+     (lambda (x)
+       (and (functionp x)
+            (string-match "tramp-file-name" (symbol-name x))
+            (ert-fail (format "Structure function `%s' still exists" x)))))
     ;; There shouldn't be left a hook function containing a Tramp
     ;; function.  We do not regard the Tramp unload hooks.
     (mapatoms

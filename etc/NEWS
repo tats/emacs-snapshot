@@ -590,6 +590,12 @@ different buffer while keeping point, mark, markers, and text
 properties as intact as possible.
 
 +++
+** New commands 'apropos-local-variable' and 'apropos-local-value.
+These are buffer-local versions of 'apropos-variable' and
+'apropos-value', respectively.  They show buffer-local variables whose
+names and values, respectively, match a given pattern.
+
++++
 ** More user control of reordering bidirectional text for display.
 The two new variables, 'bidi-paragraph-start-re' and
 'bidi-paragraph-separate-re', allow customization of what exactly are
@@ -598,7 +604,12 @@ paragraphs, for the purposes of bidirectional display.
 
 * Changes in Specialized Modes and Packages in Emacs 26.1
 
+** New function `cl-generic-p'.
+
 ** Dired
+
++++
+*** Dired supports wildcards in the directory part of the file names.
 
 +++
 *** You can now use '`?`' in 'dired-do-shell-command'; as ' ? ', it gets replaced
@@ -1076,6 +1087,9 @@ fontification, and commenting for embedded JavaScript and CSS.
 
 * Incompatible Lisp Changes in Emacs 26.1
 
+*** password-data is now a hash-table
+so that `password-read' can use any object for the `key' argument.
+
 +++
 *** Command 'dired-mark-extension' now automatically prepends a '.' to the
 extension when not present.  The new command 'dired-mark-suffix' behaves
@@ -1166,6 +1180,8 @@ break.
 
 
 * Lisp Changes in Emacs 26.1
+
+** New function `define-symbol-prop'.
 
 +++
 ** New optional argument TESTFN in 'alist-get', 'map-elt' and 'map-put'.
@@ -1555,6 +1571,9 @@ manual.
 ** 'tcl-auto-fill-mode' is now declared obsolete.  Its functionality
 can be replicated simply by setting 'comment-auto-fill-only-comments'.
 
+** New pcase pattern 'rx' to match against a rx-style regular
+expression.
+
 
 * Changes in Emacs 26.1 on Non-Free Operating Systems
 
@@ -1599,6 +1618,9 @@ debugger has been attached to it.
 
 ** 'set-mouse-position' and 'set-mouse-absolute-pixel-position' work
 on macOS.
+
+** Emacs can now be run as a GUI application from the command line on
+macOS.
 
 
 ----------------------------------------------------------------------
