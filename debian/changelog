@@ -1,3 +1,11 @@
+emacs25 (25.2+1-4~1.gbp80aeb4) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @80aeb49251d30efe7f992da4fe573a34cc69f45a **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 30 Jul 2017 21:38:21 -0500
+
 emacs25 (25.2+1-3) unstable; urgency=medium
 
   * Actually run tests by default (fix DEB_BUILD_OPTIONS nocheck test)
