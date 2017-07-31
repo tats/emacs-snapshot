@@ -189,16 +189,16 @@
   (cl-call-next-method)
   )
 
-(ert-deftest eieio-test-method-order-list-6 ()
-  (let ((eieio-test-method-order-list nil)
-	(ans '(
-	       (:STATIC C)
-	       (:STATIC C-base1)
-	       (:STATIC C-base2)
-	       )))
-    (C nil)
-    (setq eieio-test-method-order-list (nreverse eieio-test-method-order-list))
-    (eieio-test-match ans)))
+;; (ert-deftest eieio-test-method-order-list-6 ()
+;;   (let ((eieio-test-method-order-list nil)
+;; 	(ans '(
+;; 	       (:STATIC C)
+;; 	       (:STATIC C-base1)
+;; 	       (:STATIC C-base2)
+;; 	       )))
+;;     (C nil)
+;;     (setq eieio-test-method-order-list (nreverse eieio-test-method-order-list))
+;;     (eieio-test-match ans)))
 
 ;;; Diamond Test
 ;;
