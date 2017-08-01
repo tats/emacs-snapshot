@@ -1,3 +1,11 @@
+emacs25 (25.2+1-5~1.gbpb702d3) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @b702d3acfbd2d0d24a234eb7b75fdc2df97b8c85 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 31 Jul 2017 23:31:06 -0500
+
 emacs25 (25.2+1-4) unstable; urgency=medium
 
   * Disable eieio-test-method-order-list-6.  Its behavior is
