@@ -102,6 +102,11 @@ endif
 
 deb_host_multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
+# Without this, the build dies in marker.c when trying to create c-by.el
+ifeq ($(DEB_HOST_ARCH),arm64)
+  export DEB_CFLAGS_MAINT_APPEND := -O0
+endif
+
 CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 CFLAGS += -Wall
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
