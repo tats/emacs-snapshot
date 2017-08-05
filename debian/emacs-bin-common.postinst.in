@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+ALTERNATIVES="@ALTERNATIVES@"
+BIN_PRIORITY="@BIN_PRIORITY@"
+
+# update-alternatives on things that collide with xemacs, other editors
+for i in ${ALTERNATIVES}
+do
+  update-alternatives \
+    --install "/usr/bin/$i" "$i" "/usr/bin/$i.emacs" "$BIN_PRIORITY" \
+    --slave "/usr/share/man/man1/$i.1.gz" "$i.1.gz" \
+            "/usr/share/man/man1/$i.emacs.1.gz"
+done
+
+#DEBHELPER#

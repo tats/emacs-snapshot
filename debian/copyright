@@ -10,10 +10,10 @@ Comment:
   The original source for this package can be found at
   git://git.savannah.gnu.org/emacs.git under the
   emacs-25.2 tag.  That tag was used to create the
-  Debian upstream archive (emacs25_25.2+1.orig.tar.xz)
+  Debian upstream archive (emacs_1:25.2+1.orig.tar.xz)
   after making adjustments to comply with the DFSG (see below).
 
-  Please see /usr/share/doc/emacs25-common/README.Debian.gz for a
+  Please see /usr/share/doc/emacs-common/README.Debian.gz for a
   description of the Debian specific differences from the upstream
   version.
 

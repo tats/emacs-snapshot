@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+# update-alternatives on things that collide with xemacs, other editors
+if [ "$1" != upgrade ]
+then
+  update-alternatives --verbose --remove editor /usr/bin/emacs
+  update-alternatives --verbose --remove emacs /usr/bin/emacs-@X_SUPPORT@
+fi
+
+# emacsen-common registration.
+/usr/lib/emacsen-common/emacs-remove emacs
+
+#DEBHELPER#

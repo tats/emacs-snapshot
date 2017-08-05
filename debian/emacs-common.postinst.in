@@ -2,11 +2,9 @@
 
 set -e
 
-MAJOR=@MAJOR_VERSION@
-MINOR=@MINOR_VERSION@
 FULL=@FULL_VERSION@
 
-# Create the site-lisp dir for this flavor if we're allowed
+# Create the site-lisp dir if we're allowed
 
 parentdir=/usr/local/share/emacs
 newdir=site-lisp

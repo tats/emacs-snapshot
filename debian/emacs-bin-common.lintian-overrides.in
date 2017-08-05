@@ -1,0 +1,8 @@
+emacs-bin-common binary: setgid-binary @MOVEMAIL_BIN@ 2755 root/mail
+emacs-bin-common binary: binary-without-manpage usr/bin/b2m.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/ctags.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/ebrowse.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/emacsclient.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/etags.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/grep-changelog.emacs
+emacs-bin-common binary: binary-without-manpage usr/bin/rcs-checkin.emacs
