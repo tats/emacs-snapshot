@@ -149,11 +149,11 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-lucid.lintian-overrides \
   debian/$(flavor)-lucid.postinst \
   debian/$(flavor)-lucid.prerm \
-  debian/$(flavor).README.Debian \
-  debian/$(flavor).desktop \
-  debian/$(flavor).lintian-overrides \
-  debian/$(flavor).postinst \
-  debian/$(flavor).prerm
+  debian/$(flavor)-gtk.README.Debian \
+  debian/$(flavor)-gtk.desktop \
+  debian/$(flavor)-gtk.lintian-overrides \
+  debian/$(flavor)-gtk.postinst \
+  debian/$(flavor)-gtk.prerm
 
 autogen_build_files := \
   $(nonpersistent_autogen_build_files) $(persistent_autogen_build_files)
@@ -171,12 +171,12 @@ nonpersistent_autogen_files := \
 # Build directories
 pkgdir_common := $(CURDIR)/debian/$(flavor)-common
 pkgdir_bin_common := $(CURDIR)/debian/$(flavor)-bin-common
-pkgdir_x := $(CURDIR)/debian/$(flavor)
+pkgdir_gtk := $(CURDIR)/debian/$(flavor)-gtk
 pkgdir_nox := $(CURDIR)/debian/$(flavor)-nox
 pkgdir_lucid := $(CURDIR)/debian/$(flavor)-lucid
 pkgdir_el := $(CURDIR)/debian/$(flavor)-el
 
-install_dir_x := $(CURDIR)/debian/install-x
+install_dir_gtk := $(CURDIR)/debian/install-gtk
 install_dir_nox := $(CURDIR)/debian/install-nox
 install_dir_lucid := $(CURDIR)/debian/install-lucid
 
@@ -243,8 +243,8 @@ debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target
 	true
 
-debian/$(flavor).%: xsupport := "x"
-debian/$(flavor).%: pkg_name := $(flavor)
+debian/$(flavor)-gtk.%: xsupport := "gtk"
+debian/$(flavor)-gtk.%: pkg_name := $(flavor)-gtk
 
 debian/$(flavor)-nox.%: xsupport := "nox"
 debian/$(flavor)-nox.%: pkg_name := $(flavor)-nox
@@ -267,7 +267,7 @@ debian/$(flavor)-common.%: debian/emacsVER-common.% debian/changelog
 debian/$(flavor)-el.%: debian/emacsVER-el.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor).%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-gtk.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-nox.%: debian/emacsVER.% debian/changelog
@@ -308,13 +308,13 @@ confflags += --with-sound=alsa
 confflags += --without-gconf
 
 # x configure flags
-confflags_x := $(confflags) 
-confflags_x += --with-x=yes
-confflags_x += --with-x-toolkit=gtk3
+confflags_gtk := $(confflags)
+confflags_gtk += --with-x=yes
+confflags_gtk += --with-x-toolkit=gtk3
 # For those who prefer the old-style non-toolkit scrollbars, just
 # change the assignment below to --without-toolkit-scroll-bars.  The
 # resulting emacsXY package will have the old scrollbars.
-confflags_x += --with-toolkit-scroll-bars
+confflags_gtk += --with-toolkit-scroll-bars
 
 # nox configure flags
 confflags_nox := $(confflags) 
@@ -350,15 +350,15 @@ override_dh_auto_configure:
 
 debian/stamp-configured: $(autogen_build_files)
         # If the deps for this target change, start over
-	rm -rf debian/build-src debian/build-x debian/build-lucid debian/build-nox
+	rm -rf debian/build-src debian/build-gtk debian/build-lucid debian/build-nox
 	mkdir debian/build-src
 	cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') debian/build-src
 	cp -a /usr/share/misc/config.guess /usr/share/misc/config.sub \
 	  debian/build-src
 	cd debian/build-src && ./autogen.sh
-	mkdir debian/build-lucid debian/build-nox debian/build-x
+	mkdir debian/build-lucid debian/build-nox debian/build-gtk
         # Create one VPATH build per-flavor
-	$(call cfg_tree,debian/build-x,$(confflags_x))
+	$(call cfg_tree,debian/build-gtk,$(confflags_gtk))
 	$(call cfg_tree,debian/build-nox,$(confflags_nox))
 	$(call cfg_tree,debian/build-lucid,$(confflags_lucid))
 	touch $@
@@ -366,7 +366,7 @@ debian/stamp-configured: $(autogen_build_files)
 override_dh_auto_build: debian/stamp-configured
         # The first build will bootstrap build-src, which will speed
         # the remaining builds.
-	$(call build_cmd,debian/build-x)
+	$(call build_cmd,debian/build-gtk)
 	$(call build_cmd,debian/build-nox)
 	$(call build_cmd,debian/build-lucid)
 
@@ -374,7 +374,7 @@ override_dh_auto_test:
   ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) -C debian/build-lucid check
 	$(MAKE) -C debian/build-nox check
-	$(MAKE) -C debian/build-x check
+	$(MAKE) -C debian/build-gtk check
   endif
 
 define install_common_binpkg_bits
@@ -400,21 +400,21 @@ endef
 
 override_dh_auto_install: $(autogen_install_files)
 	rm -rf \
-	  $(install_dir_x) $(install_dir_nox) $(install_dir_lucid) \
+	  $(install_dir_gtk) $(install_dir_nox) $(install_dir_lucid) \
 	  $(pkgdir_common)/* \
 	  $(pkgdir_bin_common)/* \
-	  $(pkgdir_x)/* \
+	  $(pkgdir_gtk)/* \
 	  $(pkgdir_nox)/* \
 	  $(pkgdir_lucid)/* \
 	  $(pkgdir_el)/*
 
-	$(call emacs_inst,build-x,$(install_dir_x))
+	$(call emacs_inst,build-gtk,$(install_dir_gtk))
 
         ##################################################
         # emacsXY-common
         ifneq (,$(findstring $(flavor)-common, $(shell dh_listpackages)))
 	  install -d $(pkgdir_common)
-	  cp -a $(install_dir_x)/* $(pkgdir_common)
+	  cp -a $(install_dir_gtk)/* $(pkgdir_common)
 
 	  rm -r $(pkgdir_common)/usr/bin
 	  rm -r $(pkgdir_common)/usr/lib
@@ -515,8 +515,8 @@ override_dh_auto_install: $(autogen_install_files)
         ifneq (,$(findstring $(flavor)-bin-common, $(shell dh_listpackages)))
 	  # Move common binaries to emacs-bin-common.
 	  install -d $(pkgdir_bin_common)/usr
-	  cp -a $(install_dir_x)/usr/bin $(pkgdir_bin_common)/usr
-	  cp -a $(install_dir_x)/usr/lib $(pkgdir_bin_common)/usr
+	  cp -a $(install_dir_gtk)/usr/bin $(pkgdir_bin_common)/usr
+	  cp -a $(install_dir_gtk)/usr/lib $(pkgdir_bin_common)/usr
 
 	  # Make sure there's just one.
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
@@ -545,14 +545,14 @@ override_dh_auto_install: $(autogen_install_files)
         # emacsXY
         ifneq (,$(findstring $(flavor), $(shell dh_listpackages)))
 	  $(call install_common_binpkg_bits,\
-	    $(install_dir_x),$(pkgdir_x),$(flavor),x)
+	    $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-gtk,gtk)
 
           # install desktop entries
-	  install -d $(pkgdir_x)/usr/share/applications
+	  install -d $(pkgdir_gtk)/usr/share/applications
 	  install -m 0644 \
 	    debian/$(flavor).desktop \
 	    debian/$(flavor)-term.desktop \
-	    $(pkgdir_x)/usr/share/applications/
+	    $(pkgdir_gtk)/usr/share/applications/
         endif
 
         ##################################################
@@ -562,9 +562,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
           # install desktop entry
-	  install -d $(pkgdir_x)/usr/share/applications
+	  install -d $(pkgdir_gtk)/usr/share/applications
 	  install -m 0644 \
-	    debian/$(flavor)-term.desktop $(pkgdir_x)/usr/share/applications/
+	    debian/$(flavor)-term.desktop $(pkgdir_gtk)/usr/share/applications/
 	  rm -rf $(install_dir_nox)
         endif
 
@@ -589,20 +589,20 @@ override_dh_auto_install: $(autogen_install_files)
         ifneq (,$(findstring $(flavor)-el, $(shell dh_listpackages)))
 	  install -d $(pkgdir_el)
 	  $(pf); \
-	  (cd $(install_dir_x) && find -name "*.el" -o -name "*.el.gz" -print0 \
+	  (cd $(install_dir_gtk) && find -name "*.el" -o -name "*.el.gz" -print0 \
 	   | tar cpf - --null --files-from -) \
 	     | (cd $(pkgdir_el) && tar xpf -)
         endif
 
         ##################################################
         # final cleanup
-	rm -rf $(install_dir_x)
+	rm -rf $(install_dir_gtk)
 	rm -rf $(install_dir_nox)
 	rm -rf $(install_dir_lucid)
 
 .PHONY: override_dh_strip
 override_dh_strip:
-	dh_strip -p$(flavor) --dbg-package=$(flavor)-dbg
+	dh_strip -p$(flavor)-gtk --dbg-package=$(flavor)-gtk-dbg
 	dh_strip -p$(flavor)-lucid --dbg-package=$(flavor)-lucid-dbg
 	dh_strip -p$(flavor)-nox --dbg-package=$(flavor)-nox-dbg
 	dh_strip
@@ -649,12 +649,12 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/build-lucid \
 	  debian/build-nox \
 	  debian/build-src \
-	  debian/build-x \
+	  debian/build-gtk \
 	  debian/elgz-canary \
 	  debian/elgz-info \
 	  debian/emacsVER-common.README.00 \
 	  debian/emacsVER-common.README.01 \
 	  debian/install-lucid \
 	  debian/install-nox \
-	  debian/install-x
+	  debian/install-gtk
 	rm -f $(nonpersistent_autogen_files)

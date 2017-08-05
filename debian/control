@@ -27,13 +27,13 @@ Architecture: any
 Depends: emacs25-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs25, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs25-common-non-dfsg
-Conflicts: emacs25, emacs25-nox
-Replaces: emacs25, emacs25-nox
+Conflicts: emacs25-gtk, emacs25-nox
+Replaces: emacs25-gtk, emacs25-nox
 Description: GNU Emacs editor (with Lucid GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs with support for a graphical user
  interface based on the Lucid toolkit (instead of the GTK+ interface
- provided by the emacs25 package).  Until some known GTK+
+ provided by the emacs25-gtk package).  Until some known GTK+
  problems are fixed, this version may help avoid crashing Emacs during
  an emacsclient disconnect.  See
  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=567934 and
@@ -55,8 +55,8 @@ Architecture: any
 Depends: emacs25-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs25, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs25-common-non-dfsg
-Conflicts: emacs25, emacs25-lucid
-Replaces: emacs25, emacs25-lucid
+Conflicts: emacs25-gtk, emacs25-lucid
+Replaces: emacs25-gtk, emacs25-lucid
 Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
@@ -72,10 +72,10 @@ Description: Debugging symbols for emacs25-nox
  package contains the debugging symbols for the emacs25-nox
  package.
 
-Package: emacs25
+Package: emacs25-gtk
 Architecture: any
 Depends: emacs25-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: editor, emacsen, info-browser, mail-reader, news-reader
+Provides: emacs25, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs25-common-non-dfsg
 Conflicts: emacs25-lucid, emacs25-nox
 Replaces: emacs25-lucid, emacs25-nox
@@ -85,14 +85,14 @@ Description: GNU Emacs editor (with GTK+ GUI support)
  based on GTK+ (instead of the Lucid toolkit provided by the
  emacs25-lucid package).
 
-Package: emacs25-dbg
+Package: emacs25-gtk-dbg
 Section: debug
 Priority: extra
 Architecture: any
-Depends: emacs25-dbg (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs25
+Depends: emacs25-gtk-dbg (= ${binary:Version}), ${misc:Depends}
+Description: Debugging symbols for emacs25-gtk
  GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs25 package.
+ package contains the debugging symbols for the emacs25-gtk package.
 
 Package: emacs25-bin-common
 Architecture: any
@@ -100,7 +100,7 @@ Depends: emacs25-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends
 Description: GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
- that's shared by emacs25, emacs25-lucid, and emacs25-nox.
+ that's shared by emacs25-gtk, emacs25-lucid, and emacs25-nox.
 
 Package: emacs25-common
 Architecture: all
@@ -112,7 +112,7 @@ Breaks: apel (<< 10.8+0.20120427-4)
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
- that's shared by emacs25, emacs25-lucid, and emacs25-nox.
+ that's shared by emacs25-gtk, emacs25-lucid, and emacs25-nox.
 
 Package: emacs25-el
 Architecture: all
