@@ -6566,7 +6566,7 @@ Valid wildcards are '*', '?', '[abc]' and '[a-z]'."
                    ls-lisp-support-shell-wildcards)
                (string-match (concat "[" wildcards "]") (file-name-directory dir))
                (not (file-exists-p dir))) ; Prefer an existing file to wildcards.
-      (let ((regexp (format "\\`\\([^%s]+/\\)\\([^%s]*[%s].*\\)"
+      (let ((regexp (format "\\`\\([^%s]*/\\)\\([^%s]*[%s].*\\)"
                             wildcards wildcards wildcards)))
         (string-match regexp dir)
         (cons (match-string 1 dir) (match-string 2 dir))))))
@@ -6701,7 +6701,7 @@ normally equivalent short `-D' option is just passed on to
 			;; See eg dired-safe-switches-p.
 			(call-process
 			 shell-file-name nil t nil
-			 "-c"
+			 shell-command-switch
 			 (concat (if (memq system-type '(ms-dos windows-nt))
 				     ""
 				   "\\") ; Disregard Unix shell aliases!

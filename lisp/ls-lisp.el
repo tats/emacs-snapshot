@@ -61,7 +61,6 @@
 ;;; Code:
 
 
-(require 'em-glob)
 
 (defgroup ls-lisp nil
   "Emulate the ls program completely in Emacs Lisp."
@@ -480,6 +479,8 @@ not contain `d', so that a full listing is expected."
 	(message "%s: doesn't exist or is inaccessible" file)
 	(ding) (sit-for 2)))))		; to show user the message!
 
+(declare-function dired-read-dir-and-switches "dired" (str))
+(declare-function dired-goto-next-file "dired" ())
 
 (defun ls-lisp--dired (orig-fun dir-or-list &optional switches)
   (interactive (dired-read-dir-and-switches ""))
@@ -490,7 +491,7 @@ not contain `d', so that a full listing is expected."
       (if (not dir-wildcard)
           (funcall orig-fun dir-or-list switches)
         (let* ((default-directory (car dir-wildcard))
-               (files (eshell-extended-glob (cdr dir-wildcard)))
+               (files (file-expand-wildcards (cdr dir-wildcard)))
                (dir (car dir-wildcard)))
           (if files
               (let ((inhibit-read-only t)

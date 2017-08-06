@@ -123,9 +123,10 @@ being the result.")
   (cdr tramp--test-enabled-checked))
 
 (defun tramp--test-make-temp-name (&optional local quoted)
-  "Create a temporary file name for test.
-If LOCAL is non-nil, a local file is created.
-If QUOTED is non-nil, the local part of the file is quoted."
+  "Return a temporary file name for test.
+If LOCAL is non-nil, a local file name is returned.
+If QUOTED is non-nil, the local part of the file name is quoted.
+The temporary file is not created."
   (funcall
    (if quoted 'tramp-compat-file-name-quote 'identity)
    (expand-file-name
@@ -149,7 +150,6 @@ handled properly.  BODY shall not contain a timeout."
 	 (debug-ignored-errors
 	  (cons "^make-symbolic-link not supported$" debug-ignored-errors))
 	 inhibit-message)
-     (message "tramp--test-instrument-test-case %s" tramp-verbose)
      (unwind-protect
 	 (let ((tramp--test-instrument-test-case-p t)) ,@body)
        ;; Unwind forms.
@@ -2202,6 +2202,110 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	;; Cleanup.
 	(ignore-errors (delete-directory tmp-name1 'recursive))))))
 
+(ert-deftest tramp-test17-dired-with-wildcards ()
+  "Check `dired' with wildcards."
+  (skip-unless (tramp--test-enabled))
+  (skip-unless (tramp--test-sh-p))
+  ;; Since Emacs 26.1.
+  (skip-unless (fboundp 'insert-directory-wildcard-in-dir-p))
+
+  (dolist (quoted (if tramp--test-expensive-test '(nil t) '(nil)))
+    (let* ((tmp-name1
+	    (expand-file-name (tramp--test-make-temp-name nil quoted)))
+	   (tmp-name2
+            (expand-file-name (tramp--test-make-temp-name nil quoted)))
+	   (tmp-name3 (expand-file-name "foo" tmp-name1))
+	   (tmp-name4 (expand-file-name "bar" tmp-name2))
+	   (tramp-test-temporary-file-directory
+	    (funcall
+	     (if quoted 'tramp-compat-file-name-quote 'identity)
+	     tramp-test-temporary-file-directory))
+	   buffer)
+      (unwind-protect
+	  (progn
+	    (make-directory tmp-name1)
+	    (write-region "foo" nil tmp-name3)
+	    (should (file-directory-p tmp-name1))
+	    (should (file-exists-p tmp-name3))
+	    (make-directory tmp-name2)
+	    (write-region "foo" nil tmp-name4)
+	    (should (file-directory-p tmp-name2))
+	    (should (file-exists-p tmp-name4))
+
+	    ;; Check for expanded directory names.
+	    (with-current-buffer
+		(setq buffer
+		      (dired-noselect
+		       (expand-file-name
+			"tramp-test*" tramp-test-temporary-file-directory)))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name1 tramp-test-temporary-file-directory))))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name2 tramp-test-temporary-file-directory)))))
+	    (kill-buffer buffer)
+
+	    ;; Check for expanded directory and file names.
+	    (with-current-buffer
+		(setq buffer
+		      (dired-noselect
+		       (expand-file-name
+			"tramp-test*/*" tramp-test-temporary-file-directory)))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name3 tramp-test-temporary-file-directory))))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name4
+		  tramp-test-temporary-file-directory)))))
+	    (kill-buffer buffer)
+
+	    ;; Check for special characters.
+	    (setq tmp-name3 (expand-file-name "*?" tmp-name1))
+	    (setq tmp-name4 (expand-file-name "[a-z0-9]" tmp-name2))
+	    (write-region "foo" nil tmp-name3)
+	    (should (file-exists-p tmp-name3))
+	    (write-region "foo" nil tmp-name4)
+	    (should (file-exists-p tmp-name4))
+
+	    (with-current-buffer
+		(setq buffer
+		      (dired-noselect
+		       (expand-file-name
+			"tramp-test*/*" tramp-test-temporary-file-directory)))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name3 tramp-test-temporary-file-directory))))
+	      (goto-char (point-min))
+	      (should
+	       (re-search-forward
+		(regexp-quote
+		 (file-relative-name
+		  tmp-name4
+		  tramp-test-temporary-file-directory)))))
+	    (kill-buffer buffer))
+
+	;; Cleanup.
+	(ignore-errors (kill-buffer buffer))
+	(ignore-errors (delete-directory tmp-name1 'recursive))
+	(ignore-errors (delete-directory tmp-name2 'recursive))))))
+
 (ert-deftest tramp-test18-file-attributes ()
   "Check `file-attributes'.
 This tests also `file-readable-p', `file-regular-p' and
@@ -3006,6 +3110,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  ;; Since Emacs 26.1.
   (skip-unless (and (fboundp 'connection-local-set-profile-variables)
 		    (fboundp 'connection-local-set-profiles)))
 
@@ -3215,6 +3320,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 (ert-deftest tramp-test33-make-nearby-temp-file ()
   "Check `make-nearby-temp-file' and `temporary-file-directory'."
   (skip-unless (tramp--test-enabled))
+  ;; Since Emacs 26.1.
   (skip-unless
    (and (fboundp 'make-nearby-temp-file) (fboundp 'temporary-file-directory)))
 
@@ -3698,6 +3804,7 @@ process sentinels.  They shall not disturb each other."
   ;; seconds, and we send a SIGUSR1 signal after 300 seconds.
   (with-timeout (300 (tramp--test-timeout-handler))
     (define-key special-event-map [sigusr1] 'tramp--test-timeout-handler)
+    (tramp--test-instrument-test-case (if (getenv "EMACS_HYDRA_CI") 10 0)
     (let* ((watchdog
             (start-process
              "*watchdog*" nil shell-file-name shell-command-switch
@@ -3801,27 +3908,18 @@ process sentinels.  They shall not disturb each other."
                        (count (process-get proc 'bar)))
                   (tramp--test-message
                    "Start action %d %s %s" count buf (current-time-string))
-                  ;; Regular operation.
+                  ;; Regular operation prior process action.
                   (if (= count 0)
                       (should-not (file-attributes file))
                     (should (file-attributes file)))
                   ;; Send string to process.
-                  (tramp--test-message
-                   "Trace 1 action %d %s %s" count buf (current-time-string))
                   (process-send-string proc (format "%s\n" (buffer-name buf)))
-                  (tramp--test-message
-                   "Trace 2 action %d %s %s" count buf (current-time-string))
                   (accept-process-output proc 0.1 nil 0)
-                  ;; Regular operation.
-                  (tramp--test-message
-                   "Trace 3 action %d %s %s" count buf (current-time-string))
                   ;; Give the watchdog a chance.
                   (read-event nil nil 0.01)
+                  ;; Regular operation post process action.
                   (if (= count 2)
-                      (if (= (length buffers) 1)
-                          (tramp--test-instrument-test-case 10
-                            (should-not (file-attributes file)))
-                        (should-not (file-attributes file)))
+                      (should-not (file-attributes file))
                     (should (file-attributes file)))
                   (tramp--test-message
                    "Stop action %d %s %s" count buf (current-time-string))
@@ -3847,7 +3945,7 @@ process sentinels.  They shall not disturb each other."
           (ignore-errors (delete-process (get-buffer-process buf)))
           (ignore-errors (kill-buffer buf)))
         (ignore-errors (cancel-timer timer))
-        (ignore-errors (delete-directory tmp-name 'recursive))))))
+        (ignore-errors (delete-directory tmp-name 'recursive)))))))
 
 (ert-deftest tramp-test37-recursive-load ()
   "Check that Tramp does not fail due to recursive load."
