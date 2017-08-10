@@ -22,6 +22,14 @@ Build-Depends: bsd-mailx | mailx, libncurses5-dev, texinfo, liblockfile-dev, lib
 Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
+Package: emacs
+Architecture: all
+Depends: emacs-gtk | emacs-lucid | emacs-nox, ${misc:Depends}
+Description: GNU Emacs editor (metapackage)
+ GNU Emacs is the extensible self-documenting text editor.
+ This is a metapackage that will always depend on the latest
+ recommended Emacs variant (currently emacs-gtk).
+
 Package: emacs-lucid
 Architecture: any
 Depends: emacs-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
