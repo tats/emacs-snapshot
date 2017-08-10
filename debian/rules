@@ -395,6 +395,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  install -d $(pkgdir_common)/etc/emacs/site-start.d
 	  install -d $(pkgdir_common)/usr/share/emacs/site-lisp
 
+	install -m 0644 debian/00debian.el \
+	  $(pkgdir_common)/etc/emacs/site-start.d/
+
 	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
 	    && convert hicolor/16x16/apps/emacs.{png,xpm}
 	  cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/images/icons \
