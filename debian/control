@@ -112,7 +112,7 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: emacs-common
 Architecture: all
-Depends: emacsen-common (>= 2.0.8), install-info, ${shlibs:Depends}, ${misc:Depends}
+Depends: emacsen-common (>= 3.0.0), install-info, ${shlibs:Depends}, ${misc:Depends}
 Recommends: emacs-el
 Suggests: emacs-el, emacs-common-non-dfsg, ncurses-term
 Conflicts: emacs-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
