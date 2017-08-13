@@ -97,6 +97,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <allocator.h>
 #include <careadlinkat.h>
 #include <stat-time.h>
+#include <tempname.h>
 
 #include <binary-io.h>
 
@@ -267,9 +268,9 @@ Otherwise, return nil.
 A file name is handled if one of the regular expressions in
 `file-name-handler-alist' matches it.
 
-If OPERATION equals `inhibit-file-name-operation', then we ignore
+If OPERATION equals `inhibit-file-name-operation', then ignore
 any handlers that are members of `inhibit-file-name-handlers',
-but we still do run any other handlers.  This lets handlers
+but still do run any other handlers.  This lets handlers
 use the standard functions without calling themselves recursively.  */)
   (Lisp_Object filename, Lisp_Object operation)
 {
@@ -583,6 +584,38 @@ directory_file_name (char *dst, char *src, ptrdiff_t srclen, bool multibyte)
   return srclen;
 }
 
+DEFUN ("directory-name-p", Fdirectory_name_p, Sdirectory_name_p, 1, 1, 0,
+       doc: /* Return non-nil if NAME ends with a directory separator character.  */)
+  (Lisp_Object name)
+{
+  CHECK_STRING (name);
+  ptrdiff_t namelen = SBYTES (name);
+  unsigned char c = namelen ? SREF (name, namelen - 1) : 0;
+  return IS_DIRECTORY_SEP (c) ? Qt : Qnil;
+}
+
+/* Return true if NAME must be that of a directory if it exists.
+   When NAME is a directory name, this avoids system calls compared to
+   just calling Ffile_directory_p.  */
+
+static bool
+directory_like (Lisp_Object name)
+{
+  return !NILP (Fdirectory_name_p (name)) || !NILP (Ffile_directory_p (name));
+}
+
+/* Return the expansion of NEWNAME, except that if NEWNAME is like a
+   directory then return the expansion of FILE's basename under
+   NEWNAME.  This is like how 'cp FILE NEWNAME' works.  */
+
+static Lisp_Object
+expand_cp_target (Lisp_Object file, Lisp_Object newname)
+{
+  return (directory_like (newname)
+	  ? Fexpand_file_name (Ffile_name_nondirectory (file), newname)
+	  : Fexpand_file_name (newname, Qnil));
+}
+
 DEFUN ("directory-file-name", Fdirectory_file_name, Sdirectory_file_name,
        1, 1, 0,
        doc: /* Returns the file name of the directory named DIRECTORY.
@@ -623,148 +656,66 @@ In Unix-syntax, this function just removes the final slash.  */)
   return val;
 }
 
-static const char make_temp_name_tbl[64] =
+DEFUN ("make-temp-file-internal", Fmake_temp_file_internal,
+       Smake_temp_file_internal, 3, 3, 0,
+       doc: /* Generate a new file whose name starts with PREFIX, a string.
+Return the name of the generated file.  If DIR-FLAG is zero, do not
+create the file, just its name.  Otherwise, if DIR-FLAG is non-nil,
+create an empty directory.  The file name should end in SUFFIX.
+Do not expand PREFIX; a non-absolute PREFIX is relative to the Emacs
+working directory.
+
+Signal an error if the file could not be created.
+
+This function does not grok magic file names.  */)
+  (Lisp_Object prefix, Lisp_Object dir_flag, Lisp_Object suffix)
 {
-  'A','B','C','D','E','F','G','H',
-  'I','J','K','L','M','N','O','P',
-  'Q','R','S','T','U','V','W','X',
-  'Y','Z','a','b','c','d','e','f',
-  'g','h','i','j','k','l','m','n',
-  'o','p','q','r','s','t','u','v',
-  'w','x','y','z','0','1','2','3',
-  '4','5','6','7','8','9','-','_'
-};
-
-static unsigned make_temp_name_count, make_temp_name_count_initialized_p;
-
-/* Value is a temporary file name starting with PREFIX, a string.
-
-   The Emacs process number forms part of the result, so there is
-   no danger of generating a name being used by another process.
-   In addition, this function makes an attempt to choose a name
-   which has no existing file.  To make this work, PREFIX should be
-   an absolute file name.
-
-   BASE64_P means add the pid as 3 characters in base64
-   encoding.  In this case, 6 characters will be added to PREFIX to
-   form the file name.  Otherwise, if Emacs is running on a system
-   with long file names, add the pid as a decimal number.
-
-   This function signals an error if no unique file name could be
-   generated.  */
-
-Lisp_Object
-make_temp_name (Lisp_Object prefix, bool base64_p)
-{
-  Lisp_Object val, encoded_prefix;
-  ptrdiff_t len;
-  printmax_t pid;
-  char *p, *data;
-  char pidbuf[INT_BUFSIZE_BOUND (printmax_t)];
-  int pidlen;
-
   CHECK_STRING (prefix);
-
-  /* VAL is created by adding 6 characters to PREFIX.  The first
-     three are the PID of this process, in base 64, and the second
-     three are incremented if the file already exists.  This ensures
-     262144 unique file names per PID per PREFIX.  */
-
-  pid = getpid ();
-
-  if (base64_p)
+  CHECK_STRING (suffix);
+  Lisp_Object encoded_prefix = ENCODE_FILE (prefix);
+  Lisp_Object encoded_suffix = ENCODE_FILE (suffix);
+  ptrdiff_t prefix_len = SBYTES (encoded_prefix);
+  ptrdiff_t suffix_len = SBYTES (encoded_suffix);
+  if (INT_MAX < suffix_len)
+    args_out_of_range (prefix, suffix);
+  int nX = 6;
+  Lisp_Object val = make_uninit_string (prefix_len + nX + suffix_len);
+  char *data = SSDATA (val);
+  memcpy (data, SSDATA (encoded_prefix), prefix_len);
+  memset (data + prefix_len, 'X', nX);
+  memcpy (data + prefix_len + nX, SSDATA (encoded_suffix), suffix_len);
+  int kind = (NILP (dir_flag) ? GT_FILE
+	      : EQ (dir_flag, make_number (0)) ? GT_NOCREATE
+	      : GT_DIR);
+  int fd = gen_tempname (data, suffix_len, O_BINARY | O_CLOEXEC, kind);
+  if (fd < 0 || (NILP (dir_flag) && emacs_close (fd) != 0))
     {
-      pidbuf[0] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidbuf[1] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidbuf[2] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidlen = 3;
-    }
-  else
-    {
-#ifdef HAVE_LONG_FILE_NAMES
-      pidlen = sprintf (pidbuf, "%"pMd, pid);
-#else
-      pidbuf[0] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidbuf[1] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidbuf[2] = make_temp_name_tbl[pid & 63], pid >>= 6;
-      pidlen = 3;
-#endif
-    }
-
-  encoded_prefix = ENCODE_FILE (prefix);
-  len = SBYTES (encoded_prefix);
-  val = make_uninit_string (len + 3 + pidlen);
-  data = SSDATA (val);
-  memcpy (data, SSDATA (encoded_prefix), len);
-  p = data + len;
-
-  memcpy (p, pidbuf, pidlen);
-  p += pidlen;
-
-  /* Here we try to minimize useless stat'ing when this function is
-     invoked many times successively with the same PREFIX.  We achieve
-     this by initializing count to a random value, and incrementing it
-     afterwards.
-
-     We don't want make-temp-name to be called while dumping,
-     because then make_temp_name_count_initialized_p would get set
-     and then make_temp_name_count would not be set when Emacs starts.  */
-
-  if (!make_temp_name_count_initialized_p)
-    {
-      make_temp_name_count = time (NULL);
-      make_temp_name_count_initialized_p = 1;
-    }
-
-  while (1)
-    {
-      unsigned num = make_temp_name_count;
-
-      p[0] = make_temp_name_tbl[num & 63], num >>= 6;
-      p[1] = make_temp_name_tbl[num & 63], num >>= 6;
-      p[2] = make_temp_name_tbl[num & 63], num >>= 6;
-
-      /* Poor man's congruential RN generator.  Replace with
-         ++make_temp_name_count for debugging.  */
-      make_temp_name_count += 25229;
-      make_temp_name_count %= 225307;
-
-      if (!check_existing (data))
+      static char const kind_message[][32] =
 	{
-	  /* We want to return only if errno is ENOENT.  */
-	  if (errno == ENOENT)
-	    return DECODE_FILE (val);
-	  else
-	    /* The error here is dubious, but there is little else we
-	       can do.  The alternatives are to return nil, which is
-	       as bad as (and in many cases worse than) throwing the
-	       error, or to ignore the error, which will likely result
-	       in looping through 225307 stat's, which is not only
-	       dog-slow, but also useless since eventually nil would
-	       have to be returned anyway.  */
-	    report_file_error ("Cannot create temporary name for prefix",
-			       prefix);
-	  /* not reached */
-	}
+	  [GT_FILE] = "Creating file with prefix",
+	  [GT_DIR] = "Creating directory with prefix",
+	  [GT_NOCREATE] = "Creating file name with prefix"
+	};
+      report_file_error (kind_message[kind], prefix);
     }
+  return DECODE_FILE (val);
 }
 
 
 DEFUN ("make-temp-name", Fmake_temp_name, Smake_temp_name, 1, 1, 0,
        doc: /* Generate temporary file name (string) starting with PREFIX (a string).
-The Emacs process number forms part of the result, so there is no
-danger of generating a name being used by another Emacs process
-\(so long as only a single host can access the containing directory...).
 
 This function tries to choose a name that has no existing file.
-For this to work, PREFIX should be an absolute file name.
+For this to work, PREFIX should be an absolute file name, and PREFIX
+and the returned string should both be non-magic.
 
-There is a race condition between calling `make-temp-name' and creating the
-file, which opens all kinds of security holes.  For that reason, you should
-normally use `make-temp-file' instead.  */)
+There is a race condition between calling `make-temp-name' and
+later creating the file, which opens all kinds of security holes.
+For that reason, you should normally use `make-temp-file' instead.  */)
   (Lisp_Object prefix)
 {
-  return make_temp_name (prefix, 0);
+  return Fmake_temp_file_internal (prefix, make_number (0),
+				   empty_unibyte_string);
 }
 
 DEFUN ("expand-file-name", Fexpand_file_name, Sexpand_file_name, 1, 2, 0,
@@ -1873,9 +1824,9 @@ This function always sets the file modes of the output file to match
 the input file.
 
 The optional third argument OK-IF-ALREADY-EXISTS specifies what to do
-if file NEWNAME already exists.  If OK-IF-ALREADY-EXISTS is nil, we
+if file NEWNAME already exists.  If OK-IF-ALREADY-EXISTS is nil,
 signal a `file-already-exists' error without overwriting.  If
-OK-IF-ALREADY-EXISTS is a number, we request confirmation from the user
+OK-IF-ALREADY-EXISTS is an integer, request confirmation from the user
 about overwriting; this is what happens in interactive use with M-x.
 Any other value for OK-IF-ALREADY-EXISTS means to overwrite the
 existing file.
@@ -1885,8 +1836,8 @@ last-modified time as the old one.  (This works on only some systems.)
 
 A prefix arg makes KEEP-TIME non-nil.
 
-If PRESERVE-UID-GID is non-nil, we try to transfer the
-uid and gid of FILE to NEWNAME.
+If PRESERVE-UID-GID is non-nil, try to transfer the uid and gid of
+FILE to NEWNAME.
 
 If PRESERVE-PERMISSIONS is non-nil, copy permissions of FILE to NEWNAME;
 this includes the file modes, along with ACL entries and SELinux
@@ -1913,16 +1864,8 @@ permissions.  */)
   struct stat st;
 #endif
 
-  encoded_file = encoded_newname = Qnil;
-  CHECK_STRING (file);
-  CHECK_STRING (newname);
-
-  if (!NILP (Ffile_directory_p (newname)))
-    newname = Fexpand_file_name (Ffile_name_nondirectory (file), newname);
-  else
-    newname = Fexpand_file_name (newname, Qnil);
-
   file = Fexpand_file_name (file, Qnil);
+  newname = expand_cp_target (file, newname);
 
   /* If the input file name has special constructs in it,
      call the corresponding file handler.  */
@@ -2153,11 +2096,7 @@ DEFUN ("make-directory-internal", Fmake_directory_internal,
 
   dir = SSDATA (encoded_dir);
 
-#ifdef WINDOWSNT
-  if (mkdir (dir) != 0)
-#else
   if (mkdir (dir, 0777 & ~auto_saving_dir_umask) != 0)
-#endif
     report_file_error ("Creating directory", directory);
 
   return Qnil;
@@ -2303,9 +2242,9 @@ DEFUN ("rename-file", Frename_file, Srename_file, 2, 3,
        "fRename file: \nGRename %s to file: \np",
        doc: /* Rename FILE as NEWNAME.  Both args must be strings.
 If file has names other than FILE, it continues to have those names.
-Signals a `file-already-exists' error if a file NEWNAME already exists
+Signal a `file-already-exists' error if a file NEWNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
-A number as third arg means request confirmation if NEWNAME already exists.
+An integer third arg means request confirmation if NEWNAME already exists.
 This is what happens in interactive use with M-x.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists)
 {
@@ -2313,24 +2252,22 @@ This is what happens in interactive use with M-x.  */)
   Lisp_Object encoded_file, encoded_newname, symlink_target;
   int dirp = -1;
 
-  symlink_target = encoded_file = encoded_newname = Qnil;
-  CHECK_STRING (file);
-  CHECK_STRING (newname);
   file = Fexpand_file_name (file, Qnil);
 
-  if ((!NILP (Ffile_directory_p (newname)))
-      /* If the filesystem is case-insensitive and the file names are
-	 identical but for the case, don't attempt to move directory
-	 to itself.  */
-      && (NILP (Ffile_name_case_insensitive_p (file))
-	  || NILP (Fstring_equal (Fdowncase (file), Fdowncase (newname)))))
+  /* If the filesystem is case-insensitive and the file names are
+     identical but for case, treat it as a change-case request, and do
+     not worry whether NEWNAME exists or whether it is a directory, as
+     it is already another name for FILE.  */
+  bool case_only_rename = false;
+  if (!NILP (Ffile_name_case_insensitive_p (file)))
     {
-      dirp = !NILP (Ffile_directory_p (file));
-      Lisp_Object fname = dirp ? Fdirectory_file_name (file) : file;
-      newname = Fexpand_file_name (Ffile_name_nondirectory (fname), newname);
+      newname = Fexpand_file_name (newname, Qnil);
+      case_only_rename = !NILP (Fstring_equal (Fdowncase (file),
+					       Fdowncase (newname)));
     }
-  else
-    newname = Fexpand_file_name (newname, Qnil);
+
+  if (!case_only_rename)
+    newname = expand_cp_target (Fdirectory_file_name (file), newname);
 
   /* If the file name has special constructs in it,
      call the corresponding file handler.  */
@@ -2344,15 +2281,9 @@ This is what happens in interactive use with M-x.  */)
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
 
-  /* If the filesystem is case-insensitive and the file names are
-     identical but for the case, don't worry whether the destination
-     already exists: the caller simply wants to change the letter-case
-     of the file name.  */
-  bool plain_rename
-    = ((!NILP (ok_if_already_exists) && !INTEGERP (ok_if_already_exists))
-       || (file_name_case_insensitive_p (SSDATA (encoded_file))
-	   && ! NILP (Fstring_equal (Fdowncase (file), Fdowncase (newname)))));
-
+  bool plain_rename = (case_only_rename
+		       || (!NILP (ok_if_already_exists)
+			   && !INTEGERP (ok_if_already_exists)));
   int rename_errno;
   if (!plain_rename)
     {
@@ -2394,7 +2325,7 @@ This is what happens in interactive use with M-x.  */)
   else
     {
       if (dirp < 0)
-	dirp = !NILP (Ffile_directory_p (file));
+	dirp = directory_like (file);
       if (dirp)
 	call4 (Qcopy_directory, file, newname, Qt, Qnil);
       else
@@ -2413,24 +2344,17 @@ This is what happens in interactive use with M-x.  */)
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
        "fAdd name to file: \nGName to add to %s: \np",
        doc: /* Give FILE additional name NEWNAME.  Both args must be strings.
-Signals a `file-already-exists' error if a file NEWNAME already exists
+Signal a `file-already-exists' error if a file NEWNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
-A number as third arg means request confirmation if NEWNAME already exists.
+An integer third arg means request confirmation if NEWNAME already exists.
 This is what happens in interactive use with M-x.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists)
 {
   Lisp_Object handler;
   Lisp_Object encoded_file, encoded_newname;
 
-  encoded_file = encoded_newname = Qnil;
-  CHECK_STRING (file);
-  CHECK_STRING (newname);
   file = Fexpand_file_name (file, Qnil);
-
-  if (!NILP (Ffile_directory_p (newname)))
-    newname = Fexpand_file_name (Ffile_name_nondirectory (file), newname);
-  else
-    newname = Fexpand_file_name (newname, Qnil);
+  newname = expand_cp_target (file, newname);
 
   /* If the file name has special constructs in it,
      call the corresponding file handler.  */
@@ -2470,28 +2394,23 @@ DEFUN ("make-symbolic-link", Fmake_symbolic_link, Smake_symbolic_link, 2, 3,
        "FMake symbolic link to file: \nGMake symbolic link to file %s: \np",
        doc: /* Make a symbolic link to TARGET, named LINKNAME.
 Both args must be strings.
-Signals a `file-already-exists' error if a file LINKNAME already exists
+Signal a `file-already-exists' error if a file LINKNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
-A number as third arg means request confirmation if LINKNAME already exists.
+An integer third arg means request confirmation if LINKNAME already exists.
 This happens for interactive use with M-x.  */)
   (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_already_exists)
 {
   Lisp_Object handler;
   Lisp_Object encoded_target, encoded_linkname;
 
-  encoded_target = encoded_linkname = Qnil;
   CHECK_STRING (target);
-  CHECK_STRING (linkname);
   /* If the link target has a ~, we must expand it to get
      a truly valid file name.  Otherwise, do not expand;
      we want to permit links to relative file names.  */
   if (SREF (target, 0) == '~')
     target = Fexpand_file_name (target, Qnil);
 
-  if (!NILP (Ffile_directory_p (linkname)))
-    linkname = Fexpand_file_name (Ffile_name_nondirectory (target), linkname);
-  else
-    linkname = Fexpand_file_name (linkname, Qnil);
+  linkname = expand_cp_target (target, linkname);
 
   /* If the file name has special constructs in it,
      call the corresponding file handler.  */
@@ -4851,8 +4770,8 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   if (!NILP (handler))
     {
       Lisp_Object val;
-      val = call6 (handler, Qwrite_region, start, end,
-		   filename, append, visit);
+      val = call8 (handler, Qwrite_region, start, end,
+		   filename, append, visit, lockname, mustbenew);
 
       if (visiting)
 	{
@@ -5576,7 +5495,7 @@ and are changed since last auto-saved.
 Auto-saving writes the buffer into a file
 so that your editing is not lost if the system crashes.
 This file is not the file you visited; that changes only when you save.
-Normally we run the normal hook `auto-save-hook' before saving.
+Normally, run the normal hook `auto-save-hook' before saving.
 
 A non-nil NO-MESSAGE argument means do not print any message if successful.
 A non-nil CURRENT-ONLY argument means save only current buffer.  */)
@@ -6110,7 +6029,7 @@ This applies only to the operation `inhibit-file-name-operation'.  */);
   Vinhibit_file_name_operation = Qnil;
 
   DEFVAR_LISP ("auto-save-list-file-name", Vauto_save_list_file_name,
-	       doc: /* File name in which we write a list of all auto save file names.
+	       doc: /* File name in which to write a list of all auto save file names.
 This variable is initialized automatically from `auto-save-list-file-prefix'
 shortly after Emacs reads your init file, if you have not yet given it
 a non-nil value.  */);
@@ -6165,7 +6084,9 @@ This includes interactive calls to `delete-file' and
   defsubr (&Sfile_name_nondirectory);
   defsubr (&Sunhandled_file_name_directory);
   defsubr (&Sfile_name_as_directory);
+  defsubr (&Sdirectory_name_p);
   defsubr (&Sdirectory_file_name);
+  defsubr (&Smake_temp_file_internal);
   defsubr (&Smake_temp_name);
   defsubr (&Sexpand_file_name);
   defsubr (&Ssubstitute_in_file_name);

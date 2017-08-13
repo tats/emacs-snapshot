@@ -3279,6 +3279,17 @@ output buffer and running a new command in the default buffer,
   :group 'shell
   :version "24.3")
 
+(defcustom async-shell-command-display-buffer t
+  "Whether to display the command buffer immediately.
+If t, display the buffer immediately; if nil, wait until there
+is output."
+  :type '(choice (const :tag "Display buffer immediately"
+			t)
+		 (const :tag "Display buffer on output"
+			nil))
+  :group 'shell
+  :version "26.1")
+
 (defun shell-command--save-pos-or-erase ()
   "Store a buffer position or erase the buffer.
 See `shell-command-dont-erase-buffer'."
@@ -3525,7 +3536,6 @@ the use of a shell (with its need to quote arguments)."
 		    (setq buffer (get-buffer-create
 				  (or output-buffer "*Async Shell Command*"))))))
 		(with-current-buffer buffer
-		  (display-buffer buffer '(nil (allow-no-window . t)))
                   (shell-command--save-pos-or-erase)
 		  (setq default-directory directory)
 		  (setq proc (start-process "Shell" buffer shell-file-name
@@ -3536,7 +3546,16 @@ the use of a shell (with its need to quote arguments)."
 		  ;; Use the comint filter for proper handling of carriage motion
 		  ;; (see `comint-inhibit-carriage-motion'),.
 		  (set-process-filter proc 'comint-output-filter)
-		  ))
+                  (if async-shell-command-display-buffer
+                      (display-buffer buffer '(nil (allow-no-window . t)))
+                    (add-function :before (process-filter proc)
+                                  `(lambda (process string)
+                                     (when (and (= 0 (buffer-size (process-buffer process)))
+                                                (string= (buffer-name (process-buffer process))
+                                                    ,(or output-buffer "*Async Shell Command*")))
+                                       (display-buffer (process-buffer process))))
+                                  ))
+                  ))
 	    ;; Otherwise, command is executed synchronously.
 	    (shell-command-on-region (point) (point) command
 				     output-buffer nil error-buffer)))))))
@@ -6603,6 +6622,8 @@ which are part of the text that the image rests on.)
 
 With argument ARG not nil or 1, move forward ARG - 1 lines first.
 If point reaches the beginning or end of buffer, it stops there.
+\(But if the buffer doesn't end in a newline, it stops at the
+beginning of the last line.)
 To ignore intangibility, bind `inhibit-point-motion-hooks' to t."
   (interactive "^p")
   (or arg (setq arg 1))
@@ -6691,6 +6712,8 @@ To ignore intangibility, bind `inhibit-point-motion-hooks' to t."
   "Move point to beginning of current visual line.
 With argument N not nil or 1, move forward N - 1 visual lines first.
 If point reaches the beginning or end of buffer, it stops there.
+\(But if the buffer doesn't end in a newline, it stops at the
+beginning of the last visual line.)
 To ignore intangibility, bind `inhibit-point-motion-hooks' to t."
   (interactive "^p")
   (or n (setq n 1))
@@ -7224,7 +7247,7 @@ unless optional argument SOFT is non-nil."
   (when (or (not comment-start)
             (not comment-auto-fill-only-comments)
             (nth 4 (syntax-ppss)))
-    (do-auto-fill)))
+    (funcall auto-fill-function)))
 
 (defvar normal-auto-fill-function 'do-auto-fill
   "The function to use for `auto-fill-function' if Auto Fill mode is turned on.

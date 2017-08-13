@@ -124,7 +124,6 @@ AC_DEFUN([gl_EARLY],
   # Code from module readlink:
   # Code from module readlinkat:
   # Code from module root-uid:
-  # Code from module secure_getenv:
   # Code from module sig2str:
   # Code from module signal-h:
   # Code from module snippet/_Noreturn:
@@ -388,6 +387,7 @@ AC_DEFUN([gl_INIT],
   AC_PROG_MKDIR_P
   gl_SYS_TYPES_H
   AC_PROG_MKDIR_P
+  gl_FUNC_GEN_TEMPNAME
   gl_HEADER_TIME_H
   gl_TIME_R
   if test $HAVE_LOCALTIME_R = 0 || test $REPLACE_LOCALTIME_R = 1; then
@@ -424,9 +424,7 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_5264294aa0a5557541b53c8c741f7f31=false
   gl_gnulib_enabled_03e0aaad4cb89ca757653bd367a6ccb7=false
   gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c=false
-  gl_gnulib_enabled_secure_getenv=false
   gl_gnulib_enabled_strtoll=false
-  gl_gnulib_enabled_tempname=false
   gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec=false
   func_gl_gnulib_m4code_260941c0e5dc67ec9e87d1fb321c300b ()
   {
@@ -550,18 +548,6 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c=true
     fi
   }
-  func_gl_gnulib_m4code_secure_getenv ()
-  {
-    if ! $gl_gnulib_enabled_secure_getenv; then
-      gl_FUNC_SECURE_GETENV
-      if test $HAVE_SECURE_GETENV = 0; then
-        AC_LIBOBJ([secure_getenv])
-        gl_PREREQ_SECURE_GETENV
-      fi
-      gl_STDLIB_MODULE_INDICATOR([secure_getenv])
-      gl_gnulib_enabled_secure_getenv=true
-    fi
-  }
   func_gl_gnulib_m4code_strtoll ()
   {
     if ! $gl_gnulib_enabled_strtoll; then
@@ -572,14 +558,6 @@ AC_DEFUN([gl_INIT],
       fi
       gl_STDLIB_MODULE_INDICATOR([strtoll])
       gl_gnulib_enabled_strtoll=true
-    fi
-  }
-  func_gl_gnulib_m4code_tempname ()
-  {
-    if ! $gl_gnulib_enabled_tempname; then
-      gl_FUNC_GEN_TEMPNAME
-      gl_gnulib_enabled_tempname=true
-      func_gl_gnulib_m4code_secure_getenv
     fi
   }
   func_gl_gnulib_m4code_682e609604ccaac6be382e4ee3a4eaec ()
@@ -627,9 +605,6 @@ AC_DEFUN([gl_INIT],
   if test $REPLACE_LSTAT = 1; then
     func_gl_gnulib_m4code_dosname
   fi
-  if test $HAVE_MKOSTEMP = 0; then
-    func_gl_gnulib_m4code_tempname
-  fi
   if test $HAVE_READLINKAT = 0; then
     func_gl_gnulib_m4code_260941c0e5dc67ec9e87d1fb321c300b
   fi
@@ -658,9 +633,7 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_5264294aa0a5557541b53c8c741f7f31], [$gl_gnulib_enabled_5264294aa0a5557541b53c8c741f7f31])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_03e0aaad4cb89ca757653bd367a6ccb7], [$gl_gnulib_enabled_03e0aaad4cb89ca757653bd367a6ccb7])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c], [$gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c])
-  AM_CONDITIONAL([gl_GNULIB_ENABLED_secure_getenv], [$gl_gnulib_enabled_secure_getenv])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strtoll], [$gl_gnulib_enabled_strtoll])
-  AM_CONDITIONAL([gl_GNULIB_ENABLED_tempname], [$gl_gnulib_enabled_tempname])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec], [$gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec])
   # End of code from modules
   m4_ifval(gl_LIBSOURCES_LIST, [
@@ -907,7 +880,6 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/readlink.c
   lib/readlinkat.c
   lib/root-uid.h
-  lib/secure_getenv.c
   lib/set-permissions.c
   lib/sha1.c
   lib/sha1.h
@@ -1008,6 +980,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/localtime-buffer.m4
   m4/longlong.m4
   m4/lstat.m4
+  m4/manywarnings-c++.m4
   m4/manywarnings.m4
   m4/md5.m4
   m4/memrchr.m4
@@ -1024,7 +997,6 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/putenv.m4
   m4/readlink.m4
   m4/readlinkat.m4
-  m4/secure_getenv.m4
   m4/sha1.m4
   m4/sha256.m4
   m4/sha512.m4

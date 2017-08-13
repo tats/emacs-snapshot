@@ -191,7 +191,7 @@ Populated by `tabulated-list-init-header'.")
   ;; FIXME: Should share code with tabulated-list-print-col!
   (let ((x (max tabulated-list-padding 0))
 	(button-props `(help-echo "Click to sort by column"
-			mouse-face highlight
+			mouse-face header-line-highlight
 			keymap ,tabulated-list-sort-button-map))
 	(cols nil))
     (if display-line-numbers
@@ -628,7 +628,9 @@ as the ewoc pretty-printer."
   (setq-local glyphless-char-display tabulated-list-glyphless-char-display)
   ;; Avoid messing up the entries' display just because the first
   ;; column of the first entry happens to begin with a R2L letter.
-  (setq bidi-paragraph-direction 'left-to-right))
+  (setq bidi-paragraph-direction 'left-to-right)
+  ;; This is for if/when they turn on display-line-numbers
+  (add-hook 'display-line-numbers-mode-hook #'tabulated-list-revert nil t))
 
 (put 'tabulated-list-mode 'mode-class 'special)
 

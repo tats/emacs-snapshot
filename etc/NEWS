@@ -206,6 +206,11 @@ the behavior of 'shell-command', 'shell-command-on-region' and
 'async-shell-command' is as usual.
 
 +++
+** The new user option 'async-shell-command-display-buffer' controls
+whether the output buffer of an asynchronous command is shown
+immediately, or only when there is output.
+
++++
 ** The new user option 'mouse-select-region-move-to-beginning'
 controls the position of point when double-clicking mouse-1 on the end
 of a parenthetical grouping or string-delimiter: the default value nil
@@ -248,6 +253,12 @@ face instead of the 'escape-glyph' face.
 +++
 ** Approximations to quotes are now displayed with the new 'homoglyph'
 face instead of the 'escape-glyph' face.
+
++++
+** New face 'header-line-highlight'.
+This face is the header-line analogue of 'mode-line-highlight'; it
+should be the preferred mouse-face for mouse-sensitive elements in the
+header line.
 
 ---
 ** 'C-x h' ('mark-whole-buffer') will now avoid marking the prompt
@@ -736,6 +747,11 @@ where to place point after C-c M-r and C-c M-s.
 *** Messages from CMake are now recognized.
 
 +++
+*** The number of errors, warnings, and informational messages is now
+displayed in the mode line.  These are updated as compilation
+proceeds.
+
++++
 *** A new option 'dired-always-read-filesystem' default to nil.
 If non-nil, buffers visiting files are reverted before search them;
 for instance, in 'dired-mark-files-containing-regexp' a non-nil value
@@ -1183,6 +1199,10 @@ characters: ‘’‛“”‟〞＂＇, unless they are escaped with backslash.
 particular, the function 'internal--module-call' has been removed.
 Code that depends on undocumented internals of the module system might
 break.
+
+---
+** The arguments LOCKNAME and MUSTBENEW of 'write-region' are
+propagated to file name handlers now.
 
 
 * Lisp Changes in Emacs 26.1
