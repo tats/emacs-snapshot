@@ -438,6 +438,7 @@ override_dh_auto_install: $(autogen_install_files)
 	  rm -f $(pkgdir_common)/usr/share/info/emacs/dir
 	  rm -f $(pkgdir_common)/usr/share/info/emacs/dir.old
 
+	  install -d $(pkgdir_common)/usr/local/share/emacs/site-lisp
         endif
 
         ##################################################
