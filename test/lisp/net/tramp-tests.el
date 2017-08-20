@@ -3719,7 +3719,8 @@ Use the `ls' command."
 		   'utf-8-hfs 'utf-8))
 	 (coding-system-for-read utf8)
 	 (coding-system-for-write utf8)
-	 (file-name-coding-system utf8))
+	 (file-name-coding-system
+	  (coding-system-change-eol-conversion utf8 'unix)))
     (tramp--test-check-files
      (unless (tramp--test-hpux-p) "Γυρίστε το Γαλαξία με Ώτο Στοπ")
      (unless (tramp--test-hpux-p)
@@ -3821,7 +3822,9 @@ process sentinels.  They shall not disturb each other."
   (with-timeout (300 (tramp--test-timeout-handler))
     (define-key special-event-map [sigusr1] 'tramp--test-timeout-handler)
     (tramp--test-instrument-test-case (if (getenv "EMACS_HYDRA_CI") 10 0)
-    (let* ((watchdog
+    (let* (;; For the watchdog.
+	   (default-directory (expand-file-name temporary-file-directory))
+	   (watchdog
             (start-process
              "*watchdog*" nil shell-file-name shell-command-switch
              (format "sleep 300; kill -USR1 %d" (emacs-pid))))

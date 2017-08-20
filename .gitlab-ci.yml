@@ -36,6 +36,6 @@ stages:
 test:
   stage: test
   script:
-    - ./autogen.sh
+    - ./autogen.sh autoconf
     - ./configure --without-makeinfo
     - make check

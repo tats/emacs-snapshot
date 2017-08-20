@@ -1106,6 +1106,9 @@ fontification, and commenting for embedded JavaScript and CSS.
 
 ** New minor mode 'pixel-scroll-mode' provides smooth pixel-level scrolling.
 
+** New major mode 'less-css-mode' (a minor variant of 'css-mode') for
+editing Less files.
+
 
 * Incompatible Lisp Changes in Emacs 26.1
 
@@ -1195,6 +1198,12 @@ accepts Lisp symbols which begin with the following quotation
 characters: ‘’‛“”‟〞＂＇, unless they are escaped with backslash.
 
 +++
+** 'default-file-name-coding-system' now defaults to a coding system
+that does not process CRLF.  For example, it defaults to utf-8-unix
+instead of to utf-8.  Before this change, Emacs would sometimes
+mishandle file names containing these control characters.
+
++++
 ** Module functions are now implemented slightly differently; in
 particular, the function 'internal--module-call' has been removed.
 Code that depends on undocumented internals of the module system might
@@ -1206,6 +1215,8 @@ propagated to file name handlers now.
 
 
 * Lisp Changes in Emacs 26.1
+
+** New optional argument TEXT in 'make-temp-file'.
 
 ** New function `define-symbol-prop'.
 
@@ -1563,7 +1574,7 @@ a new window when opening man pages when there's already one, use
         (mode . Man-mode))))
 
 +++
-*** New window parameter 'no-delete-other-window' prevents that
+*** New window parameter 'no-delete-other-windows' prevents that
 its window gets deleted by 'delete-other-windows'.
 
 +++

@@ -210,7 +210,7 @@ get_boot_time (void)
 		 names up to 8 bytes long.  Choose a 2 byte prefix, so
 		 the 6-byte suffix does not make the name too long.  */
 	      filename = Fmake_temp_file_internal (build_string ("wt"), Qnil,
-						   empty_unibyte_string);
+						   empty_unibyte_string, Qnil);
 	      CALLN (Fcall_process, build_string ("gzip"), Qnil,
 		     list2 (QCfile, filename), Qnil,
 		     build_string ("-cd"), tempname);
@@ -403,8 +403,6 @@ create_lock_file (char *lfname, char *lock_info_str, bool force)
       else
 	{
 	  ptrdiff_t lock_info_len;
-	  if (! O_CLOEXEC)
-	    fcntl (fd, F_SETFD, FD_CLOEXEC);
 	  lock_info_len = strlen (lock_info_str);
 	  err = 0;
 	  if (emacs_write (fd, lock_info_str, lock_info_len) != lock_info_len

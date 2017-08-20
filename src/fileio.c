@@ -657,18 +657,20 @@ In Unix-syntax, this function just removes the final slash.  */)
 }
 
 DEFUN ("make-temp-file-internal", Fmake_temp_file_internal,
-       Smake_temp_file_internal, 3, 3, 0,
+       Smake_temp_file_internal, 4, 4, 0,
        doc: /* Generate a new file whose name starts with PREFIX, a string.
 Return the name of the generated file.  If DIR-FLAG is zero, do not
 create the file, just its name.  Otherwise, if DIR-FLAG is non-nil,
 create an empty directory.  The file name should end in SUFFIX.
 Do not expand PREFIX; a non-absolute PREFIX is relative to the Emacs
-working directory.
+working directory.  If TEXT is a string, insert it into the newly
+created file.
 
 Signal an error if the file could not be created.
 
 This function does not grok magic file names.  */)
-  (Lisp_Object prefix, Lisp_Object dir_flag, Lisp_Object suffix)
+  (Lisp_Object prefix, Lisp_Object dir_flag, Lisp_Object suffix,
+   Lisp_Object text)
 {
   CHECK_STRING (prefix);
   CHECK_STRING (suffix);
@@ -688,7 +690,19 @@ This function does not grok magic file names.  */)
 	      : EQ (dir_flag, make_number (0)) ? GT_NOCREATE
 	      : GT_DIR);
   int fd = gen_tempname (data, suffix_len, O_BINARY | O_CLOEXEC, kind);
-  if (fd < 0 || (NILP (dir_flag) && emacs_close (fd) != 0))
+  bool failed = fd < 0;
+  if (!failed)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_protect_int (close_file_unwind, fd);
+      val = DECODE_FILE (val);
+      if (STRINGP (text) && SBYTES (text) != 0)
+	write_region (text, Qnil, val, Qnil, Qnil, Qnil, Qnil, fd);
+      failed = NILP (dir_flag) && emacs_close (fd) != 0;
+      /* Discard the unwind protect.  */
+      specpdl_ptr = specpdl + count;
+    }
+  if (failed)
     {
       static char const kind_message[][32] =
 	{
@@ -698,7 +712,7 @@ This function does not grok magic file names.  */)
 	};
       report_file_error (kind_message[kind], prefix);
     }
-  return DECODE_FILE (val);
+  return val;
 }
 
 
@@ -715,7 +729,7 @@ For that reason, you should normally use `make-temp-file' instead.  */)
   (Lisp_Object prefix)
 {
   return Fmake_temp_file_internal (prefix, make_number (0),
-				   empty_unibyte_string);
+				   empty_unibyte_string, Qnil);
 }
 
 DEFUN ("expand-file-name", Fexpand_file_name, Sexpand_file_name, 1, 2, 0,
@@ -2259,12 +2273,14 @@ This is what happens in interactive use with M-x.  */)
      not worry whether NEWNAME exists or whether it is a directory, as
      it is already another name for FILE.  */
   bool case_only_rename = false;
+#if defined CYGWIN || defined DOS_NT
   if (!NILP (Ffile_name_case_insensitive_p (file)))
     {
       newname = Fexpand_file_name (newname, Qnil);
       case_only_rename = !NILP (Fstring_equal (Fdowncase (file),
 					       Fdowncase (newname)));
     }
+#endif
 
   if (!case_only_rename)
     newname = expand_cp_target (Fdirectory_file_name (file), newname);
@@ -2296,6 +2312,9 @@ This is what happens in interactive use with M-x.  */)
       switch (rename_errno)
 	{
 	case EEXIST: case EINVAL: case ENOSYS:
+#if ENOSYS != ENOTSUP
+	case ENOTSUP:
+#endif
 	  barf_or_query_if_file_exists (newname, rename_errno == EEXIST,
 					"rename to it",
 					INTEGERP (ok_if_already_exists),
