@@ -1,4 +1,4 @@
-0001-Prefer-usr-share-info-emacs-MAJORVERSION.patch
+0001-Prefer-usr-share-info-emacs.patch
 0002-Run-debian-startup-and-set-debian-emacs-flavor.patch
 0003-Remove-files-that-appear-to-be-incompatible-with-the.patch
 0004-Adjust-documentation-references-for-Debian.patch

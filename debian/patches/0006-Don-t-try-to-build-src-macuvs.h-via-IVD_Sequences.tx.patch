@@ -1,4 +1,4 @@
-From bc4a4c2ece7a047e0de8191514bdeac7d3c3a0a6 Mon Sep 17 00:00:00 2001
+From 6676f1cb9a837dc0cdcc3a36588c4e3a43287d0b Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Tue, 21 Oct 2014 19:10:17 -0500
 Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)

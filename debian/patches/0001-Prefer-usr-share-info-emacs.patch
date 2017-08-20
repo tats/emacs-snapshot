@@ -1,19 +1,18 @@
-From 060a24af491b07c293e6d998d58e343e42d71e70 Mon Sep 17 00:00:00 2001
+From f395622508301666a356a84e003d987888229804 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 7 Apr 2013 15:03:05 -0500
-Subject: Prefer /usr/share/info/emacs-MAJORVERSION
+Subject: Prefer /usr/share/info/emacs/
 
-Emacs prefers /usr/share/info/emacs-MAJORVERSION to /usr/share/info.
+Emacs prefers /usr/share/info/emacs to /usr/share/info.
 
 The value of Info-default-directory-list has been augmented via
-lisp/info.el to include /usr/share/info/emacs-MAJORVERSION before
-/usr/share/info.
+lisp/info.el to include /usr/share/info/emacs before /usr/share/info.
 ---
  lisp/info.el | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/info.el b/lisp/info.el
-index 40b2f90ebd6..63402780d42 100644
+index 40b2f90ebd6..0cd9c480a67 100644
 --- a/lisp/info.el
 +++ b/lisp/info.el
 @@ -218,7 +218,8 @@ Info-default-directory-list
@@ -21,8 +20,8 @@ index 40b2f90ebd6..63402780d42 100644
  	    (cons config-dir standard-info-dirs))))
      (if (not (eq system-type 'windows-nt))
 -	dirs
-+        ;; Debian: add per-flavor info directory in front.
-+        (cons (format "/usr/share/info/emacs-%d" emacs-major-version) dirs)
++        ;; Debian: add flavor info directory in front
++        (cons "/usr/share/info/emacs" dirs)
        ;; Include the info directory near where Emacs executable was installed.
        (let* ((instdir (file-name-directory invocation-directory))
  	     (dir1 (expand-file-name "../info/" instdir))

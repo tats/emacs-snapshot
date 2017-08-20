@@ -438,9 +438,9 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning
   :type 'directory
   :initialize #'custom-initialize-delay)
 
-(defconst debian-emacs-flavor 'emacs25
+(defconst debian-emacs-flavor 'emacs
   "A symbol representing the particular debian flavor of emacs running.
-Something like 'emacs20, 'xemacs20, etc.")
+Something like 'emacs, 'xemacs21, etc.")
 
 (defun normal-top-level-add-subdirs-to-load-path ()
   "Recursively add all subdirectories of `default-directory' to `load-path'.

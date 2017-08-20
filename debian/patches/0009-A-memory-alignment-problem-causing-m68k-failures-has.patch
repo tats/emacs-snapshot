@@ -1,4 +1,4 @@
-From e0103758d20a59363b6a356e8d50d28cf25616b1 Mon Sep 17 00:00:00 2001
+From ab4d66e702754caec90d22a751d101cbe51a85ec Mon Sep 17 00:00:00 2001
 From: Andreas Schwab <schwab@linux-m68k.org>
 Date: Tue, 25 Jul 2017 01:12:50 +0200
 Subject: A memory alignment problem causing m68k failures has been fixed

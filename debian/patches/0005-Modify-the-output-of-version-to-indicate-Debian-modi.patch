@@ -1,4 +1,4 @@
-From e7fd49e3547acb756c6c8036f7055c885da83a68 Mon Sep 17 00:00:00 2001
+From d33f56378cb4ead76c7c89b6dcde66d4ddbe482c Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:28 -0500
 Subject: Modify the output of (version) to indicate Debian modifications

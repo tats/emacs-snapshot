@@ -1,4 +1,4 @@
-From dfaa56fe12feedba0be460235a2309a93188509f Mon Sep 17 00:00:00 2001
+From 73a3fcd5d030f1b42424ab70ede79ea59e0c8e38 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 29 Jul 2017 11:50:27 -0500
 Subject: Don't downcase real xref in elisp-mode-tests

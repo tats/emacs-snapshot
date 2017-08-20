@@ -1,4 +1,4 @@
-From 8900499027b692994a3b411954850c3672b9d2f6 Mon Sep 17 00:00:00 2001
+From 9f401bf21707b484aeb2d2f6c1ed2ce41c50f253 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 30 Jul 2017 21:43:10 -0500
 Subject: Disable eieio-test-method-order-list-6

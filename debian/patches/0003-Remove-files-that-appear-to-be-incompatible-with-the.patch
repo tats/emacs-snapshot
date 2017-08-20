@@ -1,4 +1,4 @@
-From 83f3a4a687c29df447fffc9bf416db64c75c3a0d Mon Sep 17 00:00:00 2001
+From 53dad1e8f5cd98546a215217b1f6dcd74fe03981 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG

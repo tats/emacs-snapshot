@@ -218,8 +218,8 @@ A header-line does not scroll with the rest of the buffer."
 	      (nconc standard-info-dirs (list config-dir))
 	    (cons config-dir standard-info-dirs))))
     (if (not (eq system-type 'windows-nt))
-        ;; Debian: add per-flavor info directory in front.
-        (cons (format "/usr/share/info/emacs-%d" emacs-major-version) dirs)
+        ;; Debian: add flavor info directory in front
+        (cons "/usr/share/info/emacs" dirs)
       ;; Include the info directory near where Emacs executable was installed.
       (let* ((instdir (file-name-directory invocation-directory))
 	     (dir1 (expand-file-name "../info/" instdir))

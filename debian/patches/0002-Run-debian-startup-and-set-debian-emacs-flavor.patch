@@ -1,4 +1,4 @@
-From ae16c941cd1b1cfae352136af9db2d698f5e4388 Mon Sep 17 00:00:00 2001
+From 276ba4620041b4d7e2e90d190bbfa7c005885b6f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor
@@ -8,7 +8,7 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
 * Emacs runs debian-startup during the startup process unless
   site-run-file is false.
 
-* The global variable debian-emacs-flavor is bound to 'emacs25.
+* The global variable debian-emacs-flavor is bound to 'emacs.
 
 Author: Rob Browning <rlb@defaultvalue.org>
 ---
@@ -16,16 +16,16 @@ Author: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 2855e7c31ca..b0df4f59d0c 100644
+index 2855e7c31ca..79c5119420e 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
 @@ -438,6 +438,10 @@ tutorial-directory
    :type 'directory
    :initialize #'custom-initialize-delay)
  
-+(defconst debian-emacs-flavor 'emacs25
++(defconst debian-emacs-flavor 'emacs
 +  "A symbol representing the particular debian flavor of emacs running.
-+Something like 'emacs20, 'xemacs20, etc.")
++Something like 'emacs, 'xemacs21, etc.")
 +
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Recursively add all subdirectories of `default-directory' to `load-path'.

@@ -1,4 +1,4 @@
-From 3456bf7e394316db2cde7522f233cf5b2d5dda83 Mon Sep 17 00:00:00 2001
+From bf56e978684eeebc859fc70983a8805d8210b149 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 10 Oct 2016 17:35:56 -0500
 Subject: Kill gpg agent in package-test.el to avoid a race

@@ -1,4 +1,4 @@
-From 47583d9d9a27fe9fa4fe96a932501497dc27af56 Mon Sep 17 00:00:00 2001
+From 933561a3372d684a5529d460145ca30c6a23802e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 22 Apr 2017 12:02:00 -0500
 Subject: Don't provide openssl s_client as an option for ssl connections
