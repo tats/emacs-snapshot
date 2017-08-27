@@ -9,11 +9,11 @@ The info files for each version are installed in
 /usr/share/info/emacs-N, so you can prefer a particular version's
 pages by prepending that directory to your INFOPATH, e.g.:
 
-  INFOPATH=/usr/share/info/emacs-@MAJOR_VERSION@ info emacs
+  INFOPATH=/usr/share/info/emacs info emacs
 
 This variable also affects Emacs.  For example:
 
-  INFOPATH=/usr/share/info/emacs-@MAJOR_VERSION@: emacs --eval '(info "emacs")'
+  INFOPATH=/usr/share/info/emacs: emacs --eval '(info "emacs")'
 
 @@PATCH_LIST_HERE@@
 

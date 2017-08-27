@@ -7,7 +7,7 @@
 
 # Copyright 1994,1995 Ian Jackson
 # Copyright 2004-2005 Jérôme Marant <jerome@debian.org>
-# Copyright 1998-2016 Rob Browning <rlb@defaultvalue.org>
+# Copyright 1998-2017 Rob Browning <rlb@defaultvalue.org>
 
 # Originally copied from the GNU Hello Debian rules file (1.3).
 # Modified for emacs by Mark Eichin <eichin@kitten.gen.ma.us>.
@@ -44,24 +44,19 @@ upstream_ver := $(shell echo $(debsrc_ver) | sed 's/+[^+]\+$$//')
 # 20.5, not 20.5a (used in load-path, etc.)
 runtime_ver := $(shell echo $(upstream_ver) | sed 's/[^0-9]\+$$//')
 
-# The flavor (i.e. emacs21) currently matches the source package name.
-flavor := $(shell echo $(src_name) | sed 's/-non-dfsg$$//')
-
 # These files must always exist, i.e. can't ever be cleaned.
-persistent_autogen_install_files := debian/control debian/copyright
+persistent_autogen_install_files := debian/copyright
 
 transient_autogen_install_files := \
-  debian/$(flavor)-common-non-dfsg.README.Debian \
-  debian/$(flavor)-common-non-dfsg.lintian-overrides
+  debian/emacs-common-non-dfsg.README.Debian \
+  debian/emacs-common-non-dfsg.lintian-overrides
 
 autogen_install_files := \
   $(persistent_autogen_install_files) $(transient_autogen_install_files)
 
-autogen_installdeb_files := $(addprefix debian/, \
-  $(flavor)-common-non-dfsg.postinst \
-  $(flavor)-common-non-dfsg.prerm)
+autogen_installdeb_files := debian/emacs-common-non-dfsg.postinst
 
-pkgdir_common := $(CURDIR)/debian/$(flavor)-common-non-dfsg
+pkgdir_common := $(CURDIR)/debian/emacs-common-non-dfsg
 
 etc_dir := /usr/share/emacs/$(runtime_ver)/etc
 etc_files := DEVEL.HUMOR JOKES
@@ -75,7 +70,6 @@ debian/autogen.sed: debian/rules debian/changelog
 	echo 's|@PACKAGE_VERSION@|$(debian_ver)|g' >> '$@.tmp'
 	echo 's|@UPSTREAM_VERSION@|$(upstream_ver)|g' >> '$@.tmp'
 	echo 's|@DEBSRC_VERSION@|$(debsrc_ver)|g' >> '$@.tmp'
-	echo 's|@DEB_FLAVOR@|$(flavor)|g' >> '$@.tmp'
 	mv '$@.tmp' '$@'
 
 .PHONY: debian-sync
@@ -83,7 +77,7 @@ debian-sync: $(persistent_autogen_install_files)
         # so dh pattern rule doesn't try to handle this target
 	true
 
-debian/$(flavor)-common-non-dfsg.README.Debian: \
+debian/emacs-common-non-dfsg.README.Debian: \
   debian/emacs-common-non-dfsg.README \
   debian/patches/*.patch debian/patches/series \
   debian/rules debian/patch-to-news
@@ -107,14 +101,10 @@ debian/%: debian/%.in debian/autogen.sed
 	sed -f debian/autogen.sed "$<" > "$@.tmp"
 	mv "$@.tmp" "$@"
 
-debian/$(flavor)-%: debian/emacs-%.in debian/autogen.sed
-	sed -f debian/autogen.sed "$<" > "$@.tmp"
-	mv "$@.tmp" "$@"
-
-debian/$(flavor)-common-non-dfsg.postinst:
+debian/emacs-common-non-dfsg.postinst:
 	shopt -s nullglob; \
 	DEB_ALT_PRIORITY='$(bin_priority)' \
-	DEB_INFO_SUBDIR='emacs-$(major_ver)' \
+	DEB_INFO_SUBDIR=emacs \
 	debian/emacs-common-non-dfsg.postinst.gen \
 	  info/*.info info/*.info-[0-9] info/*.info-[0-9][0-9] \
 	    > '$@.tmp'
@@ -161,7 +151,7 @@ override_dh_auto_build: $(doc_makefiles)
 
 override_dh_auto_install: ; true
 
-pkg_infodir := $(pkgdir_common)/usr/share/info/emacs-$(major_ver)
+pkg_infodir := $(pkgdir_common)/usr/share/info/emacs
 
 override_dh_install: $(autogen_install_files)
 	install -d $(pkg_infodir)

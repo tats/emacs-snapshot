@@ -9,14 +9,13 @@ Comment:
   00:05:45 -0600.
 
   The original source for this package can be found at
-  git://git.savannah.gnu.org/emacs.git under the emacs-@UPSTREAM_VERSION@ tag.
-  That tag was used to create the Debian upstream archive
-  (@DEB_FLAVOR@_@DEBSRC_VERSION@.orig.tar.bz2) after making adjustments to comply with
-  the DFSG (see below).
+  git://git.savannah.gnu.org/emacs.git under the
+  emacs-@UPSTREAM_VERSION@ tag.  That tag was used to create the
+  Debian upstream archive (emacs-non-free_@DEBSRC_VERSION@.orig.tar.bz2)
+  after making the adjustments to comply with the DFSG detailed below.
 
-  Please see
-  /usr/share/doc/@DEB_FLAVOR@-common-non-dfsg/README.Debian.gz
-  for a description of the Debian specific differences from the upstream
+  Please see /usr/share/doc/emacs-common-non-dfsg/README.Debian for a
+  description of the Debian specific differences from the upstream
   version.
 
   This package contains files which have been deemed unsuitable for

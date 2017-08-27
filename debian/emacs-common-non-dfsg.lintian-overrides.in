@@ -1,2 +1,2 @@
 # This is not a license file
-@DEB_FLAVOR@-common-non-dfsg: extra-license-file usr/share/emacs/@UPSTREAM_VERSION@/etc/copying.paper
+emacs-common-non-dfsg: extra-license-file usr/share/emacs/@UPSTREAM_VERSION@/etc/copying.paper
