@@ -335,6 +335,13 @@ probability of data corruption due to techniques Emacs uses to recover
 in these situations.
 
 +++
+** 'interrupt-process' consults now the list
+'interrupt-process-functions', which function has to be called in
+order to deliver the SIGINT signal.  This allows Tramp to send the
+SIGINT signal to remote asynchronous processes.  The hitherto existing
+implementation has been moved to 'internal-default-interrupt-process'.
+
++++
 ** File local and directory local variables are now initialized each
 time the major mode is set, not just when the file is first visited.
 These local variables will thus not vanish on setting a major mode.
@@ -988,6 +995,9 @@ manual documents how to configure ssh and PuTTY accordingly.
 initialization files.
 
 ---
+*** Tramp is able now to send SIGINT to remote asynchronous processes.
+
+---
 *** Variable 'tramp-completion-mode' is obsoleted.
 
 ---
@@ -1084,6 +1094,17 @@ file.
 ** New DNS mode command 'dns-mode-ipv6-to-nibbles' to convert IPv6 addresses
 to a format suitable for reverse lookup zone files.
 
+** Ispell
+
++++
+*** Enchant (version 2.1.0 or later required) is now supported as a
+spell-checker.  Enchant is a meta-spell-checker that uses providers
+such as Hunspell to do the actual checking.  With it, users can use
+spell-checkers not directly supported by Emacs, such as Voikko, Hspell
+and AppleSpell, more easily share personal word-lists with other
+programs, and configure different spelling-checkers for different
+languages.
+
 ** Flymake
 
 +++
@@ -1103,6 +1124,9 @@ processes on exit.
 *** A new submode of 'html-mode', 'mhtml-mode', is now the default
 mode for *.html files.  This mode handles indentation,
 fontification, and commenting for embedded JavaScript and CSS.
+
+** New mode 'conf-toml-mode' is a sub-mode of conf-mode, specialized
+   for editing TOML files.
 
 ** New minor mode 'pixel-scroll-mode' provides smooth pixel-level scrolling.
 
@@ -1202,6 +1226,30 @@ characters: ‘’‛“”‟〞＂＇, unless they are escaped with backslash.
 that does not process CRLF.  For example, it defaults to utf-8-unix
 instead of to utf-8.  Before this change, Emacs would sometimes
 mishandle file names containing these control characters.
+
++++
+** 'file-attributes', 'file-symlink-p' and 'make-symbolic-link' no
+longer quietly mutate the target of a local symbolic link, so that
+Emacs can access and copy them reliably regardless of their contents.
+The following changes are involved.
+
+*** 'file-attributes' and 'file-symlink-p' no longer prepend "/:" to
+symbolic links whose targets begin with "/" and contain ":".  For
+example, if a symbolic link "x" has a target "/y:z", (file-symlink-p
+"x") now returns "/y:z" rather than "/:/y:z".
+
+*** 'make-symbolic-link' no longer looks for file name handlers when
+creating a local symbolic link.  For example, (make-symbolic-link
+"/y:z" "x") now creates a symlink to "/y:z" instead of failing.
+
+*** 'make-symbolic-link' now expands a link target with leading "~"
+only when the optional third arg is an integer, as when invoked
+interactively.  For example, (make-symbolic-link "~y" "x") now creates
+a link with target the literal string "~y"; to get the old behavior,
+use (make-symbolic-link (expand-file-name "~y") "x").  To avoid this
+expansion in interactive use, you can now prefix the link target with
+"/:".  For example, (make-symbolic-link "/:~y" "x" 1) now creates a
+link to literal "~y".
 
 +++
 ** Module functions are now implemented slightly differently; in
@@ -1402,6 +1450,12 @@ job of signaling list cycles instead of looping indefinitely.
 +++
 ** The new functions 'make-nearby-temp-file' and 'temporary-file-directory'
 can be used for creation of temporary files of remote or mounted directories.
+
++++
+** On GNU platforms when operating on a local file, 'file-attributes'
+no longer suffers from a race when called while another process is
+altering the filesystem.  On non-GNU platforms 'file-attributes'
+attempts to detect the race, and returns nil if it does so.
 
 +++
 ** The new function 'file-local-name' can be used to specify arguments

@@ -937,38 +937,8 @@ The default regexp prevents fruitless and time-consuming attempts to find
 special files in directories in which filenames are interpreted as hostnames,
 or mount points potentially requiring authentication as a different user.")
 
-;; (defun locate-dominating-files (file regexp)
-;;   "Look up the directory hierarchy from FILE for a file matching REGEXP.
-;; Stop at the first parent where a matching file is found and return the list
-;; of files that that match in this directory."
-;;   (catch 'found
-;;     ;; `user' is not initialized yet because `file' may not exist, so we may
-;;     ;; have to walk up part of the hierarchy before we find the "initial UID".
-;;     (let ((user nil)
-;;           ;; Abbreviate, so as to stop when we cross ~/.
-;;           (dir (abbreviate-file-name (file-name-as-directory file)))
-;;           files)
-;;       (while (and dir
-;;                   ;; As a heuristic, we stop looking up the hierarchy of
-;;                   ;; directories as soon as we find a directory belonging to
-;;                   ;; another user.  This should save us from looking in
-;;                   ;; things like /net and /afs.  This assumes that all the
-;;                   ;; files inside a project belong to the same user.
-;;                   (let ((prev-user user))
-;;                     (setq user (nth 2 (file-attributes dir)))
-;;                     (or (null prev-user) (equal user prev-user))))
-;;         (if (setq files (condition-case nil
-;; 			    (directory-files dir 'full regexp 'nosort)
-;; 			  (error nil)))
-;;             (throw 'found files)
-;;           (if (equal dir
-;;                      (setq dir (file-name-directory
-;;                                 (directory-file-name dir))))
-;;               (setq dir nil))))
-;;       nil)))
-
 (defun locate-dominating-file (file name)
-  "Starting from FILE, look up directory hierarchy for directory containing NAME.
+  "Starting at FILE, look up directory hierarchy for directory containing NAME.
 FILE can be a file or a directory.  If it's a file, its directory will
 serve as the starting point for searching the hierarchy of directories.
 Stop at the first parent directory containing a file NAME,
@@ -977,31 +947,13 @@ Instead of a string, NAME can also be a predicate taking one argument
 \(a directory) and returning a non-nil value if that directory is the one for
 which we're looking.  The predicate will be called with every file/directory
 the function needs to examine, starting with FILE."
-  ;; We used to use the above locate-dominating-files code, but the
-  ;; directory-files call is very costly, so we're much better off doing
-  ;; multiple calls using the code in here.
-  ;;
   ;; Represent /home/luser/foo as ~/foo so that we don't try to look for
   ;; `name' in /home or in /.
   (setq file (abbreviate-file-name (expand-file-name file)))
   (let ((root nil)
-        ;; `user' is not initialized outside the loop because
-        ;; `file' may not exist, so we may have to walk up part of the
-        ;; hierarchy before we find the "initial UID".  Note: currently unused
-        ;; (user nil)
         try)
     (while (not (or root
                     (null file)
-                    ;; FIXME: Disabled this heuristic because it is sometimes
-                    ;; inappropriate.
-                    ;; As a heuristic, we stop looking up the hierarchy of
-                    ;; directories as soon as we find a directory belonging
-                    ;; to another user.  This should save us from looking in
-                    ;; things like /net and /afs.  This assumes that all the
-                    ;; files inside a project belong to the same user.
-                    ;; (let ((prev-user user))
-                    ;;   (setq user (nth 2 (file-attributes file)))
-                    ;;   (and prev-user (not (equal user prev-user))))
                     (string-match locate-dominating-stop-dir-regexp file)))
       (setq try (if (stringp name)
                     (file-exists-p (expand-file-name name file))
@@ -1194,6 +1146,13 @@ accessible."
 	(funcall handler 'file-local-copy file)
       nil)))
 
+(defun files--name-absolute-system-p (file)
+  "Return non-nil if FILE is an absolute name to the operating system.
+This is like `file-name-absolute-p', except that it returns nil for
+names beginning with `~'."
+  (and (file-name-absolute-p file)
+       (not (eq (aref file 0) ?~))))
+
 (defun file-truename (filename &optional counter prev-dirs)
   "Return the truename of FILENAME.
 If FILENAME is not absolute, first expands it against `default-directory'.
@@ -1295,9 +1254,9 @@ containing it, until no links are left at any level.
 		    ;; since target might look like foo/../bar where foo
 		    ;; is itself a link.  Instead, we handle . and .. above.
 		    (setq filename
-			  (if (file-name-absolute-p target)
-			      target
-			    (concat dir target))
+			  (concat (if (files--name-absolute-system-p target)
+				      "/:" dir)
+				  target)
 			  done nil)
 		  ;; No, we are done!
 		  (setq done t))))))))
@@ -1332,7 +1291,10 @@ it means chase no more than that many links and then stop."
 		 (directory-file-name (file-name-directory newname))))
 	  ;; Now find the parent of that dir.
 	  (setq newname (file-name-directory newname)))
-	(setq newname (expand-file-name tem (file-name-directory newname)))
+	(setq newname (concat (if (files--name-absolute-system-p tem)
+				  "/:"
+				(file-name-directory newname))
+			      tem))
 	(setq count (1+ count))))
     newname))
 
@@ -2653,6 +2615,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.ppd\\'" . conf-ppd-mode)
      ("java.+\\.conf\\'" . conf-javaprop-mode)
      ("\\.properties\\(?:\\.[a-zA-Z0-9._-]+\\)?\\'" . conf-javaprop-mode)
+     ("\\.toml\\'" . conf-toml-mode)
      ("\\`/etc/\\(?:DIR_COLORS\\|ethers\\|.?fstab\\|.*hosts\\|lesskey\\|login\\.?de\\(?:fs\\|vperm\\)\\|magic\\|mtab\\|pam\\.d/.*\\|permissions\\(?:\\.d/.+\\)?\\|protocols\\|rpc\\|services\\)\\'" . conf-space-mode)
      ("\\`/etc/\\(?:acpid?/.+\\|aliases\\(?:\\.d/.+\\)?\\|default/.+\\|group-?\\|hosts\\..+\\|inittab\\|ksysguarddrc\\|opera6rc\\|passwd-?\\|shadow-?\\|sysconfig/.+\\)\\'" . conf-mode)
      ;; ChangeLog.old etc.  Other change-log-mode entries are above;
@@ -4732,46 +4695,6 @@ Uses `backup-directory-alist' in the same way as
   "Return number of names file FILENAME has."
   (car (cdr (file-attributes filename))))
 
-;; (defun file-relative-name (filename &optional directory)
-;;   "Convert FILENAME to be relative to DIRECTORY (default: `default-directory').
-;; This function returns a relative file name which is equivalent to FILENAME
-;; when used with that default directory as the default.
-;; If this is impossible (which can happen on MSDOS and Windows
-;; when the file name and directory use different drive names)
-;; then it returns FILENAME."
-;;   (save-match-data
-;;     (let ((fname (expand-file-name filename)))
-;;       (setq directory (file-name-as-directory
-;; 		       (expand-file-name (or directory default-directory))))
-;;       ;; On Microsoft OSes, if FILENAME and DIRECTORY have different
-;;       ;; drive names, they can't be relative, so return the absolute name.
-;;       (if (and (or (eq system-type 'ms-dos)
-;; 		   (eq system-type 'cygwin)
-;; 		   (eq system-type 'windows-nt))
-;; 	       (not (string-equal (substring fname  0 2)
-;; 				  (substring directory 0 2))))
-;; 	  filename
-;; 	(let ((ancestor ".")
-;; 	      (fname-dir (file-name-as-directory fname)))
-;; 	  (while (and (not (string-match (concat "^" (regexp-quote directory)) fname-dir))
-;; 		      (not (string-match (concat "^" (regexp-quote directory)) fname)))
-;; 	    (setq directory (file-name-directory (substring directory 0 -1))
-;; 		  ancestor (if (equal ancestor ".")
-;; 			       ".."
-;; 			     (concat "../" ancestor))))
-;; 	  ;; Now ancestor is empty, or .., or ../.., etc.
-;; 	  (if (string-match (concat "^" (regexp-quote directory)) fname)
-;; 	      ;; We matched within FNAME's directory part.
-;; 	      ;; Add the rest of FNAME onto ANCESTOR.
-;; 	      (let ((rest (substring fname (match-end 0))))
-;; 		(if (and (equal ancestor ".")
-;; 			 (not (equal rest "")))
-;; 		    ;; But don't bother with ANCESTOR if it would give us `./'.
-;; 		    rest
-;; 		  (concat (file-name-as-directory ancestor) rest)))
-;; 	    ;; We matched FNAME's directory equivalent.
-;; 	    ancestor))))))
-
 (defun file-relative-name (filename &optional directory)
   "Convert FILENAME to be relative to DIRECTORY (default: `default-directory').
 This function returns a relative file name which is equivalent to FILENAME
@@ -5591,10 +5514,10 @@ directly into NEWNAME instead."
 	    ;; If NEWNAME is an existing directory and COPY-CONTENTS
 	    ;; is nil, copy into NEWNAME/[DIRECTORY-BASENAME].
 	    ((not copy-contents)
-	     (setq newname (expand-file-name
+	     (setq newname (concat
+			    (file-name-as-directory newname)
 			    (file-name-nondirectory
-			     (directory-file-name directory))
-			    newname))
+			     (directory-file-name directory))))
 	     (and (file-exists-p newname)
 		  (not (file-directory-p newname))
 		  (error "Cannot overwrite non-directory %s with a directory"
@@ -5606,7 +5529,8 @@ directly into NEWNAME instead."
 	       ;; We do not want to copy "." and "..".
 	       (directory-files directory 'full
 				directory-files-no-dot-files-regexp))
-	(let ((target (expand-file-name (file-name-nondirectory file) newname))
+	(let ((target (concat (file-name-as-directory newname)
+			      (file-name-nondirectory file)))
 	      (filetype (car (file-attributes file))))
 	  (cond
 	   ((eq filetype t)       ; Directory but not a symlink.
@@ -7042,7 +6966,7 @@ only these files will be asked to be saved."
 	(setq file-arg-indices (cdr file-arg-indices))))
     (pcase method
       (`identity (car arguments))
-      (`add (concat "/:" (apply operation arguments)))
+      (`add (file-name-quote (apply operation arguments)))
       (`insert-file-contents
        (let ((visit (nth 1 arguments)))
          (unwind-protect
@@ -7236,8 +7160,8 @@ Otherwise, trash FILENAME using the freedesktop.org conventions,
 	 ;; If `trash-directory' is non-nil, move the file there.
 	 (let* ((trash-dir   (expand-file-name trash-directory))
 		(fn          (directory-file-name (expand-file-name filename)))
-		(new-fn      (expand-file-name (file-name-nondirectory fn)
-					       trash-dir)))
+		(new-fn      (concat (file-name-as-directory trash-dir)
+				     (file-name-nondirectory fn))))
 	   ;; We can't trash a parent directory of trash-directory.
 	   (if (string-prefix-p fn trash-dir)
 	       (error "Trash directory `%s' is a subdirectory of `%s'"

@@ -1498,7 +1498,7 @@ w32_valid_pointer_p (void *p, int size)
 
    . Turning on w32-unicode-filename on Windows 9X (if it at all
      works) requires UNICOWS.DLL, which is thus a requirement even in
-     non-GUI sessions, something the we previously avoided.  */
+     non-GUI sessions, something that we previously avoided.  */
 
 
 
@@ -3908,7 +3908,9 @@ faccessat (int dirfd, const char * path, int mode, int flags)
       path = fullname;
     }
 
-  if (IS_DIRECTORY_SEP (path[strlen (path) - 1]) && (mode & F_OK) != 0)
+  /* When dired.c calls us with F_OK and a trailing slash, it actually
+     wants to know whether PATH is a directory.  */
+  if (IS_DIRECTORY_SEP (path[strlen (path) - 1]) && mode == F_OK)
     mode |= D_OK;
 
   /* MSVCRT implementation of 'access' doesn't recognize D_OK, and its
