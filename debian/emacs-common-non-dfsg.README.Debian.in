@@ -15,7 +15,7 @@ This variable also affects Emacs.  For example:
 
   INFOPATH=/usr/share/info/emacs: emacs --eval '(info "emacs")'
 
-@@PATCH_LIST_HERE@@
+@DEBIAN_NEWS@
 
 Local Variables:
 mode: outline

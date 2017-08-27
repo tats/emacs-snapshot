@@ -2,9 +2,9 @@
 
 set -eo pipefail
 
-patch="$1"
+for patch in "$@"; do
 
-sed '
+  sed '
   # delete everything after the first line starting with "--- " (the diff)
   /^--- [^ ]/,$d' < "$patch" \
 | tac \
@@ -20,4 +20,6 @@ sed '
   1 s/^/* /
   2,$ s/^/  /'
 
-echo "  Patch: $(basename $patch)"
+  echo "  Patch: $(basename $patch)"
+
+done
