@@ -1762,7 +1762,13 @@ This checks also `file-name-as-directory', `file-name-directory',
 		  (tramp-copy-size-limit 4)
 		  (tramp-inline-compress-start-size 2))
 	      (delete-file tmp-name2)
-	      (should (setq tmp-name2 (file-local-copy tmp-name1)))))
+	      (should (setq tmp-name2 (file-local-copy tmp-name1))))
+	    ;; Error case.
+	    (delete-file tmp-name1)
+	    (delete-file tmp-name2)
+	    (should-error
+	     (setq tmp-name2 (file-local-copy tmp-name1))
+	     :type tramp-file-missing))
 
 	;; Cleanup.
 	(ignore-errors
@@ -1776,19 +1782,23 @@ This checks also `file-name-as-directory', `file-name-directory',
   (dolist (quoted (if tramp--test-expensive-test '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
       (unwind-protect
-	  (progn
+	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
-	    (with-temp-buffer
-	      (insert-file-contents tmp-name)
-	      (should (string-equal (buffer-string) "foo"))
-	      (insert-file-contents tmp-name)
-	      (should (string-equal (buffer-string) "foofoo"))
-	      ;; Insert partly.
-	      (insert-file-contents tmp-name nil 1 3)
-	      (should (string-equal (buffer-string) "oofoofoo"))
-	      ;; Replace.
-	      (insert-file-contents tmp-name nil nil nil 'replace)
-	      (should (string-equal (buffer-string) "foo"))))
+	    (insert-file-contents tmp-name)
+	    (should (string-equal (buffer-string) "foo"))
+	    (insert-file-contents tmp-name)
+	    (should (string-equal (buffer-string) "foofoo"))
+	    ;; Insert partly.
+	    (insert-file-contents tmp-name nil 1 3)
+	    (should (string-equal (buffer-string) "oofoofoo"))
+	    ;; Replace.
+	    (insert-file-contents tmp-name nil nil nil 'replace)
+	    (should (string-equal (buffer-string) "foo"))
+	    ;; Error case.
+	    (delete-file tmp-name)
+	    (should-error
+	     (insert-file-contents tmp-name)
+	     :type tramp-file-missing))
 
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name))))))
@@ -2374,6 +2384,20 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	(ignore-errors (delete-directory tmp-name1 'recursive))
 	(ignore-errors (delete-directory tmp-name2 'recursive))))))
 
+;; Method "smb" supports `make-symbolic-link' only if the remote host
+;; has CIFS capabilities.  tramp-adb.el and tramp-gvfs.el do not
+;; support symbolic links at all.
+(defmacro tramp--test-ignore-make-symbolic-link-error (&rest body)
+  "Run BODY, ignoring \"make-symbolic-link not supported\" file error."
+  (declare (indent defun) (debug t))
+  `(condition-case err
+       (progn ,@body)
+     ((error quit debug)
+      (unless (and (eq (car err) 'file-error)
+		   (string-equal (error-message-string err)
+				 "make-symbolic-link not supported"))
+	(signal (car err) (cdr err))))))
+
 (ert-deftest tramp-test18-file-attributes ()
   "Check `file-attributes'.
 This tests also `file-readable-p', `file-regular-p' and
@@ -2429,26 +2453,22 @@ This tests also `file-readable-p', `file-regular-p' and
 	    (should (stringp (nth 2 attr))) ;; Uid.
 	    (should (stringp (nth 3 attr))) ;; Gid.
 
-	    (condition-case err
-		(progn
-		  (when (tramp--test-sh-p)
-		    (should (file-ownership-preserved-p tmp-name2 'group)))
-		  (make-symbolic-link tmp-name1 tmp-name2)
-		  (should (file-exists-p tmp-name2))
-		  (should (file-symlink-p tmp-name2))
-		  (when (tramp--test-sh-p)
-		    (should (file-ownership-preserved-p tmp-name2 'group)))
-		  (setq attr (file-attributes tmp-name2))
-		  (should
-		   (string-equal
-		    (funcall
-		     (if quoted 'tramp-compat-file-name-quote 'identity)
-		     (car attr))
-		    (file-remote-p (file-truename tmp-name1) 'localname)))
-		  (delete-file tmp-name2))
-	      (file-error
-	       (should (string-equal (error-message-string err)
-				     "make-symbolic-link not supported"))))
+	    (tramp--test-ignore-make-symbolic-link-error
+	      (when (tramp--test-sh-p)
+		(should (file-ownership-preserved-p tmp-name2 'group)))
+	      (make-symbolic-link tmp-name1 tmp-name2)
+	      (should (file-exists-p tmp-name2))
+	      (should (file-symlink-p tmp-name2))
+	      (when (tramp--test-sh-p)
+		(should (file-ownership-preserved-p tmp-name2 'group)))
+	      (setq attr (file-attributes tmp-name2))
+	      (should
+	       (string-equal
+		(funcall
+		 (if quoted 'tramp-compat-file-name-quote 'identity)
+		 (car attr))
+		(file-remote-p (file-truename tmp-name1) 'localname)))
+	      (delete-file tmp-name2))
 
 	    ;; Check, that "//" in symlinks are handled properly.
 	    (with-temp-buffer
@@ -2574,26 +2594,54 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 
       ;; Check `make-symbolic-link'.
       (unwind-protect
-	  (progn
+	  (tramp--test-ignore-make-symbolic-link-error
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
-	    ;; Method "smb" supports `make-symbolic-link' only if the
-	    ;; remote host has CIFS capabilities.  tramp-adb.el and
-	    ;; tramp-gvfs.el do not support symbolic links at all.
-	    (condition-case err
-		(make-symbolic-link tmp-name1 tmp-name2)
-	      (file-error
-	       (skip-unless
-		(not (string-equal (error-message-string err)
-				   "make-symbolic-link not supported")))))
-	    (should (file-symlink-p tmp-name2))
-	    (should-error (make-symbolic-link tmp-name1 tmp-name2)
-			  :type 'file-already-exists)
+	    (make-symbolic-link tmp-name1 tmp-name2)
+	    (should
+	     (string-equal
+	      (funcall
+	       (if quoted 'tramp-compat-file-name-unquote 'identity)
+	       (file-remote-p tmp-name1 'localname))
+	      (file-symlink-p tmp-name2)))
+	    (should-error
+	     (make-symbolic-link tmp-name1 tmp-name2)
+	     :type 'file-already-exists)
+	    ;; 0 means interactive case.
+	    (cl-letf (((symbol-function 'yes-or-no-p) 'ignore))
+	      (should-error
+	       (make-symbolic-link tmp-name1 tmp-name2 0)
+	       :type 'file-already-exists))
+	    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_prompt) t)))
+	      (make-symbolic-link tmp-name1 tmp-name2 0)
+	      (should
+	       (string-equal
+		(funcall
+		 (if quoted 'tramp-compat-file-name-unquote 'identity)
+		 (file-remote-p tmp-name1 'localname))
+		(file-symlink-p tmp-name2))))
 	    (make-symbolic-link tmp-name1 tmp-name2 'ok-if-already-exists)
-	    (should (file-symlink-p tmp-name2))
-	    ;; `tmp-name3' is a local file name.
+	    (should
+	     (string-equal
+	      (funcall
+	       (if quoted 'tramp-compat-file-name-unquote 'identity)
+	       (file-remote-p tmp-name1 'localname))
+	      (file-symlink-p tmp-name2)))
+	    ;; If we use the local part of `tmp-name1', it shall still work.
+	    (make-symbolic-link
+	     (file-remote-p tmp-name1 'localname)
+	     tmp-name2 'ok-if-already-exists)
+	    (should
+	     (string-equal
+	      (funcall
+	       (if quoted 'tramp-compat-file-name-unquote 'identity)
+	       (file-remote-p tmp-name1 'localname))
+	      (file-symlink-p tmp-name2)))
+	    ;; `tmp-name3' is a local file name.  Therefore, the link
+	    ;; target remains unchanged, even if quoted.
 	    (make-symbolic-link tmp-name1 tmp-name3)
-	    (should (file-symlink-p tmp-name3)))
+	    (should
+	     (string-equal tmp-name1 (file-symlink-p tmp-name3))))
 
 	;; Cleanup.
 	(ignore-errors
@@ -2607,13 +2655,25 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
 	    (add-name-to-file tmp-name1 tmp-name2)
-	    (should-not (file-symlink-p tmp-name2))
-	    (should-error (add-name-to-file tmp-name1 tmp-name2)
-			  :type 'file-already-exists)
+	    (should (file-regular-p tmp-name2))
+	    (should-error
+	     (add-name-to-file tmp-name1 tmp-name2)
+	     :type 'file-already-exists)
+	    ;; 0 means interactive case.
+	    (cl-letf (((symbol-function 'yes-or-no-p) 'ignore))
+	      (should-error
+	       (add-name-to-file tmp-name1 tmp-name2 0)
+	       :type 'file-already-exists))
+	    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_prompt) t)))
+	       (add-name-to-file tmp-name1 tmp-name2 0)
+	       (should (file-regular-p tmp-name2)))
 	    (add-name-to-file tmp-name1 tmp-name2 'ok-if-already-exists)
 	    (should-not (file-symlink-p tmp-name2))
+	    (should (file-regular-p tmp-name2))
 	    ;; `tmp-name3' is a local file name.
-	    (should-error (add-name-to-file tmp-name1 tmp-name3)))
+	    (should-error
+	     (add-name-to-file tmp-name1 tmp-name3)
+	     :type 'file-error))
 
 	;; Cleanup.
 	(ignore-errors
@@ -2622,7 +2682,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 
       ;; Check `file-truename'.
       (unwind-protect
-	  (progn
+	  (tramp--test-ignore-make-symbolic-link-error
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
 	    (make-symbolic-link tmp-name1 tmp-name2)
@@ -2631,6 +2691,16 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should
 	     (string-equal (file-truename tmp-name1) (file-truename tmp-name2)))
 	    (should (file-equal-p tmp-name1 tmp-name2))
+	    ;; Symbolic links could look like a remote file name.
+	    ;; They must be quoted then.
+	    (delete-file tmp-name2)
+	    (make-symbolic-link "/penguin:motd:" tmp-name2)
+	    (should (file-symlink-p tmp-name2))
+	    (should
+	     (string-equal
+	      (file-truename tmp-name2)
+	      (tramp-compat-file-name-quote
+	       (concat (file-remote-p tmp-name2) "/penguin:motd:"))))
 	    ;; `tmp-name3' is a local file name.
 	    (make-symbolic-link tmp-name1 tmp-name3)
 	    (should (file-symlink-p tmp-name3))
@@ -2640,14 +2710,55 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should
 	     (string-equal
 	      (file-truename tmp-name1)
-	      (funcall
-	       'tramp-compat-file-name-unquote (file-truename tmp-name3)))))
+	      (tramp-compat-file-name-unquote (file-truename tmp-name3)))))
 
 	;; Cleanup.
 	(ignore-errors
 	  (delete-file tmp-name1)
 	  (delete-file tmp-name2)
 	  (delete-file tmp-name3)))
+
+      ;; Symbolic links could be nested.
+      (unwind-protect
+	  (tramp--test-ignore-make-symbolic-link-error
+	    (make-directory tmp-name1)
+	    (should (file-directory-p tmp-name1))
+	    (let* ((tramp-test-temporary-file-directory
+		    (file-truename tmp-name1))
+		   (tmp-name2 (tramp--test-make-temp-name nil quoted))
+		   (tmp-name3 tmp-name2)
+		   (number-nesting 50))
+	      (dotimes (_ number-nesting)
+		(make-symbolic-link
+		 tmp-name3
+		 (setq tmp-name3 (tramp--test-make-temp-name nil quoted))))
+	      (should
+	       (string-equal
+		(file-truename tmp-name2)
+		(file-truename tmp-name3)))
+	      (should-error
+	       (with-temp-buffer (insert-file-contents tmp-name2))
+               :type tramp-file-missing)
+	      (should-error
+	       (with-temp-buffer (insert-file-contents tmp-name3))
+               :type tramp-file-missing)))
+
+	;; Cleanup.
+	(ignore-errors (delete-directory tmp-name1 'recursive)))
+
+      ;; Detect cyclic symbolic links.
+      (unwind-protect
+	  (tramp--test-ignore-make-symbolic-link-error
+	    (make-symbolic-link tmp-name2 tmp-name1)
+	    (should (file-symlink-p tmp-name1))
+	    (make-symbolic-link tmp-name1 tmp-name2)
+	    (should (file-symlink-p tmp-name2))
+	    (should-error (file-truename tmp-name1) :type 'file-error))
+
+	;; Cleanup.
+	(ignore-errors
+	  (delete-file tmp-name1)
+	  (delete-file tmp-name2)))
 
       ;; `file-truename' shall preserve trailing link of directories.
       (unless (file-symlink-p tramp-test-temporary-file-directory)
@@ -3570,31 +3681,23 @@ This requires restrictions of file name syntax."
 		(copy-file file2 tmp-name1)
 		(should (file-exists-p file1))
 
-		;; Method "smb" supports `make-symbolic-link' only if the
-		;; remote host has CIFS capabilities.  tramp-adb.el and
-		;; tramp-gvfs.el do not support symbolic links at all.
-		(condition-case err
-		    (progn
-		      (make-symbolic-link file1 file3)
-		      (should (file-symlink-p file3))
-		      (should
-		       (string-equal
-			(expand-file-name file1) (file-truename file3)))
-		      (should
-		       (string-equal
-			(funcall
-			 (if quoted 'tramp-compat-file-name-quote 'identity)
-			 (car (file-attributes file3)))
-			(file-remote-p (file-truename file1) 'localname)))
-		      ;; Check file contents.
-		      (with-temp-buffer
-			(insert-file-contents file3)
-			(should (string-equal (buffer-string) elt)))
-		      (delete-file file3))
-		  (file-error
-		   (should
-		    (string-equal (error-message-string err)
-				  "make-symbolic-link not supported"))))))
+		(tramp--test-ignore-make-symbolic-link-error
+		  (make-symbolic-link file1 file3)
+		  (should (file-symlink-p file3))
+		  (should
+		   (string-equal
+		    (expand-file-name file1) (file-truename file3)))
+		  (should
+		   (string-equal
+		    (funcall
+		     (if quoted 'tramp-compat-file-name-quote 'identity)
+		     (car (file-attributes file3)))
+		    (file-remote-p (file-truename file1) 'localname)))
+		  ;; Check file contents.
+		  (with-temp-buffer
+		    (insert-file-contents file3)
+		    (should (string-equal (buffer-string) elt)))
+		  (delete-file file3))))
 
 	    ;; Check file names.
 	    (should (equal (directory-files
@@ -3647,27 +3750,23 @@ This requires restrictions of file name syntax."
 		  elt))
 
 		;; Check symlink in `directory-files-and-attributes'.
-		(condition-case err
-		    (progn
-		      (make-symbolic-link file2 file3)
-		      (should (file-symlink-p file3))
-		      (should
-		       (string-equal
-			(caar (directory-files-and-attributes
-			       file1 nil (regexp-quote elt1)))
-			elt1))
-		      (should
-		       (string-equal
-			(funcall
-			 (if quoted 'tramp-compat-file-name-quote 'identity)
-			 (cadr (car (directory-files-and-attributes
-				     file1 nil (regexp-quote elt1)))))
-			(file-remote-p (file-truename file2) 'localname)))
-		      (delete-file file3)
-		      (should-not (file-exists-p file3)))
-		  (file-error
-		   (should (string-equal (error-message-string err)
-					 "make-symbolic-link not supported"))))
+		(tramp--test-ignore-make-symbolic-link-error
+		  (make-symbolic-link file2 file3)
+		  (should (file-symlink-p file3))
+		  (should
+		   (string-equal
+		    (caar (directory-files-and-attributes
+			   file1 nil (regexp-quote elt1)))
+		    elt1))
+		  (should
+		   (string-equal
+		    (funcall
+		     (if quoted 'tramp-compat-file-name-quote 'identity)
+		     (cadr (car (directory-files-and-attributes
+				 file1 nil (regexp-quote elt1)))))
+		    (file-remote-p (file-truename file2) 'localname)))
+		  (delete-file file3)
+		  (should-not (file-exists-p file3)))
 
 		(delete-file file2)
 		(should-not (file-exists-p file2))
@@ -3982,7 +4081,7 @@ process sentinels.  They shall not disturb each other."
             ;; Create temporary buffers.  The number of buffers
             ;; corresponds to the number of processes; it could be
             ;; increased in order to make pressure on Tramp.
-            (dotimes (_i number-proc)
+            (dotimes (_ number-proc)
               (setq buffers (cons (generate-new-buffer "foo") buffers)))
 
             ;; Open asynchronous processes.  Set process filter and sentinel.

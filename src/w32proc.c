@@ -1449,7 +1449,11 @@ waitpid (pid_t pid, int *status, int options)
 
   do
     {
-      maybe_quit ();
+      /* When child_status_changed calls us with WNOHANG in OPTIONS,
+	 we are supposed to be non-interruptible, so don't allow
+	 quitting in that case.  */
+      if (!dont_wait)
+	maybe_quit ();
       active = WaitForMultipleObjects (nh, wait_hnd, FALSE, timeout_ms);
     } while (active == WAIT_TIMEOUT && !dont_wait);
 
@@ -1488,12 +1492,17 @@ waitpid (pid_t pid, int *status, int options)
     }
   if (retval == STILL_ACTIVE)
     {
-      /* Should never happen.  */
+      /* Should never happen.  But it does, with invoking git-gui.exe
+	 asynchronously.  So we punt, and just report this process as
+	 exited with exit code 259, when we are called with WNOHANG
+	 from child_status_changed, because in that case we already
+	 _know_ the process has died.  */
       DebPrint (("Wait.WaitForMultipleObjects returned an active process\n"));
-      if (pid > 0 && dont_wait)
-	return 0;
-      errno = EINVAL;
-      return -1;
+      if (!(pid > 0 && dont_wait))
+	{
+	  errno = EINVAL;
+	  return -1;
+	}
     }
 
   /* Massage the exit code from the process to match the format expected

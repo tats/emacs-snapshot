@@ -1382,12 +1382,13 @@ x_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 	  {
 	    unsigned long color = face->background;
 	    Display *display = FRAME_X_DISPLAY (f);
+	    GC gc = f->output_data.x->normal_gc;
 
-	    XSetForeground (display, f->output_data.x->normal_gc, color);
-	    x_fill_rectangle (f, f->output_data.x->normal_gc,
-			      0, y, width, height);
-	    x_fill_rectangle (f, f->output_data.x->normal_gc,
-			      FRAME_PIXEL_WIDTH (f) - width, y, width, height);
+	    XSetForeground (display, gc, color);
+	    x_fill_rectangle (f, gc, 0, y, width, height);
+	    x_fill_rectangle (f, gc, FRAME_PIXEL_WIDTH (f) - width, y,
+			      width, height);
+	    XSetForeground (display, gc, FRAME_FOREGROUND_PIXEL (f));
 	  }
 	else
 	  {
@@ -4018,7 +4019,13 @@ XTflash (struct frame *f)
        when the scroll bars and the edit widget share the same X window.  */
     GdkWindow *window = gtk_widget_get_window (FRAME_GTK_WIDGET (f));
 #ifdef HAVE_GTK3
+#if GTK_CHECK_VERSION (3, 22, 0)
+    cairo_region_t *region = gdk_window_get_visible_region (window);
+    GdkDrawingContext *context = gdk_window_begin_draw_frame (window, region);
+    cairo_t *cr = gdk_drawing_context_get_cairo_context (context);
+#else
     cairo_t *cr = gdk_cairo_create (window);
+#endif
     cairo_set_source_rgb (cr, 1, 1, 1);
     cairo_set_operator (cr, CAIRO_OPERATOR_DIFFERENCE);
 #define XFillRectangle(d, win, gc, x, y, w, h) \
@@ -4132,7 +4139,12 @@ XTflash (struct frame *f)
 
 #ifdef USE_GTK
 #ifdef HAVE_GTK3
+#if GTK_CHECK_VERSION (3, 22, 0)
+      gdk_window_end_draw_frame (window, context);
+      cairo_region_destroy (region);
+#else
       cairo_destroy (cr);
+#endif
 #else
       g_object_unref (G_OBJECT (gc));
 #endif
@@ -5715,11 +5727,10 @@ xaw_jump_callback (Widget widget, XtPointer client_data, XtPointer call_data)
   struct scroll_bar *bar = client_data;
   float *top_addr = call_data;
   double top = *top_addr;
-  float shown;
+  double shown;
   int whole, portion, height, width;
   enum scroll_bar_part part;
   bool horizontal = bar->horizontal;
-
 
   if (horizontal)
     {
@@ -6355,8 +6366,9 @@ x_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar, int portion, int positio
     }
 
   {
-    float old_top, old_shown;
+    double old_top, old_shown;
     Dimension height;
+
     XtVaGetValues (widget,
 		   XtNtopOfThumb, &old_top,
 		   XtNshown, &old_shown,
@@ -6383,7 +6395,8 @@ x_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar, int portion, int positio
     /* If the call to XawScrollbarSetThumb below doesn't seem to
        work, check that 'NARROWPROTO' is defined in src/config.h.
        If this is not so, most likely you need to fix configure.  */
-    float ftop = top, fshown = shown;
+    double ftop = top, fshown = shown;
+
     if (ftop != old_top || fshown != old_shown)
       {
 	if (bar->dragging == -1)
@@ -8711,9 +8724,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
       if (f)
         {
-	  /* Don't call x_net_wm_state for the scroll bar window.
-	     (Bug#24963, Bug#25887)  */
+#ifdef USE_GTK
+	  /* For GTK+ don't call x_net_wm_state for the scroll bar
+	     window.  (Bug#24963, Bug#25887) */
 	  if (configureEvent.xconfigure.window == FRAME_X_WINDOW (f))
+#endif
 	    x_net_wm_state (f, configureEvent.xconfigure.window);
 
 #ifdef USE_X_TOOLKIT
@@ -13300,6 +13315,7 @@ transition between the various maximization states.  */);
     doc: /* Non-nil means rely on gtk_window_move to set frame positions.
 If this variable is t (the default), the GTK build uses the function
 gtk_window_move to set or store frame positions and disables some time
-consuming frame position adjustments.  */);
+consuming frame position adjustments.  In newer versions of GTK, Emacs
+always uses gtk_window_move and ignores the value of this variable.  */);
   x_gtk_use_window_move = true;
 }

@@ -562,11 +562,7 @@ This variable is only used when Tramp needs to start up another shell
 for tilde expansion.  The extra arguments should typically prevent the
 shell from reading its init file."
   :group 'tramp
-  ;; This might be the wrong way to test whether the widget type
-  ;; `alist' is available.  Who knows the right way to test it?
-  :type (if (get 'alist 'widget-type)
-	    '(alist :key-type string :value-type string)
-	  '(repeat (cons string string)))
+  :type '(alist :key-type regexp :value-type string)
   :require 'tramp)
 
 (defconst tramp-actions-before-shell
@@ -1088,8 +1084,9 @@ component is used as the target of the symlink."
 	    (delete-file linkname)))
 
 	;; If TARGET is a Tramp name, use just the localname component.
-	(when (tramp-file-name-equal-p
-	       v (tramp-dissect-file-name (expand-file-name target)))
+	(when (and (tramp-tramp-file-p target)
+		   (tramp-file-name-equal-p
+		    v (tramp-dissect-file-name target)))
 	  (setq target
 		(tramp-file-name-localname
 		 (tramp-dissect-file-name (expand-file-name target)))))
@@ -1135,7 +1132,12 @@ component is used as the target of the symlink."
 		     (tramp-shell-quote-argument localname)))
 	    (with-current-buffer (tramp-get-connection-buffer v)
 	      (goto-char (point-min))
-	      (setq result (buffer-substring (point-min) (point-at-eol)))))
+	      (setq result (buffer-substring (point-min) (point-at-eol))))
+	    (when (and (file-symlink-p filename)
+		       (string-equal result localname))
+	      (tramp-error
+	       v 'file-error
+	       "Apparent cycle of symbolic links for %s" filename)))
 
 	   ;; Use Perl implementation.
 	   ((and (tramp-get-remote-perl v)
@@ -1217,8 +1219,11 @@ component is used as the target of the symlink."
 			"/"))
 		(when (string= "" result)
 		  (setq result "/")))))
-
-	  (when quoted (setq result (tramp-compat-file-name-quote result)))
+	  ;; If the resulting localname looks remote, we must quote it
+	  ;; for security reasons.
+	  (when (or quoted (file-remote-p result))
+	    (let (file-name-handler-alist)
+	      (setq result (tramp-compat-file-name-quote result))))
 	  (tramp-message v 4 "True name of `%s' is `%s'" localname result)
 	  result))))
 
@@ -3075,7 +3080,7 @@ the result will be a local, non-Tramp, file name."
 (defun tramp-sh-handle-file-local-copy (filename)
   "Like `file-local-copy' for Tramp files."
   (with-parsed-tramp-file-name filename nil
-    (unless (file-exists-p filename)
+    (unless (file-exists-p (file-truename filename))
       (tramp-error
        v tramp-file-missing
        "Cannot make local copy of non-existing file `%s'" filename))
