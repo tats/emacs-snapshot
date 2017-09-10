@@ -2233,9 +2233,15 @@ directory in another window."
 ;; Don't override the setting from .emacs.
 ;;;###autoload (put 'dired-find-alternate-file 'disabled t)
 
-(defun dired-mouse-find-file-other-window (event)
-  "In Dired, visit the file or directory name you click on."
+(defun dired-mouse-find-file (event &optional find-file-func find-dir-func)
+  "In Dired, visit the file or directory name you click on.
+The optional arguments FIND-FILE-FUNC and FIND-DIR-FUNC specify
+functions to visit the file and directory, respectively.  If
+omitted or nil, these arguments default to `find-file' and `dired',
+respectively."
   (interactive "e")
+  (or find-file-func (setq find-file-func 'find-file))
+  (or find-dir-func (setq find-dir-func 'dired))
   (let (window pos file)
     (save-excursion
       (setq window (posn-window (event-end event))
@@ -2250,9 +2256,19 @@ directory in another window."
 		 (dired-goto-subdir file))
 	    (progn
 	      (select-window window)
-	      (dired-other-window file)))
+              (funcall find-dir-func file)))
       (select-window window)
-      (find-file-other-window (file-name-sans-versions file t)))))
+      (funcall find-file-func (file-name-sans-versions file t)))))
+
+(defun dired-mouse-find-file-other-window (event)
+  "In Dired, visit the file or directory name you click on in another window."
+  (interactive "e")
+  (dired-mouse-find-file event 'find-file-other-window 'dired-other-window))
+
+(defun dired-mouse-find-file-other-frame (event)
+  "In Dired, visit the file or directory name you click on in another frame."
+  (interactive "e")
+  (dired-mouse-find-file event 'find-file-other-frame 'dired-other-frame))
 
 (defun dired-view-file ()
   "In Dired, examine a file in view mode, returning to Dired when done.
@@ -3164,12 +3180,15 @@ non-empty directories is allowed."
   (dired-clean-up-after-deletion file))
 
 (defvar dired-clean-up-buffers-too)
+(defvar dired-clean-confirm-killing-deleted-buffers)
 
 (defun dired-clean-up-after-deletion (fn)
   "Clean up after a deleted file or directory FN.
-Removes any expanded subdirectory of deleted directory.
-If `dired-x' is loaded and `dired-clean-up-buffers-too' is non-nil,
-also offers to kill buffers visiting deleted files and directories."
+Removes any expanded subdirectory of deleted directory.  If
+`dired-x' is loaded and `dired-clean-up-buffers-too' is non-nil,
+kill any buffers visiting those files, prompting for
+confirmation.  To disable the confirmation, see
+`dired-clean-confirm-killing-deleted-buffers'."
   (save-excursion (and (cdr dired-subdir-alist)
 		       (dired-goto-subdir fn)
 		       (dired-kill-subdir)))
@@ -3177,15 +3196,17 @@ also offers to kill buffers visiting deleted files and directories."
   (when (and (featurep 'dired-x) dired-clean-up-buffers-too)
     (let ((buf (get-file-buffer fn)))
       (and buf
-           (funcall #'y-or-n-p
-                    (format "Kill buffer of %s, too? "
-                            (file-name-nondirectory fn)))
+           (and dired-clean-confirm-killing-deleted-buffers
+                (funcall #'y-or-n-p
+                         (format "Kill buffer of %s, too? "
+                                 (file-name-nondirectory fn))))
            (kill-buffer buf)))
     (let ((buf-list (dired-buffers-for-dir (expand-file-name fn))))
       (and buf-list
-           (y-or-n-p (format "Kill Dired buffer%s of %s, too? "
-                             (dired-plural-s (length buf-list))
-                             (file-name-nondirectory fn)))
+           (and dired-clean-confirm-killing-deleted-buffers
+                (y-or-n-p (format "Kill Dired buffer%s of %s, too? "
+                                  (dired-plural-s (length buf-list))
+                                  (file-name-nondirectory fn))))
            (dolist (buf buf-list)
              (kill-buffer buf))))))
 

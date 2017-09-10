@@ -700,40 +700,69 @@ Do not change the value by `setq', it must be changed only by
     (setq values (mapcar 'last values)
 	  values (mapcar 'car values))))
 
+(defun tramp-lookup-syntax (alist)
+  "Look up a syntax string in ALIST according to `tramp-compat-tramp-syntax.'
+Raise an error if `tramp-syntax' is invalid."
+  (or (cdr (assq (tramp-compat-tramp-syntax) alist))
+      (error "Wrong `tramp-syntax' %s" tramp-syntax)))
+
+(defconst tramp-prefix-format-alist
+  '((default    . "/")
+    (simplified . "/")
+    (separate   . "/["))
+  "Alist mapping Tramp syntax to strings beginning Tramp file names.")
+
 (defun tramp-prefix-format ()
   "String matching the very beginning of Tramp file names.
 Used in `tramp-make-tramp-file-name'."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) "/")
-	((eq (tramp-compat-tramp-syntax) 'simplified) "/")
-	((eq (tramp-compat-tramp-syntax) 'separate) "/[")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-prefix-format-alist))
+
+(defconst tramp-prefix-regexp-alist
+  (mapcar (lambda (x)
+            (cons (car x) (concat "^" (regexp-quote (cdr x)))))
+          tramp-prefix-format-alist)
+  "Alist of regexps matching the beginnings of Tramp file names.
+Keyed by Tramp syntax. Derived from `tramp-prefix-format-alist'.")
 
 (defun tramp-prefix-regexp ()
   "Regexp matching the very beginning of Tramp file names.
 Should always start with \"^\". Derived from `tramp-prefix-format'."
-  (concat "^" (regexp-quote (tramp-prefix-format))))
+  (tramp-lookup-syntax tramp-prefix-regexp-alist))
+
+(defconst tramp-method-regexp-alist
+  '((default    . "[a-zA-Z0-9-]+")
+    (simplified . "")
+    (separate   . "[a-zA-Z0-9-]*"))
+  "Alist mapping Tramp syntax to regexps matching methods identifiers.")
 
 (defun tramp-method-regexp ()
   "Regexp matching methods identifiers.
 The `ftp' syntax does not support methods."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) "[a-zA-Z0-9-]+")
-	((eq (tramp-compat-tramp-syntax) 'simplified) "")
-	((eq (tramp-compat-tramp-syntax) 'separate) "[a-zA-Z0-9-]*")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-method-regexp-alist))
+
+(defconst tramp-postfix-method-format-alist
+  '((default    . ":")
+    (simplified . "")
+    (separate   . "/"))
+  "Alist mapping Tramp syntax to the delimiter after the method.")
 
 (defun tramp-postfix-method-format ()
   "String matching delimiter between method and user or host names.
 The `ftp' syntax does not support methods.
 Used in `tramp-make-tramp-file-name'."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) ":")
-	((eq (tramp-compat-tramp-syntax) 'simplified) "")
-	((eq (tramp-compat-tramp-syntax) 'separate) "/")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-postfix-method-format-alist))
+
+(defconst tramp-postfix-method-regexp-alist
+  (mapcar (lambda (x)
+            (cons (car x) (regexp-quote (cdr x))))
+          tramp-postfix-method-format-alist)
+  "Alist mapping Tramp syntax to regexp matching delimiter after method.
+Derived from `tramp-postfix-method-format-alist'.")
 
 (defun tramp-postfix-method-regexp ()
   "Regexp matching delimiter between method and user or host names.
 Derived from `tramp-postfix-method-format'."
-  (regexp-quote (tramp-postfix-method-format)))
+  (tramp-lookup-syntax tramp-postfix-method-regexp-alist))
 
 (defconst tramp-user-regexp "[^/|: \t]+"
   "Regexp matching user names.")
@@ -769,18 +798,28 @@ Derived from `tramp-postfix-user-format'.")
 (defconst tramp-host-regexp "[a-zA-Z0-9_.-]+"
   "Regexp matching host names.")
 
+(defconst tramp-prefix-ipv6-format-alist
+  '((default    . "[")
+    (simplified . "[")
+    (separate   . ""))
+  "Alist mapping Tramp syntax to strings prefixing IPv6 addresses.")
+
 (defun tramp-prefix-ipv6-format ()
   "String matching left hand side of IPv6 addresses.
 Used in `tramp-make-tramp-file-name'."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) "[")
-	((eq (tramp-compat-tramp-syntax) 'simplified) "[")
-	((eq (tramp-compat-tramp-syntax) 'separate) "")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-prefix-ipv6-format-alist))
+
+(defconst tramp-prefix-ipv6-regexp-alist
+  (mapcar (lambda (x)
+            (cons (car x) (regexp-quote (cdr x))))
+          tramp-prefix-ipv6-format-alist)
+  "Alist mapping Tramp syntax to regexp matching prefix of IPv6 addresses.
+Derived from `tramp-prefix-ipv6-format-alist'")
 
 (defun tramp-prefix-ipv6-regexp ()
   "Regexp matching left hand side of IPv6 addresses.
 Derived from `tramp-prefix-ipv6-format'."
-  (regexp-quote (tramp-prefix-ipv6-format)))
+  (tramp-lookup-syntax tramp-prefix-ipv6-regexp-alist))
 
 ;; The following regexp is a bit sloppy.  But it shall serve our
 ;; purposes.  It covers also IPv4 mapped IPv6 addresses, like in
@@ -789,18 +828,28 @@ Derived from `tramp-prefix-ipv6-format'."
   "\\(?:\\(?:[a-zA-Z0-9]+\\)?:\\)+[a-zA-Z0-9.]+"
   "Regexp matching IPv6 addresses.")
 
+(defconst tramp-postfix-ipv6-format-alist
+  '((default    . "]")
+    (simplified . "]")
+    (separate   . ""))
+  "Alist mapping Tramp syntax to suffix for IPv6 addresses.")
+
 (defun tramp-postfix-ipv6-format ()
   "String matching right hand side of IPv6 addresses.
 Used in `tramp-make-tramp-file-name'."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) "]")
-	((eq (tramp-compat-tramp-syntax) 'simplified) "]")
-	((eq (tramp-compat-tramp-syntax) 'separate) "")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-postfix-ipv6-format-alist))
+
+(defconst tramp-postfix-ipv6-regexp-alist
+  (mapcar (lambda (x)
+            (cons (car x) (regexp-quote (cdr x))))
+          tramp-postfix-ipv6-format-alist)
+  "Alist mapping Tramp syntax to regexps matching IPv6 suffixes.
+Derived from `tramp-postfix-ipv6-format-alist'.")
 
 (defun tramp-postfix-ipv6-regexp ()
   "Regexp matching right hand side of IPv6 addresses.
 Derived from `tramp-postfix-ipv6-format'."
-  (regexp-quote (tramp-postfix-ipv6-format)))
+  (tramp-lookup-syntax tramp-postfix-ipv6-format-alist))
 
 (defconst tramp-prefix-port-format "#"
   "String matching delimiter between host names and port numbers.")
@@ -827,18 +876,28 @@ Derived from `tramp-prefix-port-format'.")
   "Regexp matching delimiter after ad-hoc hop definitions.
 Derived from `tramp-postfix-hop-format'.")
 
+(defconst tramp-postfix-host-format-alist
+  '((default    . ":")
+    (simplified . ":")
+    (separate   . "]"))
+  "Alist mapping Tramp syntax to strings between host and local names.")
+
 (defun tramp-postfix-host-format ()
   "String matching delimiter between host names and localnames.
 Used in `tramp-make-tramp-file-name'."
-  (cond ((eq (tramp-compat-tramp-syntax) 'default) ":")
-	((eq (tramp-compat-tramp-syntax) 'simplified) ":")
-	((eq (tramp-compat-tramp-syntax) 'separate) "]")
-	(t (error "Wrong `tramp-syntax' %s" tramp-syntax))))
+  (tramp-lookup-syntax tramp-postfix-host-format-alist))
+
+(defconst tramp-postfix-host-regexp-alist
+  (mapcar (lambda (x)
+            (cons (car x) (regexp-quote (cdr x))))
+          tramp-postfix-host-format-alist)
+  "Alist mapping Tramp syntax to regexp matching name delimiters.
+Derived from `tramp-postfix-host-format-alist'.")
 
 (defun tramp-postfix-host-regexp ()
   "Regexp matching delimiter between host names and localnames.
 Derived from `tramp-postfix-host-format'."
-  (regexp-quote (tramp-postfix-host-format)))
+  (tramp-lookup-syntax tramp-postfix-host-regexp-alist))
 
 (defconst tramp-localname-regexp ".*$"
   "Regexp matching localnames.")
@@ -851,16 +910,46 @@ Derived from `tramp-postfix-host-format'."
 
 ;;; File name format:
 
+(defun tramp-build-remote-file-name-spec-regexp (syntax)
+  "Construct a regexp matching a Tramp file name for a Tramp SYNTAX."
+  (let ((tramp-syntax syntax))
+    (concat
+     "\\("   (tramp-method-regexp) "\\)" (tramp-postfix-method-regexp)
+     "\\(?:" "\\("   tramp-user-regexp     "\\)" tramp-postfix-user-regexp "\\)?"
+     "\\("   "\\(?:" tramp-host-regexp     "\\|"
+     (tramp-prefix-ipv6-regexp)
+     "\\(?:" tramp-ipv6-regexp "\\)?"
+     (tramp-postfix-ipv6-regexp) "\\)?"
+     "\\(?:" tramp-prefix-port-regexp    tramp-port-regexp "\\)?" "\\)?")))
+
+(defconst tramp-remote-file-name-spec-regexp-alist
+  `((default    . ,(tramp-build-remote-file-name-spec-regexp 'default))
+    (simplified . ,(tramp-build-remote-file-name-spec-regexp 'simplified))
+    (separate   . ,(tramp-build-remote-file-name-spec-regexp 'separate)))
+  "Alist mapping Tramp syntax to regexps matching Tramp file names.")
+
 (defun tramp-remote-file-name-spec-regexp ()
   "Regular expression matching a Tramp file name between prefix and postfix."
-  (concat
-           "\\("   (tramp-method-regexp) "\\)" (tramp-postfix-method-regexp)
-   "\\(?:" "\\("   tramp-user-regexp     "\\)" tramp-postfix-user-regexp "\\)?"
-   "\\("   "\\(?:" tramp-host-regexp     "\\|"
-	           (tramp-prefix-ipv6-regexp)
-		   "\\(?:" tramp-ipv6-regexp "\\)?"
-                   (tramp-postfix-ipv6-regexp) "\\)?"
-	   "\\(?:" tramp-prefix-port-regexp    tramp-port-regexp "\\)?" "\\)?"))
+  (tramp-lookup-syntax tramp-remote-file-name-spec-regexp-alist))
+
+(defun tramp-build-file-name-structure (syntax)
+  "Construct the Tramp file name structure for SYNTAX.
+See `tramp-file-name-structure'."
+  (let ((tramp-syntax syntax))
+    (list
+     (concat
+      (tramp-prefix-regexp)
+      "\\(" "\\(?:" (tramp-remote-file-name-spec-regexp)
+      tramp-postfix-hop-regexp "\\)+" "\\)?"
+      (tramp-remote-file-name-spec-regexp) (tramp-postfix-host-regexp)
+      "\\(" tramp-localname-regexp "\\)")
+     5 6 7 8 1)))
+
+(defconst tramp-file-name-structure-alist
+  `((default    . ,(tramp-build-file-name-structure 'default))
+    (simplified . ,(tramp-build-file-name-structure 'simplified))
+    (separate   . ,(tramp-build-file-name-structure 'separate)))
+  "Alist mapping Tramp syntax to the file name structure for that syntax.")
 
 (defun tramp-file-name-structure ()
   "List of six elements (REGEXP METHOD USER HOST FILE HOP), detailing \
@@ -881,14 +970,7 @@ These numbers are passed directly to `match-string', which see.  That
 means the opening parentheses are counted to identify the pair.
 
 See also `tramp-file-name-regexp'."
-  (list
-   (concat
-    (tramp-prefix-regexp)
-    "\\(" "\\(?:" (tramp-remote-file-name-spec-regexp)
-                  tramp-postfix-hop-regexp "\\)+" "\\)?"
-    (tramp-remote-file-name-spec-regexp) (tramp-postfix-host-regexp)
-    "\\(" tramp-localname-regexp "\\)")
-   5 6 7 8 1))
+  (tramp-lookup-syntax tramp-file-name-structure-alist))
 
 (defun tramp-file-name-regexp ()
   "Regular expression matching file names handled by Tramp.
@@ -2824,6 +2906,33 @@ User is always nil."
 (defvar tramp-handle-write-region-hook nil
   "Normal hook to be run at the end of `tramp-*-handle-write-region'.")
 
+(defun tramp-handle-add-name-to-file
+  (filename newname &optional ok-if-already-exists)
+  "Like `add-name-to-file' for Tramp files."
+  (with-parsed-tramp-file-name
+      (if (tramp-tramp-file-p newname) newname filename) nil
+    (unless (tramp-equal-remote filename newname)
+      (tramp-error
+       v 'file-error
+       "add-name-to-file: %s"
+       "only implemented for same method, same user, same host"))
+    ;; Do the 'confirm if exists' thing.
+    (when (file-exists-p newname)
+      ;; What to do?
+      (if (or (null ok-if-already-exists) ; not allowed to exist
+	      (and (numberp ok-if-already-exists)
+		   (not (yes-or-no-p
+			 (format
+			  "File %s already exists; make it a link anyway? "
+			  localname)))))
+	  (tramp-error v 'file-already-exists newname)
+	(delete-file newname)))
+    (tramp-flush-file-property v (file-name-directory localname))
+    (tramp-flush-file-property v localname)
+    (copy-file
+     filename newname 'ok-if-already-exists 'keep-time
+     'preserve-uid-gid 'preserve-permissions)))
+
 (defun tramp-handle-directory-file-name (directory)
   "Like `directory-file-name' for Tramp files."
   ;; If localname component of filename is "/", leave it unchanged.
@@ -3067,6 +3176,47 @@ User is always nil."
   "Like `file-symlink-p' for Tramp files."
   (let ((x (tramp-compat-file-attribute-type (file-attributes filename))))
     (and (stringp x) x)))
+
+(defun tramp-handle-file-truename (filename)
+  "Like `file-truename' for Tramp files."
+  (let ((result filename)
+	(numchase 0)
+	;; Don't make the following value larger than
+	;; necessary.  People expect an error message in a
+	;; timely fashion when something is wrong;
+	;; otherwise they might think that Emacs is hung.
+	;; Of course, correctness has to come first.
+	(numchase-limit 20)
+	symlink-target)
+    (format
+     "%s%s"
+     (with-parsed-tramp-file-name (expand-file-name result) v1
+       (with-tramp-file-property v1 v1-localname "file-truename"
+	 (while (and (setq symlink-target (file-symlink-p result))
+		     (< numchase numchase-limit))
+	   (setq numchase (1+ numchase)
+		 result
+		 (with-parsed-tramp-file-name (expand-file-name result) v2
+		   (tramp-make-tramp-file-name
+		    v2-method v2-user v2-domain v2-host v2-port
+		    (funcall
+		     (if (tramp-compat-file-name-quoted-p v2-localname)
+			 'tramp-compat-file-name-quote 'identity)
+
+		     (if (stringp symlink-target)
+			 (if (file-remote-p symlink-target)
+			     (let (file-name-handler-alist)
+			       (tramp-compat-file-name-quote symlink-target))
+			   symlink-target)
+		       v2-localname)))))
+	   (when (>= numchase numchase-limit)
+	     (tramp-error
+	      v1 'file-error
+	      "Maximum number (%d) of symlinks exceeded" numchase-limit)))
+	 result))
+
+     ;; Preserve trailing "/".
+     (if (string-equal (file-name-nondirectory filename) "") "/" ""))))
 
 (defun tramp-handle-find-backup-file-name (filename)
   "Like `find-backup-file-name' for Tramp files."

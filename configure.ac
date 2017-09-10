@@ -976,9 +976,10 @@ AS_IF([test $gl_gcc_warnings = no],
     nw="$nw -Wmissing-braces"
   fi
 
-  # This causes too much noise in the MinGW build
+  # These cause too much noise in the MinGW build
   if test $opsys = mingw32; then
     nw="$nw -Wpointer-sign"
+    nw="$nw -Wsuggest-attribute=format"
   fi
 
   gl_MANYWARN_ALL_GCC([ws])
@@ -3364,7 +3365,7 @@ if test "${HAVE_X11}" = "yes"; then
       AC_CACHE_CHECK([for XpmReturnAllocPixels preprocessor define],
       [emacs_cv_cpp_xpm_return_alloc_pixels],
       [AC_EGREP_CPP(no_return_alloc_pixels,
-      [#include "noX/xpm.h"
+      [#include "X11/xpm.h"
 #ifndef XpmReturnAllocPixels
 no_return_alloc_pixels
 #endif
