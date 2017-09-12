@@ -1,10 +1,12 @@
-emacs25 (25.2+1-6~1.gbp1353b0) UNRELEASED; urgency=medium
+emacs25 (25.2+1-6) unstable; urgency=high
 
-  ** SNAPSHOT build @1353b03c55df949fb408c7148c7fe95628f5118b **
+  * Block remote code execution via enriched text.  Add
+    0012-A-remote-execution-exploit-via-enriched-text-has-bee.patch to
+    fix the problem.  Thanks to David Bremner for the alert and
+    Salvatore Bonaccorso for reporting the problem to Debian.
+    (Closes: 875447)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 11 Sep 2017 21:31:17 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 11 Sep 2017 21:51:49 -0500
 
 emacs25 (25.2+1-5) unstable; urgency=medium
 
