@@ -29,14 +29,14 @@ debian/patches/series.
 Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 ---
- lib-src/fakemail.c    |    6 ++++--
- lisp/gnus/message.el  |    8 +++++++-
- lisp/mail/feedmail.el |    7 ++++++-
- lisp/mail/sendmail.el |    7 ++++++-
+ lib-src/fakemail.c    | 6 ++++--
+ lisp/gnus/message.el  | 8 +++++++-
+ lisp/mail/feedmail.el | 7 ++++++-
+ lisp/mail/sendmail.el | 7 ++++++-
  4 files changed, 23 insertions(+), 5 deletions(-)
 
 diff --git a/lib-src/fakemail.c b/lib-src/fakemail.c
-index cebd8d7..5edb360 100644
+index cebd8d7a455..5edb360bee3 100644
 --- a/lib-src/fakemail.c
 +++ b/lib-src/fakemail.c
 @@ -136,8 +136,10 @@ struct linebuffer lb;
@@ -53,7 +53,7 @@ index cebd8d7..5edb360 100644
  
  static char *my_name;
 diff --git a/lisp/gnus/message.el b/lisp/gnus/message.el
-index 318e34f..1b6a9df 100644
+index 318e34f5edb..1b6a9dff91f 100644
 --- a/lisp/gnus/message.el
 +++ b/lisp/gnus/message.el
 @@ -4609,7 +4609,13 @@ If you always want Gnus to send messages in one piece, set
@@ -72,7 +72,7 @@ index 318e34f..1b6a9df 100644
  			message-sendmail-extra-arguments
  			;; Always specify who from,
 diff --git a/lisp/mail/feedmail.el b/lisp/mail/feedmail.el
-index 77d82f6..29cc891 100644
+index 77d82f6076f..29cc8919a6d 100644
 --- a/lisp/mail/feedmail.el
 +++ b/lisp/mail/feedmail.el
 @@ -1327,7 +1327,12 @@ complicated cases."
@@ -90,7 +90,7 @@ index 77d82f6..29cc891 100644
  		 ;; provide envelope "from" to sendmail; results will vary
  		 (list "-f" user-mail-address)
 diff --git a/lisp/mail/sendmail.el b/lisp/mail/sendmail.el
-index e6e49c4..4705f61 100644
+index e6e49c4b527..4705f616b00 100644
 --- a/lisp/mail/sendmail.el
 +++ b/lisp/mail/sendmail.el
 @@ -52,7 +52,12 @@

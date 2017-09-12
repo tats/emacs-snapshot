@@ -9,12 +9,12 @@ indian-tlg-base-table.
 Applied-By: Rob Browning <rlb@defaultvalue.org>
 Origin: upstream, commit: 141162dace9e05123a73dfe6d8be921840ff2416
 ---
- leim/ChangeLog       |    4 ++++
- leim/quail/indian.el |    2 +-
+ leim/ChangeLog       | 4 ++++
+ leim/quail/indian.el | 2 +-
  2 files changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/leim/ChangeLog b/leim/ChangeLog
-index 1a8c37a..7ca7270 100644
+index 1a8c37a41d6..7ca7270af83 100644
 --- a/leim/ChangeLog
 +++ b/leim/ChangeLog
 @@ -1,3 +1,7 @@
@@ -26,7 +26,7 @@ index 1a8c37a..7ca7270 100644
  
  	* Version 23.4 released.
 diff --git a/leim/quail/indian.el b/leim/quail/indian.el
-index d92fef5..6d4ecbf 100644
+index d92fef51d49..6d4ecbfbb42 100644
 --- a/leim/quail/indian.el
 +++ b/leim/quail/indian.el
 @@ -269,7 +269,7 @@

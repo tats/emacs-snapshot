@@ -11,11 +11,11 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
 * The global variable debian-emacs-flavor is bound to 'emacs23.
   Author: Rob Browning <rlb@defaultvalue.org>
 ---
- lisp/startup.el |   21 +++++++++++++++++++--
+ lisp/startup.el | 21 +++++++++++++++++++--
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 775d2f7..b3e56ad 100644
+index 775d2f7305f..b3e56ade8d9 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
 @@ -393,6 +393,10 @@ Warning Warning!!!  Pure space overflow    !!!Warning Warning

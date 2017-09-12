@@ -11,12 +11,12 @@ Date: Wed, 26 Oct 2011 01:39:35 +0900
 Applied-by: Rob Browning <rlb@defaultvalue.org>
 Bug-Debian: http://bugs.debian.org/646609
 ---
- configure.in   |    8 ++++----
- src/m/macppc.h |    4 ++--
+ configure.in   | 8 ++++----
+ src/m/macppc.h | 4 ++--
  2 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/configure.in b/configure.in
-index 958903d..75af0f7 100644
+index 958903d41b9..75af0f71ecc 100644
 --- a/configure.in
 +++ b/configure.in
 @@ -172,7 +172,7 @@ fi
@@ -44,7 +44,7 @@ index 958903d..75af0f7 100644
     ## For anything else (eg /usr/lib32), it is up the user to specify
     ## the location (bug#5655).
 diff --git a/src/m/macppc.h b/src/m/macppc.h
-index 810c62a..17dc9d3 100644
+index 810c62abd2b..17dc9d38fd6 100644
 --- a/src/m/macppc.h
 +++ b/src/m/macppc.h
 @@ -50,9 +50,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */

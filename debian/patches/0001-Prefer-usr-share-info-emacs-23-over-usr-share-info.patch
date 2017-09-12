@@ -9,13 +9,13 @@ The value of Info-default-directory-list has been augmented via
 site-init.el to include /usr/share/info/emacs-23 before
 /usr/share/info.
 ---
- lisp/site-init.el |   11 +++++++++++
+ lisp/site-init.el | 11 +++++++++++
  1 file changed, 11 insertions(+)
  create mode 100644 lisp/site-init.el
 
 diff --git a/lisp/site-init.el b/lisp/site-init.el
 new file mode 100644
-index 0000000..d8d6256
+index 00000000000..d8d6256ac1d
 --- /dev/null
 +++ b/lisp/site-init.el
 @@ -0,0 +1,11 @@

@@ -13,11 +13,11 @@ Forwarded: bug-gnu-emacs@gnu.org
 Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=655118
 Applied-By: Rob Browning <rlb@defaultvalue.org>
 ---
- lib-src/movemail.c |   34 ++++++++++++++++------------------
+ lib-src/movemail.c | 34 ++++++++++++++++------------------
  1 file changed, 16 insertions(+), 18 deletions(-)
 
 diff --git a/lib-src/movemail.c b/lib-src/movemail.c
-index ec38678..74ae004 100644
+index ec3867867bb..74ae004198c 100644
 --- a/lib-src/movemail.c
 +++ b/lib-src/movemail.c
 @@ -60,6 +60,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */

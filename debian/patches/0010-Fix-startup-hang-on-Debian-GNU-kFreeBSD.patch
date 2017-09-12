@@ -11,11 +11,11 @@ Provided-By: Petr Salinger <Petr.Salinger@seznam.cz>
 Bug: 559392
 Status: new
 ---
- src/s/gnu-kfreebsd.h |    5 +++++
+ src/s/gnu-kfreebsd.h | 5 +++++
  1 file changed, 5 insertions(+)
 
 diff --git a/src/s/gnu-kfreebsd.h b/src/s/gnu-kfreebsd.h
-index a1e8c02..89563de 100644
+index a1e8c024744..89563de1b81 100644
 --- a/src/s/gnu-kfreebsd.h
 +++ b/src/s/gnu-kfreebsd.h
 @@ -5,6 +5,11 @@

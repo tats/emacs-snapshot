@@ -10,13 +10,13 @@ Applied-By: Rob Browning <rlb@defaultvalue.org>
 Origin: upstream, commit: d3b65adf905c408aea986ff113cb3bc1b24d73e9
 Bug-Debian: http://bugs.debian.org/655592
 ---
- src/ChangeLog |   13 +++++++++++++
- src/xterm.c   |   45 +++++++++++++++++++++++++++++++++------------
- src/xterm.h   |    3 ++-
+ src/ChangeLog | 13 +++++++++++++
+ src/xterm.c   | 45 +++++++++++++++++++++++++++++++++------------
+ src/xterm.h   |  3 ++-
  3 files changed, 48 insertions(+), 13 deletions(-)
 
 diff --git a/src/ChangeLog b/src/ChangeLog
-index e44ec5f..e1f24d1 100644
+index e44ec5fde6b..e1f24d19a6e 100644
 --- a/src/ChangeLog
 +++ b/src/ChangeLog
 @@ -90,6 +90,19 @@
@@ -40,7 +40,7 @@ index e44ec5f..e1f24d1 100644
  
  	* keymap.c (Fsingle_key_description): Use make_specified_string
 diff --git a/src/xterm.c b/src/xterm.c
-index af8af50..866915a 100644
+index af8af50298d..866915a9865 100644
 --- a/src/xterm.c
 +++ b/src/xterm.c
 @@ -375,7 +375,7 @@ static void x_scroll_bar_report_motion P_ ((struct frame **, Lisp_Object *,
@@ -181,7 +181,7 @@ index af8af50..866915a 100644
      = XInternAtom (dpyinfo->display, "_NET_WM_WINDOW_TYPE", False);
    dpyinfo->Xatom_net_window_type_tooltip
 diff --git a/src/xterm.h b/src/xterm.h
-index cdfe649..14fa687 100644
+index cdfe6493e38..14fa6879f4c 100644
 --- a/src/xterm.h
 +++ b/src/xterm.h
 @@ -365,7 +365,8 @@ struct x_display_info

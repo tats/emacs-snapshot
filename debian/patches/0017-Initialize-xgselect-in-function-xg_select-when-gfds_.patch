@@ -12,11 +12,11 @@ Bug-Red-Hat: https://bugzilla.redhat.com/show_bug.cgi?id=711739
 Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=666691
 Applied-Upstream: Fixed in Emacs 24
 ---
- src/xgselect.c |   13 +++++++++----
+ src/xgselect.c | 13 +++++++++----
  1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/src/xgselect.c b/src/xgselect.c
-index 333f7b1..7bb5f00 100644
+index 333f7b132c7..7bb5f00676f 100644
 --- a/src/xgselect.c
 +++ b/src/xgselect.c
 @@ -55,10 +55,15 @@ xg_select (max_fds, rfds, wfds, efds, timeout)

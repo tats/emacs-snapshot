@@ -13,11 +13,11 @@ Applied-By: Rob Browning <rlb@defaultvalue.org>
 Forwarded: bug-gnu-emacs@gnu.org
 Closes: #650976
 ---
- src/s/gnu.h |    2 ++
+ src/s/gnu.h | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/src/s/gnu.h b/src/s/gnu.h
-index 388b3e3..51e6ec4 100644
+index 388b3e3552e..51e6ec47e22 100644
 --- a/src/s/gnu.h
 +++ b/src/s/gnu.h
 @@ -83,5 +83,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
