@@ -7,3 +7,4 @@
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Emacs-shouldn-t-segfault-when-gcc-expects-nopie.patch
 0009-openssl-s_client-is-no-longer-a-default-for-ssl-conn.patch
+0010-A-remote-execution-exploit-via-enriched-text-has-bee.patch
