@@ -1,3 +1,11 @@
+emacs25 (25.1+1-4+deb9u1~1.gbp4b9e7e) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @4b9e7e71a77ea4cc09081b8de8faf58c534e81bb **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 12 Sep 2017 19:46:39 -0500
+
 emacs25 (25.1+1-4) unstable; urgency=medium
 
   * Don't offer/use openssl s_client by default: "s_client is a debug
