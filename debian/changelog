@@ -1,10 +1,12 @@
-emacs23 (23.4+1-4+deb7u1~1.gbp77ab0e) UNRELEASED; urgency=medium
+emacs23 (23.4+1-4+deb7u1) wheezy-security; urgency=high
 
-  ** SNAPSHOT build @77ab0e81e0e3123c3bbf81e0d400e6dcd5e137b1 **
+  * Block remote code execution via enriched text.  Add
+    0012-A-remote-execution-exploit-via-enriched-text-has-bee.patch to
+    fix the problem.  Thanks to David Bremner for the alert and
+    Salvatore Bonaccorso for reporting the problem to Debian.
+    (Closes: 875447)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 16 Sep 2017 15:39:07 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 16 Sep 2017 15:43:24 -0500
 
 emacs23 (23.4+1-4) unstable; urgency=high
 
