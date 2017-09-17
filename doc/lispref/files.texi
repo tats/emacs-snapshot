@@ -457,15 +457,23 @@ Even though this is not a normal hook, you can use @code{add-hook} and
 @defvar write-contents-functions
 This works just like @code{write-file-functions}, but it is intended
 for hooks that pertain to the buffer's contents, not to the particular
-visited file or its location.  Such hooks are usually set up by major
-modes, as buffer-local bindings for this variable.  This variable
-automatically becomes buffer-local whenever it is set; switching to a
-new major mode always resets this variable, but calling
-@code{set-visited-file-name} does not.
+visited file or its location, and can be used to create arbitrary save
+processes for buffers that aren't visiting files at all.  Such hooks
+are usually set up by major modes, as buffer-local bindings for this
+variable.  This variable automatically becomes buffer-local whenever
+it is set; switching to a new major mode always resets this variable,
+but calling @code{set-visited-file-name} does not.
 
 If any of the functions in this hook returns non-@code{nil}, the file
 is considered already written and the rest are not called and neither
 are the functions in @code{write-file-functions}.
+
+When using this hook to save buffers that are not visiting files (for
+instance, special-mode buffers), keep in mind that, if the function
+fails to save correctly and returns a @code{nil} value,
+@code{save-buffer} will go on to prompt the user for a file to save
+the buffer in.  If this is undesirable, consider having the function
+fail by raising an error.
 @end defvar
 
 @defopt before-save-hook
@@ -1563,15 +1571,15 @@ a @code{file-missing} error instead.
 made by these functions instead of writing them immediately to
 secondary storage.  @xref{Files and Storage}.
 
-@c FIXME: This paragraph is purposely silent on what happens if
-@c @var{newname} is not a directory name but happens to name a
-@c directory.  See Bug#27986 for discussion on how to clear this up.
   In the functions that have an argument @var{newname}, if this
 argument is a directory name it is treated as if the nondirectory part
 of the source name were appended.  Typically, a directory name is one
 that ends in @samp{/} (@pxref{Directory Names}).  For example, if the
 old name is @file{a/b/c}, the @var{newname} @file{d/e/f/} is treated
-as if it were @file{d/e/f/c}.
+as if it were @file{d/e/f/c}.  This special treatment does not apply
+if @var{newname} is not a directory name but names a file that is a
+directory; for example, the @var{newname} @file{d/e/f} is left as-is
+even if @file{d/e/f} happens to be a directory.
 
   In the functions that have an argument @var{newname}, if a file by the
 name of @var{newname} already exists, the actions taken depend on the
@@ -2976,8 +2984,9 @@ if they don't already exist.
 
 @deffn Command copy-directory dirname newname &optional keep-time parents copy-contents
 This command copies the directory named @var{dirname} to
-@var{newname}.  If @var{newname} names an existing directory,
+@var{newname}.  If @var{newname} is a directory name,
 @var{dirname} will be copied to a subdirectory there.
+@xref{Directory Names}.
 
 It always sets the file modes of the copied files to match the
 corresponding original file.
@@ -2992,7 +3001,7 @@ this happens by default.
 
 The fifth argument @var{copy-contents}, if non-@code{nil}, means to
 copy the contents of @var{dirname} directly into @var{newname} if the
-latter is an existing directory, instead of copying @var{dirname} into
+latter is a directory name, instead of copying @var{dirname} into
 it as a subdirectory.
 @end deffn
 

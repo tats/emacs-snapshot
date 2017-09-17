@@ -19,7 +19,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs. If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs. If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -163,6 +163,7 @@ This should be called at the beginning of a line."
 ;; notion of l10n/i18n
 (defconst xdg-desktop-entry-regexp
   (rx (group-n 1 (+ (in "A-Za-z0-9-")))
+      ;; (? "[" (group-n 3 (+ nonl)) "]")
       (* blank) "=" (* blank)
       (group-n 2 (* nonl)))
   "Regexp matching desktop file entry key-value pairs.")

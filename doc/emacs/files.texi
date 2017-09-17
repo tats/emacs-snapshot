@@ -1558,7 +1558,8 @@ In all these commands, if the argument @var{new} is just a directory
 name, the real new name is in that directory, with the same
 non-directory component as @var{old}.  For example, the command
 @w{@kbd{M-x rename-file @key{RET} ~/foo @key{RET} /tmp/ @key{RET}}}
-renames @file{~/foo} to @file{/tmp/foo}.  @xref{Directory Names,,,
+renames @file{~/foo} to @file{/tmp/foo}.  On GNU and other POSIX-like
+systems, directory names end in @samp{/}.  @xref{Directory Names,,,
 elisp, the Emacs Lisp Reference Manual}.
 
 All these commands ask for confirmation when the new file name already
@@ -1571,10 +1572,10 @@ file @var{new}.
 
 @findex copy-directory
   @kbd{M-x copy-directory} copies directories, similar to the
-@command{cp -r} shell command.  If @var{new} is an existing directory,
-it creates a copy of the @var{old} directory and puts it in @var{new}.
-If @var{new} is not an existing directory, it copies all the contents
-of @var{old} into a new directory named @var{new}.
+@command{cp -r} shell command.  If @var{new} is a directory name, it
+creates a copy of the @var{old} directory and puts it in @var{new}.
+Otherwise it copies all the contents of @var{old} into a new directory
+named @var{new}.
 
 @cindex renaming files
 @findex rename-file
@@ -1816,10 +1817,9 @@ syntax:
 
 @noindent
 To carry out this request, Emacs uses a remote-login program such as
-@command{ftp}, @command{ssh}, @command{rlogin}, or @command{telnet}.
+@command{ssh}.
 You must always specify in the file name which method to use---for
-example, @file{/ftp:@var{user}@@@var{host}:@var{filename}} uses FTP,
-whereas @file{/ssh:@var{user}@@@var{host}:@var{filename}} uses
+example, @file{/ssh:@var{user}@@@var{host}:@var{filename}} uses
 @command{ssh}.  When you specify the pseudo method @var{-} in the file
 name, Emacs chooses the method as follows:
 

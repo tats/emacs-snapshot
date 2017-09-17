@@ -16,7 +16,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /*
 Originally by Carl Edman
@@ -2040,17 +2040,17 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 void
 ns_set_appearance (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 {
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1090
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
   EmacsView *view = (EmacsView *)FRAME_NS_VIEW (f);
   NSWindow *window = [view window];
 
   NSTRACE ("ns_set_appearance");
 
-#ifndef NSAppKitVersionNumber10_9
-#define NSAppKitVersionNumber10_9 1265
+#ifndef NSAppKitVersionNumber10_10
+#define NSAppKitVersionNumber10_10 1343
 #endif
 
-  if (NSAppKitVersionNumber < NSAppKitVersionNumber10_9)
+  if (NSAppKitVersionNumber < NSAppKitVersionNumber10_10)
     return;
 
   if (EQ (new_value, Qdark))
@@ -2065,7 +2065,7 @@ ns_set_appearance (struct frame *f, Lisp_Object new_value, Lisp_Object old_value
                             appearanceNamed: NSAppearanceNameAqua];
       FRAME_NS_APPEARANCE (f) = ns_appearance_aqua;
     }
-#endif /* MAC_OS_X_VERSION_MAX_ALLOWED >= 1090 */
+#endif /* MAC_OS_X_VERSION_MAX_ALLOWED >= 101000 */
 }
 
 void
@@ -6076,7 +6076,7 @@ not_in_argv (NSString *arg)
               /*  GNUstep uses incompatible keycodes, even for those that are
                   supposed to be hardware independent.  Just check for delete.
                   Keypad delete does not have keysym 0xFFFF.
-                  See http://savannah.gnu.org/bugs/?25395
+                  See https://savannah.gnu.org/bugs/?25395
               */
               || (fnKeysym == 0xFFFF && code == 127)
 #endif
@@ -7135,12 +7135,12 @@ not_in_argv (NSString *arg)
   if (! FRAME_UNDECORATED (f))
     [self createToolbar: f];
 
-#if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED >= 1090
-#ifndef NSAppKitVersionNumber10_9
-#define NSAppKitVersionNumber10_9 1265
+#if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
+#ifndef NSAppKitVersionNumber10_10
+#define NSAppKitVersionNumber10_10 1343
 #endif
 
-  if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_9
+  if (NSAppKitVersionNumber >= NSAppKitVersionNumber10_10
       && FRAME_NS_APPEARANCE (f) != ns_appearance_aqua)
     win.appearance = [NSAppearance
                           appearanceNamed: NSAppearanceNameVibrantDark];

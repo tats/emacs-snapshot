@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -517,10 +517,12 @@ updates before the buffer is saved, use `before-save-hook'.")
     'write-contents-functions "22.1")
 (defvar write-contents-functions nil
   "List of functions to be called before writing out a buffer to a file.
-Only used by `save-buffer'.
-If one of them returns non-nil, the file is considered already written
-and the rest are not called and neither are the functions in
-`write-file-functions'.
+
+Only used by `save-buffer'.  If one of them returns non-nil, the
+file is considered already written and the rest are not called
+and neither are the functions in `write-file-functions'.  This
+hook can thus be used to create save behavior for buffers that
+are not visiting a file at all.
 
 This variable is meant to be used for hooks that pertain to the
 buffer's contents, not to the particular visited file; thus,
@@ -4212,10 +4214,10 @@ Interactively, confirmation is required unless you supply a prefix argument."
 	 (not current-prefix-arg)))
   (or (null filename) (string-equal filename "")
       (progn
-	;; If arg is just a directory,
+	;; If arg is a directory name,
 	;; use the default file name, but in that directory.
-	(if (file-directory-p filename)
-	    (setq filename (concat (file-name-as-directory filename)
+	(if (directory-name-p filename)
+	    (setq filename (concat filename
 				   (file-name-nondirectory
 				    (or buffer-file-name (buffer-name))))))
 	(and confirm
@@ -4875,9 +4877,12 @@ in such cases.")
 
 (defun basic-save-buffer (&optional called-interactively)
   "Save the current buffer in its visited file, if it has been modified.
-The hooks `write-contents-functions' and `write-file-functions' get a chance
-to do the job of saving; if they do not, then the buffer is saved in
-the visited file in the usual way.
+
+The hooks `write-contents-functions', `local-write-file-hooks'
+and `write-file-functions' get a chance to do the job of saving;
+if they do not, then the buffer is saved in the visited file in
+the usual way.
+
 Before and after saving the buffer, this function runs
 `before-save-hook' and `after-save-hook', respectively."
   (interactive '(called-interactively))
@@ -4886,29 +4891,14 @@ Before and after saving the buffer, this function runs
     (if (buffer-base-buffer)
 	(set-buffer (buffer-base-buffer)))
     (if (or (buffer-modified-p)
-	    ;; handle the case when no modification has been made but
-	    ;; the file disappeared since visited
+	    ;; Handle the case when no modification has been made but
+	    ;; the file disappeared since visited.
 	    (and buffer-file-name
 		 (not (file-exists-p buffer-file-name))))
 	(let ((recent-save (recent-auto-save-p))
 	      setmodes)
-          ;; If buffer has no file name, ask user for one.
-	  (or buffer-file-name
-              (let ((filename
-                     (expand-file-name
-                      (read-file-name "File to save in: "
-                                      nil (expand-file-name (buffer-name))))))
-                (if (file-exists-p filename)
-                    (if (file-directory-p filename)
-                        ;; Signal an error if the user specified the name of an
-                        ;; existing directory.
-                        (error "%s is a directory" filename)
-                      (unless (y-or-n-p (format-message
-                                         "File `%s' exists; overwrite? "
-                                         filename))
-                        (error "Canceled"))))
-                (set-visited-file-name filename)))
-	  (or (verify-visited-file-modtime (current-buffer))
+	  (or (null buffer-file-name)
+              (verify-visited-file-modtime (current-buffer))
 	      (not (file-exists-p buffer-file-name))
 	      (yes-or-no-p
 	       (format
@@ -4920,6 +4910,7 @@ Before and after saving the buffer, this function runs
 	    (save-excursion
 	      (and (> (point-max) (point-min))
 		   (not find-file-literally)
+                   (null buffer-read-only)
 		   (/= (char-after (1- (point-max))) ?\n)
 		   (not (and (eq selective-display t)
 			     (= (char-after (1- (point-max))) ?\r)))
@@ -4932,46 +4923,65 @@ Before and after saving the buffer, this function runs
 		   (save-excursion
 		     (goto-char (point-max))
 		     (insert ?\n))))
-	    ;; Support VC version backups.
-	    (vc-before-save)
 	    ;; Don't let errors prevent saving the buffer.
 	    (with-demoted-errors (run-hooks 'before-save-hook))
-	    (or (run-hook-with-args-until-success 'write-contents-functions)
-		(run-hook-with-args-until-success 'local-write-file-hooks)
-		(run-hook-with-args-until-success 'write-file-functions)
-		;; If a hook returned t, file is already "written".
-		;; Otherwise, write it the usual way now.
-		(let ((dir (file-name-directory
-			    (expand-file-name buffer-file-name))))
-		  (unless (file-exists-p dir)
-		    (if (y-or-n-p
-			 (format-message
-                          "Directory `%s' does not exist; create? " dir))
-			(make-directory dir t)
-		      (error "Canceled")))
-		  (setq setmodes (basic-save-buffer-1))))
+            ;; Give `write-contents-functions' a chance to
+            ;; short-circuit the whole process.
+	    (unless (run-hook-with-args-until-success 'write-contents-functions)
+              ;; If buffer has no file name, ask user for one.
+              (or buffer-file-name
+                  (let ((filename
+                         (expand-file-name
+                          (read-file-name "File to save in: "
+                                          nil (expand-file-name (buffer-name))))))
+                    (if (file-exists-p filename)
+                        (if (file-directory-p filename)
+                            ;; Signal an error if the user specified the name of an
+                            ;; existing directory.
+                            (error "%s is a directory" filename)
+                          (unless (y-or-n-p (format-message
+                                             "File `%s' exists; overwrite? "
+                                             filename))
+                            (error "Canceled"))))
+                    (set-visited-file-name filename)))
+              ;; Support VC version backups.
+	      (vc-before-save)
+	      (or (run-hook-with-args-until-success 'local-write-file-hooks)
+	          (run-hook-with-args-until-success 'write-file-functions)
+	          ;; If a hook returned t, file is already "written".
+	          ;; Otherwise, write it the usual way now.
+	          (let ((dir (file-name-directory
+			      (expand-file-name buffer-file-name))))
+		    (unless (file-exists-p dir)
+		      (if (y-or-n-p
+		           (format-message
+                            "Directory `%s' does not exist; create? " dir))
+		          (make-directory dir t)
+		        (error "Canceled")))
+		    (setq setmodes (basic-save-buffer-1)))))
 	    ;; Now we have saved the current buffer.  Let's make sure
 	    ;; that buffer-file-coding-system is fixed to what
 	    ;; actually used for saving by binding it locally.
-	    (if save-buffer-coding-system
-		(setq save-buffer-coding-system last-coding-system-used)
-	      (setq buffer-file-coding-system last-coding-system-used))
-	    (setq buffer-file-number
-		  (nthcdr 10 (file-attributes buffer-file-name)))
-	    (if setmodes
-		(condition-case ()
-		    (progn
-		      (unless
-			  (with-demoted-errors
-			    (set-file-modes buffer-file-name (car setmodes)))
-			(set-file-extended-attributes buffer-file-name
-						      (nth 1 setmodes))))
-		  (error nil))))
-	  ;; If the auto-save file was recent before this command,
-	  ;; delete it now.
-	  (delete-auto-save-file-if-necessary recent-save)
-	  ;; Support VC `implicit' locking.
-	  (vc-after-save)
+            (when buffer-file-name
+	      (if save-buffer-coding-system
+		  (setq save-buffer-coding-system last-coding-system-used)
+	        (setq buffer-file-coding-system last-coding-system-used))
+	      (setq buffer-file-number
+		    (nthcdr 10 (file-attributes buffer-file-name)))
+	      (if setmodes
+		  (condition-case ()
+		      (progn
+		        (unless
+			    (with-demoted-errors
+			        (set-file-modes buffer-file-name (car setmodes)))
+			  (set-file-extended-attributes buffer-file-name
+						        (nth 1 setmodes))))
+		    (error nil)))
+              ;; Support VC `implicit' locking.
+	      (vc-after-save))
+            ;; If the auto-save file was recent before this command,
+	    ;; delete it now.
+	    (delete-auto-save-file-if-necessary recent-save))
 	  (run-hooks 'after-save-hook))
       (or noninteractive
           (not called-interactively)
@@ -5080,7 +5090,7 @@ Before and after saving the buffer, this function runs
 	      (progn
                 ;; Pass in nil&nil rather than point-min&max to indicate
                 ;; we're saving the buffer rather than just a region.
-                ;; write-region-annotate-functions may make us of it.
+                ;; write-region-annotate-functions may make use of it.
                 (write-region nil nil
                               buffer-file-name nil t buffer-file-truename)
                 (when save-silently (message nil))
@@ -5183,7 +5193,9 @@ change the additional actions you can take on files."
                      (and pred
                           (progn
                             (set-buffer buffer)
-                            (and buffer-offer-save (> (buffer-size) 0)))))
+                            (and buffer-offer-save (> (buffer-size) 0))))
+                     (buffer-local-value
+                      'write-contents-functions buffer))
                     (or (not (functionp pred))
                         (with-current-buffer buffer (funcall pred)))
                     (if arg
@@ -5320,6 +5332,14 @@ instance of such commands."
       (rename-buffer (generate-new-buffer-name base-name))
       (force-mode-line-update))))
 
+(defun files--ensure-directory (dir)
+  "Make directory DIR if it is not already a directory.  Return nil."
+  (condition-case err
+      (make-directory-internal dir)
+    (file-already-exists
+     (unless (file-directory-p dir)
+       (signal (car err) (cdr err))))))
+
 (defun make-directory (dir &optional parents)
   "Create the directory DIR and optionally any nonexistent parent dirs.
 If DIR already exists as a directory, signal an error, unless
@@ -5348,18 +5368,19 @@ raised."
       (if (not parents)
 	  (make-directory-internal dir)
 	(let ((dir (directory-file-name (expand-file-name dir)))
-	      create-list)
-	  (while (and (not (file-exists-p dir))
-		      ;; If directory is its own parent, then we can't
-		      ;; keep looping forever
-		      (not (equal dir
-				  (directory-file-name
-				   (file-name-directory dir)))))
+	      create-list parent)
+	  (while (progn
+		   (setq parent (directory-file-name
+				 (file-name-directory dir)))
+		   (condition-case err
+		       (files--ensure-directory dir)
+		     (file-missing
+		      ;; Do not loop if root does not exist (Bug#2309).
+		      (not (string= dir parent)))))
 	    (setq create-list (cons dir create-list)
-		  dir (directory-file-name (file-name-directory dir))))
-	  (while create-list
-	    (make-directory-internal (car create-list))
-	    (setq create-list (cdr create-list))))))))
+		  dir parent))
+	  (dolist (dir create-list)
+            (files--ensure-directory dir)))))))
 
 (defconst directory-files-no-dot-files-regexp
   "^\\([^.]\\|\\.\\([^.]\\|\\..\\)\\).*"
@@ -5492,10 +5513,10 @@ Noninteractively, the last argument PARENTS says whether to
 create parent directories if they don't exist.  Interactively,
 this happens by default.
 
-If NEWNAME names an existing directory, copy DIRECTORY as a
-subdirectory there.  However, if called from Lisp with a non-nil
-optional argument COPY-CONTENTS, copy the contents of DIRECTORY
-directly into NEWNAME instead."
+If NEWNAME is a directory name, copy DIRECTORY as a subdirectory
+there.  However, if called from Lisp with a non-nil optional
+argument COPY-CONTENTS, copy the contents of DIRECTORY directly
+into NEWNAME instead."
   (interactive
    (let ((dir (read-directory-name
 	       "Copy directory: " default-directory default-directory t nil)))
@@ -5517,19 +5538,17 @@ directly into NEWNAME instead."
 
       ;; Compute target name.
       (setq directory (directory-file-name (expand-file-name directory))
-	    newname   (directory-file-name (expand-file-name newname)))
+	    newname (expand-file-name newname))
 
-      (cond ((not (file-directory-p newname))
-	     ;; If NEWNAME is not an existing directory, create it;
+      (cond ((not (directory-name-p newname))
+	     ;; If NEWNAME is not a directory name, create it;
 	     ;; that is where we will copy the files of DIRECTORY.
 	     (make-directory newname parents))
-	    ;; If NEWNAME is an existing directory and COPY-CONTENTS
+	    ;; If NEWNAME is a directory name and COPY-CONTENTS
 	    ;; is nil, copy into NEWNAME/[DIRECTORY-BASENAME].
 	    ((not copy-contents)
-	     (setq newname (concat
-			    (file-name-as-directory newname)
-			    (file-name-nondirectory
-			     (directory-file-name directory))))
+	     (setq newname (concat newname
+			    (file-name-nondirectory directory)))
 	     (and (file-exists-p newname)
 		  (not (file-directory-p newname))
 		  (error "Cannot overwrite non-directory %s with a directory"

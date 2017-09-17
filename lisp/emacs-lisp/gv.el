@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -431,7 +431,7 @@ The return value is the last VAL in the list.
            ;; code is large, but otherwise results in more efficient code.
            `(if ,test ,(gv-get then do)
               ,@(macroexp-unprogn (gv-get (macroexp-progn else) do)))
-         (let ((v (make-symbol "v")))
+         (let ((v (gensym "v")))
            (macroexp-let2 nil
                gv `(if ,test ,(gv-letplace (getter setter) then
                                 `(cons (lambda () ,getter)
@@ -456,7 +456,7 @@ The return value is the last VAL in the list.
                                     (gv-get (macroexp-progn (cdr branch)) do)))
                            (gv-get (car branch) do)))
                        branches))
-         (let ((v (make-symbol "v")))
+         (let ((v (gensym "v")))
            (macroexp-let2 nil
                gv `(cond
                     ,@(mapcar

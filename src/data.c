@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
@@ -3011,7 +3011,7 @@ minmax_driver (ptrdiff_t nargs, Lisp_Object *args,
 	       enum Arith_Comparison comparison)
 {
   eassume (0 < nargs);
-  Lisp_Object accum;
+  Lisp_Object accum = args[0];	/* pacify GCC */
   for (ptrdiff_t argnum = 0; argnum < nargs; argnum++)
     {
       Lisp_Object val = args[argnum];

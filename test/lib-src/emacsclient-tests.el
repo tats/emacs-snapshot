@@ -15,7 +15,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -43,7 +43,7 @@
      ;; Skip if emacsclient was compiled with -pg (bug#28319).
      ;; Use ert--skip-unless rather than skip-unless to silence compiler.
      (ert--skip-unless (not (and (stringp stat)
-                                 (string-match-p "rofiling" stat))))
+                                 (string-match-p "Profiling" stat))))
      (should (eq 0 stat))))
 
 (ert-deftest emacsclient-test-alternate-editor-allows-arguments ()

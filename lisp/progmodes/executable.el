@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -228,8 +228,8 @@ executable."
 			 (and argument (string< "" argument) " ")
 			 argument))
 
-  ;; For backward compatibilty, allow `executable-prefix-env' to be
-  ;; overriden by custom `executable-prefix'.
+  ;; For backward compatibility, allow `executable-prefix-env' to be
+  ;; overridden by custom `executable-prefix'.
   (if (string-match "#!\\([ \t]*/usr/bin/env[ \t]*\\)?$" executable-prefix)
       (if executable-prefix-env
           (setq argument (concat "/usr/bin/env "

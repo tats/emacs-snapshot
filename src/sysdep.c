@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
@@ -40,6 +40,10 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #ifdef HAVE_LINUX_FS_H
 # include <linux/fs.h>
 # include <sys/syscall.h>
+#endif
+
+#ifdef CYGWIN
+# include <cygwin/fs.h>
 #endif
 
 #if defined DARWIN_OS || defined __FreeBSD__
@@ -2685,6 +2689,8 @@ renameat_noreplace (int srcfd, char const *src, int dstfd, char const *dst)
 {
 #if defined SYS_renameat2 && defined RENAME_NOREPLACE
   return syscall (SYS_renameat2, srcfd, src, dstfd, dst, RENAME_NOREPLACE);
+#elif defined CYGWIN && defined RENAME_NOREPLACE
+  return renameat2 (srcfd, src, dstfd, dst, RENAME_NOREPLACE);
 #elif defined RENAME_EXCL
   return renameatx_np (srcfd, src, dstfd, dst, RENAME_EXCL);
 #else

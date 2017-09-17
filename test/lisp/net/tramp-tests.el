@@ -15,7 +15,7 @@
 ;; General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `http://www.gnu.org/licenses/'.
+;; along with this program.  If not, see `https://www.gnu.org/licenses/'.
 
 ;;; Commentary:
 
@@ -39,7 +39,6 @@
 
 (require 'dired)
 (require 'ert)
-(require 'seq)
 (require 'tramp)
 (require 'vc)
 (require 'vc-bzr)
@@ -1862,11 +1861,8 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    ;; Do not overwrite if excluded.
 	    (cl-letf (((symbol-function 'y-or-n-p) (lambda (_prompt) t)))
 	      (write-region "foo" nil tmp-name nil nil nil 'mustbenew))
-	    ;; `mustbenew' is passed to Tramp since Emacs 26.1.  We
-	    ;; have no test for this, so we check function
-	    ;; `temporary-file-directory', which has been added to
-	    ;; Emacs 26.1 as well.
-	    (when (fboundp 'temporary-file-directory)
+	    ;; `mustbenew' is passed to Tramp since Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
 	      (should-error
 	       (cl-letf (((symbol-function 'y-or-n-p) 'ignore))
 		 (write-region "foo" nil tmp-name nil nil nil 'mustbenew))
@@ -1900,10 +1896,17 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    (with-temp-buffer
 	      (insert-file-contents tmp-name2)
 	      (should (string-equal (buffer-string) "foo")))
-	    (should-error (copy-file tmp-name1 tmp-name2))
+	    (should-error
+	     (copy-file tmp-name1 tmp-name2)
+	     :type 'file-already-exists)
 	    (copy-file tmp-name1 tmp-name2 'ok)
 	    (make-directory tmp-name3)
-	    (copy-file tmp-name1 tmp-name3)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (copy-file tmp-name1 tmp-name3)
+	       :type 'file-already-exists))
+	    (copy-file tmp-name1 (file-name-as-directory tmp-name3))
 	    (should
 	     (file-exists-p
 	      (expand-file-name (file-name-nondirectory tmp-name1) tmp-name3))))
@@ -1922,10 +1925,17 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    (with-temp-buffer
 	      (insert-file-contents tmp-name4)
 	      (should (string-equal (buffer-string) "foo")))
-	    (should-error (copy-file tmp-name1 tmp-name4))
+	    (should-error
+	     (copy-file tmp-name1 tmp-name4)
+	     :type 'file-already-exists)
 	    (copy-file tmp-name1 tmp-name4 'ok)
 	    (make-directory tmp-name5)
-	    (copy-file tmp-name1 tmp-name5)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (copy-file tmp-name1 tmp-name5)
+	       :type 'file-already-exists))
+	    (copy-file tmp-name1 (file-name-as-directory tmp-name5))
 	    (should
 	     (file-exists-p
 	      (expand-file-name (file-name-nondirectory tmp-name1) tmp-name5))))
@@ -1944,10 +1954,17 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    (with-temp-buffer
 	      (insert-file-contents tmp-name1)
 	      (should (string-equal (buffer-string) "foo")))
-	    (should-error (copy-file tmp-name4 tmp-name1))
+	    (should-error
+	     (copy-file tmp-name4 tmp-name1)
+	     :type 'file-already-exists)
 	    (copy-file tmp-name4 tmp-name1 'ok)
 	    (make-directory tmp-name3)
-	    (copy-file tmp-name4 tmp-name3)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (copy-file tmp-name4 tmp-name3)
+	       :type 'file-already-exists))
+	    (copy-file tmp-name4 (file-name-as-directory tmp-name3))
 	    (should
 	     (file-exists-p
 	      (expand-file-name (file-name-nondirectory tmp-name4) tmp-name3))))
@@ -1981,12 +1998,19 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (insert-file-contents tmp-name2)
 	      (should (string-equal (buffer-string) "foo")))
 	    (write-region "foo" nil tmp-name1)
-	    (should-error (rename-file tmp-name1 tmp-name2))
+	    (should-error
+	     (rename-file tmp-name1 tmp-name2)
+	     :type 'file-already-exists)
 	    (rename-file tmp-name1 tmp-name2 'ok)
 	    (should-not (file-exists-p tmp-name1))
 	    (write-region "foo" nil tmp-name1)
 	    (make-directory tmp-name3)
-	    (rename-file tmp-name1 tmp-name3)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (rename-file tmp-name1 tmp-name3)
+	       :type 'file-already-exists))
+	    (rename-file tmp-name1 (file-name-as-directory tmp-name3))
 	    (should-not (file-exists-p tmp-name1))
 	    (should
 	     (file-exists-p
@@ -2008,12 +2032,19 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (insert-file-contents tmp-name4)
 	      (should (string-equal (buffer-string) "foo")))
 	    (write-region "foo" nil tmp-name1)
-	    (should-error (rename-file tmp-name1 tmp-name4))
+	    (should-error
+	     (rename-file tmp-name1 tmp-name4)
+	     :type 'file-already-exists)
 	    (rename-file tmp-name1 tmp-name4 'ok)
 	    (should-not (file-exists-p tmp-name1))
 	    (write-region "foo" nil tmp-name1)
 	    (make-directory tmp-name5)
-	    (rename-file tmp-name1 tmp-name5)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (rename-file tmp-name1 tmp-name5)
+	       :type 'file-already-exists))
+	    (rename-file tmp-name1 (file-name-as-directory tmp-name5))
 	    (should-not (file-exists-p tmp-name1))
 	    (should
 	     (file-exists-p
@@ -2035,12 +2066,19 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (insert-file-contents tmp-name1)
 	      (should (string-equal (buffer-string) "foo")))
 	    (write-region "foo" nil tmp-name4 nil 'nomessage)
-	    (should-error (rename-file tmp-name4 tmp-name1))
+	    (should-error
+	     (rename-file tmp-name4 tmp-name1)
+	     :type 'file-already-exists)
 	    (rename-file tmp-name4 tmp-name1 'ok)
 	    (should-not (file-exists-p tmp-name4))
 	    (write-region "foo" nil tmp-name4 nil 'nomessage)
 	    (make-directory tmp-name3)
-	    (rename-file tmp-name4 tmp-name3)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (rename-file tmp-name4 tmp-name3)
+	       :type 'file-already-exists))
+	    (rename-file tmp-name4 (file-name-as-directory tmp-name3))
 	    (should-not (file-exists-p tmp-name4))
 	    (should
 	     (file-exists-p
@@ -2064,7 +2102,7 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    (make-directory tmp-name1)
 	    (should (file-directory-p tmp-name1))
 	    (should (file-accessible-directory-p tmp-name1))
-	    (should-error (make-directory tmp-name2))
+	    (should-error (make-directory tmp-name2) :type 'file-error)
 	    (make-directory tmp-name2 'parents)
 	    (should (file-directory-p tmp-name2))
 	    (should (file-accessible-directory-p tmp-name2)))
@@ -2088,7 +2126,7 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
       (should (file-directory-p tmp-name))
       (write-region "foo" nil (expand-file-name "bla" tmp-name))
       (should (file-exists-p (expand-file-name "bla" tmp-name)))
-      (should-error (delete-directory tmp-name))
+      (should-error (delete-directory tmp-name) :type 'file-error)
       (delete-directory tmp-name 'recursive)
       (should-not (file-directory-p tmp-name)))))
 
@@ -2117,7 +2155,12 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    (should (file-directory-p tmp-name2))
 	    (should (file-exists-p tmp-name5))
 	    ;; Target directory does exist already.
-	    (copy-directory tmp-name1 tmp-name2)
+	    ;; This has been changed in Emacs 26.1.
+	    (when (tramp--test-emacs26-p)
+	      (should-error
+	       (copy-directory tmp-name1 tmp-name2)
+	       :type 'file-error))
+	    (copy-directory tmp-name1 (file-name-as-directory tmp-name2))
 	    (should (file-directory-p tmp-name3))
 	    (should (file-exists-p tmp-name6)))
 
@@ -2140,7 +2183,9 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    ;; Target directory does exist already.
 	    (delete-file tmp-name5)
 	    (should-not (file-exists-p tmp-name5))
-	    (copy-directory tmp-name1 tmp-name2 nil 'parents 'contents)
+	    (copy-directory
+	     tmp-name1 (file-name-as-directory tmp-name2)
+	     nil 'parents 'contents)
 	    (should (file-directory-p tmp-name2))
 	    (should (file-exists-p tmp-name5))
 	    (should-not (file-directory-p tmp-name3))
@@ -2205,30 +2250,44 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	    (should (file-exists-p tmp-name3))
 	    (should (file-exists-p tmp-name4))
 
-	    ;; We cannot use `sort', it works destructive.
-	    (should (equal (file-expand-wildcards "*")
-			   (seq-sort 'string< '("foo" "bar" "baz"))))
-	    (should (equal (file-expand-wildcards "ba?")
-			   (seq-sort 'string< '("bar" "baz"))))
-	    (should (equal (file-expand-wildcards "ba[rz]")
-			   (seq-sort 'string< '("bar" "baz"))))
+	    ;; `sort' works destructive.
+	    (should
+	     (equal (file-expand-wildcards "*")
+		    (sort (copy-sequence '("foo" "bar" "baz")) 'string<)))
+	    (should
+	     (equal (file-expand-wildcards "ba?")
+		    (sort (copy-sequence '("bar" "baz")) 'string<)))
+	    (should
+	     (equal (file-expand-wildcards "ba[rz]")
+		    (sort (copy-sequence '("bar" "baz")) 'string<)))
 
-	    (should (equal (file-expand-wildcards "*" 'full)
-			   (seq-sort
-			    'string< `(,tmp-name2 ,tmp-name3 ,tmp-name4))))
-	    (should (equal (file-expand-wildcards "ba?" 'full)
-			   (seq-sort 'string< `(,tmp-name3 ,tmp-name4))))
-	    (should (equal (file-expand-wildcards "ba[rz]" 'full)
-			   (seq-sort 'string< `(,tmp-name3 ,tmp-name4))))
+	    (should
+	     (equal
+	      (file-expand-wildcards "*" 'full)
+	      (sort
+	       (copy-sequence `(,tmp-name2 ,tmp-name3 ,tmp-name4)) 'string<)))
+	    (should
+	     (equal
+	      (file-expand-wildcards "ba?" 'full)
+	      (sort (copy-sequence `(,tmp-name3 ,tmp-name4)) 'string<)))
+	    (should
+	     (equal
+	      (file-expand-wildcards "ba[rz]" 'full)
+	      (sort (copy-sequence `(,tmp-name3 ,tmp-name4)) 'string<)))
 
-	    (should (equal (file-expand-wildcards (concat tmp-name1 "/" "*"))
-			   (seq-sort
-			    'string< `(,tmp-name2 ,tmp-name3 ,tmp-name4))))
-	    (should (equal (file-expand-wildcards (concat tmp-name1 "/" "ba?"))
-			   (seq-sort 'string< `(,tmp-name3 ,tmp-name4))))
-	    (should (equal (file-expand-wildcards
-			    (concat tmp-name1 "/" "ba[rz]"))
-			   (seq-sort 'string< `(,tmp-name3 ,tmp-name4)))))
+	    (should
+	     (equal
+	      (file-expand-wildcards (concat tmp-name1 "/" "*"))
+	      (sort
+	       (copy-sequence `(,tmp-name2 ,tmp-name3 ,tmp-name4)) 'string<)))
+	    (should
+	     (equal
+	      (file-expand-wildcards (concat tmp-name1 "/" "ba?"))
+	      (sort (copy-sequence `(,tmp-name3 ,tmp-name4)) 'string<)))
+	    (should
+	     (equal
+	      (file-expand-wildcards (concat tmp-name1 "/" "ba[rz]"))
+	      (sort (copy-sequence `(,tmp-name3 ,tmp-name4)) 'string<))))
 
 	;; Cleanup.
 	(ignore-errors
@@ -2581,6 +2640,9 @@ This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
   "Check `file-symlink-p'.
 This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (skip-unless (tramp--test-enabled))
+  ;; The semantics has changed heavily in Emacs 26.1.  We cannot test
+  ;; older Emacsen, therefore.
+  (skip-unless (tramp--test-emacs26-p))
 
   (dolist (quoted (if tramp--test-expensive-test '(nil t) '(nil)))
     ;; We must use `file-truename' for the temporary directory,
@@ -2590,7 +2652,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (file-truename tramp-test-temporary-file-directory))
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name nil quoted))
-	   (tmp-name3 (tramp--test-make-temp-name 'local quoted)))
+	   (tmp-name3 (tramp--test-make-temp-name 'local quoted))
+	   (tmp-name4 (tramp--test-make-temp-name nil quoted)))
 
       ;; Check `make-symbolic-link'.
       (unwind-protect
@@ -2641,13 +2704,28 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    ;; target remains unchanged, even if quoted.
 	    (make-symbolic-link tmp-name1 tmp-name3)
 	    (should
-	     (string-equal tmp-name1 (file-symlink-p tmp-name3))))
+	     (string-equal tmp-name1 (file-symlink-p tmp-name3)))
+	    ;; Check directory as newname.
+	    (make-directory tmp-name4)
+	    (should-error
+	     (make-symbolic-link tmp-name1 tmp-name4)
+	     :type 'file-already-exists)
+	    (make-symbolic-link tmp-name1 (file-name-as-directory tmp-name4))
+	    (should
+	     (string-equal
+	      (funcall
+	       (if quoted 'tramp-compat-file-name-unquote 'identity)
+	       (file-remote-p tmp-name1 'localname))
+	      (file-symlink-p
+	       (expand-file-name
+		(file-name-nondirectory tmp-name1) tmp-name4)))))
 
 	;; Cleanup.
 	(ignore-errors
 	  (delete-file tmp-name1)
 	  (delete-file tmp-name2)
-	  (delete-file tmp-name3)))
+	  (delete-file tmp-name3)
+	  (delete-directory tmp-name4 'recursive)))
 
       ;; Check `add-name-to-file'.
       (unwind-protect
@@ -2673,12 +2751,22 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    ;; `tmp-name3' is a local file name.
 	    (should-error
 	     (add-name-to-file tmp-name1 tmp-name3)
-	     :type 'file-error))
+	     :type 'file-error)
+	    ;; Check directory as newname.
+	    (make-directory tmp-name4)
+	    (should-error
+	     (add-name-to-file tmp-name1 tmp-name4)
+	     :type 'file-already-exists)
+	    (add-name-to-file tmp-name1 (file-name-as-directory tmp-name4))
+	    (should
+	     (file-regular-p
+	      (expand-file-name (file-name-nondirectory tmp-name1) tmp-name4))))
 
 	;; Cleanup.
 	(ignore-errors
 	  (delete-file tmp-name1)
-	  (delete-file tmp-name2)))
+	  (delete-file tmp-name2)
+	  (delete-directory tmp-name4 'recursive)))
 
       ;; Check `file-truename'.
       (unwind-protect
@@ -2851,16 +2939,16 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
             (tramp-change-syntax syntax)
             (let ;; This is needed for the `simplified' syntax.
                 ((method-marker
-                  (if (zerop (length (tramp-method-regexp)))
+                  (if (zerop (length tramp-method-regexp))
                       "" tramp-default-method-marker))
                  ;; This is needed for the `separate' syntax.
-                 (prefix-format (substring (tramp-prefix-format) 1)))
+                 (prefix-format (substring tramp-prefix-format 1)))
               ;; Complete method name.
 	      (unless (or (zerop (length method))
-                          (zerop (length (tramp-method-regexp))))
+                          (zerop (length tramp-method-regexp)))
 	        (should
 	         (member
-		  (concat prefix-format method (tramp-postfix-method-format))
+		  (concat prefix-format method tramp-postfix-method-format)
 		  (file-name-all-completions
                    (concat prefix-format (substring method 0 1)) "/"))))
               ;; Complete host name for default method.  With gvfs
@@ -2872,25 +2960,25 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		  (should
 		   (member
 		    (concat
-                     prefix-format method-marker (tramp-postfix-method-format)
-                     host (tramp-postfix-host-format))
+                     prefix-format method-marker tramp-postfix-method-format
+                     host tramp-postfix-host-format)
 		    (file-name-all-completions
 		     (concat
-                      prefix-format method-marker (tramp-postfix-method-format)
+                      prefix-format method-marker tramp-postfix-method-format
                       (substring host 0 1))
                      "/")))))
               ;; Complete host name.
 	      (unless (or (zerop (length method))
-                          (zerop (length (tramp-method-regexp)))
+                          (zerop (length tramp-method-regexp))
                           (zerop (length host))
 			  (tramp--test-gvfs-p method))
 	        (should
 	         (member
 		  (concat
-                   prefix-format method (tramp-postfix-method-format)
-                   host (tramp-postfix-host-format))
+                   prefix-format method tramp-postfix-method-format
+                   host tramp-postfix-host-format)
 		  (file-name-all-completions
-		   (concat prefix-format method (tramp-postfix-method-format))
+		   (concat prefix-format method tramp-postfix-method-format)
                    "/"))))))
 
 	;; Cleanup.
@@ -2968,7 +3056,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (write-region "(provide 'tramp-test-load)" nil tmp-name)
 	    ;; `load' in lread.c does not pass `must-suffix'.  Why?
 	    ;;(should-error
-	    ;; (load tmp-name nil 'nomessage 'nosuffix 'must-suffix))
+	    ;; (load tmp-name nil 'nomessage 'nosuffix 'must-suffix)
+	    ;; :type 'file-error)
 	    (load tmp-name nil 'nomessage 'nosuffix)
 	    (should (featurep 'tramp-test-load)))
 
@@ -3111,7 +3200,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (should (equal (process-status proc) 'signal))
 	  ;; An interrupted process cannot be interrupted, again.
 	  ;; Does not work reliable.
-	  ;; (should-error (interrupt-process proc)))
+	  ;; (should-error (interrupt-process proc) :type 'error))
 	  )
 
       ;; Cleanup.
@@ -3586,6 +3675,12 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     (delete-directory tmp-file)
     (should-not (file-exists-p tmp-file))))
 
+(defun tramp--test-emacs26-p ()
+  "Check for Emacs version >= 26.1.
+Some semantics has been changed for there, w/o new functions or
+variables, so we check function Emacs version directly."
+  (>= emacs-major-version 26))
+
 (defun tramp--test-adb-p ()
   "Check, whether the remote host runs Android.
 This requires restrictions of file name syntax."
@@ -3681,11 +3776,11 @@ This requires restrictions of file name syntax."
 		  (should (string-equal (buffer-string) elt)))
 
 		;; Copy file both directions.
-		(copy-file file1 tmp-name2)
+		(copy-file file1 (file-name-as-directory tmp-name2))
 		(should (file-exists-p file2))
 		(delete-file file1)
 		(should-not (file-exists-p file1))
-		(copy-file file2 tmp-name1)
+		(copy-file file2 (file-name-as-directory tmp-name1))
 		(should (file-exists-p file1))
 
 		(tramp--test-ignore-make-symbolic-link-error
