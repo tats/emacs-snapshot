@@ -11,10 +11,10 @@ appropriate, etc.
  1 file changed, 4 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index 3f7feba..ea59ab8 100644
+index 371cdf6..1d6297a 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
-@@ -21,6 +21,10 @@ Temporary note:
+@@ -22,6 +22,10 @@ Temporary note:
  --- means no change in the manuals is needed.
  When you add a new item, use the appropriate mark if you are sure it applies,
  
@@ -23,5 +23,5 @@ index 3f7feba..ea59ab8 100644
 +Please see /usr/share/doc/emacs-snapshot-common/README.Debian.gz.
 +
  
- * Installation Changes in Emacs 26.1
+ * Installation Changes in Emacs 27.1
  

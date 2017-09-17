@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 8a08465..0c37b39 100644
+index 14244ea..71ac33d 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -157,7 +157,9 @@ man1dir=
@@ -81,9 +81,9 @@ index 8a08465..0c37b39 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -994,14 +993,10 @@ ${srcdir}/info/dir:
- 	) >$@.tmp
- 	mv $@.tmp $@
+@@ -993,14 +992,10 @@ ${srcdir}/info/dir:
+ 	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
+ 	) >$@.tmp && mv $@.tmp $@
  
 -INSTALL_DVI = install-emacs-dvi install-lispref-dvi \
 -	install-lispintro-dvi install-misc-dvi
@@ -100,7 +100,7 @@ index 8a08465..0c37b39 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1019,14 +1014,10 @@ install-pdf:
+@@ -1018,14 +1013,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -120,7 +120,7 @@ index 8a08465..0c37b39 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index ba4ed00..6ba7788 100755
+index cfbb7c7..49b64d4 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -259,8 +259,7 @@ info_dir ()
@@ -134,10 +134,10 @@ index ba4ed00..6ba7788 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 8ffc7cf..06374f2 100644
+index 35b7e69..af439b1 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5460,7 +5460,7 @@ AC_DEFUN
+@@ -5483,7 +5483,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 8ffc7cf..06374f2 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5513,15 +5513,6 @@ m4_define
+@@ -5536,15 +5536,6 @@ m4_define
  fi
  ])
  
@@ -163,7 +163,7 @@ index 8ffc7cf..06374f2 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 8ff8232..24aeb1c 100644
+index a60fb0b..9128f61 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -190,7 +190,7 @@ index 8ff8232..24aeb1c 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index bc7ee2c..03c19be 100644
+index bc8035d..093ce0a 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file
