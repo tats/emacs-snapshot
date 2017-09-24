@@ -37,11 +37,19 @@ When you add a new item, use the appropriate mark if you are sure it applies,
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+** Enhanced xterm support
+
+*** New variable 'xterm-set-window-title' controls whether Emacs
+sets the XTerm window title.  The default is to set the window title.
+
 
 * New Modes and Packages in Emacs 27.1
 
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+** The FILENAME argument to 'file-name-base' is now mandatory and no
+longer defaults to 'buffer-file-name'.
 
 
 * Lisp Changes in Emacs 27.1

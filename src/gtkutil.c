@@ -566,6 +566,14 @@ xg_check_special_colors (struct frame *f,
   if (! FRAME_GTK_WIDGET (f) || ! (get_bg || get_fg))
     return success_p;
 
+#if GTK_CHECK_VERSION (3, 16, 0)
+  if (get_bg)
+    /* gtk_style_context_get_background_color is deprecated in
+       GTK+ 3.16.  New versions of GTK+ don't use the concept of a
+       single background color any more, so we can't query for it.  */
+    return false;
+#endif
+
   block_input ();
   {
 #ifdef HAVE_GTK3
@@ -577,7 +585,12 @@ xg_check_special_colors (struct frame *f,
     if (get_fg)
       gtk_style_context_get_color (gsty, state, &col);
     else
+#if GTK_CHECK_VERSION (3, 16, 0)
+      /* We can't get here.  */
+      emacs_abort ();
+#else
       gtk_style_context_get_background_color (gsty, state, &col);
+#endif
 
     unsigned short
       r = col.red * 65535,
@@ -1050,16 +1063,23 @@ static void
 xg_set_widget_bg (struct frame *f, GtkWidget *w, unsigned long pixel)
 {
 #ifdef HAVE_GTK3
-  GdkRGBA bg;
   XColor xbg;
   xbg.pixel = pixel;
   if (XQueryColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), &xbg))
     {
-      bg.red = (double)xbg.red/65535.0;
-      bg.green = (double)xbg.green/65535.0;
-      bg.blue = (double)xbg.blue/65535.0;
-      bg.alpha = 1.0;
-      gtk_widget_override_background_color (w, GTK_STATE_FLAG_NORMAL, &bg);
+      const char format[] = "* { background-color: #%02x%02x%02x; }";
+      /* The format is always longer than the resulting string.  */
+      char buffer[sizeof format];
+      int n = snprintf(buffer, sizeof buffer, format,
+                       xbg.red >> 8, xbg.green >> 8, xbg.blue >> 8);
+      eassert (n > 0);
+      eassert (n < sizeof buffer);
+      GtkCssProvider *provider = gtk_css_provider_new ();
+      gtk_css_provider_load_from_data (provider, buffer, -1, NULL);
+      gtk_style_context_add_provider (gtk_widget_get_style_context(w),
+                                      GTK_STYLE_PROVIDER (provider),
+                                      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+      g_clear_object (&provider);
     }
 #else
   GdkColor bg;
@@ -1213,16 +1233,20 @@ xg_create_frame_widgets (struct frame *f)
   if (FRAME_EXTERNAL_TOOL_BAR (f))
     update_frame_tool_bar (f);
 
+#if ! GTK_CHECK_VERSION (3, 14, 0)
   /* We don't want this widget double buffered, because we draw on it
      with regular X drawing primitives, so from a GTK/GDK point of
      view, the widget is totally blank.  When an expose comes, this
      will make the widget blank, and then Emacs redraws it.  This flickers
      a lot, so we turn off double buffering.  */
   gtk_widget_set_double_buffered (wfixed, FALSE);
+#endif
 
+#if ! GTK_CHECK_VERSION (3, 22, 0)
   gtk_window_set_wmclass (GTK_WINDOW (wtop),
                           SSDATA (Vx_resource_name),
                           SSDATA (Vx_resource_class));
+#endif
 
   /* Add callback to do nothing on WM_DELETE_WINDOW.  The default in
      GTK is to destroy the widget.  We want Emacs to do that instead.  */
@@ -4085,8 +4109,10 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
 
         if (int_gtk_range_get_value (GTK_RANGE (wscroll)) != value)
           gtk_range_set_value (GTK_RANGE (wscroll), (gdouble)value);
+#if ! GTK_CHECK_VERSION (3, 18, 0)
         else if (changed)
           gtk_adjustment_changed (adj);
+#endif
 
         xg_ignore_gtk_scrollbar = 0;
 
@@ -4123,7 +4149,9 @@ xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
       gtk_adjustment_configure (adj, (gdouble) value, (gdouble) lower,
 				(gdouble) upper, (gdouble) step_increment,
 				(gdouble) page_increment, (gdouble) pagesize);
+#if ! GTK_CHECK_VERSION (3, 18, 0)
       gtk_adjustment_changed (adj);
+#endif
       unblock_input ();
     }
 }
