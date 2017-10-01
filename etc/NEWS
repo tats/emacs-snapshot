@@ -31,8 +31,21 @@ When you add a new item, use the appropriate mark if you are sure it applies,
 
 * Changes in Emacs 27.1
 
++++
+** New function 'logcount' calculates an integer's Hamming weight.
+
 
 * Editing Changes in Emacs 27.1
+
+---
+** New variable 'x-wait-for-event-timeout'.
+This controls how long Emacs will wait for updates to the graphical
+state to take effect (making a frame visible, for example).
+
++++
+** The new user option 'electric-quote-replace-double' controls
+whether " is also replaced in 'electric-quote-mode'.  If non-nil, " is
+replaced by a double typographic quote.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
@@ -51,6 +64,12 @@ sets the XTerm window title.  The default is to set the window title.
 ** The FILENAME argument to 'file-name-base' is now mandatory and no
 longer defaults to 'buffer-file-name'.
 
+---
+** The function 'eldoc-message' now accepts a single argument.
+Programs that called it with multiple arguments before should pass
+them through 'format' first.  Even that is discouraged: for ElDoc
+support, you should set 'eldoc-documentation-function' instead of
+calling 'eldoc-message' directly.
 
 * Lisp Changes in Emacs 27.1
 
