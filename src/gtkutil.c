@@ -577,11 +577,18 @@ xg_check_special_colors (struct frame *f,
     if (get_fg)
       gtk_style_context_get_color (gsty, state, &col);
     else
-      /* FIXME: gtk_style_context_get_background_color is deprecated
-         in GTK+ 3.16.  New versions of GTK+ don’t use the concept of
-         a single background color any more, so we shouldn’t query for
-         it.  */
-      gtk_style_context_get_background_color (gsty, state, &col);
+      {
+        GdkRGBA *c;
+        /* FIXME: Retrieving the background color is deprecated in
+           GTK+ 3.16.  New versions of GTK+ don’t use the concept of a
+           single background color any more, so we shouldn’t query for
+           it.  */
+        gtk_style_context_get (gsty, state,
+                               GTK_STYLE_PROPERTY_BACKGROUND_COLOR, &c,
+                               NULL);
+        col = *c;
+        gdk_rgba_free (c);
+      }
 
     unsigned short
       r = col.red * 65535,
@@ -1376,7 +1383,7 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 
   /* Don't set size hints during initialization; that apparently leads
      to a race condition.  See the thread at
-     http://lists.gnu.org/archive/html/emacs-devel/2008-10/msg00033.html  */
+     https://lists.gnu.org/archive/html/emacs-devel/2008-10/msg00033.html  */
   if (NILP (Vafter_init_time)
       || !FRAME_GTK_OUTER_WIDGET (f)
       || FRAME_PARENT_FRAME (f))

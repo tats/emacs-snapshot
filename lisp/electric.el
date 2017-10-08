@@ -469,6 +469,8 @@ substitution is inhibited.  The functions are called after the
 after the inserted character.  The functions in this hook should
 not move point or change the current buffer.")
 
+(defvar electric-pair-text-pairs)
+
 (defun electric-quote-post-self-insert-function ()
   "Function that `electric-quote-mode' adds to `post-self-insert-hook'.
 This requotes when a quoting key is typed."
