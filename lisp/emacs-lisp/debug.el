@@ -253,7 +253,9 @@ first will be printed into the backtrace buffer."
 		;; Unshow debugger-buffer.
 		(quit-restore-window debugger-window debugger-bury-or-kill)
 		;; Restore current buffer (Bug#12502).
-		(set-buffer debugger-old-buffer))))
+		(set-buffer debugger-old-buffer)))
+            ;; Forget debugger window, it won't be back (Bug#17882).
+            (setq debugger-previous-window nil))
           ;; Restore previous state of debugger-buffer in case we were
           ;; in a recursive invocation of the debugger, otherwise just
           ;; erase the buffer and put it into fundamental mode.
@@ -420,7 +422,7 @@ will be used, such as in a debug on exit from a frame."
                "from an error" "at function entrance")))
   (setq debugger-value val)
   (princ "Returning " t)
-  (prin1 debugger-value)
+  (debugger--print debugger-value)
   (save-excursion
     ;; Check to see if we've flagged some frame for debug-on-exit, in which
     ;; case we'll probably come back to the debugger soon.
@@ -535,7 +537,7 @@ The environment used is the one when entering the activation frame at point."
     (debugger-env-macro
       (let ((val (backtrace-eval exp nframe base)))
         (prog1
-            (prin1 val t)
+            (debugger--print val t)
           (let ((str (eval-expression-print-format val)))
             (if str (princ str t))))))))
 
@@ -557,7 +559,7 @@ The environment used is the one when entering the activation frame at point."
 	       (insert "\n    ")
 	       (prin1 symbol (current-buffer))
 	       (insert " = ")
-	       (prin1 value (current-buffer))))))))
+	       (debugger--print value (current-buffer))))))))
 
 (defun debugger--show-locals ()
   "For the frame at point, insert locals and add text properties."
