@@ -134,7 +134,7 @@ index cfbb7c7..49b64d4 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 627a392..72071ee 100644
+index 7437eb9..b6735fb 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5485,7 +5485,7 @@ AC_DEFUN
