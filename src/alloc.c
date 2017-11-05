@@ -2298,11 +2298,13 @@ string_overflow (void)
   error ("Maximum string size exceeded");
 }
 
-DEFUN ("make-string", Fmake_string, Smake_string, 2, 2, 0,
+DEFUN ("make-string", Fmake_string, Smake_string, 2, 3, 0,
        doc: /* Return a newly created string of length LENGTH, with INIT in each element.
 LENGTH must be an integer.
-INIT must be an integer that represents a character.  */)
-  (Lisp_Object length, Lisp_Object init)
+INIT must be an integer that represents a character.
+If optional argument MULTIBYTE is non-nil, the result will be
+a multibyte string even if INIT is an ASCII character.  */)
+  (Lisp_Object length, Lisp_Object init, Lisp_Object multibyte)
 {
   register Lisp_Object val;
   int c;
@@ -2312,7 +2314,7 @@ INIT must be an integer that represents a character.  */)
   CHECK_CHARACTER (init);
 
   c = XFASTINT (init);
-  if (ASCII_CHAR_P (c))
+  if (ASCII_CHAR_P (c) && NILP (multibyte))
     {
       nbytes = XINT (length);
       val = make_uninit_string (nbytes);
@@ -3930,7 +3932,7 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
   {
     Lisp_Object result;
 
-    result = Fmake_string (make_number (nargs), make_number (0));
+    result = Fmake_string (make_number (nargs), make_number (0), Qnil);
     for (i = 0; i < nargs; i++)
       {
 	SSET (result, i, XINT (args[i]));
@@ -7031,7 +7033,15 @@ sweep_symbols (void)
           if (!sym->s.gcmarkbit)
             {
               if (sym->s.redirect == SYMBOL_LOCALIZED)
-                xfree (SYMBOL_BLV (&sym->s));
+		{
+                  xfree (SYMBOL_BLV (&sym->s));
+                  /* At every GC we sweep all symbol_blocks and rebuild the
+                     symbol_free_list, so those symbols which stayed unused
+                     between the two will be re-swept.
+                     So we have to make sure we don't re-free this blv next
+                     time we sweep this symbol_block (bug#29066).  */
+                  sym->s.redirect = SYMBOL_PLAINVAL;
+                }
               sym->s.next = symbol_free_list;
               symbol_free_list = &sym->s;
               symbol_free_list->function = Vdead;

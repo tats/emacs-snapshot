@@ -228,13 +228,13 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
 
    USE_LSB_TAG not only requires the least 3 bits of pointers returned by
    malloc to be 0 but also needs to be able to impose a mult-of-8 alignment
-   on the few static Lisp_Objects used: lispsym, all the defsubr, and
-   the two special buffers buffer_defaults and buffer_local_symbols.  */
+   on the few static Lisp_Objects used, all of which are aligned via
+   the GCALIGN macro defined below.  */
 
 enum Lisp_Bits
   {
     /* 2**GCTYPEBITS.  This must be a macro that expands to a literal
-       integer constant, for MSVC.  */
+       integer constant, for older versions of GCC (through at least 4.9).  */
 #define GCALIGNMENT 8
 
     /* Number of bits in a Lisp_Object value, not counting the tag.  */
@@ -277,6 +277,10 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
 error !;
 #endif
 
+/* Declare an object to have an address that is a multiple of
+   GCALIGNMENT.  This is a no-op if the object's natural alignment is
+   already a multiple of GCALIGNMENT.  alignas is not suitable here,
+   as it fails if the object's natural alignment exceeds GCALIGNMENT.  */
 #ifdef HAVE_STRUCT_ATTRIBUTE_ALIGNED
 # define GCALIGNED __attribute__ ((aligned (GCALIGNMENT)))
 #else
@@ -420,9 +424,8 @@ error !;
 #define case_Lisp_Int case Lisp_Int0: case Lisp_Int1
 
 /* Idea stolen from GDB.  Pedantic GCC complains about enum bitfields,
-   MSVC doesn't support them, and xlc and Oracle Studio c99 complain
-   vociferously about them.  */
-#if (defined __STRICT_ANSI__ || defined _MSC_VER || defined __IBMC__ \
+   and xlc and Oracle Studio c99 complain vociferously about them.  */
+#if (defined __STRICT_ANSI__ || defined __IBMC__ \
      || (defined __SUNPRO_C && __STDC__))
 #define ENUM_BF(TYPE) unsigned int
 #else
@@ -2937,23 +2940,12 @@ CHECK_NUMBER_CDR (Lisp_Object x)
 
 /* This version of DEFUN declares a function prototype with the right
    arguments, so we can catch errors with maxargs at compile-time.  */
-#ifdef _MSC_VER
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
-   Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
-   static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
-   { { (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS)				\
-       | (sizeof (struct Lisp_Subr) / sizeof (EMACS_INT)) },		\
-      { (Lisp_Object (__cdecl *)(void))fnname },                        \
-       minargs, maxargs, lname, intspec, 0};				\
-   Lisp_Object fnname
-#else  /* not _MSC_VER */
-#define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
-   static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
+   static struct Lisp_Subr GCALIGNED sname =				\
      { { PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },				\
        { .a ## maxargs = fnname },					\
        minargs, maxargs, lname, intspec, 0};				\
    Lisp_Object fnname
-#endif
 
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */
@@ -4399,9 +4391,9 @@ extern void syms_of_xterm (void);
 extern char *x_get_keysym_name (int);
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#ifdef HAVE_LIBXML2
 /* Defined in xml.c.  */
 extern void syms_of_xml (void);
+#ifdef HAVE_LIBXML2
 extern void xml_cleanup_parser (void);
 #endif
 
