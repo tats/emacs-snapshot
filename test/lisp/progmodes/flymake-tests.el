@@ -108,24 +108,30 @@ SEVERITY-PREDICATE is used to setup
     (should (eq 'flymake-warning
                 (face-at-point)))))
 
-(ert-deftest warning-predicate-rx-perl ()
-  "Test perl warning via regular expression predicate."
+(ert-deftest perl-backend ()
+  "Test the perl backend"
   (skip-unless (executable-find "perl"))
-  (flymake-tests--with-flymake
-      ("test.pl" :severity-predicate "^Scalar value")
+  (flymake-tests--with-flymake ("test.pl")
     (flymake-goto-next-error)
-    (should (eq 'flymake-warning
-                (face-at-point)))))
+    (should (eq 'flymake-warning (face-at-point)))
+    (goto-char (point-max))
+    (flymake-goto-prev-error)
+    (should (eq 'flymake-error (face-at-point)))))
 
-(ert-deftest warning-predicate-function-perl ()
-  "Test perl warning via function predicate."
-  (skip-unless (executable-find "perl"))
-  (flymake-tests--with-flymake
-      ("test.pl" :severity-predicate
-       (lambda (msg) (string-match "^Scalar value" msg)))
-    (flymake-goto-next-error)
-    (should (eq 'flymake-warning
-                (face-at-point)))))
+(ert-deftest ruby-backend ()
+  "Test the ruby backend"
+  (skip-unless (executable-find "ruby"))
+  ;; Some versions of ruby fail if HOME doesn't exist (bug#29187).
+  (let* ((tempdir (make-temp-file "flymake-tests-ruby" t))
+         (process-environment (cons (format "HOME=%s" tempdir)
+                                    process-environment)))
+    (unwind-protect
+        (flymake-tests--with-flymake ("test.rb")
+          (flymake-goto-next-error)
+          (should (eq 'flymake-warning (face-at-point)))
+          (flymake-goto-next-error)
+          (should (eq 'flymake-error (face-at-point))))
+      (delete-directory tempdir t))))
 
 (ert-deftest different-diagnostic-types ()
   "Test GCC warning via function predicate."
