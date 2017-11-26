@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 8ad3f99..fc48a32 100644
+index 3f46d0a..bae003a 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -157,7 +157,9 @@ man1dir=
@@ -134,7 +134,7 @@ index cfbb7c7..49b64d4 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 29016d8..9d557eb 100644
+index 469ad00..03ca1aa 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5477,7 +5477,7 @@ AC_DEFUN
@@ -190,7 +190,7 @@ index a60fb0b..9128f61 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index fbb9fc8..81e6e30 100644
+index 212e367..b142a32 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file
