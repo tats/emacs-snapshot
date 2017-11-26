@@ -979,7 +979,7 @@ This prompts for a branch to merge from."
              ;; FIXME
              ;; 1) the net result is to call git twice per file.
              ;; 2) v-g-c-f is documented to take a directory.
-             ;; https://lists.gnu.org/archive/html/emacs-devel/2014-01/msg01126.html
+             ;; https://lists.gnu.org/r/emacs-devel/2014-01/msg01126.html
              (vc-git-conflicted-files buffer-file-name)
              (save-excursion
                (goto-char (point-min))
@@ -1408,7 +1408,9 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
   "Run git grep, searching for REGEXP in FILES in directory DIR.
 The search is limited to file names matching shell pattern FILES.
 FILES may use abbreviations defined in `grep-files-aliases', e.g.
-entering `ch' is equivalent to `*.[ch]'.
+entering `ch' is equivalent to `*.[ch]'.  As whitespace triggers
+completion when entering a pattern, including it requires
+quoting, e.g. `\\[quoted-insert]<space>'.
 
 With \\[universal-argument] prefix, you can edit the constructed shell command line
 before it is executed.

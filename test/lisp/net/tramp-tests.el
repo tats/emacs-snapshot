@@ -2313,6 +2313,14 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	      (insert-directory tmp-name1 nil)
 	      (goto-char (point-min))
 	      (should (looking-at-p (regexp-quote tmp-name1))))
+	    ;; This has been fixed in Emacs 26.1.  See Bug#29423.
+	    (when (tramp--test-emacs26-p)
+	      (with-temp-buffer
+	        (insert-directory (file-name-as-directory tmp-name1) nil)
+	        (goto-char (point-min))
+	        (should
+                 (looking-at-p
+                  (regexp-quote (file-name-as-directory tmp-name1))))))
 	    (with-temp-buffer
 	      (insert-directory tmp-name1 "-al")
 	      (goto-char (point-min))
@@ -2671,7 +2679,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should-error
 	     (make-symbolic-link tmp-name1 tmp-name2)
 	     :type 'file-already-exists)
-	    ;; number means interactive case.
+	    ;; A number means interactive case.
 	    (cl-letf (((symbol-function 'yes-or-no-p) 'ignore))
 	      (should-error
 	       (make-symbolic-link tmp-name1 tmp-name2 0)
@@ -2778,6 +2786,15 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-exists-p tmp-name1))
 	    (should (string-equal tmp-name1 (file-truename tmp-name1)))
 	    (make-symbolic-link tmp-name1 tmp-name2)
+	    (should (file-symlink-p tmp-name2))
+	    (should-not (string-equal tmp-name2 (file-truename tmp-name2)))
+	    (should
+	     (string-equal (file-truename tmp-name1) (file-truename tmp-name2)))
+	    (should (file-equal-p tmp-name1 tmp-name2))
+	    ;; Check relative symlink file name.
+	    (delete-file tmp-name2)
+	    (let ((default-directory tramp-test-temporary-file-directory))
+	      (make-symbolic-link (file-name-nondirectory tmp-name1) tmp-name2))
 	    (should (file-symlink-p tmp-name2))
 	    (should-not (string-equal tmp-name2 (file-truename tmp-name2)))
 	    (should
@@ -2968,47 +2985,29 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-acl tmp-name1))
 	    (copy-file tmp-name1 tmp-name3 nil nil nil 'preserve-permissions)
 	    (should (file-acl tmp-name3))
-            (tramp--test-message
-             "tmp-name1:\n%stmp-name3:\n%s"
-             (file-acl tmp-name1) (file-acl tmp-name3))
 	    (should (string-equal (file-acl tmp-name1) (file-acl tmp-name3)))
 	    ;; Different permissions mean different ACLs.
 	    (set-file-modes tmp-name1 #o777)
 	    (set-file-modes tmp-name3 #o444)
-            (tramp--test-message
-             "tmp-name1:\n%stmp-name3:\n%s"
-             (file-acl tmp-name1) (file-acl tmp-name3))
 	    (should-not
 	     (string-equal (file-acl tmp-name1) (file-acl tmp-name3)))
 	    ;; Copy ACL.  Since we don't know whether Emacs is built
 	    ;; with local ACL support, we must check it.
 	    (when (set-file-acl tmp-name3 (file-acl tmp-name1))
-              (tramp--test-message
-               "tmp-name1:\n%stmp-name3:\n%s"
-               (file-acl tmp-name1) (file-acl tmp-name3))
 	      (should (string-equal (file-acl tmp-name1) (file-acl tmp-name3))))
 
 	    ;; Two files with same ACLs.
 	    (delete-file tmp-name1)
 	    (copy-file tmp-name3 tmp-name1 nil nil nil 'preserve-permissions)
 	    (should (file-acl tmp-name1))
-            (tramp--test-message
-             "tmp-name1:\n%stmp-name3:\n%s"
-             (file-acl tmp-name1) (file-acl tmp-name3))
 	    (should (string-equal (file-acl tmp-name1) (file-acl tmp-name3)))
 	    ;; Different permissions mean different ACLs.
 	    (set-file-modes tmp-name1 #o777)
 	    (set-file-modes tmp-name3 #o444)
-            (tramp--test-message
-             "tmp-name1:\n%stmp-name3:\n%s"
-             (file-acl tmp-name1) (file-acl tmp-name3))
 	    (should-not
 	     (string-equal (file-acl tmp-name1) (file-acl tmp-name3)))
 	    ;; Copy ACL.
 	    (set-file-acl tmp-name1 (file-acl tmp-name3))
-            (tramp--test-message
-             "tmp-name1:\n%stmp-name3:\n%s"
-             (file-acl tmp-name1) (file-acl tmp-name3))
 	    (should (string-equal (file-acl tmp-name1) (file-acl tmp-name3))))
 
 	;; Cleanup.
@@ -3089,7 +3088,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-selinux-context tmp-name3))
 	    ;; We cannot expect that copying over file system
 	    ;; boundaries keeps SELinux context.  So we copy it
-	    ;; explicitely.
+	    ;; explicitly.
 	    (should
 	     (set-file-selinux-context
 	      tmp-name3 (file-selinux-context tmp-name1)))
@@ -3123,7 +3122,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-selinux-context tmp-name1))
 	    ;; We cannot expect that copying over file system
 	    ;; boundaries keeps SELinux context.  So we copy it
-	    ;; explicitely.
+	    ;; explicitly.
 	    (should
 	     (set-file-selinux-context
 	      tmp-name1 (file-selinux-context tmp-name3)))

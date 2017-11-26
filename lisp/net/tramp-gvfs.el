@@ -992,7 +992,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 		    (tramp-file-mode-from-int (string-to-number n))
 		  (format
 		   "%s%s%s%s------"
-		   (if dirp "d" "-")
+		   (if dirp "d" (if res-symlink-target "l" "-"))
 		   (if (equal (cdr (assoc "access::can-read" attributes))
 			      "FALSE")
 		       "-" "r")
@@ -1056,11 +1056,11 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 (defun tramp-gvfs-handle-file-local-copy (filename)
   "Like `file-local-copy' for Tramp files."
   (with-parsed-tramp-file-name filename nil
+    (unless (file-exists-p filename)
+      (tramp-error
+       v tramp-file-missing
+       "Cannot make local copy of non-existing file `%s'" filename))
     (let ((tmpfile (tramp-compat-make-temp-file filename)))
-      (unless (file-exists-p filename)
-	(tramp-error
-	 v tramp-file-missing
-	 "Cannot make local copy of non-existing file `%s'" filename))
       (copy-file filename tmpfile 'ok-if-already-exists 'keep-time)
       tmpfile)))
 
