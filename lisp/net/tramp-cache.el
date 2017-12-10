@@ -98,10 +98,7 @@ matching entries of `tramp-connection-properties'."
 	  (dolist (elt tramp-connection-properties)
 	    (when (string-match
 		   (or (nth 0 elt) "")
-		   (tramp-make-tramp-file-name
-		    (tramp-file-name-method key) (tramp-file-name-user key)
-		    (tramp-file-name-domain key) (tramp-file-name-host key)
-		    (tramp-file-name-port key) nil))
+		   (tramp-make-tramp-file-name key 'noloc 'nohop))
 	      (tramp-set-connection-property key (nth 1 elt) (nth 2 elt)))))
 	hash)))
 
@@ -387,6 +384,8 @@ used to cache connection properties of the local machine."
 	(maphash
 	 (lambda (key value)
 	   (if (and (tramp-file-name-p key) value
+		    (not (string-equal
+			  (tramp-file-name-method key) tramp-archive-method))
 		    (not (tramp-file-name-localname key))
 		    (not (gethash "login-as" value))
 		    (not (gethash "started" value)))

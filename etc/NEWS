@@ -113,8 +113,23 @@ styles as configured by the variable 'completion-styles'.
 These macros are analogue to 'let' and 'let*', but create bindings that
 are evaluated lazily.
 
+** Eshell
+
+---
+*** Expansion of history event designators is disabled by default.
+To restore the old behavior, use
+
+    (add-hook 'eshell-expand-input-functions
+              #'eshell-expand-history-references)
+
 
 * New Modes and Packages in Emacs 27.1
+
++++
+** Emacs can now visit files in archives as if they were directories.
+This feature uses Tramp and works only on systems which support GVFS,
+i.e. GNU/Linux, roughly spoken.  See the chapter "(tramp) Archive file
+names" in the Tramp manual for full documentation of these facilities.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
@@ -128,6 +143,9 @@ Programs that called it with multiple arguments before should pass
 them through 'format' first.  Even that is discouraged: for ElDoc
 support, you should set 'eldoc-documentation-function' instead of
 calling 'eldoc-message' directly.
+
+** Old-style backquotes now generate an error.  They have been
+generating warnings for a decade.
 
 
 * Lisp Changes in Emacs 27.1
