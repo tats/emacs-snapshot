@@ -2948,8 +2948,8 @@ User is always nil."
 			  localname)))))
 	  (tramp-error v 'file-already-exists newname)
 	(delete-file newname)))
-    (tramp-flush-file-property v (file-name-directory localname))
-    (tramp-flush-file-property v localname)
+    (tramp-flush-file-properties v (file-name-directory localname))
+    (tramp-flush-file-properties v localname)
     (copy-file
      filename newname 'ok-if-already-exists 'keep-time
      'preserve-uid-gid 'preserve-permissions)))
@@ -2993,7 +2993,7 @@ User is always nil."
   "Like `dired-uncache' for Tramp files."
   (with-parsed-tramp-file-name
       (if (file-directory-p dir) dir (file-name-directory dir)) nil
-    (tramp-flush-directory-property v localname)))
+    (tramp-flush-directory-properties v localname)))
 
 (defun tramp-handle-file-accessible-directory-p (filename)
   "Like `file-accessible-directory-p' for Tramp files."
@@ -3833,7 +3833,9 @@ connection buffer."
 This is needed in order to hide `last-coding-system-used', which is set
 for process communication also."
   (with-current-buffer (process-buffer proc)
-    (let (buffer-read-only last-coding-system-used)
+    (let (buffer-read-only last-coding-system-used
+	  ;; We do not want to run timers.
+	  timer-list timer-idle-list)
       ;; Under Windows XP, `accept-process-output' doesn't return
       ;; sometimes.  So we add an additional timeout.  JUST-THIS-ONE
       ;; is set due to Bug#12145.  It is an integer, in order to avoid
@@ -4547,14 +4549,14 @@ Only works for Bourne-like shells."
 	 'tramp-send-command
 	 (tramp-get-connection-property proc "vector" nil)
 	 (format "kill -2 %d" pid))
-	;; Wait, until the process has disappeared.
-	(with-timeout
-	    (1 (tramp-error proc 'error "Process %s did not interrupt" proc))
+	;; Wait, until the process has disappeared.  If it doesn't,
+	;; fall back to the default implementation.
+	(with-timeout (1 (ignore))
 	  (while (process-live-p proc)
 	    ;; We cannot run `tramp-accept-process-output', it blocks timers.
-	    (accept-process-output proc 0.1)))
-	;; Report success.
-	proc))))
+	    (accept-process-output proc 0.1))
+	  ;; Report success.
+	  proc)))))
 
 ;; `interrupt-process-functions' exists since Emacs 26.1.
 (when (boundp 'interrupt-process-functions)

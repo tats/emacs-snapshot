@@ -929,13 +929,18 @@ major mode should use the mode's own name as an element of
 
 @defun invisible-p pos-or-prop
 If @var{pos-or-prop} is a marker or number, this function returns a
-non-@code{nil} value if the text at that position is invisible.
+non-@code{nil} value if the text at that position is currently
+invisible.
 
 If @var{pos-or-prop} is any other kind of Lisp object, that is taken
 to mean a possible value of the @code{invisible} text or overlay
 property.  In that case, this function returns a non-@code{nil} value
 if that value would cause text to become invisible, based on the
 current value of @code{buffer-invisibility-spec}.
+
+The return value of this function is @code{t} if the text would be
+completely hidden on display, or a non-@code{nil}, non-@code{t} value
+if the text would be replaced by an ellipsis.
 @end defun
 
 @vindex line-move-ignore-invisible
@@ -2241,10 +2246,10 @@ attribute is ignored.
 
 @table @code
 @item :family
-Font family or fontset (a string).  @xref{Fonts,,, emacs, The GNU
+Font family name (a string).  @xref{Fonts,,, emacs, The GNU
 Emacs Manual}, for more information about font families.  The function
 @code{font-family-list} (see below) returns a list of available family
-names.  @xref{Fontsets}, for information about fontsets.
+names.
 
 @item :foundry
 The name of the @dfn{font foundry} for the font family specified by
@@ -2404,9 +2409,10 @@ Normally you do not need to set the stipple attribute, because it is
 used automatically to handle certain shades of gray.
 
 @item :font
-The font used to display the face.  Its value should be a font object.
-@xref{Low-Level Font}, for information about font objects, font specs,
-and font entities.
+The font used to display the face.  Its value should be a font object
+or a fontset.  @xref{Low-Level Font}, for information about font
+objects, font specs, and font entities.  @xref{Fontsets}, for
+information about fontsets.
 
 When specifying this attribute using @code{set-face-attribute}
 (@pxref{Attribute Functions}), you may also supply a font spec, a font

@@ -33,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "dispextern.h"
 #include "intervals.h"
+#include "ptr-bounds.h"
 #include "puresize.h"
 #include "sheap.h"
 #include "systime.h"
@@ -502,30 +503,20 @@ pointer_align (void *ptr, int alignment)
   return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
 }
 
-/* Extract the pointer hidden within A, if A is not a symbol.
-   If A is a symbol, extract the hidden pointer's offset from lispsym,
-   converted to void *.  */
+/* Extract the pointer hidden within O.  Define this as a function, as
+   functions are cleaner and can be used in debuggers.  Also, define
+   it as a macro if being compiled with GCC without optimization, for
+   performance in that case.  macro_XPNTR is private to this section
+   of code.  */
 
-#define macro_XPNTR_OR_SYMBOL_OFFSET(a) \
-  ((void *) (intptr_t) (USE_LSB_TAG ? XLI (a) - XTYPE (a) : XLI (a) & VALMASK))
+#define macro_XPNTR(o)                                                 \
+  ((void *) \
+   (SYMBOLP (o)							       \
+    ? ((char *) lispsym						       \
+       - ((EMACS_UINT) Lisp_Symbol << (USE_LSB_TAG ? 0 : VALBITS))     \
+       + XLI (o))						       \
+    : (char *) XLP (o) - (XLI (o) & ~VALMASK)))
 
-/* Extract the pointer hidden within A.  */
-
-#define macro_XPNTR(a) \
-  ((void *) ((intptr_t) XPNTR_OR_SYMBOL_OFFSET (a) \
-	     + (SYMBOLP (a) ? (char *) lispsym : NULL)))
-
-/* For pointer access, define XPNTR and XPNTR_OR_SYMBOL_OFFSET as
-   functions, as functions are cleaner and can be used in debuggers.
-   Also, define them as macros if being compiled with GCC without
-   optimization, for performance in that case.  The macro_* names are
-   private to this section of code.  */
-
-static ATTRIBUTE_UNUSED void *
-XPNTR_OR_SYMBOL_OFFSET (Lisp_Object a)
-{
-  return macro_XPNTR_OR_SYMBOL_OFFSET (a);
-}
 static ATTRIBUTE_UNUSED void *
 XPNTR (Lisp_Object a)
 {
@@ -533,7 +524,6 @@ XPNTR (Lisp_Object a)
 }
 
 #if DEFINE_KEY_OPS_AS_MACROS
-# define XPNTR_OR_SYMBOL_OFFSET(a) macro_XPNTR_OR_SYMBOL_OFFSET (a)
 # define XPNTR(a) macro_XPNTR (a)
 #endif
 
@@ -1737,7 +1727,8 @@ static EMACS_INT total_string_bytes;
    a pointer to the `u.data' member of its sdata structure; the
    structure starts at a constant offset in front of that.  */
 
-#define SDATA_OF_STRING(S) ((sdata *) ((S)->u.s.data - SDATA_DATA_OFFSET))
+#define SDATA_OF_STRING(S) ((sdata *) ptr_bounds_init ((S)->u.s.data \
+						       - SDATA_DATA_OFFSET))
 
 
 #ifdef GC_CHECK_STRING_OVERRUN
@@ -1929,7 +1920,7 @@ allocate_string (void)
 	  /* Every string on a free list should have NULL data pointer.  */
 	  s->u.s.data = NULL;
 	  NEXT_FREE_LISP_STRING (s) = string_free_list;
-	  string_free_list = s;
+	  string_free_list = ptr_bounds_clip (s, sizeof *s);
 	}
 
       total_free_strings += STRING_BLOCK_SIZE;
@@ -2044,7 +2035,7 @@ allocate_string_data (struct Lisp_String *s,
 
   MALLOC_UNBLOCK_INPUT;
 
-  s->u.s.data = SDATA_DATA (data);
+  s->u.s.data = ptr_bounds_clip (SDATA_DATA (data), nbytes + 1);
 #ifdef GC_CHECK_STRING_BYTES
   SDATA_NBYTES (data) = nbytes;
 #endif
@@ -2130,7 +2121,7 @@ sweep_strings (void)
 
 		  /* Put the string on the free-list.  */
 		  NEXT_FREE_LISP_STRING (s) = string_free_list;
-		  string_free_list = s;
+		  string_free_list = ptr_bounds_clip (s, sizeof *s);
 		  ++nfree;
 		}
 	    }
@@ -2138,7 +2129,7 @@ sweep_strings (void)
 	    {
 	      /* S was on the free-list before.  Put it there again.  */
 	      NEXT_FREE_LISP_STRING (s) = string_free_list;
-	      string_free_list = s;
+	      string_free_list = ptr_bounds_clip (s, sizeof *s);
 	      ++nfree;
 	    }
 	}
@@ -2234,9 +2225,9 @@ compact_small_strings (void)
 	      nbytes = s ? STRING_BYTES (s) : SDATA_NBYTES (from);
 	      eassert (nbytes <= LARGE_STRING_BYTES);
 
-	      nbytes = SDATA_SIZE (nbytes);
+	      ptrdiff_t size = SDATA_SIZE (nbytes);
 	      sdata *from_end = (sdata *) ((char *) from
-					   + nbytes + GC_STRING_EXTRA);
+					   + size + GC_STRING_EXTRA);
 
 #ifdef GC_CHECK_STRING_OVERRUN
 	      if (memcmp (string_overrun_cookie,
@@ -2250,22 +2241,23 @@ compact_small_strings (void)
 		{
 		  /* If TB is full, proceed with the next sblock.  */
 		  sdata *to_end = (sdata *) ((char *) to
-					     + nbytes + GC_STRING_EXTRA);
+					     + size + GC_STRING_EXTRA);
 		  if (to_end > tb_end)
 		    {
 		      tb->next_free = to;
 		      tb = tb->next;
 		      tb_end = (sdata *) ((char *) tb + SBLOCK_SIZE);
 		      to = tb->data;
-		      to_end = (sdata *) ((char *) to + nbytes + GC_STRING_EXTRA);
+		      to_end = (sdata *) ((char *) to + size + GC_STRING_EXTRA);
 		    }
 
 		  /* Copy, and update the string's `data' pointer.  */
 		  if (from != to)
 		    {
 		      eassert (tb != b || to < from);
-		      memmove (to, from, nbytes + GC_STRING_EXTRA);
-		      to->string->u.s.data = SDATA_DATA (to);
+		      memmove (to, from, size + GC_STRING_EXTRA);
+		      to->string->u.s.data
+			= ptr_bounds_clip (SDATA_DATA (to), nbytes + 1);
 		    }
 
 		  /* Advance past the sdata we copied to.  */
@@ -3048,6 +3040,7 @@ static EMACS_INT total_vector_slots, total_free_vector_slots;
 static void
 setup_on_free_list (struct Lisp_Vector *v, ptrdiff_t nbytes)
 {
+  v = ptr_bounds_clip (v, nbytes);
   eassume (header_size <= nbytes);
   ptrdiff_t nwords = (nbytes - header_size) / word_size;
   XSETPVECTYPESIZE (v, PVEC_FREE, 0, nwords);
@@ -3357,7 +3350,7 @@ allocate_vectorlike (ptrdiff_t len)
 
       MALLOC_UNBLOCK_INPUT;
 
-      return p;
+      return ptr_bounds_clip (p, nbytes);
     }
 }
 
@@ -4575,6 +4568,7 @@ live_string_holding (struct mem_node *m, void *p)
 	 must not be on the free-list.  */
       if (0 <= offset && offset < STRING_BLOCK_SIZE * sizeof b->strings[0])
 	{
+	  cp = ptr_bounds_copy (cp, b);
 	  struct Lisp_String *s = p = cp -= offset % sizeof b->strings[0];
 	  if (s->u.s.data)
 	    return make_lisp_ptr (s, Lisp_String);
@@ -4609,6 +4603,7 @@ live_cons_holding (struct mem_node *m, void *p)
 	  && (b != cons_block
 	      || offset / sizeof b->conses[0] < cons_block_index))
 	{
+	  cp = ptr_bounds_copy (cp, b);
 	  struct Lisp_Cons *s = p = cp -= offset % sizeof b->conses[0];
 	  if (!EQ (s->u.s.car, Vdead))
 	    return make_lisp_ptr (s, Lisp_Cons);
@@ -4644,6 +4639,7 @@ live_symbol_holding (struct mem_node *m, void *p)
 	  && (b != symbol_block
 	      || offset / sizeof b->symbols[0] < symbol_block_index))
 	{
+	  cp = ptr_bounds_copy (cp, b);
 	  struct Lisp_Symbol *s = p = cp -= offset % sizeof b->symbols[0];
 	  if (!EQ (s->u.s.function, Vdead))
 	    return make_lisp_symbol (s);
@@ -4703,6 +4699,7 @@ live_misc_holding (struct mem_node *m, void *p)
 	  && (b != marker_block
 	      || offset / sizeof b->markers[0] < marker_block_index))
 	{
+	  cp = ptr_bounds_copy (cp, b);
 	  union Lisp_Misc *s = p = cp -= offset % sizeof b->markers[0];
 	  if (s->u_any.type != Lisp_Misc_Free)
 	    return make_lisp_ptr (s, Lisp_Misc);
@@ -5364,7 +5361,7 @@ pure_alloc (size_t size, int type)
   pure_bytes_used = pure_bytes_used_lisp + pure_bytes_used_non_lisp;
 
   if (pure_bytes_used <= pure_size)
-    return result;
+    return ptr_bounds_clip (result, size);
 
   /* Don't allocate a large amount here,
      because it might get mmap'd and then its address
@@ -5449,7 +5446,7 @@ find_string_data_in_pure (const char *data, ptrdiff_t nbytes)
       /* Check the remaining characters.  */
       if (memcmp (data, non_lisp_beg + start, nbytes) == 0)
 	/* Found.  */
-	return non_lisp_beg + start;
+	return ptr_bounds_clip (non_lisp_beg + start, nbytes + 1);
 
       start += last_char_skip;
     }
@@ -5605,7 +5602,7 @@ static Lisp_Object
 purecopy (Lisp_Object obj)
 {
   if (INTEGERP (obj)
-      || (! SYMBOLP (obj) && PURE_P (XPNTR_OR_SYMBOL_OFFSET (obj)))
+      || (! SYMBOLP (obj) && PURE_P (XPNTR (obj)))
       || SUBRP (obj))
     return obj;    /* Already pure.  */
 
@@ -5966,6 +5963,7 @@ garbage_collect_1 (void *end)
 	      stack_copy = xrealloc (stack_copy, stack_size);
 	      stack_copy_size = stack_size;
 	    }
+	  stack = ptr_bounds_set (stack, stack_size);
 	  no_sanitize_memcpy (stack_copy, stack, stack_size);
 	}
     }
@@ -6859,7 +6857,9 @@ sweep_conses (void)
 
               for (pos = start; pos < stop; pos++)
                 {
-                  if (!CONS_MARKED_P (&cblk->conses[pos]))
+		  struct Lisp_Cons *acons
+		    = ptr_bounds_copy (&cblk->conses[pos], cblk);
+		  if (!CONS_MARKED_P (acons))
                     {
                       this_free++;
                       cblk->conses[pos].u.s.u.chain = cons_free_list;
@@ -6869,7 +6869,7 @@ sweep_conses (void)
                   else
                     {
                       num_used++;
-                      CONS_UNMARK (&cblk->conses[pos]);
+		      CONS_UNMARK (acons);
                     }
                 }
             }
@@ -6912,17 +6912,20 @@ sweep_floats (void)
       register int i;
       int this_free = 0;
       for (i = 0; i < lim; i++)
-        if (!FLOAT_MARKED_P (&fblk->floats[i]))
-          {
-            this_free++;
-            fblk->floats[i].u.chain = float_free_list;
-            float_free_list = &fblk->floats[i];
-          }
-        else
-          {
-            num_used++;
-            FLOAT_UNMARK (&fblk->floats[i]);
-          }
+	{
+	  struct Lisp_Float *afloat = ptr_bounds_copy (&fblk->floats[i], fblk);
+	  if (!FLOAT_MARKED_P (afloat))
+	    {
+	      this_free++;
+	      fblk->floats[i].u.chain = float_free_list;
+	      float_free_list = &fblk->floats[i];
+	    }
+	  else
+	    {
+	      num_used++;
+	      FLOAT_UNMARK (afloat);
+	    }
+	}
       lim = FLOAT_BLOCK_SIZE;
       /* If this block contains only free floats and we have already
          seen more than two blocks worth of free floats then deallocate
