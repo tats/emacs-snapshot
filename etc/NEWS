@@ -38,6 +38,13 @@ interpreter or modules that it uses.  If your platform supports it you
 can enable it when configuring, e.g., './configure CFLAGS="-g3 -O2
 -mmpx -fcheck-pointer-bounds"' on Intel MPX platforms.
 
+** Emacs now normally uses a pointer type instead of an integer type
+for the fundamental word in the Emacs Lisp interpreter, to help
+catch typos and support -fcheck-pointer-bounds.  The 'configure'
+option --enable-check-lisp-object-type is therefore no longer as
+useful and so is no longer enabled by default in developer builds,
+to reduce differences between developer and production builds.
+
 
 * Startup Changes in Emacs 27.1
 
@@ -70,12 +77,20 @@ This controls how long Emacs will wait for updates to the graphical
 state to take effect (making a frame visible, for example).
 
 +++
-** The new user option 'electric-quote-replace-double' controls
-whether '"' is also replaced in 'electric-quote-mode'.  If non-nil,
-'"' is replaced by a double typographic quote.
+** New user option 'electric-quote-replace-double'.
+This option controls whether '"' is replaced in 'electric-quote-mode',
+in addition to other quote characters.  If non-nil, ASCII double-quote
+characters that quote text "like this" are replaced by double
+typographic quotes, “like this”, in text modes, and in comments and
+strings in non-text modes.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** Footnote-mode
+*** Support Hebrew-style footnotes
+*** Footnote text lines are now aligned.
+Can be controlled via the new variable 'footnote-align-to-fn-text'.
 
 ** CSS mode
 

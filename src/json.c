@@ -30,6 +30,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 
+#define JSON_HAS_ERROR_CODE (JANSSON_VERSION_HEX >= 0x020B00)
+
 #ifdef WINDOWSNT
 # include <windows.h>
 # include "w32.h"
@@ -179,6 +181,8 @@ init_json (void)
   json_set_alloc_funcs (json_malloc, json_free);
 }
 
+#if !JSON_HAS_ERROR_CODE
+
 /* Return whether STRING starts with PREFIX.  */
 
 static bool
@@ -200,10 +204,14 @@ json_has_suffix (const char *string, const char *suffix)
     && memcmp (string + string_len - suffix_len, suffix, suffix_len) == 0;
 }
 
+#endif
+
 /* Create a multibyte Lisp string from the UTF-8 string in
    [DATA, DATA + SIZE).  If the range [DATA, DATA + SIZE) does not
-   contain a valid UTF-8 string, an unspecified string is
-   returned.  */
+   contain a valid UTF-8 string, an unspecified string is returned.
+   Note that all callers below either pass only value UTF-8 strings or
+   use this function for formatting error messages; in the latter case
+   correctness isn't critical.  */
 
 static Lisp_Object
 json_make_string (const char *data, ptrdiff_t size)
@@ -214,7 +222,10 @@ json_make_string (const char *data, ptrdiff_t size)
 
 /* Create a multibyte Lisp string from the null-terminated UTF-8
    string beginning at DATA.  If the string is not a valid UTF-8
-   string, an unspecified string is returned.  */
+   string, an unspecified string is returned.  Note that all callers
+   below either pass only value UTF-8 strings or use this function for
+   formatting error messages; in the latter case correctness isn't
+   critical.  */
 
 static Lisp_Object
 json_build_string (const char *data)
@@ -230,6 +241,8 @@ json_build_string (const char *data)
 static Lisp_Object
 json_encode (Lisp_Object string)
 {
+  /* FIXME: Raise an error if STRING is not a scalar value
+     sequence.  */
   return code_convert_string (string, Qutf_8_unix, Qt, true, true, true);
 }
 
@@ -245,15 +258,27 @@ static _Noreturn void
 json_parse_error (const json_error_t *error)
 {
   Lisp_Object symbol;
-  /* FIXME: Upstream Jansson should have a way to return error codes
-     without parsing the error messages.  See
-     https://github.com/akheron/jansson/issues/352.  */
+#if JSON_HAS_ERROR_CODE
+  switch (json_error_code (error))
+    {
+    case json_error_premature_end_of_input:
+      symbol = Qjson_end_of_file;
+      break;
+    case json_error_end_of_input_expected:
+      symbol = Qjson_trailing_content;
+      break;
+    default:
+      symbol = Qjson_parse_error;
+      break;
+    }
+#else
   if (json_has_suffix (error->text, "expected near end of file"))
     symbol = Qjson_end_of_file;
   else if (json_has_prefix (error->text, "end of file expected"))
     symbol = Qjson_trailing_content;
   else
     symbol = Qjson_parse_error;
+#endif
   xsignal (symbol,
            list5 (json_build_string (error->text),
                   json_build_string (error->source), make_natnum (error->line),
@@ -330,6 +355,8 @@ lisp_to_json_toplevel_1 (Lisp_Object lisp, json_t **json)
             int status = json_object_set_new (*json, SSDATA (key),
                                               lisp_to_json (HASH_VALUE (h, i)));
             if (status == -1)
+              /* FIXME: A failure here might also indicate that the
+                 key is not a valid Unicode string.  */
               json_out_of_memory ();
           }
       clear_unwind_protect (count);
@@ -376,8 +403,9 @@ lisp_to_json (Lisp_Object lisp)
   else if (STRINGP (lisp))
     {
       Lisp_Object encoded = json_encode (lisp);
-      ptrdiff_t size = SBYTES (encoded);
-      return json_check (json_stringn (SSDATA (encoded), size));
+      /* FIXME: We might throw an out-of-memory error here if the
+         string is not valid Unicode.  */
+      return json_check (json_stringn (SSDATA (encoded), SBYTES (encoded)));
     }
 
   /* LISP now must be a vector or hashtable.  */
@@ -415,6 +443,8 @@ each object.  */)
   json_t *json = lisp_to_json_toplevel (object);
   record_unwind_protect_ptr (json_release_object, json);
 
+  /* If desired, we might want to add the following flags:
+     JSON_DECODE_ANY, JSON_ALLOW_NUL.  */
   char *string = json_dumps (json, JSON_COMPACT);
   if (string == NULL)
     json_out_of_memory ();
@@ -494,6 +524,8 @@ OBJECT.  */)
   record_unwind_protect_ptr (json_release_object, json);
 
   struct json_insert_data data;
+  /* If desired, we might want to add the following flags:
+     JSON_DECODE_ANY, JSON_ALLOW_NUL.  */
   int status
     = json_dump_callback (json, json_insert_callback, &data, JSON_COMPACT);
   if (status == -1)
@@ -507,10 +539,15 @@ OBJECT.  */)
   return unbind_to (count, Qnil);
 }
 
+enum json_object_type {
+  json_object_hashtable,
+  json_object_alist,
+};
+
 /* Convert a JSON object to a Lisp object.  */
 
 static _GL_ARG_NONNULL ((1)) Lisp_Object
-json_to_lisp (json_t *json)
+json_to_lisp (json_t *json, enum json_object_type object_type)
 {
   switch (json_typeof (json))
     {
@@ -544,7 +581,7 @@ json_to_lisp (json_t *json)
         Lisp_Object result = Fmake_vector (make_natnum (size), Qunbound);
         for (ptrdiff_t i = 0; i < size; ++i)
           ASET (result, i,
-                json_to_lisp (json_array_get (json, i)));
+                json_to_lisp (json_array_get (json, i), object_type));
         --lisp_eval_depth;
         return result;
       }
@@ -552,23 +589,49 @@ json_to_lisp (json_t *json)
       {
         if (++lisp_eval_depth > max_lisp_eval_depth)
           xsignal0 (Qjson_object_too_deep);
-        size_t size = json_object_size (json);
-        if (FIXNUM_OVERFLOW_P (size))
-          xsignal0 (Qoverflow_error);
-        Lisp_Object result = CALLN (Fmake_hash_table, QCtest, Qequal,
-                                    QCsize, make_natnum (size));
-        struct Lisp_Hash_Table *h = XHASH_TABLE (result);
-        const char *key_str;
-        json_t *value;
-        json_object_foreach (json, key_str, value)
+        Lisp_Object result;
+        switch (object_type)
           {
-            Lisp_Object key = json_build_string (key_str);
-            EMACS_UINT hash;
-            ptrdiff_t i = hash_lookup (h, key, &hash);
-            /* Keys in JSON objects are unique, so the key can't be
-               present yet.  */
-            eassert (i < 0);
-            hash_put (h, key, json_to_lisp (value), hash);
+          case json_object_hashtable:
+            {
+              size_t size = json_object_size (json);
+              if (FIXNUM_OVERFLOW_P (size))
+                xsignal0 (Qoverflow_error);
+              result = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
+                              make_natnum (size));
+              struct Lisp_Hash_Table *h = XHASH_TABLE (result);
+              const char *key_str;
+              json_t *value;
+              json_object_foreach (json, key_str, value)
+                {
+                  Lisp_Object key = json_build_string (key_str);
+                  EMACS_UINT hash;
+                  ptrdiff_t i = hash_lookup (h, key, &hash);
+                  /* Keys in JSON objects are unique, so the key can't
+                     be present yet.  */
+                  eassert (i < 0);
+                  hash_put (h, key, json_to_lisp (value, object_type), hash);
+                }
+              break;
+            }
+          case json_object_alist:
+            {
+              result = Qnil;
+              const char *key_str;
+              json_t *value;
+              json_object_foreach (json, key_str, value)
+                {
+                  Lisp_Object key = Fintern (json_build_string (key_str), Qnil);
+                  result
+                    = Fcons (Fcons (key, json_to_lisp (value, object_type)),
+                             result);
+                }
+              result = Fnreverse (result);
+              break;
+            }
+          default:
+            /* Can't get here.  */
+            emacs_abort ();
           }
         --lisp_eval_depth;
         return result;
@@ -578,15 +641,44 @@ json_to_lisp (json_t *json)
   emacs_abort ();
 }
 
-DEFUN ("json-parse-string", Fjson_parse_string, Sjson_parse_string, 1, 1, NULL,
+static enum json_object_type
+json_parse_object_type (ptrdiff_t nargs, Lisp_Object *args)
+{
+  switch (nargs)
+    {
+    case 0:
+      return json_object_hashtable;
+    case 2:
+      {
+        Lisp_Object key = args[0];
+        Lisp_Object value = args[1];
+        if (!EQ (key, QCobject_type))
+          wrong_choice (list1 (QCobject_type), key);
+        if (EQ (value, Qhash_table))
+          return json_object_hashtable;
+        else if (EQ (value, Qalist))
+          return json_object_alist;
+        else
+          wrong_choice (list2 (Qhash_table, Qalist), value);
+      }
+    default:
+      wrong_type_argument (Qplistp, Flist (nargs, args));
+    }
+}
+
+DEFUN ("json-parse-string", Fjson_parse_string, Sjson_parse_string, 1, MANY,
+       NULL,
        doc: /* Parse the JSON STRING into a Lisp object.
 This is essentially the reverse operation of `json-serialize', which
-see.  The returned object will be a vector or hashtable.  Its elements
-will be `:null', `:false', t, numbers, strings, or further vectors and
-hashtables.  If there are duplicate keys in an object, all but the
-last one are ignored.  If STRING doesn't contain a valid JSON object,
-an error of type `json-parse-error' is signaled.  */)
-  (Lisp_Object string)
+see.  The returned object will be a vector, hashtable, or alist.  Its
+elements will be `:null', `:false', t, numbers, strings, or further
+vectors, hashtables, and alists.  If there are duplicate keys in an
+object, all but the last one are ignored.  If STRING doesn't contain a
+valid JSON object, an error of type `json-parse-error' is signaled.
+The keyword argument `:object-type' specifies which Lisp type is used
+to represent objects; it can be `hash-table' or `alist'.
+usage: (string &key (OBJECT-TYPE \\='hash-table)) */)
+  (ptrdiff_t nargs, Lisp_Object *args)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
 
@@ -605,8 +697,11 @@ an error of type `json-parse-error' is signaled.  */)
     }
 #endif
 
+  Lisp_Object string = args[0];
   Lisp_Object encoded = json_encode (string);
   check_string_without_embedded_nulls (encoded);
+  enum json_object_type object_type
+    = json_parse_object_type (nargs - 1, args + 1);
 
   json_error_t error;
   json_t *object = json_loads (SSDATA (encoded), 0, &error);
@@ -617,7 +712,7 @@ an error of type `json-parse-error' is signaled.  */)
   if (object != NULL)
     record_unwind_protect_ptr (json_release_object, object);
 
-  return unbind_to (count, json_to_lisp (object));
+  return unbind_to (count, json_to_lisp (object, object_type));
 }
 
 struct json_read_buffer_data
@@ -650,12 +745,13 @@ json_read_buffer_callback (void *buffer, size_t buflen, void *data)
 }
 
 DEFUN ("json-parse-buffer", Fjson_parse_buffer, Sjson_parse_buffer,
-       0, 0, NULL,
+       0, MANY, NULL,
        doc: /* Read JSON object from current buffer starting at point.
 This is similar to `json-parse-string', which see.  Move point after
 the end of the object if parsing was successful.  On error, point is
-not moved.  */)
-  (void)
+not moved.
+usage: (&key (OBJECT-TYPE \\='hash-table))  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
 
@@ -674,6 +770,8 @@ not moved.  */)
     }
 #endif
 
+  enum json_object_type object_type = json_parse_object_type (nargs, args);
+
   ptrdiff_t point = PT_BYTE;
   struct json_read_buffer_data data = {.point = point};
   json_error_t error;
@@ -687,7 +785,7 @@ not moved.  */)
   record_unwind_protect_ptr (json_release_object, object);
 
   /* Convert and then move point only if everything succeeded.  */
-  Lisp_Object lisp = json_to_lisp (object);
+  Lisp_Object lisp = json_to_lisp (object, object_type);
 
   /* Adjust point by how much we just read.  */
   point += error.position;
@@ -749,6 +847,9 @@ syms_of_json (void)
   Fput (Qjson_serialize, Qside_effect_free, Qt);
   Fput (Qjson_parse_string, Qpure, Qt);
   Fput (Qjson_parse_string, Qside_effect_free, Qt);
+
+  DEFSYM (QCobject_type, ":object-type");
+  DEFSYM (Qalist, "alist");
 
   defsubr (&Sjson_serialize);
   defsubr (&Sjson_insert);

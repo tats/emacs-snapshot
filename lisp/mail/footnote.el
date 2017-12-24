@@ -3,6 +3,7 @@
 ;; Copyright (C) 1997, 2000-2017 Free Software Foundation, Inc.
 
 ;; Author: Steven L Baur <steve@xemacs.org>
+;;         Boruch Baum <boruch_baum@gmx.com>
 ;; Keywords: mail, news
 ;; Version: 0.19
 
@@ -29,9 +30,36 @@
 ;; [1] Footnotes look something like this.  Along with some decorative
 ;; stuff.
 
-;; TODO:
-;; Reasonable Undo support.
-;; more language styles.
+;;;; TODO:
+;; + Reasonable Undo support.
+;;   - could use an `apply' entry in the buffer-undo-list to be warned when
+;;     a footnote we inserted is removed via undo.
+;;   - should try to handle the more general problem of deleting/removing
+;;     footnotes via standard editing commands rather than via footnote
+;;     commands.
+;; + more language styles.
+;; + The key sequence 'C-c ! a C-y C-c ! b' should auto-fill the
+;;   footnote in adaptive fill mode. This does not seem to be a bug in
+;;   `adaptive-fill' because it behaves that way on all point movements
+;; + Handle footmode mode elegantly in all modes, even if that means refuses to
+;;   accept the burden. For example, in a programming language mode, footnotes
+;;   should be commented.
+;; + Manually autofilling the a first footnote should not cause it to
+;;   wrap into the footnote section tag
+;;   + Current solution adds a second newline after the section tag, so it is
+;;     clearly a separate paragraph. There may be stylistic objections to this.
+;; + Footnotes with multiple paragraphs should not have their first
+;;   line out-dented.
+;; + Upon leaving footnote area, perform an auto-fill on an entire
+;;   footnote (including multiple paragraphs), or on entire footnote area.
+;;   + fill-paragraph takes arg REGION, but seemingly only when called
+;;     interactively.
+;; + At some point, it became necessary to change `footnote-section-tag-regexp'
+;;   to remove its trailing space. (Adaptive fill side-effect?)
+;; + useful for lazy testing
+;;   (setq footnote-narrow-to-footnotes-when-editing t)
+;;   (setq footnote-section-tag "Footnotes: ")
+;;   (setq footnote-section-tag-regexp "Footnotes\\(\\[.\\]\\)?:")
 
 ;;; Code:
 
@@ -101,11 +129,15 @@ footnotes."
   :type 'string
   :group 'footnote)
 
-(defcustom footnote-section-tag-regexp "Footnotes\\(\\[.\\]\\)?: "
+(defcustom footnote-section-tag-regexp
+  ;; Even if `footnote-section-tag' has a trailing space, let's not require it
+  ;; here, since it might be trimmed by various commands.
+  "Footnotes\\(\\[.\\]\\)?:"
   "Regexp which indicates the start of a footnote section.
 This variable is disregarded when `footnote-section-tag' is the
 empty string.  Customizing this variable has no effect on buffers
 already displaying footnotes."
+  :version "27.1"
   :type 'regexp
   :group 'footnote)
 
@@ -124,12 +156,20 @@ has no effect on buffers already displaying footnotes."
   :type 'string
   :group 'footnote)
 
-(defcustom footnote-signature-separator (if (boundp 'message-signature-separator)
-					    message-signature-separator
-					  "^-- $")
+(defcustom footnote-signature-separator
+  (if (boundp 'message-signature-separator)
+      message-signature-separator
+    "^-- $")
   "Regexp used by Footnote mode to recognize signatures."
   :type 'regexp
   :group 'footnote)
+
+(defcustom footnote-align-to-fn-text t
+  "If non-nil, align footnote text lines.
+If nil, footnote text lines are to be aligned flush left with left side
+of the footnote number.  If non-nil footnote text lines are to be aligned
+with the first character of footnote text."
+  :type  'boolean)
 
 ;;; Private variables
 
@@ -147,6 +187,8 @@ has no effect on buffers already displaying footnotes."
 
 (defvar footnote-mouse-highlight 'highlight
   "Text property name to enable mouse over highlight.")
+
+(defvar footnote-mode)
 
 ;;; Default styles
 ;;; NUMERIC
@@ -310,6 +352,48 @@ Use Unicode characters for footnoting."
       (push (aref footnote-unicode-string modulus) result))
     (apply #'string result)))
 
+;; Hebrew
+
+(defconst footnote-hebrew-numeric-regex "[אבגדהוזחטיכלמנסעפצקרשת']+")
+; (defconst footnote-hebrew-numeric-regex "\\([אבגדהוזחט]'\\)?\\(ת\\)?\\(ת\\)?\\([קרשת]\\)?\\([טיכלמנסעפצ]\\)?\\([אבגדהוזחט]\\)?")
+
+(defconst footnote-hebrew-numeric
+  '(
+    ("א" "ב" "ג" "ד" "ה" "ו" "ז" "ח" "ט")
+    ("י" "כ" "ל" "מ" "נ" "ס" "ע" "פ" "צ")
+    ("ק" "ר" "ש" "ת" "תק" "תר"" תש" "תת" "תתק")))
+
+(defun Footnote-hebrew-numeric (n)
+  "Supports 9999 footnotes, then rolls over."
+  (let* ((n (+ (mod n 10000) (/ n 10000)))
+         (thousands (/ n 1000))
+         (hundreds (/ (mod n 1000) 100))
+         (tens (/ (mod n 100) 10))
+         (units (mod n 10))
+         (special (if (not (= tens 1)) nil
+                    (or (when (= units 5) "טו")
+                        (when (= units 6) "טז")))))
+    (concat
+     (when (/= 0 thousands)
+       (concat (nth (1- thousands) (nth 0 footnote-hebrew-numeric)) "'"))
+     (when (/= 0 hundreds)
+       (nth (1- hundreds) (nth 2 footnote-hebrew-numeric)))
+     (if special special
+      (concat
+        (when (/= 0 tens) (nth (1- tens) (nth 1 footnote-hebrew-numeric)))
+        (when (/= 0 units) (nth (1- units) (nth 0 footnote-hebrew-numeric))))))))
+
+(defconst footnote-hebrew-symbolic-regex "[אבגדהוזחטיכלמנסעפצקרשת]")
+
+(defconst footnote-hebrew-symbolic
+  '(
+    "א" "ב" "ג" "ד" "ה" "ו" "ז" "ח" "ט" "י" "כ" "ל" "מ" "נ" "ס" "ע" "פ" "צ" "ק" "ר" "ש" "ת"))
+
+(defun Footnote-hebrew-symbolic (n)
+  "Only 22 elements, per the style of eg. 'פירוש שפתי חכמים על רש״י'.
+Proceeds from `י' to `כ', from `צ' to `ק'. After `ת', rolls over to `א'."
+  (nth (mod (1- n) 22) footnote-hebrew-symbolic))
+
 ;;; list of all footnote styles
 (defvar footnote-style-alist
   `((numeric Footnote-numeric ,footnote-numeric-regexp)
@@ -318,12 +402,13 @@ Use Unicode characters for footnoting."
     (roman-lower Footnote-roman-lower ,footnote-roman-lower-regexp)
     (roman-upper Footnote-roman-upper ,footnote-roman-upper-regexp)
     (latin Footnote-latin ,footnote-latin-regexp)
-    (unicode Footnote-unicode ,footnote-unicode-regexp))
+    (unicode Footnote-unicode ,footnote-unicode-regexp)
+    (hebrew-numeric Footnote-hebrew-numeric ,footnote-hebrew-numeric-regex)
+    (hebrew-symbolic Footnote-hebrew-symbolic ,footnote-hebrew-symbolic-regex))
   "Styles of footnote tags available.
-By default only boring Arabic numbers, English letters and Roman Numerals
-are available.
-See footnote-han.el, footnote-greek.el and footnote-hebrew.el for more
-exciting styles.")
+By default, Arabic numbers, English letters, Roman Numerals,
+Latin and Unicode superscript characters, and Hebrew numerals
+are available.")
 
 (defcustom footnote-style 'numeric
   "Default style used for footnoting.
@@ -334,6 +419,8 @@ roman-lower == i, ii, iii, iv, v, ...
 roman-upper == I, II, III, IV, V, ...
 latin == ¹ ² ³ º ª § ¶
 unicode == ¹, ², ³, ...
+hebrew-numeric == א, ב, ..., יא, ..., תקא...
+hebrew-symbolic == א, ב, ..., י, כ, ..., צ, ק, ..., ת, א
 See also variables `footnote-start-tag' and `footnote-end-tag'.
 
 Note: some characters in the unicode style may not show up
@@ -487,20 +574,15 @@ styles."
 		footnote-end-tag)
 	'footnote-number to)))))
 
-;; Not needed?
+;; Not needed? <-- 2017-12 Boruch: Not my comment! BUT, when I
+;; starting hacking the code, this function
+;; `Footnote-narrow-to-footnotes' was never narrowing, and the result
+;; wasn't breaking anything.
 (defun Footnote-narrow-to-footnotes ()
   "Restrict text in buffer to show only text of footnotes."
-  (interactive)	; testing
-  (goto-char (point-max))
-  (when (re-search-backward footnote-signature-separator nil t)
-    (let ((end (point)))
-      (cond
-       ((and (not (string-equal footnote-section-tag ""))
-	     (re-search-backward
-	      (concat "^" footnote-section-tag-regexp) nil t))
-	(narrow-to-region (point) end))
-       (footnote-text-marker-alist
-	(narrow-to-region (cdar footnote-text-marker-alist) end))))))
+  (interactive) ; testing
+  (narrow-to-region (Footnote--get-area-point-min)
+                    (Footnote--get-area-point-max)))
 
 (defun Footnote-goto-char-point-max ()
   "Move to end of buffer or prior to start of .signature."
@@ -580,34 +662,103 @@ styles."
 	       (< (car e1) (car e2)))))
 
 (defun Footnote-text-under-cursor ()
-  "Return the number of footnote if in footnote text.
+  "Return the number of the current footnote if in footnote text.
 Return nil if the cursor is not positioned over the text of
 a footnote."
-  (when (and (let ((old-point (point)))
-	       (save-excursion
-		 (save-restriction
-		   (Footnote-narrow-to-footnotes)
-		   (and (>= old-point (point-min))
-			(<= old-point (point-max))))))
-	     footnote-text-marker-alist
-             (>= (point) (cdar footnote-text-marker-alist)))
-    (let ((i 1)
-	  alist-txt rc)
+  (when (and footnote-text-marker-alist
+             (<= (Footnote--get-area-point-min)
+                 (point)
+                 (Footnote--get-area-point-max)))
+    (let ((i 1) alist-txt result)
       (while (and (setq alist-txt (nth i footnote-text-marker-alist))
-		  (null rc))
-	(when (< (point) (cdr alist-txt))
-	  (setq rc (car (nth (1- i) footnote-text-marker-alist))))
-	(setq i (1+ i)))
-      (when (and (null rc)
-		 (null alist-txt))
-	(setq rc (car (nth (1- i) footnote-text-marker-alist))))
-      rc)))
+                  (null result))
+        (when (< (point) (cdr alist-txt))
+          (setq result (car (nth (1- i) footnote-text-marker-alist))))
+        (setq i (1+ i)))
+      (when (and (null result) (null alist-txt))
+        (setq result (car (nth (1- i) footnote-text-marker-alist))))
+      result)))
 
 (defun Footnote-under-cursor ()
   "Return the number of the footnote underneath the cursor.
 Return nil if the cursor is not over a footnote."
   (or (get-text-property (point) 'footnote-number)
       (Footnote-text-under-cursor)))
+
+(defun Footnote--calc-fn-alignment-column ()
+  "Calculate the left alignment for footnote text."
+  ;; FIXME: Maybe it would be better to go to the footnote's beginning and
+  ;; see at which column it starts.
+  (+ footnote-body-tag-spacing
+     (string-width
+      (concat footnote-start-tag  footnote-end-tag
+              (Footnote-index-to-string
+               (caar (last footnote-text-marker-alist)))))))
+
+(defun Footnote--fill-prefix-string ()
+  "Return the fill prefix to be used by footnote mode."
+  ;; TODO: Prefix to this value other prefix strings, such as those
+  ;; designating a comment line, a message response, or a boxquote.
+  (make-string (Footnote--calc-fn-alignment-column) ?\s))
+
+(defun Footnote--point-in-body-p ()
+  "Return non-nil if point is in the buffer text area,
+i.e. before the beginning of the footnote area."
+  (< (point) (Footnote--get-area-point-min)))
+
+(defun Footnote--get-area-point-min (&optional before-tag)
+  "Return start of the first footnote.
+If there is no footnote area, returns `point-max'.
+With optional arg BEFORE-TAG, return position of the `footnote-section-tag'
+instead, if applicable."
+  (cond
+   ;; FIXME: Shouldn't we use `Footnote--get-area-point-max' instead?
+   ((not footnote-text-marker-alist) (point-max))
+   ((not before-tag) (cdr (car footnote-text-marker-alist)))
+   ((string-equal footnote-section-tag "")
+    (cdr (car footnote-text-marker-alist)))
+   (t
+    (save-excursion
+      (goto-char (cdr (car footnote-text-marker-alist)))
+      (if (re-search-backward (concat "^" footnote-section-tag-regexp) nil t)
+          (match-beginning 0)
+        (message "Footnote section tag not found!")
+        ;; This `else' should never happen, and indicates an error,
+        ;; ie. footnotes already exist and a footnote-section-tag is defined,
+        ;; but the section tag hasn't been found. We choose to assume that the
+        ;; user deleted it intentionally and wants us to behave in this buffer
+        ;; as if the section tag was set "", so we do that, now.
+        ;;(setq footnote-section-tag "")
+        ;;
+        ;; HOWEVER: The rest of footnote mode does not currently honor or
+        ;; account for this.
+        ;;
+        ;; To illustrate the difference in behavior, create a few footnotes,
+        ;; delete the section tag, and create another footnote. Then undo,
+        ;; comment the above line (that sets the tag to ""), re-evaluate this
+        ;; function, and repeat.
+        ;;
+        ;; TODO: integrate sanity checks at reasonable operational points.
+        (cdr (car footnote-text-marker-alist)))))))
+
+(defun Footnote--get-area-point-max ()
+  "Return the end of footnote area.
+This is either `point-max' or the start of a `.signature' string, as
+defined by variable `footnote-signature-separator'. If there is no
+footnote area, returns `point-max'."
+  (save-excursion (Footnote-goto-char-point-max)))
+
+(defun Footnote--adaptive-fill-function (orig-fun)
+  (or
+   (and
+    footnote-mode
+    footnote-align-to-fn-text
+    (Footnote-text-under-cursor)
+    ;; (not (Footnote--point-in-body-p))
+    ;; (< (point) (Footnote--signature-area-start-point))
+    (Footnote--fill-prefix-string))
+   ;; If not within a footnote's text, fallback to the default.
+   (funcall orig-fun)))
 
 ;;; User functions
 
@@ -694,7 +845,7 @@ delete the footnote with that number."
 	 (point)
 	 (if footnote-spaced-footnotes
 	     (search-forward "\n\n" nil t)
-	   (save-restriction
+           (save-restriction ; <= 2017-12 Boruch: WHY?? I see no narrowing / widening here.
 	     (end-of-line)
 	     (next-single-char-property-change
 	      (point) 'footnote-number nil (Footnote-goto-char-point-max))))))
@@ -800,6 +951,12 @@ play around with the following keys:
   :lighter    footnote-mode-line-string
   :keymap     footnote-minor-mode-map
   ;; (filladapt-mode t)
+  (unless adaptive-fill-function
+    ;; nil and `ignore' have the same semantics for adaptive-fill-function,
+    ;; but only `ignore' behaves correctly with add/remove-function.
+    (setq adaptive-fill-function #'ignore))
+  (remove-function (local 'adaptive-fill-function)
+                   #'Footnote--adaptive-fill-function)
   (when footnote-mode
     ;; (Footnote-setup-keybindings)
     (make-local-variable 'footnote-style)
@@ -809,7 +966,12 @@ play around with the following keys:
     (make-local-variable 'footnote-section-tag-regexp)
     (make-local-variable 'footnote-start-tag)
     (make-local-variable 'footnote-end-tag)
+    (make-local-variable 'adaptive-fill-function)
+    (add-function :around (local 'adaptive-fill-function)
+                  #'Footnote--adaptive-fill-function)
 
+    ;; filladapt is an XEmacs package which AFAIK has never been ported
+    ;; to Emacs.
     (when (boundp 'filladapt-token-table)
       ;; add tokens to filladapt to match footnotes
       ;; 1] xxxxxxxxxxx x x x or [1] x x x x x x x

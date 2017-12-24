@@ -28,8 +28,10 @@
 
 (ert-deftest json-serialize/roundtrip ()
   (skip-unless (fboundp 'json-serialize))
-  (let ((lisp [:null :false t 0 123 -456 3.75 "abcαβγ"])
-        (json "[null,false,true,0,123,-456,3.75,\"abcαβγ\"]"))
+  ;; The noncharacter U+FFFF should be passed through,
+  ;; cf. https://www.unicode.org/faq/private_use.html#noncharacters.
+  (let ((lisp [:null :false t 0 123 -456 3.75 "abc\uFFFFαβγ𝔸𝐁𝖢\"\\"])
+        (json "[null,false,true,0,123,-456,3.75,\"abc\uFFFFαβγ𝔸𝐁𝖢\\\"\\\\\"]"))
     (should (equal (json-serialize lisp) json))
     (with-temp-buffer
       (json-insert lisp)
@@ -52,13 +54,15 @@
 
 (ert-deftest json-parse-string/object ()
   (skip-unless (fboundp 'json-parse-string))
-  (let ((actual
-         (json-parse-string
-          "{ \"abc\" : [1, 2, true], \"def\" : null, \"abc\" : [9, false] }\n")))
-    (should (hash-table-p actual))
-    (should (equal (hash-table-count actual) 2))
-    (should (equal (cl-sort (map-pairs actual) #'string< :key #'car)
-                   '(("abc" . [9 :false]) ("def" . :null))))))
+  (let ((input
+         "{ \"abc\" : [1, 2, true], \"def\" : null, \"abc\" : [9, false] }\n"))
+    (let ((actual (json-parse-string input)))
+      (should (hash-table-p actual))
+      (should (equal (hash-table-count actual) 2))
+      (should (equal (cl-sort (map-pairs actual) #'string< :key #'car)
+                     '(("abc" . [9 :false]) ("def" . :null)))))
+    (should (equal (json-parse-string input :object-type 'alist)
+                   '((abc . [9 :false]) (def . :null))))))
 
 (ert-deftest json-parse-string/string ()
   (skip-unless (fboundp 'json-parse-string))
@@ -75,7 +79,43 @@
   (should (equal (json-serialize ["foo"]) "[\"foo\"]"))
   (should (equal (json-serialize ["a\n\fb"]) "[\"a\\n\\fb\"]"))
   (should (equal (json-serialize ["\nasdфыв\u001f\u007ffgh\t"])
-                 "[\"\\nasdфыв\\u001F\u007ffgh\\t\"]")))
+                 "[\"\\nasdфыв\\u001F\u007ffgh\\t\"]"))
+  (should (equal (json-serialize ["a\0b"]) "[\"a\\u0000b\"]")))
+
+(ert-deftest json-serialize/invalid-unicode ()
+  (skip-unless (fboundp 'json-serialize))
+  ;; FIXME: "out of memory" is the wrong error signal, but we don't
+  ;; currently distinguish between error types when serializing.
+  (should-error (json-serialize ["a\uDBBBb"]) :type 'json-out-of-memory)
+  (should-error (json-serialize ["u\x110000v"]) :type 'json-out-of-memory)
+  (should-error (json-serialize ["u\x3FFFFFv"]) :type 'json-out-of-memory)
+  (should-error (json-serialize ["u\xCCv"]) :type 'json-out-of-memory))
+
+(ert-deftest json-parse-string/null ()
+  (skip-unless (fboundp 'json-parse-string))
+  (should-error (json-parse-string "\x00") :type 'wrong-type-argument)
+  ;; FIXME: Reconsider whether this is the right behavior.
+  (should-error (json-parse-string "[a\\u0000b]") :type 'json-parse-error))
+
+(ert-deftest json-parse-string/invalid-unicode ()
+  "Some examples from
+https://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt."
+  (skip-unless (fboundp 'json-parse-string))
+  ;; Invalid UTF-8 code unit sequences.
+  (should-error (json-parse-string "[\"\x80\"]") :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xBF\"]") :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xFE\"]") :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xC0\xAF\"]") :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xC0\x80\"]") :type 'json-parse-error)
+  ;; Surrogates.
+  (should-error (json-parse-string "[\"\uDB7F\"]")
+                :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xED\xAD\xBF\"]")
+                :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\uDB7F\uDFFF\"]")
+                :type 'json-parse-error)
+  (should-error (json-parse-string "[\"\xED\xAD\xBF\xED\xBF\xBF\"]")
+                :type 'json-parse-error))
 
 (ert-deftest json-parse-string/incomplete ()
   (skip-unless (fboundp 'json-parse-string))
