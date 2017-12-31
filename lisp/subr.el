@@ -1839,15 +1839,13 @@ if it is empty or a duplicate."
 
 (defvar delay-mode-hooks nil
   "If non-nil, `run-mode-hooks' should delay running the hooks.")
-(defvar delayed-mode-hooks nil
+(defvar-local delayed-mode-hooks nil
   "List of delayed mode hooks waiting to be run.")
-(make-variable-buffer-local 'delayed-mode-hooks)
 (put 'delay-mode-hooks 'permanent-local t)
 
-(defvar delayed-after-hook-functions nil
+(defvar-local delayed-after-hook-functions nil
   "List of delayed :after-hook forms waiting to be run.
 These forms come from `define-derived-mode'.")
-(make-variable-buffer-local 'delayed-after-hook-functions)
 
 (defvar change-major-mode-after-body-hook nil
   "Normal hook run in major mode functions, before the mode hooks.")
@@ -1889,9 +1887,9 @@ running their FOO-mode-hook."
         (with-demoted-errors "File local-variables error: %s"
           (hack-local-variables 'no-mode)))
     (run-hooks 'after-change-major-mode-hook)
-    (dolist (fun (nreverse delayed-after-hook-functions))
-      (funcall fun))
-    (setq delayed-after-hook-functions nil)))
+    (dolist (fun (prog1 (nreverse delayed-after-hook-functions)
+                    (setq delayed-after-hook-functions nil)))
+      (funcall fun))))
 
 (defmacro delay-mode-hooks (&rest body)
   "Execute BODY, but delay any `run-mode-hooks'.
@@ -3478,8 +3476,8 @@ See also `with-temp-file' and `with-output-to-string'."
 
 (defmacro with-silent-modifications (&rest body)
   "Execute BODY, pretending it does not modify the buffer.
-This macro is Typically used around modifications of
-text-properties which do not really affect the buffer's content.
+This macro is typically used around modifications of
+text properties which do not really affect the buffer's content.
 If BODY performs real modifications to the buffer's text, other
 than cosmetic ones, undo data may become corrupted.
 

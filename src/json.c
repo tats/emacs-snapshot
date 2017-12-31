@@ -60,6 +60,7 @@ DEF_DLL_FN (double, json_real_value, (const json_t *real));
 DEF_DLL_FN (const char *, json_string_value, (const json_t *string));
 DEF_DLL_FN (size_t, json_string_length, (const json_t *string));
 DEF_DLL_FN (json_t *, json_array_get, (const json_t *array, size_t index));
+DEF_DLL_FN (json_t *, json_object_get, (const json_t *object, const char *key));
 DEF_DLL_FN (size_t, json_object_size, (const json_t *object));
 DEF_DLL_FN (const char *, json_object_iter_key, (void *iter));
 DEF_DLL_FN (void *, json_object_iter, (json_t *object));
@@ -108,6 +109,7 @@ init_json_functions (void)
   LOAD_DLL_FN (library, json_string_value);
   LOAD_DLL_FN (library, json_string_length);
   LOAD_DLL_FN (library, json_array_get);
+  LOAD_DLL_FN (library, json_object_get);
   LOAD_DLL_FN (library, json_object_size);
   LOAD_DLL_FN (library, json_object_iter_key);
   LOAD_DLL_FN (library, json_object_iter);
@@ -141,6 +143,7 @@ init_json_functions (void)
 #define json_string_value fn_json_string_value
 #define json_string_length fn_json_string_length
 #define json_array_get fn_json_array_get
+#define json_object_get fn_json_object_get
 #define json_object_size fn_json_object_size
 #define json_object_iter_key fn_json_object_iter_key
 #define json_object_iter fn_json_object_iter
@@ -313,6 +316,15 @@ json_check (json_t *object)
   return object;
 }
 
+/* If STRING is not a valid UTF-8 string, signal an error of type
+   `wrong-type-argument'.  STRING must be a unibyte string.  */
+
+static void
+json_check_utf8 (Lisp_Object string)
+{
+  CHECK_TYPE (utf8_string_p (string), Qutf_8_string_p, string);
+}
+
 static json_t *lisp_to_json (Lisp_Object);
 
 /* Convert a Lisp object to a toplevel JSON object (array or object).
@@ -352,13 +364,57 @@ lisp_to_json_toplevel_1 (Lisp_Object lisp, json_t **json)
             /* We can't specify the length, so the string must be
                null-terminated.  */
             check_string_without_embedded_nulls (key);
-            int status = json_object_set_new (*json, SSDATA (key),
+            const char *key_str = SSDATA (key);
+            /* Reject duplicate keys.  These are possible if the hash
+               table test is not `equal'.  */
+            if (json_object_get (*json, key_str) != NULL)
+              wrong_type_argument (Qjson_value_p, lisp);
+            int status = json_object_set_new (*json, key_str,
                                               lisp_to_json (HASH_VALUE (h, i)));
             if (status == -1)
-              /* FIXME: A failure here might also indicate that the
-                 key is not a valid Unicode string.  */
-              json_out_of_memory ();
+              {
+                /* A failure can be caused either by an invalid key or
+                   by low memory.  */
+                json_check_utf8 (key);
+                json_out_of_memory ();
+              }
           }
+      clear_unwind_protect (count);
+      return unbind_to (count, Qnil);
+    }
+  else if (NILP (lisp))
+    {
+      *json = json_check (json_object ());
+      return Qnil;
+    }
+  else if (CONSP (lisp))
+    {
+      Lisp_Object tail = lisp;
+      *json = json_check (json_object ());
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_protect_ptr (json_release_object, *json);
+      FOR_EACH_TAIL (tail)
+        {
+          Lisp_Object pair = XCAR (tail);
+          CHECK_CONS (pair);
+          Lisp_Object key_symbol = XCAR (pair);
+          Lisp_Object value = XCDR (pair);
+          CHECK_SYMBOL (key_symbol);
+          Lisp_Object key = SYMBOL_NAME (key_symbol);
+          /* We can't specify the length, so the string must be
+             null-terminated.  */
+          check_string_without_embedded_nulls (key);
+          const char *key_str = SSDATA (key);
+          /* Only add element if key is not already present.  */
+          if (json_object_get (*json, key_str) == NULL)
+            {
+              int status
+                = json_object_set_new (*json, key_str, lisp_to_json (value));
+              if (status == -1)
+                json_out_of_memory ();
+            }
+        }
+      CHECK_LIST_END (tail, lisp);
       clear_unwind_protect (count);
       return unbind_to (count, Qnil);
     }
@@ -366,8 +422,8 @@ lisp_to_json_toplevel_1 (Lisp_Object lisp, json_t **json)
 }
 
 /* Convert LISP to a toplevel JSON object (array or object).  Signal
-   an error of type `wrong-type-argument' if LISP is not a vector or
-   hashtable.  */
+   an error of type `wrong-type-argument' if LISP is not a vector,
+   hashtable, or alist.  */
 
 static json_t *
 lisp_to_json_toplevel (Lisp_Object lisp)
@@ -403,24 +459,31 @@ lisp_to_json (Lisp_Object lisp)
   else if (STRINGP (lisp))
     {
       Lisp_Object encoded = json_encode (lisp);
-      /* FIXME: We might throw an out-of-memory error here if the
-         string is not valid Unicode.  */
-      return json_check (json_stringn (SSDATA (encoded), SBYTES (encoded)));
+      json_t *json = json_stringn (SSDATA (encoded), SBYTES (encoded));
+      if (json == NULL)
+        {
+          /* A failure can be caused either by an invalid string or by
+             low memory.  */
+          json_check_utf8 (encoded);
+          json_out_of_memory ();
+        }
+      return json;
     }
 
-  /* LISP now must be a vector or hashtable.  */
+  /* LISP now must be a vector, hashtable, or alist.  */
   return lisp_to_json_toplevel (lisp);
 }
 
 DEFUN ("json-serialize", Fjson_serialize, Sjson_serialize, 1, 1, NULL,
        doc: /* Return the JSON representation of OBJECT as a string.
-OBJECT must be a vector or hashtable, and its elements can recursively
-contain `:null', `:false', t, numbers, strings, or other vectors and
-hashtables.  `:null', `:false', and t will be converted to JSON null,
-false, and true values, respectively.  Vectors will be converted to
-JSON arrays, and hashtables to JSON objects.  Hashtable keys must be
-strings without embedded null characters and must be unique within
-each object.  */)
+OBJECT must be a vector, hashtable, or alist, and its elements can
+recursively contain `:null', `:false', t, numbers, strings, or other
+vectors hashtables, and alist.  `:null', `:false', and t will be
+converted to JSON null, false, and true values, respectively.  Vectors
+will be converted to JSON arrays, and hashtables and alists to JSON
+objects.  Hashtable keys must be strings without embedded null
+characters and must be unique within each object.  Alist keys must be
+symbols; if a key is duplicate, the first instance is used.  */)
   (Lisp_Object object)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
@@ -818,8 +881,7 @@ syms_of_json (void)
 
   DEFSYM (Qstring_without_embedded_nulls_p, "string-without-embedded-nulls-p");
   DEFSYM (Qjson_value_p, "json-value-p");
-
-  DEFSYM (Qutf_8_unix, "utf-8-unix");
+  DEFSYM (Qutf_8_string_p, "utf-8-string-p");
 
   DEFSYM (Qjson_error, "json-error");
   DEFSYM (Qjson_out_of_memory, "json-out-of-memory");
