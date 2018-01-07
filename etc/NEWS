@@ -1,6 +1,6 @@
 GNU Emacs NEWS -- history of user-visible changes.
 
-Copyright (C) 2017 Free Software Foundation, Inc.
+Copyright (C) 2017-2018 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 Please send Emacs bug reports to bug-gnu-emacs@gnu.org.
@@ -38,8 +38,9 @@ interpreter or modules that it uses.  If your platform supports it you
 can enable it when configuring, e.g., './configure CFLAGS="-g3 -O2
 -mmpx -fcheck-pointer-bounds"' on Intel MPX platforms.
 
-** Emacs now normally uses a pointer type instead of an integer type
-for the fundamental word in the Emacs Lisp interpreter, to help
+** Emacs now normally uses a C pointer type instead of a C integer
+type to implement Lisp_Object, which is the fundamental machine word
+type internal to the Emacs Lisp interpreter.  This change aims to
 catch typos and support -fcheck-pointer-bounds.  The 'configure'
 option --enable-check-lisp-object-type is therefore no longer as
 useful and so is no longer enabled by default in developer builds,
@@ -157,6 +158,12 @@ To restore the old behavior, use
 
     (add-hook 'eshell-expand-input-functions
               #'eshell-expand-history-references)
+
+** Tramp
+
++++
+*** New connection method "owncloud", which allows to access OwnCloud
+or NextCloud hosted files and directories.
 
 
 * New Modes and Packages in Emacs 27.1

@@ -1,6 +1,6 @@
 ;;; tramp-archive-tests.el --- Tests of file archive access  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
@@ -699,7 +699,8 @@ This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
 	tmp-file)
     ;; The file archive shall know a temporary file directory.  It is
     ;; not in the archive itself.
-    (should (stringp (with-no-warnings (temporary-file-directory))))
+    (should
+     (stringp (with-no-warnings (with-no-warnings (temporary-file-directory)))))
     (should-not
      (tramp-archive-file-name-p (with-no-warnings (temporary-file-directory))))
 
