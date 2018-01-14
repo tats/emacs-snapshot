@@ -501,9 +501,11 @@ This requotes when a quoting key is typed."
          (let ((backtick ?\`))
            (if (or (eq last-command-event ?\`)
                    (and (or electric-quote-context-sensitive
-                            electric-quote-replace-double)
+                            (and electric-quote-replace-double
+                                 (eq last-command-event ?\")))
                         (save-excursion
                           (backward-char)
+                          (skip-syntax-backward "\\")
                           (or (bobp) (bolp)
                               (memq (char-before) (list q< q<<))
                               (memq (char-syntax (char-before))

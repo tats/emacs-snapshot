@@ -1423,9 +1423,10 @@ the form (METHOD USER DOMAIN HOST PORT LOCALNAME &optional HOP)."
 	      localname (nth 5 args)
 	      hop (nth 6 args))))
 
+    (when (zerop (length method))
+      (signal 'wrong-type-argument (list 'stringp method)))
     (concat tramp-prefix-format hop
-	    (unless (or (zerop (length method))
-			(zerop (length tramp-postfix-method-format)))
+	    (unless (zerop (length tramp-postfix-method-format))
 	      (concat method tramp-postfix-method-format))
 	    user
 	    (unless (zerop (length domain))
@@ -1557,7 +1558,9 @@ The outline level is equal to the verbosity of the Tramp message."
 	    (outline-regexp tramp-debug-outline-regexp))
 	(outline-mode))
       (set (make-local-variable 'outline-regexp) tramp-debug-outline-regexp)
-      (set (make-local-variable 'outline-level) 'tramp-debug-outline-level))
+      (set (make-local-variable 'outline-level) 'tramp-debug-outline-level)
+      ;; Do not edit the debug buffer.
+      (set-keymap-parent (current-local-map) special-mode-map))
     (current-buffer)))
 
 (defsubst tramp-debug-message (vec fmt-string &rest arguments)
@@ -1662,17 +1665,18 @@ applicable)."
 		 arguments))
 	;; Log only when there is a minimum level.
 	(when (>= tramp-verbose 4)
-	  ;; Translate proc to vec.
-	  (when (processp vec-or-proc)
-	    (let ((tramp-verbose 0))
-	      (setq vec-or-proc
-		    (tramp-get-connection-property vec-or-proc "vector" nil))))
-	  ;; Append connection buffer for error messages.
-	  (when (= level 1)
-	    (let ((tramp-verbose 0))
-	      (with-current-buffer (tramp-get-connection-buffer vec-or-proc)
+	  (let ((tramp-verbose 0))
+	    ;; Append connection buffer for error messages.
+	    (when (= level 1)
+	      (with-current-buffer
+		  (if (processp vec-or-proc)
+		      (process-buffer vec-or-proc)
+		    (tramp-get-connection-buffer vec-or-proc))
 		(setq fmt-string (concat fmt-string "\n%s")
-		      arguments (append arguments (list (buffer-string)))))))
+		      arguments (append arguments (list (buffer-string))))))
+	    ;; Translate proc to vec.
+	    (when (processp vec-or-proc)
+	      (setq vec-or-proc (process-get vec-or-proc 'vector))))
 	  ;; Do it.
 	  (when (tramp-file-name-p vec-or-proc)
 	    (apply 'tramp-debug-message
@@ -3786,8 +3790,7 @@ connection buffer."
   ;; use the "password-vector" property in case we have several hops.
   (tramp-set-connection-property
    (tramp-get-connection-property
-    proc "password-vector"
-    (tramp-get-connection-property proc "vector" nil))
+    proc "password-vector" (process-get proc 'vector))
    "first-password-request" tramp-cache-read-persistent-data)
   (save-restriction
     (with-tramp-progress-reporter
@@ -4404,9 +4407,7 @@ Invokes `password-read' if available, `read-passwd' else."
 	       ;; In tramp-sh.el, we must use "password-vector" due to
 	       ;; multi-hop.
 	       (tramp-get-connection-property
-		proc "password-vector"
-		;; All other backends simply use "vector".
-		(tramp-get-connection-property proc "vector" nil))
+		proc "password-vector" (process-get proc 'vector))
 	       'noloc 'nohop))
 	 (pw-prompt
 	  (or prompt
@@ -4552,7 +4553,7 @@ Only works for Bourne-like shells."
 	;; This is for tramp-sh.el.  Other backends do not support this (yet).
 	(tramp-compat-funcall
 	 'tramp-send-command
-	 (tramp-get-connection-property proc "vector" nil)
+	 (process-get proc 'vector)
 	 (format "kill -2 %d" pid))
 	;; Wait, until the process has disappeared.  If it doesn't,
 	;; fall back to the default implementation.

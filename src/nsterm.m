@@ -1736,7 +1736,6 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 {
   NSView *view = FRAME_NS_VIEW (f);
   NSArray *screens = [NSScreen screens];
-  NSScreen *fscreen = [screens objectAtIndex: 0];
   NSScreen *screen = [[view window] screen];
 
   NSTRACE ("x_set_offset");
@@ -1746,26 +1745,41 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
   f->left_pos = xoff;
   f->top_pos = yoff;
 
-  if (view != nil && screen && fscreen)
+  if (view != nil)
     {
-      f->left_pos = f->size_hint_flags & XNegative
-        ? [screen visibleFrame].size.width + f->left_pos - FRAME_PIXEL_WIDTH (f)
-        : f->left_pos;
-      /* We use visibleFrame here to take menu bar into account.
-	 Ideally we should also adjust left/top with visibleFrame.origin.  */
+      if (FRAME_PARENT_FRAME (f) == NULL && screen)
+        {
+          f->left_pos = f->size_hint_flags & XNegative
+            ? [screen visibleFrame].size.width + f->left_pos - FRAME_PIXEL_WIDTH (f)
+            : f->left_pos;
+          /* We use visibleFrame here to take menu bar into account.
+             Ideally we should also adjust left/top with visibleFrame.origin.  */
 
-      f->top_pos = f->size_hint_flags & YNegative
-        ? ([screen visibleFrame].size.height + f->top_pos
-           - FRAME_PIXEL_HEIGHT (f) - FRAME_NS_TITLEBAR_HEIGHT (f)
-           - FRAME_TOOLBAR_HEIGHT (f))
-        : f->top_pos;
+          f->top_pos = f->size_hint_flags & YNegative
+            ? ([screen visibleFrame].size.height + f->top_pos
+               - FRAME_PIXEL_HEIGHT (f) - FRAME_NS_TITLEBAR_HEIGHT (f)
+               - FRAME_TOOLBAR_HEIGHT (f))
+            : f->top_pos;
 #ifdef NS_IMPL_GNUSTEP
-      if (FRAME_PARENT_FRAME (f) == NULL)
-	{
 	  if (f->left_pos < 100)
 	    f->left_pos = 100;  /* don't overlap menu */
-	}
 #endif
+        }
+      else if (FRAME_PARENT_FRAME (f) != NULL)
+        {
+          struct frame *parent = FRAME_PARENT_FRAME (f);
+
+          /* On X negative values for child frames always result in
+             positioning relative to the bottom right corner of the
+             parent frame.  */
+          if (f->left_pos < 0)
+            f->left_pos = FRAME_PIXEL_WIDTH (parent) - FRAME_PIXEL_WIDTH (f) + f->left_pos;
+
+          if (f->top_pos < 0)
+            f->top_pos = FRAME_PIXEL_HEIGHT (parent) + FRAME_TOOLBAR_HEIGHT (parent)
+              - FRAME_PIXEL_HEIGHT (f) + f->top_pos;
+        }
+
       /* Constrain the setFrameTopLeftPoint so we don't move behind the
          menu bar.  */
       NSPoint pt = NSMakePoint (SCREENMAXBOUND (f->left_pos
@@ -6283,14 +6297,20 @@ not_in_argv (NSString *arg)
          by doCommandBySelector: deleteBackward: */
 - (void)insertText: (id)aString
 {
-  int code;
-  int len = [(NSString *)aString length];
-  int i;
+  NSString *s;
+  NSUInteger len;
 
   NSTRACE ("[EmacsView insertText:]");
 
+  if ([aString isKindOfClass:[NSAttributedString class]])
+    s = [aString string];
+  else
+    s = aString;
+
+  len = [s length];
+
   if (NS_KEYLOG)
-    NSLog (@"insertText '%@'\tlen = %d", aString, len);
+    NSLog (@"insertText '%@'\tlen = %lu", aString, (unsigned long) len);
   processingCompose = NO;
 
   if (!emacs_event)
@@ -6300,10 +6320,24 @@ not_in_argv (NSString *arg)
   if (workingText != nil)
     [self deleteWorkingText];
 
+  /* It might be preferable to use getCharacters:range: below,
+     cf. https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/StringDrawing.html#//apple_ref/doc/uid/TP40001445-112378.
+     However, we probably can't use SAFE_NALLOCA here because it might
+     exit nonlocally.  */
+
   /* now insert the string as keystrokes */
-  for (i =0; i<len; i++)
+  for (NSUInteger i = 0; i < len; i++)
     {
-      code = [aString characterAtIndex: i];
+      NSUInteger code = [s characterAtIndex:i];
+      if (UTF_16_HIGH_SURROGATE_P (code) && i < len - 1)
+        {
+          unichar low = [s characterAtIndex:i + 1];
+          if (UTF_16_LOW_SURROGATE_P (low))
+            {
+              code = surrogates_to_codepoint (low, code);
+              ++i;
+            }
+        }
       /* TODO: still need this? */
       if (code == 0x2DC)
         code = '~'; /* 0x7E */
