@@ -580,8 +580,8 @@ xg_check_special_colors (struct frame *f,
       {
         GdkRGBA *c;
         /* FIXME: Retrieving the background color is deprecated in
-           GTK+ 3.16.  New versions of GTK+ don’t use the concept of a
-           single background color any more, so we shouldn’t query for
+           GTK+ 3.16.  New versions of GTK+ don't use the concept of a
+           single background color any more, so we shouldn't query for
            it.  */
         gtk_style_context_get (gsty, state,
                                GTK_STYLE_PROPERTY_BACKGROUND_COLOR, &c,
@@ -687,6 +687,7 @@ qttip_cb (GtkWidget  *widget,
       g_signal_connect (x->ttip_lbl, "hierarchy-changed",
                         G_CALLBACK (hierarchy_ch_cb), f);
     }
+
   return FALSE;
 }
 
@@ -713,7 +714,8 @@ xg_prepare_tooltip (struct frame *f,
   GtkRequisition req;
   Lisp_Object encoded_string;
 
-  if (!x->ttip_lbl) return 0;
+  if (!x->ttip_lbl)
+    return FALSE;
 
   block_input ();
   encoded_string = ENCODE_UTF_8 (string);
@@ -745,7 +747,7 @@ xg_prepare_tooltip (struct frame *f,
 
   unblock_input ();
 
-  return 1;
+  return TRUE;
 #endif /* USE_GTK_TOOLTIP */
 }
 
@@ -768,18 +770,18 @@ xg_show_tooltip (struct frame *f, int root_x, int root_y)
 #endif
 }
 
+
 /* Hide tooltip if shown.  Do nothing if not shown.
    Return true if tip was hidden, false if not (i.e. not using
    system tooltips).  */
-
 bool
 xg_hide_tooltip (struct frame *f)
 {
-  bool ret = 0;
 #ifdef USE_GTK_TOOLTIP
   if (f->output_data.x->ttip_window)
     {
       GtkWindow *win = f->output_data.x->ttip_window;
+
       block_input ();
       gtk_widget_hide (GTK_WIDGET (win));
 
@@ -792,10 +794,10 @@ xg_hide_tooltip (struct frame *f)
         }
       unblock_input ();
 
-      ret = 1;
+      return TRUE;
     }
 #endif
-  return ret;
+  return FALSE;
 }
 
 
