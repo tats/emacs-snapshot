@@ -75,6 +75,18 @@ detect built-in libxml support, instead of testing for that
 indirectly, e.g., by checking that functions like
 'libxml-parse-html-region' return nil.
 
++++
+** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
+It blocks line breaking after a one-letter word, also in the case when
+this word is preceded by a non-space, but non-alphanumeric character.
+
++++
+** The limit on repetitions in regexps has been raised to 2^16-1.
+It was previously limited to 2^15-1.  For example, the following
+regular expression was previously invalid, but is now accepted:
+
+   x\{32768\}
+
 
 * Editing Changes in Emacs 27.1
 
@@ -93,6 +105,13 @@ non-text modes.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** Ecomplete
+*** The ecomplete sorting has changed to a decay-based algorithm.
+This can be controlled by the new `ecomplete-sort-predicate' variable.
+
+*** The 'ecompleterc' file is now placed in ~/.emacs.d/ecompleterc by default
+Of course it will still find it if you have it in ~/.ecompleterc
 
 ** Smtpmail
 Authentication mechanisms can be added via external packages, by
@@ -204,6 +223,9 @@ as new-style, bind the new variable 'force-new-style-backquotes' to t.
 
 * Lisp Changes in Emacs 27.1
 
++++
+** New function assoc-delete-all.
+
 ** 'print-quoted' now defaults to t, so if you want to see
 (quote x) instead of 'x you will have to bind it to nil where applicable.
 
@@ -237,8 +259,8 @@ It's a simple convenience function for looking up MIME types based on
 file name extensions.
 
 +++
-** The ecomplete sorting has changed to a decay-based algorithm.  This
-can be controlled by the new `ecomplete-sort-predicate' variable.
+** The new function 'read-answer' accepts either long or short answers
+depending on the new customizable variable 'read-answer-short'.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
