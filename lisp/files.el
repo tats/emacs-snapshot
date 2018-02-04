@@ -963,7 +963,8 @@ the function needs to examine, starting with FILE."
                     (null file)
                     (string-match locate-dominating-stop-dir-regexp file)))
       (setq try (if (stringp name)
-                    (file-exists-p (expand-file-name name file))
+                    (and (file-directory-p file)
+                         (file-exists-p (expand-file-name name file)))
                   (funcall name file)))
       (cond (try (setq root file))
             ((equal file (setq file (file-name-directory
@@ -5220,7 +5221,8 @@ view the differences using `diff-buffer-with-file'.
 This command first saves any buffers where `buffer-save-without-query' is
 non-nil, without asking.
 
-Optional argument (the prefix) non-nil means save all with no questions.
+Optional argument ARG (interactively, prefix argument) non-nil means save
+all with no questions.
 Optional second argument PRED determines which buffers are considered:
 If PRED is nil, all the file-visiting buffers are considered.
 If PRED is t, then certain non-file buffers will also be considered.
@@ -6472,9 +6474,10 @@ The return value is a string describing the amount of free
 space (normally, the number of free 1KB blocks).
 
 If DIR's free space cannot be obtained, this function returns nil."
-  (let ((avail (nth 2 (file-system-info dir))))
-    (if avail
-	(format "%.0f" (/ avail 1024)))))
+  (save-match-data
+    (let ((avail (nth 2 (file-system-info dir))))
+      (if avail
+	  (format "%.0f" (/ avail 1024))))))
 
 ;; The following expression replaces `dired-move-to-filename-regexp'.
 (defvar directory-listing-before-filename-regexp
@@ -6996,7 +6999,7 @@ only these files will be asked to be saved."
            ;; Bug#25949.
 	   (if (memq operation
                      '(insert-directory process-file start-file-process
-                                        shell-command))
+                                        shell-command temporary-file-directory))
 	       (directory-file-name
 	        (expand-file-name
 		 (unhandled-file-name-directory default-directory)))
@@ -7020,15 +7023,23 @@ only these files will be asked to be saved."
 			    ;; temporarily to unquoted filename.
 			    (verify-visited-file-modtime unquote-then-quote)
 			    ;; List the arguments which are filenames.
-			    (file-name-completion 1)
-			    (file-name-all-completions 1)
+			    (file-name-completion 0 1)
+			    (file-name-all-completions 0 1)
+                            (file-equal-p 0 1)
+                            (file-newer-than-file-p 0 1)
 			    (write-region 2 5)
 			    (rename-file 0 1)
 			    (copy-file 0 1)
 			    (copy-directory 0 1)
 			    (file-in-directory-p 0 1)
 			    (make-symbolic-link 0 1)
-			    (add-name-to-file 0 1))))
+			    (add-name-to-file 0 1)
+                            (make-auto-save-file-name buffer-file-name)
+                            (set-visited-file-modtime buffer-file-name)
+                            ;; These file-notify-* operations take a
+                            ;; descriptor.
+                            (file-notify-rm-watch . nil)
+                            (file-notify-valid-p . nil))))
 		   ;; For all other operations, treat the first argument only
 		   ;; as the file name.
 		   '(nil 0))))
@@ -7051,6 +7062,12 @@ only these files will be asked to be saved."
     (pcase method
       (`identity (car arguments))
       (`add (file-name-quote (apply operation arguments)))
+      (`buffer-file-name
+       (let ((buffer-file-name
+              (if (string-match "\\`/:" buffer-file-name)
+                  (substring buffer-file-name (match-end 0))
+                buffer-file-name)))
+         (apply operation arguments)))
       (`insert-file-contents
        (let ((visit (nth 1 arguments)))
          (unwind-protect

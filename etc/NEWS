@@ -220,6 +220,10 @@ calling 'eldoc-message' directly.
 generating warnings for a decade.  To interpret old-style backquotes
 as new-style, bind the new variable 'force-new-style-backquotes' to t.
 
+** Defining a Common Lisp structure using 'cl-defstruct' or
+'cl-struct-define' whose name clashes with a builtin type (e.g.,
+'integer' or 'hash-table') now signals an error.
+
 
 * Lisp Changes in Emacs 27.1
 
@@ -228,6 +232,15 @@ as new-style, bind the new variable 'force-new-style-backquotes' to t.
 
 ** 'print-quoted' now defaults to t, so if you want to see
 (quote x) instead of 'x you will have to bind it to nil where applicable.
+
+** To avoid confusion caused by "smart quotes", the reader signals an
+error when reading Lisp symbols which begin with one of the following
+quotation characters: ‘’‛“”‟〞＂＇.  A symbol beginning with such a
+character can be written by escaping the quotation character with a
+backslash.  For example:
+
+    (read "‘smart") => (invalid-read-syntax "strange quote" "‘")
+    (read "\\‘smart") == (intern "‘smart")
 
 ** Internal parsing commands now use syntax-ppss and disregard
 open-paren-in-column-0-is-defun-start.  This affects mostly things like
@@ -261,6 +274,10 @@ file name extensions.
 +++
 ** The new function 'read-answer' accepts either long or short answers
 depending on the new customizable variable 'read-answer-short'.
+
+** The function 'load' now behaves correctly when loading modules.
+Specifically, it puts the module name into 'load-history', prints
+loading messages if requested, and protects against recursive loads.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

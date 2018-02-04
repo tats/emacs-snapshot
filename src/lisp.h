@@ -583,7 +583,10 @@ enum Lisp_Fwd_Type
    resources allocated for it that are not Lisp objects.  You can even
    make a pointer to the function that frees the resources a slot in
    your object -- this way, the same object could be used to represent
-   several disparate C structures.  */
+   several disparate C structures.
+
+   You also need to add the new type to the constant
+   `cl--typeof-types' in lisp/emacs-lisp/cl-preloaded.el.  */
 
 
 /* A Lisp_Object is a tagged pointer or integer.  Ordinarily it is a
@@ -4127,7 +4130,7 @@ extern _Noreturn void report_file_error (const char *, Lisp_Object);
 extern _Noreturn void report_file_notify_error (const char *, Lisp_Object);
 extern bool internal_delete_file (Lisp_Object);
 extern Lisp_Object emacs_readlinkat (int, const char *);
-extern bool file_directory_p (const char *);
+extern bool file_directory_p (Lisp_Object);
 extern bool file_accessible_directory_p (Lisp_Object);
 extern void init_fileio (void);
 extern void syms_of_fileio (void);

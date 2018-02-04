@@ -37,28 +37,6 @@
 (defvar compilation-current-error)
 (defvar compilation-context-lines)
 
-(defcustom shell-command-dont-erase-buffer nil
-  "If non-nil, output buffer is not erased between shell commands.
-Also, a non-nil value sets the point in the output buffer
-once the command completes.
-The value `beg-last-out' sets point at the beginning of the output,
-`end-last-out' sets point at the end of the buffer, `save-point'
-restores the buffer position before the command."
-  :type '(choice
-          (const :tag "Erase buffer" nil)
-          (const :tag "Set point to beginning of last output" beg-last-out)
-          (const :tag "Set point to end of last output" end-last-out)
-          (const :tag "Save point" save-point))
-  :group 'shell
-  :version "26.1")
-
-(defvar shell-command-saved-pos nil
-  "Record of point positions in output buffers after command completion.
-The value is an alist whose elements are of the form (BUFFER . POS),
-where BUFFER is the output buffer, and POS is the point position
-in BUFFER once the command finishes.
-This variable is used when `shell-command-dont-erase-buffer' is non-nil.")
-
 (defcustom idle-update-delay 0.5
   "Idle time delay before updating various things on the screen.
 Various Emacs features that update auxiliary information when point moves
@@ -3299,6 +3277,28 @@ is output."
 			nil))
   :group 'shell
   :version "26.1")
+
+(defcustom shell-command-dont-erase-buffer nil
+  "If non-nil, output buffer is not erased between shell commands.
+Also, a non-nil value sets the point in the output buffer
+once the command completes.
+The value `beg-last-out' sets point at the beginning of the output,
+`end-last-out' sets point at the end of the buffer, `save-point'
+restores the buffer position before the command."
+  :type '(choice
+          (const :tag "Erase buffer" nil)
+          (const :tag "Set point to beginning of last output" beg-last-out)
+          (const :tag "Set point to end of last output" end-last-out)
+          (const :tag "Save point" save-point))
+  :group 'shell
+  :version "26.1")
+
+(defvar shell-command-saved-pos nil
+  "Record of point positions in output buffers after command completion.
+The value is an alist whose elements are of the form (BUFFER . POS),
+where BUFFER is the output buffer, and POS is the point position
+in BUFFER once the command finishes.
+This variable is used when `shell-command-dont-erase-buffer' is non-nil.")
 
 (defun shell-command--save-pos-or-erase ()
   "Store a buffer position or erase the buffer.
@@ -8963,7 +8963,7 @@ Otherwise, it calls `upcase-word', with prefix argument passed to it
 to upcase ARG words."
   (interactive "*p")
   (if (use-region-p)
-      (upcase-region (region-beginning) (region-end))
+      (upcase-region (region-beginning) (region-end) (region-noncontiguous-p))
     (upcase-word arg)))
 
 (defun downcase-dwim (arg)
@@ -8973,7 +8973,7 @@ Otherwise, it calls `downcase-word', with prefix argument passed to it
 to downcase ARG words."
   (interactive "*p")
   (if (use-region-p)
-      (downcase-region (region-beginning) (region-end))
+      (downcase-region (region-beginning) (region-end) (region-noncontiguous-p))
     (downcase-word arg)))
 
 (defun capitalize-dwim (arg)

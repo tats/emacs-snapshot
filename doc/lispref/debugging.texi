@@ -619,7 +619,7 @@ was called.  The convention for arguments is detailed in the description
 of @code{debug} (@pxref{Invoking the Debugger}).
 @end defvar
 
-@deffn Command backtrace
+@defun backtrace
 @cindex run time stack
 @cindex call stack
 This function prints a trace of Lisp function calls currently active.
@@ -669,9 +669,9 @@ forms are elided.
 ----------- Buffer: backtrace-output ------------
 @end group
 @end smallexample
-@end deffn
+@end defun
 
-@defvar debugger-stack-frame-as-list
+@defopt debugger-stack-frame-as-list
 If this variable is non-@code{nil}, every stack frame of the backtrace
 is displayed as a list.  This aims at improving the backtrace
 readability at the cost of special forms no longer being visually
@@ -700,7 +700,7 @@ example would look as follows:
 ----------- Buffer: backtrace-output ------------
 @end group
 @end smallexample
-@end defvar
+@end defopt
 
 @defvar debug-on-next-call
 @cindex @code{eval}, and debugging
@@ -941,10 +941,10 @@ The profiler report buffer shows, on each line, a function that was
 called, followed by how much resource (processor or memory) it used in
 absolute and percentage times since profiling started.  If a given
 line has a @samp{+} symbol at the left-hand side, you can expand that
-line by typing @key{RET}, in order to see the function(s) called by
-the higher-level function.  Use a prefix argument (@key{C-u RET}) to
-see the whole call tree below a function.  Pressing @key{RET} again
-will collapse back to the original state.
+line by typing @kbd{@key{RET}}, in order to see the function(s) called
+by the higher-level function.  Use a prefix argument (@kbd{C-u
+@key{RET}}) to see the whole call tree below a function.  Pressing
+@kbd{@key{RET}} again will collapse back to the original state.
 
 Press @kbd{j} or @kbd{mouse-2} to jump to the definition of a function.
 Press @kbd{d} to view a function's documentation.
