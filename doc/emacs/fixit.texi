@@ -78,7 +78,6 @@ the undo command.
 previous undo commands, use @kbd{M-x undo-only}.  This is like
 @code{undo}, but will not redo changes you have just undone.
 
-@c What about @kbd{M-x revert-buffer}? --xfq
   If you notice that a buffer has been modified accidentally, the
 easiest way to recover is to type @kbd{C-/} repeatedly until the stars
 disappear from the front of the mode line (@pxref{Mode Line}).
@@ -89,6 +88,10 @@ changed the buffer deliberately, type @kbd{C-/} once.  When you see
 the last change you made undone, you will see whether it was an
 intentional change.  If it was an accident, leave it undone.  If it
 was deliberate, redo the change as described above.
+
+Alternatively, you can discard all the changes since the buffer was
+last visited or saved with @kbd{M-x revert-buffer}
+(@pxref{Reverting}).
 
 @cindex selective undo
 @kindex C-u C-/
@@ -159,9 +162,10 @@ last two characters on the line.  So, if you catch your transposition error
 right away, you can fix it with just a @kbd{C-t}.  If you don't catch it so
 fast, you must move the cursor back between the two transposed
 characters before you type @kbd{C-t}.  If you transposed a space with
-the last character of the word before it, the word motion commands are
-a good way of getting there.  Otherwise, a reverse search (@kbd{C-r})
-is often the best way.  @xref{Search}.
+the last character of the word before it, the word motion commands
+(@kbd{M-f}, @kbd{M-b}, etc.) are a good way of getting there.
+Otherwise, a reverse search (@kbd{C-r}) is often the best way.
+@xref{Search}.
 
 @kindex C-x C-t
 @findex transpose-lines
@@ -181,22 +185,23 @@ punctuation characters between the words do not move.  For example,
   @kbd{C-M-t} (@code{transpose-sexps}) is a similar command for
 transposing two expressions (@pxref{Expressions}), and @kbd{C-x C-t}
 (@code{transpose-lines}) exchanges lines.  They work like @kbd{M-t}
-except as regards what units of text they transpose.
+except as regards the units of text they transpose.
 
   A numeric argument to a transpose command serves as a repeat count: it
-tells the transpose command to move the character (word, expression, line)
-before or containing point across several other characters (words,
-expressions, lines).  For example, @kbd{C-u 3 C-t} moves the character before
-point forward across three other characters.  It would change
-@samp{f@point{}oobar} into @samp{oobf@point{}ar}.  This is equivalent to
-repeating @kbd{C-t} three times.  @kbd{C-u - 4 M-t} moves the word
-before point backward across four words.  @kbd{C-u - C-M-t} would cancel
-the effect of plain @kbd{C-M-t}.
+tells the transpose command to move the character (or word or
+expression or line) before or containing point across several other
+characters (or words or expressions or lines).  For example, @kbd{C-u
+3 C-t} moves the character before point forward across three other
+characters.  It would change @samp{f@point{}oobar} into
+@samp{oobf@point{}ar}.  This is equivalent to repeating @kbd{C-t}
+three times.  @kbd{C-u - 4 M-t} moves the word before point backward
+across four words.  @kbd{C-u - C-M-t} would cancel the effect of plain
+@kbd{C-M-t}.
 
   A numeric argument of zero is assigned a special meaning (because
 otherwise a command with a repeat count of zero would do nothing): to
-transpose the character (word, expression, line) ending after point
-with the one ending after the mark.
+transpose the character (or word or expression or line) ending after
+point with the one ending after the mark.
 
 @node Fixing Case
 @section Case Conversion
@@ -214,7 +219,7 @@ Convert last word to lower case with capital initial.
 @kindex M-@t{-} M-u
 @kindex M-@t{-} M-c
   A very common error is to type words in the wrong case.  Because of this,
-the word case-conversion commands @kbd{M-l}, @kbd{M-u} and @kbd{M-c} have a
+the word case-conversion commands @kbd{M-l}, @kbd{M-u}, and @kbd{M-c} have a
 special feature when used with a negative argument: they do not move the
 cursor.  As soon as you see you have mistyped the last word, you can simply
 case-convert it and go on typing.  @xref{Case}.
@@ -227,9 +232,10 @@ case-convert it and go on typing.  @xref{Case}.
 
   This section describes the commands to check the spelling of a
 single word or of a portion of a buffer.  These commands only work if
-the spelling checker program Hunspell, Aspell, Ispell or Enchant is installed.
-These programs are not part of Emacs, but one of them is usually
-installed in GNU/Linux and other free operating systems.
+a spelling checker program, one of Hunspell, Aspell, Ispell or
+Enchant, is installed.  These programs are not part of Emacs, but one
+of them is usually installed on GNU/Linux and other free operating
+systems.
 @ifnottex
 @xref{Top, Aspell,, aspell, The Aspell Manual}.
 @end ifnottex
