@@ -4,7 +4,7 @@
 
 ;; Author: Fabián E. Gallina <fgallina@gnu.org>
 ;; URL: https://github.com/fgallina/python.el
-;; Version: 0.25.2
+;; Version: 0.26
 ;; Package-Requires: ((emacs "24.1") (cl-lib "1.0"))
 ;; Maintainer: emacs-devel@gnu.org
 ;; Created: Jul 2010
@@ -422,7 +422,7 @@
       (string-delimiter . ,(rx (and
                                 ;; Match even number of backslashes.
                                 (or (not (any ?\\ ?\' ?\")) point
-                                    ;; Quotes might be preceded by a escaped quote.
+                                    ;; Quotes might be preceded by an escaped quote.
                                     (and (or (not (any ?\\)) point) ?\\
                                          (* ?\\ ?\\) (any ?\' ?\")))
                                 (* ?\\ ?\\)
@@ -925,7 +925,7 @@ keyword
                 (back-to-indentation)
                 (python-syntax-closing-paren-p))
               (cons :inside-paren-at-closing-nested-paren start))
-             ;; This line starts from a opening block in its own line.
+             ;; This line starts from an opening block in its own line.
              ((save-excursion
                 (goto-char start)
                 (when (and
@@ -1474,7 +1474,7 @@ nested definitions."
 (defun python-nav-beginning-of-statement ()
   "Move to start of current statement."
   (interactive "^")
-  (back-to-indentation)
+  (forward-line 0)
   (let* ((ppss (syntax-ppss))
          (context-point
           (or
@@ -1489,6 +1489,7 @@ nested definitions."
              (python-info-line-ends-backslash-p))
            (forward-line -1)
            (python-nav-beginning-of-statement))))
+  (back-to-indentation)
   (point-marker))
 
 (defun python-nav-end-of-statement (&optional noend)
@@ -1640,7 +1641,7 @@ ARG move forward only one sexp, else move backwards."
 
 (defun python-nav--lisp-forward-sexp-safe (&optional arg)
   "Safe version of standard `forward-sexp'.
-When at end of sexp (i.e. looking at a opening/closing paren)
+When at end of sexp (i.e. looking at an opening/closing paren)
 skips it instead of throwing an error.  With positive ARG move
 forward only one sexp, else move backwards."
   (let* ((arg (if (or (not arg) (> arg 0)) 1 -1))

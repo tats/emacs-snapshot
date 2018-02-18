@@ -67,6 +67,7 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 
 #ifdef NS_IMPL_COCOA
 #include "macfont.h"
+#include <Carbon/Carbon.h>
 #endif
 
 static EmacsMenu *dockMenu;
@@ -352,31 +353,56 @@ static CGPoint menu_mouse_point;
 #define NSRightCommandKeyMask   (0x000010 | NSEventModifierFlagCommand)
 #define NSLeftAlternateKeyMask  (0x000020 | NSEventModifierFlagOption)
 #define NSRightAlternateKeyMask (0x000040 | NSEventModifierFlagOption)
-#define EV_MODIFIERS2(flags)                          \
-    (((flags & NSEventModifierFlagHelp) ?           \
-           hyper_modifier : 0)                        \
-     | (!EQ (ns_right_alternate_modifier, Qleft) && \
-        ((flags & NSRightAlternateKeyMask) \
-         == NSRightAlternateKeyMask) ? \
-           parse_solitary_modifier (ns_right_alternate_modifier) : 0) \
-     | ((flags & NSEventModifierFlagOption) ?                 \
-           parse_solitary_modifier (ns_alternate_modifier) : 0)   \
-     | ((flags & NSEventModifierFlagShift) ?     \
-           shift_modifier : 0)                        \
-     | (!EQ (ns_right_control_modifier, Qleft) && \
-        ((flags & NSRightControlKeyMask) \
-         == NSRightControlKeyMask) ? \
-           parse_solitary_modifier (ns_right_control_modifier) : 0) \
-     | ((flags & NSEventModifierFlagControl) ?      \
-           parse_solitary_modifier (ns_control_modifier) : 0)     \
-     | ((flags & NS_FUNCTION_KEY_MASK) ?  \
-           parse_solitary_modifier (ns_function_modifier) : 0)    \
-     | (!EQ (ns_right_command_modifier, Qleft) && \
-        ((flags & NSRightCommandKeyMask) \
-         == NSRightCommandKeyMask) ? \
-           parse_solitary_modifier (ns_right_command_modifier) : 0) \
-     | ((flags & NSEventModifierFlagCommand) ?      \
-           parse_solitary_modifier (ns_command_modifier):0))
+
+static unsigned int
+ev_modifiers_helper (unsigned int flags, unsigned int left_mask,
+                     unsigned int right_mask, unsigned int either_mask,
+                     Lisp_Object left_modifier, Lisp_Object right_modifier)
+{
+  unsigned int modifiers = 0;
+
+  if (flags & either_mask)
+    {
+      BOOL left_key = (flags & left_mask) == left_mask;
+      BOOL right_key = (flags & right_mask) == right_mask
+        && ! EQ (right_modifier, Qleft);
+
+      if (right_key)
+        modifiers |= parse_solitary_modifier (right_modifier);
+
+      /* GNUstep (and possibly macOS in certain circumstances) doesn't
+         differentiate between the left and right keys, so if we can't
+         identify which key it is, we use the left key setting.  */
+      if (left_key || ! right_key)
+        modifiers |= parse_solitary_modifier (left_modifier);
+    }
+
+  return modifiers;
+}
+
+#define EV_MODIFIERS2(flags)                                            \
+  (((flags & NSEventModifierFlagHelp) ?                                 \
+    hyper_modifier : 0)                                                 \
+   | ((flags & NSEventModifierFlagShift) ?                              \
+      shift_modifier : 0)                                               \
+   | ((flags & NS_FUNCTION_KEY_MASK) ?                                  \
+      parse_solitary_modifier (ns_function_modifier) : 0)               \
+   | ev_modifiers_helper (flags, NSLeftControlKeyMask,                  \
+                          NSRightControlKeyMask,                        \
+                          NSEventModifierFlagControl,                   \
+                          ns_control_modifier,                          \
+                          ns_right_control_modifier)                    \
+   | ev_modifiers_helper (flags, NSLeftCommandKeyMask,                  \
+                          NSRightCommandKeyMask,                        \
+                          NSEventModifierFlagCommand,                   \
+                          ns_command_modifier,                          \
+                          ns_right_command_modifier)                    \
+   | ev_modifiers_helper (flags, NSLeftAlternateKeyMask,                \
+                          NSRightAlternateKeyMask,                      \
+                          NSEventModifierFlagOption,                    \
+                          ns_alternate_modifier,                        \
+                          ns_right_alternate_modifier))
+
 #define EV_MODIFIERS(e) EV_MODIFIERS2 ([e modifierFlags])
 
 #define EV_UDMODIFIERS(e)                                      \
@@ -444,10 +470,37 @@ static void ns_judge_scroll_bars (struct frame *f);
    ========================================================================== */
 
 void
-ns_set_represented_filename (NSString *fstr, struct frame *f)
+ns_set_represented_filename (struct frame *f)
 {
+  Lisp_Object filename, encoded_filename;
+  Lisp_Object buf = XWINDOW (f->selected_window)->contents;
+  NSAutoreleasePool *pool;
+  NSString *fstr;
+
+  NSTRACE ("ns_set_represented_filename");
+
+  if (f->explicit_name || ! NILP (f->title))
+    return;
+
+  block_input ();
+  pool = [[NSAutoreleasePool alloc] init];
+  filename = BVAR (XBUFFER (buf), filename);
+
+  if (! NILP (filename))
+    {
+      encoded_filename = ENCODE_UTF_8 (filename);
+
+      fstr = [NSString stringWithUTF8String: SSDATA (encoded_filename)];
+      if (fstr == nil) fstr = @"";
+    }
+  else
+    fstr = @"";
+
   represented_filename = [fstr retain];
   represented_frame = f;
+
+  [pool release];
+  unblock_input ();
 }
 
 void
@@ -2627,7 +2680,78 @@ x_get_keysym_name (int keysym)
   return value;
 }
 
+#ifdef NS_IMPL_COCOA
+static UniChar
+ns_get_shifted_character (NSEvent *event)
+/* Look up the character corresponding to the key pressed on the
+   current keyboard layout and the currently configured shift-like
+   modifiers.  This ignores the control-like modifiers that cause
+   [event characters] to give us the wrong result.
 
+   Although UCKeyTranslate doesn't require the Carbon framework, some
+   of the surrounding paraphernalia does, so this function makes
+   Carbon a requirement.  */
+{
+  static UInt32 dead_key_state;
+
+  /* UCKeyTranslate may return up to 255 characters.  If the buffer
+     isn't large enough then it produces an error.  What kind of
+     keyboard inputs 255 characters in a single keypress?  */
+  UniChar buf[255];
+  UniCharCount max_string_length = 255;
+  UniCharCount actual_string_length = 0;
+  OSStatus result;
+
+  CFDataRef layout_ref = (CFDataRef) TISGetInputSourceProperty
+    (TISCopyCurrentKeyboardLayoutInputSource (), kTISPropertyUnicodeKeyLayoutData);
+  UCKeyboardLayout* layout = (UCKeyboardLayout*) CFDataGetBytePtr (layout_ref);
+
+  UInt32 flags = [event modifierFlags];
+  UInt32 modifiers = (flags & NSEventModifierFlagShift) ? shiftKey : 0;
+
+  NSTRACE ("ns_get_shifted_character");
+
+  if ((flags & NSRightAlternateKeyMask) == NSRightAlternateKeyMask
+      && (EQ (ns_right_alternate_modifier, Qnone)
+          || (EQ (ns_right_alternate_modifier, Qleft)
+              && EQ (ns_alternate_modifier, Qnone))))
+    modifiers |= rightOptionKey;
+
+  if ((flags & NSLeftAlternateKeyMask) == NSLeftAlternateKeyMask
+      && EQ (ns_alternate_modifier, Qnone))
+    modifiers |= optionKey;
+
+  if ((flags & NSRightCommandKeyMask) == NSRightCommandKeyMask
+      && (EQ (ns_right_command_modifier, Qnone)
+          || (EQ (ns_right_command_modifier, Qleft)
+              && EQ (ns_command_modifier, Qnone))))
+    /* Carbon doesn't differentiate between left and right command
+       keys.  */
+    modifiers |= cmdKey;
+
+  if ((flags & NSLeftCommandKeyMask) == NSLeftCommandKeyMask
+      && EQ (ns_command_modifier, Qnone))
+    modifiers |= cmdKey;
+
+  result = UCKeyTranslate (layout, [event keyCode], kUCKeyActionDown,
+                           (modifiers >> 8) & 0xFF, LMGetKbdType (),
+                           kUCKeyTranslateNoDeadKeysBit, &dead_key_state,
+                           max_string_length, &actual_string_length, buf);
+
+  if (result != 0)
+    {
+      NSLog(@"Failed to translate character '%@' with modifiers %x",
+            [event characters], modifiers);
+      return 0;
+    }
+
+  /* FIXME: What do we do if more than one code unit is returned?  */
+  if (actual_string_length > 0)
+    return buf[0];
+
+  return 0;
+}
+#endif /* NS_IMPL_COCOA */
 
 /* ==========================================================================
 
@@ -6096,8 +6220,6 @@ not_in_argv (NSString *arg)
       code = ([[theEvent charactersIgnoringModifiers] length] == 0) ?
         0 : [[theEvent charactersIgnoringModifiers] characterAtIndex: 0];
 
-      /* (Carbon way: [theEvent keyCode]) */
-
       /* is it a "function key"? */
       /* Note: Sometimes a plain key will have the NSEventModifierFlagNumericPad
          flag set (this is probably a bug in the OS).
@@ -6130,15 +6252,6 @@ not_in_argv (NSString *arg)
             code = fnKeysym;
         }
 
-      /* are there modifiers? */
-      emacs_event->modifiers = 0;
-
-      if (flags & NSEventModifierFlagHelp)
-          emacs_event->modifiers |= hyper_modifier;
-
-      if (flags & NSEventModifierFlagShift)
-        emacs_event->modifiers |= shift_modifier;
-
       /* The ⌘ and ⌥ modifiers can be either shift-like (for alternate
          character input) or control-like (as command prefix).  If we
          have only shift-like modifiers, then we should use the
@@ -6148,15 +6261,23 @@ not_in_argv (NSString *arg)
          charactersIgnoringModifiers method).  An annoyance happens if
          we have both shift-like and control-like modifiers because
          the NSEvent API doesn’t let us ignore only some modifiers.
-         Therefore we ignore all shift-like modifiers in that
-         case.  */
+         In that case we use UCKeyTranslate (ns_get_shifted_character)
+         to look up the correct character.  */
 
       /* EV_MODIFIERS2 uses parse_solitary_modifier on all known
          modifier keys, which returns 0 for shift-like modifiers.
          Therefore its return value is the set of control-like
          modifiers.  */
-      unsigned int control_modifiers = EV_MODIFIERS2 (flags);
-      emacs_event->modifiers |= control_modifiers;
+      emacs_event->modifiers = EV_MODIFIERS2 (flags);
+
+      /* Function keys (such as the F-keys, arrow keys, etc.) set
+         modifiers as though the fn key has been pressed when it
+         hasn't.  Also some combinations of fn and a function key
+         return a different key than was pressed (e.g. fn-<left> gives
+         <home>).  We need to unset the fn modifier in these cases.
+         FIXME: Can we avoid setting it in the first place.  */
+      if (fnKeysym && (flags & NS_FUNCTION_KEY_MASK))
+        emacs_event->modifiers ^= parse_solitary_modifier (ns_function_modifier);
 
       if (NS_KEYLOG)
         fprintf (stderr, "keyDown: code =%x\tfnKey =%x\tflags = %x\tmods = %x\n",
@@ -6167,7 +6288,6 @@ not_in_argv (NSString *arg)
       if (fnKeysym || (emacs_event->modifiers
                        && (emacs_event->modifiers != shift_modifier)
                        && [[theEvent charactersIgnoringModifiers] length] > 0))
-/*[[theEvent characters] length] */
         {
           emacs_event->kind = NON_ASCII_KEYSTROKE_EVENT;
           /* FIXME: What are the next four lines supposed to do?  */
@@ -6176,12 +6296,21 @@ not_in_argv (NSString *arg)
           else if (code == 0x7f)
             code |= (1<<28)|(3<<16);
           else if (!fnKeysym)
-            /* FIXME: This seems wrong, characters in the range
-               [0x80, 0xFF] are not ASCII characters.  Can’t we just
-               use MULTIBYTE_CHAR_KEYSTROKE_EVENT here for all kinds
-               of characters?  */
-            emacs_event->kind = code > 0xFF
-              ? MULTIBYTE_CHAR_KEYSTROKE_EVENT : ASCII_KEYSTROKE_EVENT;
+            {
+#ifdef NS_IMPL_COCOA
+              /* We potentially have both shift- and control-like
+                 modifiers in use, so find the correct character
+                 ignoring any control-like ones.  */
+              code = ns_get_shifted_character (theEvent);
+#endif
+
+              /* FIXME: This seems wrong, characters in the range
+                 [0x80, 0xFF] are not ASCII characters.  Can’t we just
+                 use MULTIBYTE_CHAR_KEYSTROKE_EVENT here for all kinds
+                 of characters?  */
+              emacs_event->kind = code > 0xFF
+                ? MULTIBYTE_CHAR_KEYSTROKE_EVENT : ASCII_KEYSTROKE_EVENT;
+            }
 
           emacs_event->code = code;
           EV_TRAILER (theEvent);
@@ -9329,27 +9458,17 @@ This variable is ignored on macOS < 10.7 and GNUstep.  Default is t.  */);
 
   /* TODO: move to common code */
   DEFVAR_LISP ("x-toolkit-scroll-bars", Vx_toolkit_scroll_bars,
-	       doc: /* Which toolkit scroll bars Emacs uses, if any.
-A value of nil means Emacs doesn't use toolkit scroll bars.
-With the X Window system, the value is a symbol describing the
-X toolkit.  Possible values are: gtk, motif, xaw, or xaw3d.
-With MS Windows or Nextstep, the value is t.  */);
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_toolkit_scroll_bars = Qt;
 
   DEFVAR_BOOL ("x-use-underline-position-properties",
 	       x_use_underline_position_properties,
-     doc: /*Non-nil means make use of UNDERLINE_POSITION font properties.
-A value of nil means ignore them.  If you encounter fonts with bogus
-UNDERLINE_POSITION font properties, for example 7x13 on XFree prior
-to 4.1, set this to nil. */);
+     doc: /* SKIP: real doc in xterm.c.  */);
   x_use_underline_position_properties = 0;
 
   DEFVAR_BOOL ("x-underline-at-descent-line",
 	       x_underline_at_descent_line,
-     doc: /* Non-nil means to draw the underline at the same place as the descent line.
-A value of nil means to draw the underline according to the value of the
-variable `x-use-underline-position-properties', which is usually at the
-baseline level.  The default value is nil.  */);
+     doc: /* SKIP: real doc in xterm.c.  */);
   x_underline_at_descent_line = 0;
 
   /* Tell Emacs about this window system.  */
