@@ -14,10 +14,10 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 8c36c19..67bb68b 100644
+index 4105c1d..9dc20f5 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -434,6 +434,10 @@ tutorial-directory
+@@ -442,6 +442,10 @@ tutorial-directory
    :type 'directory
    :initialize #'custom-initialize-delay)
  
@@ -28,7 +28,7 @@ index 8c36c19..67bb68b 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Recursively add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -1121,8 +1125,21 @@ command-line
+@@ -1278,8 +1282,21 @@ command-line
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.
