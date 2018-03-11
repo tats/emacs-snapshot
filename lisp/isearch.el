@@ -77,11 +77,14 @@ If `shift-move', extend the search string by motion commands
 while holding down the shift key.
 Both `move' and `shift-move' extend the search string by yanking text
 that ends at the new position after moving point in the current buffer.
+If `append', the characters which you type that are not interpreted by
+the incremental search are simply appended to the search string.
 If nil, run the command without exiting Isearch."
   :type '(choice (const :tag "Terminate incremental search" t)
                  (const :tag "Edit the search string" edit)
                  (const :tag "Extend the search string by motion commands" move)
                  (const :tag "Extend the search string by shifted motion keys" shift-move)
+                 (const :tag "Append control characters to the search string" append)
                  (const :tag "Don't terminate incremental search" nil))
   :version "27.1")
 
@@ -320,10 +323,6 @@ this variable is set to the symbol `all-windows'."
   :group 'isearch
   :group 'matching)
 
-(define-obsolete-variable-alias 'isearch-lazy-highlight-cleanup
-                                'lazy-highlight-cleanup
-                                "22.1")
-
 (defcustom lazy-highlight-cleanup t
   "Controls whether to remove extra highlighting after a search.
 If this is nil, extra highlighting can be \"manually\" removed with
@@ -331,27 +330,15 @@ If this is nil, extra highlighting can be \"manually\" removed with
   :type 'boolean
   :group 'lazy-highlight)
 
-(define-obsolete-variable-alias 'isearch-lazy-highlight-initial-delay
-                                'lazy-highlight-initial-delay
-                                "22.1")
-
 (defcustom lazy-highlight-initial-delay 0.25
   "Seconds to wait before beginning to lazily highlight all matches."
   :type 'number
   :group 'lazy-highlight)
 
-(define-obsolete-variable-alias 'isearch-lazy-highlight-interval
-                                'lazy-highlight-interval
-                                "22.1")
-
 (defcustom lazy-highlight-interval 0 ; 0.0625
   "Seconds between lazily highlighting successive matches."
   :type 'number
   :group 'lazy-highlight)
-
-(define-obsolete-variable-alias 'isearch-lazy-highlight-max-at-a-time
-                                'lazy-highlight-max-at-a-time
-                                "22.1")
 
 (defcustom lazy-highlight-max-at-a-time nil ; 20 (bug#25751)
   "Maximum matches to highlight at a time (for `lazy-highlight').
@@ -2452,13 +2439,15 @@ See more for options in `search-exit-option'."
                this-command-keys-shift-translated))
       (setq this-command-keys-shift-translated nil)
       (setq isearch-pre-move-point (point)))
+     ;; Append control characters to the search string
+     ((eq search-exit-option 'append)
+      (when (cl-every #'characterp key)
+        (isearch-process-search-string key key))
+      (setq this-command 'ignore))
      ;; Other characters terminate the search and are then executed normally.
      (search-exit-option
       (isearch-done)
-      (isearch-clean-overlays))
-     ;; If search-exit-option is nil, run the command without exiting Isearch.
-     (t
-      (isearch-process-search-string key key)))))
+      (isearch-clean-overlays)))))
 
 (defun isearch-post-command-hook ()
   (cond
@@ -3196,10 +3185,6 @@ This function is called when exiting an incremental search if
   (when isearch-lazy-highlight-timer
     (cancel-timer isearch-lazy-highlight-timer)
     (setq isearch-lazy-highlight-timer nil)))
-
-(define-obsolete-function-alias 'isearch-lazy-highlight-cleanup
-                                'lazy-highlight-cleanup
-                                "22.1")
 
 (defun isearch-lazy-highlight-new-loop (&optional beg end)
   "Cleanup any previous `lazy-highlight' loop and begin a new one.
