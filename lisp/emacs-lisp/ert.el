@@ -676,6 +676,7 @@ and is displayed in front of the value of MESSAGE-FORM."
 (cl-defstruct ert-test-result
   (messages nil)
   (should-forms nil)
+  (duration 0)
   )
 (cl-defstruct (ert-test-passed (:include ert-test-result)))
 (cl-defstruct (ert-test-result-with-condition (:include ert-test-result))
@@ -1230,6 +1231,11 @@ SELECTOR is the selector that was used to select TESTS."
         (ert-run-test test)
       (setf (aref (ert--stats-test-end-times stats) pos) (current-time))
       (let ((result (ert-test-most-recent-result test)))
+        (setf (ert-test-result-duration result)
+              (float-time
+               (time-subtract
+                (aref (ert--stats-test-end-times stats) pos)
+                (aref (ert--stats-test-start-times stats) pos))))
         (ert--stats-set-test-and-result stats pos test result)
         (funcall listener 'test-ended stats test result))
       (setf (ert--stats-current-test stats) nil))))
@@ -1354,15 +1360,16 @@ Returns the stats object."
        (run-started
         (unless ert-quiet
           (cl-destructuring-bind (stats) event-args
-            (message "Running %s tests (%s)"
+            (message "Running %s tests (%s, selector `%S')"
                      (length (ert--stats-tests stats))
-                     (ert--format-time-iso8601 (ert--stats-start-time stats))))))
+                     (ert--format-time-iso8601 (ert--stats-start-time stats))
+                     selector))))
        (run-ended
         (cl-destructuring-bind (stats abortedp) event-args
           (let ((unexpected (ert-stats-completed-unexpected stats))
                 (skipped (ert-stats-skipped stats))
 		(expected-failures (ert--stats-failed-expected stats)))
-            (message "\n%sRan %s tests, %s results as expected%s%s (%s)%s\n"
+            (message "\n%sRan %s tests, %s results as expected%s%s (%s, %f sec)%s\n"
                      (if (not abortedp)
                          ""
                        "Aborted: ")
@@ -1375,6 +1382,10 @@ Returns the stats object."
                          ""
                        (format ", %s skipped" skipped))
                      (ert--format-time-iso8601 (ert--stats-end-time stats))
+                     (float-time
+                      (time-subtract
+                       (ert--stats-end-time stats)
+                       (ert--stats-start-time stats)))
                      (if (zerop expected-failures)
                          ""
                        (format "\n%s expected failures" expected-failures)))
@@ -1446,13 +1457,14 @@ Returns the stats object."
             (let* ((max (prin1-to-string (length (ert--stats-tests stats))))
                    (format-string (concat "%9s  %"
                                           (prin1-to-string (length max))
-                                          "s/" max "  %S")))
+                                          "s/" max "  %S (%f sec)")))
               (message format-string
                        (ert-string-for-test-result result
                                                    (ert-test-result-expected-p
                                                     test result))
                        (1+ (ert--stats-test-pos stats test))
-                       (ert-test-name test))))))))
+                       (ert-test-name test)
+                       (ert-test-result-duration result))))))))
    nil))
 
 ;;;###autoload
@@ -1535,7 +1547,14 @@ Ran \\([0-9]+\\) tests, \\([0-9]+\\) results as expected\
       (mapc (lambda (l) (message "  %s" l)) notests))
     (when badtests
       (message "%d files did not finish:" (length badtests))
-      (mapc (lambda (l) (message "  %s" l)) badtests))
+      (mapc (lambda (l) (message "  %s" l)) badtests)
+      (if (getenv "EMACS_HYDRA_CI")
+          (with-temp-buffer
+            (dolist (f badtests)
+              (erase-buffer)
+              (insert-file-contents f)
+              (message "Contents of unfinished file %s:" f)
+              (message "-----\n%s\n-----" (buffer-string))))))
     (when unexpected
       (message "%d files contained unexpected results:" (length unexpected))
       (mapc (lambda (l) (message "  %s" l)) unexpected))

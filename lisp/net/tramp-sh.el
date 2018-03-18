@@ -27,6 +27,7 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
 (require 'tramp)
 
 ;; Pacify byte-compiler.
@@ -4175,7 +4176,7 @@ process to set up.  VEC specifies the connection."
 	      cs-encode
 	      (coding-system-change-eol-conversion
 	       cs-encode (if (string-match "^Darwin" uname) 'mac 'unix)))
-	(tramp-send-command vec "echo foo ; echo bar" t)
+	(tramp-send-command vec "(echo foo ; echo bar)" t)
 	(goto-char (point-min))
 	(when (search-forward "\r" nil t)
 	  (setq cs-decode (coding-system-change-eol-conversion cs-decode 'dos)))

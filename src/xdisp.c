@@ -1381,6 +1381,29 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   move_it_to (&it, charpos, -1, it.last_visible_y - 1, -1,
 	      (charpos >= 0 ? MOVE_TO_POS : 0) | MOVE_TO_Y);
 
+  /* Adjust for line numbers, if CHARPOS is at or beyond first_visible_x,
+     but we didn't yet produce the line-number glyphs.  */
+  if (!NILP (Vdisplay_line_numbers)
+      && it.current_x >= it.first_visible_x
+      && IT_CHARPOS (it) == charpos
+      && !it.line_number_produced_p)
+    {
+      /* If the pixel width of line numbers was not yet known, compute
+	 it now.  This usually happens in the first display line of a
+	 window.  */
+      if (!it.lnum_pixel_width)
+	{
+	  struct it it2;
+	  void *it2data = NULL;
+
+	  SAVE_IT (it2, it, it2data);
+	  move_it_by_lines (&it, 1);
+	  it2.lnum_pixel_width = it.lnum_pixel_width;
+	  RESTORE_IT (&it, &it2, it2data);
+	}
+      it.current_x += it.lnum_pixel_width;
+    }
+
   if (charpos >= 0
       && (((!it.bidi_p || it.bidi_it.scan_dir != -1)
 	   && IT_CHARPOS (it) >= charpos)
@@ -9598,6 +9621,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       it->current_x = line_start_x;
       line_start_x = 0;
       it->hpos = 0;
+      it->line_number_produced_p = false;
       it->current_y += it->max_ascent + it->max_descent;
       ++it->vpos;
       last_height = it->max_ascent + it->max_descent;
@@ -10143,20 +10167,22 @@ include the height of both, if present, in the return value.  */)
      directionality, and regions that begin and end in text of the
      same directionality.  */
   it.bidi_p = false;
-  void *it2data = NULL;
-  struct it it2;
-  SAVE_IT (it2, it, it2data);
 
   int move_op = MOVE_TO_POS | MOVE_TO_Y;
   int to_x = -1;
   if (!NILP (x_limit))
     {
+      it.last_visible_x = max_x;
       /* Actually, we never want move_it_to stop at to_x.  But to make
 	 sure that move_it_in_display_line_to always moves far enough,
 	 we set to_x to INT_MAX and specify MOVE_TO_X.  */
       move_op |= MOVE_TO_X;
       to_x = INT_MAX;
     }
+
+  void *it2data = NULL;
+  struct it it2;
+  SAVE_IT (it2, it, it2data);
 
   x = move_it_to (&it, end, to_x, max_y, -1, move_op);
 
@@ -10170,9 +10196,14 @@ include the height of both, if present, in the return value.  */)
       RESTORE_IT (&it, &it2, it2data);
       x = move_it_to (&it, end, to_x, max_y, -1, move_op);
       /* Add the width of the thing at TO, but only if we didn't
-	 overshoot it; if we did, it is already accounted for.  */
+	 overshoot it; if we did, it is already accounted for.  Also,
+	 account for the height of the thing at TO.  */
       if (IT_CHARPOS (it) == end)
-	x += it.pixel_width;
+	{
+	  x += it.pixel_width;
+	  it.max_ascent = max (it.max_ascent, it.ascent);
+	  it.max_descent = max (it.max_descent, it.descent);
+	}
     }
   if (!NILP (x_limit))
     {
@@ -22486,6 +22517,11 @@ Value is the new character position of point.  */)
 		    new_pos += (row->reversed_p ? -dir : dir);
 		  else
 		    new_pos -= (row->reversed_p ? -dir : dir);
+		  new_pos = clip_to_bounds (BEGV, new_pos, ZV);
+		  /* If we didn't move, we've hit BEGV or ZV, so we
+		     need to signal a suitable error.  */
+		  if (new_pos == PT)
+		    break;
 		}
 	      else if (BUFFERP (g->object))
 		new_pos = g->charpos;
