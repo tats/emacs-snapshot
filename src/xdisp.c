@@ -13918,7 +13918,15 @@ redisplay_internal (void)
 
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS)
   if (popup_activated ())
-    return;
+    {
+#ifdef NS_IMPL_COCOA
+      /* On macOS we may have disabled screen updates due to window
+         resizing.  We should re-enable them so the popup can be
+         displayed.  */
+      ns_enable_screen_updates ();
+#endif
+      return;
+    }
 #endif
 
   /* I don't think this happens but let's be paranoid.  */
@@ -14722,6 +14730,12 @@ unwind_redisplay (void)
 {
   redisplaying_p = false;
   unblock_buffer_flips ();
+#ifdef NS_IMPL_COCOA
+  /* On macOS we may have disabled screen updates due to window
+     resizing.  When redisplay completes we want to re-enable
+     them.  */
+  ns_enable_screen_updates ();
+#endif
 }
 
 
@@ -21955,9 +21969,24 @@ display_line (struct it *it, int cursor_vpos)
 	  break;
 	}
 
+      /* Detect overly-wide wrap-prefixes made of (space ...) display
+	 properties.  When such a wrap prefix reaches past the right
+	 margin of the window, we need to avoid the call to
+	 set_iterator_to_next below, so that it->line_wrap is left at
+	 its TRUNCATE value wisely set by handle_line_prefix.
+	 Otherwise, set_iterator_to_next will pop the iterator stack,
+	 restore it->line_wrap, and redisplay might infloop.  */
+      bool overwide_wrap_prefix =
+	CONSP (it->object) && EQ (XCAR (it->object), Qspace)
+	&& it->sp > 0 && it->method == GET_FROM_STRETCH
+	&& it->current_x >= it->last_visible_x
+	&& it->continuation_lines_width > 0
+	&& it->line_wrap == TRUNCATE && it->stack[0].line_wrap != TRUNCATE;
+
       /* Proceed with next display element.  Note that this skips
 	 over lines invisible because of selective display.  */
-      set_iterator_to_next (it, true);
+      if (!overwide_wrap_prefix)
+	set_iterator_to_next (it, true);
 
       /* If we truncate lines, we are done when the last displayed
 	 glyphs reach past the right margin of the window.  */

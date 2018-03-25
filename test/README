@@ -12,7 +12,7 @@ Emacs uses ERT, Emacs Lisp Regression Testing, for testing.  See (info
 for more information on writing and running tests.
 
 Tests could be tagged by the developer.  In this test directory, the
-following tags are recognised:
+following tags are recognized:
 
 * :expensive-test
   The test needs a serious amount of time to run.  It is not intended
@@ -64,6 +64,11 @@ unstable tests are involved, to give nicer backtraces.  To run the
 compiled version of a test use
 
     make TEST_LOAD_EL=no ...
+
+Some tests might take long time to run.  In order to summarize the
+<nn> tests with the longest duration, call
+
+    make SUMMARIZE_TESTS=<nn> ...
 
 
 (Also, see etc/compilation.txt for compilation mode font lock tests.)

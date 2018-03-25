@@ -133,7 +133,8 @@ being the result.")
   "Whether expensive tests are run."
   (ert-select-tests
    (ert--stats-selector ert--current-run-stats)
-   (list (make-ert-test :body nil :tags '(:expensive-test)))))
+   (list (make-ert-test :name (ert-test-name (ert-running-test))
+                        :body nil :tags '(:expensive-test)))))
 
 (defun tramp--test-make-temp-name (&optional local quoted)
   "Return a temporary file name for test.
@@ -4628,27 +4629,45 @@ Use the `ls' command."
 	 (coding-system-for-write utf8)
 	 (file-name-coding-system
 	  (coding-system-change-eol-conversion utf8 'unix)))
-    (tramp--test-check-files
-     (unless (tramp--test-hpux-p) "Γυρίστε το Γαλαξία με Ώτο Στοπ")
-     (unless (tramp--test-hpux-p)
-       "أصبح بوسعك الآن تنزيل نسخة كاملة من موسوعة ويكيبيديا العربية لتصفحها بلا اتصال بالإنترنت")
-     "银河系漫游指南系列"
-     "Автостопом по гала́ктике")))
+    (apply
+     'tramp--test-check-files
+     (if (tramp--test-expensive-test)
+	 (delete-dups
+	  (mapcar
+	   ;; Use all available language specific snippets.  Filter
+	   ;; out strings which use unencodable characters.  Remove
+	   ;; slash or newline.  Not Tramp's business.
+	   (lambda (x)
+	     (setq x (eval (cdr (assoc 'sample-text x))))
+	     (unless (or (null x)
+			 (unencodable-char-position
+			  nil nil file-name-coding-system nil x))
+	       (replace-regexp-in-string "[\n/]" "" x)))
+	   language-info-alist))
+
+       (list
+	(unless (tramp--test-hpux-p) "Γυρίστε το Γαλαξία με Ώτο Στοπ")
+	(unless (tramp--test-hpux-p)
+	  "أصبح بوسعك الآن تنزيل نسخة كاملة من موسوعة ويكيبيديا العربية لتصفحها بلا اتصال بالإنترنت")
+	"银河系漫游指南系列"
+	"Автостопом по гала́ктике")))))
 
 (ert-deftest tramp-test39-utf8 ()
   "Check UTF8 encoding in file names and file contents."
+  :tags '(:unstable)
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-docker-p)))
   (skip-unless (not (tramp--test-rsync-p)))
   (skip-unless (not (tramp--test-windows-nt-and-batch)))
   (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
 
-  (tramp--test-utf8))
+  (tramp--test-instrument-test-case 10
+  (tramp--test-utf8)))
 
 (ert-deftest tramp-test39-utf8-with-stat ()
   "Check UTF8 encoding in file names and file contents.
 Use the `stat' command."
-  :tags '(:expensive-test)
+  :tags '(:expensive-test :unstable)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-docker-p)))
@@ -4668,7 +4687,7 @@ Use the `stat' command."
 (ert-deftest tramp-test39-utf8-with-perl ()
   "Check UTF8 encoding in file names and file contents.
 Use the `perl' command."
-  :tags '(:expensive-test)
+  :tags '(:expensive-test :unstable)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-docker-p)))
@@ -4691,7 +4710,7 @@ Use the `perl' command."
 (ert-deftest tramp-test39-utf8-with-ls ()
   "Check UTF8 encoding in file names and file contents.
 Use the `ls' command."
-  :tags '(:expensive-test)
+  :tags '(:expensive-test :unstable)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-docker-p)))

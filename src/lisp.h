@@ -2679,19 +2679,15 @@ struct Lisp_Buffer_Objfwd
    in the buffer structure itself.  They are handled differently,
    using struct Lisp_Buffer_Objfwd.)
 
-   The `realvalue' slot holds the variable's current value, or a
-   forwarding pointer to where that value is kept.  This value is the
-   one that corresponds to the loaded binding.  To read or set the
-   variable, you must first make sure the right binding is loaded;
-   then you can access the value in (or through) `realvalue'.
+   The `valcell' slot holds the variable's current value (unless `fwd'
+   is set).  This value is the one that corresponds to the loaded binding.
+   To read or set the variable, you must first make sure the right binding
+   is loaded; then you can access the value in (or through) `valcell'.
 
-   `buffer' and `frame' are the buffer and frame for which the loaded
-   binding was found.  If those have changed, to make sure the right
-   binding is loaded it is necessary to find which binding goes with
-   the current buffer and selected frame, then load it.  To load it,
-   first unload the previous binding, then copy the value of the new
-   binding into `realvalue' (or through it).  Also update
-   LOADED-BINDING to point to the newly loaded binding.
+   `where' is the buffer for which the loaded binding was found.
+   If it has changed, to make sure the right binding is loaded it is
+   necessary to find which binding goes with the current buffer, then
+   load it.  To load it, first unload the previous binding.
 
    `local_if_set' indicates that merely setting the variable creates a
    local binding for the current buffer.  Otherwise the latter, setting
@@ -2707,14 +2703,14 @@ struct Lisp_Buffer_Local_Value
     bool_bf found : 1;
     /* If non-NULL, a forwarding to the C var where it should also be set.  */
     union Lisp_Fwd *fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
-    /* The buffer or frame for which the loaded binding was found.  */
+    /* The buffer for which the loaded binding was found.  */
     Lisp_Object where;
     /* A cons cell that holds the default value.  It has the form
        (SYMBOL . DEFAULT-VALUE).  */
     Lisp_Object defcell;
     /* The cons cell from `where's parameter alist.
        It always has the form (SYMBOL . VALUE)
-       Note that if `forward' is non-nil, VALUE may be out of date.
+       Note that if `fwd' is non-NULL, VALUE may be out of date.
        Also if the currently loaded binding is the default binding, then
        this is `eq'ual to defcell.  */
     Lisp_Object valcell;
