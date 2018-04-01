@@ -3812,7 +3812,6 @@ extern Lisp_Object make_save_funcptr_ptr_obj (void (*) (void), void *,
 extern Lisp_Object make_save_memory (Lisp_Object *, ptrdiff_t);
 extern void free_save_value (Lisp_Object);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
-extern void free_marker (Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
 extern void init_alloc_once (void);
 extern void init_alloc (void);
@@ -3899,7 +3898,8 @@ LOADHIST_ATTACH (Lisp_Object x)
 }
 extern int openp (Lisp_Object, Lisp_Object, Lisp_Object,
                   Lisp_Object *, Lisp_Object, bool);
-extern Lisp_Object string_to_number (char const *, int, bool);
+enum { S2N_IGNORE_TRAILING = 1, S2N_OVERFLOW_TO_FLOAT = 2 };
+extern Lisp_Object string_to_number (char const *, int, int);
 extern void map_obarray (Lisp_Object, void (*) (Lisp_Object, Lisp_Object),
                          Lisp_Object);
 extern void dir_warning (const char *, Lisp_Object);
@@ -4104,7 +4104,8 @@ extern ptrdiff_t marker_byte_position (Lisp_Object);
 extern void clear_charpos_cache (struct buffer *);
 extern ptrdiff_t buf_charpos_to_bytepos (struct buffer *, ptrdiff_t);
 extern ptrdiff_t buf_bytepos_to_charpos (struct buffer *, ptrdiff_t);
-extern void unchain_marker (struct Lisp_Marker *marker);
+extern void detach_marker (Lisp_Object);
+extern void unchain_marker (struct Lisp_Marker *);
 extern Lisp_Object set_marker_restricted (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object set_marker_both (Lisp_Object, Lisp_Object, ptrdiff_t, ptrdiff_t);
 extern Lisp_Object set_marker_restricted_both (Lisp_Object, Lisp_Object,
