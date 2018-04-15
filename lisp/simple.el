@@ -2997,12 +2997,12 @@ REASON describes the reason that the boundary is being added; see
   (setq undo-auto--undoably-changed-buffers nil))
 
 (defun undo-auto--boundary-timer ()
-  "Timer which will run `undo--auto-boundary-timer'."
+  "Timer function run by `undo-auto-current-boundary-timer'."
   (setq undo-auto-current-boundary-timer nil)
   (undo-auto--boundaries 'timer))
 
 (defun undo-auto--boundary-ensure-timer ()
-  "Ensure that the `undo-auto-boundary-timer' is set."
+  "Ensure that the `undo-auto-current-boundary-timer' is set."
   (unless undo-auto-current-boundary-timer
     (setq undo-auto-current-boundary-timer
           (run-at-time 10 nil #'undo-auto--boundary-timer))))
@@ -4369,7 +4369,8 @@ argument should still be a \"useful\" string for such uses."
                                    (funcall interprogram-paste-function))))
       (when interprogram-paste
         (dolist (s (if (listp interprogram-paste)
-		       (nreverse interprogram-paste)
+                       ;; Use `reverse' to avoid modifying external data.
+                       (reverse interprogram-paste)
 		     (list interprogram-paste)))
 	  (unless (and kill-do-not-save-duplicates
 		       (equal-including-properties s (car kill-ring)))
@@ -4448,7 +4449,8 @@ move the yanking point; just return the Nth kill forward."
 	  ;; selection, with identical text.
 	  (let ((interprogram-cut-function nil))
 	    (if (listp interprogram-paste)
-	      (mapc 'kill-new (nreverse interprogram-paste))
+                ;; Use `reverse' to avoid modifying external data.
+                (mapc #'kill-new (reverse interprogram-paste))
 	      (kill-new interprogram-paste)))
 	  (car kill-ring))
       (or kill-ring (error "Kill ring is empty"))

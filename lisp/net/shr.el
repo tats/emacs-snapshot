@@ -38,6 +38,7 @@
 (require 'seq)
 (require 'svg)
 (require 'image)
+(require 'puny)
 
 (defgroup shr nil
   "Simple HTML Renderer"
@@ -139,6 +140,11 @@ cid: URL as the argument.")
 
 (defface shr-link
   '((t (:inherit link)))
+  "Font for link elements."
+  :group 'shr)
+
+(defface shr-selected-link
+  '((t (:inherit shr-link :background "red")))
   "Font for link elements."
   :group 'shr)
 
@@ -343,6 +349,30 @@ If the URL is already at the front of the kill ring act like
   (if (equal url (car kill-ring))
       (shr-probe-and-copy-url url)
     (shr-copy-url url)))
+
+(defun shr--current-link-region ()
+  (let ((current (get-text-property (point) 'shr-url))
+        start)
+    (save-excursion
+      ;; Go to the beginning.
+      (while (and (not (bobp))
+		  (equal (get-text-property (point) 'shr-url) current))
+        (forward-char -1))
+      (unless (equal (get-text-property (point) 'shr-url) current)
+        (forward-char 1))
+      (setq start (point))
+      ;; Go to the end.
+      (while (and (not (eobp))
+                  (equal (get-text-property (point) 'shr-url) current))
+        (forward-char 1))
+      (list start (point)))))
+
+(defun shr--blink-link ()
+  (let* ((region (shr--current-link-region))
+         (overlay (make-overlay (car region) (cadr region))))
+    (overlay-put overlay 'face 'shr-selected-link)
+    (run-at-time 1 nil (lambda ()
+                         (delete-overlay overlay)))))
 
 (defun shr-next-link ()
   "Skip to the next link."
@@ -706,16 +736,23 @@ size, and full-buffer size."
       ;; Success; continue.
       (when (= (preceding-char) ?\s)
 	(delete-char -1))
-      (let ((props `(face ,(get-text-property (point) 'face)
-			  ;; Don't break the image-displayer property
-			  ;; as it will cause `gnus-article-show-images'
-			  ;; to show the two or more same images.
-			  image-displayer
-			  ,(get-text-property (point) 'image-displayer)))
-	    (gap-start (point)))
+      (let ((gap-start (point)))
 	(insert "\n")
 	(shr-indent)
-	(add-text-properties gap-start (point) props))
+        (when (and (> (1- gap-start) (point-min))
+                   ;; The link on both sides of the newline are the
+                   ;; same...
+                   (equal (get-text-property (point) 'shr-url)
+                          (get-text-property (1- gap-start) 'shr-url)))
+          ;; ... so we join the two bits into one link logically, but
+          ;; not visually.  This makes navigation between links work
+          ;; well, but avoids underscores before the link on the next
+          ;; line when indented.
+          (let ((props (copy-sequence (text-properties-at (point)))))
+            ;; We don't want to use the faces on the indentation, because
+            ;; that's ugly.
+            (setq props (plist-put props 'face nil))
+	    (add-text-properties gap-start (point) props))))
       (setq start (point))
       (shr-vertical-motion shr-internal-width)
       (when (looking-at " $")
@@ -950,7 +987,9 @@ the mouse click event."
       (browse-url-mail url))
      (t
       (if external
-	  (funcall shr-external-browser url)
+          (progn
+	    (funcall shr-external-browser url)
+            (shr--blink-link))
 	(browse-url url))))))
 
 (defun shr-save-contents (directory)
@@ -1178,12 +1217,24 @@ START, and END.  Note that START and END should be markers."
   (add-text-properties
    start (point)
    (list 'shr-url url
-	 'help-echo (let ((iri (or (ignore-errors
-				     (decode-coding-string
-				      (url-unhex-string url)
-				      'utf-8 t))
-				   url)))
-		      (if title (format "%s (%s)" iri title) iri))
+	 'help-echo (let ((parsed (url-generic-parse-url
+                                   (or (ignore-errors
+				         (decode-coding-string
+				          (url-unhex-string url)
+				          'utf-8 t))
+				       url)))
+                          iri)
+                      ;; If we have an IDNA domain, then show the
+                      ;; decoded version in the mouseover to let the
+                      ;; user know that there's something possibly
+                      ;; fishy.
+                      (when (url-host parsed)
+                        (setf (url-host parsed)
+                              (puny-encode-domain (url-host parsed))))
+                      (setq iri (url-recreate-url parsed))
+		      (if title
+                          (format "%s (%s)" iri title)
+                        iri))
 	 'follow-link t
 	 'mouse-face 'highlight))
   ;; Don't overwrite any keymaps that are already in the buffer (i.e.,
@@ -1319,19 +1370,19 @@ ones, in case fg and bg are nil."
     (shr-generic dom)
     (put-text-property start (point) 'display '(raise -0.5))))
 
-(defun shr-tag-label (dom)
-  (shr-generic dom)
-  (shr-ensure-paragraph))
-
 (defun shr-tag-p (dom)
   (shr-ensure-paragraph)
   (shr-generic dom)
   (shr-ensure-paragraph))
 
 (defun shr-tag-div (dom)
-  (shr-ensure-newline)
-  (shr-generic dom)
-  (shr-ensure-newline))
+  (let ((display (cdr (assq 'display shr-stylesheet))))
+    (if (or (equal display "inline")
+            (equal display "inline-block"))
+        (shr-generic dom)
+      (shr-ensure-newline)
+      (shr-generic dom)
+      (shr-ensure-newline))))
 
 (defun shr-tag-s (dom)
   (shr-fontize-dom dom 'shr-strike-through))

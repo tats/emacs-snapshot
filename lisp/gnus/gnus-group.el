@@ -1153,7 +1153,7 @@ The following commands are available:
       (goto-char (point-min))
       (setq gnus-group-mark-positions
 	    (list (cons 'process (and (search-forward
-				       (string-to-multibyte "\200") nil t)
+				       (string gnus-process-mark) nil t)
 				      (- (point) (point-min) 1))))))))
 
 (defun gnus-mouse-pick-group (e)
@@ -4120,6 +4120,7 @@ If DONT-SCAN is non-nil, scan non-activated groups as well."
 	       method (gnus-group-real-name group) active))
 	    (gnus-group-update-group group nil t))
 	(gnus-error 3 "%s error: %s" group (gnus-status-message group))))
+    (gnus-run-hooks 'gnus-after-getting-new-news-hook)
     (when beg
       (goto-char beg))
     (when gnus-goto-next-group-when-activating

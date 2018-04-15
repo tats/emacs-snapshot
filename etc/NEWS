@@ -116,6 +116,14 @@ indirectly, e.g., by checking that functions like
 'libxml-parse-html-region' return nil.
 
 +++
+** `libxml-parse-xml-region' and `libxml-parse-html' region take
+a parameter that's called DISCARD-COMMENTS, but it really only
+discards the top-level comment.  Therefore this parameter is now
+obsolete, and the new utility function `xml-remove-comments' can be
+used to remove comments before calling the libxml functions to parse
+the data.
+
++++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
 It blocks line breaking after a one-letter word, also in the case when
 this word is preceded by a non-space, but non-alphanumeric character.
@@ -183,8 +191,38 @@ This can be controlled by the new `ecomplete-sort-predicate' variable.
 Of course it will still find it if you have it in ~/.ecompleterc
 
 ** Gnus
+
++++
+*** A prefix argument to 'gnus-summary-limit-to-score' will limit reverse
+Limit to articles with score at below.
+
 *** The function 'gnus-score-find-favorite-words' has been renamed
 from 'gnus-score-find-favourite-words'.
+
+---
+*** Gmane has been removed as an nnir backend, since Gmane no longer
+has a search engine.
+
++++
+*** Splitting mail on common mailing list has been added.  See the
+concept index in the Gnus manual for the `match-list' entry.
+
++++
+*** nil is no longer an allowed value for `mm-text-html-renderer'.
+
+** erc
+
+---
+*** `erc-button-google-url' has been renamed `erc-button-search-url'
+and its value has been changed to Duck Duck Go.
+
+** eww/shr
+
+*** When opening external links in eww/shr (typically with the
+`C-u RET' keystroke on a link), the link will be flashed with the new
+`shr-selected-link' face to give the user feedback that the command
+has been executed.
+
 
 ** Htmlfontify
 *** The functions 'hfy-color', 'hfy-color-vals' and
@@ -349,8 +387,17 @@ It was obsolete since Emacs 22.1, replaced by customize.
 +++
 *** Messages can now be systematically encrypted
 when the PGP keyring contains a public key for every recipient.  To
-achieve this, add 'message-add-encrypt-tag-if-can-encrypt' to
+achieve this, add 'message-sign-encrypt-if-all-keys-available' to
 'message-send-hook'.
+
+---
+*** When replying a message that have addresses on the form
+'"foo@bar.com" <foo@bar.com>', Message will elide the repeated "name"
+from the address field in the response.
+
+*** The default of `message-forward-as-mime' has changed from t to nil
+as it has been reported that many recipients can't read forwards that
+are formatted as MIME digests.
 
 * New Modes and Packages in Emacs 27.1
 
@@ -493,10 +540,37 @@ does not fit in a machine integer (Bug#30408).
 'json-insert', 'json-parse-string', and 'json-parse-buffer'.  These
 are implemented in C using the Jansson library.
 
+** Mailcap
+
 ---
-** The new function `mailcap-file-name-to-mime-type' has been added.
+*** The new function `mailcap-file-name-to-mime-type' has been added.
 It's a simple convenience function for looking up MIME types based on
 file name extensions.
+
+*** The default way the list of possible external viewers for MIME
+types is sorted and chosen has changed.  Earlier, the most specific
+viewer was chosen, even if there was a general override in ~/.mailcap.
+For instance, if /etc/mailcap has an entry for image/gif, that one
+will be chosen even if you have an entry for image/* in your
+~/.mailcap file.  But with the new method, entries from ~/.mailcap
+overrides all system and Emacs-provided defaults.  To get the old
+method back, set `mailcap-prefer-mailcap-viewers' to nil.
+
+
+** URL
+
+*** The file: handler no longer looks for index.html in directories if
+you ask it for a file:///dir URL.  Since this is a low-level library,
+such decisions (if they are to be made at all) are left to
+higher-level functions.
+
+
+** image-mode
+
+*** image-mode started using ImageMagick by default for all images
+some years back.  It now respects `imagemagick-types-inhibit' as a way
+to disable that.
+
 
 +++
 ** The new function 'read-answer' accepts either long or short answers
