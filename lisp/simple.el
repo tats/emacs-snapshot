@@ -122,11 +122,13 @@ A buffer becomes most recent when its compilation, grep, or
 similar mode is started, or when it is used with \\[next-error]
 or \\[compile-goto-error].")
 
-;; next-error-last-buffer is made buffer-local to keep the reference
+(defvar next-error-buffer nil
+  "The buffer-local value of the most recent `next-error' buffer.")
+;; next-error-buffer is made buffer-local to keep the reference
 ;; to the parent buffer used to navigate to the current buffer, so the
 ;; next call of next-buffer will use the same parent buffer to
 ;; continue navigation from it.
-(make-variable-buffer-local 'next-error-last-buffer)
+(make-variable-buffer-local 'next-error-buffer)
 
 (defvar next-error-function nil
   "Function to use to find the next error in the current buffer.
@@ -176,15 +178,27 @@ rejected, and the function returns nil."
 		(funcall extra-test-inclusive))))))
 
 (defcustom next-error-find-buffer-function #'ignore
-  "Function called to find a `next-error' capable buffer."
-  :type '(choice (const :tag "Single next-error capable buffer on selected frame"
+  "Function called to find a `next-error' capable buffer.
+This functions takes the same three arguments as the function
+`next-error-find-buffer', and returns the buffer to be used
+by the subsequent invocation of the command `next-error'."
+  :type '(choice (const :tag "No default" ignore)
+                 (const :tag "Single next-error capable buffer on selected frame"
                         next-error-buffer-on-selected-frame)
-                 (const :tag "No default" ignore)
                  (function :tag "Other function"))
   :group 'next-error
   :version "27.1")
 
-(defun next-error-buffer-on-selected-frame (&optional avoid-current
+(defcustom next-error-found-function #'ignore
+  "Function called when a next locus is found and displayed.
+Function is called with two arguments: a FROM-BUFFER buffer
+from which next-error navigated, and a target buffer TO-BUFFER."
+  :type '(choice (const :tag "No default" ignore)
+                 (function :tag "Other function"))
+  :group 'next-error
+  :version "27.1")
+
+(defun next-error-buffer-on-selected-frame (&optional _avoid-current
                                                       extra-test-inclusive
                                                       extra-test-exclusive)
   "Return a single visible next-error buffer on the selected frame."
@@ -193,7 +207,7 @@ rejected, and the function returns nil."
           (delq nil (mapcar (lambda (w)
                               (if (next-error-buffer-p
 				   (window-buffer w)
-                                   avoid-current
+                                   t
                                    extra-test-inclusive extra-test-exclusive)
                                   (window-buffer w)))
                             (window-list))))))
@@ -220,16 +234,24 @@ that buffer is rejected."
    (funcall next-error-find-buffer-function avoid-current
                                             extra-test-inclusive
                                             extra-test-exclusive)
-   ;; 2. If next-error-last-buffer is an acceptable buffer, use that.
+   ;; 2. If next-error-buffer has no buffer-local value
+   ;; (i.e. never navigated to the current buffer from another),
+   ;; and the current buffer is a `next-error' capable buffer,
+   ;; use it unconditionally, so next-error will always use it.
+   (if (and (not (local-variable-p 'next-error-buffer))
+            (next-error-buffer-p (current-buffer) avoid-current
+			         extra-test-inclusive extra-test-exclusive))
+       (current-buffer))
+   ;; 3. If next-error-last-buffer is an acceptable buffer, use that.
    (if (and next-error-last-buffer
             (next-error-buffer-p next-error-last-buffer avoid-current
                                  extra-test-inclusive extra-test-exclusive))
        next-error-last-buffer)
-   ;; 3. If the current buffer is acceptable, choose it.
+   ;; 4. If the current buffer is acceptable, choose it.
    (if (next-error-buffer-p (current-buffer) avoid-current
 			    extra-test-inclusive extra-test-exclusive)
        (current-buffer))
-   ;; 4. Look for any acceptable buffer.
+   ;; 5. Look for any acceptable buffer.
    (let ((buffers (buffer-list)))
      (while (and buffers
                  (not (next-error-buffer-p
@@ -237,7 +259,7 @@ that buffer is rejected."
 		       extra-test-inclusive extra-test-exclusive)))
        (setq buffers (cdr buffers)))
      (car buffers))
-   ;; 5. Use the current buffer as a last resort if it qualifies,
+   ;; 6. Use the current buffer as a last resort if it qualifies,
    ;; even despite AVOID-CURRENT.
    (and avoid-current
 	(next-error-buffer-p (current-buffer) nil
@@ -245,7 +267,7 @@ that buffer is rejected."
 	(progn
 	  (message "This is the only buffer with error message locations")
 	  (current-buffer)))
-   ;; 6. Give up.
+   ;; 7. Give up.
    (error "No buffers contain error message locations")))
 
 (defun next-error (&optional arg reset)
@@ -268,8 +290,9 @@ more generally, on any buffer in Compilation mode or with
 Compilation Minor mode enabled, or any buffer in which
 `next-error-function' is bound to an appropriate function.
 To specify use of a particular buffer for error messages, type
-\\[next-error] in that buffer when it is the only one displayed
-in the current frame.
+\\[next-error] in that buffer.  You can also use the command
+`next-error-select-buffer' to select the buffer to use for the subsequent
+invocation of `next-error'.
 
 Once \\[next-error] has chosen the buffer for error messages, it
 runs `next-error-hook' with `run-hooks', and stays with that buffer
@@ -284,46 +307,47 @@ To control which errors are matched, customize the variable
     (when buffer
       ;; We know here that next-error-function is a valid symbol we can funcall
       (with-current-buffer buffer
-        ;; Allow next-error to be used from the next-error capable buffer.
-        (setq next-error-last-buffer buffer)
         (funcall next-error-function (prefix-numeric-value arg) reset)
-        ;; Override possible change of next-error-last-buffer in next-error-function
-        (setq next-error-last-buffer buffer)
-        (setq-default next-error-last-buffer buffer)
-        (when next-error-recenter
-          (recenter next-error-recenter))
-        (message "%s error from %s"
+        (next-error-found buffer (current-buffer))
+        (message "%s locus from %s"
                  (cond (reset                             "First")
                        ((eq (prefix-numeric-value arg) 0) "Current")
                        ((< (prefix-numeric-value arg) 0)  "Previous")
                        (t                                 "Next"))
-                 next-error-last-buffer)
-        (run-hooks 'next-error-hook)))))
+                 next-error-last-buffer)))))
 
 (defun next-error-internal ()
   "Visit the source code corresponding to the `next-error' message at point."
   (let ((buffer (current-buffer)))
     ;; We know here that next-error-function is a valid symbol we can funcall
-    (with-current-buffer buffer
-      ;; Allow next-error to be used from the next-error capable buffer.
-      (setq next-error-last-buffer buffer)
-      (funcall next-error-function 0 nil)
-      ;; Override possible change of next-error-last-buffer in next-error-function
-      (setq next-error-last-buffer buffer)
-      (setq-default next-error-last-buffer buffer)
-      (when next-error-recenter
-        (recenter next-error-recenter))
-      (message "Current error from %s" next-error-last-buffer)
-      (run-hooks 'next-error-hook))))
+    (funcall next-error-function 0 nil)
+    (next-error-found buffer (current-buffer))
+    (message "Current locus from %s" next-error-last-buffer)))
+
+(defun next-error-found (&optional from-buffer to-buffer)
+  "Function to call when the next locus is found and displayed.
+FROM-BUFFER is a buffer from which next-error navigated,
+and TO-BUFFER is a target buffer."
+  (setq next-error-last-buffer (or from-buffer (current-buffer)))
+  (when to-buffer
+    (with-current-buffer to-buffer
+      (setq next-error-buffer from-buffer)))
+  (when next-error-recenter
+    (recenter next-error-recenter))
+  (funcall next-error-found-function from-buffer to-buffer)
+  (run-hooks 'next-error-hook))
 
 (defun next-error-select-buffer (buffer)
-  "Select a `next-error' capable buffer and set it as the last used."
+  "Select a `next-error' capable BUFFER and set it as the last used.
+This means that the selected buffer becomes the source of locations
+for the subsequent invocation of `next-error'.  Interactively, this command
+allows selection only among buffers where `next-error-function' is bound to
+an appropriate function."
   (interactive
    (list (get-buffer
           (read-buffer "Select next-error buffer: " nil nil
                        (lambda (b) (next-error-buffer-p (cdr b)))))))
-  (setq next-error-last-buffer buffer)
-  (setq-default next-error-last-buffer buffer))
+  (setq next-error-last-buffer buffer))
 
 (defalias 'goto-next-locus 'next-error)
 (defalias 'next-match 'next-error)
@@ -7895,6 +7919,8 @@ To disable this warning, set `compose-mail-user-agent-warnings' to nil."
 					       warn-vars " "))))))
 
   (let ((function (get mail-user-agent 'composefunc)))
+    (unless function
+      (error "Invalid value for `mail-user-agent'"))
     (funcall function to subject other-headers continue switch-function
 	     yank-action send-actions return-action)))
 

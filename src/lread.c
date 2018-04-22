@@ -898,6 +898,7 @@ lisp_file_lexically_bound_p (Lisp_Object readcharfun)
 	    ch = READCHAR;
 
 	  i = 0;
+	  beg_end_state = NOMINAL;
 	  while (ch != ':' && ch != '\n' && ch != EOF && in_file_vars)
 	    {
 	      if (i < sizeof var - 1)
@@ -923,6 +924,7 @@ lisp_file_lexically_bound_p (Lisp_Object readcharfun)
 		ch = READCHAR;
 
 	      i = 0;
+	      beg_end_state = NOMINAL;
 	      while (ch != ';' && ch != '\n' && ch != EOF && in_file_vars)
 		{
 		  if (i < sizeof val - 1)
@@ -1587,6 +1589,8 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 
   absolute = complete_filename_p (str);
 
+  /* Go through all entries in the path and see whether we find the
+     executable. */
   do {
     ptrdiff_t baselen, prefixlen;
 
@@ -2642,14 +2646,13 @@ read_integer (Lisp_Object readcharfun, EMACS_INT radix)
      Also, room for invalid syntax diagnostic.  */
   char buf[max (1 + 1 + UINTMAX_WIDTH + 1,
 		sizeof "integer, radix " + INT_STRLEN_BOUND (EMACS_INT))];
-
+  char *p = buf;
   int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
 
   if (radix < 2 || radix > 36)
     valid = 0;
   else
     {
-      char *p = buf;
       int c, digit;
 
       c = READCHAR;
@@ -2677,17 +2680,12 @@ read_integer (Lisp_Object readcharfun, EMACS_INT radix)
 	    valid = 0;
 	  if (valid < 0)
 	    valid = 1;
-
-	  if (p < buf + sizeof buf - 1)
-	    *p++ = c;
-	  else
-	    valid = 0;
-
+	  *p = c;
+	  p += p < buf + sizeof buf;
 	  c = READCHAR;
 	}
 
       UNREAD (c);
-      *p = '\0';
     }
 
   if (valid != 1)
@@ -2696,6 +2694,13 @@ read_integer (Lisp_Object readcharfun, EMACS_INT radix)
       invalid_syntax (buf);
     }
 
+  if (p == buf + sizeof buf)
+    {
+      memset (p - 3, '.', 3);
+      xsignal1 (Qoverflow_error, make_unibyte_string (buf, sizeof buf));
+    }
+
+  *p = '\0';
   return string_to_number (buf, radix, 0);
 }
 
@@ -3794,7 +3799,12 @@ string_to_number (char const *string, int base, int flags)
 	value = n;
 
       if (! (state & DOT_CHAR) && ! (flags & S2N_OVERFLOW_TO_FLOAT))
-	xsignal1 (Qoverflow_error, build_string (string));
+	{
+	  AUTO_STRING (fmt, ("%s is out of fixnum range; "
+			     "maybe set `read-integer-overflow-as-float'?"));
+	  AUTO_STRING_WITH_LEN (arg, string, cp - string);
+	  xsignal1 (Qoverflow_error, CALLN (Fformat_message, fmt, arg));
+	}
     }
 
   /* Either the number uses float syntax, or it does not fit into a fixnum.

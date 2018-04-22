@@ -525,6 +525,8 @@ This is like `describe-bindings', but displays only Isearch keys."
     (define-key map "\M-r" 'isearch-toggle-regexp)
     (define-key map "\M-e" 'isearch-edit-string)
 
+    (put 'isearch-toggle-case-fold :advertised-binding "\M-sc")
+    (put 'isearch-toggle-regexp    :advertised-binding "\M-sr")
     (put 'isearch-edit-string      :advertised-binding "\M-se")
 
     (define-key map "\M-se" 'isearch-edit-string)
@@ -560,6 +562,9 @@ This is like `describe-bindings', but displays only Isearch keys."
 
 (defvar isearch-forward nil)	; Searching in the forward direction.
 (defvar isearch-regexp nil)	; Searching for a regexp.
+;; We still support setting this to t for backwards compatibility.
+(define-obsolete-variable-alias 'isearch-word
+  'isearch-regexp-function "25.1")
 (defvar isearch-regexp-function nil
   "Regexp-based search mode for words/symbols.
 If the value is a function (e.g. `isearch-symbol-regexp'), it is
@@ -571,9 +576,6 @@ specifies the prefix string displayed in the search message.
 This variable is set and changed during isearch.  To change the
 default behavior used for searches, see `search-default-mode'
 instead.")
-;; We still support setting this to t for backwards compatibility.
-(define-obsolete-variable-alias 'isearch-word
-  'isearch-regexp-function "25.1")
 
 (defvar isearch-lax-whitespace t
   "If non-nil, a space will match a sequence of whitespace chars.
@@ -1124,19 +1126,29 @@ NOPUSH is t and EDIT is t."
 (defun isearch-update-ring (string &optional regexp)
   "Add STRING to the beginning of the search ring.
 REGEXP if non-nil says use the regexp search ring."
-  (add-to-history
-   (if regexp 'regexp-search-ring 'search-ring)
-   string
-   (if regexp regexp-search-ring-max search-ring-max)))
+  (let ((history-delete-duplicates t))
+    (add-to-history
+     (if regexp 'regexp-search-ring 'search-ring)
+     (isearch-string-propertize string)
+     (if regexp regexp-search-ring-max search-ring-max)
+     t)))
 
-;; Switching buffers should first terminate isearch-mode.
-;; ;; For Emacs 19, the frame switch event is handled.
-;; (defun isearch-switch-frame-handler ()
-;;   (interactive) ;; Is this necessary?
-;;   ;; First terminate isearch-mode.
-;;   (isearch-done)
-;;   (isearch-clean-overlays)
-;;   (handle-switch-frame (car (cdr last-command-event))))
+(defun isearch-string-propertize (string &optional properties)
+  "Add isearch properties to the isearch string."
+  (unless properties
+    (setq properties `(isearch-case-fold-search ,isearch-case-fold-search))
+    (unless isearch-regexp
+      (setq properties (append properties `(isearch-regexp-function ,isearch-regexp-function)))))
+  (apply 'propertize string properties))
+
+(defun isearch-update-from-string-properties (string)
+  "Update isearch properties from the isearch string"
+  (when (memq 'isearch-case-fold-search (text-properties-at 0 string))
+    (setq isearch-case-fold-search
+	  (get-text-property 0 'isearch-case-fold-search string)))
+  (when (memq 'isearch-regexp-function (text-properties-at 0 string))
+    (setq isearch-regexp-function
+	  (get-text-property 0 'isearch-regexp-function string))))
 
 
 ;; The search status structure and stack.
@@ -1230,13 +1242,14 @@ If MSG is non-nil, use variable `isearch-message', otherwise `isearch-string'."
 	  (length succ-msg)
 	0))))
 
+(define-obsolete-variable-alias 'isearch-new-word
+  'isearch-new-regexp-function "25.1")
+
 (defvar isearch-new-regexp-function nil
   "Holds the next `isearch-regexp-function' inside `with-isearch-suspended'.
 If this is set inside code wrapped by the macro
 `with-isearch-suspended', then the value set will be used as the
 `isearch-regexp-function' once isearch resumes.")
-(define-obsolete-variable-alias 'isearch-new-word
-  'isearch-new-regexp-function "25.1")
 
 (defvar isearch-suspended nil)
 
@@ -1342,6 +1355,8 @@ You can update the global isearch variables by setting new values to
 		  multi-isearch-file-list multi-isearch-file-list-new
 		  multi-isearch-buffer-list multi-isearch-buffer-list-new)
 
+            (isearch-update-from-string-properties isearch-string)
+
 	    ;; Restore the minibuffer message before moving point.
             (funcall (or isearch-message-function #'isearch-message) nil t)
 
@@ -1408,7 +1423,9 @@ The following additional command keys are active while editing.
 	  (history-add-new-input nil)
 	  ;; Binding minibuffer-history-symbol to nil is a work-around
 	  ;; for some incompatibility with gmhist.
-	  (minibuffer-history-symbol))
+	  (minibuffer-history-symbol)
+	  ;; Search string might have meta information on text properties.
+	  (minibuffer-allow-text-properties t))
      (setq isearch-new-string
 	   (read-from-minibuffer
 	    (isearch-message-prefix nil isearch-nonincremental)
@@ -1577,7 +1594,6 @@ Turning on word search turns off regexp mode.")
 Turning on symbol search turns off regexp mode.")
 (isearch-define-mode-toggle char-fold "'" char-fold-to-regexp "\
 Turning on character-folding turns off regexp mode.")
-(put 'char-fold-to-regexp 'isearch-message-prefix "char-fold ")
 
 (isearch-define-mode-toggle regexp "r" nil nil
   (setq isearch-regexp (not isearch-regexp))
@@ -1776,8 +1792,6 @@ the beginning or the end of the string need not match a symbol boundary."
 	 (if (string-match-p (format "%s\\'" not-word-symbol-re) string) not-word-symbol-re
 	   (unless lax "\\_>")))))))
 
-(put 'isearch-symbol-regexp 'isearch-message-prefix "symbol ")
-
 ;; Search with lax whitespace
 
 (defun search-forward-lax-whitespace (string &optional bound noerror count)
@@ -1836,7 +1850,9 @@ replacements from Isearch is `M-s w ... M-%'."
 	;; `exit-recursive-edit' in `isearch-done' that terminates
 	;; the execution of this command when it is non-nil.
 	;; We call `exit-recursive-edit' explicitly at the end below.
-	(isearch-recursive-edit nil))
+	(isearch-recursive-edit nil)
+	(isearch-string-propertized
+         (isearch-string-propertize isearch-string)))
     (isearch-done nil t)
     (isearch-clean-overlays)
     (if (and isearch-other-end
@@ -1849,12 +1865,12 @@ replacements from Isearch is `M-s w ... M-%'."
 			 (< (mark) (point))))))
         (goto-char isearch-other-end))
     (set query-replace-from-history-variable
-         (cons isearch-string
+         (cons isearch-string-propertized
                (symbol-value query-replace-from-history-variable)))
     (perform-replace
-     isearch-string
+     isearch-string-propertized
      (query-replace-read-to
-      isearch-string
+      isearch-string-propertized
       (concat "Query replace"
               (isearch--describe-regexp-mode (or delimited isearch-regexp-function) t)
 	      (if backward " backward" "")
@@ -2562,7 +2578,8 @@ Search is updated accordingly."
 		      length)))
       (setq isearch-string (nth yank-pointer ring)
 	    isearch-message (mapconcat 'isearch-text-char-description
-				       isearch-string "")))))
+				       isearch-string ""))
+      (isearch-update-from-string-properties isearch-string))))
 
 (defun isearch-ring-adjust (advance)
   ;; Helper for isearch-ring-advance and isearch-ring-retreat
@@ -2778,11 +2795,8 @@ Can be changed via `isearch-search-fun-function' for special needs."
 
 (defun isearch--lax-regexp-function-p ()
   "Non-nil if next regexp-function call should be lax."
-  (not (or isearch-nonincremental
-           (null (car isearch-cmds))
-           (eq (length isearch-string)
-               (length (isearch--state-string
-                        (car isearch-cmds)))))))
+  (or (memq this-command '(isearch-printing-char isearch-del-char))
+      isearch-yank-flag))
 
 (defun isearch-search-fun-default ()
   "Return default functions to use for the search."
@@ -2938,8 +2952,6 @@ Optional third argument, if t, means if fail just return nil (no error).
       (funcall  (overlay-get ov 'isearch-open-invisible-temporary)  ov nil)
     ;; Store the values for the `invisible' property, and then set it to nil.
     ;; This way the text hidden by this overlay becomes visible.
-
-    ;; In 19.34 this does not exist so I cannot test it.
     (overlay-put ov 'isearch-invisible (overlay-get ov 'invisible))
     (overlay-put ov 'invisible nil)))
 
@@ -3170,9 +3182,9 @@ since they have special meaning in a regexp."
 (defvar isearch-lazy-highlight-regexp nil)
 (defvar isearch-lazy-highlight-lax-whitespace nil)
 (defvar isearch-lazy-highlight-regexp-lax-whitespace nil)
-(defvar isearch-lazy-highlight-regexp-function nil)
 (define-obsolete-variable-alias 'isearch-lazy-highlight-word
   'isearch-lazy-highlight-regexp-function "25.1")
+(defvar isearch-lazy-highlight-regexp-function nil)
 (defvar isearch-lazy-highlight-forward nil)
 (defvar isearch-lazy-highlight-error nil)
 
