@@ -223,7 +223,7 @@ Then evaluate RESULT to get return value, default nil.
   "Loop a certain number of times.
 Evaluate BODY with VAR bound to successive integers running from 0,
 inclusive, to COUNT, exclusive.  Then evaluate RESULT to get
-the return value (nil if RESULT is omitted).
+the return value (nil if RESULT is omitted).  Its use is deprecated.
 
 \(fn (VAR COUNT [RESULT]) BODY...)"
   (declare (indent 1) (debug dolist))
@@ -1456,8 +1456,8 @@ be a list of the form returned by `event-start' and `event-end'."
 (set-advertised-calling-convention 'unintern '(name obarray) "23.3")
 (set-advertised-calling-convention 'indirect-function '(object) "25.1")
 (set-advertised-calling-convention 'redirect-frame-focus '(frame focus-frame) "24.3")
-(set-advertised-calling-convention 'libxml-parse-xml-region '(start end base-url) "27.1")
-(set-advertised-calling-convention 'libxml-parse-html-region '(start end base-url) "27.1")
+(set-advertised-calling-convention 'libxml-parse-xml-region '(start end &optional base-url) "27.1")
+(set-advertised-calling-convention 'libxml-parse-html-region '(start end &optional base-url) "27.1")
 
 ;;;; Obsolescence declarations for variables, and aliases.
 
@@ -4328,14 +4328,24 @@ to `display-warning'."
 (defun add-to-invisibility-spec (element)
   "Add ELEMENT to `buffer-invisibility-spec'.
 See documentation for `buffer-invisibility-spec' for the kind of elements
-that can be added."
+that can be added.
+
+If `buffer-invisibility-spec' isn't a list before calling this
+function, `buffer-invisibility-spec' will afterwards be a list
+with the value `(t ELEMENT)'.  This means that if text exists
+that invisibility values that aren't either `t' or ELEMENT, that
+text will become visible."
   (if (eq buffer-invisibility-spec t)
       (setq buffer-invisibility-spec (list t)))
   (setq buffer-invisibility-spec
 	(cons element buffer-invisibility-spec)))
 
 (defun remove-from-invisibility-spec (element)
-  "Remove ELEMENT from `buffer-invisibility-spec'."
+  "Remove ELEMENT from `buffer-invisibility-spec'.
+If `buffer-invisibility-spec' isn't a list before calling this
+function, it will be made into a list containing just `t' as the
+only list member.  This means that if text exists with non-`t'
+invisibility values, that text will become visible."
   (setq buffer-invisibility-spec
         (if (consp buffer-invisibility-spec)
 	    (delete element buffer-invisibility-spec)

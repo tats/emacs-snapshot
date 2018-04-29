@@ -49,21 +49,26 @@ If `not-immediate', if the match is under point, it will not be
 returned, but instead the next instance is returned, if any.
 
 The return value (if a match is made) is a `prop-match'
-structure.  The accessor avaliable are
-`prop-match-beginning'/`prop-match-end' (which are the region in
-the buffer that's matching, and `prop-match-value', which is the
-value of PROPERTY at the start of the region."
+structure.  The accessors available are
+`prop-match-beginning'/`prop-match-end' (the region in the buffer
+that's matching), and `prop-match-value' (the value of PROPERTY
+at the start of the region)."
   (interactive
    (list
     (let ((string (completing-read "Search for property: " obarray)))
       (when (> (length string) 0)
         (intern string obarray)))))
-  ;; We're standing in the property we're looking for, so find the
-  ;; end.
-  (if (and (text-property--match-p value (get-text-property (point) property)
-                                   predicate)
-           (not not-immediate))
-      (text-property--find-end-forward (point) property value predicate)
+  (cond
+   ;; No matches at the end of the buffer.
+   ((eobp)
+    nil)
+   ;; We're standing in the property we're looking for, so find the
+   ;; end.
+   ((and (text-property--match-p value (get-text-property (point) property)
+                                 predicate)
+         (not not-immediate))
+    (text-property--find-end-forward (point) property value predicate))
+   (t
     (let ((origin (point))
           (ended nil)
           pos)
@@ -86,7 +91,7 @@ value of PROPERTY at the start of the region."
               (goto-char origin)
               (setq ended t)))))
       (and (not (eq ended t))
-           ended))))
+           ended)))))
 
 (defun text-property--find-end-forward (start property value predicate)
   (let (end)
