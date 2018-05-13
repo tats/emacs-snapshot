@@ -11,7 +11,7 @@ Comment:
   The original source for this package can be found at
   git://git.savannah.gnu.org/emacs.git under the
   emacs-25.2 tag.  That tag was used to create the
-  Debian upstream archive (emacs-non-free_25.2+1.orig.tar.bz2)
+  Debian upstream archive (emacs-non-free_1:25.2+1.orig.tar.bz2)
   after making the adjustments to comply with the DFSG detailed below.
 
   Please see /usr/share/doc/emacs-common-non-dfsg/README.Debian for a

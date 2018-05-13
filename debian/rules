@@ -37,8 +37,9 @@ major_ver := $(shell echo $(debian_ver) | sed 's/\..*//')
 # Everything before the last '-' (21.3, 21.3a, 21.3+1, etc.)
 debsrc_ver := $(shell echo $(debian_ver) | sed 's/-[^-]\+$$//')
 
-# Everything before the last '+' (21.2, 21.3a, etc.)
+# Everything before the last '+' (21.2, 21.3a, etc.) minus epoch
 upstream_ver := $(shell echo $(debsrc_ver) | sed 's/+[^+]\+$$//')
+upstream_ver := $(shell echo $(upstream_ver) | sed 's/^[0-9]\+://')
 
 # 20.5, not 20.5a (used in load-path, etc.)
 runtime_ver := $(shell echo $(upstream_ver) | sed 's/[^0-9]\+$$//')
