@@ -10,9 +10,13 @@ Section: non-free/editors
 Priority: optional
 Architecture: all
 Depends: ${shlibs:Depends}, dpkg (>= 1.15.4) | install-info
-Conflicts: emacs22-common (<< 22.2)
-Replaces: emacs22-common (<< 22.2),
-  texinfo-doc-nonfree (<< 6.1.0-1)
+Conflicts:
+  emacs21-common-non-dfsg,
+  emacs22-common-non-dfsg,
+  emacs23-common-non-dfsg,
+  emacs24-common-non-dfsg,
+  emacs25-common-non-dfsg
+Replaces: texinfo-doc-nonfree (<< 6.1.0-1)
 Breaks: texinfo-doc-nonfree (<< 6.1.0-1)
 Description: GNU Emacs common non-DFSG items, including the core documentation
  This package includes the core Emacs documentation: the Emacs Info
