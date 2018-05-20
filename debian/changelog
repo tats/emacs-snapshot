@@ -1,10 +1,30 @@
-emacs-non-dfsg (1:25.2+1-2~1.gbp1b467a) UNRELEASED; urgency=medium
+emacs-non-dfsg (1:25.2+1-2) experimental; urgency=medium
 
-  ** SNAPSHOT build @1b467a91336cfab5d3105a4d970e5bc31b76e903 **
+  * Given retirement, remove Jerome Marant from uploaders.
+    Thanks to Tobias Frost for the report. (Closes: 869328)
 
-  * UNRELEASED
+  * Unversion the emacs packages.  Remove the major version from all
+    of the packages.  The flexibility provided no longer appears worth
+    the complexity given the more frequent upstream releases, and
+    backward-compatability across them.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 22 Jul 2017 10:50:43 -0500
+  * Stop versioning packages; change emacs25 to emacs.
+
+  * Update debian/compat to 10.
+
+  * Simplify generation of README.Debian.
+
+  * Conflict with older versioned packages.  Given the dissolution of
+    the emacs metaflavor and the unversioning of the emacs25 package,
+    conflict with all previous flavors (as emacsen-common does) so
+    that we can manage the transition without having worry about
+    interactions, common files, etc.
+
+  * Add debian epoch to match corresponding emacs package.
+
+  * debian/copyright: change compression extension to xz.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 20 May 2018 11:18:15 -0500
 
 emacs25-non-dfsg (25.2+1-1) unstable; urgency=medium
 
