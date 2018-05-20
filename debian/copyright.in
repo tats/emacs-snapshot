@@ -11,7 +11,7 @@ Comment:
   The original source for this package can be found at
   git://git.savannah.gnu.org/emacs.git under the
   emacs-@UPSTREAM_VERSION@ tag.  That tag was used to create the
-  Debian upstream archive (emacs-non-free_@DEBSRC_VERSION@.orig.tar.bz2)
+  Debian upstream archive (emacs-non-free_@DEBSRC_VERSION@.orig.tar.xz)
   after making the adjustments to comply with the DFSG detailed below.
 
   Please see /usr/share/doc/emacs-common-non-dfsg/README.Debian for a
