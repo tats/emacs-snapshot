@@ -233,12 +233,19 @@ and its value has been changed to Duck Duck Go.
 'shr-selected-link' face to give the user feedback that the command
 has been executed.
 
-
 ** Htmlfontify
 *** The functions 'hfy-color', 'hfy-color-vals' and
 'hfy-fallback-color-values' and the variables 'hfy-fallback-color-map'
 and 'hfy-rgb-txt-color-map' have been renamed from names that used
 'colour' instead of 'color'.
+
++++
+** Enriched mode supports the 'charset' text property.
+You can add or modify the 'charset' text properties of text using the
+Edit->Text Properties->Special Properties menu, or by invoking the
+'facemenu-set-charset' command.  Documents in Enriched mode will be
+saved with the charset properties, and those properties will be
+restored when the file is visited.
 
 ** Smtpmail
 Authentication mechanisms can be added via external packages, by
@@ -493,25 +500,23 @@ comint-use-prompt-regexp-instead-of-fields, compilation-finish-function,
 count-text-lines, cperl-vc-header-alist, custom-face-save-command,
 cvs-display-full-path, cvs-fileinfo->full-path, delete-frame-hook,
 derived-mode-class, describe-char-after, describe-project,
-desktop-basefilename, desktop-buffer-handlers,
-desktop-buffer-misc-functions, desktop-buffer-modes-to-save,
-desktop-enable, desktop-load-default, dired-omit-files-p,
-disabled-command-hook, dungeon-mode-map, electric-nroff-mode,
-electric-nroff-newline, electric-perl-terminator, focus-frame,
-forward-text-line, generic-define-mswindows-modes, generic-define-unix-modes,
-generic-font-lock-defaults, goto-address-at-mouse,
+desktop-basefilename, desktop-buffer-handlers, desktop-buffer-misc-functions,
+desktop-buffer-modes-to-save, desktop-enable, desktop-load-default,
+dired-omit-files-p, disabled-command-hook, dungeon-mode-map,
+electric-nroff-mode, electric-nroff-newline, electric-perl-terminator,
+focus-frame, forward-text-line, generic-define-mswindows-modes,
+generic-define-unix-modes, generic-font-lock-defaults, goto-address-at-mouse,
 highlight-changes-colours, ibuffer-elide-long-columns, ibuffer-hooks,
 ibuffer-mode-hooks, icalendar-convert-diary-to-ical,
 icalendar-extract-ical-from-buffer, imenu-always-use-completion-buffer-p,
 ipconfig-program, ipconfig-program-options, isearch-lazy-highlight-cleanup,
-isearch-lazy-highlight-cleanup, isearch-lazy-highlight-initial-delay,
-isearch-lazy-highlight-interval, isearch-lazy-highlight-max-at-a-time,
-iswitchb-use-fonts, latin1-char-displayable-p, mouse-wheel-click-button,
-mouse-wheel-down-button, mouse-wheel-up-button, new-frame, pascal-outline,
-process-kill-without-query, recentf-menu-append-commands-p,
-rmail-pop-password, rmail-pop-password-required, savehist-load,
-set-default-font, spam-list-of-processors,
-speedbar-add-ignored-path-regexp, speedbar-buffers-line-path,
+isearch-lazy-highlight-initial-delay, isearch-lazy-highlight-interval,
+isearch-lazy-highlight-max-at-a-time, iswitchb-use-fonts,
+latin1-char-displayable-p, mouse-wheel-click-button, mouse-wheel-down-button,
+mouse-wheel-up-button, new-frame, pascal-outline, process-kill-without-query,
+recentf-menu-append-commands-p, rmail-pop-password,
+rmail-pop-password-required, savehist-load, set-default-font,
+spam-list-of-processors, speedbar-add-ignored-path-regexp,
 speedbar-buffers-line-path, speedbar-ignored-path-expressions,
 speedbar-ignored-path-regexp, speedbar-line-path, speedbar-path-line,
 timer-set-time-with-usecs, tooltip-gud-display, tooltip-gud-modes,
@@ -519,7 +524,13 @@ tooltip-gud-toggle-dereference, unfocus-frame, unload-hook-features-list,
 update-autoloads-from-directories, vc-comment-ring, vc-comment-ring-index,
 vc-comment-search-forward, vc-comment-search-reverse, vc-comment-to-change-log,
 vc-diff-switches-list, vc-next-comment, vc-previous-comment, view-todo,
-x-lost-selection-hooks, x-sent-selection-hooks
+x-lost-selection-hooks, x-sent-selection-hooks.
+
+---
+** Further functions and variables obsolete since Emacs 24 have been removed:
+default-directory-alist, dired-default-directory,
+dired-default-directory-alist, dired-enable-local-variables,
+dired-hack-local-variables, dired-local-variables-file, dired-omit-here-always.
 
 ** The function 'display-buffer-in-major-side-window' no longer exists.
 It has been renamed as internal function 'window--make-major-side-window',
