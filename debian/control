@@ -129,3 +129,102 @@ Description: GNU Emacs LISP (.el) files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the elisp sources for the convenience of users,
  saving space in the main package for small systems.
+
+Package: emacs23
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-gtk
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs23
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs23-lucid
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-lucid
+Description: GNU Emacs transitional package to emacs-lucid
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs23
+ installed automatically upgrade to the new unversioned emacs-lucid
+ package.
+
+Package: emacs23-nox
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-nox
+Description: GNU Emacs transitional package to emacs-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs23
+ installed automatically upgrade to the new unversioned emacs-nox
+ package.
+
+Package: emacs24
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-gtk
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs24
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs24-lucid
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-lucid
+Description: GNU Emacs transitional package to emacs-lucid
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs24
+ installed automatically upgrade to the new unversioned emacs-lucid
+ package.
+
+Package: emacs24-nox
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-nox
+Description: GNU Emacs transitional package to emacs-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs24
+ installed automatically upgrade to the new unversioned emacs-nox
+ package.
+
+Package: emacs25
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-gtk
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs25
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs25-lucid
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-lucid
+Description: GNU Emacs transitional package to emacs-lucid
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs25
+ installed automatically upgrade to the new unversioned emacs-lucid
+ package.
+
+Package: emacs25-nox
+Section: oldlibs
+Priority: optional
+Architecture: all
+Depends: emacs-nox
+Description: GNU Emacs transitional package to emacs-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs25
+ installed automatically upgrade to the new unversioned emacs-nox
+ package.
