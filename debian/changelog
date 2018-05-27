@@ -1,10 +1,39 @@
-emacs (1:25.2+1-6~1.gbp1353b0) UNRELEASED; urgency=medium
+emacs (1:25.2+1-7) experimental; urgency=medium
 
-  ** SNAPSHOT build @1353b03c55df949fb408c7148c7fe95628f5118b **
+  * Unversion the emacs packages.  Remove the major version from all
+    of the packages.  The flexibility provided no longer appears worth
+    the complexity given the more frequent upstream releases, and
+    backward-compatability across them.
 
-  * UNRELEASED
+  * Update debian/patches for emacs25 to emacs migration.
 
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 04 Aug 2017 19:04:28 -0500
+  * Rename emacsXY to emacsXY-gtk.
+
+  * Fix dbg package self-dependencies.
+
+  * Stop versioning packages; change emacs25 to emacs.
+
+  * Move mail-host-address and gnus-nntpserver-file to new
+    00debian.el.
+
+  * Move emacs binary metapackage to this package.  Add epoch so that
+    new versions of the metapackage will be higher than the last
+    standalone version (47.0).
+
+  * Handle local emacs/site-lisp here instead of in emacsen-common.
+
+  * Depend on emacsen-common (>= 3.0.0) This will complete the
+    transfer of the emacs metapackage namespace to the emacs source
+    package as a new concrete emacs flavor.
+
+  * Add emacs23, emacs24, and emacs25 transitional packages.
+
+  * debian/control: change priority extra to optional as per policy.
+
+  * Have binary flavor packages depend on emacs-common for doc
+    symlink.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 27 May 2018 10:57:34 -0500
 
 emacs25 (25.2+1-6) unstable; urgency=high
 
