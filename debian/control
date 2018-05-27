@@ -50,7 +50,7 @@ Description: GNU Emacs editor (with Lucid GUI support)
 
 Package: emacs-lucid-dbg
 Section: debug
-Priority: extra
+Priority: optional
 Architecture: any
 Depends: emacs-lucid (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-lucid
@@ -72,7 +72,7 @@ Description: GNU Emacs editor (without GUI support)
 
 Package: emacs-nox-dbg
 Section: debug
-Priority: extra
+Priority: optional
 Architecture: any
 Depends: emacs-nox (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-nox
@@ -95,7 +95,7 @@ Description: GNU Emacs editor (with GTK+ GUI support)
 
 Package: emacs-gtk-dbg
 Section: debug
-Priority: extra
+Priority: optional
 Architecture: any
 Depends: emacs-gtk (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-gtk
