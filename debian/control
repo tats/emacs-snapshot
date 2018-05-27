@@ -32,7 +32,10 @@ Description: GNU Emacs editor (metapackage)
 
 Package: emacs-lucid
 Architecture: any
-Depends: emacs-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends:
+  emacs-bin-common (= ${binary:Version}),
+  emacs-common (= ${source:Version}),
+  ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-gtk, emacs-nox
@@ -60,7 +63,10 @@ Description: Debugging symbols for emacs-lucid
 
 Package: emacs-nox
 Architecture: any
-Depends: emacs-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends:
+  emacs-bin-common (= ${binary:Version}),
+  emacs-common (= ${source:Version}),
+  ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-gtk, emacs-lucid
@@ -82,7 +88,10 @@ Description: Debugging symbols for emacs-nox
 
 Package: emacs-gtk
 Architecture: any
-Depends: emacs-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends:
+  emacs-bin-common (= ${binary:Version}),
+  emacs-common (= ${source:Version}),
+  ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-lucid, emacs-nox
