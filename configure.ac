@@ -2684,7 +2684,7 @@ if test x"$pkg_check_gtk" = xyes; then
        closing open displays.  This is no problem if you just use
        one display, but if you use more than one and close one of them
        Emacs may crash.
-       See https://bugzilla.gnome.org/show_bug.cgi?id=85715]])
+       See https://gitlab.gnome.org/GNOME/gtk/issues/221]])
   fi
 
 fi
@@ -3257,8 +3257,8 @@ if test "${HAVE_X11}" = "yes"; then
     if test "x${with_xft}" != "xno"; then
 
       EMACS_CHECK_MODULES([XFT], [xft >= 0.13.0], [], [HAVE_XFT=no])
-      ## Because xftfont.c uses XRenderQueryExtension, we also
-      ## need to link to -lXrender.
+      ## Because xterm.c uses XRenderQueryExtension when XFT is
+      ## enabled, we also need to link to -lXrender.
       HAVE_XRENDER=no
       AC_CHECK_LIB(Xrender, XRenderQueryExtension, HAVE_XRENDER=yes)
       if test "$HAVE_XFT" != no && test "$HAVE_XRENDER" != no; then
@@ -3281,6 +3281,9 @@ if test "${HAVE_X11}" = "yes"; then
 	CPPFLAGS=$OLD_CPPFLAGS
 	CFLAGS=$OLD_CFLAGS
 	LIBS=$OLD_LIBS
+      else
+      # Make sure XFT is disabled if we found XFT but not XRender
+	HAVE_XFT=no
       fi                          # "$HAVE_XFT" != no
     fi                            # "x${with_xft}" != "xno"
 

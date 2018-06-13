@@ -70,14 +70,6 @@ typedef bool bool_bf;
 # define __has_attribute_no_sanitize_undefined GNUC_PREREQ (4, 9, 0)
 #endif
 
-/* Simulate __has_builtin on compilers that lack it.  It is used only
-   on arguments like __builtin_assume_aligned that are handled in this
-   simulation.  */
-#ifndef __has_builtin
-# define __has_builtin(a) __has_builtin_##a
-# define __has_builtin___builtin_assume_aligned GNUC_PREREQ (4, 7, 0)
-#endif
-
 /* Simulate __has_feature on compilers that lack it.  It is used only
    to define ADDRESS_SANITIZER below.  */
 #ifndef __has_feature
@@ -89,11 +81,6 @@ typedef bool bool_bf;
 # define ADDRESS_SANITIZER true
 #else
 # define ADDRESS_SANITIZER false
-#endif
-
-/* Yield PTR, which must be aligned to ALIGNMENT.  */
-#if ! __has_builtin (__builtin_assume_aligned)
-# define __builtin_assume_aligned(ptr, ...) ((void *) (ptr))
 #endif
 
 #ifdef DARWIN_OS
@@ -350,7 +337,8 @@ extern int emacs_setenv_TZ (char const *);
 # define ATTRIBUTE_NO_SANITIZE_UNDEFINED
 #endif
 
-/* gcc -fsanitize=address does not work with vfork in Fedora 25 x86-64.
+/* gcc -fsanitize=address does not work with vfork in Fedora 28 x86-64.  See:
+   https://lists.gnu.org/r/emacs-devel/2017-05/msg00464.html
    For now, assume that this problem occurs on all platforms.  */
 #if ADDRESS_SANITIZER && !defined vfork
 # define vfork fork

@@ -58,6 +58,13 @@ is initialized.  The primary purpose is to allow customizing how the
 package system is initialized given that initialization now happens
 before loading the regular init file (see below).
 
+We recommend against putting any customizations in this file that
+don't need to be set up before initializing installed add-on packages,
+because the early init file is read too early into the startup
+process, and some important parts of the Emacs session, such as
+window-system and other GUI features, are not yet set up, which could
+make some customization fail to work.
+
 +++
 ** Installed packages are now activated *before* loading the init file.
 This is part of a change intended to eliminate the behavior of
@@ -176,6 +183,16 @@ interface that's more like functions like @code{search-forward}.
 It now treats the optional 2nd argument to mean that the URL should be
 shown in the currently selected window.
 
+** Flymake
+
++++
+*** The variable 'flymake-diagnostic-types-alist' is obsolete
+You should instead set properties on known diagnostic symbols, like
+':error' and ':warning', as demonstrated in the Flymake manual.
+
+*** New customizable variable 'flymake-start-on-save-buffer'
+Control whether Flymake starts checking the buffer on save.
+
 ** Package
 *** New 'package-quickstart' feature
 When 'package-quickstart' is non-nil, package.el precomputes a big autoloads
@@ -262,6 +279,9 @@ Can be controlled via the new variable 'footnote-align-to-fn-text'.
 *** A new command 'css-cycle-color-format' for cycling between color
 formats (e.g. "black" => "#000000" => "rgb(0, 0, 0)") has been added,
 bound to 'C-c C-f'.
+
+---
+*** CSS mode, SCSS mode, and Less CSS mode now have support for Imenu.
 
 ** SGML mode
 
@@ -420,7 +440,15 @@ process.  It now accepts signals specified either by name or by its number.
 or NextCloud hosted files and directories.
 
 +++
+*** Connection methods "obex" and "synce" are removed, because they
+are obsoleted in GVFS.
+
++++
 *** Validated passwords are saved by auth-source backends which support this.
+
++++
+*** The user option 'tramp-ignored-file-name-regexp' allows to disable
+Tramp for some look-alike remote file names.
 
 ---
 ** The options.el library has been removed.
@@ -448,6 +476,25 @@ are formatted as MIME digests.
 +++
 *** 'message-forward-included-headers' has changed its default to
 exclude most headers when forwarding.
+
+** EasyPG
+
+---
+*** 'epa-pinentry-mode' is renamed to 'epg-pinentry-mode'.
+It now applies to epg functions as well as epa functions.
+
+---
+*** The alias functions 'epa--encode-coding-string',
+'epa--decode-coding-string', and 'epa--select-safe-coding-system' have
+been removed.  Use 'encode-coding-string', 'decode-coding-string', and
+'select-safe-coding-system' instead.
+
+** Rmail
+
++++
+*** New user option 'rmail-output-reset-deleted-flag'.
+If this option is non-nil, messages appended to an output file by the
+'rmail-output' command have their Deleted flag reset.
 
 * New Modes and Packages in Emacs 27.1
 
@@ -543,6 +590,28 @@ manual for more details.
 * Lisp Changes in Emacs 27.1
 
 +++
+** New hook 'after-delete-frame-functions'.
+This works like 'delete-frame-functions', but runs after the frame to
+be deleted has been made dead and removed from the frame list.
+
++++
+** New frame focus state inspection interface.
+The hooks 'focus-in-hook' and 'focus-out-hook' are now obsolete.
+Instead, attach to 'after-focus-change-function' using 'add-function'
+and inspect the focus state of each frame using 'frame-focus-state'.
+
++++
+** Emacs now requests and recognizes focus-change notifications from TTYs.
+On terminal emulators that support the feature, Emacs can now support
+'focus-in-hook' and 'focus-out-hook' for TTY frames.
+
++++
+** Window-specific face remapping.
+Face specifications (of the kind used in 'face-remapping-alist')
+now support filters, allowing faces to vary between different windows
+displaying the same buffer.
+
++++
 ** New function assoc-delete-all.
 
 +++
@@ -565,7 +634,7 @@ backslash.  For example:
 ** Omitting variables after '&optional' and '&rest' is now allowed.
 For example (defun foo (&optional)) is no longer an error.  This is
 sometimes convenient when writing macros.  See the ChangeLog entry
-titled "Allow `&rest' or `&optional' without following variable
+titled "Allow '&rest' or '&optional' without following variable
 (Bug#29165)" for a full listing of which arglists are accepted across
 versions.
 
@@ -651,6 +720,13 @@ loading messages if requested, and protects against recursive loads.
 The history of variable names read by 'read-variable' is recorded in
 the new variable 'custom-variable-history'.
 
+---
+** The function 'string-to-unibyte' is no longer declared obsolete.
+We have found that there are legitimate use cases for this function,
+where there's no better alternative.  We believe that the incorrect
+uses of this function all but disappeared by now, so we are
+un-obsoleting it.
+
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
 
@@ -665,6 +741,13 @@ and "option" modifier keys more correctly.
 to 't' would enable the macOS proxy icon has been replaced with a
 separate variable, 'ns-use-proxy-icon'.  'frame-title-format' will now
 work as on other platforms.
+
+---
+** New primitive 'w32-read-registry'.
+This primitive lets Lisp programs access the MS-Windows Registry by
+retrieving values stored under a given key.  It is intended to be used
+for supporting features such as XDG-like location of important files
+and directories.
 
 
 ----------------------------------------------------------------------

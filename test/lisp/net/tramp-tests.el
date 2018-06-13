@@ -267,6 +267,12 @@ handled properly.  BODY shall not contain a timeout."
   (should-not (tramp-tramp-file-p "/::"))
   (should-not (tramp-tramp-file-p "/:@:"))
   (should-not (tramp-tramp-file-p "/:[]:"))
+  ;; When `tramp-mode' is nil, Tramp is not activated.
+  (let (tramp-mode)
+    (should-not (tramp-tramp-file-p "/method:user@host:")))
+  ;; `tramp-ignored-file-name-regexp' suppresses Tramp.
+  (let ((tramp-ignored-file-name-regexp "^/method:user@host:"))
+    (should-not (tramp-tramp-file-p "/method:user@host:")))
   ;; Methods shall be at least two characters on MS Windows, except
   ;; the default method.
   (let ((system-type 'windows-nt))
@@ -1933,6 +1939,14 @@ This checks also `file-name-as-directory', `file-name-directory',
     (file-name-directory "/method:host:/path/to/file/")
     "/method:host:/path/to/file/"))
   (should
+   (string-equal (file-name-directory "/method:host:file") "/method:host:"))
+  (should
+   (string-equal
+    (file-name-directory "/method:host:path/") "/method:host:path/"))
+  (should
+   (string-equal
+    (file-name-directory "/method:host:path/to") "/method:host:path/"))
+  (should
    (string-equal (file-name-nondirectory "/method:host:/path/to/file") "file"))
   (should
    (string-equal (file-name-nondirectory "/method:host:/path/to/file/") ""))
@@ -3111,10 +3125,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      ;; We must unquote it.
 	      (should
 	       (string-equal
-		(funcall
-		 (if (tramp--test-emacs27-p)
-		     'tramp-compat-file-name-unquote 'identity)
-		 (file-truename tmp-name1))
+		(file-truename tmp-name1)
 		(tramp-compat-file-name-unquote (file-truename tmp-name3))))))
 
 	;; Cleanup.
@@ -4071,7 +4082,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 			 (list (file-name-nondirectory tmp-name2))))
 		;; `vc-register' has changed its arguments in Emacs
 		;; 25.1.  Let's skip it for older Emacsen.
-		(error (skip-unless (>= emacs-major-version 25))))
+		(error (skip-unless (tramp--test-emacs25-p))))
 	      ;; vc-git uses an own process sentinel, Tramp's sentinel
 	      ;; for flushing the cache isn't used.
 	      (dired-uncache (concat (file-remote-p default-directory) "/"))
@@ -4317,6 +4328,12 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     (should (file-directory-p tmp-file))
     (delete-directory tmp-file)
     (should-not (file-exists-p tmp-file))))
+
+(defun tramp--test-emacs25-p ()
+  "Check for Emacs version >= 25.1.
+Some semantics has been changed for there, w/o new functions or
+variables, so we check the Emacs version directly."
+  (>= emacs-major-version 25))
 
 (defun tramp--test-emacs26-p ()
   "Check for Emacs version >= 26.1.
