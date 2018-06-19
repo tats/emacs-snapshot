@@ -360,9 +360,7 @@ static Lisp_Object modify_event_symbol (ptrdiff_t, int, Lisp_Object,
                                         Lisp_Object *, ptrdiff_t);
 static Lisp_Object make_lispy_switch_frame (Lisp_Object);
 static Lisp_Object make_lispy_focus_in (Lisp_Object);
-#ifdef HAVE_WINDOW_SYSTEM
 static Lisp_Object make_lispy_focus_out (Lisp_Object);
-#endif /* HAVE_WINDOW_SYSTEM */
 static bool help_char_p (Lisp_Object);
 static void save_getcjmp (sys_jmp_buf);
 static void restore_getcjmp (sys_jmp_buf);
@@ -6047,15 +6045,11 @@ make_lispy_focus_in (Lisp_Object frame)
   return list2 (Qfocus_in, frame);
 }
 
-#ifdef HAVE_WINDOW_SYSTEM
-
 static Lisp_Object
 make_lispy_focus_out (Lisp_Object frame)
 {
   return list2 (Qfocus_out, frame);
 }
-
-#endif /* HAVE_WINDOW_SYSTEM */
 
 /* Manipulating modifiers.  */
 
@@ -8894,9 +8888,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* Whether each event in the mocked input came from a mouse menu.  */
   bool used_mouse_menu_history[READ_KEY_ELTS] = {0};
 
-  /* Distinguish first time through from replay with mock_input == 0.  */
-  bool is_replay = false;
-
   /* If the sequence is unbound in submaps[], then
      keybuf[fkey.start..fkey.end-1] is a prefix in Vfunction_key_map,
      and fkey.map is its binding.
@@ -9005,9 +8996,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* These are no-ops the first time through, but if we restart, they
      revert the echo area and this_command_keys to their original state.  */
   this_command_key_count = keys_start;
-  if (INTERACTIVE && is_replay)
+  if (INTERACTIVE && t < mock_input)
     echo_truncate (echo_start);
-  is_replay = true;
 
   /* If the best binding for the current key sequence is a keymap, or
      we may be looking at a function key's escape sequence, keep on

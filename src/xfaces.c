@@ -2193,7 +2193,7 @@ merge_named_face (struct window *w,
    (:window PARAMETER VALUE), which matches if the current window has
    a PARAMETER EQ to VALUE.
 
-   This function returns true if the face filter matches and false if
+   This function returns true if the face filter matches, and false if
    it doesn't or if the function encountered an error.  If the filter
    is invalid, set *OK to false and, if ERR_MSGS is true, log an error
    message.  On success, *OK is untouched.  */
@@ -2203,6 +2203,8 @@ evaluate_face_filter (Lisp_Object filter, struct window *w,
 {
   Lisp_Object orig_filter = filter;
 
+  /* Inner braces keep compiler happy about the goto skipping variable
+     initialization.  */
   {
     if (NILP (filter))
       return true;
@@ -2247,12 +2249,12 @@ evaluate_face_filter (Lisp_Object filter, struct window *w,
 
 /* Determine whether FACE_REF is a "filter" face specification (case
    #4 in merge_face_ref).  If it is, evaluate the filter, and if the
-   filter matches, return the filtered expression.  If the filter does
+   filter matches, return the filtered face spec.  If the filter does
    not match, return `nil'.  If FACE_REF is not a filtered face
    specification, return FACE_REF.
 
    On error, set *OK to false, having logged an error message if
-   ERR_MSGS is true, and return `nil'.
+   ERR_MSGS is true, and return `nil'.  Otherwise, *OK is not touched.
 
    W is either NULL or a window used to evaluate filters.  If W is
    NULL, no window-based face specification filter matches.
@@ -2319,7 +2321,7 @@ filter_face_ref (Lisp_Object face_ref,
    for compatibility with 20.2.
 
    4. Conses of the form
-   (:filter (:window PARAMETER VALUE) FACE-SPECIFICATION),
+   (:filtered (:window PARAMETER VALUE) FACE-SPECIFICATION),
    which applies FACE-SPECIFICATION only if the
    given face attributes are being evaluated in the context of a
    window with a parameter named PARAMETER being EQ VALUE.
@@ -2356,7 +2358,7 @@ merge_face_ref (struct window *w,
       Lisp_Object first = XCAR (face_ref);
 
       if (EQ (first, Qforeground_color)
-               || EQ (first, Qbackground_color))
+	  || EQ (first, Qbackground_color))
 	{
 	  /* One of (FOREGROUND-COLOR . COLOR) or (BACKGROUND-COLOR
 	     . COLOR).  COLOR must be a string.  */
@@ -6650,10 +6652,10 @@ syms_of_xfaces (void)
 #endif
 
   DEFVAR_BOOL ("face-filters-always-match", face_filters_always_match,
-               doc: /* Non-nil means that face filters are always
-deemed to match. This variable is intended for use only by code that
-evaluates the "specifity" of a face specification and should be
-let-bound only for this purpose.  */);
+    doc: /* Non-nil means that face filters are always deemed to match.
+This variable is intended for use only by code that evaluates
+the "specifity" of a face specification and should be let-bound
+only for this purpose.  */);
 
   DEFVAR_LISP ("face-new-frame-defaults", Vface_new_frame_defaults,
     doc: /* List of global face definitions (for internal use only.)  */);

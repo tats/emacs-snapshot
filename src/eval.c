@@ -673,8 +673,10 @@ default_toplevel_binding (Lisp_Object symbol)
 	  break;
 
 	case SPECPDL_UNWIND:
+	case SPECPDL_UNWIND_ARRAY:
 	case SPECPDL_UNWIND_PTR:
 	case SPECPDL_UNWIND_INT:
+	case SPECPDL_UNWIND_EXCURSION:
 	case SPECPDL_UNWIND_VOID:
 	case SPECPDL_BACKTRACE:
 	case SPECPDL_LET_LOCAL:
@@ -3407,6 +3409,15 @@ record_unwind_protect (void (*function) (Lisp_Object), Lisp_Object arg)
 }
 
 void
+record_unwind_protect_array (Lisp_Object *array, ptrdiff_t nelts)
+{
+  specpdl_ptr->unwind_array.kind = SPECPDL_UNWIND_ARRAY;
+  specpdl_ptr->unwind_array.array = array;
+  specpdl_ptr->unwind_array.nelts = nelts;
+  grow_specpdl ();
+}
+
+void
 record_unwind_protect_ptr (void (*function) (void *), void *arg)
 {
   specpdl_ptr->unwind_ptr.kind = SPECPDL_UNWIND_PTR;
@@ -3427,7 +3438,9 @@ record_unwind_protect_int (void (*function) (int), int arg)
 void
 record_unwind_protect_excursion (void)
 {
-  record_unwind_protect (save_excursion_restore, save_excursion_save ());
+  specpdl_ptr->unwind_excursion.kind = SPECPDL_UNWIND_EXCURSION;
+  save_excursion_save (specpdl_ptr);
+  grow_specpdl ();
 }
 
 void
@@ -3466,6 +3479,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
     case SPECPDL_UNWIND:
       this_binding->unwind.func (this_binding->unwind.arg);
       break;
+    case SPECPDL_UNWIND_ARRAY:
+      xfree (this_binding->unwind_array.array);
+      break;
     case SPECPDL_UNWIND_PTR:
       this_binding->unwind_ptr.func (this_binding->unwind_ptr.arg);
       break;
@@ -3474,6 +3490,10 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       break;
     case SPECPDL_UNWIND_VOID:
       this_binding->unwind_void.func ();
+      break;
+    case SPECPDL_UNWIND_EXCURSION:
+      save_excursion_restore (this_binding->unwind_excursion.marker,
+			      this_binding->unwind_excursion.window);
       break;
     case SPECPDL_BACKTRACE:
       break;
@@ -3749,18 +3769,22 @@ backtrace_eval_unrewind (int distance)
 	     unwind_protect, but the problem is that we don't know how to
 	     rewind them afterwards.  */
 	case SPECPDL_UNWIND:
-	  {
-	    Lisp_Object oldarg = tmp->unwind.arg;
-	    if (tmp->unwind.func == set_buffer_if_live)
+	  if (tmp->unwind.func == set_buffer_if_live)
+	    {
+	      Lisp_Object oldarg = tmp->unwind.arg;
 	      tmp->unwind.arg = Fcurrent_buffer ();
-	    else if (tmp->unwind.func == save_excursion_restore)
-	      tmp->unwind.arg = save_excursion_save ();
-	    else
-	      break;
-	    tmp->unwind.func (oldarg);
-	    break;
+	      set_buffer_if_live (oldarg);
+	    }
+	  break;
+	case SPECPDL_UNWIND_EXCURSION:
+	  {
+	    Lisp_Object marker = tmp->unwind_excursion.marker;
+	    Lisp_Object window = tmp->unwind_excursion.window;
+	    save_excursion_save (tmp);
+	    save_excursion_restore (marker, window);
 	  }
-
+	  break;
+	case SPECPDL_UNWIND_ARRAY:
 	case SPECPDL_UNWIND_PTR:
 	case SPECPDL_UNWIND_INT:
 	case SPECPDL_UNWIND_VOID:
@@ -3893,8 +3917,10 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	    break;
 
 	  case SPECPDL_UNWIND:
+	  case SPECPDL_UNWIND_ARRAY:
 	  case SPECPDL_UNWIND_PTR:
 	  case SPECPDL_UNWIND_INT:
+	  case SPECPDL_UNWIND_EXCURSION:
 	  case SPECPDL_UNWIND_VOID:
 	  case SPECPDL_BACKTRACE:
 	    break;
@@ -3922,6 +3948,15 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	{
 	case SPECPDL_UNWIND:
 	  mark_object (specpdl_arg (pdl));
+	  break;
+
+	case SPECPDL_UNWIND_ARRAY:
+	  mark_maybe_objects (pdl->unwind_array.array, pdl->unwind_array.nelts);
+	  break;
+
+	case SPECPDL_UNWIND_EXCURSION:
+	  mark_object (pdl->unwind_excursion.marker);
+	  mark_object (pdl->unwind_excursion.window);
 	  break;
 
 	case SPECPDL_BACKTRACE:

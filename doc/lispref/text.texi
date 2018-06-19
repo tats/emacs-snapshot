@@ -3325,6 +3325,17 @@ foreground or background color, similar to @code{(:foreground
 @var{color-name})} or @code{(:background @var{color-name})}.  This
 form is supported for backward compatibility only, and should be
 avoided.
+
+@item
+A cons cell of the form @w{@code{(:filtered @var{filter}
+@var{face-spec})}}, that specifies the face given by @var{face-spec},
+but only if @var{filter} matches when the face is used for display.
+The @var{face-spec} can use any of the forms mentioned above.  The
+@var{filter} should be of the form @w{@code{(:window @var{param}
+@var{value})}}, which matches for windows whose parameter @var{param}
+is @code{eq} to @var{value}.  If the variable
+@code{face-filters-always-match} is non-@code{nil}, all face filters
+are deemed to have matched.
 @end itemize
 
 Font Lock mode (@pxref{Font Lock Mode}) works in most buffers by
@@ -3697,6 +3708,12 @@ string to display, which is passed through
 @code{substitute-command-keys} before being given to the function; see
 @ref{Keys in Documentation}.  Tooltip mode (@pxref{Tooltips,,, emacs,
 The GNU Emacs Manual}) provides an example.
+@end defvar
+
+@defvar face-filters-always-match
+If this variable is non-@code{nil}, face filters that specify
+attributes applied only when certain conditions are met will be deemed
+to match always.
 @end defvar
 
 @node Format Properties
@@ -4999,26 +5016,27 @@ textual nodes that just contain white-space.
 @node Parsing JSON
 @section Parsing and generating JSON values
 @cindex JSON
+@cindex JavaScript Object Notation
 
-  When Emacs is compiled with JSON support, it provides a couple of
-functions to convert between Lisp objects and JSON values.  Any JSON
-value can be converted to a Lisp object, but not vice versa.
-Specifically:
+  When Emacs is compiled with @acronym{JSON} (@dfn{JavaScript Object
+Notation}) support, it provides several functions to convert
+between Lisp objects and JSON values.  Any JSON value can be converted
+to a Lisp object, but not vice versa.  Specifically:
 
 @itemize
-
 @item
-JSON has a couple of keywords: @code{null}, @code{false}, and
-@code{true}.  These are represented in Lisp using the keywords
-@code{:null}, @code{:false}, and @code{t}, respectively.
+JSON uses three keywords: @code{true}, @code{null}, @code{false}.
+@code{true} is represented by the symbol @code{t}.  By default, the
+remaining two are represented, respectively, by the symbols
+@code{:null} and @code{:false}.
 
 @item
 JSON only has floating-point numbers.  They can represent both Lisp
 integers and Lisp floating-point numbers.
 
 @item
-JSON strings are always Unicode strings.  Lisp strings can contain
-non-Unicode characters.
+JSON strings are always Unicode strings encoded in UTF-8.  Lisp
+strings can contain non-Unicode characters.
 
 @item
 JSON has only one sequence type, the array.  JSON arrays are
@@ -5030,7 +5048,6 @@ using Lisp hashtables, alists or plists.  When an alist or plist
 contains several elements with the same key, Emacs uses only the first
 element for serialization, in accordance with the behavior of
 @code{assq}.
-
 @end itemize
 
 @noindent
@@ -5041,20 +5058,18 @@ values.
 
   If some Lisp object can't be represented in JSON, the serialization
 functions will signal an error of type @code{wrong-type-argument}.
-The parsing functions will signal the following errors:
+The parsing functions can also signal the following errors:
 
 @table @code
-
 @item json-end-of-file
-    Signaled when encountering a premature end of the input text.
+Signaled when encountering a premature end of the input text.
 
 @item json-trailing-content
-    Signaled when encountering unexpected input after the first JSON
-    object parsed.
+Signaled when encountering unexpected input after the first JSON
+object parsed.
 
 @item json-parse-error
-    Signaled when encountering invalid JSON syntax.
-
+Signaled when encountering invalid JSON syntax.
 @end table
 
   Only top-level values (arrays and objects) can be serialized to
@@ -5062,34 +5077,59 @@ JSON.  The subobjects within these top-level values can be of any
 type.  Likewise, the parsing functions will only return vectors,
 hashtables, alists, and plists.
 
-  The parsing functions accept keyword arguments.  Currently only one
-keyword argument, @code{:object-type}, is recognized; its value
-decides which Lisp object to use for representing the key-value
-mappings of a JSON object.  It can be either @code{hash-table}, the
-default, to make hashtables with strings as keys, @code{alist} to use
-alists with symbols as keys or @code{plist} to use plists with keyword
-symbols as keys.
-
-@defun json-serialize object
+@defun json-serialize object &rest args
 This function returns a new Lisp string which contains the JSON
-representation of @var{object}.
+representation of @var{object}.  The argument @var{args} is a list of
+keyword/argument pairs.  The following keywords are accepted:
+
+@table @code
+@item :null-object
+The value decides which Lisp object to use to represent the JSON
+keyword @code{null}.  It defaults to the symbol @code{:null}.
+
+@item :false-object
+The value decides which Lisp object to use to represent the JSON
+keyword @code{false}.  It defaults to the symbol @code{:false}.
+@end table
+
 @end defun
 
-@defun json-insert object
+@defun json-insert object &rest args
 This function inserts the JSON representation of @var{object} into the
-current buffer before point.
+current buffer before point.  The argument @var{args} are interpreted
+as in @code{json-parse-string}.
 @end defun
 
-@defun json-parse-string string &key (object-type @code{hash-table})
+@defun json-parse-string string &rest args
 This function parses the JSON value in @var{string}, which must be a
-Lisp string.
+Lisp string.  The argument @var{args} is a list of keyword/argument
+pairs.  The following keywords are accepted:
+
+@table @code
+@item :object-type
+The value decides which Lisp object to use for representing the
+key-value mappings of a JSON object.  It can be either
+@code{hash-table}, the default, to make hashtables with strings as
+keys; @code{alist} to use alists with symbols as keys; or @code{plist}
+to use plists with keyword symbols as keys.
+
+@item :null-object
+The value decides which Lisp object to use to represent the JSON
+keyword @code{null}.  It defaults to the symbol @code{:null}.
+
+@item :false-object
+The value decides which Lisp object to use to represent the JSON
+keyword @code{false}.  It defaults to the symbol @code{:false}.
+@end table
+
 @end defun
 
-@defun json-parse-buffer &key (object-type @code{hash-table})
+@defun json-parse-buffer &rest args
 This function reads the next JSON value from the current buffer,
 starting at point.  It moves point to the position immediately after
 the value if a value could be read and converted to Lisp; otherwise it
-doesn't move point.
+doesn't move point.  The arguments @var{args} are interpreted as in
+@code{json-parse-string}.
 @end defun
 
 

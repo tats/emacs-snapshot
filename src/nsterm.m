@@ -2603,7 +2603,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
   if (f && FRAME_NS_P (f))
     {
-      view = FRAME_NS_VIEW (*fp);
+      view = FRAME_NS_VIEW (f);
 
       position = [[view window] mouseLocationOutsideOfEventStream];
       position = [view convertPoint: position fromView: nil];
@@ -4819,7 +4819,7 @@ ns_set_vertical_scroll_bar (struct window *window,
 	ns_clear_frame_area (f, left, top, width, height);
 
       bar = [[EmacsScroller alloc] initFrame: r window: win];
-      wset_vertical_scroll_bar (window, make_save_ptr (bar));
+      wset_vertical_scroll_bar (window, make_mint_ptr (bar));
       update_p = YES;
     }
   else
@@ -4898,7 +4898,7 @@ ns_set_horizontal_scroll_bar (struct window *window,
 	ns_clear_frame_area (f, left, top, width, height);
 
       bar = [[EmacsScroller alloc] initFrame: r window: win];
-      wset_horizontal_scroll_bar (window, make_save_ptr (bar));
+      wset_horizontal_scroll_bar (window, make_mint_ptr (bar));
       update_p = YES;
     }
   else

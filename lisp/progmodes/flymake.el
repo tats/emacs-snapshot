@@ -14,10 +14,10 @@
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; GNU Emacs is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
+;; GNU Emacs is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
@@ -292,7 +292,7 @@ generated it."
 
 (cl-defstruct (flymake--diag
                (:constructor flymake--diag-make))
-  buffer beg end type text backend data)
+  buffer beg end type text backend data overlay)
 
 ;;;###autoload
 (defun flymake-make-diagnostic (buffer
@@ -353,10 +353,6 @@ verify FILTER, a function, and sort them by COMPARE (using KEY)."
           (cl-sort ovs compare :key (or key
                                         #'identity))
         ovs))))
-
-(defun flymake-delete-own-overlays (&optional filter)
-  "Delete all Flymake overlays in BUFFER."
-  (mapc #'delete-overlay (flymake--overlays :filter filter)))
 
 (defface flymake-error
   '((((supports :underline (:style wave)))
@@ -444,9 +440,25 @@ number of arguments:
   detailed below;
 
 * the remaining arguments are keyword-value pairs in the
-  form (:KEY VALUE :KEY2 VALUE2...).  Currently, Flymake provides
-  no such arguments, but backend functions must be prepared to
-  accept and possibly ignore any number of them.
+  form (:KEY VALUE :KEY2 VALUE2...).
+
+Currently, Flymake may provide these keyword-value pairs:
+
+* `:recent-changes', a list of recent changes since the last time
+  the backend function was called for the buffer.  An empty list
+  indicates that no changes have been reocrded.  If it is the
+  first time that this backend function is called for this
+  activation of `flymake-mode', then this argument isn't provided
+  at all (i.e. it's not merely nil).
+
+  Each element is in the form (BEG END TEXT) where BEG and END
+  are buffer positions, and TEXT is a string containing the text
+  contained between those positions (if any) after the change was
+  performed.
+
+* `:changes-start' and `:changes-end', the minimum and maximum
+  buffer positions touched by the recent changes.  These are only
+  provided if `:recent-changes' is also provided.
 
 Whenever Flymake or the user decides to re-check the buffer,
 backend functions are called as detailed above and are expected
@@ -458,8 +470,9 @@ asynchronous processes or other asynchronous mechanisms.
 In any case, backend functions are expected to return quickly or
 signal an error, in which case the backend is disabled.  Flymake
 will not try disabled backends again for any future checks of
-this buffer.  Certain commands, like turning `flymake-mode' off
-and on again, reset the list of disabled backends.
+this buffer.  To reset the list of disabled backends, turn
+`flymake-mode' off and on again, or interactively call
+`flymake-start' with a prefix argument.
 
 If the function returns, Flymake considers the backend to be
 \"running\". If it has not done so already, the backend is
@@ -470,8 +483,9 @@ pairs in the form (:REPORT-KEY VALUE :REPORT-KEY2 VALUE2...).
 Currently accepted values for REPORT-ACTION are:
 
 * A (possibly empty) list of diagnostic objects created with
-  `flymake-make-diagnostic', causing Flymake to annotate the
-  buffer with this information.
+  `flymake-make-diagnostic', causing Flymake to delete all
+  previous diagnostic annotations in the buffer and create new
+  ones from this list.
 
   A backend may call REPORT-FN repeatedly in this manner, but
   only until Flymake considers that the most recently requested
@@ -491,7 +505,13 @@ Currently accepted REPORT-KEY arguments are:
   the situation encountered, if any.
 
 * `:force': value should be a boolean suggesting that Flymake
-  consider the report even if it was somehow unexpected.")
+  consider the report even if it was somehow unexpected.
+
+* `:region': a cons (BEG . END) of buffer positions indicating
+  that the report applies to that region only.  Specifically,
+  this means that Flymake will only delete diagnostic annotations
+  of past reports if they intersect the region by at least one
+  character.")
 
 (put 'flymake-diagnostic-functions 'safe-local-variable #'null)
 
@@ -610,7 +630,8 @@ associated `flymake-category' return DEFAULT."
     ;; Some properties can't be overridden.
     ;;
     (overlay-put ov 'evaporate t)
-    (overlay-put ov 'flymake-diagnostic diagnostic)))
+    (overlay-put ov 'flymake-diagnostic diagnostic)
+    ov))
 
 ;; Nothing in Flymake uses this at all any more, so this is just for
 ;; third-party compatibility.
@@ -657,13 +678,15 @@ backend is operating normally.")
   (flymake-running-backends))
 
 (cl-defun flymake--handle-report (backend token report-action
-                                          &key explanation force
+                                          &key explanation force region
                                           &allow-other-keys)
   "Handle reports from BACKEND identified by TOKEN.
-BACKEND, REPORT-ACTION and EXPLANATION, and FORCE conform to the calling
-convention described in `flymake-diagnostic-functions' (which
-see). Optional FORCE says to handle a report even if TOKEN was
-not expected."
+BACKEND, REPORT-ACTION and EXPLANATION, and FORCE conform to the
+calling convention described in
+`flymake-diagnostic-functions' (which see).  Optional FORCE says
+to handle a report even if TOKEN was not expected.  REGION is
+a (BEG . END) pair of buffer positions indicating that this
+report applies to that region."
   (let* ((state (gethash backend flymake--backend-state))
          (first-report (not (flymake--backend-state-reported-p state))))
     (setf (flymake--backend-state-reported-p state) t)
@@ -695,16 +718,28 @@ not expected."
         (setq new-diags report-action)
         (save-restriction
           (widen)
-          ;; only delete overlays if this is the first report
-          (when first-report
-            (flymake-delete-own-overlays
-             (lambda (ov)
-               (eq backend
-                   (flymake--diag-backend
-                    (overlay-get ov 'flymake-diagnostic))))))
+          ;; Before adding to backend's diagnostic list, decide if
+          ;; some or all must be deleted.  When deleting, also delete
+          ;; the associated overlay.
+          (cond
+           (region
+            (dolist (diag (flymake--backend-state-diags state))
+              (let ((diag-beg (flymake--diag-beg diag))
+                    (diag-end (flymake--diag-beg diag)))
+                (when (and (< diag-beg (cdr region))
+                           (> diag-end (car region)))
+                  (delete-overlay (flymake--diag-overlay diag))
+                  (setf (flymake--backend-state-diags state)
+                        (delq diag (flymake--backend-state-diags state)))))))
+           (first-report
+            (dolist (diag (flymake--backend-state-diags state))
+              (delete-overlay (flymake--diag-overlay diag)))
+            (setf (flymake--backend-state-diags state) nil)))
+          ;; Now make new ones
           (mapc (lambda (diag)
-                  (flymake--highlight-line diag)
-                  (setf (flymake--diag-backend diag) backend))
+                  (let ((overlay (flymake--highlight-line diag)))
+                    (setf (flymake--diag-backend diag) backend
+                          (flymake--diag-overlay diag) overlay)))
                 new-diags)
           (setf (flymake--backend-state-diags state)
                 (append new-diags (flymake--backend-state-diags state)))
@@ -776,14 +811,15 @@ If it is running also stop it."
           (flymake--backend-state-disabled state) explanation
           (flymake--backend-state-reported-p state) t)))
 
-(defun flymake--run-backend (backend)
-  "Run the backend BACKEND, reenabling if necessary."
+(defun flymake--run-backend (backend &optional args)
+  "Run the backend BACKEND, re-enabling if necessary.
+ARGS is a keyword-value plist passed to the backend along
+with a report function."
   (flymake-log :debug "Running backend %s" backend)
   (let ((run-token (cl-gensym "backend-token")))
     (flymake--with-backend-state backend state
       (setf (flymake--backend-state-running state) run-token
             (flymake--backend-state-disabled state) nil
-            (flymake--backend-state-diags state) nil
             (flymake--backend-state-reported-p state) nil))
     ;; FIXME: Should use `condition-case-unless-debug' here, but don't
     ;; for two reasons: (1) that won't let me catch errors from inside
@@ -794,10 +830,13 @@ If it is running also stop it."
     ;; backend) will trigger an annoying backtrace.
     ;;
     (condition-case err
-        (funcall backend
-                 (flymake-make-report-fn backend run-token))
+        (apply backend (flymake-make-report-fn backend run-token)
+               args)
       (error
        (flymake--disable-backend backend err)))))
+
+(defvar-local flymake--recent-changes nil
+  "Recent changes collected by `flymake-after-change-function'.")
 
 (defun flymake-start (&optional deferred force)
   "Start a syntax check for the current buffer.
@@ -844,18 +883,30 @@ Interactively, with a prefix arg, FORCE is t."
                        'append 'local))
             (t
              (setq flymake-check-start-time (float-time))
-             (run-hook-wrapped
-              'flymake-diagnostic-functions
-              (lambda (backend)
-                (cond
-                 ((and (not force)
-                       (flymake--with-backend-state backend state
-                         (flymake--backend-state-disabled state)))
-                  (flymake-log :debug "Backend %s is disabled, not starting"
-                               backend))
-                 (t
-                  (flymake--run-backend backend)))
-                nil)))))))
+             (let ((backend-args
+                    (and
+                     flymake--recent-changes
+                     (list :recent-changes
+                           flymake--recent-changes
+                           :changes-start
+                           (cl-reduce
+                            #'min (mapcar #'car flymake--recent-changes))
+                           :changes-end
+                           (cl-reduce
+                            #'max (mapcar #'cadr flymake--recent-changes))))))
+               (setq flymake--recent-changes nil)
+               (run-hook-wrapped
+                'flymake-diagnostic-functions
+                (lambda (backend)
+                  (cond
+                   ((and (not force)
+                         (flymake--with-backend-state backend state
+                           (flymake--backend-state-disabled state)))
+                    (flymake-log :debug "Backend %s is disabled, not starting"
+                                 backend))
+                   (t
+                    (flymake--run-backend backend backend-args)))
+                  nil))))))))
 
 (defvar flymake-mode-map
   (let ((map (make-sparse-keymap))) map)
@@ -908,6 +959,7 @@ special *Flymake log* buffer."  :group 'flymake :lighter
     (add-hook 'kill-buffer-hook 'flymake-kill-buffer-hook nil t)
 
     (setq flymake--backend-state (make-hash-table))
+    (setq flymake--recent-changes nil)
 
     (when flymake-start-on-flymake-mode (flymake-start t)))
 
@@ -918,7 +970,7 @@ special *Flymake log* buffer."  :group 'flymake :lighter
     (remove-hook 'kill-buffer-hook 'flymake-kill-buffer-hook t)
     ;;+(remove-hook 'find-file-hook (function flymake-find-file-hook) t)
 
-    (flymake-delete-own-overlays)
+    (mapc #'delete-overlay (flymake--overlays))
 
     (when flymake-timer
       (cancel-timer flymake-timer)
@@ -960,8 +1012,10 @@ Do it only if `flymake-no-changes-timeout' is non-nil."
 (make-obsolete 'flymake-mode-off 'flymake-mode "26.1")
 
 (defun flymake-after-change-function (start stop _len)
-  "Start syntax check for current buffer if it isn't already running."
+  "Start syntax check for current buffer if it isn't already running.
+START and STOP and LEN are as in `after-change-functions'."
   (let((new-text (buffer-substring start stop)))
+    (push (list start stop new-text) flymake--recent-changes)
     (when (and flymake-start-syntax-check-on-newline (equal new-text "\n"))
       (flymake-log :debug "starting syntax check as new-line has been seen")
       (flymake-start t))

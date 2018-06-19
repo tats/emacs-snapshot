@@ -2182,6 +2182,10 @@ It can be retrieved with `(process-get PROCESS PROPNAME)'."
   (set-process-plist process
 		     (plist-put (process-plist process) propname value)))
 
+(defun memory-limit ()
+  "Return an estimate of Emacs virtual memory usage, divided by 1024."
+  (or (cdr (assq 'vsize (process-attributes (emacs-pid)))) 0))
+
 
 ;;;; Input and display facilities.
 
@@ -3520,9 +3524,31 @@ If BODY finishes, `while-no-input' returns whatever value BODY produced."
   (let ((catch-sym (make-symbol "input")))
     `(with-local-quit
        (catch ',catch-sym
-	 (let ((throw-on-input ',catch-sym))
-	   (or (input-pending-p)
-	       (progn ,@body)))))))
+	 (let ((throw-on-input ',catch-sym)
+               val)
+           (setq val (or (input-pending-p)
+	                 (progn ,@body)))
+           (cond
+            ;; When input arrives while throw-on-input is non-nil,
+            ;; kbd_buffer_store_buffered_event sets quit-flag to the
+            ;; value of throw-on-input.  If, when BODY finishes,
+            ;; quit-flag still has the same value as throw-on-input, it
+            ;; means BODY never tested quit-flag, and therefore ran to
+            ;; completion even though input did arrive before it
+            ;; finished.  In that case, we must manually simulate what
+            ;; 'throw' in process_quit_flag would do, and we must
+            ;; reset quit-flag, because leaving it set will cause us
+            ;; quit to top-level, which has undesirable consequences,
+            ;; such as discarding input etc.  We return t in that case
+            ;; because input did arrive during execution of BODY.
+            ((eq quit-flag throw-on-input)
+             (setq quit-flag nil)
+             t)
+            ;; This is for when the user actually QUITs during
+            ;; execution of BODY.
+            (quit-flag
+             nil)
+            (t val)))))))
 
 (defmacro condition-case-unless-debug (var bodyform &rest handlers)
   "Like `condition-case' except that it does not prevent debugging.
@@ -5013,32 +5039,62 @@ NEW-MESSAGE, if non-nil, sets a new message for the reporter."
   "Print reporter's message followed by word \"done\" in echo area."
   (message "%sdone" (aref (cdr reporter) 3)))
 
-(defmacro dotimes-with-progress-reporter (spec message &rest body)
+(defmacro dotimes-with-progress-reporter (spec reporter-or-message &rest body)
   "Loop a certain number of times and report progress in the echo area.
 Evaluate BODY with VAR bound to successive integers running from
 0, inclusive, to COUNT, exclusive.  Then evaluate RESULT to get
 the return value (nil if RESULT is omitted).
 
-At each iteration MESSAGE followed by progress percentage is
-printed in the echo area.  After the loop is finished, MESSAGE
-followed by word \"done\" is printed.  This macro is a
-convenience wrapper around `make-progress-reporter' and friends.
+REPORTER-OR-MESSAGE is a progress reporter object or a string.  In the latter
+case, use this string to create a progress reporter.
 
-\(fn (VAR COUNT [RESULT]) MESSAGE BODY...)"
+At each iteration, print the reporter message followed by progress
+percentage in the echo area.  After the loop is finished,
+print the reporter message followed by the word \"done\".
+
+This macro is a convenience wrapper around `make-progress-reporter' and friends.
+
+\(fn (VAR COUNT [RESULT]) REPORTER-OR-MESSAGE BODY...)"
   (declare (indent 2) (debug ((symbolp form &optional form) form body)))
-  (let ((temp (make-symbol "--dotimes-temp--"))
-	(temp2 (make-symbol "--dotimes-temp2--"))
-	(start 0)
-	(end (nth 1 spec)))
-    `(let ((,temp ,end)
-	   (,(car spec) ,start)
-	   (,temp2 (make-progress-reporter ,message ,start ,end)))
-       (while (< ,(car spec) ,temp)
-	 ,@body
-	 (progress-reporter-update ,temp2
-				   (setq ,(car spec) (1+ ,(car spec)))))
-       (progress-reporter-done ,temp2)
-       nil ,@(cdr (cdr spec)))))
+  (let ((prep (make-symbol "--dotimes-prep--"))
+        (end (make-symbol "--dotimes-end--")))
+    `(let ((,prep ,reporter-or-message)
+           (,end ,(cadr spec)))
+       (when (stringp ,prep)
+         (setq ,prep (make-progress-reporter ,prep 0 ,end)))
+       (dotimes (,(car spec) ,end)
+         ,@body
+         (progress-reporter-update ,prep (1+ ,(car spec))))
+       (progress-reporter-done ,prep)
+       (or ,@(cdr (cdr spec)) nil))))
+
+(defmacro dolist-with-progress-reporter (spec reporter-or-message &rest body)
+  "Loop over a list and report progress in the echo area.
+Evaluate BODY with VAR bound to each car from LIST, in turn.
+Then evaluate RESULT to get return value, default nil.
+
+REPORTER-OR-MESSAGE is a progress reporter object or a string.  In the latter
+case, use this string to create a progress reporter.
+
+At each iteration, print the reporter message followed by progress
+percentage in the echo area.  After the loop is finished,
+print the reporter message followed by the word \"done\".
+
+\(fn (VAR LIST [RESULT]) REPORTER-OR-MESSAGE BODY...)"
+  (declare (indent 2) (debug ((symbolp form &optional form) form body)))
+  (let ((prep (make-symbol "--dolist-progress-reporter--"))
+        (count (make-symbol "--dolist-count--"))
+        (list (make-symbol "--dolist-list--")))
+    `(let ((,prep ,reporter-or-message)
+           (,count 0)
+           (,list ,(cadr spec)))
+       (when (stringp ,prep)
+         (setq ,prep (make-progress-reporter ,prep 0 (1- (length ,list)))))
+       (dolist (,(car spec) ,list)
+         ,@body
+         (progress-reporter-update ,prep (setq ,count (1+ ,count))))
+       (progress-reporter-done ,prep)
+       (or ,@(cdr (cdr spec)) nil))))
 
 
 ;;;; Comparing version strings.

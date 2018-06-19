@@ -175,13 +175,40 @@ interface that's more like functions like @code{search-forward}.
 ** More commands support noncontiguous rectangular regions, namely
 'upcase-dwim', 'downcase-dwim', 'replace-string', 'replace-regexp'.
 
++++
+** When asked to visit a large file, Emacs now offers visiting it literally.
+Previously, Emacs would only ask for confirmation before visiting
+large files.  Now it also offers a third alternative: to visit the
+file literally, as in 'find-file-literally', which speeds up
+navigation and editing of large files.
+
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
 ** Browse-url
+
 *** The function 'browse-url-emacs' can now visit a URL in selected window.
 It now treats the optional 2nd argument to mean that the URL should be
 shown in the currently selected window.
+
+** Comint
+
++++
+*** 'C-c .' (comint-insert-previous-argument) no longer interprets '&'.
+This feature caused problems when '&&' was present in the previous
+command.  Since this command emulates 'M-.' in Bash and zsh, neither
+of which treats '&' specially, the feature was removed for
+compatibility with these shells.
+
++++
+*** 'comint-insert-previous-argument' can now count arguments from the end.
+By default, invoking 'C-c .' with a numeric argument N would copy the
+Nth argument, counting from the first one.  But if the new option
+'comint-insert-previous-argument-from-end' is non-nil, it will copy
+the Nth argument counting from the last one.  Thus 'C-c .' can now
+better emulate 'M-.' in both Bash and zsh, since the former counts
+from the beginning of the arguments, while the latter counts from the
+end.
 
 ** Flymake
 
@@ -192,6 +219,10 @@ You should instead set properties on known diagnostic symbols, like
 
 *** New customizable variable 'flymake-start-on-save-buffer'
 Control whether Flymake starts checking the buffer on save.
+
+*** Flymake and backend functions may exchange hints about buffer changes
+This enables more efficient backends.  See the docstring of
+'flymake-diagnostic-functions' or the Flymake manual for details.
 
 ** Package
 *** New 'package-quickstart' feature
@@ -454,6 +485,10 @@ Tramp for some look-alike remote file names.
 ** The options.el library has been removed.
 It was obsolete since Emacs 22.1, replaced by customize.
 
+** The tls.el and starttls.el libraries are now marked obsolete.
+Use of built-in libgnutls based functionality (described in the Emacs
+GnuTLS manual) is recommended instead.
+
 
 ** Message
 
@@ -496,6 +531,10 @@ been removed.  Use 'encode-coding-string', 'decode-coding-string', and
 If this option is non-nil, messages appended to an output file by the
 'rmail-output' command have their Deleted flag reset.
 
+*** The command 'rmail-summary-by-senders' with an empty argument
+selects the messages to summarize with a regexp that matches the
+sender of the current message.
+
 * New Modes and Packages in Emacs 27.1
 
 +++
@@ -506,6 +545,22 @@ names" in the Tramp manual for full documentation of these facilities.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** Just loading a theme's file no longer activates the theme's settings.
+Loading a theme with 'M-x load-theme' still activates the theme, as it
+did before.  However, loading the theme's file with "M-x load-file",
+or using 'require' or 'load' in a Lisp program, doesn't actually apply
+the theme's settings until you either invoke 'M-x enable-theme' or
+type 'M-x load-theme'.  (In a Lisp program, calling 'enable-theme' or
+invoking 'load-theme' with NO-ENABLE argument omitted or nil has the
+same effect of activating a theme whose file has been loaded.)  The
+special case of the 'user' theme is an exception: it is frequently
+used for ad-hoc customizations, so the settings of that theme are by
+default applied immediately.
+
+The variable 'custom--inhibit-theme-enable' controls this behavior;
+its default value changed in Emacs 27.1.
 
 ** The 'repetitions' argument of 'benchmark-run' can now also be a variable.
 ** The FILENAME argument to 'file-name-base' is now mandatory and no
@@ -590,6 +645,11 @@ manual for more details.
 * Lisp Changes in Emacs 27.1
 
 +++
+** New macro 'dolist-with-progress-reporter'.
+This works like 'dolist', but reports progress similar to
+'dotimes-with-progress-reporter'.
+
++++
 ** New hook 'after-delete-frame-functions'.
 This works like 'delete-frame-functions', but runs after the frame to
 be deleted has been made dead and removed from the frame list.
@@ -609,7 +669,8 @@ On terminal emulators that support the feature, Emacs can now support
 ** Window-specific face remapping.
 Face specifications (of the kind used in 'face-remapping-alist')
 now support filters, allowing faces to vary between different windows
-displaying the same buffer.
+displaying the same buffer.  See the Info node "Face Remapping" of the
+Emacs Lisp Reference manual for more detail.
 
 +++
 ** New function assoc-delete-all.
@@ -651,6 +712,9 @@ socket has been passed to Emacs (Bug#24218).
 ** The 'file-system-info' function is now available on all platforms.
 instead of just Microsoft platforms.  This fixes a 'get-free-disk-space'
 bug on OS X 10.8 and later (Bug#28639).
+
++++
+** 'memory-limit' now returns a better estimate of memory consumption.
 
 +++
 ** New macro 'combine-change-calls' arranges to call the change hooks

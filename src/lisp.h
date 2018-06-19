@@ -233,10 +233,6 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
 
 enum Lisp_Bits
   {
-    /* 2**GCTYPEBITS.  This must be a macro that expands to a literal
-       integer constant, for older versions of GCC (through at least 4.9).  */
-#define GCALIGNMENT 8
-
     /* Number of bits in a Lisp_Object value, not counting the tag.  */
     VALBITS = EMACS_INT_WIDTH - GCTYPEBITS,
 
@@ -246,10 +242,6 @@ enum Lisp_Bits
     /* Number of bits in a Lisp fixnum value, not counting the tag.  */
     FIXNUM_BITS = VALBITS + 1
   };
-
-#if GCALIGNMENT != 1 << GCTYPEBITS
-# error "GCALIGNMENT and GCTYPEBITS are inconsistent"
-#endif
 
 /* The maximum value that can be stored in a EMACS_INT, assuming all
    bits other than the type bits contribute to a nonnegative signed value.
@@ -277,11 +269,20 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
 error !;
 #endif
 
+/* Minimum alignment requirement for Lisp objects, imposed by the
+   internal representation of tagged pointers.  It is 2**GCTYPEBITS if
+   USE_LSB_TAG, 1 otherwise.  It must be a literal integer constant,
+   for older versions of GCC (through at least 4.9).  */
 #if USE_LSB_TAG
-# define GCALIGNED_UNION char alignas (GCALIGNMENT) gcaligned;
+# define GCALIGNMENT 8
+# if GCALIGNMENT != 1 << GCTYPEBITS
+#  error "GCALIGNMENT and GCTYPEBITS are inconsistent"
+# endif
 #else
-# define GCALIGNED_UNION
+# define GCALIGNMENT 1
 #endif
+
+#define GCALIGNED_UNION char alignas (GCALIGNMENT) gcaligned;
 
 /* Lisp_Word is a scalar word suitable for holding a tagged pointer or
    integer.  Usually it is a pointer to a deliberately-incomplete type
@@ -510,8 +511,8 @@ enum Lisp_Misc_Type
     Lisp_Misc_Free = 0x5eab,
     Lisp_Misc_Marker,
     Lisp_Misc_Overlay,
-    Lisp_Misc_Save_Value,
     Lisp_Misc_Finalizer,
+    Lisp_Misc_Ptr,
 #ifdef HAVE_MODULES
     Lisp_Misc_User_Ptr,
 #endif
@@ -538,10 +539,11 @@ enum Lisp_Fwd_Type
 
    First, there are already a couple of Lisp types that can be used if
    your new type does not need to be exposed to Lisp programs nor
-   displayed to users.  These are Lisp_Save_Value, a Lisp_Misc
+   displayed to users.  These are Lisp_Misc_Ptr, a Lisp_Misc
    subtype; and PVEC_OTHER, a kind of vectorlike object.  The former
-   is suitable for temporarily stashing away pointers and integers in
-   a Lisp object.  The latter is useful for vector-like Lisp objects
+   is suitable for stashing a pointer in a Lisp object; the pointer
+   might be to some low-level C object that contains auxiliary
+   information.  The latter is useful for vector-like Lisp objects
    that need to be used as part of other objects, but which are never
    shown to users or Lisp code (search for PVEC_OTHER in xterm.c for
    an example).
@@ -557,9 +559,8 @@ enum Lisp_Fwd_Type
    members that are accessible only from C.  A Lisp_Misc object is a
    wrapper for a C struct that can contain anything you like.
 
-   Explicit freeing is discouraged for Lisp objects in general.  But if
-   you really need to exploit this, use Lisp_Misc (check free_misc in
-   alloc.c to see why).  There is no way to free a vectorlike object.
+   There is no way to explicitly free a Lisp Object; only the garbage
+   collector frees them.
 
    To add a new pseudovector type, extend the pvec_type enumeration;
    to add a new Lisp_Misc, extend the Lisp_Misc_Type enumeration.
@@ -774,7 +775,7 @@ struct Lisp_Symbol
     GCALIGNED_UNION
   } u;
 };
-verify (!USE_LSB_TAG || alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
+verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -888,7 +889,7 @@ union vectorlike_header
     ptrdiff_t size;
     GCALIGNED_UNION
   };
-verify (!USE_LSB_TAG || alignof (union vectorlike_header) % GCALIGNMENT == 0);
+verify (alignof (union vectorlike_header) % GCALIGNMENT == 0);
 
 INLINE bool
 (SYMBOLP) (Lisp_Object x)
@@ -1249,7 +1250,7 @@ struct Lisp_Cons
     GCALIGNED_UNION
   } u;
 };
-verify (!USE_LSB_TAG || alignof (struct Lisp_Cons) % GCALIGNMENT == 0);
+verify (alignof (struct Lisp_Cons) % GCALIGNMENT == 0);
 
 INLINE bool
 (NILP) (Lisp_Object x)
@@ -1371,7 +1372,7 @@ struct Lisp_String
     GCALIGNED_UNION
   } u;
 };
-verify (!USE_LSB_TAG || alignof (struct Lisp_String) % GCALIGNMENT == 0);
+verify (alignof (struct Lisp_String) % GCALIGNMENT == 0);
 
 INLINE bool
 STRINGP (Lisp_Object x)
@@ -2359,162 +2360,51 @@ struct Lisp_Overlay
     Lisp_Object plist;
   };
 
-/* Number of bits needed to store one of the values
-   SAVE_UNUSED..SAVE_OBJECT.  */
-enum { SAVE_SLOT_BITS = 3 };
-
-/* Number of slots in a save value where save_type is nonzero.  */
-enum { SAVE_VALUE_SLOTS = 4 };
-
-/* Bit-width and values for struct Lisp_Save_Value's save_type member.  */
-
-enum { SAVE_TYPE_BITS = SAVE_VALUE_SLOTS * SAVE_SLOT_BITS + 1 };
-
-/* Types of data which may be saved in a Lisp_Save_Value.  */
-
-enum Lisp_Save_Type
+struct Lisp_Misc_Ptr
   {
-    SAVE_UNUSED,
-    SAVE_INTEGER,
-    SAVE_FUNCPOINTER,
-    SAVE_POINTER,
-    SAVE_OBJECT,
-    SAVE_TYPE_INT_INT = SAVE_INTEGER + (SAVE_INTEGER << SAVE_SLOT_BITS),
-    SAVE_TYPE_INT_INT_INT
-      = (SAVE_INTEGER + (SAVE_TYPE_INT_INT << SAVE_SLOT_BITS)),
-    SAVE_TYPE_OBJ_OBJ = SAVE_OBJECT + (SAVE_OBJECT << SAVE_SLOT_BITS),
-    SAVE_TYPE_OBJ_OBJ_OBJ = SAVE_OBJECT + (SAVE_TYPE_OBJ_OBJ << SAVE_SLOT_BITS),
-    SAVE_TYPE_OBJ_OBJ_OBJ_OBJ
-      = SAVE_OBJECT + (SAVE_TYPE_OBJ_OBJ_OBJ << SAVE_SLOT_BITS),
-    SAVE_TYPE_PTR_INT = SAVE_POINTER + (SAVE_INTEGER << SAVE_SLOT_BITS),
-    SAVE_TYPE_PTR_OBJ = SAVE_POINTER + (SAVE_OBJECT << SAVE_SLOT_BITS),
-    SAVE_TYPE_PTR_PTR = SAVE_POINTER + (SAVE_POINTER << SAVE_SLOT_BITS),
-    SAVE_TYPE_FUNCPTR_PTR_OBJ
-      = SAVE_FUNCPOINTER + (SAVE_TYPE_PTR_OBJ << SAVE_SLOT_BITS),
-
-    /* This has an extra bit indicating it's raw memory.  */
-    SAVE_TYPE_MEMORY = SAVE_TYPE_PTR_INT + (1 << (SAVE_TYPE_BITS - 1))
-  };
-
-/* SAVE_SLOT_BITS must be large enough to represent these values.  */
-verify (((SAVE_UNUSED | SAVE_INTEGER | SAVE_FUNCPOINTER
-	  | SAVE_POINTER | SAVE_OBJECT)
-	 >> SAVE_SLOT_BITS)
-	== 0);
-
-/* Special object used to hold a different values for later use.
-
-   This is mostly used to package C integers and pointers to call
-   record_unwind_protect when two or more values need to be saved.
-   For example:
-
-   ...
-     struct my_data *md = get_my_data ();
-     ptrdiff_t mi = get_my_integer ();
-     record_unwind_protect (my_unwind, make_save_ptr_int (md, mi));
-   ...
-
-   Lisp_Object my_unwind (Lisp_Object arg)
-   {
-     struct my_data *md = XSAVE_POINTER (arg, 0);
-     ptrdiff_t mi = XSAVE_INTEGER (arg, 1);
-     ...
-   }
-
-   If ENABLE_CHECKING is in effect, XSAVE_xxx macros do type checking of the
-   saved objects and raise eassert if type of the saved object doesn't match
-   the type which is extracted.  In the example above, XSAVE_INTEGER (arg, 2)
-   and XSAVE_OBJECT (arg, 0) are wrong because nothing was saved in slot 2 and
-   slot 0 is a pointer.  */
-
-typedef void (*voidfuncptr) (void);
-
-struct Lisp_Save_Value
-  {
-    ENUM_BF (Lisp_Misc_Type) type : 16;	/* = Lisp_Misc_Save_Value */
+    ENUM_BF (Lisp_Misc_Type) type : 16;	/* = Lisp_Misc_Ptr */
     bool_bf gcmarkbit : 1;
-    unsigned spacer : 32 - (16 + 1 + SAVE_TYPE_BITS);
-
-    /* V->data may hold up to SAVE_VALUE_SLOTS entries.  The type of
-       V's data entries are determined by V->save_type.  E.g., if
-       V->save_type == SAVE_TYPE_PTR_OBJ, V->data[0] is a pointer,
-       V->data[1] is an integer, and V's other data entries are unused.
-
-       If V->save_type == SAVE_TYPE_MEMORY, V->data[0].pointer is the address of
-       a memory area containing V->data[1].integer potential Lisp_Objects.  */
-    ENUM_BF (Lisp_Save_Type) save_type : SAVE_TYPE_BITS;
-    union {
-      void *pointer;
-      voidfuncptr funcpointer;
-      ptrdiff_t integer;
-      Lisp_Object object;
-    } data[SAVE_VALUE_SLOTS];
+    unsigned spacer : 15;
+    void *pointer;
   };
 
-INLINE bool
-SAVE_VALUEP (Lisp_Object x)
-{
-  return MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Save_Value;
-}
+extern Lisp_Object make_misc_ptr (void *);
 
-INLINE struct Lisp_Save_Value *
-XSAVE_VALUE (Lisp_Object a)
-{
-  eassert (SAVE_VALUEP (a));
-  return XUNTAG (a, Lisp_Misc, struct Lisp_Save_Value);
-}
+/* A mint_ptr object OBJ represents a C-language pointer P efficiently.
+   Preferably (and typically), OBJ is a Lisp integer I such that
+   XINTPTR (I) == P, as this represents P within a single Lisp value
+   without requiring any auxiliary memory.  However, if P would be
+   damaged by being tagged as an integer and then untagged via
+   XINTPTR, then OBJ is a Lisp_Misc_Ptr with pointer component P.
 
-/* Return the type of V's Nth saved value.  */
-INLINE int
-save_type (struct Lisp_Save_Value *v, int n)
-{
-  eassert (0 <= n && n < SAVE_VALUE_SLOTS);
-  return (v->save_type >> (SAVE_SLOT_BITS * n) & ((1 << SAVE_SLOT_BITS) - 1));
-}
-
-/* Get and set the Nth saved pointer.  */
-
-INLINE void *
-XSAVE_POINTER (Lisp_Object obj, int n)
-{
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_POINTER);
-  return XSAVE_VALUE (obj)->data[n].pointer;
-}
-INLINE void
-set_save_pointer (Lisp_Object obj, int n, void *val)
-{
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_POINTER);
-  XSAVE_VALUE (obj)->data[n].pointer = val;
-}
-INLINE voidfuncptr
-XSAVE_FUNCPOINTER (Lisp_Object obj, int n)
-{
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_FUNCPOINTER);
-  return XSAVE_VALUE (obj)->data[n].funcpointer;
-}
-
-/* Likewise for the saved integer.  */
-
-INLINE ptrdiff_t
-XSAVE_INTEGER (Lisp_Object obj, int n)
-{
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_INTEGER);
-  return XSAVE_VALUE (obj)->data[n].integer;
-}
-INLINE void
-set_save_integer (Lisp_Object obj, int n, ptrdiff_t val)
-{
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_INTEGER);
-  XSAVE_VALUE (obj)->data[n].integer = val;
-}
-
-/* Extract Nth saved object.  */
+   mint_ptr objects are efficiency hacks intended for C code.
+   Although xmint_ptr can be given any mint_ptr generated by non-buggy
+   C code, it should not be given a mint_ptr generated from Lisp code
+   as that would allow Lisp code to coin pointers from integers and
+   could lead to crashes.  To package a C pointer into a Lisp-visible
+   object you can put the pointer into a Lisp_Misc object instead; see
+   Lisp_User_Ptr for an example.  */
 
 INLINE Lisp_Object
-XSAVE_OBJECT (Lisp_Object obj, int n)
+make_mint_ptr (void *a)
 {
-  eassert (save_type (XSAVE_VALUE (obj), n) == SAVE_OBJECT);
-  return XSAVE_VALUE (obj)->data[n].object;
+  Lisp_Object val = TAG_PTR (Lisp_Int0, a);
+  return INTEGERP (val) && XINTPTR (val) == a ? val : make_misc_ptr (a);
+}
+
+INLINE bool
+mint_ptrp (Lisp_Object x)
+{
+  return INTEGERP (x) || (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Ptr);
+}
+
+INLINE void *
+xmint_pointer (Lisp_Object a)
+{
+  eassert (mint_ptrp (a));
+  if (INTEGERP (a))
+    return XINTPTR (a);
+  return XUNTAG (a, Lisp_Misc, struct Lisp_Misc_Ptr)->pointer;
 }
 
 #ifdef HAVE_MODULES
@@ -2575,8 +2465,8 @@ union Lisp_Misc
     struct Lisp_Free u_free;
     struct Lisp_Marker u_marker;
     struct Lisp_Overlay u_overlay;
-    struct Lisp_Save_Value u_save_value;
     struct Lisp_Finalizer u_finalizer;
+    struct Lisp_Misc_Ptr u_misc_ptr;
 #ifdef HAVE_MODULES
     struct Lisp_User_Ptr u_user_ptr;
 #endif
@@ -3145,8 +3035,11 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
 
 enum specbind_tag {
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
+  SPECPDL_UNWIND_ARRAY,		/* Likewise, on an array that needs freeing.
+				   Its elements are potential Lisp_Objects.  */
   SPECPDL_UNWIND_PTR,		/* Likewise, on void *.  */
   SPECPDL_UNWIND_INT,		/* Likewise, on int.  */
+  SPECPDL_UNWIND_EXCURSION,	/* Likewise, on an execursion.  */
   SPECPDL_UNWIND_VOID,		/* Likewise, with no arg.  */
   SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
@@ -3165,6 +3058,12 @@ union specbinding
     } unwind;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      void (*func) (Lisp_Object);
+      Lisp_Object *array;
+      ptrdiff_t nelts;
+    } unwind_array;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
       void (*func) (void *);
       void *arg;
     } unwind_ptr;
@@ -3173,6 +3072,10 @@ union specbinding
       void (*func) (int);
       int arg;
     } unwind_int;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      Lisp_Object marker, window;
+    } unwind_excursion;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
       void (*func) (void);
@@ -3644,7 +3547,6 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 /* Defined in alloc.c.  */
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
-extern void free_misc (Lisp_Object);
 extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT);
 extern void malloc_warning (const char *);
 extern _Noreturn void memory_full (size_t);
@@ -3656,6 +3558,7 @@ extern void refill_memory_reserve (void);
 #endif
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
+extern void mark_maybe_objects (Lisp_Object *, ptrdiff_t);
 extern void mark_stack (char *, char *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern const char *pending_malloc_warning;
@@ -3797,16 +3700,6 @@ extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
 extern ptrdiff_t inhibit_garbage_collection (void);
-extern Lisp_Object make_save_int_int_int (ptrdiff_t, ptrdiff_t, ptrdiff_t);
-extern Lisp_Object make_save_obj_obj_obj_obj (Lisp_Object, Lisp_Object,
-					      Lisp_Object, Lisp_Object);
-extern Lisp_Object make_save_ptr (void *);
-extern Lisp_Object make_save_ptr_int (void *, ptrdiff_t);
-extern Lisp_Object make_save_ptr_ptr (void *, void *);
-extern Lisp_Object make_save_funcptr_ptr_obj (void (*) (void), void *,
-					      Lisp_Object);
-extern Lisp_Object make_save_memory (Lisp_Object *, ptrdiff_t);
-extern void free_save_value (Lisp_Object);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void free_cons (struct Lisp_Cons *);
 extern void init_alloc_once (void);
@@ -3971,6 +3864,7 @@ extern struct handler *push_handler (Lisp_Object, enum handlertype);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
+extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);
 extern void record_unwind_protect_int (void (*) (int), int);
 extern void record_unwind_protect_void (void (*) (void));
@@ -4066,9 +3960,9 @@ extern void mark_threads (void);
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);
-extern Lisp_Object save_excursion_save (void);
+extern void save_excursion_save (union specbinding *);
+extern void save_excursion_restore (Lisp_Object, Lisp_Object);
 extern Lisp_Object save_restriction_save (void);
-extern void save_excursion_restore (Lisp_Object);
 extern void save_restriction_restore (Lisp_Object);
 extern _Noreturn void time_overflow (void);
 extern Lisp_Object make_buffer_string (ptrdiff_t, ptrdiff_t, bool);
@@ -4135,10 +4029,6 @@ extern void restore_search_regs (void);
 extern void update_search_regs (ptrdiff_t oldstart,
                                 ptrdiff_t oldend, ptrdiff_t newend);
 extern void record_unwind_save_match_data (void);
-struct re_registers;
-extern struct re_pattern_buffer *compile_pattern (Lisp_Object,
-						  struct re_registers *,
-						  Lisp_Object, bool, bool);
 extern ptrdiff_t fast_string_match_internal (Lisp_Object, Lisp_Object,
 					     Lisp_Object);
 
@@ -4665,11 +4555,9 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
       (buf) = AVAIL_ALLOCA (alloca_nbytes);		       \
     else						       \
       {							       \
-	Lisp_Object arg_;				       \
 	(buf) = xmalloc (alloca_nbytes);		       \
-	arg_ = make_save_memory (buf, nelt);		       \
+	record_unwind_protect_array (buf, nelt);	       \
 	sa_must_free = true;				       \
-	record_unwind_protect (free_save_value, arg_);	       \
       }							       \
   } while (false)
 
