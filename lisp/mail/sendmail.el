@@ -1,4 +1,4 @@
-;;; sendmail.el --- mail sending commands for Emacs
+;;; sendmail.el --- mail sending commands for Emacs  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1985-1986, 1992-1996, 1998, 2000-2018 Free Software
 ;; Foundation, Inc.
@@ -76,7 +76,7 @@ Otherwise, most addresses look like `angles', but they look like
   :group 'sendmail)
 (make-obsolete-variable
  'mail-from-style
- "Only the `angles' value is valid according to RFC2822" "27.1")
+ "only the `angles' value is valid according to RFC2822." "27.1" 'set)
 
 ;;;###autoload
 (defcustom mail-specify-envelope-from nil
@@ -1144,7 +1144,7 @@ to combine them into one, and does so if the user says y."
                   ;; Try to preserve alignment of contents of the field
                   (let ((prefix-length (length (match-string 0))))
                     (replace-match " ")
-                    (dotimes (i (1- prefix-length))
+                    (dotimes (_ (1- prefix-length))
                       (insert " ")))))))
           (set-marker first-to-end nil))))))
 
@@ -1957,6 +1957,7 @@ The seventh argument ACTIONS is a list of actions to take
       ;; Require dired so that dired-trivial-filenames does not get
       ;; unbound on exit from the let.
       (require 'dired)
+      (defvar dired-trivial-filenames)
       (let ((dired-trivial-filenames t))
 	(dired-other-window wildcard (concat dired-listing-switches " -t")))
       (rename-buffer "*Auto-saved Drafts*" t)

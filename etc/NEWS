@@ -131,6 +131,22 @@ used to remove comments before calling the libxml functions to parse
 the data.
 
 +++
+** The Network Security Manager now allows more fine-grained control
+of what checks to run via the `network-security-protocol-checks'
+variable.
+
++++
+** TLS connections have their security tightened by default.
+Most of the checks for outdated, believed-to-be-weak TLS algorithms
+and ciphers are now switched on by default.  By default, the NSM will
+flag connections using these weak algorithms and ask users whether to
+allow them.  To get the old behavior back (where certificates are
+checked for validity, but no warnings about weak cryptography are
+issued), you can either set 'network-security-protocol-checks' to nil,
+or adjust the elements in that variable to only happen on the 'high'
+security level (assuming you use the 'medium' level).
+
++++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
 It blocks line breaking after a one-letter word, also in the case when
 this word is preceded by a non-space, but non-alphanumeric character.
@@ -144,6 +160,17 @@ regular expression was previously invalid, but is now accepted:
 
 ---
 ** The German prefix and postfix input methods now support Capital sharp S.
+
++++
+** New function 'exec-path'.
+This function by default returns the value of the corresponding
+variable, but can optionally return the equivalent of 'exec-path'
+from a remote host.
+
++++
+** The function 'executable-find' supports an optional argument REMOTE.
+This triggers to search the program on the remote host as indicated by
+'default-directory'.
 
 
 * Editing Changes in Emacs 27.1
@@ -225,6 +252,7 @@ This enables more efficient backends.  See the docstring of
 'flymake-diagnostic-functions' or the Flymake manual for details.
 
 ** Package
+
 *** New 'package-quickstart' feature
 When 'package-quickstart' is non-nil, package.el precomputes a big autoloads
 file so that activation of packages can be done much faster, which can speed up
@@ -235,7 +263,24 @@ you don't need to set them in your early init file.
 
 *** New function 'package-activate-all'.
 
+** Info
+
+---
+*** Info can now follow 'file://' protocol URLs.
+The 'file://' URLs in Info documents can now be followed by passing
+them to the 'browse-url' function, like the other protocols: ftp,
+http, and https.  This allows to have references to local HTML files,
+for example.
+
+** Xref
+
++++
+*** New command 'xref-find-definitions-at-mouse'.
+This command finds definitions of the identifier at the place of a
+mouse click event, and is intended to be bound to a mouse event.
+
 ** Ecomplete
+
 *** The ecomplete sorting has changed to a decay-based algorithm.
 This can be controlled by the new 'ecomplete-sort-predicate' variable.
 
@@ -282,6 +327,7 @@ and its value has been changed to Duck Duck Go.
 has been executed.
 
 ** Htmlfontify
+
 *** The functions 'hfy-color', 'hfy-color-vals' and
 'hfy-fallback-color-values' and the variables 'hfy-fallback-color-map'
 and 'hfy-rgb-txt-color-map' have been renamed from names that used
@@ -300,6 +346,7 @@ Authentication mechanisms can be added via external packages, by
 defining new cl-defmethod of smtpmail-try-auth-method.
 
 ** Footnote-mode
+
 *** Support Hebrew-style footnotes
 *** Footnote text lines are now aligned.
 Can be controlled via the new variable 'footnote-align-to-fn-text'.
@@ -436,7 +483,6 @@ It can be used to set any buffer as the next one to be used by
 This means that pressing C-M-SPACE now selects the entire tree by
 default, and not just the opening element.
 
-
 ** Eshell
 
 ---
@@ -454,10 +500,14 @@ To restore the old behavior, use
 Previously eshell/kill would fail if provided a kill signal to send to the
 process.  It now accepts signals specified either by name or by its number.
 
+** Shell
+
+---
+*** Program name completion inside remote shells works now as expected.
+
 ** Pcomplete
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
-
 
 ** Auth-source
 
@@ -542,6 +592,15 @@ sender of the current message.
 This feature uses Tramp and works only on systems which support GVFS,
 i.e. GNU/Linux, roughly spoken.  See the chapter "(tramp) Archive file
 names" in the Tramp manual for full documentation of these facilities.
+
++++
+** New library for writing JSONRPC applications (https://jsonrpc.org)
+The 'jsonrpc' library enables writing Emacs Lisp applications that
+rely on this protocol.  Since the protocol is designed to be
+transport-agnostic, the library provides an API to implement new
+transport strategies as well as a separate API to use them.  A
+transport implementation for process-based communication, such as is
+used by the Language Server Protocol (LSP), is readily available.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
@@ -643,6 +702,19 @@ exists.  See the node "Displaying Buffers in Side Windows" in the ELisp
 manual for more details.
 
 * Lisp Changes in Emacs 27.1
+
+** define-minor-mode automatically documents the meaning of ARG
+
++++
+** The function 'recenter' now accepts an additional optional argument.
+By default, calling 'recenter' will not redraw the frame even if
+'recenter-redisplay' is non-nil.  Call 'recenter' with the new second
+argument non-nil to force redisplay per 'recenter-redisplay's value.
+
++++
+** New functions 'major-mode-suspend' and 'major-mode-restore'.
+Use them when switching temporarily to another major mode, e.g. for
+'hexl-mode', or to switch between 'c-mode' and 'image-mode' in XPM.
 
 +++
 ** New macro 'dolist-with-progress-reporter'.
@@ -755,7 +827,6 @@ will be chosen even if you have an entry for image/* in your
 overrides all system and Emacs-provided defaults.  To get the old
 method back, set 'mailcap-prefer-mailcap-viewers' to nil.
 
-
 ** URL
 
 *** The file: handler no longer looks for index.html in directories if
@@ -763,13 +834,11 @@ you ask it for a file:///dir URL.  Since this is a low-level library,
 such decisions (if they are to be made at all) are left to
 higher-level functions.
 
-
 ** image-mode
 
 *** image-mode started using ImageMagick by default for all images
 some years back.  It now respects 'imagemagick-types-inhibit' as a way
 to disable that.
-
 
 +++
 ** The new function 'read-answer' accepts either long or short answers
@@ -812,6 +881,17 @@ This primitive lets Lisp programs access the MS-Windows Registry by
 retrieving values stored under a given key.  It is intended to be used
 for supporting features such as XDG-like location of important files
 and directories.
+
++++
+** The default value of 'w32-pipe-read-delay' is now zero.
+This speeds up reading output from sub-processes that produce a lot of
+data.
+
+This variable may need to be non-zero only when running DOS programs
+as Emacs subprocesses, which by now is not supported on modern
+versions of MS-Windows.  Set this variable to 50 if for some reason
+you need the old behavior (and please report such situations to Emacs
+developers).
 
 
 ----------------------------------------------------------------------

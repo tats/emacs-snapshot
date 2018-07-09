@@ -1158,11 +1158,17 @@ menu_position_func (GtkMenu *menu, gint *x, gint *y, gboolean *push_in, gpointer
   GtkRequisition req;
   int max_x = -1;
   int max_y = -1;
+#ifdef HAVE_GTK3
+  int scale;
+#endif
 
   Lisp_Object frame, workarea;
 
   XSETFRAME (frame, data->f);
 
+#ifdef HAVE_GTK3
+  scale = xg_get_scale (data->f);
+#endif
   /* TODO: Get the monitor workarea directly without calculating other
      items in x-display-monitor-attributes-list. */
   workarea = call3 (Qframe_monitor_workarea,
@@ -1188,11 +1194,20 @@ menu_position_func (GtkMenu *menu, gint *x, gint *y, gboolean *push_in, gpointer
       max_y = x_display_pixel_height (dpyinfo);
     }
 
+  /* frame-monitor-workarea and {x,y}_display_pixel_width/height all
+     return device pixels, but GTK wants scaled pixels.  The positions
+     passed in via data were already scaled for us.  */
+#ifdef HAVE_GTK3
+  max_x /= scale;
+  max_y /= scale;
+#endif
   *x = data->x;
   *y = data->y;
 
   /* Check if there is room for the menu.  If not, adjust x/y so that
-     the menu is fully visible.  */
+     the menu is fully visible.  gtk_widget_get_preferred_size returns
+     scaled pixels, so there is no need to apply the scaling
+     factor.  */
   gtk_widget_get_preferred_size (GTK_WIDGET (menu), NULL, &req);
   if (data->x + req.width > max_x)
     *x -= data->x + req.width - max_x;
@@ -2042,7 +2057,7 @@ struct pop_down_menu
 static void
 pop_down_menu (void *arg)
 {
-  union pop_down_menu *data = arg;
+  struct pop_down_menu *data = arg;
   struct frame *f = data->frame;
   XMenu *menu = data->menu;
 
@@ -2360,8 +2375,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
 
  return_entry:
   unblock_input ();
-  SAFE_FREE ();
-  return unbind_to (specpdl_count, entry);
+  return SAFE_FREE_UNBIND_TO (specpdl_count, entry);
 }
 
 #endif /* not USE_X_TOOLKIT */

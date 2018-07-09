@@ -544,7 +544,7 @@ The PATH environment variable should be set via `tramp-remote-path'.
 The TERM environment variable should be set via `tramp-terminal-type'.
 
 The INSIDE_EMACS environment variable will automatically be set
-based on the TRAMP and Emacs versions, and should not be set here."
+based on the Tramp and Emacs versions, and should not be set here."
   :group 'tramp
   :version "26.1"
   :type '(repeat string))
@@ -990,6 +990,7 @@ of command line.")
      . tramp-sh-handle-directory-files-and-attributes)
     (dired-compress-file . tramp-sh-handle-dired-compress-file)
     (dired-uncache . tramp-handle-dired-uncache)
+    (exec-path . tramp-sh-handle-exec-path)
     (expand-file-name . tramp-sh-handle-expand-file-name)
     (file-accessible-directory-p . tramp-handle-file-accessible-directory-p)
     (file-acl . tramp-sh-handle-file-acl)
@@ -1269,6 +1270,13 @@ component is used as the target of the symlink."
 	      ;; The scripts could fail, for example with huge file size.
 	      (tramp-do-file-attributes-with-ls v localname id-format)))))))))
 
+(defun tramp-sh--quoting-style-options (vec)
+  (or
+   (tramp-get-ls-command-with
+    vec "--quoting-style=literal --show-control-chars")
+   (tramp-get-ls-command-with vec "-w")
+   ""))
+
 (defun tramp-do-file-attributes-with-ls (vec localname &optional id-format)
   "Implement `file-attributes' for Tramp files using the ls(1) command."
   (let (symlinkp dirp
@@ -1294,11 +1302,7 @@ component is used as the target of the symlink."
                (if (eq id-format 'integer) "-ildn" "-ild")
                ;; On systems which have no quoting style, file names
                ;; with special characters could fail.
-               (cond
-                ((tramp-get-ls-command-with
-		  vec "--quoting-style=literal --show-control-chars"))
-                ((tramp-get-ls-command-with vec "-w"))
-                (t ""))
+               (tramp-sh--quoting-style-options vec)
                (tramp-shell-quote-argument localname)))
       ;; Parse `ls -l' output ...
       (with-current-buffer (tramp-get-buffer vec)
@@ -1827,11 +1831,7 @@ be non-negative integers."
     (tramp-get-ls-command vec)
     ;; On systems which have no quoting style, file names with special
     ;; characters could fail.
-    (cond
-     ((tramp-get-ls-command-with
-       vec "--quoting-style=literal --show-control-chars"))
-     ((tramp-get-ls-command-with vec "-w"))
-     (t ""))
+    (tramp-sh--quoting-style-options vec)
     (tramp-get-remote-stat vec)
     tramp-stat-marker tramp-stat-marker
     tramp-stat-marker tramp-stat-marker
@@ -2037,7 +2037,9 @@ file names."
   (unless (memq op '(copy rename))
     (error "Unknown operation `%s', must be `copy' or `rename'" op))
 
-  (if (file-directory-p filename)
+  (if (and
+       (file-directory-p filename)
+       (not (tramp-equal-remote filename newname)))
       (progn
 	(copy-directory filename newname keep-date t)
 	(when (eq op 'rename) (delete-directory filename 'recursive)))
@@ -2200,6 +2202,8 @@ the uid and gid from FILENAME."
 	     (localname2 (if t2 (file-remote-p newname 'localname) newname))
 	     (prefix (file-remote-p (if t1 filename newname)))
              cmd-result)
+	(when (and (eq op 'copy) (file-directory-p filename))
+	  (setq cmd (concat cmd " -R")))
 
 	(cond
 	 ;; Both files are on a remote host, with same user.
@@ -2631,7 +2635,7 @@ The method used must be an out-of-band method."
 	 filename switches wildcard full-directory-p)
       (when (stringp switches)
         (setq switches (split-string switches)))
-      (when (tramp-get-ls-command-with
+      (when (tramp-get-ls-command-with ;FIXME: tramp-sh--quoting-style-options?
 	     v "--quoting-style=literal --show-control-chars")
 	(setq switches
 	      (append
@@ -3082,6 +3086,13 @@ the result will be a local, non-Tramp, file name."
       (if (equal ret -1)
 	  (keyboard-quit)
 	ret))))
+
+(defun tramp-sh-handle-exec-path ()
+  "Like `exec-path' for Tramp files."
+  (append
+   (tramp-get-remote-path (tramp-dissect-file-name default-directory))
+   ;; The equivalent to `exec-directory'.
+   `(,(file-remote-p default-directory 'localname))))
 
 (defun tramp-sh-handle-file-local-copy (filename)
   "Like `file-local-copy' for Tramp files."
@@ -5326,7 +5337,7 @@ Nonexistent directories are removed from spec."
 	     ;; Check parameters.  On busybox, "ls" output coloring is
 	     ;; enabled by default sometimes.  So we try to disable it
 	     ;; when possible.  $LS_COLORING is not supported there.
-	     ;; Some "ls" versions are sensible wrt the order of
+	     ;; Some "ls" versions are sensitive to the order of
 	     ;; arguments, they fail when "-al" is after the
 	     ;; "--color=never" argument (for example on FreeBSD).
 	     (when (tramp-send-command-and-check
@@ -5341,16 +5352,21 @@ Nonexistent directories are removed from spec."
 
 (defun tramp-get-ls-command-with (vec option)
   "Return OPTION, if the remote `ls' command supports the OPTION option."
-  (save-match-data
-    (with-tramp-connection-property vec (concat "ls" option)
-      (tramp-message vec 5 "Checking, whether `ls %s' works" option)
-      ;; Some "ls" versions are sensible wrt the order of arguments,
-      ;; they fail when "-al" is after the "--dired" argument (for
-      ;; example on FreeBSD).
-      (and
-       (tramp-send-command-and-check
-	vec (format "%s %s -al /dev/null" (tramp-get-ls-command vec) option))
-       option))))
+  (with-tramp-connection-property vec (concat "ls" option)
+    (tramp-message vec 5 "Checking, whether `ls %s' works" option)
+    ;; Some "ls" versions are sensitive to the order of arguments,
+    ;; they fail when "-al" is after the "--dired" argument (for
+    ;; example on FreeBSD).  Busybox does not support this kind of
+    ;; options.
+    (and
+     (not
+      (tramp-send-command-and-check
+       vec
+       (format
+	"%s --help 2>&1 | grep -iq busybox" (tramp-get-ls-command vec))))
+     (tramp-send-command-and-check
+      vec (format "%s %s -al /dev/null" (tramp-get-ls-command vec) option))
+     option)))
 
 (defun tramp-get-test-command (vec)
   "Determine remote `test' command."
