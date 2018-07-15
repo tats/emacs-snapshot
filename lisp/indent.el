@@ -300,8 +300,11 @@ only if necessary.  It leaves point at end of indentation."
 			      (progn (skip-chars-backward " ") (point))))
 	   (indent-to column))
 	  ((> cur-col column) ; too far right (after tab?)
-	   (delete-region (progn (move-to-column column t) (point))
-			  (progn (backward-to-indentation 0) (point)))))))
+           (delete-region (progn (move-to-column column t) (point))
+                          ;; The `move-to-column' call may replace
+                          ;; tabs with spaces, so we can't reuse the
+                          ;; previous `back-to-indentation' point.
+                          (progn (back-to-indentation) (point)))))))
 
 (defun current-left-margin ()
   "Return the left margin to use for this line.

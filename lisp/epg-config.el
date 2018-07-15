@@ -171,10 +171,13 @@ version requirement is met."
 (defun epg-config--make-gpg-configuration (program)
   (let (config groups type args)
     (with-temp-buffer
-      (apply #'call-process program nil (list t nil) nil
+      (apply #'call-process program nil
+             (list t (and (boundp 'trace-level) (> trace-level 0))) nil
 	     (append (if epg-gpg-home-directory
 			 (list "--homedir" epg-gpg-home-directory))
 		     '("--with-colons" "--list-config")))
+      (when (and (boundp 'trace-level) (> trace-level 0))
+        (trace-values (concat "gpg output:\n" (buffer-string))))
       (goto-char (point-min))
       (while (re-search-forward "^cfg:\\([^:]+\\):\\(.*\\)" nil t)
 	(setq type (intern (match-string 1))
