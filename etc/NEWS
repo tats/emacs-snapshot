@@ -172,6 +172,11 @@ from a remote host.
 This triggers to search the program on the remote host as indicated by
 'default-directory'.
 
++++
+** New variable 'main-thread' holds Emacs's main thread.
+This is handy in Lisp programs that run on a non-main thread and want
+to signal the main thread, e.g., when they encounter an error.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -212,6 +217,17 @@ navigation and editing of large files.
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+** Change Logs and VC
+
+*** Recording ChangeLog entries doesn't require an actual file.
+If a ChangeLog file doesn't exist, and if the new variable
+'add-log-dont-create-changelog-file' is non-nil (which is the
+default), commands such as 'C-x 4 a' will add log entries to a
+suitable named temporary buffer.  (An existing ChangeLog file will
+still be used if it exists.)  Set the variable to nil to get the
+previous behavior of always creating a buffer that visits a ChangeLog
+file.
+
 ** diff-mode
 *** Hunks are now automatically refined by default
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
@@ -226,6 +242,10 @@ It now treats the optional 2nd argument to mean that the URL should be
 shown in the currently selected window.
 
 ** Comint
+
++++
+*** 'send-invisible' is now an obsolete alias for `comint-send-invisible'
+Also, 'shell-strip-ctrl-m' is declared obsolete.
 
 +++
 *** 'C-c .' (comint-insert-previous-argument) no longer interprets '&'.
@@ -374,6 +394,13 @@ bound to 'C-c C-f'.
 *** 'sgml-quote' now handles double quotes and apostrophes
 when escaping text and in addition all numeric entities when
 unescaping text.
+
+** Python mode
+
+---
+*** Python mode supports three different font lock decoration levels.
+The maximum level is used by default; customize
+'font-lock-maximum-decoration' to tone down the decoration.
 
 ** Dired
 
@@ -537,6 +564,11 @@ are obsoleted in GVFS.
 +++
 *** The user option 'tramp-ignored-file-name-regexp' allows to disable
 Tramp for some look-alike remote file names.
+
+** Register
+---
+*** The return value of method 'register-val-describe' includes the
+names of buffers shown by the windows of a window configuration.
 
 ---
 ** The options.el library has been removed.
@@ -713,7 +745,8 @@ manual for more details.
 +++
 ** New function 'proper-list-p'.
 Given a proper list as argument, this predicate returns its length;
-otherwise, it returns nil.
+otherwise, it returns nil.  'format-proper-list-p' is now an obsolete
+alias for the new function.
 
 ** define-minor-mode automatically documents the meaning of ARG
 
@@ -810,6 +843,13 @@ changes and the change hooks are time consuming.
 ---
 ** The function 'get-free-disk-space' returns now a non-nil value for
 remote systems, which support this check.
+
++++
+** 'eql', 'make-hash-table', etc. now treat NaNs consistently.
+Formerly, some of these functions ignored signs and significands of
+NaNs.  Now, all these functions treat NaN signs and significands as
+significant.  For example, (eql 0.0e+NaN -0.0e+NaN) now returns nil
+because the two NaNs have different signs; formerly it returned t.
 
 +++
 ** The function 'make-string' accepts an additional optional argument.
