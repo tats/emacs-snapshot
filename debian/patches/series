@@ -10,3 +10,4 @@
 0010-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
 0011-Disable-eieio-test-method-order-list-6.patch
 0012-A-remote-execution-exploit-via-enriched-text-has-bee.patch
+0013-Disable-eieio-test-37-obsolete-name-in-constructor.patch
