@@ -1,3 +1,11 @@
+emacs (1:25.2+1-9~1.gbped7f56) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @ed7f561b8b5d8ccd4e0e8e0ca4c7705eab3126fd **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jul 2018 14:12:15 -0500
+
 emacs (1:25.2+1-8) unstable; urgency=medium
 
   * Move unversioned emacs packages from experimental to unstable.
