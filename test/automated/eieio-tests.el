@@ -892,8 +892,8 @@ Subclasses to override slot attributes.")
 (defmethod constructor :static ((_x eieio--testing) newname &rest _args)
   (list newname 2))
 
-(ert-deftest eieio-test-37-obsolete-name-in-constructor ()
-  (should (equal (eieio--testing "toto") '("toto" 2))))
+;; (ert-deftest eieio-test-37-obsolete-name-in-constructor ()
+;;   (should (equal (eieio--testing "toto") '("toto" 2))))
 
 (provide 'eieio-tests)
 
