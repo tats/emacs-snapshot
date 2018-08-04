@@ -133,12 +133,15 @@ nonpersistent_autogen_install_files := \
   debian/emacs-common.postinst \
   debian/emacs-common.prerm \
   debian/emacs-nox.lintian-overrides \
+  debian/emacs-nox.maintscript \
   debian/emacs-nox.postinst \
   debian/emacs-nox.prerm \
   debian/emacs-lucid.lintian-overrides \
+  debian/emacs-lucid.maintscript \
   debian/emacs-lucid.postinst \
   debian/emacs-lucid.prerm \
   debian/emacs-gtk.lintian-overrides \
+  debian/emacs-gtk.maintscript \
   debian/emacs-gtk.postinst \
   debian/emacs-gtk.prerm
 
@@ -218,6 +221,9 @@ check-vars:
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
 	@echo "movemail_bin: $(movemail_bin)"
+
+.PHONY: check-autogen
+check-autogen: $(persistent_autogen_files) $(nonpersistent_autogen_files)
 
 debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target

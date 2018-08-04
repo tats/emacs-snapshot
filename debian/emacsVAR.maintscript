@@ -1,0 +1,1 @@
+dir_to_symlink /usr/share/doc/@PKG_NAME@ emacs-common 1:25.2+1-9~
