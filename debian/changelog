@@ -1,10 +1,27 @@
-emacs (1:25.2+1-9~1.gbped7f56) UNRELEASED; urgency=medium
+emacs (1:25.2+1-9) unstable; urgency=medium
 
-  ** SNAPSHOT build @ed7f561b8b5d8ccd4e0e8e0ca4c7705eab3126fd **
+  * Disable the eieio-test-37-obsolete-name-in-constructor test.  Its
+    behavior is unpredictable, and it was causing some buildd builds
+    to fail (cf. https://debbugs.gnu.org/24503).  Add
+    0013-Disable-eieio-test-37-obsolete-name-in-constructor.patch to
+    fix the problem, and thanks to Aaron M. Ucko for reporting it, and
+    J. Smith for tracking down the upstream issue. (Closes: 879020)
 
-  * UNRELEASED
+  * Ensure /usr/share/doc/emacs-{gtk,lucid,nox} symlink is
+    established.  Use dir_to_symlink to make sure the new symlink to
+    emacs-common is correctly established if we're upgrading from the
+    emacs-defaults packages that had a real directory.  Thanks to
+    Andreas Beckmann for reporting the problem. (Closes: 903779)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jul 2018 14:12:15 -0500
+  * Have emacs-{gtk,lucid,nox} replace all the related emacs25
+    packages.  Add "emacs-gtk (<< 1:25), emacs-lucid (<< 1:25),
+    emacs-nox (<< 1:25)" to the "Replaces:" for emacs-gtk,
+    emacs-lucid, and emacs-nox to avoid conflicts over
+    /usr/share/emacs/25.2/etc/DOC while unpacking.  Thanks to Axel
+    Beckert for reporting the problem and Adrian Bunk and Sven Joachim
+    for help with the solution. (Closes: 904957)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 04 Aug 2018 12:29:53 -0500
 
 emacs (1:25.2+1-8) unstable; urgency=medium
 
