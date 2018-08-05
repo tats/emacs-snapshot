@@ -92,6 +92,9 @@ the new version of the file again.)
 
 * Changes in Emacs 27.1
 
++++
+** The function 'read-passwd' uses '*' as default character to hide passwords.
+
 ---
 ** New variable 'xft-ignore-color-fonts'.
 Default t means don't try to load color fonts when using Xft, as they
@@ -182,6 +185,9 @@ This triggers to search the program on the remote host as indicated by
 
 * Editing Changes in Emacs 27.1
 
++++
+** New command 'make-empty-file'.
+
 ---
 ** New variable 'x-wait-for-event-timeout'.
 This controls how long Emacs will wait for updates to the graphical
@@ -218,6 +224,11 @@ navigation and editing of large files.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
++++
+** Dired
+
+*** New command 'dired-create-empty-file'.
 
 ** Change Logs and VC
 
@@ -265,6 +276,11 @@ the Nth argument counting from the last one.  Thus 'C-c .' can now
 better emulate 'M-.' in both Bash and zsh, since the former counts
 from the beginning of the arguments, while the latter counts from the
 end.
+
+** Term
+
+---
+*** 'term-read-noecho' is now obsolete, use 'read-passwd' instead.
 
 ** Flymake
 
@@ -450,6 +466,14 @@ the shift key.
 *** Isearch now remembers the regexp-based search mode for words/symbols
 and case-sensitivity together with search strings in the search ring.
 
+** Debugger
+
++++
+*** The Lisp Debugger is now based on 'backtrace-mode'.
+Backtrace mode adds fontification and commands for changing the
+appearance of backtrace frames.  See the node "Backtraces" in the Elisp
+manual for documentation of the new mode and its commands.
+
 ** Edebug
 
 +++
@@ -459,13 +483,26 @@ using the new variables 'edebug-behavior-alist',
 'edebug-new-definition-function'.  Edebug's behavior can be changed
 globally or for individual definitions.
 
++++
+*** Edebug's backtrace buffer now uses 'backtrace-mode'.
+Backtrace mode adds fontification, links and commands for changing the
+appearance of backtrace frames.  See the node "Backtraces" in the Elisp
+manual for documentation of the new mode and its commands.
+
+The binding of 'd' in Edebug's keymap is now 'edebug-pop-to-backtrace'
+which replaces 'edebug-backtrace'.  Consequently Edebug's backtrace
+windows now behave like those of the Lisp Debugger and of ERT, in that
+when they appear they will be the selected window.
+
+The new 'backtrace-goto-source' command, bound to 's', works in
+Edebug's backtraces on backtrace frames whose source code has
+been instrumented by Edebug.
+
 ** Enhanced xterm support
 
 *** New variable 'xterm-set-window-title' controls whether Emacs sets
 the XTerm window title.  This feature is experimental and is disabled
 by default.
-
-** Gamegrid
 
 ** grep
 
@@ -482,6 +519,14 @@ The abbreviation can be disabled by the new option
 +++
 *** New variable 'ert-quiet' allows to make ERT output in batch mode
 less verbose by removing non-essential information.
+
++++
+*** ERT's backtrace buffer now uses 'backtrace-mode'.
+Backtrace mode adds fontification and commands for changing the
+appearance of backtrace frames.  See the node "Backtraces" in the Elisp
+manual for documentation of the new mode and its commands.
+
+** Gamegrid
 
 ---
 *** Gamegrid now determines its default glyph size based on display
@@ -553,7 +598,7 @@ process.  It now accepts signals specified either by name or by its number.
 ** Tramp
 
 +++
-*** New connection method "owncloud", which allows to access OwnCloud
+*** New connection method "nextcloud", which allows to access OwnCloud
 or NextCloud hosted files and directories.
 
 +++
@@ -652,6 +697,13 @@ transport-agnostic, the library provides an API to implement new
 transport strategies as well as a separate API to use them.  A
 transport implementation for process-based communication, such as is
 used by the Language Server Protocol (LSP), is readily available.
+
++++
+** Backtrace mode improves viewing of Elisp backtraces.
+Backtrace mode adds pretty printing, fontification and ellipsis
+expansion to backtrace buffers produced by the Lisp debugger, Edebug
+and ERT.  See the node "Backtraces" in the Elisp manual for
+documentation of the new mode and its commands.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
@@ -872,6 +924,9 @@ Formerly, some of these functions ignored signs and significands of
 NaNs.  Now, all these functions treat NaN signs and significands as
 significant.  For example, (eql 0.0e+NaN -0.0e+NaN) now returns nil
 because the two NaNs have different signs; formerly it returned t.
+Also, Emacs now reads and prints NaN significands; e.g., if X is a
+NaN, (format "%s" X) now returns "0.0e+NaN", "1.0e+NaN", etc.,
+depending on X's significand.
 
 +++
 ** The function 'make-string' accepts an additional optional argument.
@@ -913,10 +968,6 @@ higher-level functions.
 *** image-mode started using ImageMagick by default for all images
 some years back.  It now respects 'imagemagick-types-inhibit' as a way
 to disable that.
-
-+++
-** The new function 'read-answer' accepts either long or short answers
-depending on the new customizable variable 'read-answer-short'.
 
 ** The function 'load' now behaves correctly when loading modules.
 Specifically, it puts the module name into 'load-history', prints
