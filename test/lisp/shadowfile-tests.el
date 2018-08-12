@@ -63,6 +63,14 @@
       (format "/mock::%s" temporary-file-directory)))
   "Temporary directory for Tramp tests.")
 
+(setq password-cache-expiry nil
+      tramp-verbose 0
+      tramp-message-show-message nil)
+
+;; This should happen on hydra only.
+(when (getenv "EMACS_HYDRA_CI")
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+
 (defconst shadow-test-info-file
   (expand-file-name "shadows_test" temporary-file-directory)
   "File to keep shadow information in during tests.")
@@ -618,7 +626,7 @@ guaranteed by the originator of a cluster definition."
 		  shadow-test-remote-temporary-file-directory))
 		mocked-input `(,cluster1 ,file1 ,cluster2 ,file2 ,(kbd "RET")))
 	  (with-temp-buffer
-	    (setq-local buffer-file-name file1)
+            (set-visited-file-name file1)
 	    (call-interactively 'shadow-define-literal-group))
 
           ;; `shadow-literal-groups' is a list of lists.
@@ -679,7 +687,7 @@ guaranteed by the originator of a cluster definition."
 		mocked-input `(,(shadow-regexp-superquote file)
                                ,cluster1 ,cluster2 ,(kbd "RET")))
 	  (with-temp-buffer
-	    (setq-local buffer-file-name nil)
+            (set-visited-file-name nil)
 	    (call-interactively 'shadow-define-regexp-group))
 
           ;; `shadow-regexp-groups' is a list of lists.
@@ -720,6 +728,17 @@ guaranteed by the originator of a cluster definition."
     (unwind-protect
         (condition-case err
         (progn
+          (require 'trace)
+          (dolist (elt (all-completions "shadow-" obarray 'functionp))
+            (trace-function-background (intern elt)))
+          (dolist (elt (all-completions "tramp-" obarray 'functionp))
+            (trace-function-background (intern elt)))
+          (trace-function-background 'save-buffer)
+          (trace-function-background 'basic-save-buffer)
+          (trace-function-background 'basic-save-buffer-1)
+          (trace-function-background 'basic-save-buffer-2)
+          (dolist (elt write-file-functions)
+            (trace-function-background elt))
 	  ;; Cleanup.
 	  (when (file-exists-p shadow-info-file)
 	    (delete-file shadow-info-file))
@@ -750,7 +769,7 @@ guaranteed by the originator of a cluster definition."
           (message "Point 3")
           ;; Save file from "cluster1" definition.
           (with-temp-buffer
-            (setq buffer-file-name file)
+            (set-visited-file-name file)
             (insert "foo")
             (save-buffer))
           (message "%s" file)
@@ -767,11 +786,14 @@ guaranteed by the originator of a cluster definition."
             (message "Point 4.1")
             (message "%s" file)
             (message "%s" (shadow-site-primary cluster2))
-            (setq buffer-file-name (concat (shadow-site-primary cluster2) file))
+            (set-visited-file-name (concat (shadow-site-primary cluster2) file))
             (message "Point 4.2")
             (insert "foo")
             (message "%s" buffer-file-name)
+            (message "%s" write-file-functions)
+	    (setenv "BUG_32226" "1")
             (save-buffer))
+	  (setenv "BUG_32226")
           (message "Point 4.3")
           (message "%s" (shadow-site-primary cluster2))
           (message "%s" (shadow-contract-file-name (concat "/cluster1:" file)))
@@ -795,7 +817,7 @@ guaranteed by the originator of a cluster definition."
           (message "Point 6")
           ;; Save file from "cluster1" definition.
           (with-temp-buffer
-            (setq buffer-file-name file)
+            (set-visited-file-name file)
             (insert "foo")
             (save-buffer))
 	  (should
@@ -806,7 +828,7 @@ guaranteed by the originator of a cluster definition."
           (message "Point 7")
           ;; Save file from "cluster2" definition.
           (with-temp-buffer
-            (setq buffer-file-name (concat (shadow-site-primary cluster2) file))
+            (set-visited-file-name (concat (shadow-site-primary cluster2) file))
             (insert "foo")
             (save-buffer))
 	  (should
@@ -816,6 +838,10 @@ guaranteed by the originator of a cluster definition."
              (shadow-contract-file-name (concat "/cluster1:" file)))
             shadow-files-to-copy)))
         (error (message "Error: %s" err) (signal (car err) (cdr err))))
+
+      (setenv "BUG_32226")
+      (untrace-all)
+      (message "%s" (with-current-buffer trace-buffer (buffer-string)))
 
       ;; Cleanup.
       (when (file-exists-p shadow-info-file)
@@ -879,11 +905,11 @@ guaranteed by the originator of a cluster definition."
 
           ;; Save files.
           (with-temp-buffer
-            (setq buffer-file-name file)
+            (set-visited-file-name file)
             (insert "foo")
             (save-buffer))
           (with-temp-buffer
-            (setq buffer-file-name (concat (shadow-site-primary cluster2) file))
+            (set-visited-file-name (concat (shadow-site-primary cluster2) file))
             (insert "foo")
             (save-buffer))
 
