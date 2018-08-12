@@ -1,10 +1,15 @@
-emacs (1:25.2+1-10~1.gbpca9f79) UNRELEASED; urgency=medium
+emacs (1:25.2+1-10) unstable; urgency=medium
 
-  ** SNAPSHOT build @ca9f79ed60afac475a83aea5d1920ff8df055c4d **
+  * Handle the emacs-{gtk,lucid,nox} doc dir transition manually.
+    Before the unversioning, these packages were in a different source
+    package (emacs-defaults) and were arch all.  Since
+    dpkg-mainscript-helper can't hande "all to any" transitions
+    (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=813455), clean
+    up manually in the preinsts.  Thanks to Sven Joachim for reporting
+    the problem and indentifying the underlying cause.
+    (Closes: 905555)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 12 Aug 2018 11:20:59 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 12 Aug 2018 11:55:27 -0500
 
 emacs (1:25.2+1-9) unstable; urgency=medium
 
