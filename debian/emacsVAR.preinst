@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+doc_dir=/usr/share/doc/@PKG_NAME@
+
+test '@PKG_NAME@'
+
+case "$1" in
+    install|upgrade)
+        # Before the unversioning, emacs-{gtk,lucid,nox} packages were
+        # in a different source package (emacs-defaults) and were arch
+        # all, and dpkg can't handle dir to symlink transitions.
+        rm -rf "$doc_dir"
+        ;;
+    abort-upgrade)
+        ;;
+    *)
+        echo "unexpected $(basename "$0") argument"
+        ;;
+esac
+
+#DEBHELPER#
