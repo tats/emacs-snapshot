@@ -1,3 +1,11 @@
+emacs (1:25.2+1-10~1.gbpca9f79) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @ca9f79ed60afac475a83aea5d1920ff8df055c4d **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 12 Aug 2018 11:20:59 -0500
+
 emacs (1:25.2+1-9) unstable; urgency=medium
 
   * Disable the eieio-test-37-obsolete-name-in-constructor test.  Its
