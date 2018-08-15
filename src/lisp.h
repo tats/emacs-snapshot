@@ -849,6 +849,8 @@ union vectorlike_header
 	 Current layout limits the pseudovectors to 63 PVEC_xxx subtypes,
 	 4095 Lisp_Objects in GC-ed area and 4095 word-sized other slots.  */
     ptrdiff_t size;
+    /* Align the union so that there is no padding after it.  */
+    Lisp_Object align;
     GCALIGNED_UNION
   };
 verify (alignof (union vectorlike_header) % GCALIGNMENT == 0);
@@ -1187,9 +1189,16 @@ XFIXNUMPTR (Lisp_Object a)
 }
 
 INLINE Lisp_Object
-make_pointer_integer (void *p)
+make_pointer_integer_unsafe (void *p)
 {
   Lisp_Object a = TAG_PTR (Lisp_Int0, p);
+  return a;
+}
+
+INLINE Lisp_Object
+make_pointer_integer (void *p)
+{
+  Lisp_Object a = make_pointer_integer_unsafe (p);
   eassert (FIXNUMP (a) && XFIXNUMPTR (a) == p);
   return a;
 }
@@ -1575,6 +1584,7 @@ enum
     bool_header_size = offsetof (struct Lisp_Bool_Vector, data),
     word_size = sizeof (Lisp_Object)
   };
+verify (header_size == sizeof (union vectorlike_header));
 
 /* The number of data words and bytes in a bool vector with SIZE bits.  */
 
