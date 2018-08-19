@@ -3752,25 +3752,20 @@ make_number (mpz_t value)
       if (!FIXNUM_OVERFLOW_P (l))
 	return make_fixnum (l);
     }
-
-  /* Check if fixnum can be larger than long.  */
-  if (sizeof (EMACS_INT) > sizeof (long))
+  else if (LONG_WIDTH < FIXNUM_BITS)
     {
       size_t bits = mpz_sizeinbase (value, 2);
-      int sign = mpz_sgn (value);
 
-      if (bits < FIXNUM_BITS + (sign < 0))
+      if (bits <= FIXNUM_BITS)
         {
           EMACS_INT v = 0;
-          size_t limbs = mpz_size (value);
-          mp_size_t i;
-
-          for (i = 0; i < limbs; i++)
+	  int i = 0;
+	  for (int shift = 0; shift < bits; shift += mp_bits_per_limb)
             {
-              mp_limb_t limb = mpz_getlimbn (value, i);
-              v |= (EMACS_INT) ((EMACS_UINT) limb << (i * mp_bits_per_limb));
+	      EMACS_INT limb = mpz_getlimbn (value, i++);
+	      v += limb << shift;
             }
-          if (sign < 0)
+	  if (mpz_sgn (value) < 0)
             v = -v;
 
           if (!FIXNUM_OVERFLOW_P (v))
@@ -3790,31 +3785,23 @@ make_number (mpz_t value)
 void
 mpz_set_intmax_slow (mpz_t result, intmax_t v)
 {
-  /* If long is larger then a faster path is taken.  */
-  eassert (sizeof (intmax_t) > sizeof (long));
+  /* If V fits in long, a faster path is taken.  */
+  eassert (! (LONG_MIN <= v && v <= LONG_MAX));
 
-  bool negate = false;
-  if (v < 0)
-    {
-      v = -v;
-      negate = true;
-    }
-  mpz_set_uintmax_slow (result, (uintmax_t) v);
-  if (negate)
-    mpz_neg (result, result);
-}
+  bool complement = v < 0;
+  if (complement)
+    v = -1 - v;
 
-void
-mpz_set_uintmax_slow (mpz_t result, uintmax_t v)
-{
-  /* If long is larger then a faster path is taken.  */
-  eassert (sizeof (uintmax_t) > sizeof (unsigned long));
+  enum { nails = sizeof v * CHAR_BIT - INTMAX_WIDTH };
+# ifndef HAVE_GMP
+  /* mini-gmp requires NAILS to be zero, which is true for all
+     likely Emacs platforms.  Sanity-check this.  */
+  verify (nails == 0);
+# endif
 
-  /* COUNT = 1 means just a single word of the given size.  ORDER = -1
-     is arbitrary since there's only a single word.  ENDIAN = 0 means
-     use the native endian-ness.  NAILS = 0 means use the whole
-     word.  */
-  mpz_import (result, 1, -1, sizeof (uintmax_t), 0, 0, &v);
+  mpz_import (result, 1, -1, sizeof v, 0, nails, &v);
+  if (complement)
+    mpz_com (result, result);
 }
 
 

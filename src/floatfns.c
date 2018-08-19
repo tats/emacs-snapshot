@@ -204,29 +204,36 @@ DEFUN ("expt", Fexpt, Sexpt, 2, 2, 0,
        doc: /* Return the exponential ARG1 ** ARG2.  */)
   (Lisp_Object arg1, Lisp_Object arg2)
 {
-  CHECK_FIXNUM_OR_FLOAT (arg1);
-  CHECK_FIXNUM_OR_FLOAT (arg2);
-  if (FIXNUMP (arg1)     /* common lisp spec */
-      && FIXNUMP (arg2)   /* don't promote, if both are ints, and */
-      && XFIXNUM (arg2) >= 0) /* we are sure the result is not fractional */
-    {				/* this can be improved by pre-calculating */
-      EMACS_INT y;		/* some binary powers of x then accumulating */
-      EMACS_UINT acc, x;  /* Unsigned so that overflow is well defined.  */
-      Lisp_Object val;
+  CHECK_NUMBER (arg1);
+  CHECK_NUMBER (arg2);
 
-      x = XFIXNUM (arg1);
-      y = XFIXNUM (arg2);
-      acc = (y & 1 ? x : 1);
+  /* Common Lisp spec: don't promote if both are integers, and if the
+     result is not fractional.  */
+  if (INTEGERP (arg1) && NATNUMP (arg2))
+    {
+      unsigned long exp;
+      if (RANGED_FIXNUMP (0, arg2, ULONG_MAX))
+	exp = XFIXNUM (arg2);
+      else if (MOST_POSITIVE_FIXNUM < ULONG_MAX && BIGNUMP (arg2)
+	       && mpz_fits_ulong_p (XBIGNUM (arg2)->value))
+	exp = mpz_get_ui (XBIGNUM (arg2)->value);
+      else
+	xsignal3 (Qrange_error, build_string ("expt"), arg1, arg2);
 
-      while ((y >>= 1) != 0)
+      mpz_t val;
+      mpz_init (val);
+      if (FIXNUMP (arg1))
 	{
-	  x *= x;
-	  if (y & 1)
-	    acc *= x;
+	  mpz_set_intmax (val, XFIXNUM (arg1));
+	  mpz_pow_ui (val, val, exp);
 	}
-      XSETINT (val, acc);
-      return val;
+      else
+	mpz_pow_ui (val, XBIGNUM (arg1)->value, exp);
+      Lisp_Object res = make_number (val);
+      mpz_clear (val);
+      return res;
     }
+
   return make_float (pow (XFLOATINT (arg1), XFLOATINT (arg2)));
 }
 
@@ -266,30 +273,43 @@ DEFUN ("sqrt", Fsqrt, Ssqrt, 1, 1, 0,
 
 DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
        doc: /* Return the absolute value of ARG.  */)
-  (register Lisp_Object arg)
+  (Lisp_Object arg)
 {
   CHECK_NUMBER (arg);
 
-  if (BIGNUMP (arg))
+  if (FIXNUMP (arg))
     {
-      mpz_t val;
-      mpz_init (val);
-      mpz_abs (val, XBIGNUM (arg)->value);
-      arg = make_number (val);
-      mpz_clear (val);
-    }
-  else if (FIXNUMP (arg) && XFIXNUM (arg) == MOST_NEGATIVE_FIXNUM)
-    {
-      mpz_t val;
-      mpz_init (val);
-      mpz_set_intmax (val, - MOST_NEGATIVE_FIXNUM);
-      arg = make_number (val);
-      mpz_clear (val);
+      if (XFIXNUM (arg) < 0)
+	{
+	  EMACS_INT absarg = -XFIXNUM (arg);
+	  if (absarg <= MOST_POSITIVE_FIXNUM)
+	    arg = make_fixnum (absarg);
+	  else
+	    {
+	      mpz_t val;
+	      mpz_init (val);
+	      mpz_set_intmax (val, absarg);
+	      arg = make_number (val);
+	      mpz_clear (val);
+	    }
+	}
     }
   else if (FLOATP (arg))
-    arg = make_float (fabs (XFLOAT_DATA (arg)));
-  else if (XFIXNUM (arg) < 0)
-    XSETINT (arg, - XFIXNUM (arg));
+    {
+      if (signbit (XFLOAT_DATA (arg)))
+	arg = make_float (- XFLOAT_DATA (arg));
+    }
+  else
+    {
+      if (mpz_sgn (XBIGNUM (arg)->value) < 0)
+	{
+	  mpz_t val;
+	  mpz_init (val);
+	  mpz_neg (val, XBIGNUM (arg)->value);
+	  arg = make_number (val);
+	  mpz_clear (val);
+	}
+    }
 
   return arg;
 }
@@ -501,10 +521,8 @@ With optional DIVISOR, truncate ARG/DIVISOR.  */)
 Lisp_Object
 fmod_float (Lisp_Object x, Lisp_Object y)
 {
-  double f1, f2;
-
-  f1 = FLOATP (x) ? XFLOAT_DATA (x) : XFIXNUM (x);
-  f2 = FLOATP (y) ? XFLOAT_DATA (y) : XFIXNUM (y);
+  double f1 = XFLOATINT (x);
+  double f2 = XFLOATINT (y);
 
   f1 = fmod (f1, f2);
 
