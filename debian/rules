@@ -18,7 +18,10 @@
 #export DH_VERBOSE=1
 
 SHELL := /bin/bash
-quilt := QUILT_PATCHES=debian/patches quilt
+
+# See https://github.com/dkogan/emacs-snapshot/pull/1 for rationale behind
+# QUILT_PATCHES_PREFIX
+quilt := QUILT_PATCHES=debian/patches QUILT_PATCHES_PREFIX=y quilt
 pf := set -o pipefail
 
 # This package uses debian/source/format 3.0 (quilt).
