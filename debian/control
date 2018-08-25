@@ -24,7 +24,9 @@ Standards-Version: 3.7.2
 
 Package: emacs
 Architecture: all
-Depends: emacs-gtk | emacs-lucid | emacs-nox, ${misc:Depends}
+Depends:
+  emacs-gtk (>= 1:25) | emacs-lucid (>= 1:25) | emacs-nox (>= 1:25),
+  ${misc:Depends}
 Description: GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage that will always depend on the latest
@@ -146,7 +148,7 @@ Package: emacs23
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-gtk
+Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs23
@@ -157,7 +159,7 @@ Package: emacs23-lucid
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-lucid
+Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs23
@@ -168,7 +170,7 @@ Package: emacs23-nox
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-nox
+Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs23
@@ -179,7 +181,7 @@ Package: emacs24
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-gtk
+Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs24
@@ -190,7 +192,7 @@ Package: emacs24-lucid
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-lucid
+Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs24
@@ -201,7 +203,7 @@ Package: emacs24-nox
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-nox
+Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs24
@@ -212,7 +214,7 @@ Package: emacs25
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-gtk
+Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs25
@@ -223,7 +225,7 @@ Package: emacs25-lucid
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-lucid
+Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs25
@@ -234,7 +236,7 @@ Package: emacs25-nox
 Section: oldlibs
 Priority: optional
 Architecture: all
-Depends: emacs-nox
+Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
  GNU Emacs is the extensible self-documenting text editor.  This
  package is a transitional package to ensure that systems with emacs25
