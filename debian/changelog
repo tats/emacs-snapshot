@@ -1,3 +1,11 @@
+emacs (1:25.2+1-11~1.gbpab615f) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @ab615fb0ce8ecccc9b438490d7a542a1057d023e **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 25 Aug 2018 14:01:27 -0500
+
 emacs (1:25.2+1-10) unstable; urgency=medium
 
   * Handle the emacs-{gtk,lucid,nox} doc dir transition manually.
