@@ -1,10 +1,17 @@
-emacs (1:25.2+1-11~1.gbpab615f) UNRELEASED; urgency=medium
+emacs (1:25.2+1-11) unstable; urgency=medium
 
-  ** SNAPSHOT build @ab615fb0ce8ecccc9b438490d7a542a1057d023e **
+  * Add (>= 1:25) restriction to emacs metapackage dependencies.
+    Without this it was possible to end up with two empty metapackages
+    installed instead of the expected metapackage and actual package.
+    Thanks to Shin Yoshida for reporting the problem and Sven Joachim
+    for noting the solution. (Closes: 906534)
 
-  * UNRELEASED
+  * Don't unexpectedly modify the byte order mark.  Add
+    0014-Emacs-should-no-longer-unexpectedly-alter-the-byte-o.patch to
+    fix the problem.  Thanks to Vincent Lefevre for reporting the
+    problem and Eli Zaretskii for the patch. (Closes: 883434)
 
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 25 Aug 2018 14:01:27 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 26 Aug 2018 11:49:09 -0500
 
 emacs (1:25.2+1-10) unstable; urgency=medium
 
