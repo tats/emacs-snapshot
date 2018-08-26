@@ -11,3 +11,4 @@
 0011-Disable-eieio-test-method-order-list-6.patch
 0012-A-remote-execution-exploit-via-enriched-text-has-bee.patch
 0013-Disable-eieio-test-37-obsolete-name-in-constructor.patch
+0014-Emacs-should-no-longer-unexpectedly-alter-the-byte-o.patch
