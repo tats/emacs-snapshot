@@ -255,6 +255,12 @@ navigation and editing of large files.
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+---
+** bibtex
+*** New commands 'bibtex-next-entry' and 'bibtex-previous-entry'.
+In bibtex-mode-map, forward-paragraph and backward-paragraph are
+remapped to these, respectively.
+
 +++
 ** Dired
 
@@ -404,6 +410,11 @@ and its value has been changed to Duck Duck Go.
 'C-u RET' keystroke on a link), the link will be flashed with the new
 'shr-selected-link' face to give the user feedback that the command
 has been executed.
+
++++
+*** New option 'shr-discard-aria-hidden'.
+If set, shr will not render tags with attribute 'aria-hidden="true"'.
+This attribute is meant to tell screen readers to ignore a tag.
 
 ** Htmlfontify
 
@@ -715,6 +726,13 @@ to signal the main thread, e.g., when they encounter an error.
 +++
 *** 'thread-join' returns the result of the finished thread now.
 
++++
+*** 'thread-signal' does not propagate errors to the main thread.
+Instead, error messages are just printed in the main thread.
+
+---
+*** 'thread-alive-p' is now obsolete, use 'thread-live-p' instead.
+
 ---
 ** thingatpt.el supports a new "thing" called 'uuid'.
 A symbol 'uuid' can be passed to thing-at-point and it returns the
@@ -854,6 +872,8 @@ removed.
 
 * Lisp Changes in Emacs 27.1
 
+** lookup-key can take a list of keymaps as argument.
+
 +++
 ** New function 'proper-list-p'.
 Given a proper list as argument, this predicate returns its length;
@@ -879,6 +899,14 @@ the largest bignum a Lisp program is allowed to create.  The
 nonnegative value of the new variable 'integer-width' specifies the
 maximum number of bits allowed in a bignum.  Emacs signals an integer
 overflow error if this limit is exceeded.
+
+Several primitive functions formerly returned floats or lists of
+integers to represent integers that did not fit into fixnums.  These
+functions now simply return integers instead.  Affected functions
+include functions like encode-char that compute code-points, functions
+like file-attributes that compute file sizes and other attributes,
+functions like process-id that compute process IDs, and functions like
+user-uid and group-gid that compute user and group IDs.
 
 ** define-minor-mode automatically documents the meaning of ARG.
 

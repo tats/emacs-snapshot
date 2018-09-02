@@ -31,12 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <inttypes.h>
 #include <limits.h>
 
-#ifdef HAVE_GMP
-# include <gmp.h>
-#else
-# include "mini-gmp.h"
-#endif
-
 #include <intprops.h>
 #include <verify.h>
 
@@ -589,6 +583,11 @@ enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 					      Lisp_Object);
 
+/* Defined in bignum.c.  */
+extern double bignum_to_double (Lisp_Object);
+extern Lisp_Object make_bigint (intmax_t);
+extern Lisp_Object make_biguint (uintmax_t);
+
 /* Defined in chartab.c.  */
 extern Lisp_Object char_table_ref (Lisp_Object, int);
 extern void char_table_set (Lisp_Object, int, Lisp_Object);
@@ -867,7 +866,16 @@ union vectorlike_header
 	 Current layout limits the pseudovectors to 63 PVEC_xxx subtypes,
 	 4095 Lisp_Objects in GC-ed area and 4095 word-sized other slots.  */
     ptrdiff_t size;
-    /* Align the union so that there is no padding after it.  */
+    /* Align the union so that there is no padding after it.
+       This is needed for the following reason:
+       If the alignment constraint of Lisp_Object is greater than the size of
+       vectorlike_header (e.g. with-wide-int), vectorlike objects which have
+       0 Lisp_Object fields and whose 1st field has a smaller alignment
+       constraint than Lisp_Object may end up with their 1st field "before
+       pseudovector index 0", in which case PSEUDOVECSIZE will return
+       a "negative" number.  We could fix PSEUDOVECSIZE, but it's easier to
+       just force rounding up the size of vectorlike_header to the alignment
+       of Lisp_Object.  */
     Lisp_Object align;
     GCALIGNED_UNION
   };
@@ -1012,14 +1020,6 @@ enum More_Lisp_Bits
    values.  They are macros for use in static initializers.  */
 #define MOST_POSITIVE_FIXNUM (EMACS_INT_MAX >> INTTYPEBITS)
 #define MOST_NEGATIVE_FIXNUM (-1 - MOST_POSITIVE_FIXNUM)
-
-
-/* GMP-related limits.  */
-
-/* Number of data bits in a limb.  */
-#ifndef GMP_NUMB_BITS
-enum { GMP_NUMB_BITS = TYPE_WIDTH (mp_limb_t) };
-#endif
 
 #if USE_LSB_TAG
 
@@ -2460,23 +2460,10 @@ XUSER_PTR (Lisp_Object a)
 }
 #endif
 
-struct Lisp_Bignum
-{
-  union vectorlike_header header;
-  mpz_t value;
-};
-
 INLINE bool
 BIGNUMP (Lisp_Object x)
 {
   return PSEUDOVECTORP (x, PVEC_BIGNUM);
-}
-
-INLINE struct Lisp_Bignum *
-XBIGNUM (Lisp_Object a)
-{
-  eassert (BIGNUMP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Bignum);
 }
 
 INLINE bool
@@ -2484,6 +2471,22 @@ INTEGERP (Lisp_Object x)
 {
   return FIXNUMP (x) || BIGNUMP (x);
 }
+
+/* Return a Lisp integer with value taken from n.  */
+INLINE Lisp_Object
+make_int (intmax_t n)
+{
+  return FIXNUM_OVERFLOW_P (n) ? make_bigint (n) : make_fixnum (n);
+}
+INLINE Lisp_Object
+make_uint (uintmax_t n)
+{
+  return FIXNUM_OVERFLOW_P (n) ? make_biguint (n) : make_fixnum (n);
+}
+
+/* Return a Lisp integer equal to the value of the C integer EXPR.  */
+#define INT_TO_INTEGER(expr) \
+  (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
 
 /* Forwarding pointer to an int variable.
@@ -2688,20 +2691,8 @@ enum char_bits
 /* Data type checking.  */
 
 INLINE bool
-FIXED_OR_FLOATP (Lisp_Object x)
-{
-  return FIXNUMP (x) || FLOATP (x);
-}
-INLINE bool
 FIXNATP (Lisp_Object x)
 {
-  return FIXNUMP (x) && 0 <= XFIXNUM (x);
-}
-INLINE bool
-NATNUMP (Lisp_Object x)
-{
-  if (BIGNUMP (x))
-    return mpz_sgn (XBIGNUM (x)->value) >= 0;
   return FIXNUMP (x) && 0 <= XFIXNUM (x);
 }
 INLINE bool
@@ -2848,15 +2839,9 @@ CHECK_FIXNAT (Lisp_Object x)
 INLINE double
 XFLOATINT (Lisp_Object n)
 {
-  if (BIGNUMP (n))
-    return mpz_get_d (XBIGNUM (n)->value);
-  return FLOATP (n) ? XFLOAT_DATA (n) : XFIXNUM (n);
-}
-
-INLINE void
-CHECK_FIXNUM_OR_FLOAT (Lisp_Object x)
-{
-  CHECK_TYPE (FIXED_OR_FLOATP (x), Qnumberp, x);
+  return (FIXNUMP (n) ? XFIXNUM (n)
+	  : FLOATP (n) ? XFLOAT_DATA (n)
+	  : bignum_to_double (n));
 }
 
 INLINE void
@@ -2870,14 +2855,6 @@ CHECK_INTEGER (Lisp_Object x)
 {
   CHECK_TYPE (INTEGERP (x), Qnumberp, x);
 }
-
-#define CHECK_FIXNUM_OR_FLOAT_COERCE_MARKER(x)				\
-  do {									\
-    if (MARKERP (x))							\
-      XSETFASTINT (x, marker_position (x));				\
-    else								\
-      CHECK_TYPE (FIXED_OR_FLOATP (x), Qnumber_or_marker_p, x);		\
-  } while (false)
 
 #define CHECK_NUMBER_COERCE_MARKER(x)					\
   do {									\
@@ -3310,6 +3287,16 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
   XSUB_CHAR_TABLE (table)->contents[idx] = val;
 }
 
+/* Defined in bignum.c.  This part of bignum.c's API does not require
+   the caller to access bignum internals; see bignum.h for that.  */
+extern intmax_t bignum_to_intmax (Lisp_Object);
+extern uintmax_t bignum_to_uintmax (Lisp_Object);
+extern ptrdiff_t bignum_bufsize (Lisp_Object, int);
+extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
+extern Lisp_Object bignum_to_string (Lisp_Object, int);
+extern Lisp_Object make_bignum_str (char const *, int);
+extern Lisp_Object double_to_bignum (double);
+
 /* Defined in data.c.  */
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
@@ -3326,16 +3313,6 @@ enum Arith_Comparison {
 };
 extern Lisp_Object arithcompare (Lisp_Object num1, Lisp_Object num2,
                                  enum Arith_Comparison comparison);
-
-/* Convert the integer I to an Emacs representation, either the integer
-   itself, or a cons of two or three integers, or if all else fails a float.
-   I should not have side effects.  */
-#define INTEGER_TO_CONS(i)					    \
-  (! FIXNUM_OVERFLOW_P (i)					    \
-   ? make_fixnum (i)						    \
-   : EXPR_SIGNED (i) ? intbig_to_lisp (i) : uintbig_to_lisp (i))
-extern Lisp_Object intbig_to_lisp (intmax_t);
-extern Lisp_Object uintbig_to_lisp (uintmax_t);
 
 /* Convert the Emacs representation CONS back to an integer of type
    TYPE, storing the result the variable VAR.  Signal an error if CONS
@@ -3581,22 +3558,6 @@ extern Lisp_Object list5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
 			  Lisp_Object);
 enum constype {CONSTYPE_HEAP, CONSTYPE_PURE};
 extern Lisp_Object listn (enum constype, ptrdiff_t, Lisp_Object, ...);
-
-extern Lisp_Object make_bignum_str (const char *num, int base);
-extern Lisp_Object make_number (mpz_t value);
-extern void mpz_set_intmax_slow (mpz_t result, intmax_t v);
-
-INLINE void
-mpz_set_intmax (mpz_t result, intmax_t v)
-{
-  /* mpz_set_si works in terms of long, but Emacs may use a wider
-     integer type, and so sometimes will have to construct the mpz_t
-     by hand.  */
-  if (LONG_MIN <= v && v <= LONG_MAX)
-    mpz_set_si (result, v);
-  else
-    mpz_set_intmax_slow (result, v);
-}
 
 /* Build a frequently used 2/3/4-integer lists.  */
 
@@ -4506,12 +4467,6 @@ extern void init_system_name (void);
    exceed the maximum for its promoted type.  This is called 'eabs'
    because 'abs' is reserved by the C standard.  */
 #define eabs(x)         ((x) < 0 ? -(x) : (x))
-
-/* Return a fixnum or float, depending on whether the integer VAL fits
-   in a Lisp fixnum.  */
-
-#define make_fixnum_or_float(val) \
-   (FIXNUM_OVERFLOW_P (val) ? make_float (val) : make_fixnum (val))
 
 /* SAFE_ALLOCA normally allocates memory on the stack, but if size is
    larger than MAX_ALLOCA, use xmalloc to avoid overflowing the stack.  */
