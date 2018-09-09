@@ -277,6 +277,10 @@ still be used if it exists.)  Set the variable to nil to get the
 previous behavior of always creating a buffer that visits a ChangeLog
 file.
 
+*** New customizable variable 'vc-git-grep-template'.
+This new variable allows customizing the default arguments passed to
+git-grep when 'vc-git-grep' is used.
+
 ** diff-mode
 *** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
@@ -873,6 +877,9 @@ removed.
 * Lisp Changes in Emacs 27.1
 
 ** lookup-key can take a list of keymaps as argument.
+
++++
+** 'condition-case' now accepts 't' to match any error symbol.
 
 +++
 ** New function 'proper-list-p'.

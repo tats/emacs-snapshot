@@ -1157,6 +1157,7 @@ If PROCESS has not yet exited or died, return 0.  */)
 DEFUN ("process-id", Fprocess_id, Sprocess_id, 1, 1, 0,
        doc: /* Return the process id of PROCESS.
 This is the pid of the external process which PROCESS uses or talks to.
+It is a fixnum if the value is small enough, otherwise a bignum.
 For a network, serial, and pipe connections, this value is nil.  */)
   (register Lisp_Object process)
 {
@@ -7055,8 +7056,9 @@ handle_child_signal (int sig)
       xpid = XCAR (head);
       if (all_pids_are_fixnums ? FIXNUMP (xpid) : INTEGERP (xpid))
 	{
-	  pid_t deleted_pid = (FIXNUMP (xpid) ? XFIXNUM (xpid)
-			       : bignum_to_intmax (xpid));
+	  intmax_t deleted_pid;
+	  bool ok = integer_to_intmax (xpid, &deleted_pid);
+	  eassert (ok);
 	  if (child_status_changed (deleted_pid, 0, 0))
 	    {
 	      if (STRINGP (XCDR (head)))
