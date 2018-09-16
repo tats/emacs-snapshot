@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 
+#include <math.h>
 #include <stdlib.h>
 
 /* mpz global temporaries.  Making them global saves the trouble of
@@ -64,10 +65,13 @@ bignum_to_double (Lisp_Object n)
   return mpz_get_d (XBIGNUM (n)->value);
 }
 
-/* Return D, converted to a bignum.  Discard any fraction.  */
+/* Return D, converted to a Lisp integer.  Discard any fraction.
+   Signal an error if D cannot be converted.  */
 Lisp_Object
-double_to_bignum (double d)
+double_to_integer (double d)
 {
+  if (!isfinite (d))
+    overflow_error ();
   mpz_set_d (mpz[0], d);
   return make_integer_mpz ();
 }
@@ -80,7 +84,7 @@ make_bignum_bits (size_t bits)
   /* The documentation says integer-width should be nonnegative, so
      a single comparison suffices even though 'bits' is unsigned.  */
   if (integer_width < bits)
-    range_error ();
+    overflow_error ();
 
   struct Lisp_Bignum *b = ALLOCATE_PSEUDOVECTOR (struct Lisp_Bignum, value,
 						 PVEC_BIGNUM);
