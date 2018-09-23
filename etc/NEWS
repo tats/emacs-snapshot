@@ -196,6 +196,9 @@ regular expression was previously invalid, but is now accepted:
 ---
 ** The German prefix and postfix input methods now support Capital sharp S.
 
+---
+** New input methods hawaiian-postfix and hawaiian-prefix.
+
 +++
 ** New function 'exec-path'.
 This function by default returns the value of the corresponding
@@ -261,6 +264,17 @@ navigation and editing of large files.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** project.el
+*** New commands project-search and project-query-replace
+
+** Etags
++++
+*** 'next-file' is now an obsolete alias of tags-next-file
+*** tags-loop-revert-buffers is an obsolete alias of multifile-revert-buffers
+*** The tags-loop-continue function along with the tags-loop-operate and
+tags-loop-scan variables are now obsolete; use the new multifile-initialize and
+multifile-continue functions instead.
 
 ---
 ** bibtex
@@ -767,6 +781,8 @@ subexpression.
 
 * New Modes and Packages in Emacs 27.1
 
+** multifile.el lets one setup multifile operations like search&replace
+
 +++
 ** Emacs can now visit files in archives as if they were directories.
 This feature uses Tramp and works only on systems which support GVFS,
@@ -1056,6 +1072,14 @@ a multibyte string even if its second argument is an ASCII character.
 
 ** (format "%d" X) no longer mishandles a floating-point number X that
 does not fit in a machine integer.
+
++++
+** In the DST slot, encode-time and parse-time-string now return -1
+if it is not known whether daylight saving time is in effect.
+Formerly they were inconsistent: encode-time returned t in this
+situation, whereas parse-time-string returned nil.  Now they
+consistently use use nil to mean that DST is not in effect, and use -1
+to mean that it is not known whether DST is in effect.
 
 ** New JSON parsing and serialization functions 'json-serialize',
 'json-insert', 'json-parse-string', and 'json-parse-buffer'.  These
