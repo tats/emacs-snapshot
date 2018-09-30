@@ -62,6 +62,11 @@ to reduce differences between developer and production builds.
 ** Ibuffer
 
 ---
+*** All mode filters can now accept a list of symbols.
+This means you can now easily filter several major modes, as well
+as a single mode.
+
+---
 *** New toggle 'ibuffer-do-toggle-lock', bound to 'L'.
 
 ** Gnus
@@ -247,6 +252,12 @@ case does not match.
 for abbrevs that have them.
 
 +++
+** 'insert-abbrev-table-description' skips empty tables.
+'insert-abbrev-table-description' skips inserting empty tables when
+inserting non-readable tables.  By extension, this makes
+'write-abbrev-file' skip writing empty tables.
+
++++
 ** The new functions and commands 'text-property-search-forward' and
 'text-property-search-backward' have been added.  These provide an
 interface that's more like functions like @code{search-forward}.
@@ -261,6 +272,12 @@ Previously, Emacs would only ask for confirmation before visiting
 large files.  Now it also offers a third alternative: to visit the
 file literally, as in 'find-file-literally', which speeds up
 navigation and editing of large files.
+
+---
+** add-dir-local-variable now uses dotted pair notation syntax
+to write alists of variables to .dir-locals.el.  This is the same
+syntax that you can see in the example of a .dir-locals.el file
+in (info "(emacs) Directory Variables")
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
@@ -945,6 +962,14 @@ like file-attributes that compute file sizes and other attributes,
 functions like process-id that compute process IDs, and functions like
 user-uid and group-gid that compute user and group IDs.
 
++++
+** 'time-add', 'time-subtract', and 'time-less-p' now accept
+infinities and NaNs too, and propagate them or return nil like
+floating-point operators do.
+
++++
+** New function 'time-equal-p' compares time values for equality.
+
 ** define-minor-mode automatically documents the meaning of ARG.
 
 +++
@@ -967,6 +992,11 @@ This works like 'dolist', but reports progress similar to
 ** New hook 'after-delete-frame-functions'.
 This works like 'delete-frame-functions', but runs after the frame to
 be deleted has been made dead and removed from the frame list.
+
+---
+** The function 'provided-mode-derived-p' was extended to support aliases.
+The function now returns non-nil when the argument MODE is derived
+from any alias of any of MODES.
 
 +++
 ** New frame focus state inspection interface.
