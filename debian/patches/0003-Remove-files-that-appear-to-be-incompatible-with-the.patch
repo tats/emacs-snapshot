@@ -29,10 +29,10 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index c6b2cfa..ab215a0 100644
+index f0b2b66..a401e73 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -159,7 +159,9 @@ man1dir=
+@@ -162,7 +162,9 @@ man1dir=
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,7 +43,7 @@ index c6b2cfa..ab215a0 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -816,8 +818,7 @@ $(1)_$(2):
+@@ -824,8 +826,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index c6b2cfa..ab215a0 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -949,11 +950,11 @@ check check-maybe check-expensive check-all:
+@@ -957,11 +958,11 @@ check check-maybe check-expensive check-all:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index c6b2cfa..ab215a0 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -974,9 +975,7 @@ info-dir:
+@@ -982,9 +983,7 @@ info-dir:
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index c6b2cfa..ab215a0 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -998,14 +997,10 @@ ${srcdir}/info/dir:
+@@ -1006,14 +1005,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index c6b2cfa..ab215a0 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1023,14 +1018,10 @@ install-pdf:
+@@ -1031,14 +1026,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
