@@ -888,11 +888,11 @@ main (int argc, char **argv)
 		lim = newlim;
 	    }
 	}
-      /* If the stack is big enough, let regex-emacs.c more of it before
-         falling back to heap allocation.  */
-      emacs_re_safe_alloca = max
-        (min (lim - extra, SIZE_MAX) * (min_ratio / ratio),
-         MAX_ALLOCA);
+      /* If the stack is big enough, let regex-emacs.c use more of it
+	 before falling back to heap allocation.  */
+      ptrdiff_t max_failures
+	= min (lim - extra, min (PTRDIFF_MAX, SIZE_MAX)) / ratio;
+      emacs_re_safe_alloca = max (max_failures * min_ratio, MAX_ALLOCA);
     }
 #endif /* HAVE_SETRLIMIT and RLIMIT_STACK and not CYGWIN */
 
@@ -1512,6 +1512,8 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_minibuf ();
       syms_of_process ();
       syms_of_search ();
+      syms_of_sysdep ();
+      syms_of_timefns ();
       syms_of_frame ();
       syms_of_syntax ();
       syms_of_terminal ();
@@ -1653,9 +1655,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   init_charset ();
 
-  /* This calls putenv and so must precede init_process_emacs.  Also,
-     it sets Voperating_system_release, which init_process_emacs uses.  */
-  init_editfns (dumping);
+  /* This calls putenv and so must precede init_process_emacs.  */
+  init_timefns (dumping);
+
+  /* This sets Voperating_system_release, which init_process_emacs uses.  */
+  init_editfns ();
 
   /* These two call putenv.  */
 #ifdef HAVE_DBUS
