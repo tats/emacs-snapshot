@@ -361,7 +361,7 @@ OPTION_DEFAULT_ON([xft],[don't use XFT for anti aliased fonts])
 OPTION_DEFAULT_ON([libotf],[don't use libotf for OpenType font support])
 OPTION_DEFAULT_ON([m17n-flt],[don't use m17n-flt for text shaping])
 
-OPTION_DEFAULT_ON([toolkit-scroll-bars],[don't use Motif or Xaw3d scroll bars])
+OPTION_DEFAULT_ON([toolkit-scroll-bars],[don't use Motif/Xaw3d/GTK toolkit scroll bars])
 OPTION_DEFAULT_ON([xaw3d],[don't use Xaw3d])
 OPTION_DEFAULT_ON([xim],[at runtime, default X11 XIM to off])
 AC_ARG_WITH([ns],[AS_HELP_STRING([--with-ns],
@@ -1335,6 +1335,37 @@ else
   test "x$NON_GCC_LINK_TEST_OPTIONS" != x && \
     ac_link="$ac_link $NON_GCC_LINK_TEST_OPTIONS"
 fi
+
+dnl On some platforms using GNU ld, linking temacs needs -znocombreloc.
+dnl Although this has something to do with dumping, the details are unknown.
+dnl If the flag is used but not needed,
+dnl Emacs should still work (albeit a bit more slowly),
+dnl so use the flag everywhere that it is supported.
+dnl When testing whether the flag works, treat GCC specially
+dnl since it just gives a non-fatal 'unrecognized option'
+dnl if not built to support GNU ld.
+if test "$GCC" = yes; then
+  LDFLAGS_NOCOMBRELOC="-Wl,-znocombreloc"
+else
+  LDFLAGS_NOCOMBRELOC="-znocombreloc"
+fi
+
+AC_CACHE_CHECK([for -znocombreloc], [emacs_cv_znocombreloc],
+  [if test "$CANNOT_DUMP" = "yes"; then
+     emacs_cv_znocombreloc='not needed'
+   else
+     save_LDFLAGS=$LDFLAGS
+     LDFLAGS="$LDFLAGS $LDFLAGS_NOCOMBRELOC"
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+       [emacs_cv_znocombreloc=yes], [emacs_cv_znocombreloc=no])
+     LDFLAGS=$save_LDFLAGS
+   fi])
+
+case $emacs_cv_znocombreloc in
+  no*)
+    LDFLAGS_NOCOMBRELOC= ;;
+esac
+
 
 AC_CACHE_CHECK([whether addresses are sanitized],
   [emacs_cv_sanitize_address],
@@ -5345,6 +5376,8 @@ if test x$ac_enable_profiling != x ; then
     *) LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS -pg" ;;
   esac
 fi
+
+LD_SWITCH_SYSTEM_TEMACS="$LDFLAGS_NOCOMBRELOC $LD_SWITCH_SYSTEM_TEMACS"
 
 AC_SUBST(LD_SWITCH_SYSTEM_TEMACS)
 
