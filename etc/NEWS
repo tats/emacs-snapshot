@@ -120,10 +120,11 @@ the new version of the file again.)
 * Changes in Emacs 27.1
 
 +++
-** emacsclient uses EMACS_SOCKET_NAME if --socket-name is not set.
-The behavior is identical to the EMACS_SERVER_FILE, in that the
-command line value will override the environment, and the natural
-default to TMPDIR, then /tmp, continues to apply.
+** emacsclient now supports the 'EMACS_SOCKET_NAME' environment variable.
+The behavior is identical to 'EMACS_SERVER_FILE', in that the
+command-line value specified via '--socket-name' will override the
+environment, and the natural default to TMPDIR, then '/tmp', continues
+to apply.
 
 +++
 ** The function 'read-passwd' uses '*' as default character to hide passwords.
@@ -338,6 +339,13 @@ When no files are marked, all modified files are stashed, as before.
 
 *** The new hook 'vc-retrieve-tag-hook' runs after retrieving a tag.
 
+---
+*** 'vc-hg' now invokes 'smerge-mode' when visiting files.
+Code that attempted to invoke 'smerge-mode' when visiting an Hg file
+with conflicts existed in earlier versions of Emacs, but incorrectly
+never detected a conflict due to invalid assumptions about cached
+values.
+
 ** diff-mode
 *** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
@@ -480,6 +488,11 @@ See the concept index in the Gnus manual for the 'match-list' entry.
 ('gnus-summary-attach-article') can be used to attach the current
 article(s) to a pre-existing Message buffer, or create a new Message
 buffer with the article(s) attached.
+
+---
+*** New option 'nnir-notmuch-filter-group-names-function'.
+This option controls whether and how to use Gnus search groups as
+'path:' search terms to 'notmuch'.
 
 ** erc
 
@@ -750,12 +763,24 @@ are obsoleted in GVFS.
 *** Validated passwords are saved by auth-source backends which support this.
 
 +++
+*** During user and host name completion in the minibuffer, results
+from auth-source search are taken into account.  This can be disabled
+by setting user option 'tramp-completion-use-auth-sources' to nil.
+
++++
 *** The user option 'tramp-ignored-file-name-regexp' allows to disable
 Tramp for some look-alike remote file names.
 
 +++
 *** For some connection methods, like "su" or "sudo", the host name in
 ad-hoc multi-hop file names must match the previous hop.
+
+** Rcirc
+
+---
+*** New user option 'rcirc-url-max-length'.
+Setting this option to an integer causes URLs displayed in Rcirc
+buffers to be truncated to that many characters.
 
 ** Register
 ---
@@ -846,11 +871,17 @@ UUID at point.
 
 
 ** Interactive automatic highlighting
-
 +++
 *** 'highlight-regexp' can now highlight subexpressions.
 The now command accepts a prefix numeric argument to choose the
 subexpression.
+
+** Mouse display of minor mode menu
+
+---
+*** 'minor-mode-menu-from-indicator' now display full minor mode name.
+When there is no menu for a mode, display the mode name after the
+indicator instead of just the indicator (which is sometimes cryptic).
 
 
 * New Modes and Packages in Emacs 27.1
