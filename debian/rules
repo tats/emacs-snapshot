@@ -523,6 +523,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  cp -a $(install_dir_x)/usr/bin $(pkgdir_bin_common)/usr
 	  cp -a $(install_dir_x)/usr/lib $(pkgdir_bin_common)/usr
 
+	  # I do NOT want the systemd service
+	  rm -rf $(pkgdir_bin_common)/usr/lib/systemd
+
 	  # Make sure there's just one.
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
 	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
