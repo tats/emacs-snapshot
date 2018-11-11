@@ -1374,7 +1374,8 @@ connect to @samp{bastion.your.domain}, then:
 @end lisp
 
 @var{proxy} can take patterns @code{%h} or @code{%u} for @var{host} or
-@var{user} respectively.
+@var{user} respectively.  Ports or domains, if they are part of
+a hop file name, are not expanded by those patterns.
 
 To login as @samp{root} on remote hosts in the domain
 @samp{your.domain}, but login as @samp{root} is disabled for non-local
@@ -1667,6 +1668,16 @@ by setting the user option @code{auth-source-save-behavior} to @code{nil}.
 
 @vindex auth-source-debug
 Set @code{auth-source-debug} to @code{t} to debug messages.
+
+@vindex ange-ftp-netrc-filename
+@strong{Note} that @file{auth-source.el} is not used for @option{ftp}
+connections, because @value{tramp} passes the work to Ange FTP.  If
+you want, for example, use your @file{~/.authinfo.gpg} authentication
+file, you must customize @code{ange-ftp-netrc-filename}:
+
+@lisp
+(customize-set-variable 'ange-ftp-netrc-filename "~/.authinfo.gpg")
+@end lisp
 
 
 @anchor{Caching passwords}
@@ -4035,7 +4046,7 @@ export EDITOR=/path/to/emacsclient.sh
 
 
 @item
-How to determine wheter a buffer is remote?
+How to determine whether a buffer is remote?
 
 The buffer-local variable @code{default-directory} tells this.  If the
 form @code{(file-remote-p default-directory)} returns non-@code{nil},

@@ -60,6 +60,7 @@
 
 ;; Pacify byte-compiler.
 (require 'cl-lib)
+(declare-function netrc-parse "netrc")
 (defvar auto-save-file-name-transforms)
 (defvar eshell-path-env)
 (defvar ls-lisp-use-insert-directory-program)
@@ -379,11 +380,17 @@ empty string for the method name."
 This is an alist of items (HOST USER PROXY).  The first matching
 item specifies the proxy to be passed for a file name located on
 a remote target matching USER@HOST.  HOST and USER are regular
-expressions.  PROXY must be a Tramp filename without a localname
-part.  Method and user name on PROXY are optional, which is
-interpreted with the default values.  PROXY can contain the
-patterns %h and %u, which are replaced by the strings matching
-HOST or USER, respectively.
+expressions, which could also cover a domain (USER%DOMAIN) or
+port (HOST#PORT).  PROXY must be a Tramp filename without a
+localname part.  Method and user name on PROXY are optional,
+which is interpreted with the default values.
+
+PROXY can contain the patterns %h and %u, which are replaced by
+the strings matching HOST or USER (without DOMAIN and PORT parts),
+respectively.
+
+If an entry is added while parsing ad-hoc hop definitions, PROXY
+carries the non-nil text property `tramp-ad-hoc'.
 
 HOST, USER or PROXY could also be Lisp forms, which will be
 evaluated.  The result must be a string or nil, which is
@@ -1586,7 +1593,7 @@ The outline level is equal to the verbosity of the Tramp message."
       (set (make-local-variable 'outline-regexp) tramp-debug-outline-regexp)
       (set (make-local-variable 'outline-level) 'tramp-debug-outline-level)
       ;; Do not edit the debug buffer.
-      (set-keymap-parent (current-local-map) special-mode-map))
+      (use-local-map special-mode-map))
     (current-buffer)))
 
 (defsubst tramp-debug-message (vec fmt-string &rest arguments)
@@ -1602,10 +1609,13 @@ ARGUMENTS to actually emit the message (if applicable)."
 	";; Emacs: %s Tramp: %s -*- mode: outline; -*-"
 	emacs-version tramp-version))
       (when (>= tramp-verbose 10)
-	(insert
-	 (format
-	  "\n;; Location: %s Git: %s"
-	  (locate-library "tramp") (tramp-repository-get-version)))))
+	(let ((tramp-verbose 0))
+	  (insert
+	   (format
+	    "\n;; Location: %s Git: %s/%s"
+	    (locate-library "tramp")
+	    (or tramp-repository-branch "")
+	    (or tramp-repository-version ""))))))
     (unless (bolp)
       (insert "\n"))
     ;; Timestamp.
@@ -2964,20 +2974,11 @@ Host is always \"localhost\"."
 (defun tramp-parse-netrc (filename)
   "Return a list of (user host) tuples allowed to access.
 User may be nil."
-  (tramp-parse-file filename 'tramp-parse-netrc-group))
-
-(defun tramp-parse-netrc-group ()
-   "Return a (user host) tuple allowed to access.
-User may be nil."
-   (let ((result)
-	 (regexp
-	  (concat
-	   "^[ \t]*machine[ \t]+" "\\(" tramp-host-regexp "\\)"
-	   "\\([ \t]+login[ \t]+" "\\(" tramp-user-regexp "\\)" "\\)?")))
-     (when (re-search-forward regexp (point-at-eol) t)
-       (setq result (list (match-string 3) (match-string 1))))
-     (forward-line 1)
-     result))
+  (mapcar
+   (lambda (item)
+     (and (assoc "machine" item)
+	  `(,(cdr (assoc "login" item)) ,(cdr (assoc "machine" item)))))
+   (netrc-parse filename)))
 
 ;;;###tramp-autoload
 (defun tramp-parse-putty (registry-or-dirname)
@@ -4195,10 +4196,14 @@ ID-FORMAT valid values are `string' and `integer'."
 (defun tramp-get-local-gid (id-format)
   "The gid of the local user, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
-  ;; `group-gid' has been introduced with Emacs 24.4.
-  (if (and (fboundp 'group-gid) (equal id-format 'integer))
-      (tramp-compat-funcall 'group-gid)
-    (tramp-compat-file-attribute-group-id (file-attributes "~/" id-format))))
+  (cond
+   ;; `group-gid' has been introduced with Emacs 24.4.
+   ((and (fboundp 'group-gid) (equal id-format 'integer))
+    (tramp-compat-funcall 'group-gid))
+   ;; `group-name' has been introduced with Emacs 27.1.
+   ((and (fboundp 'group-name) (equal id-format 'string))
+    (tramp-compat-funcall 'group-name (tramp-compat-funcall 'group-gid)))
+   ((tramp-compat-file-attribute-group-id (file-attributes "~/" id-format)))))
 
 (defun tramp-get-local-locale (&optional vec)
   "Determine locale, supporting UTF8 if possible.

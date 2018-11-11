@@ -1176,6 +1176,24 @@ Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   return INT_TO_INTEGER (uid);
 }
 
+DEFUN ("group-name", Fgroup_name, Sgroup_name, 1, 1, 0,
+       doc: /* Return the name of the group whose numeric group ID is GID.
+The argument GID should be an integer or a float.
+Return nil if a group with such GID does not exists or is not known.  */)
+  (Lisp_Object gid)
+{
+  struct group *gr;
+  gid_t id;
+
+  if (!NUMBERP (gid) && !CONSP (gid))
+    error ("Invalid GID specification");
+  CONS_TO_INTEGER (gid, gid_t, id);
+  block_input ();
+  gr = getgrgid (id);
+  unblock_input ();
+  return gr ? build_string (gr->gr_name) : Qnil;
+}
+
 DEFUN ("group-gid", Fgroup_gid, Sgroup_gid, 0, 0, 0,
        doc: /* Return the effective gid of Emacs.
 Value is a fixnum, if it's small enough, otherwise a bignum.  */)
@@ -4487,6 +4505,7 @@ it to be non-nil.  */);
   defsubr (&Sinsert_byte);
 
   defsubr (&Suser_login_name);
+  defsubr (&Sgroup_name);
   defsubr (&Suser_real_login_name);
   defsubr (&Suser_uid);
   defsubr (&Suser_real_uid);

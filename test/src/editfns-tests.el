@@ -351,4 +351,26 @@
     (should (equal (format "%-#50.40x" v3)
                    "-0x000000003ffffffffffffffe000000000000000        "))))
 
+(ert-deftest test-group-name ()
+  (should (stringp (group-name (group-gid))))
+  (should-error (group-name 'foo))
+  (cond
+   ((memq system-type '(windows-nt ms-dos))
+    (should-not (group-name 123456789)))
+   ((executable-find "getent")
+    (with-temp-buffer
+      (let (stat name)
+      (dolist (gid (list 0 1212345 (group-gid)))
+        (erase-buffer)
+        (setq stat (ignore-errors
+                     (call-process "getent" nil '(t nil) nil "group"
+                                   (number-to-string gid))))
+        (setq name (group-name gid))
+        (goto-char (point-min))
+        (cond ((eq stat 0)
+               (if (looking-at "\\([[:alnum:]_-]+\\):")
+                   (should (string= (match-string 1) name))))
+              ((eq stat 2)
+               (should-not name)))))))))
+
 ;;; editfns-tests.el ends here

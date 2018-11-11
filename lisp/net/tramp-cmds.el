@@ -147,6 +147,19 @@ This includes password cache, file cache, connection cache, buffers."
   (when (bound-and-true-p tramp-archive-enabled)
     (tramp-archive-cleanup-hash))
 
+  ;; Remove ad-hoc proxies.
+  (let ((proxies tramp-default-proxies-alist))
+    (while proxies
+      (if (ignore-errors
+	    (get-text-property 0 'tramp-ad-hoc (nth 2 (car proxies))))
+	  (setq tramp-default-proxies-alist
+		(delete (car proxies) tramp-default-proxies-alist)
+		proxies tramp-default-proxies-alist)
+	(setq proxies (cdr proxies)))))
+    (when (and tramp-default-proxies-alist tramp-save-ad-hoc-proxies)
+      (customize-save-variable
+       'tramp-default-proxies-alist tramp-default-proxies-alist))
+
   ;; Remove buffers.
   (dolist (name (tramp-list-tramp-buffers))
     (when (bufferp (get-buffer name)) (kill-buffer name))))
@@ -185,8 +198,9 @@ This includes password cache, file cache, connection cache, buffers."
 	  ;; In rare cases, it could contain the password.  So we make it nil.
 	  tramp-password-save-function)
       (reporter-submit-bug-report
-       tramp-bug-report-address		; to-address
-       (format "tramp (%s)" tramp-version) ; package name and version
+       tramp-bug-report-address	  ; to-address
+       (format "tramp (%s %s/%s)" ; package name and version
+	       tramp-version tramp-repository-branch tramp-repository-version)
        (sort
 	(delq nil (mapcar
 	  (lambda (x)
