@@ -55,6 +55,8 @@
 ;;; Code:
 (eval-when-compile (require 'cl-lib))
 
+(autoload 'vc-find-revision "vc")
+(defvar vc-find-revision-no-save)
 (defvar add-log-buffer-file-name-function)
 
 
@@ -103,6 +105,9 @@ when editing big diffs)."
 
 (defvar diff-vc-backend nil
   "The VC backend that created the current Diff buffer, if any.")
+
+(defvar diff-vc-revisions nil
+  "The VC revisions compared in the current Diff buffer, if any.")
 
 (defvar diff-outline-regexp
   "\\([*+][*+][*+] [^0-9]\\|@@ ...\\|\\*\\*\\* [0-9].\\|--- [0-9]..\\)")
@@ -1736,7 +1741,15 @@ NOPROMPT, if non-nil, means not to prompt the user."
 		       (match-string 1)))))
 	   (file (or (diff-find-file-name other noprompt)
                      (error "Can't find the file")))
-	   (buf (find-file-noselect file)))
+	   (revision (and other diff-vc-backend
+                          (if reverse (nth 1 diff-vc-revisions)
+                            (or (nth 0 diff-vc-revisions)
+                                ;; When diff shows changes in working revision
+                                (vc-working-revision file)))))
+	   (buf (if revision
+                    (let ((vc-find-revision-no-save t))
+                      (vc-find-revision file revision diff-vc-backend))
+                  (find-file-noselect file))))
       ;; Update the user preference if he so wished.
       (when (> (prefix-numeric-value other-file) 8)
 	(setq diff-jump-to-old-file other))
@@ -1862,20 +1875,24 @@ With a prefix argument, try to REVERSE the hunk."
 `diff-jump-to-old-file' (or its opposite if the OTHER-FILE prefix arg
 is given) determines whether to jump to the old or the new file.
 If the prefix arg is bigger than 8 (for example with \\[universal-argument] \\[universal-argument])
-then `diff-jump-to-old-file' is also set, for the next invocations."
+then `diff-jump-to-old-file' is also set, for the next invocations.
+
+Under version control, the OTHER-FILE prefix arg means jump to the old
+revision of the file if point is on an old changed line, or to the new
+revision of the file otherwise."
   (interactive (list current-prefix-arg last-input-event))
   ;; When pointing at a removal line, we probably want to jump to
   ;; the old location, and else to the new (i.e. as if reverting).
   ;; This is a convenient detail when using smerge-diff.
   (if event (posn-set-point (event-end event)))
   (let ((buffer (when event (current-buffer)))
-        (rev (not (save-excursion (beginning-of-line) (looking-at "[-<]")))))
+        (reverse (not (save-excursion (beginning-of-line) (looking-at "[-<]")))))
     (pcase-let ((`(,buf ,line-offset ,pos ,src ,_dst ,switched)
-                 (diff-find-source-location other-file rev)))
+                 (diff-find-source-location other-file reverse)))
       (pop-to-buffer buf)
       (goto-char (+ (car pos) (cdr src)))
       (when buffer (next-error-found buffer (current-buffer)))
-      (diff-hunk-status-msg line-offset (diff-xor rev switched) t))))
+      (diff-hunk-status-msg line-offset (diff-xor reverse switched) t))))
 
 
 (defun diff-current-defun ()
