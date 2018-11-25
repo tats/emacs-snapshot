@@ -248,6 +248,10 @@ pair of the form (KEY VALUE).  The following KEYs are defined:
     In general, the global default value shall be used, but for
     some methods, like \"su\" or \"sudo\", a shorter timeout
     might be desirable.
+  * `tramp-session-timeout'
+    How long a Tramp connection keeps open before being disconnected.
+    This is useful for methods like \"su\" or \"sudo\", which
+    shouldn't run an open connection in the background forever.
   * `tramp-case-insensitive'
     Whether the remote file system handles file names case insensitive.
     Only a non-nil value counts, the default value nil means to
@@ -1226,6 +1230,7 @@ If nil, return `tramp-default-port'."
   (or (tramp-file-name-port vec)
       (tramp-get-method-parameter vec 'tramp-default-port)))
 
+;; Comparision of file names is performed by `tramp-equal-remote'.
 (defun tramp-file-name-equal-p (vec1 vec2)
   "Check, whether VEC1 and VEC2 denote the same `tramp-file-name'."
   (and (tramp-file-name-p vec1) (tramp-file-name-p vec2)
@@ -2171,7 +2176,7 @@ ARGS are the arguments OPERATION has been called with."
 	      file-ownership-preserved-p file-readable-p
 	      file-regular-p file-remote-p file-selinux-context
 	      file-symlink-p file-truename file-writable-p
-	      find-backup-file-name find-file-noselect get-file-buffer
+	      find-backup-file-name get-file-buffer
 	      insert-directory insert-file-contents load
 	      make-directory make-directory-internal set-file-acl
 	      set-file-modes set-file-selinux-context set-file-times
@@ -3297,31 +3302,34 @@ User is always nil."
 	 (numchase-limit 20)
 	 symlink-target)
      (with-parsed-tramp-file-name result v1
-       (with-tramp-file-property v1 v1-localname "file-truename"
-	 (while (and (setq symlink-target (file-symlink-p result))
-		     (< numchase numchase-limit))
-	   (setq numchase (1+ numchase)
-		 result
-		 (with-parsed-tramp-file-name (expand-file-name result) v2
-		   (tramp-make-tramp-file-name
-		    v2
-		    (funcall
-		     (if (tramp-compat-file-name-quoted-p v2-localname)
-			 'tramp-compat-file-name-quote 'identity)
+       ;; We cache only the localname.
+       (tramp-make-tramp-file-name
+	v1
+	(with-tramp-file-property v1 v1-localname "file-truename"
+	  (while (and (setq symlink-target (file-symlink-p result))
+		      (< numchase numchase-limit))
+	    (setq numchase (1+ numchase)
+		  result
+		  (with-parsed-tramp-file-name (expand-file-name result) v2
+		    (tramp-make-tramp-file-name
+		     v2
+		     (funcall
+		      (if (tramp-compat-file-name-quoted-p v2-localname)
+			  'tramp-compat-file-name-quote 'identity)
 
-		     (if (stringp symlink-target)
-			 (if (file-remote-p symlink-target)
-			     (let (file-name-handler-alist)
-			       (tramp-compat-file-name-quote symlink-target))
-			   (expand-file-name
-			    symlink-target (file-name-directory v2-localname)))
-		       v2-localname))
-		    'nohop)))
-	   (when (>= numchase numchase-limit)
-	     (tramp-error
-	      v1 'file-error
-	      "Maximum number (%d) of symlinks exceeded" numchase-limit)))
-	 (directory-file-name result))))))
+		      (if (stringp symlink-target)
+			  (if (file-remote-p symlink-target)
+			      (let (file-name-handler-alist)
+				(tramp-compat-file-name-quote symlink-target))
+			    (expand-file-name
+			     symlink-target (file-name-directory v2-localname)))
+			v2-localname))
+		     'nohop)))
+	    (when (>= numchase numchase-limit)
+	      (tramp-error
+	       v1 'file-error
+	       "Maximum number (%d) of symlinks exceeded" numchase-limit)))
+	  (file-local-name (directory-file-name result))))))))
 
 (defun tramp-handle-find-backup-file-name (filename)
   "Like `find-backup-file-name' for Tramp files."
@@ -4061,6 +4069,7 @@ If it doesn't exist, generate a new one."
   (with-tramp-connection-property (tramp-get-connection-process vec) "device"
     (cons -1 (setq tramp-devices (1+ tramp-devices)))))
 
+;; Comparision of vectors is performed by `tramp-file-name-equal-p'.
 (defun tramp-equal-remote (file1 file2)
   "Check, whether the remote parts of FILE1 and FILE2 are identical.
 The check depends on method, user and host name of the files.  If
@@ -4070,7 +4079,7 @@ account.
 
 Example:
 
-  (tramp-equal-remote \"/ssh::/etc\" \"/<your host name>:/home\")
+  (tramp-equal-remote \"/ssh::/etc\" \"/-:<your host name>:/home\")
 
 would yield t.  On the other hand, the following check results in nil:
 
@@ -4432,7 +4441,7 @@ ALIST is of the form ((FROM . TO) ...)."
 It always returns a return code.  The Lisp error raised when
 PROGRAM is nil is trapped also, returning 1.  Furthermore, traces
 are written with verbosity of 6."
-  (let ((default-directory  (tramp-compat-temporary-file-directory))
+  (let ((default-directory (tramp-compat-temporary-file-directory))
 	(destination (if (eq destination t) (current-buffer) destination))
 	output error result)
     (tramp-message

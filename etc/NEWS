@@ -640,6 +640,21 @@ can now be searched via 'C-s'.
 
 ** Search and Replace
 
+*** Isearch supports a prefix argument for 'C-s' ('isearch-repeat-forward')
+and 'C-r' ('isearch-repeat-backward').  With a prefix argument, these
+commands repeat the search for the specified occurrence of the search string.
+A negative argument repeats the search in the opposite direction.
+This makes possible also to use a prefix argument for 'M-s .'
+('isearch-forward-symbol-at-point') to find the next Nth symbol.
+
+*** To go to the first/last occurrence of the current search string
+is possible now with new commands 'isearch-beginning-of-buffer' and
+'isearch-end-of-buffer' bound to 'M-s M-<' and 'M-s M->' in Isearch.
+With a numeric argument, they go to the Nth absolute occurrence
+counting from the beginning/end of the buffer.  This complements
+'C-s'/'C-r' that searches for the next Nth relative occurrence
+with a numeric argument.
+
 *** 'isearch-lazy-count' shows the current match number and total number
 of matches in the Isearch prompt.  Customizable variables
 'lazy-count-prefix-format' and 'lazy-count-suffix-format' define the
@@ -671,6 +686,9 @@ the shift key.
 ---
 *** Isearch now remembers the regexp-based search mode for words/symbols
 and case-sensitivity together with search strings in the search ring.
+
+---
+*** Isearch now has its own tool-bar and menu-bar menu.
 
 ** Debugger
 
@@ -808,6 +826,10 @@ process.  It now accepts signals specified either by name or by its number.
 or NextCloud hosted files and directories.
 
 +++
+*** New connection method "rclone", which allows to access system
+storages via the 'rclone' program.  This feature is experimental.
+
++++
 *** Connection methods "obex" and "synce" are removed, because they
 are obsoleted in GVFS.
 
@@ -826,6 +848,11 @@ Tramp for some look-alike remote file names.
 +++
 *** For some connection methods, like "su" or "sudo", the host name in
 ad-hoc multi-hop file names must match the previous hop.
+
++++
+*** For the connection methods "sudo" and "doas" there exists a
+timeout, after which the underlying session is disabled.  This is for
+security reasons.
 
 ** Rcirc
 

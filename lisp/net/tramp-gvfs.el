@@ -569,7 +569,6 @@ It has been changed in GVFS 1.14.")
     (file-truename . tramp-handle-file-truename)
     (file-writable-p . tramp-gvfs-handle-file-writable-p)
     (find-backup-file-name . tramp-handle-find-backup-file-name)
-    ;; `find-file-noselect' performed by default handler.
     ;; `get-file-buffer' performed by default handler.
     (insert-directory . tramp-handle-insert-directory)
     (insert-file-contents . tramp-handle-insert-file-contents)
@@ -2088,7 +2087,7 @@ This uses \"avahi-browse\" in case D-Bus is not enabled in Avahi."
 ;;; TODO:
 
 ;; * (Customizable) unmount when exiting Emacs.  See tramp-archive.el.
-
+;;
 ;; * Host name completion for existing mount points (afp-server,
 ;;   smb-server, google-drive, nextcloud) or via smb-network or network.
 ;;
