@@ -20287,7 +20287,7 @@ extend_face_to_end_of_line (struct it *it)
   if (FRAME_WINDOW_P (f)
       && MATRIX_ROW_DISPLAYS_TEXT_P (it->glyph_row)
       && face->box == FACE_NO_BOX
-      && face->background == FRAME_BACKGROUND_PIXEL (f)
+      && FACE_COLOR_TO_PIXEL (face->background, f) == FRAME_BACKGROUND_PIXEL (f)
 #ifdef HAVE_WINDOW_SYSTEM
       && !face->stipple
 #endif
@@ -20432,7 +20432,7 @@ extend_face_to_end_of_line (struct it *it)
 	  && (it->glyph_row->used[LEFT_MARGIN_AREA]
 	      < WINDOW_LEFT_MARGIN_WIDTH (it->w))
 	  && !it->glyph_row->mode_line_p
-	  && default_face->background != FRAME_BACKGROUND_PIXEL (f))
+	  && FACE_COLOR_TO_PIXEL (face->background, f) != FRAME_BACKGROUND_PIXEL (f))
 	{
 	  struct glyph *g = it->glyph_row->glyphs[LEFT_MARGIN_AREA];
 	  struct glyph *e = g + it->glyph_row->used[LEFT_MARGIN_AREA];
@@ -20473,7 +20473,7 @@ extend_face_to_end_of_line (struct it *it)
 	  && (it->glyph_row->used[RIGHT_MARGIN_AREA]
 	      < WINDOW_RIGHT_MARGIN_WIDTH (it->w))
 	  && !it->glyph_row->mode_line_p
-	  && default_face->background != FRAME_BACKGROUND_PIXEL (f))
+	  && FACE_COLOR_TO_PIXEL (face->background, f) != FRAME_BACKGROUND_PIXEL (f))
 	{
 	  struct glyph *g = it->glyph_row->glyphs[RIGHT_MARGIN_AREA];
 	  struct glyph *e = g + it->glyph_row->used[RIGHT_MARGIN_AREA];
@@ -32360,7 +32360,14 @@ expose_window_tree (struct window *w, XRectangle *r)
   struct frame *f = XFRAME (w->frame);
   bool mouse_face_overwritten_p = false;
 
-  while (w && !FRAME_GARBAGED_P (f))
+  /* NS toolkits may have aleady modified the frame in expectation of
+     a successful redraw, so don't bail out here if the frame is
+     garbaged.  */
+  while (w
+#if !defined (HAVE_NS)
+         && !FRAME_GARBAGED_P (f)
+#endif
+         )
     {
       mouse_face_overwritten_p
 	|= (WINDOWP (w->contents)
@@ -32388,12 +32395,16 @@ expose_frame (struct frame *f, int x, int y, int w, int h)
 
   TRACE ((stderr, "expose_frame "));
 
-  /* No need to redraw if frame will be redrawn soon.  */
+#if !defined (HAVE_NS)
+  /* No need to redraw if frame will be redrawn soon except under NS
+     where the toolkit may have already modified the frame in
+     expectation of us redrawing it.  */
   if (FRAME_GARBAGED_P (f))
     {
       TRACE ((stderr, " garbaged\n"));
       return;
     }
+#endif
 
   /* If basic faces haven't been realized yet, there is no point in
      trying to redraw anything.  This can happen when we get an expose

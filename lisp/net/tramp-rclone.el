@@ -170,26 +170,27 @@ pass to the OPERATION."
 ;;;###tramp-autoload
 (defun tramp-rclone-parse-device-names (_ignore)
   "Return a list of (nil host) tuples allowed to access."
-  (with-timeout (10)
-    (with-temp-buffer
-      ;; `call-process' does not react on timer under MS Windows.
-      ;; That's why we use `start-process'.
-      (let ((p (start-process
-		tramp-rclone-program (current-buffer)
-		tramp-rclone-program "listremotes"))
-	    (v (make-tramp-file-name :method tramp-rclone-method))
-	    result)
-	(tramp-message v 6 "%s" (mapconcat 'identity (process-command p) " "))
-	(process-put p 'adjust-window-size-function 'ignore)
-	(set-process-query-on-exit-flag p nil)
-	(while (process-live-p p)
-	  (accept-process-output p 0.1))
-	(accept-process-output p 0.1)
-	(tramp-message v 6 "\n%s" (buffer-string))
-	(goto-char (point-min))
-	(while (search-forward-regexp "^\\(\\S-+\\):$" nil t)
-	  (push (list nil (match-string 1)) result))
-	result))))
+  (with-tramp-connection-property nil "rclone-device-names"
+    (with-timeout (10)
+      (with-temp-buffer
+	;; `call-process' does not react on timer under MS Windows.
+	;; That's why we use `start-process'.
+	(let ((p (start-process
+		  tramp-rclone-program (current-buffer)
+		  tramp-rclone-program "listremotes"))
+	      (v (make-tramp-file-name :method tramp-rclone-method))
+	      result)
+	  (tramp-message v 6 "%s" (mapconcat 'identity (process-command p) " "))
+	  (process-put p 'adjust-window-size-function 'ignore)
+	  (set-process-query-on-exit-flag p nil)
+	  (while (process-live-p p)
+	    (accept-process-output p 0.1))
+	  (accept-process-output p 0.1)
+	  (tramp-message v 6 "\n%s" (buffer-string))
+	  (goto-char (point-min))
+	  (while (search-forward-regexp "^\\(\\S-+\\):$" nil t)
+	    (push (list nil (match-string 1)) result))
+	  result)))))
 
 
 ;; File name primitives.
@@ -435,15 +436,10 @@ file names."
 
 (defun tramp-rclone-mounted-p (vec)
   "Check, whether storage system determined by VEC is mounted."
-  (or
-   ;; We set this property at the end of
-   ;; `tramp-rclone-maybe-open-connection'.  Let's use it as
-   ;; indicator.
-   (tramp-get-connection-property vec "uid-integer" nil)
-   ;; If it is mounted, "." is not shown.  If the endpoint is not
-   ;; connected, `directory-files' returns an error.
-   (ignore-errors
-     (not (member "." (directory-files (tramp-rclone-mount-point vec)))))))
+  (with-tramp-file-property vec "/" "mounted"
+    (string-match
+     (format "^%s:" (regexp-quote (tramp-file-name-host vec)))
+     (shell-command-to-string "mount"))))
 
 (defun tramp-rclone-flush-mount (vec)
   "Flush directory cache of VEC mount."
@@ -494,7 +490,7 @@ file names."
   "Maybe open a connection VEC.
 Does not do anything if a connection is already open, but re-opens the
 connection if a previous connection has died for some reason."
-  (unless (or (null non-essential) (tramp-rclone-mounted-p vec))
+  (unless (tramp-rclone-mounted-p vec)
     (let ((host (tramp-file-name-host vec)))
       (if (zerop (length host))
 	  (tramp-error vec 'file-error "Storage %s not connected" host))
@@ -511,6 +507,7 @@ connection if a previous connection has died for some reason."
 			  (tramp-compat-temporary-file-directory)))
 		    (apply 'start-process (tramp-get-connection-name vec) buf
 			   tramp-rclone-program (delq nil args)))))
+	  (tramp-set-file-property vec "/" "mounted" t)
 	  (tramp-message
 	   vec 6 "%s" (mapconcat 'identity (process-command p) " "))
 	  (process-put p 'adjust-window-size-function 'ignore)
@@ -521,15 +518,14 @@ connection if a previous connection has died for some reason."
 
   ;; In `tramp-check-cached-permissions', the connection properties
   ;; {uig,gid}-{integer,string} are used.  We set them to proper values.
-  (unless (tramp-get-connection-property vec "uid-integer" nil)
-    (tramp-set-connection-property
-     vec "uid-integer" (tramp-get-local-uid 'integer))
-    (tramp-set-connection-property
-     vec "gid-integer" (tramp-get-local-gid 'integer))
-    (tramp-set-connection-property
-     vec "uid-string" (tramp-get-local-uid 'string))
-    (tramp-set-connection-property
-     vec "gid-string" (tramp-get-local-gid 'string))))
+  (with-tramp-connection-property
+      vec "uid-integer" (tramp-get-local-uid 'integer))
+  (with-tramp-connection-property
+      vec "gid-integer" (tramp-get-local-gid 'integer))
+  (with-tramp-connection-property
+      vec "uid-string" (tramp-get-local-uid 'string))
+  (with-tramp-connection-property
+      vec "gid-string" (tramp-get-local-gid 'string)))
 
 (defun tramp-rclone-send-command (vec &rest args)
   "Send the COMMAND to connection VEC."

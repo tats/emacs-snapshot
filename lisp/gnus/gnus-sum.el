@@ -946,13 +946,6 @@ This variable is local to the summary buffers."
   :type '(choice (const :tag "off" nil)
 		 integer))
 
-(defcustom gnus-summary-mode-hook nil
-  "A hook for Gnus summary mode.
-This hook is run before any variables are set in the summary buffer."
-  :options '(turn-on-gnus-mailing-list-mode gnus-pick-mode)
-  :group 'gnus-summary-various
-  :type 'hook)
-
 (defcustom gnus-summary-menu-hook nil
   "Hook run after the creation of the summary mode menu."
   :group 'gnus-summary-visual
@@ -1430,12 +1423,12 @@ These are paired with what variables they correspond with, along with
 the type of the variable (string, integer, character, etc).")
 
 (defvar gnus-summary-dummy-line-format-alist
-  `((?S gnus-tmp-subject ?s)
+  '((?S gnus-tmp-subject ?s)
     (?N gnus-tmp-number ?d)
     (?u gnus-tmp-user-defined ?s)))
 
 (defvar gnus-summary-mode-line-format-alist
-  `((?G gnus-tmp-group-name ?s)
+  '((?G gnus-tmp-group-name ?s)
     (?g (gnus-short-group-name gnus-tmp-group-name) ?s)
     (?p (gnus-group-real-name gnus-tmp-group-name) ?s)
     (?A gnus-tmp-article-number ?d)
@@ -2602,7 +2595,7 @@ gnus-summary-show-article-from-menu-as-charset-%s" cs))))
 
     (easy-menu-define
       gnus-summary-post-menu gnus-summary-mode-map ""
-      `("Post"
+      '("Post"
 	["Send a message (mail or news)" gnus-summary-post-news
 	 :help "Compose a new message (mail or news)"]
 	["Followup" gnus-summary-followup
@@ -2663,7 +2656,7 @@ gnus-summary-show-article-from-menu-as-charset-%s" cs))))
 
     (easy-menu-define
       gnus-summary-misc-menu gnus-summary-mode-map ""
-      `("Gnus"
+      '("Gnus"
 	("Mark Read"
 	 ["Mark as read" gnus-summary-mark-as-read-forward t]
 	 ["Mark same subject and select"
