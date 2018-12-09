@@ -133,6 +133,8 @@ to apply.
 as the directory for client/server sockets, if Emacs is running
 under an X Window System desktop that sets the XDG_RUNTIME_DIR
 environment variable to indicate where session sockets should go.
+To get the old, less-secure behavior, you can set the
+EMACS_SOCKET_NAME environment variable to an appropriate value.
 
 ---
 *** When run by root, emacsclient no longer connects to non-root sockets.
@@ -691,11 +693,13 @@ highlight in one iteration while processing the full buffer.
 'C-M-d'.
 
 +++
-*** 'search-exit-option' provides new options 'move' and 'shift-move'
+*** New variable 'isearch-yank-on-move' provides options 't' and 'shift'
 to extend the search string by yanking text that ends at the new
-position after moving point in the current buffer.  'shift-move'
-extends the search string by motion commands while holding down
-the shift key.
+position after moving point in the current buffer.  'shift' extends
+the search string by motion commands while holding down the shift key.
+
+*** 'isearch-allow-scroll' provides new option 'unlimited' to allow
+scrolling any distance off screen.
 
 ---
 *** Isearch now remembers the regexp-based search mode for words/symbols
@@ -816,8 +820,15 @@ To restore the old behavior, use
 'eshell-uniqify-list'.
 
 *** The function 'eshell/kill' is now able to handle signal switches.
-Previously 'eshell/kill' would fail if provided a kill signal to send to the
-process.  It now accepts signals specified either by name or by its number.
+Previously 'eshell/kill' would fail if provided a kill signal to send
+to the process.  It now accepts signals specified either by name or by
+its number.
+
+---
+*** Emacs now follows symlinks in history-related files.
+The files specified by 'eshell-history-file-name' and
+'eshell-last-dir-ring-file-name' can include symlinks; these are now
+followed when Emacs writes the relevant history variables to the disk.
 
 ** Shell
 
@@ -1224,6 +1235,12 @@ A buffer-local value of this hook is now run only if at least one
 window showing the buffer has changed its size.
 
 +++
+** New buffer display action alist entry 'window-min-height'.
+Such an entry allows to specify a minimum height of the window used
+for displaying a buffer.  'display-buffer-below-selected' is the only
+action function to respect it at the moment.
+
++++
 ** The function 'assoc-delete-all' now takes an optional predicate argument.
 
 +++
@@ -1304,6 +1321,11 @@ a multibyte string even if its second argument is an ASCII character.
 
 ** '(format "%d" X)' no longer mishandles a floating-point number X that
 does not fit in a machine integer.
+
+---
+** New coding-system 'ibm038'.
+This is the International EBCDIC encoding, also available as aliases
+'ebcdic-int' and 'cp038'.
 
 +++
 ** In the DST slot, 'encode-time' and 'parse-time-string' now return -1

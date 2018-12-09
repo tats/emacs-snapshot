@@ -72,21 +72,11 @@
 If t, random control and meta characters terminate the search
 and are then executed normally.
 If `edit', edit the search string instead of exiting.
-If `move', extend the search string by motion commands
-that have the `isearch-move' property on their symbols
-equal to `enabled', or the shift-translated command is
-not disabled by the value `disabled' of the same property.
-If `shift-move', extend the search string by motion commands
-while holding down the shift key.
-Both `move' and `shift-move' extend the search string by yanking text
-that ends at the new position after moving point in the current buffer.
 If `append', the characters which you type that are not interpreted by
 the incremental search are simply appended to the search string.
 If nil, run the command without exiting Isearch."
   :type '(choice (const :tag "Terminate incremental search" t)
                  (const :tag "Edit the search string" edit)
-                 (const :tag "Extend the search string by motion commands" move)
-                 (const :tag "Extend the search string by shifted motion keys" shift-move)
                  (const :tag "Append control characters to the search string" append)
                  (const :tag "Don't terminate incremental search" nil))
   :version "27.1")
@@ -2746,9 +2736,13 @@ to the barrier."
 (defcustom isearch-allow-scroll nil
   "Whether scrolling is allowed during incremental search.
 If non-nil, scrolling commands can be used in Isearch mode.
-However, the current match will never scroll offscreen.
-If nil, scrolling commands will first cancel Isearch mode."
-  :type 'boolean
+However, you cannot scroll far enough that the current match is
+no longer visible (is off screen).  But if the value is `unlimited'
+that limitation is removed and you can scroll any distance off screen.
+If nil, scrolling commands exit Isearch mode."
+  :type '(choice (const :tag "Scrolling exits Isearch" nil)
+                 (const :tag "Scrolling with current match on screen" t)
+                 (const :tag "Scrolling with current match off screen" unlimited))
   :group 'isearch)
 
 (defcustom isearch-allow-prefix t
@@ -2812,6 +2806,21 @@ the bottom."
 (defvar isearch-pre-scroll-point nil)
 (defvar isearch-pre-move-point nil)
 
+(defcustom isearch-yank-on-move nil
+  "Motion keys yank text to the search string while you move the cursor.
+If `shift', extend the search string by motion commands while holding down
+the shift key.  The search string is extended by yanking text that
+ends at the new position after moving point in the current buffer.
+If t, extend the search string without the shift key pressed
+by motion commands that have the `isearch-move' property on their
+symbols equal to `enabled', or for which the shift-translated command
+is not disabled by the value `disabled' of property `isearch-move'."
+  :type '(choice (const :tag "Motion keys exit Isearch" nil)
+                 (const :tag "Motion keys extend the search string" t)
+                 (const :tag "Shifted motion keys extend the search string" shift))
+  :group 'isearch
+  :version "27.1")
+
 (defun isearch-pre-command-hook ()
   "Decide whether to exit Isearch mode before executing the command.
 Don't exit Isearch if the key sequence that invoked this command
@@ -2846,7 +2855,8 @@ See more for options in `search-exit-option'."
 	       (or (eq (get this-command 'isearch-scroll) t)
 		   (eq (get this-command 'scroll-command) t))))
       (when isearch-allow-scroll
-	(setq isearch-pre-scroll-point (point))))
+	(unless (eq isearch-allow-scroll 'unlimited)
+          (setq isearch-pre-scroll-point (point)))))
      ;; A mouse click on the isearch message starts editing the search string.
      ((and (eq (car-safe main-event) 'down-mouse-1)
 	   (window-minibuffer-p (posn-window (event-start main-event))))
@@ -2854,13 +2864,13 @@ See more for options in `search-exit-option'."
       (read-event)
       (setq this-command 'isearch-edit-string))
      ;; Don't terminate the search for motion commands.
-     ((or (and (eq search-exit-option 'move)
+     ((or (and (eq isearch-yank-on-move t)
                (symbolp this-command)
                (or (eq (get this-command 'isearch-move) 'enabled)
                    (and (not (eq (get this-command 'isearch-move) 'disabled))
                         (stringp (nth 1 (interactive-form this-command)))
                         (string-match-p "^^" (nth 1 (interactive-form this-command))))))
-          (and (eq search-exit-option 'shift-move)
+          (and (eq isearch-yank-on-move 'shift)
                this-command-keys-shift-translated))
       (setq this-command-keys-shift-translated nil)
       (setq isearch-pre-move-point (point)))
@@ -2875,29 +2885,30 @@ See more for options in `search-exit-option'."
       (isearch-clean-overlays)))))
 
 (defun isearch-post-command-hook ()
-  (cond
-   (isearch-pre-scroll-point
-    (let ((ab-bel (isearch-string-out-of-window isearch-pre-scroll-point)))
-      (if ab-bel
-	  (isearch-back-into-window (eq ab-bel 'above) isearch-pre-scroll-point)
-	(goto-char isearch-pre-scroll-point)))
-    (setq isearch-pre-scroll-point nil)
-    (isearch-update))
-   ((memq search-exit-option '(move shift-move))
-    (when (and isearch-pre-move-point
-               (not (eq isearch-pre-move-point (point))))
-      (let ((string (buffer-substring-no-properties
-                     (or isearch-other-end isearch-opoint) (point))))
-        (if isearch-regexp (setq string (regexp-quote string)))
-        (setq isearch-string string)
-        (setq isearch-message (mapconcat 'isearch-text-char-description
-                                         string ""))
-        (setq isearch-yank-flag t)
-        (setq isearch-forward (<= (or isearch-other-end isearch-opoint) (point)))
-        (when isearch-forward
-          (goto-char isearch-pre-move-point))
-        (isearch-search-and-update)))
-    (setq isearch-pre-move-point nil)))
+   (when isearch-pre-scroll-point
+     (let ((ab-bel (isearch-string-out-of-window isearch-pre-scroll-point)))
+       (if ab-bel
+	   (isearch-back-into-window (eq ab-bel 'above) isearch-pre-scroll-point)
+	 (goto-char isearch-pre-scroll-point)))
+     (setq isearch-pre-scroll-point nil)
+     (isearch-update))
+   (when (eq isearch-allow-scroll 'unlimited)
+     (when isearch-lazy-highlight
+       (isearch-lazy-highlight-new-loop)))
+   (when isearch-pre-move-point
+     (when (not (eq isearch-pre-move-point (point)))
+       (let ((string (buffer-substring-no-properties
+                      (or isearch-other-end isearch-opoint) (point))))
+         (if isearch-regexp (setq string (regexp-quote string)))
+         (setq isearch-string string)
+         (setq isearch-message (mapconcat 'isearch-text-char-description
+                                          string ""))
+         (setq isearch-yank-flag t)
+         (setq isearch-forward (<= (or isearch-other-end isearch-opoint) (point)))
+         (when isearch-forward
+           (goto-char isearch-pre-move-point))
+         (isearch-search-and-update)))
+     (setq isearch-pre-move-point nil))
   (force-mode-line-update))
 
 (defun isearch-quote-char (&optional count)
@@ -3181,12 +3192,12 @@ the word mode."
 
 (defun isearch-message-suffix (&optional c-q-hack)
   (propertize (concat (if c-q-hack "^Q" "")
-	              (if isearch-error
-	                  (concat " [" isearch-error "]")
-	                "")
-                      (isearch-lazy-count-format 'suffix)
-	              (or isearch-message-suffix-add ""))
-              'face 'minibuffer-prompt))
+		      (isearch-lazy-count-format 'suffix)
+		      (if isearch-error
+			  (concat " [" isearch-error "]")
+			"")
+		      (or isearch-message-suffix-add ""))
+	      'face 'minibuffer-prompt))
 
 (defun isearch-lazy-count-format (&optional suffix-p)
   "Format the current match number and the total number of matches.

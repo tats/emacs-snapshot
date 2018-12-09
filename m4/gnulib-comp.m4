@@ -81,7 +81,6 @@ AC_DEFUN([gl_EARLY],
   # Code from module faccessat:
   # Code from module fcntl:
   # Code from module fcntl-h:
-  # Code from module fdatasync:
   # Code from module fdopendir:
   # Code from module filemode:
   # Code from module filevercmp:
@@ -241,11 +240,6 @@ AC_DEFUN([gl_INIT],
   fi
   gl_FCNTL_MODULE_INDICATOR([fcntl])
   gl_FCNTL_H
-  gl_FUNC_FDATASYNC
-  if test $HAVE_FDATASYNC = 0; then
-    AC_LIBOBJ([fdatasync])
-  fi
-  gl_UNISTD_MODULE_INDICATOR([fdatasync])
   gl_FUNC_FDOPENDIR
   if test $HAVE_FDOPENDIR = 0 || test $REPLACE_FDOPENDIR = 1; then
     AC_LIBOBJ([fdopendir])
@@ -650,6 +644,9 @@ AC_DEFUN([gl_INIT],
   if test $NEED_LOCALTIME_BUFFER = 1; then
     func_gl_gnulib_m4code_2049e887c7e5308faad27b3f894bb8c9
   fi
+  if test $REPLACE_MKTIME = 1; then
+    func_gl_gnulib_m4code_21ee726a3540c09237a8e70c0baf7467
+  fi
   if test $HAVE_READLINKAT = 0; then
     func_gl_gnulib_m4code_260941c0e5dc67ec9e87d1fb321c300b
   fi
@@ -877,7 +874,6 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/faccessat.c
   lib/fcntl.c
   lib/fcntl.in.h
-  lib/fdatasync.c
   lib/fdopendir.c
   lib/filemode.c
   lib/filemode.h
@@ -1025,7 +1021,6 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/fcntl-o.m4
   m4/fcntl.m4
   m4/fcntl_h.m4
-  m4/fdatasync.m4
   m4/fdopendir.m4
   m4/filemode.m4
   m4/flexmember.m4

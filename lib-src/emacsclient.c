@@ -50,6 +50,7 @@ char *w32_getenv (const char *);
 # include "syswait.h"
 
 # include <arpa/inet.h>
+# include <fcntl.h>
 # include <netinet/in.h>
 # include <sys/socket.h>
 # include <sys/un.h>
@@ -972,6 +973,24 @@ get_server_config (const char *config_file, struct sockaddr_in *server,
   return true;
 }
 
+/* Like socket (DOMAIN, TYPE, PROTOCOL), except arrange for the
+   resulting file descriptor to be close-on-exec.  */
+
+static HSOCKET
+cloexec_socket (int domain, int type, int protocol)
+{
+#ifdef SOCK_CLOEXEC
+  return socket (domain, type | SOCK_CLOEXEC, protocol);
+#else
+  HSOCKET s = socket (domain, type, protocol);
+# ifndef WINDOWSNT
+  if (0 <= s)
+    fcntl (s, F_SETFD, FD_CLOEXEC);
+# endif
+  return s;
+#endif
+}
+
 static HSOCKET
 set_tcp_socket (const char *local_server_file)
 {
@@ -990,7 +1009,7 @@ set_tcp_socket (const char *local_server_file)
 	     progname, inet_ntoa (server.in.sin_addr));
 
   /* Open up an AF_INET socket.  */
-  HSOCKET s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  HSOCKET s = cloexec_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (s < 0)
     {
       /* Since we have an alternate to try out, this is not an error
@@ -1076,23 +1095,44 @@ find_tty (const char **tty_type, const char **tty_name, bool noabort)
   return true;
 }
 
+/* Return the process group if in the foreground, the negative of the
+   process group if in the background, and zero if there is no
+   foreground process group for the controlling terminal.
+   Unfortunately, use of this function introduces an unavoidable race,
+   since whether the process is in the foreground or background can
+   change at any time.  */
+
+static pid_t
+process_grouping (void)
+{
+#ifdef SOCKETS_IN_FILE_SYSTEM
+  pid_t tcpgrp = tcgetpgrp (STDOUT_FILENO);
+  if (0 <= tcpgrp)
+    {
+      pid_t pgrp = getpgrp ();
+      return tcpgrp == pgrp ? pgrp : -pgrp;
+    }
+#endif
+  return 0;
+}
 
 #ifdef SOCKETS_IN_FILE_SYSTEM
 
-/* Three possibilities:
+/* Return the file status of NAME, ordinarily a socket.
+   It should be owned by UID.  Return one of the following:
   >0 - 'stat' failed with this errno value
   -1 - isn't owned by us
    0 - success: none of the above */
 
 static int
-socket_status (const char *name)
+socket_status (const char *name, uid_t uid)
 {
   struct stat statbfr;
 
   if (stat (name, &statbfr) != 0)
     return errno;
 
-  if (statbfr.st_uid != geteuid ())
+  if (statbfr.st_uid != uid)
     return -1;
 
   return 0;
@@ -1233,21 +1273,17 @@ act_on_signals (HSOCKET emacs_socket)
 	    {
 	      got_sigcont = 0;
 	      took_action = true;
-	      pid_t tcpgrp = tcgetpgrp (STDOUT_FILENO);
-	      if (0 <= tcpgrp)
+	      pid_t grouping = process_grouping ();
+	      if (grouping < 0)
 		{
-		  pid_t pgrp = getpgrp ();
-		  if (tcpgrp == pgrp)
+		  if (tty)
 		    {
-		      /* We are in the foreground.  */
-		      send_to_emacs (emacs_socket, "-resume \n");
-		    }
-		  else if (tty)
-		    {
-		      /* We are in the background; cancel the continue.  */
-		      kill (-pgrp, SIGTTIN);
+		      /* Cancel the continue.  */
+		      kill (grouping, SIGTTIN);
 		    }
 		}
+	      else
+		send_to_emacs (emacs_socket, "-resume \n");
 	    }
 
 	  if (got_sigtstp)
@@ -1316,18 +1352,11 @@ set_local_socket (char const *server_name)
     struct sockaddr_un un;
     struct sockaddr sa;
   } server = {{ .sun_family = AF_UNIX }};
-
-  HSOCKET s = socket (AF_UNIX, SOCK_STREAM, 0);
-  if (s < 0)
-    {
-      message (true, "%s: socket: %s\n", progname, strerror (errno));
-      return INVALID_SOCKET;
-    }
-
   char *sockname = server.un.sun_path;
   enum { socknamesize = sizeof server.un.sun_path };
   int tmpdirlen = -1;
   int socknamelen = -1;
+  uid_t uid = geteuid ();
 
   if (strchr (server_name, '/')
       || (ISSLASH ('\\') && strchr (server_name, '\\')))
@@ -1359,7 +1388,7 @@ set_local_socket (char const *server_name)
 		tmpdirlen = snprintf (sockname, socknamesize, "/tmp");
 	    }
 	  socknamelen = local_sockname (sockname, socknamesize, tmpdirlen,
-					geteuid (), server_name);
+					uid, server_name);
 	}
     }
 
@@ -1370,7 +1399,7 @@ set_local_socket (char const *server_name)
     }
 
   /* See if the socket exists, and if it's owned by us. */
-  int sock_status = socket_status (sockname);
+  int sock_status = socket_status (sockname, uid);
   if (sock_status)
     {
       /* Failing that, see if LOGNAME or USER exist and differ from
@@ -1387,7 +1416,7 @@ set_local_socket (char const *server_name)
 	{
 	  struct passwd *pw = getpwnam (user_name);
 
-	  if (pw && (pw->pw_uid != geteuid ()))
+	  if (pw && pw->pw_uid != uid)
 	    {
 	      /* We're running under su, apparently. */
 	      socknamelen = local_sockname (sockname, socknamesize, tmpdirlen,
@@ -1399,39 +1428,49 @@ set_local_socket (char const *server_name)
 		  exit (EXIT_FAILURE);
 		}
 
-	      sock_status = socket_status (sockname);
+	      sock_status = socket_status (sockname, uid);
 	    }
 	}
     }
 
-  switch (sock_status)
+  if (sock_status == 0)
     {
-    case -1:
-      /* There's a socket, but it isn't owned by us.  */
-      message (true, "%s: Invalid socket owner\n", progname);
-      break;
+      HSOCKET s = cloexec_socket (AF_UNIX, SOCK_STREAM, 0);
+      if (s < 0)
+	{
+	  message (true, "%s: socket: %s\n", progname, strerror (errno));
+	  return INVALID_SOCKET;
+	}
+      if (connect (s, &server.sa, sizeof server.un) != 0)
+	{
+	  message (true, "%s: connect: %s\n", progname, strerror (errno));
+	  CLOSE_SOCKET (s);
+	  return INVALID_SOCKET;
+	}
 
-    case 0:
-      if (connect (s, &server.sa, sizeof server.un) == 0)
+      struct stat connect_stat;
+      if (fstat (s, &connect_stat) != 0)
+	sock_status = errno;
+      else if (connect_stat.st_uid == uid)
 	return s;
-      message (true, "%s: connect: %s\n", progname, strerror (errno));
-      break;
-
-    default:
-      /* 'stat' failed.  */
-      if (sock_status == ENOENT)
-	message (true,
-		 ("%s: can't find socket; have you started the server?\n"
-		  "%s: To start the server in Emacs,"
-		  " type \"M-x server-start\".\n"),
-		 progname, progname);
       else
-	message (true, "%s: can't stat %s: %s\n",
-		 progname, sockname, strerror (sock_status));
-      break;
+	sock_status = -1;
+
+      CLOSE_SOCKET (s);
     }
 
-  CLOSE_SOCKET (s);
+  if (sock_status < 0)
+    message (true, "%s: Invalid socket owner\n", progname);
+  else if (sock_status == ENOENT)
+    message (true,
+	     ("%s: can't find socket; have you started the server?\n"
+	      "%s: To start the server in Emacs,"
+	      " type \"M-x server-start\".\n"),
+	     progname, progname);
+  else
+    message (true, "%s: can't stat %s: %s\n",
+	     progname, sockname, strerror (sock_status));
+
   return INVALID_SOCKET;
 }
 #endif /* SOCKETS_IN_FILE_SYSTEM */
@@ -1713,15 +1752,6 @@ start_daemon_and_retry_set_socket (void)
   return emacs_socket;
 }
 
-/* Flush standard output and its underlying file descriptor.  */
-static void
-flush_stdout (HSOCKET emacs_socket)
-{
-  fflush (stdout);
-  while (fdatasync (STDOUT_FILENO) != 0 && errno == EINTR)
-    act_on_signals (emacs_socket);
-}
-
 int
 main (int argc, char **argv)
 {
@@ -1753,13 +1783,12 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-#ifndef WINDOWSNT
+#ifdef SOCKETS_IN_FILE_SYSTEM
   if (tty)
     {
-      pid_t pgrp = getpgrp ();
-      pid_t tcpgrp = tcgetpgrp (STDOUT_FILENO);
-      if (0 <= tcpgrp && tcpgrp != pgrp)
-	kill (-pgrp, SIGTTIN);
+      pid_t grouping = process_grouping ();
+      if (grouping < 0)
+	kill (grouping, SIGTTIN);
     }
 #endif
 
@@ -1932,12 +1961,12 @@ main (int argc, char **argv)
   send_to_emacs (emacs_socket, "\n");
 
   /* Wait for an answer. */
-  if (!eval && !tty && !nowait && !quiet)
+  if (!eval && !tty && !nowait && !quiet && 0 <= process_grouping ())
     {
       printf ("Waiting for Emacs...");
       skiplf = false;
     }
-  flush_stdout (emacs_socket);
+  fflush (stdout);
 
   /* Now, wait for an answer and print any messages.  */
   while (exit_status == EXIT_SUCCESS)
@@ -2038,9 +2067,8 @@ main (int argc, char **argv)
 	}
     }
 
-  if (!skiplf)
+  if (!skiplf && 0 <= process_grouping ())
     printf ("\n");
-  flush_stdout (emacs_socket);
 
   if (rl < 0)
     exit_status = EXIT_FAILURE;

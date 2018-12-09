@@ -108,7 +108,7 @@ It is used for TCP/IP devices."
     (dired-compress-file . ignore)
     (dired-uncache . tramp-handle-dired-uncache)
     (exec-path . tramp-adb-handle-exec-path)
-    (expand-file-name . tramp-adb-handle-expand-file-name)
+    (expand-file-name . tramp-handle-expand-file-name)
     (file-accessible-directory-p . tramp-handle-file-accessible-directory-p)
     (file-acl . ignore)
     (file-attributes . tramp-adb-handle-file-attributes)
@@ -226,28 +226,6 @@ pass to the OPERATION."
 	 result)
 	result))))
 
-(defun tramp-adb-handle-expand-file-name (name &optional dir)
-  "Like `expand-file-name' for Tramp files."
-  ;; If DIR is not given, use DEFAULT-DIRECTORY or "/".
-  (setq dir (or dir default-directory "/"))
-  ;; Unless NAME is absolute, concat DIR and NAME.
-  (unless (file-name-absolute-p name)
-    (setq name (concat (file-name-as-directory dir) name)))
-  ;; If NAME is not a Tramp file, run the real handler.
-  (if (not (tramp-tramp-file-p name))
-      (tramp-run-real-handler 'expand-file-name (list name nil))
-    ;; Dissect NAME.
-    (with-parsed-tramp-file-name name nil
-      (unless (tramp-run-real-handler 'file-name-absolute-p (list localname))
-	(setq localname (concat "/" localname)))
-      ;; Do normal `expand-file-name' (this does "/./" and "/../").
-      ;; `default-directory' is bound, because on Windows there would
-      ;; be problems with UNC shares or Cygwin mounts.
-      (let ((default-directory (tramp-compat-temporary-file-directory)))
-	(tramp-make-tramp-file-name
-	 v (tramp-drop-volume-letter
-	    (tramp-run-real-handler 'expand-file-name (list localname))))))))
-
 (defun tramp-adb-handle-file-system-info (filename)
   "Like `file-system-info' for Tramp files."
   (ignore-errors
@@ -259,10 +237,11 @@ pass to the OPERATION."
 	(goto-char (point-min))
 	(forward-line)
 	(when (looking-at
-	       (concat "[[:space:]]*[^[:space:]]+"
-		       "[[:space:]]+\\([[:digit:]]+\\)"
-		       "[[:space:]]+\\([[:digit:]]+\\)"
-		       "[[:space:]]+\\([[:digit:]]+\\)"))
+	       (eval-when-compile
+		 (concat "[[:space:]]*[^[:space:]]+"
+			 "[[:space:]]+\\([[:digit:]]+\\)"
+			 "[[:space:]]+\\([[:digit:]]+\\)"
+			 "[[:space:]]+\\([[:digit:]]+\\)")))
 	  ;; The values are given as 1k numbers, so we must change
 	  ;; them to number of bytes.
 	  (list (* 1024 (string-to-number (match-string 1)))
@@ -462,7 +441,7 @@ pass to the OPERATION."
 		     (sort result (lambda (x y) (string< (car x) (car y))))))
 	     (delq nil
 		   (mapcar (lambda (x)
-			     (if (or (not match) (string-match match (car x)))
+			     (if (or (not match) (string-match-p match (car x)))
 				 x))
 			   result)))))))))
 
@@ -499,7 +478,7 @@ Convert (\"-al\") to (\"-a\" \"-l\").  Remove arguments like \"--dired\"."
 		  (delq nil
 			(mapcar
 			 (lambda (s)
-			   (and (not (string-match "\\(^--\\|^[^-]\\)" s)) s))
+			   (and (not (string-match-p "\\(^--\\|^[^-]\\)" s)) s))
 			 switches))))))
 
 (defun tramp-adb-sh-fix-ls-output (&optional sort-by-time)
@@ -514,7 +493,7 @@ Emacs dired can't find files."
 	 "[[:space:]]\\([[:space:]][0-9]\\{4\\}-[0-9][0-9]-[0-9][0-9][[:space:]]\\)" nil t)
       (replace-match "0\\1" "\\1" nil)
       ;; Insert missing "/".
-      (when (looking-at "[0-9][0-9]:[0-9][0-9][[:space:]]+$")
+      (when (looking-at-p "[0-9][0-9]:[0-9][0-9][[:space:]]+$")
 	(end-of-line)
 	(insert "/")))
     ;; Sort entries.
@@ -594,28 +573,27 @@ Emacs dired can't find files."
    filename
    (with-parsed-tramp-file-name (expand-file-name directory) nil
      (with-tramp-file-property v localname "file-name-all-completions"
-       (save-match-data
-	 (tramp-adb-send-command
-	  v (format "%s -a %s"
-		    (tramp-adb-get-ls-command v)
-		    (tramp-shell-quote-argument localname)))
-	 (mapcar
-	  (lambda (f)
-	    (if (file-directory-p (expand-file-name f directory))
-		(file-name-as-directory f)
-	      f))
-	  (with-current-buffer (tramp-get-buffer v)
-	    (delete-dups
-	     (append
-	      ;; In older Android versions, "." and ".." are not
-	      ;; included.  In newer versions (toybox, since Android
-	      ;; 6) they are.  We fix this by `delete-dups'.
-	      '("." "..")
-	      (delq
-	       nil
-	       (mapcar
-		(lambda (l) (and (not (string-match  "^[[:space:]]*$" l)) l))
-		(split-string (buffer-string) "\n"))))))))))))
+       (tramp-adb-send-command
+	v (format "%s -a %s"
+		  (tramp-adb-get-ls-command v)
+		  (tramp-shell-quote-argument localname)))
+       (mapcar
+	(lambda (f)
+	  (if (file-directory-p (expand-file-name f directory))
+	      (file-name-as-directory f)
+	    f))
+	(with-current-buffer (tramp-get-buffer v)
+	  (delete-dups
+	   (append
+	    ;; In older Android versions, "." and ".." are not
+	    ;; included.  In newer versions (toybox, since Android 6)
+	    ;; they are.  We fix this by `delete-dups'.
+	    '("." "..")
+	    (delq
+	     nil
+	     (mapcar
+	      (lambda (l) (and (not (string-match-p  "^[[:space:]]*$" l)) l))
+	      (split-string (buffer-string) "\n")))))))))))
 
 (defun tramp-adb-handle-file-local-copy (filename)
   "Like `file-local-copy' for Tramp files."
@@ -640,7 +618,7 @@ Emacs dired can't find files."
       tmpfile)))
 
 (defun tramp-adb-handle-file-writable-p (filename)
-  "Like `tramp-sh-handle-file-writable-p'.
+  "Like `file-writable-p' for Tramp files.
 But handle the case, if the \"test\" command is not available."
   (with-parsed-tramp-file-name filename nil
     (with-tramp-file-property v localname "file-writable-p"
@@ -754,8 +732,8 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    v 0 (format "Copying %s to %s" filename newname)
 
 	  (if (and t1 t2 (tramp-equal-remote filename newname))
-	      (let ((l1 (file-remote-p filename 'localname))
-		    (l2 (file-remote-p newname 'localname)))
+	      (let ((l1 (tramp-compat-file-local-name filename))
+		    (l2 (tramp-compat-file-local-name newname)))
 		(when (and (not ok-if-already-exists)
 			   (file-exists-p newname))
 		  (tramp-error v 'file-already-exists newname))
@@ -835,8 +813,8 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	  (if (and t1 t2
 		   (tramp-equal-remote filename newname)
 		   (not (file-directory-p filename)))
-	      (let ((l1 (file-remote-p filename 'localname))
-		    (l2 (file-remote-p newname 'localname)))
+	      (let ((l1 (tramp-compat-file-local-name filename))
+		    (l2 (tramp-compat-file-local-name newname)))
 		(when (and (not ok-if-already-exists)
 			   (file-exists-p newname))
 		  (tramp-error v 'file-already-exists newname))
@@ -967,7 +945,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 (defun tramp-adb-handle-shell-command
   (command &optional output-buffer error-buffer)
   "Like `shell-command' for Tramp files."
-  (let* ((asynchronous (string-match "[ \t]*&[ \t]*\\'" command))
+  (let* ((asynchronous (string-match-p "[ \t]*&[ \t]*\\'" command))
 	 ;; We cannot use `shell-file-name' and `shell-command-switch',
 	 ;; they are variables of the local host.
 	 (args (list "sh" "-c" (substring command 0 asynchronous)))
@@ -1111,7 +1089,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		    p))))
 
 	  ;; Save exit.
-	  (if (string-match tramp-temp-buffer-name (buffer-name))
+	  (if (string-match-p tramp-temp-buffer-name (buffer-name))
 	      (ignore-errors
 		(set-process-buffer (tramp-get-connection-process v) nil)
 		(kill-buffer (current-buffer)))
@@ -1132,7 +1110,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	  (read (current-buffer)))
 	":" 'omit)))
    ;; The equivalent to `exec-directory'.
-   `(,(file-remote-p default-directory 'localname))))
+   `(,(tramp-compat-file-local-name default-directory))))
 
 (defun tramp-adb-get-device (vec)
   "Return full host name from VEC to be used in shell execution.

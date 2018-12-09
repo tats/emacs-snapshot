@@ -399,7 +399,10 @@ handled properly.  BODY shall not contain a timeout."
 	(tramp-default-host "default-host")
 	tramp-default-method-alist
 	tramp-default-user-alist
-	tramp-default-host-alist)
+	tramp-default-host-alist
+	;; Suppress check for multihops.
+	(tramp-cache-data  (make-hash-table :test 'equal))
+	(tramp-connection-properties '((nil "login-program" t))))
     ;; Expand `tramp-default-user' and `tramp-default-host'.
     (should (string-equal
 	     (file-remote-p "/method::")
@@ -836,6 +839,9 @@ handled properly.  BODY shall not contain a timeout."
 	(tramp-default-host "default-host")
 	tramp-default-user-alist
 	tramp-default-host-alist
+	;; Suppress check for multihops.
+	(tramp-cache-data  (make-hash-table :test 'equal))
+	(tramp-connection-properties '((nil "login-program" t)))
 	(syntax tramp-syntax))
     (unwind-protect
 	(progn
@@ -1157,6 +1163,9 @@ handled properly.  BODY shall not contain a timeout."
 	tramp-default-method-alist
 	tramp-default-user-alist
 	tramp-default-host-alist
+	;; Suppress check for multihops.
+	(tramp-cache-data  (make-hash-table :test 'equal))
+	(tramp-connection-properties '((nil "login-program" t)))
 	(syntax tramp-syntax))
     (unwind-protect
 	(progn
@@ -1851,6 +1860,16 @@ handled properly.  BODY shall not contain a timeout."
 (ert-deftest tramp-test03-file-name-method-rules ()
   "Check file name rules for some methods."
   (skip-unless (tramp--test-enabled))
+  ;; `user-error' has appeared in Emacs 24.3.
+  (skip-unless (fboundp 'user-error))
+
+  ;; Multi hops are allowed for inline methods only.
+  (should-error
+   (file-remote-p "/ssh:user1@host1|method:user2@host2:/path/to/file")
+   :type 'user-error)
+  (should-error
+   (file-remote-p "/method:user1@host1|ssh:user2@host2:/path/to/file")
+   :type 'user-error)
 
   ;; Samba does not support file names with periods followed by
   ;; spaces, and trailing periods or spaces.
@@ -1978,7 +1997,7 @@ handled properly.  BODY shall not contain a timeout."
   (skip-unless (tramp--test-enabled))
 
   ;; These are the methods the test doesn't fail.
-  (when (or (tramp--test-adb-p) (tramp--test-gvfs-p)
+  (when (or (tramp--test-adb-p) (tramp--test-gvfs-p) (tramp--test-rclone-p)
 	    (tramp-smb-file-name-p tramp-test-temporary-file-directory))
     (setf (ert-test-expected-result-type
 	   (ert-get-test 'tramp-test05-expand-file-name-relative))
@@ -4532,6 +4551,11 @@ This does not support external Emacs calls."
   (string-equal
    "nextcloud" (file-remote-p tramp-test-temporary-file-directory 'method)))
 
+(defun tramp--test-rclone-p ()
+  "Check, whether the remote host is offered by rclone.
+This requires restrictions of file name syntax."
+  (tramp-rclone-file-name-p tramp-test-temporary-file-directory))
+
 (defun tramp--test-rsync-p ()
   "Check, whether the rsync method is used.
 This does not support special file names."
@@ -4736,7 +4760,9 @@ This requires restrictions of file name syntax."
   ;; expanded to <TAB>.
   (let ((files
 	 (list
-	  (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
+	  (if (or (tramp--test-gvfs-p)
+		  (tramp--test-rclone-p)
+		  (tramp--test-windows-nt-or-smb-p))
 	      "foo bar baz"
 	    (if (or (tramp--test-adb-p)
 		    (tramp--test-docker-p)
@@ -4762,7 +4788,9 @@ This requires restrictions of file name syntax."
 	  (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
 	      "!foo!bar!baz!"
 	    "!foo|bar!baz|")
-	  (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
+	  (if (or (tramp--test-gvfs-p)
+		  (tramp--test-rclone-p)
+		  (tramp--test-windows-nt-or-smb-p))
 	      ";foo;bar;baz;"
 	    ":foo;bar:baz;")
 	  (unless (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
