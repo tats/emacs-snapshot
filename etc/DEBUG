@@ -1,6 +1,6 @@
 Debugging GNU Emacs
 
-Copyright (C) 1985, 2000-2017 Free Software Foundation, Inc.
+Copyright (C) 1985, 2000-2018 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 ** Preliminaries
@@ -16,7 +16,8 @@ make the debugging easier.  Here's the configure-time options we
 recommend (they are in addition to any other options you might need,
 such as --prefix):
 
-  CFLAGS='-O0 -g3' ./configure --enable-checking='yes,glyphs' --enable-check-lisp-object-type
+  ./configure --enable-checking='yes,glyphs' --enable-check-lisp-object-type \
+    CFLAGS='-O0 -g3'
 
 The CFLAGS value is important: debugging optimized code can be very
 hard.  (If the problem only happens with optimized code, you may need
@@ -42,6 +43,11 @@ created in the 'src' directory.
 
 *** Configuring GDB
 
+To start GDB to debug Emacs, you can simply type "gdb ./emacs RET" at
+the shell prompt (assuming you do that from the directory of the Emacs
+executable, usually the 'src' sub-directory of the Emacs tree).
+However, we recommend starting GDB from Emacs, see below.
+
 When you debug Emacs with GDB, you should start GDB in the directory
 where the Emacs executable was made (the 'src' directory in the Emacs
 source tree).  That directory has a .gdbinit file that defines various
@@ -51,16 +57,19 @@ Emacs Redisplay problems".)
 
 Starting the debugger from Emacs, via the "M-x gdb" command (described
 below), when the current buffer visits one of the Emacs C source files
-will automatically start GDB in the 'src' directory.
+will automatically start GDB in the 'src' directory.  If you invoke
+"M-x gdb" from a buffer whose default directory is different, such as
+from the "*scratch*" buffer, you can change the default directory with
+the "M-x cd" command before starting the debugger.
 
-Some GDB versions by default do not automatically load .gdbinit files
-in the directory where you invoke GDB.  With those versions of GDB,
-you will see a warning when GDB starts, like this:
+Recent GDB versions by default do not automatically load .gdbinit
+files in the directory where you invoke GDB.  With those versions of
+GDB, you will see a warning when GDB starts, like this:
 
   warning: File ".../src/.gdbinit" auto-loading has been declined by your `auto-load safe-path' set to "$debugdir:$datadir/auto-load".
 
 The simplest way to fix this is to add the following line to your
-~/.gdbinit file:
+~/.gdbinit file (creating such a file if it doesn't already exist):
 
   add-auto-load-safe-path /path/to/emacs/src/.gdbinit
 
@@ -68,6 +77,14 @@ There are other ways to overcome that difficulty, they are all
 described in the node "Auto-loading safe path" in the GDB user manual.
 If nothing else helps, type "source /path/to/.gdbinit RET" at the GDB
 prompt, to unconditionally load the GDB init file.
+
+Running GDB on macOS sometimes brings an error message like this:
+
+  Unable to find Mach task port for process-id NNN: (os/kern) failure (0x5).
+
+To overcome this, search the Internet for the phrase "Unable to find
+Mach task port for process-id", and you will find detailed
+instructions to follow.
 
 *** Use the Emacs GDB UI front-end
 
@@ -132,9 +149,12 @@ to the debugger".
 
 You are now ready to start your debugging session.
 
+*** Running Emacs from GDB
+
 If you are starting a new Emacs session, type "run", followed by any
 command-line arguments (e.g., "-Q") into the *gud-emacs* buffer and
-press RET.
+press RET.  If you ran GDB outside of Emacs, type "run" followed by
+the command-line arguments at the GDB prompt instead.
 
 If you attached the debugger to a running Emacs, type "continue" into
 the *gud-emacs* buffer and press RET.
@@ -144,8 +164,8 @@ These are displayed as integer values (or structures, if you used the
 "--enable-check-lisp-object-type" option at configure time) that are
 hard to interpret, especially if they represent long lists.  You can
 use the 'pp' command to display them in their Lisp form.  That command
-displays its output on the standard error stream (on GNU/Linux, you
-can redirect that to a file using "M-x redirect-debugging-output").
+displays its output on the standard error stream, which you
+can redirect to a file using "M-x redirect-debugging-output".
 This means that if you attach GDB to a running Emacs that was invoked
 from a desktop icon, chances are you will not see the output at all,
 or it will wind up in an obscure place (check the documentation of
@@ -200,7 +220,7 @@ errors go through there.  If you are only interested in errors that
 would fire the Lisp debugger, breaking at 'maybe_call_debugger' is
 useful.
 
-Another technique for get control to the debugger is to put a
+Another technique for getting control to the debugger is to put a
 breakpoint in some rarely used function.  One such convenient function
 is Fredraw_display, which you can invoke at will interactively with
 "M-x redraw-display RET".
@@ -225,7 +245,7 @@ this command:
    handle SIGINT stop nopass
 
 After this 'handle' command, SIGINT will return control to GDB.  If
-you want the C-g to cause a QUIT within Emacs as well, omit the 'nopass'.
+you want the C-g to cause a quit within Emacs as well, omit the 'nopass'.
 See the GDB manual for more details about signal handling and the
 'handle' command.
 
@@ -281,8 +301,8 @@ To see the current value of a Lisp Variable, use 'pv variable'.
 These commands send their output to stderr; if that is closed or
 redirected to some file you don't know, you won't see their output.
 This is particularly so for Emacs invoked on MS-Windows from the
-desktop shortcut.  On GNU/Linux, you can use the command
-'redirect-debugging-output' to redirect stderr to a file.
+desktop shortcut.  You can use the command 'redirect-debugging-output'
+to redirect stderr to a file.
 
 Note: It is not a good idea to try 'pr', 'pp', or 'pv' if you know that Emacs
 is in deep trouble: its stack smashed (e.g., if it encountered SIGSEGV
@@ -313,7 +333,7 @@ type.  Here are these commands:
     xbufobjfwd xkbobjfwd xbuflocal xbuffer xsymbol xstring xvector xframe
     xwinconfig xcompiled xcons xcar xcdr xsubr xprocess xfloat xscrollbar
     xchartable xsubchartable xboolvector xhashtable xlist xcoding
-    xcharset xfontset xfont xbytecode
+    xcharset xfontset xfont
 
 Each one of them applies to a certain type or class of types.
 (Some of these types are not visible in Lisp, because they exist only
@@ -622,6 +642,15 @@ Setting a breakpoint in the function 'x_error_quitter' and looking at
 the backtrace when Emacs stops inside that function will show what
 code causes the X protocol errors.
 
+Note that the -xrm option may have no effect when you make an Emacs
+process invoked with the -nw option a server and want to trace X
+protocol errors from subsequent invocations of emacsclient in a GUI
+frame.  In that case calling the initial Emacs via
+
+emacs -nw --eval '(setq x-command-line-resources "emacs.synchronous: true")'
+
+should give more reliable results.
+
 Some bugs related to the X protocol disappear when Emacs runs in a
 synchronous mode.  To track down those bugs, we suggest the following
 procedure:
@@ -668,7 +697,7 @@ procedure:
 ** If Emacs causes errors or memory leaks in your X server
 
 You can trace the traffic between Emacs and your X server with a tool
-like xmon, available at ftp://ftp.x.org/contrib/devel_tools/.
+like xmon.
 
 Xmon can be used to see exactly what Emacs sends when X protocol errors
 happen.  If Emacs causes the X server memory usage to increase you can
@@ -942,7 +971,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 
 Local variables:

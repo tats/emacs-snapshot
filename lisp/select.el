@@ -1,6 +1,6 @@
 ;;; select.el --- lisp portion of standard selection support  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 2001-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1994, 2001-2018 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -98,7 +98,7 @@ if applicable (i.e. under X11)."
   'select-enable-clipboard "25.1")
 
 (defcustom select-enable-primary nil
-  "Non-nil means cutting and pasting uses the primary selection
+  "Non-nil means cutting and pasting uses the primary selection.
 The existence of a primary selection depends on the underlying GUI you use.
 E.g. it doesn't exist under MS-Windows."
   :type 'boolean
@@ -291,8 +291,10 @@ all upper-case names.  The most often used ones, in addition to
 `PRIMARY', are `SECONDARY' and `CLIPBOARD'.
 
 DATA-TYPE is usually `STRING', but can also be one of the symbols
-in `selection-converter-alist', which see.  This argument is
-ignored on NS, MS-Windows and MS-DOS."
+in `selection-converter-alist', which see.  Window systems other
+than X usually support only a small subset of these symbols, in
+addition to `STRING'; MS-Windows supports `TARGETS', which reports
+the formats available in the clipboard if TYPE is `CLIPBOARD'."
   (let ((data (gui-backend-get-selection (or type 'PRIMARY)
                                          (or data-type 'STRING))))
     (when (and (stringp data)
@@ -474,6 +476,9 @@ two markers or an overlay.  Otherwise, it is nil."
 
 	   (t
 	    (error "Unknown selection type: %S" type)))))
+
+      ;; Most programs are unable to handle NUL bytes in strings.
+      (setq str (replace-regexp-in-string "\0" "\\0" str t t))
 
       (setq next-selection-coding-system nil)
       (cons type str))))
