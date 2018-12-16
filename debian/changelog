@@ -1,3 +1,11 @@
+emacs (1:26.1+1-1~1.gbp37b306) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @37b3065df60918488d5187015138114d07334d84 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 16 Dec 2018 13:05:01 -0600
+
 emacs (1:25.2+1-11) unstable; urgency=medium
 
   * Add (>= 1:25) restriction to emacs metapackage dependencies.
