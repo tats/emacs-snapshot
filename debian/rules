@@ -112,9 +112,6 @@ ifeq (,$(joblimit))
   joblimit := 1
 endif
 
-target := $(DEB_HOST_GNU_TYPE)
-movemail_bin := usr/lib/emacs/$(runtime_ver)/$(target)/movemail
-
 # Info files that are going to show up in the main dir.
 main_dir_info_files := efaq.info
 
@@ -126,21 +123,17 @@ nonpersistent_autogen_build_files :=
 persistent_autogen_install_files :=
 
 nonpersistent_autogen_install_files := \
-  debian/emacs-bin-common.lintian-overrides \
   debian/emacs-bin-common.postinst \
   debian/emacs-bin-common.prerm \
   debian/emacs-common.README.Debian \
   debian/emacs-common.postinst \
   debian/emacs-common.prerm \
-  debian/emacs-nox.lintian-overrides \
   debian/emacs-nox.postinst \
   debian/emacs-nox.preinst \
   debian/emacs-nox.prerm \
-  debian/emacs-lucid.lintian-overrides \
   debian/emacs-lucid.postinst \
   debian/emacs-lucid.preinst \
   debian/emacs-lucid.prerm \
-  debian/emacs-gtk.lintian-overrides \
   debian/emacs-gtk.preinst \
   debian/emacs-gtk.postinst \
   debian/emacs-gtk.prerm
@@ -204,7 +197,6 @@ define deb_sub
     -e "s|\@MENU_VERSION\@|$(menu_ver)|go;" \
     -e "s|\@X_SUPPORT\@|$(xsupport)|go;" \
     -e "s|\@BIN_PRIORITY\@|$(bin_priority)|go;" \
-    -e "s|\@MOVEMAIL_BIN\@|$(movemail_bin)|go;" \
       < $(1) > $(2)
 endef
 
@@ -220,7 +212,6 @@ check-vars:
 	@echo "runtime_ver: $(runtime_ver)"
 	@echo "major_ver: $(major_ver)"
 	@echo "minor_ver: $(minor_ver)"
-	@echo "movemail_bin: $(movemail_bin)"
 
 .PHONY: check-autogen
 check-autogen: $(persistent_autogen_files) $(nonpersistent_autogen_files)
@@ -280,6 +271,7 @@ confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
 confflags += --with-sound=alsa
 confflags += --without-gconf
+confflags += --with-mailutils
 
 # x configure flags
 confflags_gtk := $(confflags)
@@ -313,8 +305,6 @@ define build_cmd
   $(MAKE) -C $(1) -j $(joblimit)
   # If we don't use bootstrap, we need to explicitly build info.
   $(MAKE) -C $(1) -j $(joblimit) info
-  # Make sure we chose liblockfile.
-  ldd $(1)/lib-src/movemail | grep liblockfile
 endef
 
 # Don't mess with the source tree (we build in debian/build-*)
@@ -459,10 +449,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
 	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
 
-	  # Set up movemail.
-	  chown root.mail $(pkgdir_bin_common)/$(movemail_bin)
-	  chmod g+s $(pkgdir_bin_common)/$(movemail_bin)
-
 	  # Set up alternatives.
 	  alternatives=$$(ls $(pkgdir_bin_common)/usr/bin) \
 	    && set -x \
@@ -573,9 +559,6 @@ override_dh_strip_nondeterminism:
 
 override_dh_testdir:
 	dh_testdir debian/emacsVAR.postinst
-
-override_dh_fixperms:
-	dh_fixperms -X$(movemail_bin)
 
 override_dh_auto_clean: $(persistent_autogen_files)
 	true
