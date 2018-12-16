@@ -1,4 +1,4 @@
-From f73a994589db30a6b11a77a2a2656d7600ec209f Mon Sep 17 00:00:00 2001
+From 2ea6063c2c43ae7816e387548dbb3ba1800293ad Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:25 -0500
 Subject: Adjust documentation references for Debian
@@ -12,18 +12,18 @@ appropriate, etc.
  1 file changed, 5 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index 539e56e42a0..1d8a47b6549 100644
+index 10afb7b4202..a866194bfea 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
-@@ -15,6 +15,11 @@ and NEWS.1-17 for changes in older Emacs versions.
+@@ -15,6 +15,11 @@ in older Emacs versions.
  You can narrow news to a specific version by calling 'view-emacs-news'
  with a prefix argument or by typing C-u C-h C-n.
  
 + 
 +* Debian specific changes to Emacs
 +
-+Please see /usr/share/doc/emacs25-common/README.Debian.gz.
++Please see /usr/share/doc/emacs-common/README.Debian.gz.
 +
  
- * Changes in Emacs 25.2
+ * Installation Changes in Emacs 26.1
  

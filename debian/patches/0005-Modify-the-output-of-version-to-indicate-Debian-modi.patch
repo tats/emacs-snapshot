@@ -1,4 +1,4 @@
-From d33f56378cb4ead76c7c89b6dcde66d4ddbe482c Mon Sep 17 00:00:00 2001
+From d69466776a75671d6d818b3b4a0be73c54876c3d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:28 -0500
 Subject: Modify the output of (version) to indicate Debian modifications
@@ -8,21 +8,19 @@ The output of (version) has been modified to indicate Debian modifications.
 Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 ---
- lisp/version.el | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ lisp/version.el | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index 0e21ab2cad6..518cd4fb850 100644
+index 3a38b1d83c8..5d1248ac581 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
-@@ -59,8 +59,8 @@ emacs-version
+@@ -62,7 +62,7 @@ emacs-version
+ to the system configuration; look at `system-configuration' instead."
    (interactive "P")
    (let ((version-string
-          (format (if (not (called-interactively-p 'interactive))
--		     "GNU Emacs %s (%s%s%s%s)\n of %s"
--		   "GNU Emacs %s (%s%s%s%s) of %s")
-+		     "GNU Emacs %s (%s%s%s%s)\n of %s, modified by Debian"
-+		   "GNU Emacs %s (%s%s%s%s) of %s, modified by Debian")
+-         (format "GNU Emacs %s (build %s, %s%s%s%s)%s"
++         (format "GNU Emacs %s (build %s, %s%s%s%s)%s, modified by Debian"
                   emacs-version
+                  emacs-build-number
  		 system-configuration
- 		 (cond ((featurep 'motif)

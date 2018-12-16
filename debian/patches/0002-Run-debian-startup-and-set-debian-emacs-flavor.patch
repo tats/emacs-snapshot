@@ -1,4 +1,4 @@
-From 276ba4620041b4d7e2e90d190bbfa7c005885b6f Mon Sep 17 00:00:00 2001
+From 381dc48e4f31a00726f44f3723b913aea4485cca Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor
@@ -16,10 +16,10 @@ Author: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 2855e7c31ca..79c5119420e 100644
+index 9d16b59defd..d20431492a7 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -438,6 +438,10 @@ tutorial-directory
+@@ -434,6 +434,10 @@ tutorial-directory
    :type 'directory
    :initialize #'custom-initialize-delay)
  
@@ -30,7 +30,7 @@ index 2855e7c31ca..79c5119420e 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Recursively add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -1124,8 +1128,21 @@ command-line
+@@ -1121,8 +1125,21 @@ command-line
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.

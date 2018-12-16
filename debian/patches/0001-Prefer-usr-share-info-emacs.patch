@@ -1,4 +1,4 @@
-From f395622508301666a356a84e003d987888229804 Mon Sep 17 00:00:00 2001
+From 888dd6f8381aea7c01ea578b3357b9edb9bf988d Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 7 Apr 2013 15:03:05 -0500
 Subject: Prefer /usr/share/info/emacs/
@@ -12,10 +12,10 @@ lisp/info.el to include /usr/share/info/emacs before /usr/share/info.
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/info.el b/lisp/info.el
-index 40b2f90ebd6..0cd9c480a67 100644
+index 8743b449976..14d62f7f1cb 100644
 --- a/lisp/info.el
 +++ b/lisp/info.el
-@@ -218,7 +218,8 @@ Info-default-directory-list
+@@ -213,7 +213,8 @@ Info-default-directory-list
  	      (nconc standard-info-dirs (list config-dir))
  	    (cons config-dir standard-info-dirs))))
      (if (not (eq system-type 'windows-nt))

@@ -1,4 +1,4 @@
-From 6676f1cb9a837dc0cdcc3a36588c4e3a43287d0b Mon Sep 17 00:00:00 2001
+From 598ff07f7cee81ffe382d37a3d134599a63d5a90 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Tue, 21 Oct 2014 19:10:17 -0500
 Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
@@ -6,37 +6,26 @@ Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
 These are OS X specific, and were removed for now, due to uncertainty
 over the licensing.
 ---
- admin/unidata/Makefile.in | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ admin/unidata/Makefile.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index f58303b6d76..408a4cd5a0d 100644
+index 818404f8baf..bb1223248b9 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -53,16 +53,7 @@ am__v_at_1 =
+@@ -56,7 +56,7 @@ am__v_at_1 =
  
- .PHONY: all unifiles
+ .PHONY: all
  
--all: ${top_srcdir}/src/macuvs.h unifiles ${unidir}/charscript.el
--
--## Specify .elc as an order-only prereq so as to not needlessly rebuild
--## target just because the .elc is missing.
--## Same with charprop.el below.
--${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
--  ${srcdir}/uvs.elc
--	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
--	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
--	  > $@
-+all: unifiles ${unidir}/charscript.el
+-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
++all: ${unifiles} ${unidir}/charscript.el \
+   ${unidir}/charprop.el
  
- %.elc: %.el
- 	$(AM_V_ELC)${emacs} -f batch-byte-compile $<
-@@ -122,7 +113,7 @@ maintainer-clean: distclean
+ ## Specify .elc as an order-only prereq so as to not needlessly rebuild
+@@ -117,5 +117,5 @@ maintainer-clean: distclean
  ## change and it slows down bootstrap (a tiny bit).
  ## Cf leim/ja-dic (which is much slower).
  extraclean:
 -	rm -f ${top_srcdir}/src/macuvs.h ${unidir}/charscript.el*
 +	rm -f ${unidir}/charscript.el*
-   ifneq (,$(wildcard $(unidir)/charprop.el))
- 	cd $(unidir) && \
- 	  rm -f `sed -n 's/^;; FILE: //p' < charprop.el` charprop.el
+ 	rm -f ${unifiles} ${unidir}/charprop.el

@@ -5,10 +5,4 @@
 0005-Modify-the-output-of-version-to-indicate-Debian-modi.patch
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
-0008-Don-t-provide-openssl-s_client-as-an-option-for-ssl-.patch
-0009-A-memory-alignment-problem-causing-m68k-failures-has.patch
-0010-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
-0011-Disable-eieio-test-method-order-list-6.patch
-0012-A-remote-execution-exploit-via-enriched-text-has-bee.patch
-0013-Disable-eieio-test-37-obsolete-name-in-constructor.patch
-0014-Emacs-should-no-longer-unexpectedly-alter-the-byte-o.patch
+0008-Don-t-downcase-real-xref-in-elisp-mode-tests.patch

@@ -1,6 +1,6 @@
 ;;; tls.el --- TLS/SSL support via wrapper around GnuTLS
 
-;; Copyright (C) 1996-1999, 2002-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2002-2018 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <simon@josefsson.org>
 ;; Keywords: comm, tls, gnutls, ssl
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -69,9 +69,8 @@
    "^\\*\\*\\* Starting TLS handshake\n\\)*"
    "\\)")
   "Regexp matching end of TLS client informational messages.
-Client data stream begins after the last character matched by
-this.  The default matches `openssl s_client' (version 0.9.8c)
-and `gnutls-cli' (version 2.0.1) output."
+Client data stream begins after the last character this matches.
+The default matches the output of \"gnutls-cli\" (version 2.0.1)."
   :version "22.2"
   :type 'regexp
   :group 'tls)
@@ -107,7 +106,7 @@ successful negotiation."
 	  (repeat :inline t :tag "Other" (string)))
     (list :tag "List of commands"
 	  (repeat :tag "Command" (string))))
-  :version "22.1"
+  :version "26.1"                       ; remove s_client
   :group 'tls)
 
 (defcustom tls-process-connection-type nil
@@ -118,8 +117,8 @@ successful negotiation."
 
 (defcustom tls-success "- Handshake was completed\\|SSL handshake has read "
   "Regular expression indicating completed TLS handshakes.
-The default is what GnuTLS's \"gnutls-cli\" or OpenSSL's
-\"openssl s_client\" outputs."
+The default is what GnuTLS's \"gnutls-cli\" outputs."
+;; or OpenSSL's \"openssl s_client\"
   :version "22.1"
   :type 'regexp
   :group 'tls)
@@ -144,9 +143,9 @@ consider trustworthy, e.g.:
 (defcustom tls-untrusted
   "- Peer's certificate is NOT trusted\\|Verify return code: \\([^0] \\|.[^ ]\\)"
   "Regular expression indicating failure of TLS certificate verification.
-The default is what GnuTLS's \"gnutls-cli\" or OpenSSL's
-\"openssl s_client\" return in the event of unsuccessful
-verification."
+The default is what GnuTLS's \"gnutls-cli\" returns in the event of
+unsuccessful verification."
+;; or OpenSSL's \"openssl s_client\"
   :type 'regexp
   :version "23.1" ;; No Gnus
   :group 'tls)
@@ -205,7 +204,7 @@ Args are NAME BUFFER HOST PORT.
 NAME is name for process.  It is modified if necessary to make it unique.
 BUFFER is the buffer (or buffer name) to associate with the process.
  Process output goes at end of that buffer, unless you specify
- an output stream or filter function to handle the output.
+ a filter function to handle the output.
  BUFFER may be also nil, meaning that this process is not associated
  with any buffer
 Third arg is name of the host to connect to, or its IP address.

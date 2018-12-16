@@ -1,4 +1,4 @@
-From bf56e978684eeebc859fc70983a8805d8210b149 Mon Sep 17 00:00:00 2001
+From 106dcf98d829f04606674df728bb95f99f5298c0 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 10 Oct 2016 17:35:56 -0500
 Subject: Kill gpg agent in package-test.el to avoid a race
@@ -16,14 +16,14 @@ package-test.el should no longer fail during clean up.
   before attempting to delete the gnupg home directory, and then delete
   via "rm -rf" to ignore any vanishing files.
 ---
- test/automated/package-test.el | 9 ++++++++-
+ test/lisp/emacs-lisp/package-tests.el | 9 ++++++++-
  1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/test/automated/package-test.el b/test/automated/package-test.el
-index 637a94bb330..05272736881 100644
---- a/test/automated/package-test.el
-+++ b/test/automated/package-test.el
-@@ -149,7 +149,14 @@ package-test-fake-contents-file
+diff --git a/test/lisp/emacs-lisp/package-tests.el b/test/lisp/emacs-lisp/package-tests.el
+index 62fba58919f..e4aa519a4c6 100644
+--- a/test/lisp/emacs-lisp/package-tests.el
++++ b/test/lisp/emacs-lisp/package-tests.el
+@@ -150,7 +150,14 @@ package-test-fake-contents-file
                 ,@body)))
  
         (when (file-directory-p package-test-user-dir)

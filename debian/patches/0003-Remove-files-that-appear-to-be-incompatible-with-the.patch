@@ -1,4 +1,4 @@
-From 53dad1e8f5cd98546a215217b1f6dcd74fe03981 Mon Sep 17 00:00:00 2001
+From d641a7c62e38661b1d786adc846b73b2e40595d1 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG
@@ -24,16 +24,16 @@ Status: new
 ---
  Makefile.in          | 44 +++++++++++++++++---------------------------
  admin/update_autogen |  3 +--
- configure.ac         | 19 ++++++++-----------
- doc/misc/Makefile.in | 44 +++++---------------------------------------
+ configure.ac         | 15 ++++++---------
+ doc/misc/Makefile.in | 43 +++++--------------------------------------
  lisp/help.el         |  8 ++++++++
- 5 files changed, 39 insertions(+), 79 deletions(-)
+ 5 files changed, 37 insertions(+), 76 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index bba9bb158cc..da42196bd7b 100644
+index 238df40ded8..baed5771863 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
+@@ -159,7 +159,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -44,7 +44,7 @@ index bba9bb158cc..da42196bd7b 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -808,8 +810,7 @@ endef
+@@ -814,8 +816,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -54,7 +54,7 @@ index bba9bb158cc..da42196bd7b 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -936,11 +937,11 @@ check check-expensive: all
+@@ -947,11 +948,11 @@ check check-maybe check-expensive check-all: have-tests all
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -71,7 +71,7 @@ index bba9bb158cc..da42196bd7b 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -961,9 +962,6 @@ info-dir: ${srcdir}/info/dir
+@@ -972,9 +973,6 @@ info-dir: ${srcdir}/info/dir
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,9 +81,9 @@ index bba9bb158cc..da42196bd7b 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -988,14 +986,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
- 	) >$$tempfile && \
- 	${srcdir}/build-aux/move-if-change $${tempfile} ${srcdir}/info/dir
+@@ -996,14 +994,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+ 	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
+ 	) >$@.tmp && mv $@.tmp $@
  
 -INSTALL_DVI = install-emacs-dvi install-lispref-dvi \
 -	install-lispintro-dvi install-misc-dvi
@@ -100,7 +100,7 @@ index bba9bb158cc..da42196bd7b 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1013,14 +1007,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1021,14 +1015,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -120,10 +120,10 @@ index bba9bb158cc..da42196bd7b 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 86054aef9fd..5bc8aeafd45 100755
+index d2118674792..7708b3fa03c 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -269,8 +269,7 @@ info_dir ()
+@@ -259,8 +259,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,25 +134,19 @@ index 86054aef9fd..5bc8aeafd45 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 5853cbbac85..7278ef64cb6 100644
+index 256b954a89c..976667caf32 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5387,11 +5387,11 @@ dnl This will work, but you get a config.status that is not quite right
- dnl (see http://lists.gnu.org/archive/html/bug-autoconf/2008-08/msg00028.html).
- dnl That doesn't have any obvious consequences for Emacs, but on the whole
- dnl it seems better to just live with the duplication.
--SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile"
-+SUBDIR_MAKEFILES="lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/misc/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile"
+@@ -5480,7 +5480,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
+ AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
- AC_CONFIG_FILES([Makefile lib/Makefile lib-src/Makefile oldXMenu/Makefile \
--       doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile \
--       doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile \
-+       doc/misc/Makefile \
-+       src/Makefile lwlib/Makefile lisp/Makefile \
-        leim/Makefile nextstep/Makefile nt/Makefile])
+ m4_define([subdir_makefiles],
+-  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/emacs/Makefile doc/misc/Makefile doc/lispintro/Makefile doc/lispref/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile])
++  [lib/Makefile lib-src/Makefile oldXMenu/Makefile doc/misc/Makefile src/Makefile lwlib/Makefile lisp/Makefile leim/Makefile nextstep/Makefile nt/Makefile])
+ SUBDIR_MAKEFILES="subdir_makefiles"
+ AC_CONFIG_FILES(subdir_makefiles)
  
- dnl test/ is not present in release tarfiles.
-@@ -5443,14 +5443,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5533,14 +5533,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -173,7 +167,7 @@ index 5853cbbac85..7278ef64cb6 100644
  dnl If we give this the more natural name, etc/refcards/emacsver.texi,
  dnl then a directory etc/refcards is created in the build directory,
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 741d56cd207..39d09abeed7 100644
+index 11086b33037..76fca3ff416 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA = @INSTALL_DATA@
@@ -231,7 +225,7 @@ index 741d56cd207..39d09abeed7 100644
  
  ## efaq, efaq_w32 do not depend on gfdl.
  ## Maybe we can use .SECONDEXPANSION for this.
-@@ -203,24 +187,6 @@ efaq%.pdf: ${srcdir}/efaq%.texi
+@@ -203,23 +187,6 @@ efaq%.pdf: ${srcdir}/efaq%.texi
  efaq%.html: ${srcdir}/efaq%.texi
  	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ $<
  
@@ -250,14 +244,13 @@ index 741d56cd207..39d09abeed7 100644
 -	cp gnustmppdf.pdf $@
 -	rm gnustmppdf.*
 -
--${buildinfodir}/tramp.info tramp.html: EXTRA_OPTS = -D emacs
 -${buildinfodir}/tramp.info tramp.html: ${srcdir}/trampver.texi
 -
  
  .PHONY: mostlyclean clean distclean bootstrap-clean maintainer-clean
  
 diff --git a/lisp/help.el b/lisp/help.el
-index 68e8890ee1b..13a80cfa604 100644
+index 77e32848318..22516310692 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -292,6 +292,14 @@ view-help-file
