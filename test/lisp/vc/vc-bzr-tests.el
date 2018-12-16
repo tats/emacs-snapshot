@@ -124,6 +124,7 @@
 ;; https://lists.gnu.org/r/help-gnu-emacs/2012-04/msg00145.html
 (ert-deftest vc-bzr-test-faulty-bzr-autoloads ()
   "Test we can generate autoloads in a bzr directory when bzr is faulty."
+  :tags '(:unstable)
   (skip-unless (executable-find vc-bzr-program))
   (let* ((homedir (make-temp-file "vc-bzr-test" t))
          (bzrdir (expand-file-name "bzr" homedir))
