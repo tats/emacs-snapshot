@@ -21242,7 +21242,10 @@ maybe_produce_line_number (struct it *it)
       if (lnum_face_id != current_lnum_face_id
 	  && (EQ (Vdisplay_line_numbers, Qvisual)
 	      ? this_line == 0
-	      : this_line == it->pt_lnum))
+	      : this_line == it->pt_lnum)
+	  /* Avoid displaying the line-number-current-line face on
+	     empty lines beyond EOB.  */
+	  && it->what != IT_EOB)
 	tem_it.face_id = current_lnum_face_id;
       else
 	tem_it.face_id = lnum_face_id;
@@ -23041,7 +23044,7 @@ Emacs UBA implementation, in particular with the test suite.  */)
     }
   else
     {
-      CHECK_FIXNUM_COERCE_MARKER (vpos);
+      CHECK_FIXNUM (vpos);
       nrow = XFIXNUM (vpos);
     }
 
