@@ -111,6 +111,7 @@
 ;; https://lists.gnu.org/r/help-gnu-emacs/2012-04/msg00145.html
 (ert-deftest vc-bzr-test-faulty-bzr-autoloads ()
   "Test we can generate autoloads in a bzr directory when bzr is faulty."
+  :tags '(:unstable)
   (skip-unless (executable-find vc-bzr-program))
   ;; Avoid vc-mode-line bug;
   ;; http://lists.gnu.org/r/emacs-devel/2018-12/msg00368.html
