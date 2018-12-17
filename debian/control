@@ -118,7 +118,7 @@ Description: Debugging symbols for emacs-gtk
 
 Package: emacs-bin-common
 Architecture: any
-Depends: emacs-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: emacs-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends},
  mailutils
 Description: GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
