@@ -1,10 +1,39 @@
-emacs (1:26.1+1-1~1.gbp37b306) UNRELEASED; urgency=medium
+emacs (1:26.1+1-1) experimental; urgency=medium
 
-  ** SNAPSHOT build @37b3065df60918488d5187015138114d07334d84 **
+  * Merge upstream version 26.1.
 
-  * UNRELEASED
+  * Update debian/copyright version for 26.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 16 Dec 2018 13:05:01 -0600
+  * Use more secure mailutils instead of internal movemail.  See the
+    26.1 NEWS for more information.
+
+  * Add debian/copyright entries for 26.1.
+
+  * Fix epg-tests with upstream patch for newer GnuPG.  Add
+    0009-An-epg-test-failure-with-recent-GnuPG-versions-has-b.patch to
+    fix the problem.
+
+  * Mark the vc-bzr-test-faulty-bzr-autoloads as unstable for now.
+    Add 0010-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch to
+    disable the test for now.  See the patch header for a description
+    of the error.
+
+  * tramp-test42-remote-load-path: regexp-quote directory.  Add
+    0011-tramp-test42-remote-load-path-regexp-quote-directory.patch to
+    fix the problem.  Otherwise the test may fail for some paths like
+    those seen in an sbuild chroot,
+    e.g. build/emacs-i87jK3/emacs-26.1+1/...
+
+  * ibuffer-filter-inclusion-3: regexp-quote directory.  Add
+    0012-ibuffer-filter-inclusion-3-regexp-quote-directory.patch to
+    fix the problem.  Otherwise the test may fail for some paths like
+    those seen in an sbuild chroot,
+    e.g. build/emacs-i87jK3/emacs-26.1+1/...
+
+  * Mark echo-server-with-dns test as :unstable for now.  It fails
+    inside a Debian sbuild chroot.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 17 Dec 2018 16:41:12 -0600
 
 emacs (1:25.2+1-11) unstable; urgency=medium
 
