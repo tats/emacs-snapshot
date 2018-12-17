@@ -9,3 +9,4 @@
 0009-An-epg-test-failure-with-recent-GnuPG-versions-has-b.patch
 0010-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
 0011-tramp-test42-remote-load-path-regexp-quote-directory.patch
+0012-ibuffer-filter-inclusion-3-regexp-quote-directory.patch
