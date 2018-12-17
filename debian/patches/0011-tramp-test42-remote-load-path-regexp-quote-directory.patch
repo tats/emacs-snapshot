@@ -1,0 +1,27 @@
+From ef1a7ddf208a19da9d2dc265b8027fc4f589fccf Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 17 Dec 2018 15:09:12 -0600
+Subject: tramp-test42-remote-load-path: regexp-quote directory
+
+Otherwise the test may fail for some paths like those seen in a Debian
+sbuild chroot, e.g. build/emacs-i87jK3/emacs-26.1+1/...
+---
+ test/lisp/net/tramp-tests.el | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/test/lisp/net/tramp-tests.el b/test/lisp/net/tramp-tests.el
+index 996a31d375f..60f2aaf034b 100644
+--- a/test/lisp/net/tramp-tests.el
++++ b/test/lisp/net/tramp-tests.el
+@@ -4702,8 +4702,9 @@ tramp--test-timeout-handler
+      (string-match
+       (format
+        "Loading %s"
+-       (expand-file-name
+-	"tramp-cmds" (file-name-directory (locate-library "tramp"))))
++       (regexp-quote
++        (expand-file-name
++         "tramp-cmds" (file-name-directory (locate-library "tramp")))))
+       (shell-command-to-string
+        (format
+ 	"%s -batch -Q -L %s -l tramp-sh --eval %s"
