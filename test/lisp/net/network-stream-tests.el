@@ -137,6 +137,7 @@
       ))))
 
 (ert-deftest echo-server-with-dns ()
+  :tags '(:unstable) ;; This doesn't work in an sbuild chroot (at least)
   (let* ((server (make-server (system-name)))
          (port (aref (process-contact server :local) 4))
          (proc (make-network-process :name "foo"
