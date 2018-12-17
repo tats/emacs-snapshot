@@ -1,0 +1,33 @@
+From d13836843d9f34fa308d83bf3dd09ee9d00e142d Mon Sep 17 00:00:00 2001
+From: Glenn Morris <rgm@gnu.org>
+Date: Fri, 14 Dec 2018 20:09:02 -0500
+Subject: An epg test failure with recent GnuPG versions has been fixed
+
+This patch has been backported from upstream to fix m68k build
+failures:
+
+  Fix an epg test for recent GnuPG versions (bug#33439)
+
+  * test/lisp/epg-tests.el (epg-decrypt-1):
+  Tell recent GnuPG (e.g. 2.2.11) not to worry about missing MDC.
+
+Origin: backport, commit: fa953b58afd39d396dab4d76a6ff0b8ba4040eb8)
+Bug: https://debbugs.gnu.org/33439
+Forwarded: not-needed
+---
+ test/lisp/epg-tests.el | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/test/lisp/epg-tests.el b/test/lisp/epg-tests.el
+index 0fe15017dd0..f2cc351d70b 100644
+--- a/test/lisp/epg-tests.el
++++ b/test/lisp/epg-tests.el
+@@ -87,6 +87,8 @@ epg-tests-passphrase-callback
+ (ert-deftest epg-decrypt-1 ()
+   (skip-unless (epg-tests-find-usable-gpg-configuration 'require-passphrase))
+   (with-epg-tests (:require-passphrase t)
++    (with-temp-file (expand-file-name "gpg.conf" epg-tests-home-directory)
++      (insert "ignore-mdc-error"))
+     (should (equal "test"
+ 		   (epg-decrypt-string epg-tests-context "\
+ -----BEGIN PGP MESSAGE-----

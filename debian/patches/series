@@ -6,3 +6,4 @@
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
+0009-An-epg-test-failure-with-recent-GnuPG-versions-has-b.patch
