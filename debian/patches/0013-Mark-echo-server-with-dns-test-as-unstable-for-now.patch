@@ -1,0 +1,22 @@
+From 50583dfa0a2d83a65848bf93c39f14fe3bcf7d10 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 17 Dec 2018 15:27:30 -0600
+Subject: Mark echo-server-with-dns test as :unstable for now
+
+It fails inside a Debian sbuild chroot.
+---
+ test/lisp/net/network-stream-tests.el | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/test/lisp/net/network-stream-tests.el b/test/lisp/net/network-stream-tests.el
+index ddb8f9ea6f5..42515025df8 100644
+--- a/test/lisp/net/network-stream-tests.el
++++ b/test/lisp/net/network-stream-tests.el
+@@ -100,6 +100,7 @@ server-process-filter
+       ))))
+ 
+ (ert-deftest echo-server-with-dns ()
++  :tags '(:unstable) ;; This doesn't work in an sbuild chroot (at least)
+   (let* ((server (make-server (system-name)))
+          (port (aref (process-contact server :local) 4))
+          (proc (make-network-process :name "foo"
