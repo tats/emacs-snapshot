@@ -25,7 +25,7 @@ Standards-Version: 3.7.2
 Package: emacs
 Architecture: all
 Depends:
-  emacs-gtk (>= 1:25) | emacs-lucid (>= 1:25) | emacs-nox (>= 1:25),
+  emacs-gtk (>= 1:26.1) | emacs-lucid (>= 1:26.1) | emacs-nox (>= 1:26.1),
   ${misc:Depends}
 Description: GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
