@@ -1,10 +1,11 @@
-emacs (1:26.1+1-2~1.gbpbf6494) UNRELEASED; urgency=medium
+emacs (1:26.1+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @bf64949666d49f1e62d2a085f7479baf1e7c353f **
+  * Update emacs metapackage to depend on >= 1:26.1.
 
-  * UNRELEASED
+  * Enable support for systemd socket activation.  Thanks to Ansgar
+    Burchardt for the report. (Closes: 916760)
 
- -- Rob Browning <rlb@defaultvalue.org>  Tue, 18 Dec 2018 11:07:43 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 20 Dec 2018 10:49:20 -0600
 
 emacs (1:26.1+1-1) experimental; urgency=medium
 
