@@ -7,6 +7,7 @@ Build-Depends: bsd-mailx | mailx, libncurses5-dev, texinfo, liblockfile-dev, lib
  gnupg-agent,
  libgif-dev | libungif4-dev,
  libtiff-dev,
+ libsystemd-dev,
  procps,
  xaw3dg-dev,
  libpng-dev, libjpeg-dev, libm17n-dev, libotf-dev,
