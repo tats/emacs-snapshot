@@ -1,3 +1,11 @@
+emacs (1:26.1+1-3~1.gbp2b7037) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @2b703713167abe649fe5ca2d50a9d958f2417114 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 21 Dec 2018 10:20:40 -0600
+
 emacs (1:26.1+1-2) unstable; urgency=medium
 
   * Update emacs metapackage to depend on >= 1:26.1.
