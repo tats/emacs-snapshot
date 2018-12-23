@@ -147,14 +147,14 @@
 
 ;; Add defaults for `tramp-default-user-alist' and `tramp-default-host-alist'.
 ;;;###tramp-autoload
-(when (string-match "\\(.+\\)@\\(\\(?:gmail\\|googlemail\\)\\.com\\)"
-		    user-mail-address)
-  (add-to-list 'tramp-default-user-alist
-	       `("\\`gdrive\\'" nil ,(match-string 1 user-mail-address)))
-  (add-to-list 'tramp-default-host-alist
-	       '("\\`gdrive\\'" nil ,(match-string 2 user-mail-address))))
+(tramp--with-startup
+ (when (string-match "\\(.+\\)@\\(\\(?:gmail\\|googlemail\\)\\.com\\)"
+		     user-mail-address)
+   (add-to-list 'tramp-default-user-alist
+	        `("\\`gdrive\\'" nil ,(match-string 1 user-mail-address)))
+   (add-to-list 'tramp-default-host-alist
+	        '("\\`gdrive\\'" nil ,(match-string 2 user-mail-address)))))
 
-;;;###tramp-autoload
 (defcustom tramp-gvfs-zeroconf-domain "local"
   "Zeroconf domain to be used for discovering services, like host names."
   :group 'tramp
@@ -165,9 +165,10 @@
 ;; completion.
 ;;;###tramp-autoload
 (when (featurep 'dbusbind)
-  (dolist (elt tramp-gvfs-methods)
-    (unless (assoc elt tramp-methods)
-      (add-to-list 'tramp-methods (cons elt nil)))))
+  (tramp--with-startup
+   (dolist (elt tramp-gvfs-methods)
+     (unless (assoc elt tramp-methods)
+       (add-to-list 'tramp-methods (cons elt nil))))))
 
 (defconst tramp-gvfs-path-tramp (concat dbus-path-emacs "/Tramp")
   "The preceding object path for own objects.")
@@ -577,6 +578,7 @@ It has been changed in GVFS 1.14.")
     (make-directory . tramp-gvfs-handle-make-directory)
     (make-directory-internal . ignore)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
+    (make-process . ignore)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
     (process-file . ignore)
     (rename-file . tramp-gvfs-handle-rename-file)
@@ -589,6 +591,7 @@ It has been changed in GVFS 1.14.")
     (start-file-process . ignore)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
@@ -620,8 +623,9 @@ pass to the OPERATION."
 
 ;;;###tramp-autoload
 (when (featurep 'dbusbind)
-  (tramp-register-foreign-file-name-handler
-   'tramp-gvfs-file-name-p 'tramp-gvfs-file-name-handler))
+  (tramp--with-startup
+   (tramp-register-foreign-file-name-handler
+    #'tramp-gvfs-file-name-p #'tramp-gvfs-file-name-handler)))
 
 
 ;; D-Bus helper function.
@@ -1843,7 +1847,7 @@ connection if a previous connection has died for some reason."
 	 (tramp-get-connection-process vec) "connected" t))))
 
   ;; In `tramp-check-cached-permissions', the connection properties
-  ;; {uig,gid}-{integer,string} are used.  We set them to proper values.
+  ;; "{uid,gid}-{integer,string}" are used.  We set them to proper values.
   (unless tramp-gvfs-get-remote-uid-gid-in-progress
     (let ((tramp-gvfs-get-remote-uid-gid-in-progress t))
       (tramp-gvfs-get-remote-uid vec 'integer)

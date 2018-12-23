@@ -35,14 +35,12 @@
 
 (require 'tramp)
 
-;;;###tramp-autoload
 (defcustom tramp-adb-program "adb"
   "Name of the Android Debug Bridge program."
   :group 'tramp
   :version "24.4"
   :type 'string)
 
-;;;###tramp-autoload
 (defcustom tramp-adb-connect-if-not-connected nil
   "Try to run `adb connect' if provided device is not connected currently.
 It is used for TCP/IP devices."
@@ -54,7 +52,6 @@ It is used for TCP/IP devices."
 (defconst tramp-adb-method "adb"
   "When this method name is used, forward all calls to Android Debug Bridge.")
 
-;;;###tramp-autoload
 (defcustom tramp-adb-prompt
   "^\\(?:[[:digit:]]*|?\\)?\\(?:[[:alnum:]\e;[]*@?[[:alnum:]]*[^#\\$]*\\)?[#\\$][[:space:]]"
   "Regexp used as prompt in almquist shell."
@@ -78,18 +75,16 @@ It is used for TCP/IP devices."
   "Regexp for ls output.")
 
 ;;;###tramp-autoload
-(add-to-list 'tramp-methods
-	     `(,tramp-adb-method
-	       (tramp-tmpdir "/data/local/tmp")
-               (tramp-default-port 5555)))
+(tramp--with-startup
+ (add-to-list 'tramp-methods
+	      `(,tramp-adb-method
+	        (tramp-tmpdir "/data/local/tmp")
+                (tramp-default-port 5555)))
 
-;;;###tramp-autoload
-(add-to-list 'tramp-default-host-alist `(,tramp-adb-method nil ""))
+ (add-to-list 'tramp-default-host-alist `(,tramp-adb-method nil ""))
 
-;;;###tramp-autoload
-(eval-after-load 'tramp
-  '(tramp-set-completion-function
-    tramp-adb-method '((tramp-adb-parse-device-names ""))))
+ (tramp-set-completion-function
+  tramp-adb-method '((tramp-adb-parse-device-names ""))))
 
 ;;;###tramp-autoload
 (defconst tramp-adb-file-name-handler-alist
@@ -149,6 +144,7 @@ It is used for TCP/IP devices."
     (make-directory . tramp-adb-handle-make-directory)
     (make-directory-internal . ignore)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
+    (make-process . ignore)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
     (process-file . tramp-adb-handle-process-file)
     (rename-file . tramp-adb-handle-rename-file)
@@ -161,6 +157,7 @@ It is used for TCP/IP devices."
     (start-file-process . tramp-adb-handle-start-file-process)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
@@ -187,8 +184,9 @@ pass to the OPERATION."
       (tramp-run-real-handler operation args))))
 
 ;;;###tramp-autoload
-(tramp-register-foreign-file-name-handler
- 'tramp-adb-file-name-p 'tramp-adb-file-name-handler)
+(tramp--with-startup
+ (tramp-register-foreign-file-name-handler
+  #'tramp-adb-file-name-p #'tramp-adb-file-name-handler))
 
 ;;;###tramp-autoload
 (defun tramp-adb-parse-device-names (_ignore)

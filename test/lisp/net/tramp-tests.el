@@ -57,8 +57,12 @@
 (declare-function tramp-method-out-of-band-p "tramp-sh")
 (declare-function tramp-smb-get-localname "tramp-smb")
 (defvar auto-save-file-name-transforms)
+(defvar tramp-connection-properties)
 (defvar tramp-copy-size-limit)
+(defvar tramp-display-escape-sequence-regexp)
+(defvar tramp-inline-compress-start-size)
 (defvar tramp-persistency-file-name)
+(defvar tramp-remote-path)
 (defvar tramp-remote-process-environment)
 
 ;; Beautify batch mode.
@@ -3009,7 +3013,7 @@ This tests also `file-readable-p', `file-regular-p' and
   "Check `file-modes'.
 This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
   (skip-unless (tramp--test-enabled))
-  (skip-unless (tramp--test-sh-p))
+  (skip-unless (or (tramp--test-sh-p) (tramp--test-sudoedit-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
@@ -3309,7 +3313,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 (ert-deftest tramp-test22-file-times ()
   "Check `set-file-times' and `file-newer-than-file-p'."
   (skip-unless (tramp--test-enabled))
-  (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless
+   (or (tramp--test-adb-p) (tramp--test-sh-p) (tramp--test-sudoedit-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name1 (tramp--test-make-temp-name nil quoted))
@@ -4181,6 +4186,72 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
       ;; Cleanup.
       (ignore-errors (delete-file tmp-name)))))
 
+;; This test is inspired by Bug#33781.
+;; `exec-path' was introduced in Emacs 27.1.  `executable-find' has
+;; changed the number of parameters, so we use `apply' for older
+;; Emacsen.
+(ert-deftest tramp-test34-remote-path ()
+  "Check loooong `tramp-remote-path'."
+  (skip-unless (tramp--test-enabled))
+  (skip-unless (tramp--test-sh-p))
+  ;; Since Emacs 27.1.
+  (skip-unless (fboundp 'exec-path))
+
+  (let* ((tmp-name (tramp--test-make-temp-name))
+	 (default-directory tramp-test-temporary-file-directory)
+         (orig-exec-path (exec-path))
+         (tramp-remote-path tramp-remote-path)
+	 (orig-tramp-remote-path tramp-remote-path))
+    (unwind-protect
+	(progn
+          ;; Non existing directories are removed.
+          (setq tramp-remote-path
+                (cons (file-remote-p tmp-name 'localname) tramp-remote-path))
+          (tramp-cleanup-connection
+           (tramp-dissect-file-name tramp-test-temporary-file-directory)
+           'keep-debug 'keep-password)
+          (should (equal (with-no-warnings (exec-path)) orig-exec-path))
+          (setq tramp-remote-path orig-tramp-remote-path)
+
+          ;; Double entries are removed.
+          (setq tramp-remote-path (append '("/" "/") tramp-remote-path))
+          (tramp-cleanup-connection
+           (tramp-dissect-file-name tramp-test-temporary-file-directory)
+           'keep-debug 'keep-password)
+          (should
+	   (equal (with-no-warnings (exec-path)) (cons "/" orig-exec-path)))
+          (setq tramp-remote-path orig-tramp-remote-path)
+
+          ;; We make a super long `tramp-remote-path'.
+          (make-directory tmp-name)
+          (should (file-directory-p tmp-name))
+          (while (< (length (mapconcat 'identity orig-exec-path ":")) 5000)
+            (let ((dir (make-temp-file (file-name-as-directory tmp-name) 'dir)))
+              (should (file-directory-p dir))
+              (setq tramp-remote-path
+                    (cons (file-remote-p dir 'localname) tramp-remote-path)
+                    orig-exec-path
+                    (cons (file-remote-p dir 'localname) orig-exec-path))))
+          (tramp-cleanup-connection
+           (tramp-dissect-file-name tramp-test-temporary-file-directory)
+           'keep-debug 'keep-password)
+          (should (equal (with-no-warnings (exec-path)) orig-exec-path))
+          (should
+	   (string-equal
+	    ;; Ignore trailing newline.
+	    (substring (shell-command-to-string "echo $PATH") nil -1)
+	    ;; The last element of `exec-path' is `exec-directory'.
+	    (mapconcat 'identity (butlast orig-exec-path) ":")))
+	  ;; The shell "sh" shall always exist.
+	  (should (apply 'executable-find '("sh" remote))))
+
+      ;; Cleanup.
+      (tramp-cleanup-connection
+       (tramp-dissect-file-name tramp-test-temporary-file-directory)
+       'keep-debug 'keep-password)
+      (setq tramp-remote-path orig-tramp-remote-path)
+      (ignore-errors (delete-directory tmp-name 'recursive)))))
+
 (ert-deftest tramp-test35-vc-registered ()
   "Check `vc-registered'."
   :tags '(:expensive-test)
@@ -4567,6 +4638,10 @@ This does not support special file names."
    (tramp-find-foreign-file-name-handler tramp-test-temporary-file-directory)
    'tramp-sh-file-name-handler))
 
+(defun tramp--test-sudoedit-p ()
+  "Check, whether the sudoedit method is used."
+  (tramp-sudoedit-file-name-p tramp-test-temporary-file-directory))
+
 (defun tramp--test-windows-nt ()
   "Check, whether the locale host runs MS Windows."
   (eq system-type 'windows-nt))
@@ -4761,6 +4836,7 @@ This requires restrictions of file name syntax."
 	 (list
 	  (if (or (tramp--test-gvfs-p)
 		  (tramp--test-rclone-p)
+		  (tramp--test-sudoedit-p)
 		  (tramp--test-windows-nt-or-smb-p))
 	      "foo bar baz"
 	    (if (or (tramp--test-adb-p)
@@ -5276,8 +5352,9 @@ process sentinels.  They shall not disturb each other."
      (string-match
       (format
        "Loading %s"
-       (expand-file-name
-	"tramp-cmds" (file-name-directory (locate-library "tramp"))))
+       (regexp-quote
+        (expand-file-name
+         "tramp-cmds" (file-name-directory (locate-library "tramp")))))
       (shell-command-to-string
        (format
 	"%s -batch -Q -L %s -l tramp-sh --eval %s"

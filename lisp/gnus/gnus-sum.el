@@ -3064,6 +3064,7 @@ The following commands are available:
   (let ((gnus-summary-local-variables gnus-newsgroup-variables))
     (gnus-summary-make-local-variables))
   (gnus-summary-make-local-variables)
+  (setq gnus-newsgroup-name gnus-summary-mode-group)
   (when (gnus-visual-p 'summary-menu 'menu)
     (gnus-summary-make-menu-bar)
     (gnus-summary-make-tool-bar))
@@ -3457,6 +3458,11 @@ display only a single character."
 					       (point)
 					       (current-buffer))))))
 
+(defvar gnus-summary-mode-group nil
+  "Variable for communication with `gnus-summary-mode'.
+Allows the `gnus-newsgroup-name' local variable to be set before
+the summary mode hooks are run.")
+
 (defun gnus-summary-setup-buffer (group)
   "Initialize summary buffer for GROUP.
 This function does all setup work that relies on the specific
@@ -3476,10 +3482,10 @@ Returns non-nil if the setup was successful."
 	  (not gnus-newsgroup-prepared))
       (set-buffer (gnus-get-buffer-create buffer))
       (setq gnus-summary-buffer (current-buffer))
-      (gnus-summary-mode)
+      (let ((gnus-summary-mode-group group))
+       (gnus-summary-mode))
       (when (gnus-group-quit-config group)
 	(set (make-local-variable 'gnus-single-article-buffer) nil))
-      (setq gnus-newsgroup-name group)
       (turn-on-gnus-mailing-list-mode)
       ;; These functions don't currently depend on GROUP, but might in
       ;; the future.
@@ -4773,7 +4779,7 @@ If LINE, insert the rebuilt thread starting on line LINE."
   (let (headers thread last-id)
     ;; First go up in this thread until we find the root.
     (setq last-id (gnus-root-id id)
-	  headers (message-flatten-list (gnus-id-to-thread last-id)))
+	  headers (flatten-tree (gnus-id-to-thread last-id)))
     ;; We have now found the real root of this thread.  It might have
     ;; been gathered into some loose thread, so we have to search
     ;; through the threads to find the thread we wanted.
@@ -5069,7 +5075,7 @@ Unscored articles will be counted as having a score of zero."
   "Return the highest article number in THREAD."
   (apply 'max (mapcar (lambda (header)
 			(mail-header-number header))
-		      (message-flatten-list thread))))
+		      (flatten-tree thread))))
 
 (defun gnus-article-sort-by-most-recent-date (h1 h2)
   "Sort articles by number."
@@ -5087,9 +5093,9 @@ Unscored articles will be counted as having a score of zero."
   "Return the highest article date in THREAD."
   (apply 'max
 	 (mapcar (lambda (header) (float-time
-				   (gnus-date-get-time
-				    (mail-header-date header))))
-		 (message-flatten-list thread))))
+			      (gnus-date-get-time
+			       (mail-header-date header))))
+		 (flatten-tree thread))))
 
 (defun gnus-thread-total-score-1 (root)
   ;; This function find the total score of the thread below ROOT.

@@ -45,8 +45,6 @@
 (require 'timer)
 (require 'ucs-normalize)
 
-(require 'tramp-loaddefs)
-
 ;; For not existing functions, obsolete functions, or functions with a
 ;; changed argument list, there are compiler warnings.  We want to
 ;; avoid them in cases we know what we do.
@@ -230,6 +228,7 @@ If NAME is a remote file name, the local part of NAME is unquoted."
 ;; support old settings.
 (defsubst tramp-compat-tramp-syntax ()
   "Return proper value of `tramp-syntax'."
+  (defvar tramp-syntax)
   (cond ((eq tramp-syntax 'ftp) 'default)
 	((eq tramp-syntax 'sep) 'separate)
 	(t tramp-syntax)))
@@ -265,23 +264,25 @@ If NAME is a remote file name, the local part of NAME is unquoted."
 A nil value for either argument stands for the current time."
     (equal (or t1 (current-time)) (or t2 (current-time)))))
 
+;; `flatten-tree' has appeared in Emacs 27.1.
+(if (fboundp 'flatten-tree)
+    (defalias 'tramp-compat-flatten-tree 'flatten-tree)
+  (defun tramp-compat-flatten-tree (tree)
+    "Take TREE and \"flatten\" it."
+    (let (elems)
+      (setq tree (list tree))
+      (while (let ((elem (pop tree)))
+               (cond ((consp elem)
+                      (setq tree (cons (car elem) (cons (cdr elem) tree))))
+                     (elem
+                      (push elem elems)))
+               tree))
+      (nreverse elems))))
+
 (add-hook 'tramp-unload-hook
 	  (lambda ()
 	    (unload-feature 'tramp-loaddefs 'force)
 	    (unload-feature 'tramp-compat 'force)))
-
-;; There does not exist a common `flatten-list' yet, this is discussed
-;; in Bug#33309.  For the time being we implement our own version,
-;; derived from `eshell-flatten-list'.
-(defun tramp-compat-flatten-list (args)
-  "Flatten any lists within ARGS, so that there are no sublists."
-  (let ((new-list (list t)))
-    (dolist (a args)
-      (if (and (listp a)
-	       (listp (cdr a)))
-	  (nconc new-list (tramp-compat-flatten-list a))
-	(nconc new-list (list a))))
-    (cdr new-list)))
 
 (provide 'tramp-compat)
 

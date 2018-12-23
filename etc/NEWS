@@ -243,6 +243,12 @@ when the last screen line in a window is not fully visible.
 ** New variable 'emacs-repository-branch'.
 It reports the git branch from which Emacs was built.
 
++++
+** New user option 'switch-to-buffer-obey-display-actions'.
+When non-nil, 'switch-to-buffer' uses 'pop-to-buffer-same-window' that
+respects display actions specified by 'display-buffer-alist' and
+'display-buffer-overriding-action'.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -305,10 +311,12 @@ the node "(emacs) Directory Variables" of the user manual.
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
 ** map.el
-*** Now defined via generic functions that can be extended via cl-defmethod.
+*** Now also understands plists.
+*** Now defined via generic functions that can be extended via 'cl-defmethod'.
 *** Deprecate the 'map-put' macro in favor of a new 'map-put!' function.
-*** map-contains-key now returns a boolean rather than the key.
+*** 'map-contains-key' now returns a boolean rather than the key.
 *** Deprecate the 'testfn' args of 'map-elt' and 'map-contains-key'.
+*** New generic function 'map-insert'.
 
 ---
 ** Follow mode
@@ -335,11 +343,12 @@ displays the *Messages* buffer in the same window.
 
 *** Windmove also supports directional window deletion.
 The new command 'windmove-delete-default-keybindings' binds default
-keys with provided prefix (by default, C-x) and modifiers (by default,
-Shift) to the commands that delete the window in the specified
+keys with provided prefix (by default, 'C-x') and modifiers (by default,
+'Shift') to the commands that delete the window in the specified
 direction.  For example, 'C-x S-down' deletes the window below.
-With a prefix arg 'C-u', deletes the selected window and selects
-the window that was in the specified direction.
+With a prefix arg 'C-u', also kills the buffer in that window.
+With 'M-0', deletes the selected window and selects the window
+that was in the specified direction.
 
 ** Octave mode
 The mode is automatically enabled in files that start with the
@@ -411,6 +420,12 @@ and compares their entire trees.
 ** Diff mode
 *** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
+
++++
+*** Better syntax highlighting of Diff hunks.
+Fragments of source in Diff hunks are now by default highlighted
+according to the appropriate major mode.  Customize the new option
+'diff-font-lock-syntax' to nil to disable this.
 
 *** File headers can be shortened, mimicking Magit's diff format.
 To enable it, set the new defcustom 'diff-font-lock-prettify' to t.
@@ -865,6 +880,12 @@ or NextCloud hosted files and directories.
 storages via the 'rclone' program.  This feature is experimental.
 
 +++
+*** New connection method "sudoedit", which allows to edit local files
+with different user credentials.  Contrary to the "sudo" method, no
+session is run permanently in the background.  This is for security
+reasons.
+
++++
 *** Connection methods "obex" and "synce" are removed, because they
 are obsoleted in GVFS.
 
@@ -1128,7 +1149,7 @@ removed.
 * Lisp Changes in Emacs 27.1
 
 +++
-** self-insert-command takes the char to insert as (optional) argument
+** 'self-insert-command' takes the char to insert as (optional) argument.
 
 ** 'lookup-key' can take a list of keymaps as argument.
 
@@ -1353,6 +1374,12 @@ are implemented in C using the Jansson library.
 ** New function 'ring-resize'.
 'ring-resize' can be used to grow or shrink a ring.
 
++++
+** New function 'flatten-tree'.
+'flatten-list' is provided as an alias. These functions take a tree
+and 'flatten' it such that the result is a list of all the terminal
+nodes.
+
 ** Mailcap
 
 ---
@@ -1400,6 +1427,12 @@ un-obsoleting it.
 
 +++
 ** New function 'group-name' returns a group name corresponding to GID.
+
++++
+** 'make-process' now takes a keyword argument ':file-handler'; if
+that is non-nil, it will look for a file name handler for the current
+buffer's 'default-directory' and invoke that file name handler to make
+the process.  That way 'make-process' can start remote processes.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

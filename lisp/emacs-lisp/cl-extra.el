@@ -438,9 +438,7 @@ as an integer unless JUNK-ALLOWED is non-nil."
 ;; Random numbers.
 
 (defun cl--random-time ()
-  (let* ((time (copy-sequence (current-time-string))) (i (length time)) (v 0))
-    (while (>= (cl-decf i) 0) (setq v (+ (* v 3) (aref time i))))
-    v))
+  (car (encode-time nil t)))
 
 ;;;###autoload (autoload 'cl-random-state-p "cl-extra")
 (cl-defstruct (cl--random-state
@@ -484,7 +482,7 @@ Optional second arg STATE is a random-state object."
 If STATE is t, return a new state object seeded from the time of day."
   (unless state (setq state cl--random-state))
   (if (cl-random-state-p state)
-      (copy-tree state t)
+      (copy-sequence state)
     (cl--make-random-state (if (integerp state) state (cl--random-time)))))
 
 ;; Implementation limits.

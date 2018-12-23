@@ -383,13 +383,11 @@ backwards, if negative).
 Finds and highlights the source line like \\[next-error], but does not
 select the source buffer."
   (interactive "p")
-  (let ((next-error-highlight next-error-highlight-no-select))
-    (next-error n))
-  (let ((display-buffer-overriding-action '(display-buffer-reuse-window)))
-    ;; Override user customization such as display-buffer-same-window
-    ;; and use display-buffer-reuse-window to ensure next-error-last-buffer
-    ;; is displayed somewhere, not necessarily in the same window (bug#32607).
-    (pop-to-buffer next-error-last-buffer)))
+  (save-selected-window
+    (let ((next-error-highlight next-error-highlight-no-select)
+          (display-buffer-overriding-action
+           '(nil (inhibit-same-window . t))))
+      (next-error n))))
 
 (defun previous-error-no-select (&optional n)
   "Move point to the previous error in the `next-error' buffer and highlight match.
@@ -1615,7 +1613,7 @@ this command arranges for all errors to enter the debugger."
          (eval-expression-get-print-arguments current-prefix-arg)))
 
   (if (null eval-expression-debug-on-error)
-      (push (eval exp lexical-binding) values)
+      (push (eval (macroexpand-all exp) lexical-binding) values)
     (let ((old-value (make-symbol "t")) new-value)
       ;; Bind debug-on-error to something unique so that we can
       ;; detect when evalled code changes it.
@@ -3893,17 +3891,17 @@ interactively, this is t."
 
 (defun process-file (program &optional infile buffer display &rest args)
   "Process files synchronously in a separate process.
-Similar to `call-process', but may invoke a file handler based on
+Similar to `call-process', but may invoke a file name handler based on
 `default-directory'.  The current working directory of the
 subprocess is `default-directory'.
 
 File names in INFILE and BUFFER are handled normally, but file
 names in ARGS should be relative to `default-directory', as they
 are passed to the process verbatim.  (This is a difference to
-`call-process' which does not support file handlers for INFILE
+`call-process' which does not support file name handlers for INFILE
 and BUFFER.)
 
-Some file handlers might not support all variants, for example
+Some file name handlers might not support all variants, for example
 they might behave as if DISPLAY was nil, regardless of the actual
 value passed."
   (let ((fh (find-file-name-handler default-directory 'process-file))
@@ -3927,7 +3925,7 @@ value passed."
 
 By default, this variable is always set to t, meaning that a
 call of `process-file' could potentially change any file on a
-remote host.  When set to nil, a file handler could optimize
+remote host.  When set to nil, a file name handler could optimize
 its behavior with respect to remote file attribute caching.
 
 You should only ever change this variable with a let-binding;
@@ -3936,7 +3934,7 @@ never with `setq'.")
 (defun start-file-process (name buffer program &rest program-args)
   "Start a program in a subprocess.  Return the process object for it.
 
-Similar to `start-process', but may invoke a file handler based on
+Similar to `start-process', but may invoke a file name handler based on
 `default-directory'.  See Info node `(elisp)Magic File Names'.
 
 This handler ought to run PROGRAM, perhaps on the local host,
@@ -3945,7 +3943,7 @@ In the latter case, the local part of `default-directory' becomes
 the working directory of the process.
 
 PROGRAM and PROGRAM-ARGS might be file names.  They are not
-objects of file handler invocation.  File handlers might not
+objects of file name handler invocation.  File name handlers might not
 support pty association, if PROGRAM is nil."
   (let ((fh (find-file-name-handler default-directory 'start-file-process)))
     (if fh (apply fh 'start-file-process name buffer program program-args)

@@ -42,7 +42,6 @@
 (defconst tramp-rclone-method "rclone"
   "When this method name is used, forward all calls to rclone mounts.")
 
-;;;###tramp-autoload
 (defcustom tramp-rclone-program "rclone"
   "Name of the rclone program."
   :group 'tramp
@@ -50,18 +49,19 @@
   :type 'string)
 
 ;;;###tramp-autoload
-(add-to-list
- 'tramp-methods
- `(,tramp-rclone-method
-   (tramp-mount-args nil)
-   (tramp-copyto-args nil)
-   (tramp-moveto-args nil)
-   (tramp-about-args ("--full"))))
+(tramp--with-startup
+ (add-to-list
+  'tramp-methods
+  `(,tramp-rclone-method
+    (tramp-mount-args nil)
+    (tramp-copyto-args nil)
+    (tramp-moveto-args nil)
+    (tramp-about-args ("--full")))))
 
 ;;;###tramp-autoload
-(eval-after-load 'tramp
-  '(tramp-set-completion-function
-    tramp-rclone-method '((tramp-rclone-parse-device-names ""))))
+(tramp--with-startup
+ (tramp-set-completion-function
+  tramp-rclone-method '((tramp-rclone-parse-device-names ""))))
 
 
 ;; New handlers should be added here.
@@ -122,6 +122,7 @@
     (make-directory . tramp-rclone-handle-make-directory)
     (make-directory-internal . ignore)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
+    (make-process . ignore)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
     (process-file . ignore)
     (rename-file . tramp-rclone-handle-rename-file)
@@ -134,6 +135,7 @@
     (start-file-process . ignore)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
@@ -161,8 +163,9 @@ pass to the OPERATION."
       (tramp-run-real-handler operation args))))
 
 ;;;###tramp-autoload
-(tramp-register-foreign-file-name-handler
- 'tramp-rclone-file-name-p 'tramp-rclone-file-name-handler)
+(tramp--with-startup
+ (tramp-register-foreign-file-name-handler
+  #'tramp-rclone-file-name-p #'tramp-rclone-file-name-handler))
 
 ;;;###tramp-autoload
 (defun tramp-rclone-parse-device-names (_ignore)
@@ -575,7 +578,7 @@ connection if a previous connection has died for some reason."
 	  (tramp-cleanup-connection vec 'keep-debug 'keep-password)))))
 
   ;; In `tramp-check-cached-permissions', the connection properties
-  ;; {uig,gid}-{integer,string} are used.  We set them to proper values.
+  ;; "{uid,gid}-{integer,string}" are used.  We set them to proper values.
   (with-tramp-connection-property
       vec "uid-integer" (tramp-get-local-uid 'integer))
   (with-tramp-connection-property

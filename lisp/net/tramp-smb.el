@@ -38,45 +38,43 @@
 ;; ... and add it to the method list.
 ;;;###tramp-autoload
 (unless (memq system-type '(cygwin windows-nt))
-  (add-to-list 'tramp-methods
-    `(,tramp-smb-method
-      ;; We define an empty command, because `tramp-smb-call-winexe'
-      ;; opens already the powershell.  Used in `tramp-handle-shell-command'.
-      (tramp-remote-shell "")
-      ;; This is just a guess.  We don't know whether the share "C$"
-      ;; is available for public use, and whether the user has write
-      ;; access.
-      (tramp-tmpdir "/C$/Temp")
-      ;; Another guess.  We might implement a better check later on.
-      (tramp-case-insensitive t))))
+  (tramp--with-startup
+   (add-to-list 'tramp-methods
+                `(,tramp-smb-method
+                  ;; We define an empty command, because
+                  ;; `tramp-smb-call-winexe' opens already the powershell.
+                  ;; Used in `tramp-handle-shell-command'.
+                  (tramp-remote-shell "")
+                  ;; This is just a guess.  We don't know whether the share "C$"
+                  ;; is available for public use, and whether the user has write
+                  ;; access.
+                  (tramp-tmpdir "/C$/Temp")
+                  ;; Another guess.  We might implement a better check later on.
+                  (tramp-case-insensitive t)))))
 
 ;; Add a default for `tramp-default-user-alist'. Rule: For the SMB method,
 ;; the anonymous user is chosen.
 ;;;###tramp-autoload
-(add-to-list 'tramp-default-user-alist
-	     `(,(concat "\\`" tramp-smb-method "\\'") nil nil))
+(tramp--with-startup
+ (add-to-list 'tramp-default-user-alist
+	      `(,(concat "\\`" tramp-smb-method "\\'") nil nil))
 
-;; Add completion function for SMB method.
-;;;###tramp-autoload
-(eval-after-load 'tramp
-  '(tramp-set-completion-function
-    tramp-smb-method
-    '((tramp-parse-netrc "~/.netrc"))))
+ ;; Add completion function for SMB method.
+ (tramp-set-completion-function
+  tramp-smb-method
+  '((tramp-parse-netrc "~/.netrc"))))
 
-;;;###tramp-autoload
 (defcustom tramp-smb-program "smbclient"
   "Name of SMB client to run."
   :group 'tramp
   :type 'string)
 
-;;;###tramp-autoload
 (defcustom tramp-smb-acl-program "smbcacls"
   "Name of SMB acls to run."
   :group 'tramp
   :type 'string
   :version "24.4")
 
-;;;###tramp-autoload
 (defcustom tramp-smb-conf "/dev/null"
   "Path of the smb.conf file.
 If it is nil, no smb.conf will be added to the `tramp-smb-program'
@@ -270,6 +268,7 @@ See `tramp-actions-before-shell' for more info.")
     (make-directory . tramp-smb-handle-make-directory)
     (make-directory-internal . tramp-smb-handle-make-directory-internal)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
+    (make-process . ignore)
     (make-symbolic-link . tramp-smb-handle-make-symbolic-link)
     (process-file . tramp-smb-handle-process-file)
     (rename-file . tramp-smb-handle-rename-file)
@@ -282,6 +281,7 @@ See `tramp-actions-before-shell' for more info.")
     (start-file-process . tramp-smb-handle-start-file-process)
     (substitute-in-file-name . tramp-smb-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
@@ -290,7 +290,6 @@ See `tramp-actions-before-shell' for more info.")
 Operations not mentioned here will be handled by the default Emacs primitives.")
 
 ;; Options for remote processes via winexe.
-;;;###tramp-autoload
 (defcustom tramp-smb-winexe-program "winexe"
   "Name of winexe client to run.
 If it isn't found in the local $PATH, the absolute path of winexe
@@ -299,7 +298,6 @@ shall be given.  This is needed for remote processes."
   :type 'string
   :version "24.3")
 
-;;;###tramp-autoload
 (defcustom tramp-smb-winexe-shell-command "powershell.exe"
   "Shell to be used for processes on remote machines.
 This must be Powershell V2 compatible."
@@ -307,7 +305,6 @@ This must be Powershell V2 compatible."
   :type 'string
   :version "24.3")
 
-;;;###tramp-autoload
 (defcustom tramp-smb-winexe-shell-command-switch "-file -"
   "Command switch used together with `tramp-smb-winexe-shell-command'.
 This can be used to disable echo etc."
@@ -336,8 +333,9 @@ pass to the OPERATION."
 
 ;;;###tramp-autoload
 (unless (memq system-type '(cygwin windows-nt))
-  (tramp-register-foreign-file-name-handler
-   'tramp-smb-file-name-p 'tramp-smb-file-name-handler))
+  (tramp--with-startup
+   (tramp-register-foreign-file-name-handler
+    #'tramp-smb-file-name-p #'tramp-smb-file-name-handler)))
 
 ;; File name primitives.
 

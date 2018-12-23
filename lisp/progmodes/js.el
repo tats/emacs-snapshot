@@ -623,12 +623,6 @@ then the \".\"s will be lined up:
   "Parse state at `js--last-parse-pos'.")
 (make-variable-buffer-local 'js--state-at-last-parse-pos)
 
-(defun js--flatten-list (list)
-  (cl-loop for item in list
-           nconc (cond ((consp item)
-                        (js--flatten-list item))
-                       (item (list item)))))
-
 (defun js--maybe-join (prefix separator suffix &rest list)
   "Helper function for `js--update-quick-match-re'.
 If LIST contains any element that is not nil, return its non-nil
@@ -636,7 +630,7 @@ elements, separated by SEPARATOR, prefixed by PREFIX, and ended
 with SUFFIX as with `concat'.  Otherwise, if LIST is empty, return
 nil.  If any element in LIST is itself a list, flatten that
 element."
-  (setq list (js--flatten-list list))
+  (setq list (flatten-tree list))
   (when list
     (concat prefix (mapconcat #'identity list separator) suffix)))
 
