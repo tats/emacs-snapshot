@@ -1,4 +1,4 @@
-From aa6d56308cb108ba5ada2e3622a153da47560170 Mon Sep 17 00:00:00 2001
+From f152cea93d7eb7eb32e1a08ed8e89a67cd2444a5 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -14,7 +14,7 @@ Status: new
  1 file changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 741d56cd207..563ef8230e3 100644
+index 11086b33037..0aed0626f77 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -67,7 +67,7 @@ DOCMISC_W32 = @DOCMISC_W32@
