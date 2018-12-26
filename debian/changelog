@@ -1,10 +1,10 @@
-emacs-non-dfsg (1:26.1+1-1~1.gbpaef20d) UNRELEASED; urgency=medium
+emacs-non-dfsg (1:26.1+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @aef20d4cf76985ae90c4544893ceb719217454c9 **
+  * Merge upstream version 26.1. (Closes: 917004)
 
-  * UNRELEASED
+  * Update debian/ for 26.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Wed, 26 Dec 2018 14:13:58 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 26 Dec 2018 14:56:11 -0600
 
 emacs-non-dfsg (1:25.2+1-3) unstable; urgency=medium
 
