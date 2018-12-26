@@ -1,10 +1,9 @@
-emacs (1:26.1+1-3~1.gbp2b7037) UNRELEASED; urgency=medium
+emacs (1:26.1+1-3) unstable; urgency=medium
 
-  ** SNAPSHOT build @2b703713167abe649fe5ca2d50a9d958f2417114 **
+  * Recommend mailutils instead of depending on it.
+    (Closes: 917245, 916986)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 21 Dec 2018 10:20:40 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 26 Dec 2018 13:54:16 -0600
 
 emacs (1:26.1+1-2) unstable; urgency=medium
 
