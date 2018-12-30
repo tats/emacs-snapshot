@@ -272,7 +272,7 @@ well."
 
 (defface diff-header
   '((((class color) (min-colors 88) (background light))
-     :background "grey80")
+     :background "grey85")
     (((class color) (min-colors 88) (background dark))
      :background "grey45")
     (((class color))
@@ -282,7 +282,7 @@ well."
 
 (defface diff-file-header
   '((((class color) (min-colors 88) (background light))
-     :background "grey70" :weight bold)
+     :background "grey75" :weight bold)
     (((class color) (min-colors 88) (background dark))
      :background "grey60" :weight bold)
     (((class color))
@@ -302,7 +302,7 @@ well."
   '((default
      :inherit diff-changed)
     (((class color) (min-colors 88) (background light))
-     :background "#ffdddd")
+     :background "#ffeeee")
     (((class color) (min-colors 88) (background dark))
      :background "#553333")
     (((class color))
@@ -313,7 +313,7 @@ well."
   '((default
      :inherit diff-changed)
     (((class color) (min-colors 88) (background light))
-     :background "#ddffdd")
+     :background "#eeffee")
     (((class color) (min-colors 88) (background dark))
      :background "#335533")
     (((class color))
@@ -2026,7 +2026,7 @@ For use in `add-log-current-defun-function'."
   '((default
      :inherit diff-refine-changed)
     (((class color) (min-colors 88) (background light))
-     :background "#ffbbbb")
+     :background "#ffcccc")
     (((class color) (min-colors 88) (background dark))
      :background "#aa2222"))
   "Face used for removed characters shown by `diff-refine-hunk'."
@@ -2036,7 +2036,7 @@ For use in `add-log-current-defun-function'."
   '((default
      :inherit diff-refine-changed)
     (((class color) (min-colors 88) (background light))
-     :background "#aaffaa")
+     :background "#bbffbb")
     (((class color) (min-colors 88) (background dark))
      :background "#22aa22"))
   "Face used for added characters shown by `diff-refine-hunk'."
@@ -2434,7 +2434,7 @@ When OLD is non-nil, highlight the hunk from the old source."
                       (insert-file-contents file t)
                       (setq props (diff-syntax-fontify-props file text line-nb)))))
               ;; Get properties from a cached revision
-              (let* ((buffer-name (format " diff-syntax:%s.~%s~"
+              (let* ((buffer-name (format " *diff-syntax:%s.~%s~*"
                                           (expand-file-name file) revision))
                      (buffer (gethash buffer-name diff-syntax-fontify-revisions)))
                 (unless (and buffer (buffer-live-p buffer))

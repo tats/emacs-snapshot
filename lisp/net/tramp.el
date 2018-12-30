@@ -7,7 +7,7 @@
 ;; Maintainer: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
 ;; Package: tramp
-;; Version: 2.4.1-pre
+;; Version: 2.4.1
 ;; Package-Requires: ((emacs "24.1"))
 
 ;; This file is part of GNU Emacs.
@@ -3707,6 +3707,17 @@ support symbolic links."
 	  ;; There's some output, display it.
 	  (when (with-current-buffer output-buffer (> (point-max) (point-min)))
 	    (display-message-or-buffer output-buffer)))))))
+
+(defun tramp-handle-start-file-process (name buffer program &rest args)
+  "Like `start-file-process' for Tramp files."
+  ;; `make-process' knows the `:file-error' argument since Emacs 27.1.
+  (tramp-file-name-handler
+   'make-process
+   :name name
+   :buffer buffer
+   :command (and program (cons program args))
+   :noquery nil
+   :file-handler t))
 
 (defun tramp-handle-substitute-in-file-name (filename)
   "Like `substitute-in-file-name' for Tramp files.

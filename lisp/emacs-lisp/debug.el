@@ -236,16 +236,37 @@ first will be printed into the backtrace buffer."
 		;; Place an extra debug-on-exit for macro's.
 		(when (eq 'lambda (car-safe (cadr (backtrace-frame 4))))
 		  (backtrace-debug 5 t)))
+              (with-current-buffer debugger-buffer
+                (unless (derived-mode-p 'debugger-mode)
+	          (debugger-mode))
+	        (debugger-setup-buffer debugger-args)
+	        (when noninteractive
+		  ;; If the backtrace is long, save the beginning
+		  ;; and the end, but discard the middle.
+		  (when (> (count-lines (point-min) (point-max))
+			   debugger-batch-max-lines)
+		    (goto-char (point-min))
+		    (forward-line (/ 2 debugger-batch-max-lines))
+		    (let ((middlestart (point)))
+		      (goto-char (point-max))
+		      (forward-line (- (/ 2 debugger-batch-max-lines)
+				       debugger-batch-max-lines))
+		      (delete-region middlestart (point)))
+		    (insert "...\n"))
+		  (goto-char (point-min))
+		  (message "%s" (buffer-string))
+		  (kill-emacs -1)))
 	      (pop-to-buffer
 	       debugger-buffer
 	       `((display-buffer-reuse-window
 		  display-buffer-in-previous-window
 		  display-buffer-below-selected)
 		 . ((window-min-height . 10)
+                    (window-height . fit-window-to-buffer)
 		    ,@(when (and (window-live-p debugger-previous-window)
-				(frame-visible-p
-				 (window-frame debugger-previous-window)))
-		       `((previous-window . ,debugger-previous-window))))))
+				 (frame-visible-p
+				  (window-frame debugger-previous-window)))
+		        `((previous-window . ,debugger-previous-window))))))
 	      (setq debugger-window (selected-window))
 	      (if (eq debugger-previous-window debugger-window)
 		  (when debugger-jumping-flag
@@ -258,25 +279,6 @@ first will be printed into the backtrace buffer."
 			    (window-total-height debugger-window)))
 		      (error nil)))
 		(setq debugger-previous-window debugger-window))
-              (unless (derived-mode-p 'debugger-mode)
-	        (debugger-mode))
-	      (debugger-setup-buffer debugger-args)
-	      (when noninteractive
-		;; If the backtrace is long, save the beginning
-		;; and the end, but discard the middle.
-		(when (> (count-lines (point-min) (point-max))
-			 debugger-batch-max-lines)
-		  (goto-char (point-min))
-		  (forward-line (/ 2 debugger-batch-max-lines))
-		  (let ((middlestart (point)))
-		    (goto-char (point-max))
-		    (forward-line (- (/ 2 debugger-batch-max-lines)
-				     debugger-batch-max-lines))
-		    (delete-region middlestart (point)))
-		  (insert "...\n"))
-		(goto-char (point-min))
-		(message "%s" (buffer-string))
-		(kill-emacs -1))
 	      (message "")
 	      (let ((standard-output nil)
 		    (buffer-read-only t))
