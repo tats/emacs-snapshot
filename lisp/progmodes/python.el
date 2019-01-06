@@ -1,6 +1,6 @@
 ;;; python.el --- Python's flying circus support for Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 2003-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2019 Free Software Foundation, Inc.
 
 ;; Author: Fabián E. Gallina <fgallina@gnu.org>
 ;; URL: https://github.com/fgallina/python.el
@@ -1334,16 +1334,17 @@ the line will be re-indented automatically if needed."
            (not (equal ?: (char-before (1- (point)))))
            (not (python-syntax-comment-or-string-p)))
       ;; Just re-indent dedenters
-      (let ((dedenter-pos (python-info-dedenter-statement-p))
-            (current-pos (point)))
+      (let ((dedenter-pos (python-info-dedenter-statement-p)))
         (when dedenter-pos
-          (save-excursion
-            (goto-char dedenter-pos)
-            (python-indent-line)
-            (unless (= (line-number-at-pos dedenter-pos)
-                       (line-number-at-pos current-pos))
-              ;; Reindent region if this is a multiline statement
-              (python-indent-region dedenter-pos current-pos)))))))))
+          (let ((start (copy-marker dedenter-pos))
+                (end (point-marker)))
+            (save-excursion
+              (goto-char start)
+              (python-indent-line)
+              (unless (= (line-number-at-pos start)
+                         (line-number-at-pos end))
+                ;; Reindent region if this is a multiline statement
+                (python-indent-region start end))))))))))
 
 
 ;;; Mark

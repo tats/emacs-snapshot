@@ -1,6 +1,6 @@
 ;;; files.el --- file input and output commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1992-2019 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -802,9 +802,15 @@ The path separator is colon in GNU and GNU-like systems."
     (setq cd-path (or (parse-colon-path (getenv "CDPATH"))
                       (list "./"))))
   (cd-absolute
-   (or (locate-file dir cd-path nil
-                    (lambda (f) (and (file-directory-p f) 'dir-ok)))
-       (error "No such directory found via CDPATH environment variable"))))
+   (or
+    ;; locate-file doesn't support remote file names, so detect them
+    ;; and support them here by hand.
+    (and (file-remote-p (expand-file-name dir))
+         (file-accessible-directory-p (expand-file-name dir))
+         (expand-file-name dir))
+    (locate-file dir cd-path nil
+                 (lambda (f) (and (file-directory-p f) 'dir-ok)))
+    (error "No such directory found via CDPATH environment variable"))))
 
 (defun directory-files-recursively (dir regexp &optional include-directories)
   "Return list of all files under DIR that have file names matching REGEXP.
@@ -863,7 +869,7 @@ This function will normally skip directories, so if you want it to find
 directories, make sure the PREDICATE function returns `dir-ok' for them.
 
 PREDICATE can also be an integer to pass to the `access' system call,
-in which case file-name handlers are ignored.  This usage is deprecated.
+in which case file name handlers are ignored.  This usage is deprecated.
 For compatibility, PREDICATE can also be one of the symbols
 `executable', `readable', `writable', or `exists', or a list of
 one or more of those symbols."
@@ -1167,7 +1173,10 @@ consecutive checks.  For example:
 
 (defun file-local-name (file)
   "Return the local name component of FILE.
-It returns a file name which can be used directly as argument of
+This function removes from FILE the specification of the remote host
+and the method of accessing the host, leaving only the part that
+identifies FILE locally on the remote system.
+The returned file name can be used directly as argument of
 `process-file', `start-file-process', or `shell-command'."
   (or (file-remote-p file 'localname) file))
 
@@ -1193,10 +1202,11 @@ names beginning with `~'."
   "Splice DIRNAME to FILE like the operating system would.
 If FILE is relative, return DIRNAME concatenated to FILE.
 Otherwise return FILE, quoted as needed if DIRNAME and FILE have
-different handlers; although this quoting is dubious if DIRNAME
-is magic, it is not clear what would be better.  This function
-differs from `expand-file-name' in that DIRNAME must be a
-directory name and leading `~' and `/:' are not special in FILE."
+different file name handlers; although this quoting is dubious if
+DIRNAME is magic, it is not clear what would be better.  This
+function differs from `expand-file-name' in that DIRNAME must be
+a directory name and leading `~' and `/:' are not special in
+FILE."
   (let ((unquoted (if (files--name-absolute-system-p file)
 		      file
 		    (concat dirname file))))
@@ -6738,7 +6748,7 @@ Valid wildcards are '*', '?', '[abc]' and '[a-z]'."
 ;;   		 dired-after-subdir-garbage (defines what a "total" line is)
 ;;   - variable dired-subdir-regexp
 ;; - may be passed "--dired" as the first argument in SWITCHES.
-;;   Filename handlers might have to remove this switch if their
+;;   File name handlers might have to remove this switch if their
 ;;   "ls" command does not support it.
 (defun insert-directory (file switches &optional wildcard full-directory-p)
   "Insert directory listing for FILE, formatted according to SWITCHES.

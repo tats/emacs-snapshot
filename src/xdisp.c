@@ -1,6 +1,6 @@
 /* Display generation from window structure and buffer text.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2018 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2019 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -27991,7 +27991,7 @@ calc_line_height_property (struct it *it, Lisp_Object val, struct font *font,
   /* FIXME: Check for overflow in multiplication or conversion.  */
   if (FLOATP (val))
     height = (int)(XFLOAT_DATA (val) * height);
-  else
+  else if (INTEGERP (val))
     {
       intmax_t v;
       if (integer_to_intmax (val, &v))
@@ -32390,7 +32390,9 @@ expose_window (struct window *w, XRectangle *fr)
 static bool
 expose_window_tree (struct window *w, XRectangle *r)
 {
+#ifndef HAVE_NS
   struct frame *f = XFRAME (w->frame);
+#endif
   bool mouse_face_overwritten_p = false;
 
   /* NS toolkits may have aleady modified the frame in expectation of

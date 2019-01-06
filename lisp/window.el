@@ -1,6 +1,6 @@
 ;;; window.el --- GNU Emacs window commands aside from those written in C  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985, 1989, 1992-1994, 2000-2018 Free Software
+;; Copyright (C) 1985, 1989, 1992-1994, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -4278,7 +4278,7 @@ WINDOW must be a live window and defaults to the selected one."
 			(list (copy-marker start)
 			      (copy-marker
 			       ;; Preserve window-point-insertion-type
-			       ;; (Bug#12588).
+			       ;; (Bug#12855).
 			       point window-point-insertion-type)))))
 	  (set-window-prev-buffers
 	   window (cons entry (window-prev-buffers window)))))
@@ -6110,7 +6110,7 @@ element is BUFFER."
 	 (list 'other
 	       ;; A quadruple of WINDOW's buffer, start, point and height.
 	       (list (current-buffer) (window-start window)
-		     ;; Preserve window-point-insertion-type (Bug#12588).
+		     ;; Preserve window-point-insertion-type (Bug#12855).
 		     (copy-marker
 		      (window-point window) window-point-insertion-type)
 		     (if (window-combined-p window)
@@ -7182,9 +7182,7 @@ that allows the selected frame)."
           (or (cdr (assq 'frame-predicate alist))
               (lambda (frame)
                 (and (not (eq frame (selected-frame)))
-                     (not (window-dedicated-p
-                           (or (get-lru-window frame)
-                               (frame-first-window frame))))))))
+                     (get-lru-window frame)))))
          (frame (car (filtered-frame-list predicate)))
          (window
           (and frame

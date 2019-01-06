@@ -1,6 +1,6 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -2078,7 +2078,7 @@ alist in `woman-buffer-alist' and return nil."
   (char-to-string woman-escaped-escape-char)
   "Internal string representation of escaped escape characters.")
 
-(defconst woman-unpadded-space-char ?\^]
+(defconst woman-unpadded-space-char ?\^\]
   ;; An arbitrary unused control character
   "Internal character representation of unpadded space characters.")
 (defconst woman-unpadded-space-string

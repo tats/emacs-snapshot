@@ -1,6 +1,6 @@
 /* Fundamental definitions for GNU Emacs Lisp interpreter. -*- coding: utf-8 -*-
 
-Copyright (C) 1985-1987, 1993-1995, 1997-2018 Free Software Foundation,
+Copyright (C) 1985-1987, 1993-1995, 1997-2019 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -2683,13 +2683,6 @@ XFLOAT_DATA (Lisp_Object f)
 #define IEEE_FLOATING_POINT (FLT_RADIX == 2 && FLT_MANT_DIG == 24 \
 			     && FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128)
 
-/* A character, declared with the following typedef, is a member
-   of some character set associated with the current buffer.  */
-#ifndef _UCHAR_T  /* Protect against something in ctab.h on AIX.  */
-#define _UCHAR_T
-typedef unsigned char UCHAR;
-#endif
-
 /* Meanings of slots in a Lisp_Compiled:  */
 
 enum Lisp_Compiled
@@ -2848,12 +2841,7 @@ CHECK_FIXNAT (Lisp_Object x)
   do {									\
     CHECK_FIXNUM (x);							\
     if (! ((lo) <= XFIXNUM (x) && XFIXNUM (x) <= (hi)))			\
-      args_out_of_range_3						\
-	(x,								\
-	 make_fixnum ((lo) < 0 && (lo) < MOST_NEGATIVE_FIXNUM		\
-		      ? MOST_NEGATIVE_FIXNUM				\
-		      : (lo)),						\
-	 make_fixnum (min (hi, MOST_POSITIVE_FIXNUM)));			\
+      args_out_of_range_3 (x, INT_TO_INTEGER (lo), INT_TO_INTEGER (hi)); \
   } while (false)
 #define CHECK_TYPE_RANGED_INTEGER(type, x) \
   do {									\
@@ -3599,9 +3587,10 @@ extern void mark_stack (char *, char *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-extern EMACS_INT consing_since_gc;
-extern EMACS_INT gc_relative_threshold;
-extern EMACS_INT memory_full_cons_threshold;
+typedef uintptr_t byte_ct;  /* System byte counts reported by GC.  */
+extern byte_ct consing_since_gc;
+extern byte_ct gc_relative_threshold;
+extern byte_ct memory_full_cons_threshold;
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
 extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);

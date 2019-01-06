@@ -4,7 +4,7 @@ dnl	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2018 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2019 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -4111,7 +4111,8 @@ AC_CACHE_CHECK([for library containing tputs], [emacs_cv_tputs_lib],
   emacs_cv_tputs_lib='none required'
 else
   # curses precedes termcap because of AIX (Bug#9736#35) and OpenIndiana.
-  for tputs_library in '' tinfo ncurses terminfo curses termcap; do
+  tputs_libraries='tinfo ncurses terminfo curses termcap tinfow ncursesw'
+  for tputs_library in '' $tputs_libraries; do
     OLIBS=$LIBS
     if test -z "$tputs_library"; then
       emacs_cv_tputs_lib='none required'
@@ -5038,7 +5039,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2018 Free Software Foundation, Inc."
+copyright="Copyright (C) 2019 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)
@@ -5393,7 +5394,7 @@ AC_SUBST(WINDOW_SYSTEM_OBJ)
 
 AH_TOP([/* GNU Emacs site configuration template file.
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2018
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2019
   Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.

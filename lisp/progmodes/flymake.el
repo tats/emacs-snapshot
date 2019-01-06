@@ -1,6 +1,6 @@
 ;;; flymake.el --- A universal on-the-fly syntax checker  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2003-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2019 Free Software Foundation, Inc.
 
 ;; Author:  Pavel Kobyakov <pk_at_work@yahoo.com>
 ;; Maintainer: João Távora <joaotavora@gmail.com>
@@ -219,6 +219,15 @@ Specifically, start it when the saved buffer is actually displayed."
   "If non-nil, moving to errors wraps around buffer boundaries."
   :version "26.1"
   :type 'boolean)
+
+(defcustom flymake-suppress-zero-counters :warning
+  "Control appearance of zero-valued diagnostic counters in mode line.
+
+If set to t, supress all zero counters.  If set to a severity
+symbol like `:warning' (the default) suppress zero counters less
+severe than that severity, according to `warning-numeric-level'.
+If set to nil, don't supress any zero counters."
+  :type 'symbol)
 
 (when (fboundp 'define-fringe-bitmap)
   (define-fringe-bitmap 'flymake-double-exclamation-mark
@@ -1136,6 +1145,7 @@ default) no filter is applied."
 
 (put 'flymake--mode-line-format 'risky-local-variable t)
 
+
 (defun flymake--mode-line-format ()
   "Produce a pretty minor mode indicator."
   (let* ((known (hash-table-keys flymake--backend-state))
@@ -1203,8 +1213,14 @@ default) no filter is applied."
            for face = (flymake--lookup-type-property type
                                                      'mode-line-face
                                                      'compilation-error)
-           when (or diags (>= (flymake--severity type)
-                              (warning-numeric-level :warning)))
+           when (or diags
+                    (cond ((eq flymake-suppress-zero-counters t)
+                           nil)
+                          (flymake-suppress-zero-counters
+                           (>= (flymake--severity type)
+                               (warning-numeric-level
+                                flymake-suppress-zero-counters)))
+                          (t t)))
            collect `(:propertize
                      ,(format "%d" (length diags))
                      face ,face
@@ -1332,9 +1348,9 @@ POS can be a buffer position or a button"
          (target (or (get-buffer name)
                      (with-current-buffer (get-buffer-create name)
                        (flymake-diagnostics-buffer-mode)
-                       (setq flymake--diagnostics-buffer-source source)
                        (current-buffer)))))
     (with-current-buffer target
+      (setq flymake--diagnostics-buffer-source source)
       (revert-buffer)
       (display-buffer (current-buffer)))))
 

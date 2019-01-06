@@ -1,5 +1,5 @@
 /* Primitive operations on Lisp data types for GNU Emacs Lisp interpreter.
-   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2018 Free Software
+   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2019 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -2655,7 +2655,7 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
   else
     {
       Lisp_Object hi = CONSP (c) ? XCAR (c) : c;
-      valid = integer_to_uintmax (hi, &val);
+      valid = INTEGERP (hi) && integer_to_uintmax (hi, &val);
 
       if (valid && CONSP (c))
 	{
@@ -2716,7 +2716,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
   else
     {
       Lisp_Object hi = CONSP (c) ? XCAR (c) : c;
-      valid = integer_to_intmax (hi, &val);
+      valid = INTEGERP (hi) && integer_to_intmax (hi, &val);
 
       if (valid && CONSP (c))
 	{

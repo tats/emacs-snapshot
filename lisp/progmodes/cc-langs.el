@@ -1,6 +1,6 @@
 ;;; cc-langs.el --- language specific settings for CC Mode -*- coding: utf-8 -*-
 
-;; Copyright (C) 1985, 1987, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2019 Free Software Foundation, Inc.
 
 ;; Authors:    2002- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -1528,6 +1528,17 @@ properly."
       "a\\`"))				; Doesn't match anything.
 (c-lang-defvar c-block-comment-ender-regexp
 	       (c-lang-const c-block-comment-ender-regexp))
+
+(c-lang-defconst c-font-lock-comment-end-skip
+  ;; Regexp which matches whitespace followed by the end of a block comment
+  ;; (if such exists in the language).  This is used by font lock to determine
+  ;; the portion of the end of a comment to fontify with
+  ;; `font-lock-comment-delimiter-face'.
+  t (if (c-lang-const c-block-comment-ender)
+	(concat "[ \t]*" (c-lang-const c-block-comment-ender-regexp))
+      "a\\`"))				; Doesn't match anything.
+(c-lang-setvar font-lock-comment-end-skip
+	       (c-lang-const c-font-lock-comment-end-skip))
 
 (c-lang-defconst c-comment-start-regexp
   ;; Regexp to match the start of any type of comment.
