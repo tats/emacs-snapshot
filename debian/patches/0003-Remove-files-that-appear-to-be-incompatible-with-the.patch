@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index f0b2b66..a401e73 100644
+index cd3a0a9..ad3cbfd 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -162,7 +162,9 @@ man1dir=
@@ -120,7 +120,7 @@ index f0b2b66..a401e73 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index f4c2c39..cbde388 100755
+index bb831a0..de0d9ee 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -259,8 +259,7 @@ info_dir ()
@@ -134,10 +134,10 @@ index f4c2c39..cbde388 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 8b34c3b..213af08 100644
+index e5bd694..49680a5 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5592,7 +5592,7 @@ AC_DEFUN
+@@ -5593,7 +5593,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 8b34c3b..213af08 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5645,15 +5645,6 @@ m4_define
+@@ -5646,15 +5646,6 @@ m4_define
  fi
  ])
  
@@ -163,7 +163,7 @@ index 8b34c3b..213af08 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index fd07ea4..c535e56 100644
+index a03efaf..8800638 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -190,7 +190,7 @@ index fd07ea4..c535e56 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index ad782f7..0548488 100644
+index 5fa1876..97853ff 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -294,6 +294,14 @@ view-help-file
