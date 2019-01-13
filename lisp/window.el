@@ -700,8 +700,7 @@ failed."
 	(set-window-parameter window 'window-atom 'main))
       (set-window-parameter new 'window-atom side)
       ;; Display BUFFER in NEW and return NEW.
-      (window--display-buffer
-       buffer new 'window alist display-buffer-mark-dedicated))))
+      (window--display-buffer buffer new 'window alist))))
 
 (defun window--atom-check-1 (window)
   "Subroutine of `window--atom-check'."
@@ -958,7 +957,11 @@ and may be called only if no window on SIDE exists yet."
 	 ;; window and not make a new parent window unless needed.
 	 (window-combination-resize 'side)
 	 (window-combination-limit nil)
-	 (window (split-window-no-error next-to nil on-side)))
+	 (window (split-window-no-error next-to nil on-side))
+         (alist (if (assq 'dedicated alist)
+                    alist
+                  (cons `(dedicated . ,(or display-buffer-mark-dedicated 'side))
+                        alist))))
     (when window
       ;; Initialize `window-side' parameter of new window to SIDE and
       ;; make that parameter persistent.
@@ -985,7 +988,7 @@ and may be called only if no window on SIDE exists yet."
       (with-current-buffer buffer
         (setq window--sides-shown t))
       ;; Install BUFFER in new window and return WINDOW.
-      (window--display-buffer buffer window 'window alist 'side))))
+      (window--display-buffer buffer window 'window alist))))
 
 (defun display-buffer-in-side-window (buffer alist)
   "Display BUFFER in a side window of the selected frame.
@@ -1019,10 +1022,7 @@ nor installs any other window parameters unless they have been
 explicitly provided via a `window-parameters' entry in ALIST."
   (let* ((side (or (cdr (assq 'side alist)) 'bottom))
          (slot (or (cdr (assq 'slot alist)) 0))
-         (left-or-right (memq side '(left right)))
-         ;; Softly dedicate window to BUFFER unless
-         ;; `display-buffer-mark-dedicated' already asks for it.
-         (dedicated (or display-buffer-mark-dedicated 'side)))
+         (left-or-right (memq side '(left right))))
     (cond
      ((not (memq side '(top bottom left right)))
       (error "Invalid side %s specified" side))
@@ -1055,7 +1055,11 @@ explicitly provided via a `window-parameters' entry in ALIST."
 		  ((eq side 'bottom) 3))
 		 window-sides-slots))
            (window--sides-inhibit-check t)
-	   window this-window this-slot prev-window next-window
+           (alist (if (assq 'dedicated alist)
+                      alist
+                    (cons `(dedicated . ,(or display-buffer-mark-dedicated 'side))
+                          alist)))
+           window this-window this-slot prev-window next-window
 	   best-window best-slot abs-slot)
 
       (cond
@@ -1113,8 +1117,7 @@ explicitly provided via a `window-parameters' entry in ALIST."
 		 ;; Reuse `this-window'.
                  (with-current-buffer buffer
                    (setq window--sides-shown t))
-		 (window--display-buffer
-                  buffer this-window 'reuse alist dedicated))
+		 (window--display-buffer buffer this-window 'reuse alist))
 	    (and (or (not max-slots) (< slots max-slots))
 		 (or (and next-window
 			  ;; Make new window before `next-window'.
@@ -1131,8 +1134,7 @@ explicitly provided via a `window-parameters' entry in ALIST."
 		   (set-window-parameter window 'window-slot slot)
                    (with-current-buffer buffer
                      (setq window--sides-shown t))
-		   (window--display-buffer
-                    buffer window 'window alist dedicated))
+		   (window--display-buffer buffer window 'window alist))
 	    (and best-window
 		 ;; Reuse `best-window'.
 		 (progn
@@ -1141,7 +1143,7 @@ explicitly provided via a `window-parameters' entry in ALIST."
                    (with-current-buffer buffer
                      (setq window--sides-shown t))
                    (window--display-buffer
-		    buffer best-window 'reuse alist dedicated)))))))))
+                    buffer best-window 'reuse alist)))))))))
 
 (defun window-toggle-side-windows (&optional frame)
   "Toggle display of side windows on specified FRAME.
@@ -2041,6 +2043,8 @@ doc-string of `window-resizable'."
 ;; Aliases of functions defined in window.c.
 (defalias 'window-height 'window-total-height)
 (defalias 'window-width 'window-body-width)
+(defalias 'window-pixel-width-before-size-change 'window-old-pixel-width)
+(defalias 'window-pixel-height-before-size-change 'window-old-pixel-height)
 
 (defun window-full-height-p (&optional window)
   "Return t if WINDOW is as high as its containing frame.
@@ -2757,8 +2761,7 @@ as small) as possible, but don't signal an error."
 	;; The following routine catches the case where we want to resize
 	;; a minibuffer-only frame.
 	(when (resize-mini-window-internal window)
-	  (window--pixel-to-total frame)
-	  (run-window-configuration-change-hook frame))))))
+	  (window--pixel-to-total frame))))))
 
 (defun window--resize-apply-p (frame &optional horizontal)
   "Return t when a window on FRAME shall be resized vertically.
@@ -2856,9 +2859,7 @@ instead."
 	(window--resize-siblings window delta horizontal ignore))
       (when (window--resize-apply-p frame horizontal)
 	(if (window-resize-apply frame horizontal)
-	    (progn
-	      (window--pixel-to-total frame horizontal)
-	      (run-window-configuration-change-hook frame))
+	    (window--pixel-to-total frame horizontal)
 	  (error "Failed to apply resizing %s" window))))
      (t
       (error "Cannot resize window %s" window)))))
@@ -3577,9 +3578,7 @@ move it as far as possible in the desired direction."
 	;; Don't report an error in the standard case.
 	(when (window--resize-apply-p frame horizontal)
 	  (if (window-resize-apply frame horizontal)
-	      (progn
-		(window--pixel-to-total frame horizontal)
-		(run-window-configuration-change-hook frame))
+	      (window--pixel-to-total frame horizontal)
 	    ;; But do report an error if applying the changes fails.
 	    (error "Failed adjusting window %s" window))))))))
 
@@ -4110,7 +4109,6 @@ that is its frame's root window."
 	  ;; `delete-window-internal' has selected a window that should
 	  ;; not be selected, fix this here.
 	  (other-window -1 frame))
-	(run-window-configuration-change-hook frame)
 	(window--check frame)
 	;; Always return nil.
 	nil))))
@@ -4196,7 +4194,6 @@ any window whose `no-delete-other-windows' parameter is non-nil."
       ;; If WINDOW is the main window of its frame do nothing.
       (unless (eq window main)
 	(delete-other-windows-internal window main)
-	(run-window-configuration-change-hook frame)
 	(window--check frame))
       ;; Always return nil.
       nil)))
@@ -5184,7 +5181,6 @@ frame.  The selected window is not changed by this function."
 	  (unless size
             (window--sanitize-window-sizes horizontal))
 
-	  (run-window-configuration-change-hook frame)
 	  (run-window-scroll-functions new)
 	  (window--check frame)
 	  ;; Always return the new window.
@@ -5415,15 +5411,13 @@ window."
     (balance-windows-1 window)
     (when (window--resize-apply-p frame)
       (window-resize-apply frame)
-      (window--pixel-to-total frame)
-      (run-window-configuration-change-hook frame))
+      (window--pixel-to-total frame))
     ;; Balance horizontally.
     (window--resize-reset (window-frame window) t)
     (balance-windows-1 window t)
     (when (window--resize-apply-p frame t)
       (window-resize-apply frame t)
-      (window--pixel-to-total frame t)
-      (run-window-configuration-change-hook frame))))
+      (window--pixel-to-total frame t))))
 
 (defun window-fixed-size-p (&optional window direction)
   "Return t if WINDOW cannot be resized in DIRECTION.
@@ -6073,23 +6067,26 @@ not resized by this function."
 
 (defun display-buffer-record-window (type window buffer)
   "Record information for window used by `display-buffer'.
-TYPE specifies the type of the calling operation and must be one
-of the symbols `reuse' (when WINDOW existed already and was
-reused for displaying BUFFER), `window' (when WINDOW was created
-on an already existing frame), or `frame' (when WINDOW was
-created on a new frame).  WINDOW is the window used for or created
-by the `display-buffer' routines.  BUFFER is the buffer that
-shall be displayed.
+WINDOW is the window used for or created by a buffer display
+action function.  BUFFER is the buffer to display.  Note that
+this function must be called before BUFFER is explicitly made
+WINDOW's buffer (although WINDOW may show BUFFER already).
 
-This function installs or updates the quit-restore parameter of
-WINDOW.  The quit-restore parameter is a list of four elements:
-The first element is one of the symbols `window', `frame', `same' or
-`other'.  The second element is either one of the symbols `window'
-or `frame' or a list whose elements are the buffer previously
-shown in the window, that buffer's window start and window point,
-and the window's height.  The third element is the window
-selected at the time the parameter was created.  The fourth
-element is BUFFER."
+TYPE specifies the type of the calling operation and must be one
+of the symbols 'reuse' (meaning that WINDOW exists already and
+will be used for displaying BUFFER), 'window' (WINDOW was created
+on an already existing frame) or 'frame' (WINDOW was created on a
+new frame).
+
+This function installs or updates the 'quit-restore' parameter of
+WINDOW.  The 'quit-restore' parameter is a list of four elements:
+The first element is one of the symbols 'window', 'frame', 'same'
+or 'other'.  The second element is either one of the symbols
+'window' or 'frame' or a list whose elements are the buffer
+previously shown in the window, that buffer's window start and
+window point, and the window's height.  The third element is the
+window selected at the time the parameter was created.  The
+fourth element is BUFFER."
   (cond
    ((eq type 'reuse)
     (if (eq (window-buffer window) buffer)
@@ -6748,20 +6745,51 @@ window is larger than WINDOW."
            (/ (- (window-total-height window) (window-total-height)) 2))
         (error nil))))))
 
-(defun window--display-buffer (buffer window type &optional alist dedicated)
+(defun window--display-buffer (buffer window type &optional alist)
   "Display BUFFER in WINDOW.
-TYPE must be one of the symbols `reuse', `window' or `frame' and
-is passed unaltered to `display-buffer-record-window'.  ALIST is
-the alist argument of `display-buffer'.  Set `window-dedicated-p'
-to DEDICATED if non-nil.  Return WINDOW if BUFFER and WINDOW are
-live."
+WINDOW must be a live window chosen by a buffer display action
+function for showing BUFFER.  TYPE tells whether WINDOW existed
+already before that action function was called or is a new window
+created by that function.  ALIST is a buffer display action alist
+as compiled by `display-buffer'.
+
+TYPE must be one of the following symbols: 'reuse' (which means
+WINDOW existed before the call of `display-buffer' and may
+already show BUFFER or not), 'window' (WINDOW was created on an
+existing frame) or 'frame' (WINDOW was created on a new frame).
+TYPE is passed unaltered to `display-buffer-record-window'.
+
+Handle WINDOW's dedicated flag as follows: If WINDOW already
+shows BUFFER, leave it alone.  Otherwise, if ALIST contains a
+'dedicated' entry and WINDOW is either new or that entry's value
+equals 'side', set WINDOW's dedicated flag to the value of that
+entry.  Otherwise, if WINDOW is new and the value of
+'display-buffer-mark-dedicated' is non-nil, set WINDOW's
+dedicated flag to that value.  In any other case, reset WINDOW's
+dedicated flag to nil.
+
+Return WINDOW if BUFFER and WINDOW are live."
   (when (and (buffer-live-p buffer) (window-live-p window))
     (display-buffer-record-window type window buffer)
     (unless (eq buffer (window-buffer window))
+      ;; Unless WINDOW already shows BUFFER reset its dedicated flag.
       (set-window-dedicated-p window nil)
       (set-window-buffer window buffer))
-    (when dedicated
-      (set-window-dedicated-p window dedicated))
+    (let ((alist-dedicated (assq 'dedicated alist)))
+      ;; Maybe dedicate WINDOW to BUFFER if asked for.
+      (cond
+       ;; Don't dedicate WINDOW if it is dedicated because it shows
+       ;; BUFFER already or it is reused and is not a side window.
+       ((or (window-dedicated-p window)
+            (and (eq type 'reuse) (not (eq (cdr alist-dedicated) 'side)))))
+       ;; Otherwise, if ALIST contains a 'dedicated' entry, use that
+       ;; entry's value (which may be nil).
+       (alist-dedicated
+        (set-window-dedicated-p window (cdr alist-dedicated)))
+       ;; Otherwise, if 'display-buffer-mark-dedicated' is non-nil,
+       ;; use that.
+       (display-buffer-mark-dedicated
+        (set-window-dedicated-p window display-buffer-mark-dedicated))))
     (when (memq type '(window frame))
       (set-window-prev-buffers window nil))
     (let ((quit-restore (window-parameter window 'quit-restore))
@@ -7190,8 +7218,7 @@ that allows the selected frame)."
                 frame nil (cdr (assq 'inhibit-same-window alist))))))
     (when window
       (prog1
-          (window--display-buffer
-           buffer window 'reuse alist display-buffer-mark-dedicated)
+          (window--display-buffer buffer window 'reuse alist)
         (unless (cdr (assq 'inhibit-switch-frame alist))
           (window--maybe-raise-frame frame))))))
 
@@ -7356,8 +7383,7 @@ new frame."
 	       (with-current-buffer buffer
 		 (setq frame (funcall fun)))
 	       (setq window (frame-selected-window frame)))
-      (prog1 (window--display-buffer
-	      buffer window 'frame alist display-buffer-mark-dedicated)
+      (prog1 (window--display-buffer buffer window 'frame alist)
 	(unless (cdr (assq 'inhibit-switch-frame alist))
 	  (window--maybe-raise-frame frame))))))
 
@@ -7386,8 +7412,7 @@ raising the frame."
 				(window--try-to-split-window
 				 (get-lru-window frame t) alist))))
 
-      (prog1 (window--display-buffer
-	      buffer window 'window alist display-buffer-mark-dedicated)
+      (prog1 (window--display-buffer buffer window 'window alist)
 	(unless (cdr (assq 'inhibit-switch-frame alist))
 	  (window--maybe-raise-frame (window-frame window)))))))
 
@@ -7435,7 +7460,7 @@ be added to ALIST."
 	 (parent (or (assq 'parent-frame parameters)
                      (selected-frame)))
          (share (assq 'share-child-frame parameters))
-         share1 frame window)
+         share1 frame window type)
     (with-current-buffer buffer
       (when (frame-live-p parent)
         (catch 'frame
@@ -7448,12 +7473,14 @@ be added to ALIST."
                 (throw 'frame t))))))
 
       (if frame
-          (setq window (frame-selected-window frame))
+          (progn
+            (setq window (frame-selected-window frame))
+            (setq type 'reuse))
         (setq frame (make-frame parameters))
-        (setq window (frame-selected-window frame))))
+        (setq window (frame-selected-window frame))
+        (setq type 'frame)))
 
-    (prog1 (window--display-buffer
-	    buffer window 'frame alist display-buffer-mark-dedicated)
+    (prog1 (window--display-buffer buffer window type alist)
       (unless (cdr (assq 'inhibit-switch-frame alist))
 	(window--maybe-raise-frame frame)))))
 
@@ -7492,16 +7519,14 @@ must also contain a 'window-height' entry with the same value."
 		   split-width-threshold)
                (setq window (window--try-to-split-window
                              (selected-window) alist)))
-             (window--display-buffer
-              buffer window 'window alist display-buffer-mark-dedicated))
+             (window--display-buffer buffer window 'window alist))
 	(and (setq window (window-in-direction 'below))
              (not (window-dedicated-p window))
 	     (or (not (numberp min-height))
 		 ;; A window that showed another buffer before cannot
 		 ;; be resized.
 		 (>= (window-height window) min-height))
-	     (window--display-buffer
-              buffer window 'reuse alist display-buffer-mark-dedicated)))))
+	     (window--display-buffer buffer window 'reuse alist)))))
 
 (defun display-buffer--maybe-at-bottom (buffer alist)
   (let ((alist (append alist `(,(if temp-buffer-resize-mode
@@ -7533,21 +7558,17 @@ selected frame."
 	 (setq bottom-window window))))
      nil nil 'nomini)
     (or (and bottom-window-shows-buffer
-	     (window--display-buffer
-	      buffer bottom-window 'reuse alist display-buffer-mark-dedicated))
+	     (window--display-buffer buffer bottom-window 'reuse alist))
 	(and (not (frame-parameter nil 'unsplittable))
-	     (let (split-width-threshold)
+	     (let (split-height-threshold)
 	       (setq window (window--try-to-split-window bottom-window alist)))
-	     (window--display-buffer
-	      buffer window 'window alist display-buffer-mark-dedicated))
+	     (window--display-buffer buffer window 'window alist))
 	(and (not (frame-parameter nil 'unsplittable))
 	     (setq window (split-window-no-error (window-main-window)))
-	     (window--display-buffer
-	      buffer window 'window alist display-buffer-mark-dedicated))
+	     (window--display-buffer buffer window 'window alist))
 	(and (setq window bottom-window)
 	     (not (window-dedicated-p window))
-	     (window--display-buffer
-	      buffer window 'reuse alist display-buffer-mark-dedicated)))))
+	     (window--display-buffer buffer window 'reuse alist)))))
 
 (defun display-buffer-in-previous-window (buffer alist)
   "Display BUFFER in a window previously showing it.
@@ -7596,7 +7617,8 @@ above, even if that window never showed BUFFER before."
     ;; anything we found so far.
     (when (and (setq window (cdr (assq 'previous-window alist)))
 	       (window-live-p window)
-	       (not (window-dedicated-p window)))
+	       (or (eq buffer (window-buffer window))
+                   (not (window-dedicated-p window))))
       (if (eq window (selected-window))
 	  (unless inhibit-same-window
 	    (setq second-best-window window))
@@ -9411,15 +9433,7 @@ displaying that processes's buffer."
               (when size
                 (set-process-window-size process (cdr size) (car size))))))))))
 
-;; Remove the following call in Emacs 27, running
-;; 'window-size-change-functions' should suffice.
 (add-hook 'window-configuration-change-hook 'window--adjust-process-windows)
-
-;; Catch any size changes not handled by
-;; 'window-configuration-change-hook' (Bug#32720, "another issue" in
-;; Bug#33230).
-(add-hook 'window-size-change-functions (lambda (_frame)
-                                          (window--adjust-process-windows)))
 
 ;; Some of these are in tutorial--default-keys, so update that if you
 ;; change these.

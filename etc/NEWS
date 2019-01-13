@@ -218,6 +218,11 @@ regular expression was previously invalid, but is now accepted:
 ** New input methods 'hawaiian-postfix' and 'hawaiian-prefix'.
 
 +++
+** In Japanese environments that do not specify encodings and are not
+based on MS-Windows, the default encoding is now utf-8 instead of
+japanese-iso-8bit.
+
++++
 ** New function 'exec-path'.
 This function by default returns the value of the corresponding
 variable, but can optionally return the equivalent of 'exec-path'
@@ -1112,6 +1117,10 @@ old-style backquotes as new-style, bind the new variable
 integer, Emacs now signals an error if the number is too large for the
 implementation to format.
 
+** logb now returns infinity when given an infinite or zero argument,
+and returns a NaN when given a NaN.  Formerly, it returned an extreme
+fixnum for such arguments.
+
 ---
 ** Some functions and variables obsolete since Emacs 22 have been removed:
 archive-mouse-extract, assoc-ignore-case, assoc-ignore-representation,
@@ -1274,9 +1283,35 @@ displaying the same buffer.  See the node "(elisp) Face Remapping"
 of the Emacs Lisp Reference manual for more detail.
 
 +++
-** Special handling of buffer-local 'window-size-change-functions'.
-A buffer-local value of this hook is now run only if at least one
-window showing the buffer has changed its size.
+** Window change functions have been redesigned completely.
+Hooks reacting to window changes run now only when redisplay detects
+that a change has actually occurred.  The four hooks provided are:
+'window-buffer-change-functions' (run after window buffers have
+changed), 'window-size-change-functions' (run after a window was
+assigned a new buffer or size), 'window-configuration-change-hook'
+(like the former but run also when a window was deleted) and
+'window-selection-change-functions' (run when the selected window
+changed).  'window-scroll-functions' are unaffected by these changes.
+
+In addition, a number of functions now allow the caller to detect what
+has changed since last redisplay: 'window-old-buffer' returns for any
+window the buffer it showed at that time.  ‘old-selected-window’ and
+'old-selected-frame' return the window and frame that were selected
+during last redisplay.  'window-old-pixel-width' (renamed from
+'window-pixel-width-before-size-change'), 'window-old-pixel-height'
+(renamed from 'window-pixel-height-before-size-change'),
+'window-old-body-pixel-width' and 'window-old-body-pixel-height'
+return the total and body sizes of any window during last redisplay.
+
+One consequence of these changes is that all window change functions
+run now after functions run by 'post-command-hook'.  See the section
+"(elisp) Window Hooks" in the Elisp manual for a detailed explanation
+of the new behavior.
+
++++
+** New buffer display action alist entry 'dedicated'.
+Such an entry allows to specify the dedicated status of a window
+created by 'display-buffer'.
 
 +++
 ** New buffer display action alist entry 'window-min-height'.
@@ -1447,6 +1482,12 @@ that is non-nil, it will look for a file name handler for the current
 buffer's 'default-directory' and invoke that file name handler to make
 the process.  That way 'make-process' can start remote processes.
 
++++
+** Emacs now supports resizing images without ImageMagick on X window
+systems where the XRender extension is available, and on the NS port.
+The new function 'image-scaling-p' can be used to test whether any
+given frame supports resizing.
+
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
 
@@ -1479,6 +1520,12 @@ as Emacs subprocesses, which by now is not supported on modern
 versions of MS-Windows.  Set this variable to 50 if for some reason
 you need the old behavior (and please report such situations to Emacs
 developers).
+
++++
+** On NS the behaviour of drag and drop can now be modified by use of
+modifier keys in line with Apples guidelines.  This makes the drag and
+drop behaviour more consistent, as previously the sending application
+was able to 'set' modifiers without the knowledge of the user.
 
 
 ----------------------------------------------------------------------

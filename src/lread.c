@@ -46,10 +46,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef MSDOS
 #include "msdos.h"
-#if __DJGPP__ == 2 && __DJGPP_MINOR__ < 5
-# define INFINITY  __builtin_inf()
-# define NAN       __builtin_nan("")
-#endif
 #endif
 
 #ifdef HAVE_NS
@@ -74,6 +70,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #if IEEE_FLOATING_POINT
 # include <ieee754.h>
+# ifndef INFINITY
+#  define INFINITY ((union ieee754_double) {.ieee = {.exponent = -1}}.d)
+# endif
 #endif
 
 /* The objects or placeholders read with the #n=object form.
@@ -2880,7 +2879,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		  /* Sub char-table can't be read as a regular
 		     vector because of a two C integer fields.  */
 		  Lisp_Object tbl, tmp = read_list (1, readcharfun);
-		  ptrdiff_t size = XFIXNUM (Flength (tmp));
+		  ptrdiff_t size = list_length (tmp);
 		  int i, depth, min_char;
 		  struct Lisp_Cons *cell;
 
@@ -3847,8 +3846,7 @@ static Lisp_Object
 read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 {
   Lisp_Object tem = read_list (1, readcharfun);
-  Lisp_Object len = Flength (tem);
-  ptrdiff_t size = XFIXNAT (len);
+  ptrdiff_t size = list_length (tem);
   if (bytecodeflag && size <= COMPILED_STACK_DEPTH)
     error ("Invalid byte code");
   Lisp_Object vector = make_nil_vector (size);
