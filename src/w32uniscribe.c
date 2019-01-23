@@ -36,6 +36,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "font.h"
 #include "w32font.h"
+#include "pdumper.h"
 #include "w32common.h"
 
 struct uniscribe_font_info
@@ -177,6 +178,11 @@ uniscribe_otf_capability (struct font *font)
   Lisp_Object features;
 
   f = XFRAME (selected_frame);
+  /* Prevent quitting while we cons the lists in otf_features.
+     That's because get_frame_dc acquires the critical section, so we
+     cannot quit before we release it in release_frame_dc.  */
+  Lisp_Object prev_quit = Vinhibit_quit;
+  Vinhibit_quit = Qt;
   context = get_frame_dc (f);
   old_font = SelectObject (context, FONT_HANDLE (font));
 
@@ -187,6 +193,7 @@ uniscribe_otf_capability (struct font *font)
 
   SelectObject (context, old_font);
   release_frame_dc (f, context);
+  Vinhibit_quit = prev_quit;
 
   return capability;
 }
@@ -1176,8 +1183,16 @@ struct font_driver uniscribe_font_driver =
    as it needs to test for the existence of the Uniscribe library.  */
 void syms_of_w32uniscribe (void);
 
+static void syms_of_w32uniscribe_for_pdumper (void);
+
 void
 syms_of_w32uniscribe (void)
+{
+  pdumper_do_now_and_after_load (syms_of_w32uniscribe_for_pdumper);
+}
+
+static void
+syms_of_w32uniscribe_for_pdumper (void)
 {
   HMODULE uniscribe;
 

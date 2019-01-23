@@ -68,6 +68,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <ignore-value.h>
 
+#include "pdumper.h"
+
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -2916,6 +2918,8 @@ read_char (int commandflag, Lisp_Object map,
   recorded = true;
   if (! NILP (also_record))
     record_char (also_record);
+
+  Frun_hook_with_args (2, ((Lisp_Object []) {Qinput_event_functions, c}));
 
   /* Wipe the echo area.
      But first, if we are about to use an input method,
@@ -10977,6 +10981,8 @@ static const struct event_head head_table[] = {
   {SYMBOL_INDEX (Qselect_window),       SYMBOL_INDEX (Qswitch_frame)}
 };
 
+static void syms_of_keyboard_for_pdumper (void);
+
 void
 syms_of_keyboard (void)
 {
@@ -10987,9 +10993,11 @@ syms_of_keyboard (void)
   staticpro (&Vlispy_mouse_stem);
 
   regular_top_level_message = build_pure_c_string ("Back to top level");
+  staticpro (&regular_top_level_message);
 #ifdef HAVE_STACK_OVERFLOW_HANDLING
   recover_top_level_message
     = build_pure_c_string ("Re-entering top level after C stack overflow");
+  staticpro (&recover_top_level_message);
 #endif
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
@@ -11015,6 +11023,8 @@ syms_of_keyboard (void)
   DEFSYM (Qdisabled, "disabled");
 
   DEFSYM (Qundefined, "undefined");
+
+  DEFSYM (Qinput_event_functions, "input-event-functions");
 
   /* Hooks to run before and after each command.  */
   DEFSYM (Qpre_command_hook, "pre-command-hook");
@@ -11828,7 +11838,38 @@ preserve data in modified buffers that would otherwise be lost.
 If nil, Emacs crashes immediately in response to fatal signals.  */);
   attempt_orderly_shutdown_on_fatal_signal = true;
 
+  pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
+}
+
+static void
+syms_of_keyboard_for_pdumper (void)
+{
+  /* Make sure input state is pristine when restoring from a dump.
+     init_keyboard() also resets some of these, but the duplication
+     doesn't hurt and makes sure that allocate_kboard and subsequent
+     early init functions see the environment they expect.  */
+
+  PDUMPER_RESET_LV (pending_funcalls, Qnil);
+  PDUMPER_RESET_LV (unread_switch_frame, Qnil);
+  PDUMPER_RESET_LV (internal_last_event_frame, Qnil);
+  PDUMPER_RESET_LV (last_command_event, Qnil);
+  PDUMPER_RESET_LV (last_nonmenu_event, Qnil);
+  PDUMPER_RESET_LV (last_input_event, Qnil);
+  PDUMPER_RESET_LV (Vunread_command_events, Qnil);
+  PDUMPER_RESET_LV (Vunread_post_input_method_events, Qnil);
+  PDUMPER_RESET_LV (Vunread_input_method_events, Qnil);
+  PDUMPER_RESET_LV (Vthis_command, Qnil);
+  PDUMPER_RESET_LV (Vreal_this_command, Qnil);
+  PDUMPER_RESET_LV (Vthis_command_keys_shift_translated, Qnil);
+  PDUMPER_RESET_LV (Vthis_original_command, Qnil);
+  PDUMPER_RESET (num_input_keys, 0);
+  PDUMPER_RESET (num_nonmacro_input_events, 0);
+  PDUMPER_RESET_LV (Vlast_event_frame, Qnil);
+  PDUMPER_RESET_LV (Vdeferred_action_list, Qnil);
+  PDUMPER_RESET_LV (Vdelayed_warnings_list, Qnil);
+
   /* Create the initial keyboard.  Qt means 'unset'.  */
+  eassert (initial_kboard == NULL);
   initial_kboard = allocate_kboard (Qt);
 
   DEFVAR_LISP ("while-no-input-ignore-events",
@@ -11940,8 +11981,8 @@ mark_kboards (void)
   for (kb = all_kboards; kb; kb = kb->next_kboard)
     {
       if (kb->kbd_macro_buffer)
-	for (p = kb->kbd_macro_buffer; p < kb->kbd_macro_ptr; p++)
-	  mark_object (*p);
+        for (p = kb->kbd_macro_buffer; p < kb->kbd_macro_ptr; p++)
+          mark_object (*p);
       mark_object (KVAR (kb, Voverriding_terminal_local_map));
       mark_object (KVAR (kb, Vlast_command));
       mark_object (KVAR (kb, Vreal_last_command));

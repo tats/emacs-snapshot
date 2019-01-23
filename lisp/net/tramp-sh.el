@@ -2184,8 +2184,7 @@ the uid and gid from FILENAME."
 		   (or (eq op 'copy)
 		       (zerop
 			(logand
-			 (file-modes (file-name-directory localname1))
-			 (string-to-number "1000" 8))))
+			 (file-modes (file-name-directory localname1)) #o1000)))
 		   (file-writable-p (file-name-directory localname2))
 		   (or (file-directory-p localname2)
 		       (file-writable-p localname2))))
@@ -2229,8 +2228,7 @@ the uid and gid from FILENAME."
 		      ;; We must change the ownership as remote user.
 		      ;; Since this does not work reliable, we also
 		      ;; give read permissions.
-		      (set-file-modes
-		       (concat prefix tmpfile) (string-to-number "0777" 8))
+		      (set-file-modes (concat prefix tmpfile) #o0777)
 		      (tramp-set-file-uid-gid
 		       (concat prefix tmpfile)
 		       (tramp-get-local-uid 'integer)
@@ -2244,7 +2242,7 @@ the uid and gid from FILENAME."
 		      ;; We must change the ownership as local user.
 		      ;; Since this does not work reliable, we also
 		      ;; give read permissions.
-		      (set-file-modes tmpfile (string-to-number "0777" 8))
+		      (set-file-modes tmpfile #o0777)
 		      (tramp-set-file-uid-gid
 		       tmpfile
 		       (tramp-get-remote-uid v 'integer)
@@ -2906,7 +2904,7 @@ the result will be a local, non-Tramp, file name."
 		    ;; otherwise we might be interrupted by
 		    ;; `verify-visited-file-modtime'.
 		    (let ((buffer-undo-list t)
-			  (buffer-read-only nil)
+			  (inhibit-read-only t)
 			  (mark (point-max)))
 		      (clear-visited-file-modtime)
 		      (narrow-to-region (point-max) (point-max))
@@ -3267,9 +3265,7 @@ the result will be a local, non-Tramp, file name."
 	  ;; handles permissions.
 	  ;; Ensure that it is still readable.
 	  (when modes
-	    (set-file-modes
-	     tmpfile
-	     (logior (or modes 0) (string-to-number "0400" 8))))
+	    (set-file-modes tmpfile (logior (or modes 0) #o0400)))
 
 	  ;; This is a bit lengthy due to the different methods
 	  ;; possible for file transfer.  First, we check whether the
@@ -3817,22 +3813,26 @@ file-notify events."
 	(tramp-message v 5 "file system info: %s" localname)
 	(tramp-send-command
 	 v (format
-	    "%s --block-size=1 --output=size,used,avail %s"
+	    "%s %s"
 	    (tramp-get-remote-df v) (tramp-shell-quote-argument localname)))
 	(with-current-buffer (tramp-get-connection-buffer v)
 	  (goto-char (point-min))
 	  (forward-line)
 	  (when (looking-at
 		 (eval-when-compile
-		   (concat "[[:space:]]*\\([[:digit:]]+\\)"
+		   (concat "\\(?:^/[^[:space:]]*[[:space:]]\\)?"
+			   "[[:space:]]*\\([[:digit:]]+\\)"
 			   "[[:space:]]+\\([[:digit:]]+\\)"
 			   "[[:space:]]+\\([[:digit:]]+\\)")))
-	    (list (string-to-number (match-string 1))
-		  ;; The second value is the used size.  We need the
-		  ;; free size.
-		  (- (string-to-number (match-string 1))
-		     (string-to-number (match-string 2)))
-		  (string-to-number (match-string 3)))))))))
+	    (mapcar
+	     (lambda (d)
+	       (* d (tramp-get-connection-property v "df-blocksize" 0)))
+	     (list (string-to-number (match-string 1))
+		   ;; The second value is the used size.  We need the
+		   ;; free size.
+		   (- (string-to-number (match-string 1))
+		      (string-to-number (match-string 2)))
+		   (string-to-number (match-string 3))))))))))
 
 ;;; Internal Functions:
 
@@ -3969,9 +3969,11 @@ variable PATH."
     (if (< (length command) pipe-buf)
 	(tramp-send-command vec command)
       ;; Use a temporary file.
-      (setq tmpfile (tramp-make-tramp-temp-file vec))
+      (setq tmpfile
+	    (tramp-make-tramp-file-name vec (tramp-make-tramp-temp-file vec)))
       (write-region command nil tmpfile)
-      (tramp-send-command vec (format ". %s" tmpfile))
+      (tramp-send-command
+       vec (format ". %s" (tramp-compat-file-local-name tmpfile)))
       (delete-file tmpfile))))
 
 ;; ------------------------------------------------------------
@@ -4340,7 +4342,7 @@ Each item is a list that looks like this:
 
 \(FORMAT ENCODING DECODING)
 
-FORMAT is  symbol describing the encoding/decoding format.  It can be
+FORMAT is a symbol describing the encoding/decoding format.  It can be
 `b64' for base64 encoding, `uu' for uu encoding, or `pack' for simple packing.
 
 ENCODING and DECODING can be strings, giving commands, or symbols,
@@ -4722,7 +4724,7 @@ Goes through the list `tramp-inline-compress-commands'."
 	(ignore-errors
 	  (when (executable-find "ssh")
 	    (with-tramp-progress-reporter
-		vec 4  "Computing ControlMaster options"
+		vec 4 "Computing ControlMaster options"
 	      (with-temp-buffer
 		(tramp-call-process vec "ssh" nil t nil "-o" "ControlMaster")
 		(goto-char (point-min))
@@ -5077,7 +5079,7 @@ function waits for output unless NOOUTPUT is set."
 	   (regexp1 (format "\\(^\\|\000\\)%s" regexp))
 	   (found (tramp-wait-for-regexp proc timeout regexp1)))
       (if found
-	  (let (buffer-read-only)
+	  (let ((inhibit-read-only t))
 	    ;; A simple-minded busybox has sent " ^H" sequences.
 	    ;; Delete them.
 	    (goto-char (point-min))
@@ -5124,7 +5126,7 @@ DONT-SUPPRESS-ERR is non-nil, stderr won't be sent to /dev/null."
     (skip-chars-forward "^ ")
     (prog1
 	(zerop (read (current-buffer)))
-      (let (buffer-read-only)
+      (let ((inhibit-read-only t))
 	(delete-region (match-beginning 0) (point-max))))))
 
 (defun tramp-barf-unless-okay (vec command fmt &rest args)
@@ -5578,12 +5580,24 @@ This command is returned only if `delete-by-moving-to-trash' is non-nil."
   "Determine remote `df' command."
   (with-tramp-connection-property vec "df"
     (tramp-message vec 5 "Finding a suitable `df' command")
-    (let ((result (tramp-find-executable vec "df" (tramp-get-remote-path vec))))
-      (and
-       result
-       (tramp-send-command-and-check
-	vec (format "%s --block-size=1 --output=size,used,avail /" result))
-       result))))
+    (let ((df (tramp-find-executable vec "df" (tramp-get-remote-path vec)))
+	  result)
+      (when df
+	(cond
+	 ;; coreutils.
+	 ((tramp-send-command-and-check
+	   vec
+	   (format
+	    "%s /"
+	    (setq result
+		  (format "%s --block-size=1 --output=size,used,avail" df))))
+	  (tramp-set-connection-property vec "df-blocksize" 1)
+	  result)
+	 ;; POSIX.1
+	 ((tramp-send-command-and-check
+	   vec (format "%s /" (setq result (format "%s -k" df))))
+	  (tramp-set-connection-property vec "df-blocksize" 1024)
+	  result))))))
 
 (defun tramp-get-remote-gio-monitor (vec)
   "Determine remote `gio-monitor' command."
@@ -5933,5 +5947,9 @@ function cell is returned to be applied on a buffer."
 ;;   which could immediately be passed on to the remote side, and
 ;;   later on checks the return value of those calls as and when
 ;;   needed.  (Stefan Monnier)
+;;
+;; * Implement detaching/re-attaching remote sessions.  By this, a
+;;   session could be reused after a connection loss.  Use dtach, or
+;;   screen, or tmux, or mosh.
 
 ;;; tramp-sh.el ends here

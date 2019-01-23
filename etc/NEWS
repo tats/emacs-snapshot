@@ -59,6 +59,25 @@ option '--enable-check-lisp-object-type' is therefore no longer as
 useful and so is no longer enabled by default in developer builds,
 to reduce differences between developer and production builds.
 
++++
+** Emacs now uses a "portable dumper" instead of unexec.
+This improves compatibility with memory allocation on modern systems,
+and in particular better supports the Address Space Layout
+Randomization (ASLR) feature, a security technique used by most modern
+operating systems.
+
+Portable dumping can be disabled at configure time via the configure
+option '--with-dumping=unexec' (but we don't recommend that, unless
+the portable dumping doesn't work on your system for some
+reason---please report such systems to the Emacs developers as bugs).
+
+When built with the portable dumping support (which is the default),
+Emacs looks for the 'emacs.pdmp' file, generated during the build, in
+its data directory at startup, and loads the dumped state from there.
+The new command-line argument '--dump-file=FILE' allows to specify a
+non-default '.pdmp' file to load the state from; see the node "Initial
+Options" in the Emacs manual for more information.
+
 ** Ibuffer
 
 ---
@@ -1170,10 +1189,12 @@ removed.
 
 * Lisp Changes in Emacs 27.1
 
-+++
+
 ** 'self-insert-command' takes the char to insert as (optional) argument.
 
 ** 'lookup-key' can take a list of keymaps as argument.
+
+** New hook `input-event-functions` run whenever a user-input is read.
 
 +++
 ** 'condition-case' now accepts 't' to match any error symbol.
@@ -1284,14 +1305,17 @@ of the Emacs Lisp Reference manual for more detail.
 
 +++
 ** Window change functions have been redesigned completely.
+
 Hooks reacting to window changes run now only when redisplay detects
-that a change has actually occurred.  The four hooks provided are:
+that a change has actually occurred.  The five hooks provided are:
 'window-buffer-change-functions' (run after window buffers have
 changed), 'window-size-change-functions' (run after a window was
 assigned a new buffer or size), 'window-configuration-change-hook'
-(like the former but run also when a window was deleted) and
+(like the former but run also when a window was deleted),
 'window-selection-change-functions' (run when the selected window
-changed).  'window-scroll-functions' are unaffected by these changes.
+changed) and 'window-state-change-functions' (run when any of the
+preceding ones is run).  'window-scroll-functions' are unaffected by
+these changes.
 
 In addition, a number of functions now allow the caller to detect what
 has changed since last redisplay: 'window-old-buffer' returns for any
@@ -1483,8 +1507,12 @@ buffer's 'default-directory' and invoke that file name handler to make
 the process.  That way 'make-process' can start remote processes.
 
 +++
-** Emacs now supports resizing images without ImageMagick on X window
-systems where the XRender extension is available, and on the NS port.
+** Emacs now supports resizing (scaling) of images without ImageMagick.
+All modern systems are supported by this feature.  (On GNU and Unix
+systems, the XRender extension to X11 is required for this to be
+available; the configure script will test for it and, if found, enable
+scaling.)
+
 The new function 'image-scaling-p' can be used to test whether any
 given frame supports resizing.
 

@@ -206,9 +206,8 @@ pass to the OPERATION."
 	(tramp-message v 6 "%s" (mapconcat 'identity (process-command p) " "))
 	(process-put p 'adjust-window-size-function 'ignore)
 	(set-process-query-on-exit-flag p nil)
-	(while (process-live-p p)
-	  (accept-process-output p 0.1))
-	(accept-process-output p 0.1)
+	(while (or (accept-process-output p 0.1)
+		   (process-live-p p)))
 	(tramp-message v 6 "\n%s" (buffer-string))
 	(goto-char (point-min))
 	(while (search-forward-regexp "^\\(\\S-+\\)[[:space:]]+device$" nil t)
@@ -471,7 +470,7 @@ Convert (\"-al\") to (\"-a\" \"-l\").  Remove arguments like \"--dired\"."
    (apply 'concat
 	  (mapcar (lambda (s)
 		    (replace-regexp-in-string
-		     "\\(.\\)"  " -\\1" (replace-regexp-in-string "^-" "" s)))
+		     "\\(.\\)" " -\\1" (replace-regexp-in-string "^-" "" s)))
 		  ;; FIXME: Warning about removed switches (long and non-dash).
 		  (delq nil
 			(mapcar
@@ -590,7 +589,7 @@ Emacs dired can't find files."
 	    (delq
 	     nil
 	     (mapcar
-	      (lambda (l) (and (not (string-match-p  "^[[:space:]]*$" l)) l))
+	      (lambda (l) (and (not (string-match-p "^[[:space:]]*$" l)) l))
 	      (split-string (buffer-string) "\n")))))))))))
 
 (defun tramp-adb-handle-file-local-copy (filename)
@@ -610,9 +609,7 @@ Emacs dired can't find files."
 	  (ignore-errors (delete-file tmpfile))
 	  (tramp-error
 	   v 'file-error "Cannot make local copy of file `%s'" filename))
-	(set-file-modes
-	 tmpfile
-	 (logior (or (file-modes filename) 0) (string-to-number "0400" 8))))
+	(set-file-modes tmpfile (logior (or (file-modes filename) 0) #o0400)))
       tmpfile)))
 
 (defun tramp-adb-handle-file-writable-p (filename)
@@ -658,9 +655,7 @@ But handle the case, if the \"test\" command is not available."
 	   (tmpfile (tramp-compat-make-temp-file filename)))
       (when (and append (file-exists-p filename))
 	(copy-file filename tmpfile 'ok)
-	(set-file-modes
-	 tmpfile
-	 (logior (or (file-modes tmpfile) 0) (string-to-number "0600" 8))))
+	(set-file-modes tmpfile (logior (or (file-modes tmpfile) 0) #o0600)))
       (tramp-run-real-handler
        'write-region (list start end tmpfile append 'no-message lockname))
       (with-tramp-progress-reporter
@@ -1092,7 +1087,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		    ;; otherwise we might be interrupted by
 		    ;; `verify-visited-file-modtime'.
 		    (let ((buffer-undo-list t)
-			  (buffer-read-only nil)
+			  (inhibit-read-only t)
 			  (mark (point)))
 		      (clear-visited-file-modtime)
 		      (narrow-to-region (point-max) (point-max))
@@ -1243,7 +1238,7 @@ the exit status is not equal 0, and t otherwise."
     (skip-chars-forward "^ ")
     (prog1
 	(zerop (read (current-buffer)))
-      (let (buffer-read-only)
+      (let ((inhibit-read-only t))
 	(delete-region (match-beginning 0) (point-max))))))
 
 (defun tramp-adb-barf-unless-okay (vec command fmt &rest args)
@@ -1261,7 +1256,7 @@ FMT and ARGS are passed to `error'."
     (if (tramp-wait-for-regexp
 	 proc timeout
 	 (tramp-get-connection-property proc "prompt" tramp-adb-prompt))
-	(let (buffer-read-only)
+	(let ((inhibit-read-only t))
 	  (goto-char (point-min))
 	  ;; ADB terminal sends "^H" sequences.
 	  (when (re-search-forward "<\b+" (point-at-eol) t)
@@ -1327,7 +1322,7 @@ connection if a previous connection has died for some reason."
 	    ;; Wait for initial prompt.
 	    (tramp-adb-wait-for-output p 30)
 	    (unless (process-live-p p)
-	      (tramp-error  vec 'file-error "Terminated!"))
+	      (tramp-error vec 'file-error "Terminated!"))
 	    (process-put p 'vector vec)
 	    (process-put p 'adjust-window-size-function 'ignore)
 	    (set-process-query-on-exit-flag p nil)

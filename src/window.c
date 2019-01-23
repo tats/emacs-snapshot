@@ -42,6 +42,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef MSDOS
 #include "msdos.h"
 #endif
+#include "pdumper.h"
 
 static ptrdiff_t count_windows (struct window *);
 static ptrdiff_t get_leaf_windows (struct window *, struct window **,
@@ -3798,7 +3799,7 @@ run_window_change_functions (void)
 	    run_window_change_functions_1
 	      (Qwindow_size_change_functions, buffer, window);
 
-	  /* This window's selection has changed when it it was
+	  /* This window's selection has changed when it was
 	     (de-)selected as its frame's or the globally selected
 	     window.  */
 	  if (((frame_selected_change
@@ -3810,6 +3811,21 @@ run_window_change_functions (void)
 	      && WINDOW_LIVE_P (window))
 	    run_window_change_functions_1
 	      (Qwindow_selection_change_functions, buffer, window);
+
+	  /* This window's state has changed when its buffer or size
+	     changed or it was (de-)selected as its frame's or the
+	     globally selected window.  */
+	  if ((window_buffer_change
+	       || window_size_change
+	       || ((frame_selected_change
+		    && (EQ (window, old_selected_window)
+			|| EQ (window, selected_window)))
+		   || (frame_selected_window_change
+		       && (EQ (window, FRAME_OLD_SELECTED_WINDOW (f))
+			   || EQ (window, FRAME_SELECTED_WINDOW (f))))))
+	      && WINDOW_LIVE_P (window))
+	    run_window_change_functions_1
+	      (Qwindow_state_change_functions, buffer, window);
 	}
 
       /* When the number of windows on a frame has decreased, at least
@@ -3838,6 +3854,15 @@ run_window_change_functions (void)
 	  && FRAME_LIVE_P (f))
 	run_window_change_functions_1
 	  (Qwindow_selection_change_functions, Qnil, frame);
+
+      /* A frame has changed state when a size or buffer change
+	 occurrd or its selected window has changed or when it was
+	 (de-)selected.  */
+      if ((frame_selected_change || frame_selected_window_change
+	   || frame_buffer_change || window_deleted || frame_size_change)
+	  && FRAME_LIVE_P (f))
+	run_window_change_functions_1
+	  (Qwindow_state_change_functions, Qnil, frame);
 
       /* A frame's configuration changed when one of its windows has
 	 changed buffer or size or at least one window was deleted.  */
@@ -4649,16 +4674,26 @@ resize_frame_windows (struct frame *f, int size, bool horflag, bool pixelwise)
     /* For a leaf root window just set the size.  */
     if (horflag)
       {
+	bool changed = r->pixel_width != new_pixel_size;
+
 	r->total_cols = new_size;
 	r->pixel_width = new_pixel_size;
+
+	if (changed && !WINDOW_PSEUDO_P (r))
+	  FRAME_WINDOW_CHANGE (f) = true;
       }
     else
       {
+	bool changed = r->pixel_height != new_pixel_size;
+
 	r->top_line = FRAME_TOP_MARGIN (f);
 	r->pixel_top = FRAME_TOP_MARGIN_HEIGHT (f);
 
 	r->total_lines = new_size;
 	r->pixel_height = new_pixel_size;
+
+	if (changed && !WINDOW_PSEUDO_P (r))
+	  FRAME_WINDOW_CHANGE (f) = true;
       }
   else
     {
@@ -7876,10 +7911,59 @@ and scrolling positions.  */)
   return Qnil;
 }
 
+
+static void init_window_once_for_pdumper (void);
+
 void
 init_window_once (void)
 {
+  minibuf_window = Qnil;
+  staticpro (&minibuf_window);
+
+  selected_window = Qnil;
+  staticpro (&selected_window);
+
+  Vwindow_list = Qnil;
+  staticpro (&Vwindow_list);
+
+  minibuf_selected_window = Qnil;
+  staticpro (&minibuf_selected_window);
+
+  pdumper_do_now_and_after_load (init_window_once_for_pdumper);
+}
+
+static void init_window_once_for_pdumper (void)
+{
+  window_scroll_pixel_based_preserve_x = -1;
+  window_scroll_pixel_based_preserve_y = -1;
+  window_scroll_preserve_hpos = -1;
+  window_scroll_preserve_vpos = -1;
+  PDUMPER_IGNORE (sequence_number);
+
+  PDUMPER_RESET_LV (minibuf_window, Qnil);
+  PDUMPER_RESET_LV (selected_window, Qnil);
+  PDUMPER_RESET_LV (Vwindow_list, Qnil);
+  PDUMPER_RESET_LV (minibuf_selected_window, Qnil);
+
+  /* Hack: if mode_line_in_non_selected_windows is true (which it may
+     be, if we're restoring from a dump) the guts of
+     make_initial_frame will try to access selected_window, which is
+     invalid at this point, and lose.  For the purposes of creating
+     the initial frame and window, this variable must be false.  */
+  bool old_mode_line_in_non_selected_windows;
+
+  /* Snapshot dumped_with_pdumper to suppress compiler warning.  */
+  bool saved_dumped_with_pdumper = dumped_with_pdumper_p ();
+  if (saved_dumped_with_pdumper)
+    {
+      old_mode_line_in_non_selected_windows
+        = mode_line_in_non_selected_windows;
+      mode_line_in_non_selected_windows = false;
+    }
   struct frame *f = make_initial_frame ();
+  if (saved_dumped_with_pdumper)
+    mode_line_in_non_selected_windows =
+      old_mode_line_in_non_selected_windows;
   XSETFRAME (selected_frame, f);
   old_selected_frame = Vterminal_frame = selected_frame;
   minibuf_window = f->minibuffer_window;
@@ -7903,6 +7987,7 @@ syms_of_window (void)
   Fput (Qscroll_down, Qscroll_command, Qt);
 
   DEFSYM (Qwindow_configuration_change_hook, "window-configuration-change-hook");
+  DEFSYM (Qwindow_state_change_functions, "window-state-change-functions");
   DEFSYM (Qwindow_size_change_functions, "window-size-change-functions");
   DEFSYM (Qwindow_buffer_change_functions, "window-buffer-change-functions");
   DEFSYM (Qwindow_selection_change_functions, "window-selection-change-functions");
@@ -7931,16 +8016,6 @@ syms_of_window (void)
   DEFSYM (Qmark_for_redisplay, "mark-for-redisplay");
   DEFSYM (Qmode_line_format, "mode-line-format");
   DEFSYM (Qheader_line_format, "header-line-format");
-
-  staticpro (&Vwindow_list);
-
-  minibuf_selected_window = Qnil;
-  staticpro (&minibuf_selected_window);
-
-  window_scroll_pixel_based_preserve_x = -1;
-  window_scroll_pixel_based_preserve_y = -1;
-  window_scroll_preserve_hpos = -1;
-  window_scroll_preserve_vpos = -1;
 
   DEFVAR_LISP ("temp-buffer-show-function", Vtemp_buffer_show_function,
 	       doc: /* Non-nil means call as function to display a help buffer.
@@ -8032,6 +8107,22 @@ passed as argument.
 Functions specified by the default value are called for each frame if
 the frame's selected window has changed since the last redisplay.  In
 this case the frame is passed as argument.  */);
+  Vwindow_selection_change_functions = Qnil;
+
+  DEFVAR_LISP ("window-state-change-functions", Vwindow_state_change_functions,
+	       doc: /* Functions called during redisplay when the window state changed.
+The value should be a list of functions that take one argument.
+
+Functions specified buffer-locally are called for each window showing
+the corresponding buffer if and only if that window has been added,
+resized, changed its buffer or has been (de-)selected since the last
+redisplay.  In this case the window is passed as argument.
+
+Functions specified by the default value are called for each frame if
+at least one window on that frame has been added, deleted, changed its
+buffer or its total or body size or the frame has been (de-)selected
+or its selected window has changed since the last redisplay.  In this
+case the frame is passed as argument.  */);
   Vwindow_selection_change_functions = Qnil;
 
   DEFVAR_LISP ("window-configuration-change-hook", Vwindow_configuration_change_hook,

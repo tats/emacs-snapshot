@@ -46,6 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "termhooks.h"
 #include "font.h"
+#include "pdumper.h"
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -1899,6 +1900,12 @@ x_set_image_size (struct frame *f, struct image *img)
       img->height = height;
     }
 # endif
+# ifdef HAVE_NTGUI
+  /* Under HAVE_NTGUI, we will scale the image on the fly, when we
+     draw it.  See w32term.c:x_draw_image_foreground.  */
+  img->width = width;
+  img->height = height;
+# endif
 #endif
 }
 
@@ -2178,15 +2185,29 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
   int event_basep, error_basep;
   if (picture && XRenderQueryExtension (display, &event_basep, &error_basep))
     {
-      XRenderPictFormat *format;
-      XRenderPictureAttributes attr;
+      if (depth == 32 || depth == 24 || depth == 8)
+        {
+          XRenderPictFormat *format;
+          XRenderPictureAttributes attr;
 
-      /* FIXME: Do we need to handle all possible bit depths?  */
-      format = XRenderFindStandardFormat (display,
-                                          depth > 24 ? PictStandardARGB32
-                                          : depth > 8 ? PictStandardRGB24
-                                          : PictStandardA8);
-      *picture = XRenderCreatePicture (display, *pixmap, format, 0, &attr);
+          /* FIXME: Do we need to handle all possible bit depths?
+             XRenderFindStandardFormat supports PictStandardARGB32,
+             PictStandardRGB24, PictStandardA8, PictStandardA4,
+             PictStandardA1, and PictStandardNUM (what is this?!).
+
+             XRenderFindFormat may support more, but I don't
+             understand the documentation.  */
+          format = XRenderFindStandardFormat (display,
+                                              depth == 32 ? PictStandardARGB32
+                                              : depth == 24 ? PictStandardRGB24
+                                              : PictStandardA8);
+          *picture = XRenderCreatePicture (display, *pixmap, format, 0, &attr);
+        }
+      else
+        {
+          image_error ("Specified image bit depth is not supported by XRender");
+          *picture = 0;
+        }
     }
 # endif
 
@@ -9900,7 +9921,7 @@ DEFUN ("image-scaling-p", Fimage_scaling_p, Simage_scaling_p, 0, 1, 0,
 Return t if FRAME supports native scaling, nil otherwise.  */)
      (Lisp_Object frame)
 {
-#ifdef HAVE_NS
+#if defined (HAVE_NS) || defined (HAVE_NTGUI)
   return Qt;
 #elif defined (HAVE_X_WINDOWS) && defined (HAVE_XRENDER)
   int event_basep, error_basep;
@@ -10003,7 +10024,9 @@ void
 syms_of_image (void)
 {
   /* Initialize this only once; it will be reset before dumping.  */
+  /* The portable dumper will just leave it NULL, so no need to reset.  */
   image_types = NULL;
+  PDUMPER_IGNORE (image_types);
 
   /* Must be defined now because we're going to update it below, while
      defining the supported image types.  */

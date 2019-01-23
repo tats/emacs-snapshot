@@ -60,6 +60,7 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "keyboard.h"
 #include "buffer.h"
 #include "font.h"
+#include "pdumper.h"
 
 #ifdef NS_IMPL_GNUSTEP
 #include "process.h"
@@ -8154,6 +8155,14 @@ not_in_argv (NSString *arg)
 }
 
 
+- (void)viewWillDraw
+{
+  /* If the frame has been garbaged there's no point in redrawing
+     anything.  */
+  if (FRAME_GARBAGED_P (emacsframe))
+    [self setNeedsDisplay:NO];
+}
+
 - (void)drawRect: (NSRect)rect
 {
   const NSRect *rectList;
@@ -9326,6 +9335,7 @@ syms_of_nsterm (void)
   NSTRACE ("syms_of_nsterm");
 
   ns_antialias_threshold = 10.0;
+  PDUMPER_REMEMBER_SCALAR (ns_antialias_threshold);
 
   /* From 23+ we need to tell emacs what modifiers there are.  */
   DEFSYM (Qmodifier_value, "modifier-value");

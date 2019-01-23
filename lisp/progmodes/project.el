@@ -35,7 +35,7 @@
 ;; Infrastructure:
 ;;
 ;; Function `project-current', to determine the current project
-;; instance, and 3 (at the moment) generic functions that act on it.
+;; instance, and 5 (at the moment) generic functions that act on it.
 ;; This list is to be extended in future versions.
 ;;
 ;; Utils:
@@ -45,17 +45,15 @@
 ;;
 ;; Commands:
 ;;
-;; `project-find-regexp' and `project-or-external-find-regexp' use the
-;; current API, and thus will work in any project that has an adapter.
+;; `project-find-file', `project-find-regexp' and
+;; `project-or-external-find-regexp' use the current API, and thus
+;; will work in any project that has an adapter.
 
 ;;; TODO:
 
 ;; * Reliably cache the list of files in the project, probably using
 ;;   filenotify.el (if supported) to invalidate.  And avoiding caching
 ;;   if it's not available (manual cache invalidation is not nice).
-;;
-;; * Allow the backend to override the file-listing logic?  Maybe also
-;;   to delegate file name completion to an external tool.
 ;;
 ;; * Build tool related functionality.  Start with a `project-build'
 ;;   command, which should provide completions on tasks to run, and
@@ -162,29 +160,14 @@ end it with `/'.  DIR must be one of `project-roots' or
 DIRS is a list of absolute directories; it should be some
 subset of the project roots and external roots.
 
-The default implementation uses `find-program'.  PROJECT is used
-to find the list of ignores for each directory."
-  ;; FIXME: Uniquely abbreviate the roots?
-  (require 'xref)
-  (let ((all-files
-	 (cl-mapcan
-	  (lambda (dir)
-	    (let ((command
-		   (format "%s %s %s -type f -print0"
-			   find-program
-                           (shell-quote-argument
-                            (expand-file-name dir))
-			   (xref--find-ignores-arguments
-			    (project-ignores project dir)
-			    (expand-file-name dir)))))
-	      (split-string (shell-command-to-string command) "\0" t)))
-	  dirs)))
+The default implementation delegates to `project-files'."
+  (let ((all-files (project-files project dirs)))
     (lambda (string pred action)
       (cond
        ((eq action 'metadata)
-	'(metadata . ((category . project-file))))
+        '(metadata . ((category . project-file))))
        (t
-	(complete-with-action action all-files string pred))))))
+        (complete-with-action action all-files string pred))))))
 
 (cl-defmethod project-roots ((project (head transient)))
   (list (cdr project)))
@@ -192,14 +175,37 @@ to find the list of ignores for each directory."
 (cl-defgeneric project-files (project &optional dirs)
   "Return a list of files in directories DIRS in PROJECT.
 DIRS is a list of absolute directories; it should be some
-subset of the project roots and external roots."
-  ;; This default implementation only works if project-file-completion-table
-  ;; returns a "flat" completion table.
-  ;; FIXME: Maybe we should do the reverse: implement the default
-  ;; `project-file-completion-table' on top of `project-files'.
-  (all-completions
-   "" (project-file-completion-table
-       project (or dirs (project-roots project)))))
+subset of the project roots and external roots.
+
+The default implementation uses `find-program'.  PROJECT is used
+to find the list of ignores for each directory."
+  (require 'xref)
+  (cl-mapcan
+   (lambda (dir)
+     (project--files-in-directory dir
+                                  (project--dir-ignores project dir)))
+   (or dirs (project-roots project))))
+
+(defun project--files-in-directory (dir ignores &optional files)
+  (require 'find-dired)
+  (defvar find-name-arg)
+  (let ((command (format "%s %s %s -type f %s -print0"
+                         find-program
+                         dir
+                         (xref--find-ignores-arguments
+                          ignores
+                          (expand-file-name dir))
+                         (if files
+                             (concat (shell-quote-argument "(")
+                                     " " find-name-arg " "
+                                     (mapconcat
+                                      #'shell-quote-argument
+                                      (split-string files)
+                                      (concat " -o " find-name-arg " "))
+                                     " "
+                                     (shell-quote-argument ")"))"")
+                         )))
+    (split-string (shell-command-to-string command) "\0" t)))
 
 (defgroup project-vc nil
   "Project implementation using the VC package."
@@ -276,7 +282,10 @@ backend implementation of `project-external-roots'.")
             entry))
         (vc-call-backend backend 'ignore-completion-table root)))
      (project--value-in-dir 'project-vc-ignores root)
-     (cl-call-next-method))))
+     (mapcar
+      (lambda (dir)
+        (concat dir "/"))
+      vc-directory-exclusion-list))))
 
 (defun project-combine-directories (&rest lists-of-dirs)
   "Return a sorted and culled list of directory names.
@@ -326,11 +335,27 @@ triggers completion when entering a pattern, including it
 requires quoting, e.g. `\\[quoted-insert]<space>'."
   (interactive (list (project--read-regexp)))
   (let* ((pr (project-current t))
-         (dirs (if current-prefix-arg
-                   (list (read-directory-name "Base directory: "
-                                              nil default-directory t))
-                 (project-roots pr))))
-    (project--find-regexp-in dirs regexp pr)))
+         (files
+          (if (not current-prefix-arg)
+              (project-files pr (project-roots pr))
+            (let ((dir (read-directory-name "Base directory: "
+                                            nil default-directory t)))
+              (project--files-in-directory dir
+                                           (project--dir-ignores pr dir)
+                                           (grep-read-files regexp))))))
+    (project--find-regexp-in-files regexp files)))
+
+(defun project--dir-ignores (project dir)
+  (let* ((roots (project-roots project))
+         (root (cl-find dir roots :test #'file-in-directory-p)))
+    (if (not root)
+        (project-ignores nil nil)       ;The defaults.
+      (let ((ignores (project-ignores project root)))
+        (if (file-equal-p root dir)
+            ignores
+          ;; FIXME: Update the "rooted" ignores to relate to DIR instead.
+          (cl-delete-if (lambda (str) (string-prefix-p "./" str))
+                        ignores))))))
 
 ;;;###autoload
 (defun project-or-external-find-regexp (regexp)
@@ -339,28 +364,75 @@ With \\[universal-argument] prefix, you can specify the file name
 pattern to search for."
   (interactive (list (project--read-regexp)))
   (let* ((pr (project-current t))
-         (dirs (append
-                (project-roots pr)
-                (project-external-roots pr))))
-    (project--find-regexp-in dirs regexp pr)))
+         (files
+          (project-files pr (append
+                             (project-roots pr)
+                             (project-external-roots pr)))))
+    (project--find-regexp-in-files regexp files)))
+
+(defun project--find-regexp-in-files (regexp files)
+  (pcase-let*
+      ((output (get-buffer-create " *project grep output*"))
+       (`(,grep-re ,file-group ,line-group . ,_) (car grep-regexp-alist))
+       (status nil)
+       (hits nil)
+       (xrefs nil)
+       (command (format "xargs -0 grep %s -nHe %s"
+                        (if (and case-fold-search
+                                 (isearch-no-upper-case-p regexp t))
+                            "-i"
+                          "")
+                        (shell-quote-argument (xref--regexp-to-extended regexp)))))
+    (with-current-buffer output
+      (erase-buffer)
+      (with-temp-buffer
+        (insert (mapconcat #'identity files "\0"))
+        (setq status
+              (project--process-file-region (point-min)
+                                            (point-max)
+                                            shell-file-name
+                                            output
+                                            nil
+                                            shell-command-switch
+                                            command)))
+      (goto-char (point-min))
+      (when (and (/= (point-min) (point-max))
+                 (not (looking-at grep-re))
+                 ;; TODO: Show these matches as well somehow?
+                 (not (looking-at "Binary file .* matches")))
+        (user-error "Search failed with status %d: %s" status
+                    (buffer-substring (point-min) (line-end-position))))
+      (while (re-search-forward grep-re nil t)
+        (push (list (string-to-number (match-string line-group))
+                    (match-string file-group)
+                    (buffer-substring-no-properties (point) (line-end-position)))
+              hits)))
+    (setq xrefs (xref--convert-hits (nreverse hits) regexp))
+    (unless xrefs
+      (user-error "No matches for: %s" regexp))
+    (xref--show-xrefs xrefs nil)))
+
+(defun project--process-file-region (start end program
+                                     &optional buffer display
+                                     &rest args)
+  ;; FIXME: This branching shouldn't be necessary, but
+  ;; call-process-region *is* measurably faster, even for a program
+  ;; doing some actual work (for a period of time). Even though
+  ;; call-process-region also creates a temp file internally
+  ;; (http://lists.gnu.org/archive/html/emacs-devel/2019-01/msg00211.html).
+  (if (not (file-remote-p default-directory))
+      (apply #'call-process-region
+             start end program nil buffer display args)
+    (let ((infile (make-temp-file "ppfr")))
+      (unwind-protect
+          (progn
+            (write-region start end infile nil 'silent)
+            (apply #'process-file program infile buffer display args))
+        (delete-file infile)))))
 
 (defun project--read-regexp ()
   (let ((id (xref-backend-identifier-at-point (xref-find-backend))))
     (read-regexp "Find regexp" (and id (regexp-quote id)))))
-
-(defun project--find-regexp-in (dirs regexp project)
-  (require 'grep)
-  (let* ((files (if current-prefix-arg
-                    (grep-read-files regexp)
-                  "*"))
-         (xrefs (cl-mapcan
-                 (lambda (dir)
-                   (xref-collect-matches regexp files dir
-                                         (project-ignores project dir)))
-                 dirs)))
-    (unless xrefs
-      (user-error "No matches for: %s" regexp))
-    (xref--show-xrefs xrefs nil)))
 
 ;;;###autoload
 (defun project-find-file ()

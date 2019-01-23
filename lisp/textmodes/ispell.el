@@ -726,6 +726,7 @@ Otherwise returns the library directory name, if that is defined."
 	;; Make sure these variables are (re-)initialized to the default value
 	(setq ispell-really-aspell nil
               ispell-really-hunspell nil
+              ispell-really-enchant nil
 	      ispell-encoding8-command nil)
 
 	(goto-char (point-min))
@@ -1782,11 +1783,15 @@ You can set this variable in hooks in your init file -- eg:
 
 
 (defun ispell-accept-output (&optional timeout-secs timeout-msecs)
-  "Wait for output from Ispell process, or TIMEOUT-SECS and TIMEOUT-MSECS.
+  "Wait for output from Ispell process, or for TIMEOUT-SECS + TIMEOUT-MSECS.
+\(The TIMEOUT-MSECS argument is obsolete and should be avoided.)
 If asynchronous subprocesses are not supported, call function `ispell-filter'
 and pass it the output of the last Ispell invocation."
   (if ispell-async-processp
-      (accept-process-output ispell-process timeout-secs timeout-msecs)
+      (let ((timeout (if timeout-msecs
+			 (+ (or timeout-secs 0) (/ timeout-msecs 1000.0))
+		       timeout-secs)))
+	(accept-process-output ispell-process timeout))
     (if (null ispell-process)
 	(error "No Ispell process to read output from!")
       (let ((buf ispell-output-buffer)

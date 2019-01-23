@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "syssignal.h"
 #include "systime.h"
+#include "pdumper.h"
 
 /* Return A + B, but return the maximum fixnum if the result would overflow.
    Assume A and B are nonnegative and in fixnum range.  */
@@ -35,7 +36,20 @@ saturated_add (EMACS_INT a, EMACS_INT b)
 
 typedef struct Lisp_Hash_Table log_t;
 
-static struct hash_table_test hashtest_profiler;
+static bool cmpfn_profiler (
+  struct hash_table_test *, Lisp_Object, Lisp_Object);
+
+static EMACS_UINT hashfn_profiler (
+  struct hash_table_test *, Lisp_Object);
+
+static const struct hash_table_test hashtest_profiler =
+  {
+   LISPSYM_INITIALLY (Qprofiler_backtrace_equal),
+   LISPSYM_INITIALLY (Qnil) /* user_hash_function */,
+   LISPSYM_INITIALLY (Qnil) /* user_cmp_function */,
+   cmpfn_profiler,
+   hashfn_profiler,
+  };
 
 static Lisp_Object
 make_log (EMACS_INT heap_size, EMACS_INT max_stack_depth)
@@ -570,6 +584,8 @@ hashfn_profiler (struct hash_table_test *ht, Lisp_Object bt)
     return XHASH (bt);
 }
 
+static void syms_of_profiler_for_pdumper (void);
+
 void
 syms_of_profiler (void)
 {
@@ -583,12 +599,6 @@ to make room for new entries.  */);
   profiler_log_size = 10000;
 
   DEFSYM (Qprofiler_backtrace_equal, "profiler-backtrace-equal");
-
-  hashtest_profiler.name = Qprofiler_backtrace_equal;
-  hashtest_profiler.user_hash_function = Qnil;
-  hashtest_profiler.user_cmp_function = Qnil;
-  hashtest_profiler.cmpfn = cmpfn_profiler;
-  hashtest_profiler.hashfn = hashfn_profiler;
 
   defsubr (&Sfunction_equal);
 
@@ -608,4 +618,26 @@ to make room for new entries.  */);
   defsubr (&Sprofiler_memory_stop);
   defsubr (&Sprofiler_memory_running_p);
   defsubr (&Sprofiler_memory_log);
+
+  pdumper_do_now_and_after_load (syms_of_profiler_for_pdumper);
+}
+
+static void
+syms_of_profiler_for_pdumper (void)
+{
+  if (dumped_with_pdumper_p ())
+    {
+#ifdef PROFILER_CPU_SUPPORT
+      cpu_log = Qnil;
+#endif
+      memory_log = Qnil;
+    }
+  else
+    {
+#ifdef PROFILER_CPU_SUPPORT
+      eassert (NILP (cpu_log));
+#endif
+      eassert (NILP (memory_log));
+    }
+
 }
