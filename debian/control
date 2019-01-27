@@ -66,7 +66,6 @@ Description: GNU Emacs editor (with Lucid GUI support)
 
 Package: emacs-lucid-dbg
 Section: debug
-Priority: optional
 Architecture: any
 Depends: emacs-lucid (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-lucid
@@ -92,7 +91,6 @@ Description: GNU Emacs editor (without GUI support)
 
 Package: emacs-nox-dbg
 Section: debug
-Priority: optional
 Architecture: any
 Depends: emacs-nox (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-nox
@@ -119,7 +117,6 @@ Description: GNU Emacs editor (with GTK+ GUI support)
 
 Package: emacs-gtk-dbg
 Section: debug
-Priority: optional
 Architecture: any
 Depends: emacs-gtk (= ${binary:Version}), ${misc:Depends}
 Description: Debugging symbols for emacs-gtk
@@ -178,7 +175,6 @@ Description: GNU Emacs LISP (.el) files
 
 Package: emacs23
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
@@ -189,7 +185,6 @@ Description: GNU Emacs transitional package to emacs-gtk
 
 Package: emacs23-lucid
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
@@ -200,7 +195,6 @@ Description: GNU Emacs transitional package to emacs-lucid
 
 Package: emacs23-nox
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
@@ -211,7 +205,6 @@ Description: GNU Emacs transitional package to emacs-nox
 
 Package: emacs24
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
@@ -222,7 +215,6 @@ Description: GNU Emacs transitional package to emacs-gtk
 
 Package: emacs24-lucid
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
@@ -233,7 +225,6 @@ Description: GNU Emacs transitional package to emacs-lucid
 
 Package: emacs24-nox
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
@@ -244,7 +235,6 @@ Description: GNU Emacs transitional package to emacs-nox
 
 Package: emacs25
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-gtk (>= 1:25)
 Description: GNU Emacs transitional package to emacs-gtk
@@ -255,7 +245,6 @@ Description: GNU Emacs transitional package to emacs-gtk
 
 Package: emacs25-lucid
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-lucid (>= 1:25)
 Description: GNU Emacs transitional package to emacs-lucid
@@ -266,7 +255,6 @@ Description: GNU Emacs transitional package to emacs-lucid
 
 Package: emacs25-nox
 Section: oldlibs
-Priority: optional
 Architecture: all
 Depends: emacs-nox (>= 1:25)
 Description: GNU Emacs transitional package to emacs-nox
