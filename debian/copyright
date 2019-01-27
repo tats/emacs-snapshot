@@ -1,4 +1,4 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Emacs
 Upstream-Contact: bug-gnu-emacs@gnu.org
 Upstream-Contact: emacs-devel@gnu.org
@@ -81,7 +81,7 @@ License:
 
 Files: debian/rules
 License: GPL plus Ian
-  This file is licensed under the terms of the Gnu Public License.
+  This file is licensed under the terms of the GNU General Public License.
   With the one additional provision that Ian Jackson's name may not be
   removed from the file.
 
@@ -385,8 +385,8 @@ License: pkg.m4 license
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-  02111-1307, USA.
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+  02110-1301, USA.
 
   As a special exception to the GNU General Public License, if you
   distribute this file as part of a program that contains a
