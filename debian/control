@@ -152,6 +152,8 @@ Breaks:
  emacs25-lucid (<< 1:25),
  emacs25-nox (<< 1:25),
  apel (<< 10.8+0.20120427-4),
+ edb (<< 1.32),
+ egg (<< 4.2.0-2),
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
