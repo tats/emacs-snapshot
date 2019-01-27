@@ -132,7 +132,26 @@ Depends: emacsen-common (>= 3.0.0), install-info, ${shlibs:Depends}, ${misc:Depe
 Recommends: emacs-el
 Suggests: emacs-el, emacs-common-non-dfsg, ncurses-term
 Conflicts: emacs-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
-Breaks: apel (<< 10.8+0.20120427-4)
+Breaks:
+ emacs (<< 1:25),
+ emacs-gtk (<< 1:25),
+ emacs-lucid (<< 1:25),
+ emacs-nox (<< 1:25),
+ emacs21 (<< 1:25),
+ emacs21-nox (<< 1:25),
+ emacs22 (<< 1:25),
+ emacs22-gtk (<< 1:25),
+ emacs22-nox (<< 1:25),
+ emacs23 (<< 1:25),
+ emacs23-lucid (<< 1:25),
+ emacs23-nox (<< 1:25),
+ emacs24 (<< 1:25),
+ emacs24-lucid (<< 1:25),
+ emacs24-nox (<< 1:25),
+ emacs25 (<< 1:25),
+ emacs25-lucid (<< 1:25),
+ emacs25-nox (<< 1:25),
+ apel (<< 10.8+0.20120427-4),
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
