@@ -13,7 +13,7 @@ diff --git a/test/lisp/net/tramp-tests.el b/test/lisp/net/tramp-tests.el
 index 996a31d375f..60f2aaf034b 100644
 --- a/test/lisp/net/tramp-tests.el
 +++ b/test/lisp/net/tramp-tests.el
-@@ -4702,8 +4702,9 @@ tramp--test-timeout-handler
+@@ -4702,8 +4702,9 @@ process sentinels.  They shall not disturb each other."
       (string-match
        (format
         "Loading %s"

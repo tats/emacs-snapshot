@@ -23,7 +23,7 @@ diff --git a/test/lisp/emacs-lisp/package-tests.el b/test/lisp/emacs-lisp/packag
 index 62fba58919f..e4aa519a4c6 100644
 --- a/test/lisp/emacs-lisp/package-tests.el
 +++ b/test/lisp/emacs-lisp/package-tests.el
-@@ -150,7 +150,14 @@ package-test-fake-contents-file
+@@ -150,7 +150,14 @@
                 ,@body)))
  
         (when (file-directory-p package-test-user-dir)

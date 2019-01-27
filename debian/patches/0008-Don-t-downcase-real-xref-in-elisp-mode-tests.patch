@@ -16,7 +16,7 @@ diff --git a/test/lisp/progmodes/elisp-mode-tests.el b/test/lisp/progmodes/elisp
 index 941e85bc890..faf45b88ff7 100644
 --- a/test/lisp/progmodes/elisp-mode-tests.el
 +++ b/test/lisp/progmodes/elisp-mode-tests.el
-@@ -301,11 +301,15 @@ xref-elisp-test-descr-to-target
+@@ -301,11 +301,15 @@
  (defun xref-elisp-test-run (xrefs expected-xrefs)
    (should (= (length xrefs) (length expected-xrefs)))
    (while xrefs
@@ -33,7 +33,7 @@ index 941e85bc890..faf45b88ff7 100644
        ;; Downcase the filenames for case-insensitive file systems.
        (setf (xref-elisp-location-file (oref xref location))
              (downcase (xref-elisp-location-file (oref xref location))))
-@@ -315,7 +319,7 @@ xref-elisp-test-run
+@@ -315,7 +319,7 @@
  
        (should (equal xref expected-xref))
  

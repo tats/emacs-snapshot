@@ -11,3 +11,4 @@
 0011-tramp-test42-remote-load-path-regexp-quote-directory.patch
 0012-ibuffer-filter-inclusion-3-regexp-quote-directory.patch
 0013-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
+0014-Fix-an-eshell-ls-dired-test-for-non-recent-files.patch

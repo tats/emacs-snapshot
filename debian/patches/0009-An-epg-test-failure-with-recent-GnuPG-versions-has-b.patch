@@ -22,7 +22,7 @@ diff --git a/test/lisp/epg-tests.el b/test/lisp/epg-tests.el
 index 0fe15017dd0..f2cc351d70b 100644
 --- a/test/lisp/epg-tests.el
 +++ b/test/lisp/epg-tests.el
-@@ -87,6 +87,8 @@ epg-tests-passphrase-callback
+@@ -87,6 +87,8 @@
  (ert-deftest epg-decrypt-1 ()
    (skip-unless (epg-tests-find-usable-gpg-configuration 'require-passphrase))
    (with-epg-tests (:require-passphrase t)

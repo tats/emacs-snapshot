@@ -13,7 +13,7 @@ diff --git a/test/lisp/ibuffer-tests.el b/test/lisp/ibuffer-tests.el
 index ff5162fefa5..c1d9ed9fc3b 100644
 --- a/test/lisp/ibuffer-tests.el
 +++ b/test/lisp/ibuffer-tests.el
-@@ -312,8 +312,8 @@ ibuffer-saved-filters
+@@ -312,8 +312,8 @@
                  (funcall create-non-file-buffer "ibuf-test-3.b" :size 50
                           :mode #'text-mode
                           :include-content "...but a multitude of drops?\n"))

@@ -18,6 +18,8 @@ emacs (1:26.1+1-3.1) UNRELEASED; urgency=medium
 
   * Add Vcs-* URLs.  (Closes: #690771)
 
+  * Cherry-pick 34b4da37 to fix a test failure.  (Closes: #918646)
+
  -- Andreas Beckmann <anbe@debian.org>  Sun, 27 Jan 2019 16:56:15 +0100
 
 emacs (1:26.1+1-3) unstable; urgency=medium
