@@ -1,3 +1,9 @@
+emacs (1:26.1+1-3.1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+
+ -- Andreas Beckmann <anbe@debian.org>  Sun, 27 Jan 2019 16:56:15 +0100
+
 emacs (1:26.1+1-3) unstable; urgency=medium
 
   * Recommend mailutils instead of depending on it.
@@ -16,7 +22,7 @@ emacs (1:26.1+1-2) unstable; urgency=medium
 
 emacs (1:26.1+1-1) experimental; urgency=medium
 
-  * Merge upstream version 26.1.
+  * Merge upstream version 26.1. (Closes: #907997)
 
   * Update debian/copyright version for 26.1.
 
@@ -1424,7 +1430,7 @@ emacs22 (22.1+1-1) unstable; urgency=low
 
   * If allowed, create and remove non-flavor-specific
     /usr/local/share/emacs/site-lisp.
-  
+
   * Fix cc-mode local variable problem.  Thanks to Sven Joachim
     <sven_joachim@web.de> for forwarding the upstream patch.
     (closes: #428898) [rlb]
@@ -1466,7 +1472,7 @@ emacs21 (21.4a+1-5) unstable; urgency=low
 
   * Move man pages back to emacs21-common. (closes: #414321) [rlb]
     - debian/rules
-  
+
  -- Rob Browning <rlb@defaultvalue.org>  Sat, 10 Mar 2007 16:16:15 -0800
 
 emacs21 (21.4a+1-4) unstable; urgency=low
@@ -1477,7 +1483,7 @@ emacs21 (21.4a+1-4) unstable; urgency=low
     these changes follows:
 
     Add debian/rules info_subdir variable.
-  
+
     Modify desktop and menu files version.  This approach should work for
     normal versions, "Emacs 21.4a (X11)", and for snapshots, "Emacs
     2006-09-09 (X11)".  See the menu_ver variable in debian/rules.
@@ -1523,7 +1529,7 @@ emacs21 (21.4a+1-2) unstable; urgency=low
     (closes: #395501) [Jérôme Marant]
     - debian/patches/yow-mode-from-cvs.diff: new patch.
     - debian/patches/series: updated.
-  
+
   * Properly handle ldapsearch output from OpenLDAP version 2 and above.
     Thanks to both Joshua Judson Rosen <joshuar@russound.com> and
     Henrik Holmboe <henrik@holmboe.se>.
@@ -1559,13 +1565,13 @@ emacs21 (21.4a+1-1) unstable; urgency=low
       replacements for non-free files normally accessible through C-h
       key bindings. Those files will be displayed if the original
       ones are not available.
-  
+
   * Acknowledge NMU. Thanks Marc Brockschmidt <he@debian.org>
     (Closes: #381452) [Jérôme Marant]
 
   * Separate mipsel from mips autodetection in configure.in [Jérôme Marant]
     - debian/patches/arch-mipsel.diff: update.
-  
+
   * Split mips and mipsel ports into two separate patches [Jérôme Marant]
     - debian/patches/arch-mips.diff: new file. Add mips-specific code
       from arch-mipsel+mips.diff patch
@@ -1600,7 +1606,7 @@ emacs21 (21.4a+1-1) unstable; urgency=low
 emacs21 (21.4a-6.2) unstable; urgency=low
 
   * Non-maintainer brown paper bag release.
-  * Apply patch from 21.4a-6.1 properly, somehow quilt hates me. 
+  * Apply patch from 21.4a-6.1 properly, somehow quilt hates me.
 
  -- Marc 'HE' Brockschmidt <he@debian.org>  Wed, 27 Sep 2006 08:30:33 +0200
 
@@ -1636,7 +1642,7 @@ emacs21 (21.4a-5) unstable; urgency=low
 emacs21 (21.4a-4) unstable; urgency=low
 
   * Migrate from dpatch to quilt and update generation of README. [rlb]
-    - debian/README.in  
+    - debian/README.in
     - debian/rules
     - debian/control.in
     - debian/patches/*
@@ -1671,7 +1677,7 @@ emacs21 (21.4a-4) unstable; urgency=low
   * Rename orig_tgz and orig_tgz_dir variables to deb_orig_tgz and
     deb_orig_tgz_dir. [rlb]
     - debian/rules
-  
+
   * Lowercase local makefile variable names. [rlb]
     - debian/rules
 
@@ -1739,7 +1745,7 @@ emacs21 (21.4a-2) unstable; urgency=low
     (closes: #300368) [Jérôme Marant]
     - debian/patches/arch-ppc64.patch: new file.
     - debian/00list: updated.
-  
+
   * Add real dependency as an alternative to the libtiff-dev build
     dependency in order for the build to be deterministic.
     (closes: #311074) [Jérôme Marant]
@@ -1750,18 +1756,18 @@ emacs21 (21.4a-2) unstable; urgency=low
   * Bump Standards-Version to 3.6.2. [Jérôme Marant]
     - debian/control.in
     - debian/control: regenerated.
-  
+
   * Use the "kitchen sink" bitmap icon when iconifying the Emacs window.
     (closes: #309930) [Jérôme Marant]
     - debian/menu.in: pass the `-i' option to the command launching Emacs
       under X11.
     - debian/emacs.desktop: likewise.
-  
+
   * Work around bug in Xorg which makes AltGr incorrectly recognized.
     This patch has been backported from Emacs CVS trunk. [Jérôme Marant]
     - debian/patches/xorg-altgr-fix.dpatch: new file.
     - debian/00list: updated.
-  
+
   * Apply patch preventing an infinite loop in whitespace.el if kill-read-only
     is set to t. Thanks to Romain Francoise <rfrancoise@debian.org>
     (closes: #273123) [Jérôme Marant]
@@ -1775,16 +1781,16 @@ emacs21 (21.4a-1) unstable; urgency=medium
   * New upstream release. (closes: #294313) [Jérôme Marant]
     - debian/patches/movemail-pop-fmt-vulnerability.dpatch: removed since
     it has been applied upstream.
-  
+
   * Apply patch from Romain Francoise <rfrancoise@debian.org> making PCL-CVS
     compliant with recent versions of CVS. (closes: #291221) [Jérôme Marant]
     - debian/patches/pcl-cvs-format.dpatch: new file.
     - debian/00list: updated.
     - debian/control: tightened dependency on dpatch (>= 2.0.9).
-  
+
   * Add MIME type to desktop file. (closes: #296618) [Jérôme Marant]
     - debian/emacs.desktop: added MimeType entry.
-  
+
   * Apply patch supporting the AMD64 architecture. This is a slightly
     modified patch derived from the Emacs CVS mainline. Thanks to
     Goswin von Brederlow <brederlo@informatik.uni-tuebingen.de> and
@@ -1800,7 +1806,7 @@ emacs21 (21.4a-1) unstable; urgency=medium
   * Remove prebuild target from debian/rules.  Instead, just issue
     instructions to the user. [rlb]
     - debian/rules
-  
+
   * Fix invocation of wc -l when counting fns-*.el files. [rlb]
     - debian/rules
 
@@ -1809,7 +1815,7 @@ emacs21 (21.4a-1) unstable; urgency=medium
     handled via debian/patches/autofiles.dpatch.  Also, we no longer try
     to automatically generate the diff when needed.  Instead, the diff
     must be generated manually via "debian/rules autofiles-sync".
-  
+
     The earlier approach was broken because dpatch files that
     autofiles.diff depended on could end up later in the Debian diff (and
     hence have newer timestamps).  This would cause an unexpected run of
@@ -1820,7 +1826,7 @@ emacs21 (21.4a-1) unstable; urgency=medium
     - debian/patches/00list: added autofiles
     - debian/patches/autofiles.dpatch: new
     - debian/rules: updated
-  
+
  -- Rob Browning <rlb@defaultvalue.org>  Tue, 15 Mar 2005 11:00:04 -0600
 
 emacs21 (21.3+1-9) unstable; urgency=high
@@ -1829,12 +1835,12 @@ emacs21 (21.3+1-9) unstable; urgency=high
     archive arrangement somewhat similar to, but not compatible with
     arch-buildpackage's. [rlb]
     - debian/rules
-  
+
   * Applied patch to fix mailspool pop format string vulnerability
     (CAN-2005-0100). [rlb]
     Thanks to Max Vozeler <max@hinterhof.net>.
     - debian/patches/movemail-pop-fmt-vulnerability.dpatch
-  
+
  -- Rob Browning <rlb@defaultvalue.org>  Thu,  3 Feb 2005 21:02:03 -0600
 
 emacs21 (21.3+1-8) unstable; urgency=medium
@@ -1846,7 +1852,7 @@ emacs21 (21.3+1-8) unstable; urgency=medium
     (closes: #255286, #274103) [Jérôme Marant]
     - debian/patches/xfree86-4.3-modifiers.dpatch: new file
     - debian/patches/00list: updated.
-  
+
   * Apply patch fixing long-standing memory leak in decode-coding-region
     and similar routines. Thanks to Florian Weimer <fw@deneb.enyo.de>.
     (closes: #273919) [Jérôme Marant]
@@ -1872,7 +1878,7 @@ emacs21 (21.3+1-7) unstable; urgency=medium
 emacs21 (21.3+1-6) unstable; urgency=low
 
   * fix debian/README rendering problem. [rlb]
-  
+
   * Stop provinding www-browser since the w3-el-e21 package provides it
     now. [Jérôme Marant]
     - debian/control.in: remove www-browser provides for emacs and
@@ -1881,27 +1887,27 @@ emacs21 (21.3+1-6) unstable; urgency=low
 
   * Fixed installation of .desktop entry. [Jérôme Marant]
     - debian/build-binary-pkg: fixed typo.
-  
+
   * Set value of the auto-save-file-name-transforms variable at run-time
     in order to override its build-time value.
     (closes: #160615, #167295, #175346, #241826, #250676, #178792)
     [Jérôme Marant]
     - debian/patches/startup-auto-save-file-name-transforms.dpatch: new file.
     - debian/patches/00list: updated.
-  
+
   * Add Python byte-compiled file extensions to completion-ignore-extensions
     variable. (closes: #177276) [Jérôme Marant]
     - debian/patches/python-completion-ignored-extensions.dpatch: new file.
     - debian/patches/00list: updated.
-  
+
   * Fixed removal of alternatives
     (closes: #251822, #206901, #241820, #163034) [Jérôme Marant]
     - debian/emacs-bin-common.prerm
-  
+
   * Add a slave alternative for "editor" manpage.
     Thanks to Daniel Kraft <da_kraft@web.de>. (closes: #255639) [Jérôme Marant]
     - debian/emacs.postinst
-  
+
   * Apply a 2003-06-21 patch from upstream CVS to fix a non-interactive
     signal handling problem that could cause Emacs to die prematurely as
     the result of a SIGIO or SIGHUP. (closes: #253887) [rlb]
@@ -1922,9 +1928,9 @@ emacs21 (21.3+1-5) unstable; urgency=low
     - debian/patches/emacsclient-alternate-editor.dpatch: new file.
 
   * Provide the `editor' virtual package. [Jérôme Marant]
-    (closes: #66243, #90154, #158807) 
+    (closes: #66243, #90154, #158807)
     - debian/control.in: emacs and emacs-nox now provide the `editor'
-      virtual package. 
+      virtual package.
     - debian/control: synchronized with debian/control.in.
     - debian/emacs.postinst: adding an `editor' alternative with a priority
       of 0 as discussed in
@@ -1942,11 +1948,11 @@ emacs21 (21.3+1-5) unstable; urgency=low
     - debian/menu.in: call the text version of emacs with the `-nw'
       parameter.
 
-  * Install the emacsclient manpage [Jérôme Marant] (closes: #222767) 
+  * Install the emacsclient manpage [Jérôme Marant] (closes: #222767)
     - debian/build-common-pkg: install missing emacsclient manpage.
     - debian/emacs-common.postinst: install alternative for emacsclient
       manpage.
-  
+
   * Install .desktop entry in order to make Emacs easy to start in
     both GNOME and KDE. Thanks to Adam C Powell IV <hazelsct@debian.org>
     [Jérôme Marant] (closes: #233711)
@@ -1962,7 +1968,7 @@ emacs21 (21.3+1-5) unstable; urgency=low
     autoconf run.  Also ignore autom4te.cache when generating
     autofiles.diff. [rlb]
     - debian/rules
-  
+
   * fix bug in prepare-release autodiff prompt handling. [rlb]
     - debian/rules
 
@@ -1987,21 +1993,21 @@ emacs21 (21.3+1-5) unstable; urgency=low
     - debian/control.in: add emacsXY-bin-common and adjust other entries.
     - debian/fix-debian-scripts: deleted - no longer used.
     - debian/build-binary-pkg: adjusted to handle more of the common code.
-  
+
   * Add support for linux 2.6 to ACPI in lisp/battery.el. Thanks to
     Mario Lang <mlang@debian.org> [Jérôme Marant] (closes: #228658)
     - debian/patches/battery-acpi-support.dpatch: updated.
-  
+
   * Generate md5sums file for every package [Jérôme Marant] (closes: #22590)
     - debian/rules: generate md5sums file just before building packages.
     - debian/build-binary-pkg: likewise.
-  
+
   * no point in byte-compiling fns-*.el according to upstream authors
     (closes: #189277)
 
   * fix configure args (--build alone doesn't seem to work anymore). [rlb]
     - debian/rules
-  
+
   * re-enable gif support via libungif. [rlb]
     - debian/rules
 
@@ -2261,7 +2267,7 @@ emacs20 (20.7-8) unstable; urgency=low
 emacs20 (20.7-7) unstable; urgency=low
 
   * Fixed reftex-info problem. (closes: #44837).
-  * Fix install-strip target in Makefile.in.  Thanks to 
+  * Fix install-strip target in Makefile.in.  Thanks to
     Kalle Olavi Niemitalo <tosi@ees2.oulu.fi>.  (closes: #51348)
 
  -- Rob Browning <rlb@cs.utexas.edu>  Sat,  5 May 2001 23:50:50 -0500
@@ -2461,7 +2467,7 @@ emacs20 (20.3-9) unstable; urgency=low
 
   * Added HURD patch from Marcus Brinkmann <brinkmd@debian.org>.
     (closes: #38571).
-  * Backed out (global-set-key [delete] 'delete-char) modification 
+  * Backed out (global-set-key [delete] 'delete-char) modification
     (Ref: #26366).  This is too controversial (think cross-platform)
     and needs to be resolved by the Debian Keyboard Czar in concert with
     others.  For now we revert to the upstream behavior...
@@ -2595,7 +2601,7 @@ emacs20 (20.2-7) frozen unstable; urgency=low
 emacs20 (20.2-6) frozen unstable; urgency=low
 
   * Gack.  Fix reject due to changed .tar.gz file (./leim added to tar).
-	
+
  -- Rob Browning <rlb@cs.utexas.edu>  Wed,  8 Apr 1998 14:04:54 -0500
 
 emacs20 (20.2-5) frozen unstable; urgency=low
@@ -2604,7 +2610,7 @@ emacs20 (20.2-5) frozen unstable; urgency=low
     (closes: #20274)
   * Add leim support for alternate input methods.  May close several
     bugs.
-	
+
  -- Rob Browning <rlb@cs.utexas.edu>  Sun,  5 Apr 1998 10:38:20 -0500
 
 emacs20 (20.2-4) frozen unstable; urgency=low
