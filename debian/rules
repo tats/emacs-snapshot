@@ -198,7 +198,7 @@ define deb_sub
 endef
 
 %:
-	dh $@ --parallel
+	dh $@
 
 check-vars:
 	@echo "src_name: $(src_name)"
@@ -281,7 +281,7 @@ confflags_gtk += --with-x-toolkit=gtk3
 confflags_gtk += --with-toolkit-scroll-bars
 
 # nox configure flags
-confflags_nox := $(confflags) 
+confflags_nox := $(confflags)
 confflags_nox += --with-x=no
 confflags_nox += --without-gsettings
 
