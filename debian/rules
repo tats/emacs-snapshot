@@ -129,12 +129,9 @@ nonpersistent_autogen_install_files := \
   debian/emacs-common.postinst \
   debian/emacs-common.prerm \
   debian/emacs-nox.postinst \
-  debian/emacs-nox.preinst \
   debian/emacs-nox.prerm \
   debian/emacs-lucid.postinst \
-  debian/emacs-lucid.preinst \
   debian/emacs-lucid.prerm \
-  debian/emacs-gtk.preinst \
   debian/emacs-gtk.postinst \
   debian/emacs-gtk.prerm
 

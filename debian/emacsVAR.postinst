@@ -2,6 +2,20 @@
 
 set -e
 
+# Manual dir_to_symlink conversion since dpkg-maintscript-helper does not
+# handle this in combination with arch:all to arch:any switches (#813455).
+# Keep this code for buster and bullseye to ease backports.
+if [ "$1" = "configure" ] && dpkg --compare-versions "$2" lt-nl "1:26.1+1-3.1~"
+then
+	test -n '@PKG_NAME@'
+	if [ -d /usr/share/doc/@PKG_NAME@ ] && [ ! -h /usr/share/doc/@PKG_NAME@ ]
+	then
+		# This will intentionally fail if the directory is not empty.
+		rmdir /usr/share/doc/@PKG_NAME@
+		ln -sv emacs-common /usr/share/doc/@PKG_NAME@
+	fi
+fi
+
 update-alternatives \
   --install /usr/bin/emacs emacs \
             /usr/bin/emacs-@X_SUPPORT@ @BIN_PRIORITY@ \
