@@ -1,2 +1,2 @@
-@PKG_NAME@ binary: menu-icon-missing usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/16x16/apps/emacs.xpm
-@PKG_NAME@ binary: menu-icon-missing usr/share/emacs/@FULL_VERSION@/etc/images/icons/hicolor/32x32/apps/emacs.xpm
+# dpkg-maintscript-helper does not work due to arch:all to arch:any switch
+maintainer-script-may-use-dir_to_symlink_helper

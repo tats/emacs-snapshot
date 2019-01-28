@@ -24,6 +24,8 @@ emacs (1:26.1+1-3.1) UNRELEASED; urgency=medium
 
   * Use https:// URLs and update FSF address.
 
+  * Update Lintian overrides.
+
  -- Andreas Beckmann <anbe@debian.org>  Sun, 27 Jan 2019 16:56:15 +0100
 
 emacs (1:26.1+1-3) unstable; urgency=medium
