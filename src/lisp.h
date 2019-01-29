@@ -4224,6 +4224,7 @@ extern void syms_of_marker (void);
 /* Defined in fileio.c.  */
 
 extern char *splice_dir_file (char *, char const *, char const *);
+extern bool file_name_absolute_p (const char *);
 extern char const *get_homedir (void);
 extern Lisp_Object expand_and_dir_to_file (Lisp_Object);
 extern Lisp_Object write_region (Lisp_Object, Lisp_Object, Lisp_Object,
@@ -4270,8 +4271,8 @@ extern ptrdiff_t fast_looking_at (Lisp_Object, ptrdiff_t, ptrdiff_t,
                                   ptrdiff_t, ptrdiff_t, Lisp_Object);
 extern ptrdiff_t find_newline (ptrdiff_t, ptrdiff_t, ptrdiff_t, ptrdiff_t,
 			       ptrdiff_t, ptrdiff_t *, ptrdiff_t *, bool);
-extern ptrdiff_t scan_newline (ptrdiff_t, ptrdiff_t, ptrdiff_t, ptrdiff_t,
-			       ptrdiff_t, bool);
+extern void scan_newline (ptrdiff_t, ptrdiff_t, ptrdiff_t, ptrdiff_t,
+			  ptrdiff_t, bool);
 extern ptrdiff_t scan_newline_from_point (ptrdiff_t, ptrdiff_t *, ptrdiff_t *);
 extern ptrdiff_t find_newline_no_quit (ptrdiff_t, ptrdiff_t,
 				       ptrdiff_t, ptrdiff_t *);
@@ -4605,6 +4606,9 @@ extern void syms_of_w32cygwinx (void);
 extern Lisp_Object Vface_alternative_font_family_alist;
 extern Lisp_Object Vface_alternative_font_registry_alist;
 extern void syms_of_xfaces (void);
+#ifdef HAVE_PDUMPER
+extern void init_xfaces (void);
+#endif
 
 #ifdef HAVE_X_WINDOWS
 /* Defined in xfns.c.  */

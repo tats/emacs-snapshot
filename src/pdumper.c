@@ -707,7 +707,7 @@ emacs_basis (void)
 }
 
 static void *
-emacs_ptr (const ptrdiff_t offset)
+emacs_ptr_at (const ptrdiff_t offset)
 {
   /* TODO: assert somehow that the result is actually in the Emacs
      image.  */
@@ -5330,24 +5330,24 @@ dump_do_emacs_relocation (
     {
     case RELOC_EMACS_COPY_FROM_DUMP:
       eassume (reloc.length > 0);
-      memcpy (emacs_ptr (reloc.emacs_offset),
+      memcpy (emacs_ptr_at (reloc.emacs_offset),
               dump_ptr (dump_base, reloc.u.dump_offset),
               reloc.length);
       break;
     case RELOC_EMACS_IMMEDIATE:
       eassume (reloc.length > 0);
       eassume (reloc.length <= sizeof (reloc.u.immediate));
-      memcpy (emacs_ptr (reloc.emacs_offset),
+      memcpy (emacs_ptr_at (reloc.emacs_offset),
               &reloc.u.immediate,
               reloc.length);
       break;
     case RELOC_EMACS_DUMP_PTR_RAW:
       pval = reloc.u.dump_offset + dump_base;
-      memcpy (emacs_ptr (reloc.emacs_offset), &pval, sizeof (pval));
+      memcpy (emacs_ptr_at (reloc.emacs_offset), &pval, sizeof (pval));
       break;
     case RELOC_EMACS_EMACS_PTR_RAW:
       pval = reloc.u.emacs_offset2 + emacs_basis ();
-      memcpy (emacs_ptr (reloc.emacs_offset), &pval, sizeof (pval));
+      memcpy (emacs_ptr_at (reloc.emacs_offset), &pval, sizeof (pval));
       break;
     case RELOC_EMACS_DUMP_LV:
     case RELOC_EMACS_EMACS_LV:
@@ -5356,12 +5356,12 @@ dump_do_emacs_relocation (
         eassume (reloc.length <= Lisp_Float);
         void *obj_ptr = reloc.type == RELOC_EMACS_DUMP_LV
           ? dump_ptr (dump_base, reloc.u.dump_offset)
-          : emacs_ptr (reloc.u.emacs_offset2);
+          : emacs_ptr_at (reloc.u.emacs_offset2);
         if (reloc.length == Lisp_Symbol)
           lv = make_lisp_symbol (obj_ptr);
         else
           lv = make_lisp_ptr (obj_ptr, reloc.length);
-        memcpy (emacs_ptr (reloc.emacs_offset), &lv, sizeof (lv));
+        memcpy (emacs_ptr_at (reloc.emacs_offset), &lv, sizeof (lv));
         break;
       }
     default:
@@ -5471,7 +5471,7 @@ pdumper_load (const char *dump_filename)
     }
 
   err = PDUMPER_LOAD_OOM;
-  dump_filename_copy = strdup (dump_filename);
+  dump_filename_copy = xstrdup (dump_filename);
   if (!dump_filename_copy)
     goto out;
 
@@ -5556,8 +5556,22 @@ pdumper_load (const char *dump_filename)
     dump_bitset_destroy (&mark_bits);
   if (dump_fd >= 0)
     emacs_close (dump_fd);
-  free (dump_filename_copy);
   return err;
+}
+
+/* Prepend the Emacs startup directory to dump_filename, if that is
+   relative, so that we could later make it absolute correctly.  */
+void
+pdumper_record_wd (const char *wd)
+{
+  if (wd && !file_name_absolute_p (dump_private.dump_filename))
+    {
+      char *dfn = xmalloc (strlen (wd) + 1
+			   + strlen (dump_private.dump_filename) + 1);
+      splice_dir_file (dfn, wd, dump_private.dump_filename);
+      xfree (dump_private.dump_filename);
+      dump_private.dump_filename = dfn;
+    }
 }
 
 DEFUN ("pdumper-stats", Fpdumper_stats, Spdumper_stats, 0, 0, 0,
@@ -5579,21 +5593,18 @@ Value is nil if this session was not started using a portable dump file.*/)
 #ifdef WINDOWSNT
   char dump_fn_utf8[MAX_UTF8_PATH];
   if (filename_from_ansi (dump_private.dump_filename, dump_fn_utf8) == 0)
-    {
-      dostounix_filename (dump_fn_utf8);
-      dump_fn = DECODE_FILE (build_unibyte_string (dump_fn_utf8));
-    }
+    dump_fn = DECODE_FILE (build_unibyte_string (dump_fn_utf8));
   else
     dump_fn = build_unibyte_string (dump_private.dump_filename);
 #else
   dump_fn = DECODE_FILE (build_unibyte_string (dump_private.dump_filename));
 #endif
 
+  dump_fn = Fexpand_file_name (dump_fn, Qnil);
+
   return CALLN (Flist,
 		Fcons (Qdumped_with_pdumper, Qt),
 		Fcons (Qload_time, make_float (dump_private.load_time)),
-		/* FIXME: dump_fn should be expanded relative to the
-		   original pwd where Emacs started.  */
 		Fcons (Qdump_file_name, dump_fn));
 }
 

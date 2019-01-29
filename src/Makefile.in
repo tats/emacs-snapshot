@@ -521,12 +521,12 @@ LIBES = $(LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(LIBX_BASE) $(LIBIMAGE) \
    $(NOTIFY_LIBS) $(LIB_MATH) $(LIBZ) $(LIBMODULES) $(LIBSYSTEMD_LIBS) \
    $(JSON_LIBS) $(GMP_LIB)
 
-## FORCE it so that admin/unidata can decide whether these files
-## are up-to-date.  Although since charprop depends on bootstrap-emacs,
-## and emacs (which recreates bootstrap-emacs) depends on charprop,
-## in practice this rule was always run anyway.
-$(srcdir)/macuvs.h $(lispsource)/international/charprop.el: \
-  bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp) FORCE
+## FORCE it so that admin/unidata can decide whether this file is
+## up-to-date.  Although since charprop depends on bootstrap-emacs,
+## and emacs depends on charprop, in practice this rule was always run
+## anyway.
+$(lispsource)/international/charprop.el: \
+  FORCE | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../admin/unidata all EMACS="../$(bootstrap_exe)"
 
 ## We require charprop.el to exist before ucs-normalize.el is
@@ -565,7 +565,6 @@ ifeq ($(DUMPING),unexec)
 	cp -f $@ bootstrap-emacs$(EXEEXT)
 else
 	rm -f $@ && cp -f temacs$(EXEEXT) $@
-	cp -f $@ bootstrap-emacs$(EXEEXT)
 endif
 
 ifeq ($(DUMPING),pdumper)
@@ -691,7 +690,8 @@ mostlyclean:
 	rm -f globals.h gl-stamp
 	rm -f ./*.res ./*.tmp
 clean: mostlyclean
-	rm -f emacs-*.*.*[0-9]$(EXEEXT) emacs$(EXEEXT) $(DEPDIR)/*
+	rm -f emacs-*.*.*[0-9]$(EXEEXT) emacs-*.*.*[0-9].pdmp
+	rm -f emacs$(EXEEXT) $(DEPDIR)/*
 
 ## bootstrap-clean is used to clean up just before a bootstrap.
 ## It should remove all files generated during a compilation/bootstrap,
@@ -721,7 +721,10 @@ ETAGS = ../lib-src/etags${EXEEXT}
 ${ETAGS}: FORCE
 	${MAKE} -C ../lib-src $(notdir $@)
 
-ctagsfiles1 = $(wildcard ${srcdir}/*.[hc])
+# Remove macuvs.h and fingerprint.c since they'd cause `src/emacs`
+# to be built before we can get TAGS.
+ctagsfiles1 = $(filter-out ${srcdir}/macuvs.h ${srcdir}/fingerprint.c, \
+                           $(wildcard ${srcdir}/*.[hc]))
 ctagsfiles2 = $(wildcard ${srcdir}/*.m)
 
 ## In out-of-tree builds, TAGS are generated in the build dir, like

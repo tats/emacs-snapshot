@@ -3647,7 +3647,7 @@ Fall back to normal file name handler if no Tramp handler exists."
 	(set-process-filter p filter)
 	;; There might be an error if the monitor is not supported.
 	;; Give the filter a chance to read the output.
-	(tramp-accept-process-output p 1)
+	(while (tramp-accept-process-output p))
 	(unless (process-live-p p)
 	  (tramp-error
 	   p 'file-notify-error "Monitoring not supported for `%s'" file-name))
@@ -4499,7 +4499,7 @@ Goes through the list `tramp-local-coding-commands' and
 			   t)
 		    (throw 'wont-work-remote nil))
 
-		  (with-current-buffer (tramp-get-buffer vec)
+		  (with-current-buffer (tramp-get-connection-buffer vec)
 		    (goto-char (point-min))
 		    (unless (looking-at-p (regexp-quote magic))
 		      (throw 'wont-work-remote nil)))

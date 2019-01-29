@@ -219,6 +219,13 @@ or adjust the elements in that variable to only happen on the 'high'
 security level (assuming you use the 'medium' level).
 
 +++
+** Native GnuTLS connections can now use client certificates.
+Previously, this support was only available when using the external
+gnutls-cli command.  Call 'open-network-stream' with
+':client-certificate t' to trigger looking up of per-server
+certificates via 'auth-source'.
+
++++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
 It blocks line breaking after a one-letter word, also in the case when
 this word is preceded by a non-space, but non-alphanumeric character.
@@ -333,6 +340,9 @@ the node "(emacs) Directory Variables" of the user manual.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** doc-view-mode
+*** New commands doc-view-presentation and doc-view-fit-window-to-page
 
 ** map.el
 *** Now also understands plists.
@@ -1189,12 +1199,13 @@ removed.
 
 * Lisp Changes in Emacs 27.1
 
-
++++
 ** 'self-insert-command' takes the char to insert as (optional) argument.
 
 ** 'lookup-key' can take a list of keymaps as argument.
 
-** New hook `input-event-functions` run whenever a user-input is read.
++++
+** New hook 'input-event-functions' run whenever a user-input is read.
 
 +++
 ** 'condition-case' now accepts 't' to match any error symbol.
@@ -1480,6 +1491,13 @@ left to higher-level functions.
 *** 'image-mode' started using ImageMagick by default for all images
 some years back.  It now respects 'imagemagick-types-inhibit' as a way
 to disable that.
+
+---
+*** Some image-mode variables are now buffer-local.
+The image parameters 'image-transform-rotation',
+'image-transform-scale' and 'image-transform-resize' are now declared
+buffer-local, so each buffer could have its own values for these
+parameters.
 
 ** The function 'load' now behaves correctly when loading modules.
 Specifically, it puts the module name into 'load-history', prints

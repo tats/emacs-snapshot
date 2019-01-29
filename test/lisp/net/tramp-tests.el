@@ -161,9 +161,9 @@ This shall used dynamically bound only.")
 
 (defmacro tramp--test-instrument-test-case (verbose &rest body)
   "Run BODY with `tramp-verbose' equal VERBOSE.
-Print the content of the Tramp debug buffer, if BODY does not
-eval properly in `should' or `should-not'.  `should-error' is not
-handled properly.  BODY shall not contain a timeout."
+Print the content of the Tramp connection and debug buffers, if
+`tramp-verbose' is greater than 3.  `should-error' is not handled
+properly.  BODY shall not contain a timeout."
   (declare (indent 1) (debug (natnump body)))
   `(let ((tramp-verbose (max (or ,verbose 0) (or tramp-verbose 0)))
 	 (tramp-message-show-message t)
@@ -1817,17 +1817,15 @@ handled properly.  BODY shall not contain a timeout."
   (should (string-equal (file-remote-p "/-:ftp.host:" 'method) "ftp"))
   (dolist (u '("ftp" "anonymous"))
     (should (string-equal (file-remote-p (format "/-:%s@:" u) 'method) "ftp")))
-  ;; Default values in tramp-gvfs.el.
-  (when (and (load "tramp-gvfs" 'noerror 'nomessage)
-	     (symbol-value 'tramp-gvfs-enabled))
-    (should (string-equal (file-remote-p "/synce::" 'user) nil)))
-  ;; Default values in tramp-sh.el.
+  ;; Default values in tramp-sh.el and tramp-sudoedit.el.
   (dolist (h `("127.0.0.1" "[::1]" "localhost" "localhost6" ,(system-name)))
     (should
      (string-equal (file-remote-p (format "/-:root@%s:" h) 'method) "su")))
-  (dolist (m '("su" "sudo" "ksu"))
-    (should (string-equal (file-remote-p (format "/%s::" m) 'user) "root")))
-  (dolist (m '("rcp" "remcp" "rsh" "telnet" "krlogin" "fcp"))
+  (dolist (m '("su" "sudo" "ksu" "doas" "sudoedit"))
+    (should (string-equal (file-remote-p (format "/%s::" m) 'user) "root"))
+    (should
+     (string-equal (file-remote-p (format "/%s::" m) 'host) (system-name))))
+  (dolist (m '("rcp" "remcp" "rsh" "telnet" "krlogin" "fcp" "nc"))
     (should
      (string-equal (file-remote-p (format "/%s::" m) 'user) (user-login-name))))
   ;; Default values in tramp-smb.el.
@@ -2251,7 +2249,6 @@ This checks also `file-name-as-directory', `file-name-directory',
   "Check `copy-file'."
   (skip-unless (tramp--test-enabled))
 
-  (tramp--test-instrument-test-case (if (getenv "EMACS_EMBA_CI") 10 0)
   ;; `filename-non-special' has been fixed in Emacs 27.1, see Bug#29579.
   (dolist (quoted (if (and (tramp--test-expensive-test) (tramp--test-emacs27-p))
 		      '(nil t) '(nil)))
@@ -2358,7 +2355,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 
 	    ;; Cleanup.
 	    (ignore-errors (delete-directory source 'recursive))
-	    (ignore-errors (delete-directory target 'recursive)))))))))
+	    (ignore-errors (delete-directory target 'recursive))))))))
 
 (ert-deftest tramp-test12-rename-file ()
   "Check `rename-file'."
@@ -3873,7 +3870,6 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (skip-unless (tramp--test-sh-p))
   (skip-unless (tramp--test-emacs27-p))
 
-  (tramp--test-instrument-test-case 0
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((default-directory tramp-test-temporary-file-directory)
 	  (tmp-name (tramp--test-make-temp-name nil quoted))
@@ -3990,7 +3986,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 
 	  ;; Cleanup.
 	  (ignore-errors (delete-process proc))
-	  (ignore-errors (kill-buffer stderr))))))))
+	  (ignore-errors (kill-buffer stderr)))))))
 
 (ert-deftest tramp-test31-interrupt-process ()
   "Check `interrupt-process'."

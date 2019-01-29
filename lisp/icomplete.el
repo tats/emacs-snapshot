@@ -145,7 +145,7 @@ icompletion is occurring."
 
 (defvar icomplete-minibuffer-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?\M-\t] 'minibuffer-force-complete)
+    (define-key map [?\M-\t] 'icomplete-force-complete)
     (define-key map [?\C-j]  'icomplete-force-complete-and-exit)
     (define-key map [?\C-.]  'icomplete-forward-completions)
     (define-key map [?\C-,]  'icomplete-backward-completions)
@@ -161,6 +161,12 @@ the default otherwise."
           (> (icomplete--field-end) (icomplete--field-beg)))
       (minibuffer-force-complete-and-exit)
     (minibuffer-complete-and-exit)))
+
+(defun icomplete-force-complete ()
+  "Complete the icomplete minibuffer."
+  (interactive)
+  ;; We're not at all interested in cycling here (bug#34077).
+  (minibuffer-force-complete nil nil 'dont-cycle))
 
 (defun icomplete-forward-completions ()
   "Step forward completions by one entry.
