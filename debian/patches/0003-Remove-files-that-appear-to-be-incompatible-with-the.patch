@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index b6cd04d..6b75f81 100644
+index 5370363..4adf69e 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=
@@ -53,7 +53,7 @@ index b6cd04d..6b75f81 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -962,11 +963,11 @@ check check-maybe check-expensive check-all:
+@@ -964,11 +965,11 @@ check check-maybe check-expensive check-all:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index b6cd04d..6b75f81 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -987,9 +988,7 @@ info-dir:
+@@ -989,9 +990,7 @@ info-dir:
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index b6cd04d..6b75f81 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1011,14 +1010,10 @@ ${srcdir}/info/dir:
+@@ -1013,14 +1012,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index b6cd04d..6b75f81 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1036,14 +1031,10 @@ install-pdf:
+@@ -1038,14 +1033,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
