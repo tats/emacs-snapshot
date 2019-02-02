@@ -170,6 +170,56 @@ Description: GNU Emacs LISP (.el) files
  This package contains the elisp sources for the convenience of users,
  saving space in the main package for small systems.
 
+Package: emacs21
+Section: oldlibs
+Architecture: all
+Depends: emacs-gtk (>= 1:25), ${misc:Depends}
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs21
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs21-nox
+Section: oldlibs
+Architecture: all
+Depends: emacs-nox (>= 1:25), ${misc:Depends}
+Description: GNU Emacs transitional package to emacs-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs21
+ installed automatically upgrade to the new unversioned emacs-nox
+ package.
+
+Package: emacs22
+Section: oldlibs
+Architecture: all
+Depends: emacs-gtk (>= 1:25), ${misc:Depends}
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs22
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs22-gtk
+Section: oldlibs
+Architecture: all
+Depends: emacs-gtk (>= 1:25), ${misc:Depends}
+Description: GNU Emacs transitional package to emacs-gtk
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs22
+ installed automatically upgrade to the new unversioned emacs-gtk
+ package.
+
+Package: emacs22-nox
+Section: oldlibs
+Architecture: all
+Depends: emacs-nox (>= 1:25), ${misc:Depends}
+Description: GNU Emacs transitional package to emacs-nox
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package is a transitional package to ensure that systems with emacs22
+ installed automatically upgrade to the new unversioned emacs-nox
+ package.
+
 Package: emacs23
 Section: oldlibs
 Architecture: all
