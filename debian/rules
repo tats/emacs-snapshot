@@ -525,13 +525,6 @@ override_dh_auto_install: $(autogen_install_files)
 	rm -rf $(install_dir_nox)
 	rm -rf $(install_dir_lucid)
 
-.PHONY: override_dh_strip
-override_dh_strip:
-	dh_strip -pemacs-gtk --dbg-package=emacs-gtk-dbg
-	dh_strip -pemacs-lucid --dbg-package=emacs-lucid-dbg
-	dh_strip -pemacs-nox --dbg-package=emacs-nox-dbg
-	dh_strip
-
 # This won't be necessary once strip-nondeterminism is fixed.
 .PHONY: override_dh_strip_nondeterminism
 override_dh_strip_nondeterminism:

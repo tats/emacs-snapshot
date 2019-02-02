@@ -63,15 +63,6 @@ Description: GNU Emacs editor (with Lucid GUI support)
  https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
  information.
 
-Package: emacs-lucid-dbg
-Section: debug
-Architecture: any
-Depends: emacs-lucid (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-lucid
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-lucid
- package.
-
 Package: emacs-nox
 Architecture: any
 Depends:
@@ -86,15 +77,6 @@ Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
  and provides only a text terminal interface.
-
-Package: emacs-nox-dbg
-Section: debug
-Architecture: any
-Depends: emacs-nox (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-nox
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-nox
- package.
 
 Package: emacs-gtk
 Architecture: any
@@ -112,14 +94,6 @@ Description: GNU Emacs editor (with GTK+ GUI support)
  based on GTK+ (instead of the Lucid toolkit provided by the
  emacs-lucid package).
 
-Package: emacs-gtk-dbg
-Section: debug
-Architecture: any
-Depends: emacs-gtk (= ${binary:Version}), ${misc:Depends}
-Description: Debugging symbols for emacs-gtk
- GNU Emacs is the extensible self-documenting text editor.  This
- package contains the debugging symbols for the emacs-gtk package.
-
 Package: emacs-bin-common
 Architecture: any
 Depends: emacs-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
@@ -131,7 +105,7 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: emacs-common
 Architecture: all
-Depends: emacsen-common (>= 3.0.0), install-info, ${shlibs:Depends}, ${misc:Depends}
+Depends: emacsen-common (>= 3.0.0), install-info, ${misc:Depends}
 Recommends: emacs-el
 Suggests: emacs-common-non-dfsg, ncurses-term
 Conflicts: emacs-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
