@@ -78,20 +78,6 @@ The new command-line argument '--dump-file=FILE' allows to specify a
 non-default '.pdmp' file to load the state from; see the node "Initial
 Options" in the Emacs manual for more information.
 
-** Ibuffer
-
----
-*** All mode filters can now accept a list of symbols.
-This means you can now easily filter several major modes, as well
-as a single mode.
-
-** Gnus
-
-+++
-*** The nnimap backend now has support for IMAP namespaces.
-This feature can be enabled by setting the new 'nnimap-use-namespaces'
-server variable to non-nil.
-
 
 * Startup Changes in Emacs 27.1
 
@@ -338,11 +324,17 @@ write alists of variables to ".dir-locals.el".  This is the same
 syntax that you can see in the example of a ".dir-locals.el" file in
 the node "(emacs) Directory Variables" of the user manual.
 
++++
+** Network connections using 'local can now use IPv6.
+'make-network-process' now uses the correct loopback address when
+asked to use :host 'local and :family 'ipv6.
+
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
 ** doc-view-mode
 *** New commands doc-view-presentation and doc-view-fit-window-to-page
+*** Added support for password-protected PDF files
 
 ** map.el
 *** Now also understands plists.
@@ -598,6 +590,17 @@ Of course it will still find it if you have it in ~/.ecompleterc
 
 ** Gnus
 
+---
+*** Gnus now maps imaps to 993 only on old MS-Windows versions.
+The nnimap backend used to do this unconditionally to work around
+problems on old versions of MS-Windows.  This is now done only for
+Windows XP and older.
+
++++
+*** The nnimap backend now has support for IMAP namespaces.
+This feature can be enabled by setting the new 'nnimap-use-namespaces'
+server variable to non-nil.
+
 +++
 *** A prefix argument to 'gnus-summary-limit-to-score' will limit reverse.
 Limit to articles with score at below.
@@ -724,6 +727,11 @@ can now be searched via 'C-s'.
 
 ---
 *** New filter 'ibuffer-filter-by-process'; bound to '/E'.
+
+---
+*** All mode filters can now accept a list of symbols.
+This means you can now easily filter several major modes, as well
+as a single mode.
 
 ** Search and Replace
 
@@ -1533,6 +1541,11 @@ scaling.)
 
 The new function 'image-scaling-p' can be used to test whether any
 given frame supports resizing.
+
++++
+** (locale-info 'paper) now returns the paper size on systems that support it.
+This is currently supported on GNUish hosts and on modern versions of
+MS-Windows.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

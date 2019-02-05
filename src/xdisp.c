@@ -14153,6 +14153,9 @@ redisplay_internal (void)
       clear_garbaged_frames ();
     }
 
+  if (!NILP (Vrun_hooks))
+    run_window_change_functions ();
+
   if (windows_or_buffers_changed && !update_mode_lines)
     /* Code that sets windows_or_buffers_changed doesn't distinguish whether
        only the windows's contents needs to be refreshed, or whether the
@@ -14332,18 +14335,6 @@ redisplay_internal (void)
 		  && (w = XWINDOW (selected_window)) != sw)
 		goto retry;
 
-	      if (!NILP (Vrun_hooks))
-		{
-		  run_window_change_functions ();
-
-		  /* If windows or buffers changed or selected_window
-		     changed, redisplay again.  */
-		  if ((windows_or_buffers_changed)
-		      || (WINDOWP (selected_window)
-			  && (w = XWINDOW (selected_window)) != sw))
-		    goto retry;
-		}
-
 		/* We used to always goto end_of_redisplay here, but this
 		 isn't enough if we have a blinking cursor.  */
 	      if (w->cursor_off_p == w->last_cursor_off_p)
@@ -14440,7 +14431,17 @@ redisplay_internal (void)
 		FRAME_TERMINAL (f)->condemn_scroll_bars_hook (f);
 
 	      if (FRAME_VISIBLE_P (f) && !FRAME_OBSCURED_P (f))
-		redisplay_windows (FRAME_ROOT_WINDOW (f));
+		{
+
+		  /* Don't allow freeing images for this frame as long
+		     as the frame's update wasn't completed.  This
+		     prevents crashes when some Lisp that runs from
+		     the various hooks or font-lock decides to clear
+		     the frame's image cache, when the images in that
+		     cache are referenced by the desired matrix.  */
+		  f->inhibit_clear_image_cache = true;
+		  redisplay_windows (FRAME_ROOT_WINDOW (f));
+		}
 	      /* Remember that the invisible frames need to be redisplayed next
 		 time they're visible.  */
 	      else if (!REDISPLAY_SOME_P ())
@@ -14521,6 +14522,7 @@ redisplay_internal (void)
 		  pending |= update_frame (f, false, false);
 		  f->cursor_type_changed = false;
 		  f->updated_p = true;
+		  f->inhibit_clear_image_cache = false;
 		}
 	    }
 	}
@@ -14548,6 +14550,7 @@ redisplay_internal (void)
     }
   else if (FRAME_VISIBLE_P (sf) && !FRAME_OBSCURED_P (sf))
     {
+      sf->inhibit_clear_image_cache = true;
       displayed_buffer = XBUFFER (XWINDOW (selected_window)->contents);
       /* Use list_of_error, not Qerror, so that
 	 we catch only errors and don't run the debugger.  */
@@ -14603,6 +14606,7 @@ redisplay_internal (void)
 	  XWINDOW (selected_window)->must_be_updated_p = true;
 	  pending = update_frame (sf, false, false);
 	  sf->cursor_type_changed = false;
+	  sf->inhibit_clear_image_cache = false;
 	}
 
       /* We may have called echo_area_display at the top of this
@@ -14706,18 +14710,6 @@ redisplay_internal (void)
       || (WINDOWP (selected_window)
 	  && (w = XWINDOW (selected_window)) != sw))
     goto retry;
-
-  if (!NILP (Vrun_hooks))
-    {
-      run_window_change_functions ();
-
-      /* If windows or buffers changed or selected_window changed,
-	 redisplay again.  */
-      if ((windows_or_buffers_changed)
-	  || (WINDOWP (selected_window)
-	      && (w = XWINDOW (selected_window)) != sw))
-	goto retry;
-    }
 
   /* Clear the face and image caches.
 

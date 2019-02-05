@@ -633,11 +633,11 @@ extern bool initialized;
 
 extern struct gflags {
   /* True means this Emacs instance was born to dump.  */
-#if defined (HAVE_PDUMPER) || !defined (CANNOT_DUMP)
+#if defined HAVE_PDUMPER || defined HAVE_UNEXEC
   bool will_dump_ : 1;
   bool will_bootstrap_ : 1;
 #endif
-#if defined (HAVE_PDUMPER)
+#ifdef HAVE_PDUMPER
   /* Set in an Emacs process that will likely dump with pdumper; all
      Emacs processes may dump with pdumper, however.  */
   bool will_dump_with_pdumper_ : 1;
@@ -645,7 +645,7 @@ extern struct gflags {
      dump.  */
   bool dumped_with_pdumper_ : 1;
 #endif
-#ifndef CANNOT_DUMP
+#ifdef HAVE_UNEXEC
   bool will_dump_with_unexec_ : 1;
   /* Set in an Emacs process that has been restored from an unexec
      dump.  */
@@ -658,7 +658,7 @@ extern struct gflags {
 INLINE bool
 will_dump_p (void)
 {
-#if HAVE_PDUMPER || !defined (CANNOT_DUMP)
+#if HAVE_PDUMPER || defined HAVE_UNEXEC
   return gflags.will_dump_;
 #else
   return false;
@@ -668,7 +668,7 @@ will_dump_p (void)
 INLINE bool
 will_bootstrap_p (void)
 {
-#if HAVE_PDUMPER || !defined (CANNOT_DUMP)
+#if HAVE_PDUMPER || defined HAVE_UNEXEC
   return gflags.will_bootstrap_;
 #else
   return false;
@@ -698,20 +698,20 @@ dumped_with_pdumper_p (void)
 INLINE bool
 will_dump_with_unexec_p (void)
 {
-#ifdef CANNOT_DUMP
-  return false;
-#else
+#ifdef HAVE_UNEXEC
   return gflags.will_dump_with_unexec_;
+#else
+  return false;
 #endif
 }
 
 INLINE bool
 dumped_with_unexec_p (void)
 {
-#ifdef CANNOT_DUMP
-  return false;
-#else
+#ifdef HAVE_UNEXEC
   return gflags.dumped_with_unexec_;
+#else
+  return false;
 #endif
 }
 
@@ -721,10 +721,10 @@ dumped_with_unexec_p (void)
 INLINE bool
 definitely_will_not_unexec_p (void)
 {
-#ifdef CANNOT_DUMP
-  return true;
-#else
+#ifdef HAVE_UNEXEC
   return gflags.will_not_unexec_;
+#else
+  return true;
 #endif
 }
 
@@ -3032,7 +3032,7 @@ CHECK_INTEGER (Lisp_Object x)
 /* If we're not dumping using the legacy dumper and we might be using
    the portable dumper, try to bunch all the subr structures together
    for more efficient dump loading.  */
-#ifdef CANNOT_DUMP
+#ifndef HAVE_UNEXEC
 # ifdef DARWIN_OS
 #  define SUBR_SECTION_ATTRIBUTE ATTRIBUTE_SECTION ("__DATA,subrs")
 # else
@@ -3488,6 +3488,28 @@ integer_to_uintmax (Lisp_Object num, uintmax_t *n)
       *n = i;
       return i != 0;
     }
+}
+
+/* A modification count.  These are wide enough, and incremented
+   rarely enough, so that they should never overflow a 60-bit counter
+   in practice, and the code below assumes this so a compiler can
+   generate better code if EMACS_INT is 64 bits.  */
+typedef intmax_t modiff_count;
+
+INLINE modiff_count
+modiff_incr (modiff_count *a)
+{
+  modiff_count a0 = *a;
+  bool modiff_overflow = INT_ADD_WRAPV (a0, 1, a);
+  eassert (!modiff_overflow && *a >> 30 >> 30 == 0);
+  return a0;
+}
+
+INLINE Lisp_Object
+modiff_to_integer (modiff_count a)
+{
+  eassume (0 <= a && a >> 30 >> 30 == 0);
+  return make_int (a);
 }
 
 /* Defined in data.c.  */
@@ -4113,7 +4135,7 @@ Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
 
 /* Defined in unexmacosx.c.  */
-#if defined DARWIN_OS && !defined CANNOT_DUMP
+#if defined DARWIN_OS && defined HAVE_UNEXEC
 extern void unexec_init_emacs_zone (void);
 extern void *unexec_malloc (size_t);
 extern void *unexec_realloc (void *, size_t);
