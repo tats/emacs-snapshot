@@ -146,6 +146,8 @@ Patterns can match both regular files and directories.
 To root an entry, start it with `./'.  To match directories only,
 end it with `/'.  DIR must be one of `project-roots' or
 `project-external-roots'."
+  ;; TODO: Document and support regexp ignores as used by Hg.
+  ;; TODO: Support whitelist entries.
   (require 'grep)
   (defvar grep-find-ignored-files)
   (nconc
@@ -190,7 +192,6 @@ to find the list of ignores for each directory."
   (require 'find-dired)
   (defvar find-name-arg)
   (let ((default-directory dir)
-        (remote-id (file-remote-p dir))
         (command (format "%s %s %s -type f %s -print0"
                          find-program
                          (file-local-name dir)
@@ -207,8 +208,17 @@ to find the list of ignores for each directory."
                                      " "
                                      (shell-quote-argument ")"))"")
                          )))
-    (mapcar (lambda (file) (concat remote-id file))
-            (split-string (shell-command-to-string command) "\0" t))))
+    (project--remote-file-names
+     (split-string (shell-command-to-string command) "\0" t))))
+
+(defun project--remote-file-names (local-files)
+  "Return LOCAL-FILES as if they were on the system of `default-directory'."
+  (let ((remote-id (file-remote-p default-directory)))
+    (if (not remote-id)
+        local-files
+      (mapcar (lambda (file)
+                (concat remote-id file))
+              local-files))))
 
 (defgroup project-vc nil
   "Project implementation using the VC package."
@@ -509,30 +519,30 @@ recognized."
                              inherit-input-method)))
     (concat common-parent-directory res)))
 
-(declare-function multifile-continue "multifile" ())
+(declare-function fileloop-continue "fileloop" ())
 
 ;;;###autoload
 (defun project-search (regexp)
   "Search for REGEXP in all the files of the project.
 Stops when a match is found.
-To continue searching for next match, use command \\[multifile-continue]."
+To continue searching for next match, use command \\[fileloop-continue]."
   (interactive "sSearch (regexp): ")
-  (multifile-initialize-search
+  (fileloop-initialize-search
    regexp (project-files (project-current t)) 'default)
-  (multifile-continue))
+  (fileloop-continue))
 
 ;;;###autoload
 (defun project-query-replace (from to)
   "Search for REGEXP in all the files of the project.
 Stops when a match is found.
-To continue searching for next match, use command \\[multifile-continue]."
+To continue searching for next match, use command \\[fileloop-continue]."
   (interactive
    (pcase-let ((`(,from ,to)
                 (query-replace-read-args "Query replace (regexp)" t t)))
      (list from to)))
-  (multifile-initialize-replace
+  (fileloop-initialize-replace
    from to (project-files (project-current t)) 'default)
-  (multifile-continue))
+  (fileloop-continue))
 
 (provide 'project)
 ;;; project.el ends here

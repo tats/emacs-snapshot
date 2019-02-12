@@ -147,7 +147,7 @@
                        (icalendar--get-event-property-attributes
                         event field) zone-map))
          (dtdate-dec (icalendar--decode-isodatetime dtdate nil dtdate-zone)))
-    (apply 'encode-time dtdate-dec)))
+    (encode-time dtdate-dec)))
 
 (defun gnus-icalendar-event--find-attendee (ical name-or-email)
   (let* ((event (car (icalendar--all-events ical)))
@@ -655,10 +655,7 @@ is searched."
 (defun gnus-icalendar-show-org-agenda (event)
   (let* ((time-delta (time-subtract (gnus-icalendar-event:end-time event)
                                     (gnus-icalendar-event:start-time event)))
-         (duration-days (1+ (/ (+ (* (car time-delta) (expt 2 16))
-                                  (cadr time-delta))
-                               86400))))
-
+         (duration-days (1+ (floor (encode-time time-delta 'integer) 86400))))
     (org-agenda-list nil (gnus-icalendar-event:start event) duration-days)))
 
 (cl-defmethod gnus-icalendar-event:sync-to-org ((event gnus-icalendar-event-request) reply-status)

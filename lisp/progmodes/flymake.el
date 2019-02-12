@@ -4,7 +4,7 @@
 
 ;; Author:  Pavel Kobyakov <pk_at_work@yahoo.com>
 ;; Maintainer: João Távora <joaotavora@gmail.com>
-;; Version: 1.0.3
+;; Version: 1.0.5
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: c languages tools
 
@@ -742,14 +742,13 @@ report applies to that region."
           ;; the associated overlay.
           (cond
            (region
-            (dolist (diag (flymake--backend-state-diags state))
-              (let ((diag-beg (flymake--diag-beg diag))
-                    (diag-end (flymake--diag-beg diag)))
-                (when (and (< diag-beg (cdr region))
-                           (> diag-end (car region)))
-                  (delete-overlay (flymake--diag-overlay diag))
-                  (setf (flymake--backend-state-diags state)
-                        (delq diag (flymake--backend-state-diags state)))))))
+            (cl-loop for diag in (flymake--backend-state-diags state)
+                     if (or (> (flymake--diag-end diag) (car region))
+                            (< (flymake--diag-beg diag) (cdr region)))
+                     do (delete-overlay (flymake--diag-overlay diag))
+                     else collect diag into surviving
+                     finally (setf (flymake--backend-state-diags state)
+                                   surviving)))
            (first-report
             (dolist (diag (flymake--backend-state-diags state))
               (delete-overlay (flymake--diag-overlay diag)))
@@ -974,6 +973,11 @@ special *Flymake log* buffer."  :group 'flymake :lighter
     (add-hook 'after-save-hook 'flymake-after-save-hook nil t)
     (add-hook 'kill-buffer-hook 'flymake-kill-buffer-hook nil t)
 
+    ;; If Flymake happened to be alrady already ON, we must cleanup
+    ;; existing diagnostic overlays, lest we forget them by blindly
+    ;; reinitializing `flymake--backend-state' in the next line.
+    ;; See https://github.com/joaotavora/eglot/issues/223.
+    (mapc #'delete-overlay (flymake--overlays))
     (setq flymake--backend-state (make-hash-table))
     (setq flymake--recent-changes nil)
 
@@ -1000,7 +1004,7 @@ Do it only if `flymake-no-changes-timeout' is non-nil."
     (setq
      flymake-timer
      (run-with-idle-timer
-      (seconds-to-time flymake-no-changes-timeout)
+      (encode-time flymake-no-changes-timeout)
       nil
       (lambda (buffer)
         (when (buffer-live-p buffer)

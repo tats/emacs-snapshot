@@ -897,10 +897,13 @@ main (int argc, char **argv)
     }
   else
     {
-      eassert (!initialized);
       eassert (!temacs);
+#ifndef HAVE_UNEXEC
+      eassert (!initialized);
+#endif
 #ifdef HAVE_PDUMPER
-      attempt_load_pdump = true;
+      if (!initialized)
+	attempt_load_pdump = true;
 #endif
     }
 
@@ -909,26 +912,30 @@ main (int argc, char **argv)
     gflags.will_not_unexec_ = true;
 #endif
 
-#if defined WINDOWSNT || defined HAVE_NTGUI
+#ifdef WINDOWSNT
   /* Grab our malloc arena space now, before anything important
      happens.  This relies on the static heap being needed only in
      temacs and only if we are going to dump with unexec.  */
-  bool use_dynamic_heap = false;
-  char *temacs_str = strstr (argv[0], "temacs");
-  if (temacs_str != NULL
-      && (temacs_str == argv[0] || IS_DIRECTORY_SEP (temacs_str[-1])))
+  bool use_dynamic_heap = true;
+  if (temacs)
     {
-      eassert (temacs);
-      /* Note that gflags are set at this point only if we have been
-	 called with the --temacs=METHOD option.  We assume here that
-	 temacs is always called that way, otherwise the functions
-	 that rely on gflags, like will_dump_with_pdumper_p below,
-	 will not do their job.  */
-      use_dynamic_heap = will_dump_with_pdumper_p ();
+      char *temacs_str = NULL, *p;
+      for (p = argv[0]; (p = strstr (p, "temacs")) != NULL; p++)
+	temacs_str = p;
+      if (temacs_str != NULL
+	  && (temacs_str == argv[0] || IS_DIRECTORY_SEP (temacs_str[-1])))
+	{
+	  /* Note that gflags are set at this point only if we have been
+	     called with the --temacs=METHOD option.  We assume here that
+	     temacs is always called that way, otherwise the functions
+	     that rely on gflags, like will_dump_with_pdumper_p below,
+	     will not do their job.  */
+	  use_dynamic_heap = will_dump_with_pdumper_p ();
+	}
     }
-  else
-    use_dynamic_heap = true;
   init_heap (use_dynamic_heap);
+#endif
+#if defined WINDOWSNT || defined HAVE_NTGUI
   /* Set global variables used to detect Windows version.  Do this as
      early as possible.  (w32proc.c calls this function as well, but
      the additional call here is harmless.) */

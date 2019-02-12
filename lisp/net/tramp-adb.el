@@ -488,9 +488,9 @@ Emacs dired can't find files."
   "Sort \"ls\" output by time, descending."
   (let (time-a time-b)
     (string-match tramp-adb-ls-date-regexp a)
-    (setq time-a (apply 'encode-time (parse-time-string (match-string 0 a))))
+    (setq time-a (apply #'encode-time (parse-time-string (match-string 0 a))))
     (string-match tramp-adb-ls-date-regexp b)
-    (setq time-b (apply 'encode-time (parse-time-string (match-string 0 b))))
+    (setq time-b (apply #'encode-time (parse-time-string (match-string 0 b))))
     (time-less-p time-b time-a)))
 
 (defun tramp-adb-ls-output-name-less-p (a b)
@@ -679,9 +679,8 @@ But handle the case, if the \"test\" command is not available."
 		    (current-time)
 		  time)))
       (tramp-adb-send-command-and-check
-       ;; Use shell arithmetic because of Emacs integer size limit.
-       v (format "touch -t $(( %d * 65536 + %d )) %s"
-		 (car time) (cadr time)
+       v (format "touch -t %s %s"
+		 (format-time-string "%Y%m%d%H%M.%S" time)
 		 (tramp-shell-quote-argument localname))))))
 
 (defun tramp-adb-handle-copy-file

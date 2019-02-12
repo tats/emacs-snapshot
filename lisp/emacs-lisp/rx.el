@@ -246,7 +246,9 @@ regular expressions.")
 
 
 (defconst rx-categories
-  '((consonant			. ?0)
+  '((space-for-indent           . ?\s)
+    (base                       . ?.)
+    (consonant			. ?0)
     (base-vowel			. ?1)
     (upper-diacritical-mark	. ?2)
     (lower-diacritical-mark	. ?3)
@@ -265,7 +267,9 @@ regular expressions.")
     (japanese-hiragana-two-byte . ?H)
     (indian-two-byte		. ?I)
     (japanese-katakana-two-byte . ?K)
+    (strong-left-to-right       . ?L)
     (korean-hangul-two-byte	. ?N)
+    (strong-right-to-left       . ?R)
     (cyrillic-two-byte		. ?Y)
     (combining-diacritic	. ?^)
     (ascii			. ?a)
@@ -964,7 +968,7 @@ CHAR
      matches 0 through 9.
 
 `control', `cntrl'
-     matches ASCII control characters.
+     matches any character whose code is in the range 0-31.
 
 `hex-digit', `hex', `xdigit'
      matches 0 through 9, a through f and A through F.

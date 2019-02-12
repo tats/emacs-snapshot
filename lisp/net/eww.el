@@ -1531,10 +1531,12 @@ Differences in #targets are ignored."
   (kill-new (plist-get eww-data :url)))
 
 (defun eww-download ()
-  "Download URL under point to `eww-download-directory'."
+  "Download URL to `eww-download-directory'.
+Use link at point if there is one, else the current page's URL."
   (interactive)
   (access-file eww-download-directory "Download failed")
-  (let ((url (get-text-property (point) 'shr-url)))
+  (let ((url (or (get-text-property (point) 'shr-url)
+                 (eww-current-url))))
     (if (not url)
         (message "No URL under point")
       (url-retrieve url 'eww-download-callback (list url)))))
@@ -1542,7 +1544,7 @@ Differences in #targets are ignored."
 (defun eww-download-callback (status url)
   (unless (plist-get status :error)
     (let* ((obj (url-generic-parse-url url))
-           (path (car (url-path-and-query obj)))
+           (path (directory-file-name (car (url-path-and-query obj))))
            (file (eww-make-unique-file-name
                   (eww-decode-url-file-name (file-name-nondirectory path))
                   eww-download-directory)))

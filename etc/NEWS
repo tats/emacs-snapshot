@@ -394,11 +394,11 @@ The mode is automatically enabled in files that start with the
 *** 'next-file' is now an obsolete alias of 'tags-next-file'.
 
 *** 'tags-loop-revert-buffers' is an obsolete alias of
-'multifile-revert-buffers'.
+'fileloop-revert-buffers'.
 
 *** The 'tags-loop-continue' function along with the
 'tags-loop-operate' and 'tags-loop-scan' variables are now obsolete;
-use the new 'multifile-initialize' and 'multifile-continue' functions
+use the new 'fileloop-initialize' and 'fileloop-continue' functions
 instead.
 
 ** bibtex
@@ -448,6 +448,9 @@ values.
 *** 'C-u C-x v D' ('vc-root-version-diff') prompts for two revisions
 and compares their entire trees.
 
+*** New user option 'vc-hg-revert-switches' specifies switches to pass
+to hg revert.
+
 ** Diff mode
 *** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
@@ -465,6 +468,15 @@ To enable it, set the new defcustom 'diff-font-lock-prettify' to t.
 *** Prefix arg of 'diff-goto-source' means jump to the old revision
 of the file under version control if point is on an old changed line,
 or to the new revision of the file otherwise.
+
+** Texinfo
+
++++
+*** New function for inserting @pxref, @xref, or @ref commands.
+The function 'texinfo-insert-dwim-@ref', bound to 'C-c C-c r' by
+default, inserts one of three types of references based on the text
+surrounding point, namely @pxref near a parenthesis, @xref at the
+start of a sentence or at (point-min), else @ref.
 
 ** Browse-url
 
@@ -641,6 +653,11 @@ and its value has been changed to Duck Duck Go.
 *** XEmacs support has been removed.
 
 ** eww/shr
+
++++
+*** The 'd' ('eww-download') command now falls back to current page's URL.
+If this command is invoked with no URL at point, it now downloads the
+current page instead of signaling an error.
 
 *** When opening external links in eww/shr (typically with the
 'C-u RET' keystroke on a link), the link will be flashed with the new
@@ -1076,7 +1093,7 @@ indicator instead of just the indicator (which is sometimes cryptic).
 
 * New Modes and Packages in Emacs 27.1
 
-** multifile.el lets one setup multifile operations like search&replace.
+** fileloop.el lets one setup multifile operations like search&replace.
 
 +++
 ** Emacs can now visit files in archives as if they were directories.
