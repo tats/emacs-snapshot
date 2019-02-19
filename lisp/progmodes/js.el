@@ -477,6 +477,7 @@ This applies to function movement, marking, and so on."
   "Align continuation of non-empty ([{ lines in `js-mode'."
   :version "26.1"
   :type 'boolean
+  :safe 'booleanp
   :group 'js)
 
 (defcustom js-comment-lineup-func #'c-lineup-C-comments
@@ -1834,7 +1835,7 @@ This performs fontification according to `js--class-styles'."
              (skip-chars-backward " \t")
              (or (bobp) (backward-char))
              (and (> (point) (point-min))
-                  (save-excursion (backward-char) (not (looking-at "[/*]/")))
+                  (save-excursion (backward-char) (not (looking-at "[/*]/\\|=>")))
                   (js--looking-at-operator-p)
                   (and (progn (backward-char)
                               (not (looking-at "+\\+\\|--\\|/[/*]"))))))))))
@@ -2063,6 +2064,24 @@ indentation is aligned to that column."
         (when comma-p
           (goto-char (1+ declaration-keyword-end))))))))
 
+(defconst js--line-terminating-arrow-re "\\s-*=>\\s-*\\(/[/*]\\|$\\)"
+  "Regexp matching the last \"=>\" (arrow) token on a line.
+Whitespace and comments around the arrow are ignored.")
+
+(defun js--looking-at-broken-arrow-function-p ()
+  "Helper function for `js--proper-indentation'.
+Return t if point is at the start of a (possibly async) arrow
+function and the last non-comment, non-whitespace token of the
+current line is the \"=>\" token."
+  (when (looking-at "\\s-*async\\s-*")
+    (goto-char (match-end 0)))
+  (cond
+   ((eq (char-after) ?\()
+    (forward-list)
+    (looking-at-p js--line-terminating-arrow-re))
+   (t (looking-at-p
+       (concat js--name-re js--line-terminating-arrow-re)))))
+
 (defun js--proper-indentation (parse-status)
   "Return the proper indentation for the current line."
   (save-excursion
@@ -2093,7 +2112,8 @@ indentation is aligned to that column."
                  (continued-expr-p (js--continued-expression-p)))
              (goto-char (nth 1 parse-status)) ; go to the opening char
              (if (or (not js-indent-align-list-continuation)
-                     (looking-at "[({[]\\s-*\\(/[/*]\\|$\\)"))
+                     (looking-at "[({[]\\s-*\\(/[/*]\\|$\\)")
+                     (save-excursion (forward-char) (js--looking-at-broken-arrow-function-p)))
                  (progn ; nothing following the opening paren/bracket
                    (skip-syntax-backward " ")
                    (when (eq (char-before) ?\)) (backward-list))

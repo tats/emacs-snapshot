@@ -1070,14 +1070,15 @@ This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   return Fnreverse (lst);
 }
 
-/* Returns true if STRING ends with SUFFIX */
+/* Return true if STRING ends with SUFFIX.  */
 static bool
 suffix_p (Lisp_Object string, const char *suffix)
 {
   ptrdiff_t suffix_len = strlen (suffix);
   ptrdiff_t string_len = SBYTES (string);
 
-  return string_len >= suffix_len && !strcmp (SSDATA (string) + string_len - suffix_len, suffix);
+  return (suffix_len <= string_len
+	  && strcmp (SSDATA (string) + string_len - suffix_len, suffix) == 0);
 }
 
 static void
@@ -1932,13 +1933,10 @@ readevalloop (Lisp_Object readcharfun,
   Lisp_Object macroexpand = intern ("internal-macroexpand-for-load");
 
   if (NILP (Ffboundp (macroexpand))
-      /* Don't macroexpand in .elc files, since it should have been done
-	 already.  We actually don't know whether we're in a .elc file or not,
-	 so we use circumstantial evidence: .el files normally go through
-	 Vload_source_file_function -> load-with-code-conversion
-	 -> eval-buffer.  */
-      || EQ (readcharfun, Qget_file_char)
-      || EQ (readcharfun, Qget_emacs_mule_file_char))
+      || (STRINGP (sourcename) && suffix_p (sourcename, ".elc")))
+    /* Don't macroexpand before the corresponding function is defined
+       and don't bother macroexpanding in .elc files, since it should have
+       been done already.  */
     macroexpand = Qnil;
 
   if (MARKERP (readcharfun))

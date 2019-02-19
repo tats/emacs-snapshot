@@ -1,4 +1,4 @@
-;;; rx.el --- sexp notation for regular expressions
+;;; rx.el --- sexp notation for regular expressions  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2001-2019 Free Software Foundation, Inc.
 
@@ -429,6 +429,13 @@ Only both edges of each range is checked."
     ;; set L list of all ranges
     (mapc (lambda (e) (cond ((stringp e) (push e str))
 			    ((numberp e) (push (cons e e) l))
+                            ;; Ranges between ASCII and raw bytes are split,
+                            ;; to prevent accidental inclusion of Unicode
+                            ;; characters later on.
+                            ((and (<= (car e) #x7f)
+                                  (>= (cdr e) #x3fff80))
+                             (push (cons (car e) #x7f) l)
+                             (push (cons #x3fff80 (cdr e)) l))
 			    (t (push e l))))
 	  args)
     ;; condense overlapped ranges in L
@@ -841,33 +848,34 @@ If FORM is `(minimal-match FORM1)', non-greedy versions of `*',
   (rx-group-if (cadr form) rx-parent))
 
 
-(defun rx-form (form &optional rx-parent)
+(defun rx-form (form &optional parent)
   "Parse and produce code for regular expression FORM.
 FORM is a regular expression in sexp form.
-RX-PARENT shows which type of expression calls and controls putting of
+PARENT shows which type of expression calls and controls putting of
 shy groups around the result and some more in other functions."
-  (cond
-   ((stringp form)
-    (rx-group-if (regexp-quote form)
-                 (if (and (eq rx-parent '*) (< 1 (length form)))
-                     rx-parent)))
-   ((integerp form)
-    (regexp-quote (char-to-string form)))
-   ((symbolp form)
-    (let ((info (rx-info form nil)))
-      (cond ((stringp info)
-             info)
-            ((null info)
-             (error "Unknown rx form `%s'" form))
-            (t
-             (funcall (nth 0 info) form)))))
-   ((consp form)
-    (let ((info (rx-info (car form) 'head)))
-      (unless (consp info)
-        (error "Unknown rx form `%s'" (car form)))
-      (funcall (nth 0 info) form)))
-   (t
-    (error "rx syntax error at `%s'" form))))
+  (let ((rx-parent parent))
+    (cond
+     ((stringp form)
+      (rx-group-if (regexp-quote form)
+                   (if (and (eq parent '*) (< 1 (length form)))
+                       parent)))
+     ((integerp form)
+      (regexp-quote (char-to-string form)))
+     ((symbolp form)
+      (let ((info (rx-info form nil)))
+        (cond ((stringp info)
+               info)
+              ((null info)
+               (error "Unknown rx form `%s'" form))
+              (t
+               (funcall (nth 0 info) form)))))
+     ((consp form)
+      (let ((info (rx-info (car form) 'head)))
+        (unless (consp info)
+          (error "Unknown rx form `%s'" (car form)))
+        (funcall (nth 0 info) form)))
+     (t
+      (error "rx syntax error at `%s'" form)))))
 
 
 ;;;###autoload
@@ -1055,7 +1063,9 @@ CHAR
      matches a character with category CATEGORY.  CATEGORY must be
      either a character to use for C, or one of the following symbols.
 
-     `consonant'			(\\c0 in string notation)
+     `space-for-indent'                 (\\c\\s in string notation)
+     `base'                             (\\c.)
+     `consonant'			(\\c0)
      `base-vowel'			(\\c1)
      `upper-diacritical-mark'		(\\c2)
      `lower-diacritical-mark'		(\\c3)
@@ -1073,7 +1083,9 @@ CHAR
      `japanese-hiragana-two-byte'	(\\cH)
      `indian-two-byte'			(\\cI)
      `japanese-katakana-two-byte'	(\\cK)
+     `strong-left-to-right'             (\\cL)
      `korean-hangul-two-byte'		(\\cN)
+     `strong-right-to-left'             (\\cR)
      `cyrillic-two-byte'		(\\cY)
      `combining-diacritic'		(\\c^)
      `ascii'				(\\ca)
