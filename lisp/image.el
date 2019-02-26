@@ -804,19 +804,22 @@ If the image has a non-nil :speed property, it acts as a multiplier
 for the animation speed.  A negative value means to animate in reverse."
   (when (and (buffer-live-p (plist-get (cdr image) :animate-buffer))
              ;; Delayed more than two seconds more than expected.
-	     (or (<= (- (float-time) target-time) 2)
+	     (or (time-less-p (time-since target-time) 2)
 		 (progn
 		   (message "Stopping animation; animation possibly too big")
 		   nil)))
     (image-show-frame image n t)
     (let* ((speed (image-animate-get-speed image))
-	   (time (float-time))
+	   (time (current-time))
 	   (animation (image-multi-frame-p image))
+	   (time-to-load-image (time-since time))
+	   (stated-delay-time (/ (or (cdr animation)
+				     image-default-frame-delay)
+				 (float (abs speed))))
 	   ;; Subtract off the time we took to load the image from the
 	   ;; stated delay time.
-	   (delay (max (+ (* (or (cdr animation) image-default-frame-delay)
-			     (/ 1.0 (abs speed)))
-			  time (- (float-time)))
+	   (delay (max (float-time (time-subtract stated-delay-time
+						  time-to-load-image))
 		       image-minimum-frame-delay))
 	   done)
       (setq n (if (< speed 0)
@@ -925,7 +928,7 @@ has no effect."
   :version "24.3")
 
 (defcustom imagemagick-enabled-types
-  '(3FR ART ARW AVS BMP BMP2 BMP3 CAL CALS CMYK CMYKA CR2 CRW
+  '(3FR ARW AVS BMP BMP2 BMP3 CAL CALS CMYK CMYKA CR2 CRW
     CUR CUT DCM DCR DCX DDS DJVU DNG DPX EXR FAX FITS GBR GIF
     GIF87 GRB HRZ ICB ICO ICON J2C JNG JP2 JPC JPEG JPG JPX K25
     KDC MIFF MNG MRW MSL MSVG MTV NEF ORF OTB PBM PCD PCDS PCL
@@ -959,7 +962,7 @@ has no effect."
   :set (lambda (symbol value)
 	 (set-default symbol value)
 	 (imagemagick-register-types))
-  :version "24.3")
+  :version "26.2")                      ; remove ART (bug#22289)
 
 (imagemagick-register-types)
 

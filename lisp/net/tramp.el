@@ -56,13 +56,13 @@
 ;;; Code:
 
 (require 'tramp-compat)
+(require 'tramp-integration)
 (require 'trampver)
 
 ;; Pacify byte-compiler.
 (require 'cl-lib)
 (declare-function netrc-parse "netrc")
 (defvar auto-save-file-name-transforms)
-(defvar eshell-path-env)
 (defvar ls-lisp-use-insert-directory-program)
 (defvar outline-regexp)
 
@@ -2056,77 +2056,6 @@ For definition of that list see `tramp-set-completion-function'."
    ;; The method related defaults.
    (cdr (assoc method tramp-completion-function-alist))))
 
-;;; Fontification of `read-file-name':
-
-(defvar tramp-rfn-eshadow-overlay)
-(make-variable-buffer-local 'tramp-rfn-eshadow-overlay)
-
-(defun tramp-rfn-eshadow-setup-minibuffer ()
-  "Set up a minibuffer for `file-name-shadow-mode'.
-Adds another overlay hiding filename parts according to Tramp's
-special handling of `substitute-in-file-name'."
-  (when minibuffer-completing-file-name
-    (setq tramp-rfn-eshadow-overlay
-	  (make-overlay (minibuffer-prompt-end) (minibuffer-prompt-end)))
-    ;; Copy rfn-eshadow-overlay properties.
-    (let ((props (overlay-properties rfn-eshadow-overlay)))
-      (while props
- 	;; The `field' property prevents correct minibuffer
- 	;; completion; we exclude it.
- 	(if (not (eq (car props) 'field))
-            (overlay-put tramp-rfn-eshadow-overlay (pop props) (pop props))
- 	  (pop props) (pop props))))))
-
-(add-hook 'rfn-eshadow-setup-minibuffer-hook
-	  'tramp-rfn-eshadow-setup-minibuffer)
-(add-hook 'tramp-unload-hook
-	  (lambda ()
-	    (remove-hook 'rfn-eshadow-setup-minibuffer-hook
-			 'tramp-rfn-eshadow-setup-minibuffer)))
-
-(defun tramp-rfn-eshadow-update-overlay-regexp ()
-  (format "[^%s/~]*\\(/\\|~\\)" tramp-postfix-host-format))
-
-;; Package rfn-eshadow is preloaded in Emacs, but for some reason,
-;; it only did (defvar rfn-eshadow-overlay) without giving it a global
-;; value, so it was only declared as dynamically-scoped within the
-;; rfn-eshadow.el file.  This is now fixed in Emacs>26.1 but we still need
-;; this defvar here for older releases.
-(defvar rfn-eshadow-overlay)
-
-(defun tramp-rfn-eshadow-update-overlay ()
-  "Update `rfn-eshadow-overlay' to cover shadowed part of minibuffer input.
-This is intended to be used as a minibuffer `post-command-hook' for
-`file-name-shadow-mode'; the minibuffer should have already
-been set up by `rfn-eshadow-setup-minibuffer'."
-  ;; In remote files name, there is a shadowing just for the local part.
-  (ignore-errors
-    (let ((end (or (overlay-end rfn-eshadow-overlay)
-		   (minibuffer-prompt-end)))
-	  ;; We do not want to send any remote command.
-	  (non-essential t))
-      (when (tramp-tramp-file-p (buffer-substring end (point-max)))
-	(save-excursion
-	  (save-restriction
-	    (narrow-to-region
-	     (1+ (or (string-match-p
-		      (tramp-rfn-eshadow-update-overlay-regexp)
-		      (buffer-string) end)
-		     end))
-	     (point-max))
-	    (let ((rfn-eshadow-overlay tramp-rfn-eshadow-overlay)
-		  (rfn-eshadow-update-overlay-hook nil)
-		  file-name-handler-alist)
-	      (move-overlay rfn-eshadow-overlay (point-max) (point-max))
-	      (rfn-eshadow-update-overlay))))))))
-
-(add-hook 'rfn-eshadow-update-overlay-hook
-	  'tramp-rfn-eshadow-update-overlay)
-(add-hook 'tramp-unload-hook
-	  (lambda ()
-	    (remove-hook 'rfn-eshadow-update-overlay-hook
-			 'tramp-rfn-eshadow-update-overlay)))
-
 ;; Inodes don't exist for some file systems.  Therefore we must
 ;; generate virtual ones.  Used in `find-buffer-visiting'.  The method
 ;; applied might be not so efficient (Ange-FTP uses hashes). But
@@ -2310,6 +2239,7 @@ ARGS are the arguments OPERATION has been called with."
 (defmacro tramp-condition-case-unless-debug
   (var bodyform &rest handlers)
   "Like `condition-case-unless-debug' but `tramp-debug-on-error'."
+  (declare (debug condition-case) (indent 2))
   `(let ((debug-on-error tramp-debug-on-error))
      (condition-case-unless-debug ,var ,bodyform ,@handlers)))
 
@@ -3060,6 +2990,13 @@ User is always nil."
 (defvar tramp-handle-write-region-hook nil
   "Normal hook to be run at the end of `tramp-*-handle-write-region'.")
 
+(defun tramp-handle-access-file (filename string)
+  "Like `access-file' for Tramp files."
+  (unless (file-readable-p filename)
+    (tramp-error
+     (tramp-dissect-file-name filename) tramp-file-missing
+     "%s: No such file or directory %s" string filename)))
+
 (defun tramp-handle-add-name-to-file
   (filename newname &optional ok-if-already-exists)
   "Like `add-name-to-file' for Tramp files."
@@ -3439,6 +3376,9 @@ User is always nil."
   (when (and (zerop (length (file-name-nondirectory filename)))
 	     (not full-directory-p))
     (setq switches (concat switches "F")))
+  ;; Check, whether directory is accessible.
+  (unless wildcard
+    (access-file filename "Reading directory"))
   (with-parsed-tramp-file-name (expand-file-name filename) nil
     (with-tramp-progress-reporter v 0 (format "Opening directory %s" filename)
       (require 'ls-lisp)
@@ -4887,31 +4827,6 @@ Only works for Bourne-like shells."
    'tramp-unload-hook
    (lambda ()
      (remove-hook 'interrupt-process-functions #'tramp-interrupt-process))))
-
-;;; Integration of eshell.el:
-
-;; eshell.el keeps the path in `eshell-path-env'.  We must change it
-;; when `default-directory' points to another host.
-(defun tramp-eshell-directory-change ()
-  "Set `eshell-path-env' to $PATH of the host related to `default-directory'."
-  ;; Remove last element of `(exec-path)', which is `exec-directory'.
-  ;; Use `path-separator' as it does eshell.
-  (setq eshell-path-env
-	(mapconcat
-	 'identity (butlast (tramp-compat-exec-path)) path-separator)))
-
-(eval-after-load "esh-util"
-  '(progn
-     (add-hook 'eshell-mode-hook
-	       'tramp-eshell-directory-change)
-     (add-hook 'eshell-directory-change-hook
-	       'tramp-eshell-directory-change)
-     (add-hook 'tramp-unload-hook
-	       (lambda ()
-		 (remove-hook 'eshell-mode-hook
-			      'tramp-eshell-directory-change)
-		 (remove-hook 'eshell-directory-change-hook
-			      'tramp-eshell-directory-change)))))
 
 ;; Checklist for `tramp-unload-hook'
 ;; - Unload all `tramp-*' packages

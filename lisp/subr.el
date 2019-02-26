@@ -5041,7 +5041,7 @@ NEW-MESSAGE, if non-nil, sets a new message for the reporter."
 	 (enough-time-passed
 	  ;; See if enough time has passed since the last update.
 	  (or (not update-time)
-	      (when (>= (float-time) update-time)
+	      (when (time-less-p update-time nil)
 		;; Calculate time for the next update
 		(aset parameters 0 (+ update-time (aref parameters 5)))))))
     (cond ((and min-value max-value)
@@ -5475,31 +5475,5 @@ returned list are in the same order as in TREE.
 ;; Technically, `flatten-list' is a misnomer, but we provide it here
 ;; for discoverability:
 (defalias 'flatten-list 'flatten-tree)
-
-(defun replace-region-contents (beg end replace-fn)
-  "Replace the region between BEG and END using REPLACE-FN.
-REPLACE-FN runs on the current buffer narrowed to the region.  It
-should return either a string or a buffer replacing the region.
-
-The replacement is performed using `replace-buffer-contents'.
-
-Note: If the replacement is a string, it'll be placed in a
-temporary buffer so that `replace-buffer-contents' can operate on
-it.  Therefore, if you already have the replacement in a buffer,
-it makes no sense to convert it to a string using
-`buffer-substring' or similar."
-  (save-excursion
-    (save-restriction
-      (narrow-to-region beg end)
-      (goto-char (point-min))
-      (let ((repl (funcall replace-fn)))
-	(if (bufferp repl)
-	    (replace-buffer-contents repl)
-	  (let ((source-buffer (current-buffer)))
-	    (with-temp-buffer
-	      (insert repl)
-	      (let ((tmp-buffer (current-buffer)))
-		(set-buffer source-buffer)
-		(replace-buffer-contents tmp-buffer)))))))))
 
 ;;; subr.el ends here

@@ -214,7 +214,7 @@ See `tramp-actions-before-shell' for more info.")
 ;; New handlers should be added here.
 ;;;###tramp-autoload
 (defconst tramp-smb-file-name-handler-alist
-  '(;; `access-file' performed by default handler.
+  '((access-file . tramp-handle-access-file)
     (add-name-to-file . tramp-smb-handle-add-name-to-file)
     ;; `byte-compiler-base-file-name' performed by default handler.
     (copy-directory . tramp-smb-handle-copy-directory)
@@ -994,6 +994,9 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
       ;; Called from `dired-add-entry'.
       (setq filename (file-name-as-directory filename))
     (setq filename (directory-file-name filename)))
+  ;; Check, whether directory is accessible.
+  (unless wildcard
+    (access-file filename "Reading directory"))
   (with-parsed-tramp-file-name filename nil
     (with-tramp-progress-reporter v 0 (format "Opening directory %s" filename)
       (save-match-data
@@ -1897,11 +1900,11 @@ If ARGUMENT is non-nil, use it as argument for
     ;; connection timeout.
     (with-current-buffer buf
       (goto-char (point-min))
-      (when (and (> (tramp-time-diff
-		     (current-time)
-		     (tramp-get-connection-property
-		      p "last-cmd-time" '(0 0 0)))
-		    60)
+      ;; `seconds-to-time' can be removed once we get rid of Emacs 24.
+      (when (and (time-less-p (seconds-to-time 60)
+			      (time-since
+			       (tramp-get-connection-property
+				p "last-cmd-time" (seconds-to-time 0))))
 		 (process-live-p p)
 		 (re-search-forward tramp-smb-errors nil t))
 	(delete-process p)

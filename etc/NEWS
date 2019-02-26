@@ -335,6 +335,16 @@ the node "(emacs) Directory Variables" of the user manual.
 'make-network-process' now uses the correct loopback address when
 asked to use :host 'local and :family 'ipv6.
 
++++
+** The new function `replace-region-contents' replaces the current
+region using a given replacement-function in a non-destructive manner
+(in terms of `replace-buffer-contents').
+
++++
+** The command `replace-buffer-contents' now has two optional
+arguments mitigating performance issues when operating on huge
+buffers.
+
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
@@ -697,6 +707,9 @@ has been executed.
 *** New option 'shr-discard-aria-hidden'.
 If set, shr will not render tags with attribute 'aria-hidden="true"'.
 This attribute is meant to tell screen readers to ignore a tag.
+
+---
+*** 'shr-tag-ol' now respects the ordered list 'start' attribute.
 
 ** Htmlfontify
 
@@ -1127,6 +1140,10 @@ when given in a string.  Previously, '(any "\x80-\xff")' would match
 characters U+0080...U+00FF.  Now the expression matches raw bytes in
 the 128...255 range, as expected.
 
+** Frames
+
+*** New command 'make-frame-on-monitor' makes a frame on the specified monitor.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1329,6 +1346,12 @@ floating-point operators do.
 
 +++
 ** New function 'time-equal-p' compares time values for equality.
+
++++
+** 'format-time-string' supports a new conversion specifier flag '+'
+that acts like the '0' flag but also puts a '+' before nonnegative
+years containing more than four digits.  This is for compatibility
+with POSIX.1-2017.
 
 ** 'define-minor-mode' automatically documents the meaning of ARG.
 
@@ -1600,6 +1623,9 @@ given frame supports resizing.
 ** (locale-info 'paper) now returns the paper size on systems that support it.
 This is currently supported on GNUish hosts and on modern versions of
 MS-Windows.
+
+** New module environment function 'process_input' to process user
+input while module code is running.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

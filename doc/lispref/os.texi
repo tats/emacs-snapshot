@@ -1562,7 +1562,7 @@ following form:
 The format of this list is the same as what @code{decode-time} accepts
 (@pxref{Time Conversion}), and is described in more detail there.  Any
 element that cannot be determined from the input will be set to
-@code{nil}.  The argument @var{string} should resemble an RFC 2822 or
+@code{nil}.  The argument @var{string} should resemble an RFC 822 (or later) or
 ISO 8601 string, like ``Fri, 25 Mar 2016 16:24:56 +0100'' or
 ``1998-09-12T12:21:54-0200'', but this function will attempt to parse
 less well-formed time strings as well.
@@ -1600,7 +1600,9 @@ This is a synonym for @samp{%m/%d/%y}.
 @item %e
 This stands for the day of month, blank-padded.
 @item %F
-This stands for the ISO 8601 date format, i.e., @samp{"%Y-%m-%d"}.
+This stands for the ISO 8601 date format, which is like
+@samp{%+4Y-%m-%d} except that any flags or field width override the
+@samp{+} and (after subtracting 6) the @samp{4}.
 @item %g
 This stands for the year corresponding to the ISO week within the century.
 @item %G
@@ -1680,7 +1682,9 @@ This stands for a single @samp{%}.
 @end table
 
 One or more flag characters can appear immediately after the @samp{%}.
-@samp{0} pads with zeros, @samp{_} pads with blanks, @samp{-}
+@samp{0} pads with zeros, @samp{+} pads with zeros and also puts
+@samp{+} before nonnegative year numbers with more than four digits,
+@samp{_} pads with blanks, @samp{-}
 suppresses padding, @samp{^} upper-cases letters, and @samp{#}
 reverses the case of letters.
 

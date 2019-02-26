@@ -88,7 +88,7 @@ It is used for TCP/IP devices."
 
 ;;;###tramp-autoload
 (defconst tramp-adb-file-name-handler-alist
-  '((access-file . ignore)
+  '((access-file . tramp-handle-access-file)
     (add-name-to-file . tramp-handle-add-name-to-file)
     ;; `byte-compiler-base-file-name' performed by default handler.
     ;; `copy-directory' performed by default handler.
@@ -1314,7 +1314,10 @@ connection if a previous connection has died for some reason."
 				      (current-time-string)))))
 	    (tramp-message
 	     vec 6 "%s" (mapconcat 'identity (process-command p) " "))
-	    ;; Wait for initial prompt.
+	    ;; Wait for initial prompt.  On some devices, it needs an
+	    ;; initial RET, in order to get it.
+            (sleep-for 0.1)
+	    (tramp-send-string vec tramp-rsh-end-of-line)
 	    (tramp-adb-wait-for-output p 30)
 	    (unless (process-live-p p)
 	      (tramp-error vec 'file-error "Terminated!"))

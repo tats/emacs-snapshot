@@ -409,10 +409,7 @@ Used to decide whether to save completions.")
 (defun cmpl-coerce-string-case (string case-type)
   (cond ((eq case-type :down) (downcase string))
 	((eq case-type :up) (upcase string))
-	((eq case-type :capitalized)
-	 (setq string (downcase string))
-	 (aset string 0 (logand ?\337 (aref string 0)))
-	 string)
+	((eq case-type :capitalized) (capitalize string))
 	(t string)))
 
 (defun cmpl-merge-string-cases (string-to-coerce given-string)
@@ -435,7 +432,7 @@ Used to decide whether to save completions.")
 
 
 (defun cmpl-hours-since-origin ()
-  (floor (float-time) 3600))
+  (floor (encode-time nil 'integer) 3600))
 
 ;;---------------------------------------------------------------------------
 ;; "Symbol" parsing functions

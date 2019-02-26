@@ -940,7 +940,7 @@ of command line.")
 ;; New handlers should be added here.
 ;;;###tramp-autoload
 (defconst tramp-sh-file-name-handler-alist
-  '(;; `access-file' performed by default handler.
+  '((access-file . tramp-handle-access-file)
     (add-name-to-file . tramp-sh-handle-add-name-to-file)
     ;; `byte-compiler-base-file-name' performed by default handler.
     (copy-directory . tramp-sh-handle-copy-directory)
@@ -1635,9 +1635,9 @@ of."
 		   (tramp-compat-time-equal-p
 		    (tramp-compat-file-attribute-modification-time fa2)
 		    tramp-time-dont-know)))
-		 (> 0 (tramp-time-diff
-		       (tramp-compat-file-attribute-modification-time fa2)
-		       (tramp-compat-file-attribute-modification-time fa1)))
+		 (time-less-p
+		  (tramp-compat-file-attribute-modification-time fa2)
+		  (tramp-compat-file-attribute-modification-time fa1))
 	       ;; If one of them is the dont-know value, then we can
 	       ;; still try to run a shell command on the remote host.
 	       ;; However, this only works if both files are Tramp
@@ -2574,6 +2574,9 @@ The method used must be an out-of-band method."
   "Like `insert-directory' for Tramp files."
   (setq filename (expand-file-name filename))
   (unless switches (setq switches ""))
+  ;; Check, whether directory is accessible.
+  (unless wildcard
+    (access-file filename "Reading directory"))
   (with-parsed-tramp-file-name filename nil
     (if (and (featurep 'ls-lisp)
 	     (not (symbol-value 'ls-lisp-use-insert-directory-program)))
@@ -4781,9 +4784,12 @@ connection if a previous connection has died for some reason."
     (unless (or (process-live-p p)
 		(not (tramp-file-name-equal-p
 		      vec (car tramp-current-connection)))
-		(> (tramp-time-diff
-		    (current-time) (cdr tramp-current-connection))
-		   (or tramp-connection-min-time-diff 0)))
+		(time-less-p
+		 ;; `current-time' can be removed once we get rid of Emacs 24.
+		 (time-since (or (cdr tramp-current-connection) (current-time)))
+		 ;; `seconds-to-time' can be removed once we get rid
+		 ;; of Emacs 24.
+		 (seconds-to-time (or tramp-connection-min-time-diff 0))))
       (throw 'suppress 'suppress))
 
     ;; If too much time has passed since last command was sent, look
@@ -4794,11 +4800,11 @@ connection if a previous connection has died for some reason."
     ;; try to send a command from time to time, then look again
     ;; whether the process is really alive.
     (condition-case nil
-	(when (and (> (tramp-time-diff
-		       (current-time)
-		       (tramp-get-connection-property
-			p "last-cmd-time" '(0 0 0)))
-		      60)
+	;; `seconds-to-time' can be removed once we get rid of Emacs 24.
+	(when (and (time-less-p (seconds-to-time 60)
+				(time-since
+				 (tramp-get-connection-property
+				  p "last-cmd-time" (seconds-to-time 0))))
 		   (process-live-p p))
 	  (tramp-send-command vec "echo are you awake" t t)
 	  (unless (and (process-live-p p)
