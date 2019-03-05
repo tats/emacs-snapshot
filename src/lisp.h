@@ -1260,8 +1260,8 @@ INLINE bool
 #define FIXNUM_OVERFLOW_P(i) \
   (! ((0 <= (i) || MOST_NEGATIVE_FIXNUM <= (i)) && (i) <= MOST_POSITIVE_FIXNUM))
 
-INLINE ptrdiff_t
-clip_to_bounds (ptrdiff_t lower, EMACS_INT num, ptrdiff_t upper)
+INLINE intmax_t
+clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
 {
   return num < lower ? lower : num <= upper ? num : upper;
 }
@@ -2664,7 +2664,7 @@ make_uint (uintmax_t n)
 struct Lisp_Intfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Int */
-    EMACS_INT *intvar;
+    intmax_t *intvar;
   };
 
 /* Boolean forwarding pointer to an int variable.
@@ -3099,7 +3099,7 @@ enum maxargs
 extern void defvar_lisp (struct Lisp_Objfwd *, const char *, Lisp_Object *);
 extern void defvar_lisp_nopro (struct Lisp_Objfwd *, const char *, Lisp_Object *);
 extern void defvar_bool (struct Lisp_Boolfwd *, const char *, bool *);
-extern void defvar_int (struct Lisp_Intfwd *, const char *, EMACS_INT *);
+extern void defvar_int (struct Lisp_Intfwd *, const char *, intmax_t *);
 extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
 
 /* Macros we use to define forwarded Lisp variables.
@@ -3763,12 +3763,13 @@ extern void alloc_unexec_post (void);
 extern void mark_maybe_objects (Lisp_Object *, ptrdiff_t);
 extern void mark_stack (char *, char *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
+extern void garbage_collect (void);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
 typedef uintptr_t byte_ct;  /* System byte counts reported by GC.  */
 extern byte_ct consing_since_gc;
 extern byte_ct gc_relative_threshold;
-extern byte_ct memory_full_cons_threshold;
+extern byte_ct const memory_full_cons_threshold;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif
@@ -3781,8 +3782,12 @@ extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object list4 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object list5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
 			  Lisp_Object);
-enum constype {CONSTYPE_HEAP, CONSTYPE_PURE};
-extern Lisp_Object listn (enum constype, ptrdiff_t, Lisp_Object, ...);
+extern Lisp_Object listn (ptrdiff_t, Lisp_Object, ...);
+extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
+#define list(...) \
+  listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
+#define pure_list(...) \
+  pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 
 enum gc_root_type {
   GC_ROOT_STATICPRO,
@@ -3799,7 +3804,13 @@ struct gc_root_visitor {
 };
 extern void visit_static_gc_roots (struct gc_root_visitor visitor);
 
-/* Build a frequently used 2/3/4-integer lists.  */
+/* Build a frequently used 1/2/3/4-integer lists.  */
+
+INLINE Lisp_Object
+list1i (EMACS_INT x)
+{
+  return list1 (make_fixnum (x));
+}
 
 INLINE Lisp_Object
 list2i (EMACS_INT x, EMACS_INT y)
@@ -5003,7 +5014,7 @@ maybe_gc (void)
        && consing_since_gc > gc_relative_threshold)
       || (!NILP (Vmemory_full)
 	  && consing_since_gc > memory_full_cons_threshold))
-    Fgarbage_collect ();
+    garbage_collect ();
 }
 
 INLINE_HEADER_END

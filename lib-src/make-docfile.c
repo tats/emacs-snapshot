@@ -700,7 +700,7 @@ write_globals (void)
       switch (globals[i].type)
 	{
 	case EMACS_INTEGER:
-	  type = "EMACS_INT";
+	  type = "intmax_t";
 	  break;
 	case BOOLEAN:
 	  type = "bool";
@@ -1107,6 +1107,9 @@ scan_c_stream (FILE *infile)
 		g->flags |= DEFUN_noreturn;
 	      if (strstr (input_buffer, "const"))
 		g->flags |= DEFUN_const;
+
+	      /* Although the noinline attribute is no longer used,
+		 leave its support in, in case it's needed later.  */
 	      if (strstr (input_buffer, "noinline"))
 		g->flags |= DEFUN_noinline;
 	    }

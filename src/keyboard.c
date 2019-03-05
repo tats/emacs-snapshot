@@ -208,7 +208,7 @@ struct buffer *buffer_before_last_command_or_undo;
 
 /* Value of num_nonmacro_input_events as of last auto save.  */
 
-static EMACS_INT last_auto_save;
+static intmax_t last_auto_save;
 
 /* The value of point when the last command was started. */
 static ptrdiff_t last_point_position;
@@ -1213,7 +1213,7 @@ some_mouse_moved (void)
 
   if (ignore_mouse_drag_p)
     {
-      /* ignore_mouse_drag_p = 0; */
+      /* ignore_mouse_drag_p = false; */
       return 0;
     }
 
@@ -1301,7 +1301,7 @@ command_loop_1 (void)
 	 loop.  (This flag is set in xdisp.c whenever the tool bar is
 	 resized, because the resize moves text up or down, and would
 	 generate false mouse drag events if we don't ignore them.)  */
-      ignore_mouse_drag_p = 0;
+      ignore_mouse_drag_p = false;
 
       /* If minibuffer on and echo area in use,
 	 wait a short time and redraw minibuffer.  */
@@ -1328,7 +1328,7 @@ command_loop_1 (void)
 	  if (!NILP (Vquit_flag))
 	    {
 	      Vquit_flag = Qnil;
-	      Vunread_command_events = list1 (make_fixnum (quit_char));
+	      Vunread_command_events = list1i (quit_char);
 	    }
 	}
 
@@ -1476,8 +1476,12 @@ command_loop_1 (void)
       safe_run_hooks (Qpost_command_hook);
 
       /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  */
-      if (!NILP (echo_area_buffer[0]))
+	 that message's size exactly.  Do this only if the echo area
+	 window is the minibuffer window of the selected frame.  See
+	 Bug#34317.  */
+      if (!NILP (echo_area_buffer[0])
+	  && (EQ (echo_area_window,
+		  FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))))
 	resize_echo_area_exactly ();
 
       /* If there are warnings waiting, process them.  */
@@ -1966,14 +1970,14 @@ void
 bind_polling_period (int n)
 {
 #ifdef POLL_FOR_INPUT
-  EMACS_INT new = polling_period;
+  intmax_t new = polling_period;
 
   if (n > new)
     new = n;
 
   stop_other_atimers (poll_timer);
   stop_polling ();
-  specbind (Qpolling_period, make_fixnum (new));
+  specbind (Qpolling_period, make_int (new));
   /* Start a new alarm with the new period.  */
   start_polling ();
 #endif
@@ -2422,7 +2426,7 @@ read_char (int commandflag, Lisp_Object map,
 	  goto exit;
 	}
 
-      c = Faref (Vexecuting_kbd_macro, make_fixnum (executing_kbd_macro_index));
+      c = Faref (Vexecuting_kbd_macro, make_int (executing_kbd_macro_index));
       if (STRINGP (Vexecuting_kbd_macro)
 	  && (XFIXNAT (c) & 0x80) && (XFIXNAT (c) <= 0xff))
 	XSETFASTINT (c, CHAR_META | (XFIXNAT (c) & ~0x80));
@@ -2551,7 +2555,10 @@ read_char (int commandflag, Lisp_Object map,
       restore_getcjmp (save_jump);
       pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
       unbind_to (jmpcount, Qnil);
-      XSETINT (c, quit_char);
+      /* If we are in while-no-input, don't trigger C-g, as that will
+	 quit instead of letting while-no-input do its thing.  */
+      if (!EQ (Vquit_flag, Vthrow_on_input))
+	XSETINT (c, quit_char);
       internal_last_event_frame = selected_frame;
       Vlast_event_frame = internal_last_event_frame;
       /* If we report the quit char as an event,
@@ -2924,8 +2931,6 @@ read_char (int commandflag, Lisp_Object map,
   recorded = true;
   if (! NILP (also_record))
     record_char (also_record);
-
-  CALLN (Frun_hook_with_args, Qinput_event_functions, c);
 
   /* Wipe the echo area.
      But first, if we are about to use an input method,
@@ -5585,7 +5590,7 @@ make_lispy_event (struct input_event *event)
 	     double-click-fuzz as is.  On other frames, interpret it
 	     as a multiple of 1/8 characters.  */
 	  struct frame *f;
-	  int fuzz;
+	  intmax_t fuzz;
 
 	  if (WINDOWP (event->frame_or_window))
 	    f = XFRAME (XWINDOW (event->frame_or_window)->frame);
@@ -5628,7 +5633,7 @@ make_lispy_event (struct input_event *event)
 	      double_click_count = 1;
 	    button_down_time = event->timestamp;
 	    *start_pos_ptr = Fcopy_alist (position);
-	    ignore_mouse_drag_p = 0;
+	    ignore_mouse_drag_p = false;
 	  }
 
 	/* Now we're releasing a button - check the co-ordinates to
@@ -5644,11 +5649,14 @@ make_lispy_event (struct input_event *event)
 	    if (!CONSP (start_pos))
 	      return Qnil;
 
-	    event->modifiers &= ~up_modifier;
+	    unsigned click_or_drag_modifier = click_modifier;
 
+	    if (ignore_mouse_drag_p)
+	      ignore_mouse_drag_p = false;
+	    else
 	      {
 		Lisp_Object new_down, down;
-		EMACS_INT xdiff = double_click_fuzz, ydiff = double_click_fuzz;
+		intmax_t xdiff = double_click_fuzz, ydiff = double_click_fuzz;
 
 		/* The third element of every position
 		   should be the (x,y) pair.  */
@@ -5662,39 +5670,37 @@ make_lispy_event (struct input_event *event)
 		    ydiff = XFIXNUM (XCDR (new_down)) - XFIXNUM (XCDR (down));
 		  }
 
-		if (ignore_mouse_drag_p)
+		if (! (0 < double_click_fuzz
+		       && - double_click_fuzz < xdiff
+		       && xdiff < double_click_fuzz
+		       && - double_click_fuzz < ydiff
+		       && ydiff < double_click_fuzz
+		       /* Maybe the mouse has moved a lot, caused scrolling, and
+			  eventually ended up at the same screen position (but
+			  not buffer position) in which case it is a drag, not
+			  a click.  */
+		       /* FIXME: OTOH if the buffer position has changed
+			  because of a timer or process filter rather than
+			  because of mouse movement, it should be considered as
+			  a click.  But mouse-drag-region completely ignores
+			  this case and it hasn't caused any real problem, so
+			  it's probably OK to ignore it as well.  */
+		       && EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position)))))
 		  {
-		    event->modifiers |= click_modifier;
-		    ignore_mouse_drag_p = 0;
-		  }
-		else if (xdiff < double_click_fuzz && xdiff > - double_click_fuzz
-			 && ydiff < double_click_fuzz && ydiff > - double_click_fuzz
-		  /* Maybe the mouse has moved a lot, caused scrolling, and
-		     eventually ended up at the same screen position (but
-		     not buffer position) in which case it is a drag, not
-		     a click.  */
-		    /* FIXME: OTOH if the buffer position has changed
-		       because of a timer or process filter rather than
-		       because of mouse movement, it should be considered as
-		       a click.  But mouse-drag-region completely ignores
-		       this case and it hasn't caused any real problem, so
-		       it's probably OK to ignore it as well.  */
-		    && EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position))))
-		  /* Mouse hasn't moved (much).  */
-		  event->modifiers |= click_modifier;
-		else
-		  {
+		    /* Mouse has moved enough.  */
 		    button_down_time = 0;
-		    event->modifiers |= drag_modifier;
+		    click_or_drag_modifier = drag_modifier;
 		  }
-
-		/* Don't check is_double; treat this as multiple
-		   if the down-event was multiple.  */
-		if (double_click_count > 1)
-		  event->modifiers |= ((double_click_count > 2)
-				       ? triple_modifier
-				       : double_modifier);
 	      }
+
+	    /* Don't check is_double; treat this as multiple if the
+	       down-event was multiple.  */
+	    event->modifiers
+	      = ((event->modifiers & ~up_modifier)
+		 | click_or_drag_modifier
+		 | (double_click_count < 2 ? 0
+		    : double_click_count == 2 ? double_modifier
+		    : triple_modifier));
 	  }
 	else
 	  /* Every mouse event should either have the down_modifier or
@@ -5743,7 +5749,7 @@ make_lispy_event (struct input_event *event)
 	     double-click-fuzz as is.  On other frames, interpret it
 	     as a multiple of 1/8 characters.  */
 	  struct frame *fr;
-	  int fuzz;
+	  intmax_t fuzz;
 	  int symbol_num;
 	  bool is_double;
 
@@ -11030,8 +11036,6 @@ syms_of_keyboard (void)
 
   DEFSYM (Qundefined, "undefined");
 
-  DEFSYM (Qinput_event_functions, "input-event-functions");
-
   /* Hooks to run before and after each command.  */
   DEFSYM (Qpre_command_hook, "pre-command-hook");
   DEFSYM (Qpost_command_hook, "post-command-hook");
@@ -11844,6 +11848,17 @@ preserve data in modified buffers that would otherwise be lost.
 If nil, Emacs crashes immediately in response to fatal signals.  */);
   attempt_orderly_shutdown_on_fatal_signal = true;
 
+  DEFVAR_LISP ("while-no-input-ignore-events",
+               Vwhile_no_input_ignore_events,
+               doc: /* Ignored events from while-no-input.  */);
+
+  DEFVAR_BOOL ("inhibit--record-char",
+	       inhibit_record_char,
+	       doc: /* If non-nil, don't record input events.
+This inhibits recording input events for the purposes of keyboard
+macros, dribble file, and `recent-keys'.
+Internal use only.  */);
+
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }
 
@@ -11878,17 +11893,8 @@ syms_of_keyboard_for_pdumper (void)
   eassert (initial_kboard == NULL);
   initial_kboard = allocate_kboard (Qt);
 
-  DEFVAR_LISP ("while-no-input-ignore-events",
-               Vwhile_no_input_ignore_events,
-               doc: /* Ignored events from while-no-input.  */);
   Vwhile_no_input_ignore_events = Qnil;
 
-  DEFVAR_BOOL ("inhibit--record-char",
-	       inhibit_record_char,
-	       doc: /* If non-nil, don't record input events.
-This inhibits recording input events for the purposes of keyboard
-macros, dribble file, and `recent-keys'.
-Internal use only.  */);
   inhibit_record_char = false;
 }
 

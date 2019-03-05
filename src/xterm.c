@@ -3131,7 +3131,9 @@ x_draw_image_relief (struct glyph_string *s)
   if (s->hl == DRAW_IMAGE_SUNKEN
       || s->hl == DRAW_IMAGE_RAISED)
     {
-      thick = tool_bar_button_relief >= 0 ? tool_bar_button_relief : DEFAULT_TOOL_BAR_BUTTON_RELIEF;
+      thick = (tool_bar_button_relief < 0
+	       ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+	       : min (tool_bar_button_relief, 1000000));
       raised_p = s->hl == DRAW_IMAGE_RAISED;
     }
   else
@@ -4884,7 +4886,7 @@ x_x_to_emacs_modifiers (struct x_display_info *dpyinfo, int state)
 }
 
 static int
-x_emacs_to_x_modifiers (struct x_display_info *dpyinfo, EMACS_INT state)
+x_emacs_to_x_modifiers (struct x_display_info *dpyinfo, intmax_t state)
 {
   EMACS_INT mod_ctrl = ctrl_modifier;
   EMACS_INT mod_meta = meta_modifier;
@@ -11179,8 +11181,7 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
     {
       frame_size_history_add
 	(f, Qx_set_window_size_1, width, height,
-	 list2 (make_fixnum (old_height),
-		make_fixnum (pixelheight + FRAME_MENUBAR_HEIGHT (f))));
+	 list2i (old_height, pixelheight + FRAME_MENUBAR_HEIGHT (f)));
 
       XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 		     old_width, pixelheight + FRAME_MENUBAR_HEIGHT (f));
@@ -11189,7 +11190,7 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
     {
       frame_size_history_add
 	(f, Qx_set_window_size_2, width, height,
-	 list2 (make_fixnum (old_width), make_fixnum (pixelwidth)));
+	 list2i (old_width, pixelwidth));
 
       XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 		     pixelwidth, old_height);
@@ -11199,10 +11200,10 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
     {
       frame_size_history_add
 	(f, Qx_set_window_size_3, width, height,
-	 list3 (make_fixnum (pixelwidth + FRAME_TOOLBAR_WIDTH (f)),
-		make_fixnum (pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-			     + FRAME_MENUBAR_HEIGHT (f)),
-		make_fixnum (FRAME_MENUBAR_HEIGHT (f))));
+	 list3i (pixelwidth + FRAME_TOOLBAR_WIDTH (f),
+		 (pixelheight + FRAME_TOOLBAR_HEIGHT (f)
+		  + FRAME_MENUBAR_HEIGHT (f)),
+		 FRAME_MENUBAR_HEIGHT (f)));
 
       XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 		     pixelwidth, pixelheight + FRAME_MENUBAR_HEIGHT (f));

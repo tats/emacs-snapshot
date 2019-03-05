@@ -393,7 +393,7 @@ FORM is of the form `(and FORM1 ...)'."
   (rx-group-if
    (if (memq nil (mapcar 'stringp (cdr form)))
        (mapconcat (lambda (x) (rx-form x '|)) (cdr form) "\\|")
-     (regexp-opt (cdr form)))
+     (regexp-opt (cdr form) nil t))
    (and (memq rx-parent '(: * t)) rx-parent)))
 
 
@@ -609,7 +609,7 @@ ARG is optional."
   (rx-check form)
   (let ((result (rx-form (cadr form) '!))
 	case-fold-search)
-    (cond ((string-match "\\`\\[^" result)
+    (cond ((string-match "\\`\\[\\^" result)
 	   (cond
 	    ((equal result "[^]") "[^^]")
 	    ((and (= (length result) 4) (null (eq rx-parent '!)))
@@ -787,7 +787,7 @@ of all atomic regexps."
      ((= l 3) (string-match "\\`\\(?:\\\\[cCsS_]\\|\\[[^^]\\]\\)" r))
      ((null lax)
       (cond
-       ((string-match "\\`\\[^?\]?\\(?:\\[:[a-z]+:]\\|[^]]\\)*\\]\\'" r))
+       ((string-match "\\`\\[\\^?]?\\(?:\\[:[a-z]+:]\\|[^]]\\)*]\\'" r))
        ((string-match "\\`\\\\(\\(?:[^\\]\\|\\\\[^)]\\)*\\\\)\\'" r)))))))
 
 

@@ -145,6 +145,13 @@ EMACS_SOCKET_NAME environment variable to an appropriate value.
 *** When run by root, emacsclient no longer connects to non-root sockets.
 (Instead you can use Tramp methods to run root commands in a non-root Emacs.)
 
+---
+** Control of the threshold for using the 'distant-foreground' color.
+The threshold for color distance below which the 'distant-foreground'
+color of the face will be used instead of the foreground color can now
+be controlled via the new variable 'face-near-same-color-threshold'.
+The default value is 30000, as the previously hard-coded threshold.
+
 +++
 ** The function 'read-passwd' uses '*' as default character to hide passwords.
 
@@ -397,6 +404,10 @@ With a prefix arg 'C-u', also kills the buffer in that window.
 With 'M-0', deletes the selected window and selects the window
 that was in the specified direction.
 
+*** New command 'windmove-swap-states-in-direction' binds default keys
+to the commands that swap the states of the selected window with the
+window in the specified direction.
+
 ** Octave mode
 The mode is automatically enabled in files that start with the
 'function' keyword.
@@ -468,8 +479,15 @@ and compares their entire trees.
 to hg revert.
 
 ** Diff mode
-*** Hunks are now automatically refined by default.
-To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
++++
+*** Hunks are now automatically refined by font-lock.
+To disable refinement, set the new defcustom 'diff-refine' to nil.
+To get back the old behavior where hunks are refined as you navigate
+through a diff, set 'diff-refine' to the symbol 'navigate'.
++++
+*** 'diff-auto-refine-mode' is deprecated in favor of 'diff-refine'.
+It is no longer enabled by default and binding it no longer has any
+effect.
 
 +++
 *** Better syntax highlighting of Diff hunks.
@@ -846,6 +864,9 @@ and case-sensitivity together with search strings in the search ring.
 ---
 *** Isearch now has its own tool-bar and menu-bar menu.
 
++++
+*** flush-lines prints and returns the number of deleted matching lines.
+
 ** Debugger
 
 +++
@@ -1142,7 +1163,13 @@ the 128...255 range, as expected.
 
 ** Frames
 
++++
 *** New command 'make-frame-on-monitor' makes a frame on the specified monitor.
+
++++
+*** New value of 'minibuffer' frame parameter 'child-frame'.
+This allows to create and parent immediately a minibuffer-only child
+frame when making a frame.
 
 
 * New Modes and Packages in Emacs 27.1
@@ -1282,9 +1309,6 @@ removed.
 ** 'self-insert-command' takes the char to insert as (optional) argument.
 
 ** 'lookup-key' can take a list of keymaps as argument.
-
-+++
-** New hook 'input-event-functions' run whenever a user-input is read.
 
 +++
 ** 'condition-case' now accepts 't' to match any error symbol.
@@ -1626,6 +1650,19 @@ MS-Windows.
 
 ** New module environment function 'process_input' to process user
 input while module code is running.
+
++++
+** The function 'regexp-opt' accepts an additional optional argument.
+By default, the regexp returned by 'regexp-opt' may match the strings
+in any order.  If the new third argument is non-nil, the match is
+guaranteed to be performed in the order given, as if the strings were
+made into a regexp by joining them with '\|'.
+
++++
+** The function 'regexp-opt', when given an empty list of strings, now
+returns a regexp that never matches anything, which is an identity for
+this operation.  Previously, the empty string was returned in this
+case.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

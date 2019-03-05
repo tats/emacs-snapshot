@@ -500,7 +500,7 @@ append2 (Lisp_Object list, Lisp_Object item)
    Utility to append to a list
    -------------------------------------------------------------------------- */
 {
-  return CALLN (Fnconc, list, list1 (item));
+  return nconc2 (list, list (item));
 }
 
 
@@ -3911,8 +3911,9 @@ ns_dumpglyphs_image (struct glyph_string *s, NSRect r)
     {
       if (s->hl == DRAW_IMAGE_SUNKEN || s->hl == DRAW_IMAGE_RAISED)
         {
-          th = tool_bar_button_relief >= 0 ?
-            tool_bar_button_relief : DEFAULT_TOOL_BAR_BUTTON_RELIEF;
+          th = (tool_bar_button_relief < 0
+		? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+		: min (tool_bar_button_relief, 1000000));
           raised_p = (s->hl == DRAW_IMAGE_RAISED);
         }
       else
@@ -8283,7 +8284,7 @@ not_in_argv (NSString *arg)
 
       type_sym = Qurl;
 
-      strings = Fcons (build_string ([[url absoluteString] UTF8String]), Qnil);
+      strings = list1 (build_string ([[url absoluteString] UTF8String]));
     }
   else if ([type isEqualToString: NSStringPboardType]
            || [type isEqualToString: NSTabularTextPboardType])
@@ -8295,7 +8296,7 @@ not_in_argv (NSString *arg)
 
       type_sym = Qnil;
 
-      strings = Fcons (build_string ([data UTF8String]), Qnil);
+      strings = list1 (build_string ([data UTF8String]));
     }
   else
     {

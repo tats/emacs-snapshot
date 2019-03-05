@@ -395,8 +395,7 @@ init_gnutls_functions (void)
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
-  max_log_level = global_gnutls_log_level;
-
+  max_log_level = clip_to_bounds (INT_MIN, global_gnutls_log_level, INT_MAX);
   {
     Lisp_Object name = CAR_SAFE (Fget (Qgnutls, QCloaded_from));
     GNUTLS_LOG2 (1, max_log_level, "GnuTLS library loaded:",
@@ -760,7 +759,8 @@ emacs_gnutls_handle_error (gnutls_session_t session, int err)
 
   check_memory_full (err);
 
-  int max_log_level = global_gnutls_log_level;
+  int max_log_level
+    = clip_to_bounds (INT_MIN, global_gnutls_log_level, INT_MAX);
 
   /* TODO: use gnutls-error-fatalp and gnutls-error-string.  */
 
@@ -1691,14 +1691,17 @@ one trustfile (usually a CA bundle).  */)
 
   state = XPROCESS (proc)->gnutls_state;
 
-  if (TYPE_RANGED_FIXNUMP (int, loglevel))
+  if (INTEGERP (loglevel))
     {
       gnutls_global_set_log_function (gnutls_log_function);
 # ifdef HAVE_GNUTLS3
       gnutls_global_set_audit_log_function (gnutls_audit_log_function);
 # endif
-      gnutls_global_set_log_level (XFIXNUM (loglevel));
-      max_log_level = XFIXNUM (loglevel);
+      int level = (FIXNUMP (loglevel)
+		   ? clip_to_bounds (INT_MIN, XFIXNUM (loglevel), INT_MAX)
+		   : NILP (Fnatnump (loglevel)) ? INT_MIN : INT_MAX);
+      gnutls_global_set_log_level (level);
+      max_log_level = level;
       XPROCESS (proc)->gnutls_log_level = max_log_level;
     }
 
@@ -1995,7 +1998,7 @@ The alist key is the cipher name. */)
       ptrdiff_t cipher_tag_size = gnutls_cipher_get_tag_size (gca);
 
       Lisp_Object cp
-	= listn (CONSTYPE_HEAP, 15, cipher_symbol,
+	 = list (cipher_symbol,
 		 QCcipher_id, make_fixnum (gca),
 		 QCtype, Qgnutls_type_cipher,
 		 QCcipher_aead_capable, cipher_tag_size == 0 ? Qnil : Qt,
@@ -2326,7 +2329,7 @@ name. */)
 # ifdef HAVE_GNUTLS_MAC_GET_NONCE_SIZE
       nonce_size = gnutls_mac_get_nonce_size (gma);
 # endif
-      Lisp_Object mp = listn (CONSTYPE_HEAP, 11, gma_symbol,
+      Lisp_Object mp =  list (gma_symbol,
 			      QCmac_algorithm_id, make_fixnum (gma),
 			      QCtype, Qgnutls_type_mac_algorithm,
 
@@ -2361,7 +2364,7 @@ method name. */)
       /* A symbol representing the GnuTLS digest algorithm.  */
       Lisp_Object gda_symbol = intern (gnutls_digest_get_name (gda));
 
-      Lisp_Object mp = listn (CONSTYPE_HEAP, 7, gda_symbol,
+      Lisp_Object mp  = list (gda_symbol,
 			      QCdigest_algorithm_id, make_fixnum (gda),
 			      QCtype, Qgnutls_type_digest_algorithm,
 

@@ -12062,18 +12062,25 @@ x_consider_frame_title (Lisp_Object frame)
       /* Set global variable indicating that multiple frames exist.  */
       multiple_frames = CONSP (tail);
 
+      /* select-frame calls resize_mini_window, which could resize the
+	 mini-window and by that undo the effect of this redisplay
+	 cycle wrt minibuffer and echo-area display.  Binding
+	 inhibit-redisplay to t makes the call to resize_mini_window a
+	 no-op, thus avoiding the adverse side effects.  */
+
+      /* The following was moved before the record_unwind_protect form
+	 below to inhibit redisplay also when restoring the selected
+	 window/frame: This avoids that resize_mini_window sizes back
+	 the minibuffer window of a temporarily selected frame.  See
+	 Bug#34317.  */
+      specbind (Qinhibit_redisplay, Qt);
+
       /* Switch to the buffer of selected window of the frame.  Set up
 	 mode_line_target so that display_mode_element will output into
 	 mode_line_noprop_buf; then display the title.  */
       record_unwind_protect (unwind_format_mode_line,
 			     format_mode_line_unwind_data
 			       (f, current_buffer, selected_window, false));
-      /* select-frame calls resize_mini_window, which could resize the
-	 mini-window and by that undo the effect of this redisplay
-	 cycle wrt minibuffer and echo-area display.  Binding
-	 inhibit-redisplay to t makes the call to resize_mini_window a
-	 no-op, thus avoiding the adverse side effects.  */
-      specbind (Qinhibit_redisplay, Qt);
 
       Fselect_window (f->selected_window, Qt);
       set_buffer_internal_1
@@ -12533,7 +12540,8 @@ build_desired_tool_bar_string (struct frame *f)
 
       /* Compute margin and relief to draw.  */
       relief = (tool_bar_button_relief >= 0
-		? tool_bar_button_relief
+		? min (tool_bar_button_relief,
+		       min (INT_MAX, MOST_POSITIVE_FIXNUM))
 		: DEFAULT_TOOL_BAR_BUTTON_RELIEF);
       hmargin = vmargin = relief;
 
@@ -13334,7 +13342,8 @@ hscroll_window_tree (Lisp_Object window)
 	  text_area_width = window_box_width (w, TEXT_AREA);
 
 	  /* Scroll when cursor is inside this scroll margin.  */
-	  h_margin = hscroll_margin * WINDOW_FRAME_COLUMN_WIDTH (w);
+	  h_margin = (clip_to_bounds (0, hscroll_margin, 1000000)
+		      * WINDOW_FRAME_COLUMN_WIDTH (w));
 
 	  /* If the position of this window's point has explicitly
 	     changed, no more suspend auto hscrolling.  */
@@ -15765,7 +15774,7 @@ enum
 
 static int
 try_scrolling (Lisp_Object window, bool just_this_one_p,
-	       ptrdiff_t arg_scroll_conservatively, ptrdiff_t scroll_step,
+	       intmax_t arg_scroll_conservatively, intmax_t scroll_step,
 	       bool temp_scroll_step, bool last_line_misfit)
 {
   struct window *w = XWINDOW (window);
@@ -15797,12 +15806,15 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       arg_scroll_conservatively = scroll_limit + 1;
       scroll_max = scroll_limit * frame_line_height;
     }
-  else if (scroll_step || arg_scroll_conservatively || temp_scroll_step)
+  else if (0 < scroll_step || 0 < arg_scroll_conservatively || temp_scroll_step)
     /* Compute how much we should try to scroll maximally to bring
        point into view.  */
-    scroll_max = (max (scroll_step,
-		       max (arg_scroll_conservatively, temp_scroll_step))
-		  * frame_line_height);
+    {
+      intmax_t scroll_lines_max
+	= max (scroll_step, max (arg_scroll_conservatively, temp_scroll_step));
+      int scroll_lines = clip_to_bounds (0, scroll_lines_max, 1000000);
+      scroll_max = scroll_lines * frame_line_height;
+    }
   else if (NUMBERP (BVAR (current_buffer, scroll_down_aggressively))
 	   || NUMBERP (BVAR (current_buffer, scroll_up_aggressively)))
     /* We're trying to scroll because of aggressive scrolling but no
@@ -17295,8 +17307,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     }
 
   /* Try to scroll by specified few lines.  */
-  if ((scroll_conservatively
-       || emacs_scroll_step
+  if ((0 < scroll_conservatively
+       || 0 < emacs_scroll_step
        || temp_scroll_step
        || NUMBERP (BVAR (current_buffer, scroll_up_aggressively))
        || NUMBERP (BVAR (current_buffer, scroll_down_aggressively)))
@@ -24749,8 +24761,12 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	    ptrdiff_t limit = BUF_BEGV (b);
 	    ptrdiff_t limit_byte = BUF_BEGV_BYTE (b);
 	    ptrdiff_t position;
-	    ptrdiff_t distance =
-	      (height * 2 + 30) * line_number_display_limit_width;
+	    ptrdiff_t distance
+	      = (line_number_display_limit_width < 0 ? 0
+		 : INT_MULTIPLY_WRAPV (line_number_display_limit_width,
+				       height * 2 + 30,
+				       &distance)
+		 ? PTRDIFF_MAX : distance);
 
 	    if (startpos - distance > limit)
 	      {
@@ -28377,7 +28393,7 @@ x_produce_glyphs (struct it *it)
 	  /* If face has an overline, add the height of the overline
 	     (1 pixel) and a 1 pixel margin to the character height.  */
 	  if (face->overline_p)
-	    it->ascent += overline_margin;
+	    it->ascent += clip_to_bounds (0, overline_margin, 1000000);
 
 	  if (it->constrain_row_ascent_descent_p)
 	    {
@@ -28918,7 +28934,7 @@ x_produce_glyphs (struct it *it)
       /* If face has an overline, add the height of the overline
 	 (1 pixel) and a 1 pixel margin to the character height.  */
       if (face->overline_p)
-	it->ascent += overline_margin;
+	it->ascent += clip_to_bounds (0, overline_margin, 1000000);
 
       take_vertical_position_into_account (it);
       if (it->ascent < 0)
@@ -28967,7 +28983,7 @@ x_produce_glyphs (struct it *it)
       /* If face has an overline, add the height of the overline
 	 (1 pixel) and a 1 pixel margin to the character height.  */
       if (face->overline_p)
-	it->ascent += overline_margin;
+	it->ascent += clip_to_bounds (0, overline_margin, 1000000);
       take_vertical_position_into_account (it);
       if (it->ascent < 0)
 	it->ascent = 0;
@@ -32923,14 +32939,12 @@ and is used only on frames for which no explicit name has been set
 \(see `modify-frame-parameters').  */);
   Vicon_title_format
     = Vframe_title_format
-    = listn (CONSTYPE_PURE, 3,
-	     intern_c_string ("multiple-frames"),
-	     build_pure_c_string ("%b"),
-	     listn (CONSTYPE_PURE, 4,
-		    empty_unibyte_string,
-		    intern_c_string ("invocation-name"),
-		    build_pure_c_string ("@"),
-		    intern_c_string ("system-name")));
+    = pure_list (intern_c_string ("multiple-frames"),
+		 build_pure_c_string ("%b"),
+		 pure_list (empty_unibyte_string,
+			    intern_c_string ("invocation-name"),
+			    build_pure_c_string ("@"),
+			    intern_c_string ("system-name")));
 
   DEFVAR_LISP ("message-log-max", Vmessage_log_max,
     doc: /* Maximum number of lines to keep in the message log buffer.

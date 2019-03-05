@@ -1157,8 +1157,6 @@ load_color (struct frame *f, struct face *face, Lisp_Object name,
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-#define NEAR_SAME_COLOR_THRESHOLD 30000
-
 /* Load colors for face FACE which is used on frame F.  Colors are
    specified by slots LFACE_BACKGROUND_INDEX and LFACE_FOREGROUND_INDEX
    of ATTRS.  If the background color specified is not supported on F,
@@ -1199,7 +1197,7 @@ load_face_colors (struct frame *f, struct face *face,
 
   dfg = attrs[LFACE_DISTANT_FOREGROUND_INDEX];
   if (!NILP (dfg) && !UNSPECIFIEDP (dfg)
-      && color_distance (&xbg, &xfg) < NEAR_SAME_COLOR_THRESHOLD)
+      && color_distance (&xbg, &xfg) < face_near_same_color_threshold)
     {
       if (EQ (attrs[LFACE_INVERSE_INDEX], Qt))
         face->background = load_color (f, face, dfg, LFACE_BACKGROUND_INDEX);
@@ -1599,7 +1597,7 @@ the WIDTH times as wide as FACE on FRAME.  */)
     /* We don't have to check fontsets.  */
     return fonts;
   Lisp_Object fontsets = list_fontsets (f, pattern, size);
-  return CALLN (Fnconc, fonts, fontsets);
+  return nconc2 (fonts, fontsets);
 }
 
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -4256,12 +4254,8 @@ two lists of the form (RED GREEN BLUE) aforementioned. */)
     return make_fixnum (color_distance (&cdef1, &cdef2));
   else
     return call2 (metric,
-                  list3 (make_fixnum (cdef1.red),
-                         make_fixnum (cdef1.green),
-                         make_fixnum (cdef1.blue)),
-                  list3 (make_fixnum (cdef2.red),
-                         make_fixnum (cdef2.green),
-                         make_fixnum (cdef2.blue)));
+		  list3i (cdef1.red, cdef1.green, cdef1.blue),
+		  list3i (cdef2.red, cdef2.green, cdef2.blue));
 }
 
 
@@ -6798,6 +6792,20 @@ RESCALE-RATIO is a floating point number to specify how much larger
 \(or smaller) font we should use.  For instance, if a face requests
 a font of 10 point, we actually use a font of 10 * RESCALE-RATIO point.  */);
   Vface_font_rescale_alist = Qnil;
+
+  DEFVAR_INT ("face-near-same-color-threshold", face_near_same_color_threshold,
+	      doc: /* Threshold for using distant-foreground color instead of foreground.
+
+The value should be an integer number providing the minimum distance
+between two colors that will still qualify them to be used as foreground
+and background.  If the value of `color-distance', invoked with a nil
+METRIC argument, for the foreground and background colors of a face is
+less than this threshold, the distant-foreground color, if defined,
+will be used for the face instead of the foreground color.
+
+Lisp programs that change the value of this variable should also
+clear the face cache, see `clear-face-cache'.  */);
+  face_near_same_color_threshold = 30000;
 
 #ifdef HAVE_WINDOW_SYSTEM
   defsubr (&Sbitmap_spec_p);

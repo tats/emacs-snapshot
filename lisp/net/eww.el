@@ -470,10 +470,10 @@ Currently this means either text/html or application/xhtml+xml."
 		(condition-case nil
 		    (decode-coding-region (point) (point-max) encode)
 		  (coding-system-error nil))
-                (save-excursion
-                  ;; Remove CRLF before parsing.
-                  (while (re-search-forward "\r$" nil t)
-                    (replace-match "" t t)))
+		(save-excursion
+		  ;; Remove CRLF and replace NUL with &#0; before parsing.
+		  (while (re-search-forward "\\(\r$\\)\\|\0" nil t)
+		    (replace-match (if (match-beginning 1) "" "&#0;") t t)))
 		(libxml-parse-html-region (point) (point-max))))))
 	(source (and (null document)
 		     (buffer-substring (point) (point-max)))))

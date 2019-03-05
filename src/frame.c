@@ -163,10 +163,8 @@ frame_size_history_add (struct frame *f, Lisp_Object fun_symbol,
 	     Fcons (list4
 		    (frame, fun_symbol,
 		     ((width > 0)
-		      ? list4 (make_fixnum (FRAME_TEXT_WIDTH (f)),
-			       make_fixnum (FRAME_TEXT_HEIGHT (f)),
-			       make_fixnum (width),
-			       make_fixnum (height))
+		      ? list4i (FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f),
+				width, height)
 		      : Qnil),
 		     rest),
 		    XCDR (frame_size_history)));
@@ -744,8 +742,8 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
 
   frame_size_history_add
     (f, Qadjust_frame_size_3, new_text_width, new_text_height,
-     list4 (make_fixnum (old_pixel_width), make_fixnum (old_pixel_height),
-	    make_fixnum (new_pixel_width), make_fixnum (new_pixel_height)));
+     list4i (old_pixel_width, old_pixel_height,
+	     new_pixel_width, new_pixel_height));
 
   /* Assign new sizes.  */
   FRAME_TEXT_WIDTH (f) = new_text_width;
@@ -1851,6 +1849,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   Lisp_Object frames, frame1;
   int minibuffer_selected, is_tooltip_frame;
   bool nochild = !FRAME_PARENT_FRAME (f);
+  Lisp_Object minibuffer_child_frame = Qnil;
 
   if (!FRAME_LIVE_P (f))
     return Qnil;
@@ -1867,13 +1866,33 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   /* Softly delete all frames with this frame as their parent frame or
      as their `delete-before' frame parameter value.  */
   FOR_EACH_FRAME (frames, frame1)
-    if (FRAME_PARENT_FRAME (XFRAME (frame1)) == f
+    {
+      struct frame *f1 = XFRAME (frame1);
+
+      if (EQ (frame1, frame) || FRAME_TOOLTIP_P (f1))
+	continue;
+      else if (FRAME_PARENT_FRAME (f1) == f)
+	{
+	  if (FRAME_HAS_MINIBUF_P (f1) && !FRAME_HAS_MINIBUF_P (f)
+	      && EQ (FRAME_MINIBUF_WINDOW (f), FRAME_MINIBUF_WINDOW (f1)))
+	    /* frame1 owns frame's minibuffer window so we must not
+	       delete it here to avoid a surrogate minibuffer error.
+	       Unparent frame1 and make it a top-level frame.  */
+	    {
+	      Fmodify_frame_parameters
+		(frame1, Fcons (Fcons (Qparent_frame, Qnil), Qnil));
+	      minibuffer_child_frame = frame1;
+	    }
+	  else
+	    delete_frame (frame1, Qnil);
+	}
+      else if (nochild
+	       && EQ (get_frame_param (XFRAME (frame1), Qdelete_before), frame))
 	/* Process `delete-before' parameter iff FRAME is not a child
 	   frame.  This avoids that we enter an infinite chain of mixed
 	   dependencies.  */
-	|| (nochild
-	    && EQ (get_frame_param (XFRAME (frame1), Qdelete_before), frame)))
-      delete_frame (frame1, Qnil);
+	delete_frame (frame1, Qnil);
+    }
 
   /* Does this frame have a minibuffer, and is it the surrogate
      minibuffer for any other frame?  */
@@ -2138,18 +2157,27 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	{
 	  struct frame *f1 = XFRAME (frame1);
 
-	  /* Consider only frames on the same kboard
-	     and only those with minibuffers.  */
-	  if (kb == FRAME_KBOARD (f1)
-	      && FRAME_HAS_MINIBUF_P (f1))
-	    {
-	      frame_with_minibuf = frame1;
-	      if (FRAME_MINIBUF_ONLY_P (f1))
-		break;
-	    }
+	  /* Set frame_on_same_kboard to frame1 if it is on the same
+	     keyboard.  Set frame_with_minibuf to frame1 if it also
+	     has a minibuffer.  Leave the loop immediately if frame1
+	     is also minibuffer-only.
 
+	     Emacs 26 does _not_ set frame_on_same_kboard here when it
+	     finds a minibuffer-only frame and subsequently fails to
+	     set default_minibuffer_frame below.  Not a great deal and
+	     never noticed since make_frame_without_minibuffer creates
+	     a new minibuffer frame in that case (which can be a minor
+	     annoyance though).  To consider for Emacs 26.3.  */
 	  if (kb == FRAME_KBOARD (f1))
-	    frame_on_same_kboard = frame1;
+	    {
+	      frame_on_same_kboard = frame1;
+	      if (FRAME_HAS_MINIBUF_P (f1))
+		{
+		  frame_with_minibuf = frame1;
+		  if (FRAME_MINIBUF_ONLY_P (f1))
+		    break;
+		}
+	    }
 	}
 
       if (!NILP (frame_on_same_kboard))
@@ -2182,7 +2210,46 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
       = Fcons (list3 (Qrun_hook_with_args, Qafter_delete_frame_functions, frame),
 	       pending_funcalls);
   else
-      safe_call2 (Qrun_hook_with_args, Qafter_delete_frame_functions, frame);
+    safe_call2 (Qrun_hook_with_args, Qafter_delete_frame_functions, frame);
+
+  if (!NILP (minibuffer_child_frame))
+    /* If minibuffer_child_frame is non-nil, it was FRAME's minibuffer
+       child frame.  Delete it unless it's also the minibuffer frame
+       of another frame in which case we make sure it's visible.  */
+    {
+      struct frame *f1 = XFRAME (minibuffer_child_frame);
+
+      if (FRAME_LIVE_P (f1))
+	{
+	  Lisp_Object window1 = FRAME_ROOT_WINDOW (f1);
+	  Lisp_Object frame2;
+
+	  FOR_EACH_FRAME (frames, frame2)
+	    {
+	      struct frame *f2 = XFRAME (frame2);
+
+	      if (EQ (frame2, minibuffer_child_frame) || FRAME_TOOLTIP_P (f2))
+		continue;
+	      else if (EQ (FRAME_MINIBUF_WINDOW (f2), window1))
+		{
+		  /* minibuffer_child_frame serves as minibuffer frame
+		     for at least one other frame - so make it visible
+		     and quit.  */
+		  if (!FRAME_VISIBLE_P (f1) && !FRAME_ICONIFIED_P (f1))
+		    Fmake_frame_visible (frame1);
+
+		  return Qnil;
+		}
+	    }
+
+	  /* No other frame found that uses minibuffer_child_frame as
+	     minibuffer frame.  If FORCE is Qnoelisp or there are
+	     other visible frames left, delete minibuffer_child_frame
+	     since it presumably was used by FRAME only.  */
+	  if (EQ (force, Qnoelisp) || other_frames (f1, false, !NILP (force)))
+	    delete_frame (minibuffer_child_frame, Qnoelisp);
+	}
+    }
 
   return Qnil;
 }
@@ -2974,6 +3041,13 @@ store_frame_param (struct frame *f, Lisp_Object prop, Lisp_Object val)
 	  list = Fcons (XCAR (val), list);
       fset_buried_buffer_list (f, Fnreverse (list));
       return;
+    }
+  else if ((EQ (prop, Qscroll_bar_width) || EQ (prop, Qscroll_bar_height))
+	   && !NILP (val) && !RANGED_FIXNUMP (1, val, INT_MAX))
+    {
+      Lisp_Object old_val = Fcdr (Fassq (prop, f->param_alist));
+
+      val = old_val;
     }
 
   /* The tty color needed to be set before the frame's parameter
@@ -4119,18 +4193,14 @@ x_report_frame_params (struct frame *f, Lisp_Object *alistptr)
   store_in_alist (alistptr, Qright_fringe,
 		  make_fixnum (FRAME_RIGHT_FRINGE_WIDTH (f)));
   store_in_alist (alistptr, Qscroll_bar_width,
-		  (! FRAME_HAS_VERTICAL_SCROLL_BARS (f)
-		   ? make_fixnum (0)
-		   : FRAME_CONFIG_SCROLL_BAR_WIDTH (f) > 0
+		  (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) > 0
 		   ? make_fixnum (FRAME_CONFIG_SCROLL_BAR_WIDTH (f))
 		   /* nil means "use default width"
 		      for non-toolkit scroll bar.
 		      ruler-mode.el depends on this.  */
 		   : Qnil));
   store_in_alist (alistptr, Qscroll_bar_height,
-		  (! FRAME_HAS_HORIZONTAL_SCROLL_BARS (f)
-		   ? make_fixnum (0)
-		   : FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) > 0
+		  (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) > 0
 		   ? make_fixnum (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f))
 		   /* nil means "use default height"
 		      for non-toolkit scroll bar.  */
@@ -4600,20 +4670,20 @@ x_set_scroll_bar_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   int unit = FRAME_COLUMN_WIDTH (f);
 
-  if (NILP (arg))
+  if (RANGED_FIXNUMP (1, arg, INT_MAX)
+      && XFIXNAT (arg) != FRAME_CONFIG_SCROLL_BAR_WIDTH (f))
     {
-      x_set_scroll_bar_default_width (f);
-
+      FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = XFIXNAT (arg);
+      FRAME_CONFIG_SCROLL_BAR_COLS (f) = (XFIXNAT (arg) + unit - 1) / unit;
       if (FRAME_X_WINDOW (f))
 	adjust_frame_size (f, -1, -1, 3, 0, Qscroll_bar_width);
 
       SET_FRAME_GARBAGED (f);
     }
-  else if (RANGED_FIXNUMP (1, arg, INT_MAX)
-	   && XFIXNAT (arg) != FRAME_CONFIG_SCROLL_BAR_WIDTH (f))
+  else
     {
-      FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = XFIXNAT (arg);
-      FRAME_CONFIG_SCROLL_BAR_COLS (f) = (XFIXNAT (arg) + unit - 1) / unit;
+      x_set_scroll_bar_default_width (f);
+
       if (FRAME_X_WINDOW (f))
 	adjust_frame_size (f, -1, -1, 3, 0, Qscroll_bar_width);
 
@@ -4630,20 +4700,20 @@ x_set_scroll_bar_height (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 #if USE_HORIZONTAL_SCROLL_BARS
   int unit = FRAME_LINE_HEIGHT (f);
 
-  if (NILP (arg))
+  if (RANGED_FIXNUMP (1, arg, INT_MAX)
+      && XFIXNAT (arg) != FRAME_CONFIG_SCROLL_BAR_HEIGHT (f))
     {
-      x_set_scroll_bar_default_height (f);
-
+      FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = XFIXNAT (arg);
+      FRAME_CONFIG_SCROLL_BAR_LINES (f) = (XFIXNAT (arg) + unit - 1) / unit;
       if (FRAME_X_WINDOW (f))
 	adjust_frame_size (f, -1, -1, 3, 0, Qscroll_bar_height);
 
       SET_FRAME_GARBAGED (f);
     }
-  else if (RANGED_FIXNUMP (1, arg, INT_MAX)
-	   && XFIXNAT (arg) != FRAME_CONFIG_SCROLL_BAR_HEIGHT (f))
+  else
     {
-      FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = XFIXNAT (arg);
-      FRAME_CONFIG_SCROLL_BAR_LINES (f) = (XFIXNAT (arg) + unit - 1) / unit;
+      x_set_scroll_bar_default_height (f);
+
       if (FRAME_X_WINDOW (f))
 	adjust_frame_size (f, -1, -1, 3, 0, Qscroll_bar_height);
 
@@ -5309,9 +5379,9 @@ x_figure_window_size (struct frame *f, Lisp_Object parms, bool toolbar_p, int *x
 	{
 	  int margin, relief;
 
-	  relief = (tool_bar_button_relief >= 0
-		    ? tool_bar_button_relief
-		    : DEFAULT_TOOL_BAR_BUTTON_RELIEF);
+	  relief = (tool_bar_button_relief < 0
+		    ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+		    : min (tool_bar_button_relief, 1000000));
 
 	  if (RANGED_FIXNUMP (1, Vtool_bar_button_margin, INT_MAX))
 	    margin = XFIXNAT (Vtool_bar_button_margin);
