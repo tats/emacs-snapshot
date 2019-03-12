@@ -2236,7 +2236,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 		     for at least one other frame - so make it visible
 		     and quit.  */
 		  if (!FRAME_VISIBLE_P (f1) && !FRAME_ICONIFIED_P (f1))
-		    Fmake_frame_visible (frame1);
+		    Fmake_frame_visible (minibuffer_child_frame);
 
 		  return Qnil;
 		}
@@ -3611,6 +3611,40 @@ bottom edge of FRAME's display.  */)
 
   return Qt;
 }
+
+DEFUN ("frame-window-state-change", Fframe_window_state_change,
+       Sframe_window_state_change, 0, 1, 0,
+       doc: /* Return t if FRAME's window state change flag is set, nil otherwise.
+FRAME must be a live frame and defaults to the selected one.
+
+If FRAME's window state change flag is set, the default values of
+`window-state-change-functions' and `window-state-change-hook' will be
+run during next redisplay, regardless of whether a window state change
+actually occurred on FRAME or not.  After that, the value of this flag
+is reset.  */)
+     (Lisp_Object frame)
+{
+  return FRAME_WINDOW_STATE_CHANGE (decode_live_frame (frame)) ? Qt : Qnil;
+}
+
+DEFUN ("set-frame-window-state-change", Fset_frame_window_state_change,
+       Sset_frame_window_state_change, 0, 2, 0,
+       doc: /* Set FRAME's window state change flag according to ARG.
+Set FRAME's window state change flag if ARG is non-nil, reset it
+otherwise.
+
+If FRAME's window state change flag is set, the default values of
+`window-state-change-functions' and `window-state-change-hook' will be
+run during next redisplay, regardless of whether a window state change
+actually occurred on FRAME or not.  After that, the value of FRAME's
+window state change flag is reset.  */)
+     (Lisp_Object frame, Lisp_Object arg)
+{
+  struct frame *f = decode_live_frame (frame);
+
+  return (FRAME_WINDOW_STATE_CHANGE (f) = !NILP (arg)) ? Qt : Qnil;
+}
+
 
 /***********************************************************************
 				Frame Parameters
@@ -6045,6 +6079,19 @@ setting this variable does not change that frame's previous association.
 
 This variable is local to the current terminal and cannot be buffer-local.  */);
 
+  DEFVAR_LISP ("resize-mini-frames", resize_mini_frames,
+    doc: /* Non-nil means resize minibuffer-only frames automatically.
+If this is nil, do not resize minibuffer-only frames automatically.
+
+If this is a function, call that function with the minibuffer-only
+frame that shall be resized as sole argument.  The buffer of the root
+window of that frame is the buffer whose text will be eventually shown
+in the minibuffer window.
+
+Any other non-nil value means to resize minibuffer-only frames by
+calling `fit-frame-to-buffer'.  */);
+  resize_mini_frames = Qnil;
+
   DEFVAR_LISP ("focus-follows-mouse", focus_follows_mouse,
 	       doc: /* Non-nil if window system changes focus when you move the mouse.
 You should set this variable to tell Emacs how your window manager
@@ -6256,6 +6303,8 @@ iconify the top level frame instead.  */);
   defsubr (&Sframe_position);
   defsubr (&Sset_frame_position);
   defsubr (&Sframe_pointer_visible_p);
+  defsubr (&Sframe_window_state_change);
+  defsubr (&Sset_frame_window_state_change);
 
 #ifdef HAVE_WINDOW_SYSTEM
   defsubr (&Sx_get_resource);

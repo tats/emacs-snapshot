@@ -279,6 +279,17 @@ matches strings where the pattern appears as a subsequence.  Put
 simply, makes "foo" complete to both "barfoo" and "frodo".  Add 'flex'
 to 'completion-styles' or 'completion-category-overrides' to use it.
 
+** Connection-local variables
+
++++
+*** Connection-local variables are applied by default like file-local
+and directory-local variables.
+
++++
+*** The macro 'with-connection-local-variables' has been renamed from
+'with-connection-local-profiles'.  No argument 'profiles' needed any
+longer.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -994,7 +1005,12 @@ followed when Emacs writes the relevant history variables to the disk.
 ---
 *** Program name completion inside remote shells works now as expected.
 
++++
+*** The variable 'shell-file-name' can be set now as connection-local
+variable for remote shells.  It still defaults to "/bin/sh".
+
 ** Pcomplete
+
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
 
@@ -1424,18 +1440,20 @@ displaying the same buffer.  See the node "(elisp) Face Remapping"
 of the Emacs Lisp Reference manual for more detail.
 
 +++
-** Window change functions have been redesigned completely.
+** Window change functions have been redesigned.
 
 Hooks reacting to window changes run now only when redisplay detects
-that a change has actually occurred.  The five hooks provided are:
+that a change has actually occurred.  Six hooks are now provided:
 'window-buffer-change-functions' (run after window buffers have
 changed), 'window-size-change-functions' (run after a window was
 assigned a new buffer or size), 'window-configuration-change-hook'
 (like the former but run also when a window was deleted),
 'window-selection-change-functions' (run when the selected window
-changed) and 'window-state-change-functions' (run when any of the
-preceding ones is run).  'window-scroll-functions' are unaffected by
-these changes.
+changed) and 'window-state-change-functions' and
+'window-state-change-hook' (run when any of the preceding ones is
+run).  Applications can enforce running the latter two using the new
+function 'set-frame-window-state-change'.  'window-scroll-functions'
+are unaffected by these changes.
 
 In addition, a number of functions now allow the caller to detect what
 has changed since last redisplay: 'window-old-buffer' returns for any
@@ -1447,10 +1465,13 @@ during last redisplay.  'window-old-pixel-width' (renamed from
 'window-old-body-pixel-width' and 'window-old-body-pixel-height'
 return the total and body sizes of any window during last redisplay.
 
-One consequence of these changes is that all window change functions
-run now after functions run by 'post-command-hook'.  See the section
-"(elisp) Window Hooks" in the Elisp manual for a detailed explanation
-of the new behavior.
+See the section "(elisp) Window Hooks" in the Elisp manual for a
+detailed explanation of the new behavior.
+
++++
+*** New option 'resize-mini-frames'.
+This option allows to automatically resize minibuffer-only frames
+similarly to how minibuffer windows are resized on "normal" frames.
 
 +++
 ** New buffer display action alist entry 'dedicated'.
@@ -1474,10 +1495,10 @@ between two strings.
 '(quote x)' instead of 'x you will have to bind it to nil where applicable.
 
 +++
-** Numbers formatted via '%o' or '%x' may now be formatted as signed integers.
+** Numbers formatted via '%o' or '%x' are now formatted as signed integers.
 This avoids problems in calls like '(read (format "#x%x" -1))', and is
-more compatible with bignums, a planned feature.  To get this
-behavior, set the experimental variable 'binary-as-unsigned' to nil,
+more compatible with bignums.  To get the traditional machine-dependent
+behavior, set the experimental variable 'binary-as-unsigned' to t,
 and if the new behavior breaks your code please email
 32252@debbugs.gnu.org.  Because '%o' and '%x' can now format signed
 integers, they now support the '+' and space flags.

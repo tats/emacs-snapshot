@@ -509,11 +509,14 @@ child if WINDOW is a horizontal combination."
       (window-left-child window)
     (window-top-child window)))
 
-(defun window-combinations (window &optional horizontal)
+(defun window-combinations (window &optional horizontal ignore-fixed)
   "Return largest number of windows vertically arranged within WINDOW.
 WINDOW must be a valid window and defaults to the selected one.
 If HORIZONTAL is non-nil, return the largest number of
-windows horizontally arranged within WINDOW."
+windows horizontally arranged within WINDOW.
+
+Optional argument IGNORE-FIXED, if non-nil, means to ignore
+fixed-size windows in the calculation."
   (setq window (window-normalize-window window))
   (cond
    ((window-live-p window)
@@ -527,9 +530,10 @@ windows horizontally arranged within WINDOW."
     (let ((child (window-child window))
 	  (count 0))
       (while child
-	(setq count
-	      (+ (window-combinations child horizontal)
-		 count))
+	(unless (and ignore-fixed (window-size-fixed-p child horizontal))
+	  (setq count
+		(+ (window-combinations child horizontal ignore-fixed)
+		   count)))
 	(setq child (window-right child)))
       count))
    (t
@@ -538,9 +542,10 @@ windows horizontally arranged within WINDOW."
     (let ((child (window-child window))
 	  (count 1))
       (while child
-	(setq count
-	      (max (window-combinations child horizontal)
-		   count))
+	(unless (and ignore-fixed (window-size-fixed-p child horizontal))
+	  (setq count
+		(max (window-combinations child horizontal ignore-fixed)
+		     count)))
 	(setq child (window-right child)))
       count))))
 
@@ -2748,7 +2753,7 @@ as small) as possible, but don't signal an error."
       ;; Sanitize DELTA.
       (cond
        ((<= (+ height delta) 0)
-	(setq delta (- (frame-char-height (window-frame window)) height)))
+	(setq delta (- (frame-char-height frame) height)))
        ((> delta min-delta)
 	(setq delta min-delta)))
 
@@ -3375,6 +3380,12 @@ routines."
      (if pixelwise
 	 pixel-delta
        (/ pixel-delta (frame-char-height frame)))))
+
+(defun window--resize-mini-frame (frame)
+  "Resize minibuffer-only frame FRAME."
+  (if (functionp resize-mini-frames)
+      (funcall resize-mini-frames frame)
+    (fit-frame-to-buffer frame)))
 
 (defun window--sanitize-window-sizes (horizontal)
   "Assert that all windows on selected frame are large enough.
@@ -4692,6 +4703,8 @@ displayed there."
 BUFFER-OR-NAME may be a buffer or the name of an existing buffer
 and defaults to the current buffer.
 
+Interactively, prompt for the buffer.
+
 The following non-nil values of the optional argument FRAME
 have special meanings:
 
@@ -4708,9 +4721,25 @@ have special meanings:
 Any other value of FRAME means consider all windows on all
 frames.
 
-When a window showing BUFFER-OR-NAME is dedicated and the only
-window of its frame, that frame is deleted when there are other
-frames left."
+Interactively, FRAME is the prefix argument, so you can
+use \\[universal-argument] 0 to specify all windows only on
+the current terminal's frames.
+
+If a frame's root window shows the buffer specified by
+BUFFER-OR-NAME and is dedicated to that buffer and that frame
+does not host the active minibuffer window and there is at least
+one other frame on that frame's terminal, delete that frame.
+Otherwise, do not delete a frame's root window if it shows the
+buffer specified by BUFFER-OR-NAME and do not delete any frame's
+main window showing that buffer either.  Rather, in any such
+case, call `switch-to-prev-buffer' to show another buffer in that
+window and make sure the window is no more dedicated to its
+buffer.
+
+If the buffer specified by BUFFER-OR-NAME is shown in a
+minibuffer window, do nothing for that window.  For any window
+that does not show that buffer, remove the buffer from that
+window's lists of previous and next buffers."
   (interactive "bDelete windows on (buffer):\nP")
   (let ((buffer (window-normalize-buffer buffer-or-name))
 	;; Handle the "inverted" meaning of the FRAME argument wrt other
@@ -4905,6 +4934,24 @@ showing BUFFER-OR-NAME."
 	;; If a window doesn't show BUFFER, unrecord BUFFER in it.
 	(unrecord-window-buffer window buffer)))))
 
+(defun window--combination-resizable (parent &optional horizontal)
+  "Return number of pixels recoverable from height of window PARENT.
+PARENT must be a vertical (horizontal if HORIZONTAL is non-nil)
+window combination.  The return value is the sum of the pixel
+heights of all non-fixed height child windows of PARENT divided
+by their number plus 1.  If HORIZONTAL is non-nil, return the sum
+of the pixel widths of all non-fixed width child windows of
+PARENT divided by their number plus 1."
+  (let ((sibling (window-child parent))
+	(number 0)
+	(size 0))
+    (while sibling
+      (unless (window-size-fixed-p sibling horizontal)
+	(setq number (1+ number))
+	(setq size (+ (window-size sibling horizontal t) size)))
+      (setq sibling (window-next-sibling sibling)))
+    (/ size (1+ number))))
+
 (defun split-window (&optional window size side pixelwise)
   "Make a new window adjacent to WINDOW.
 WINDOW must be a valid window and defaults to the selected one.
@@ -5042,8 +5089,7 @@ frame.  The selected window is not changed by this function."
 		    ;; average size of a window in its combination.
 		    (max (min (- parent-pixel-size
 				 (window-min-size parent horizontal nil t))
-			      (/ parent-pixel-size
-				 (1+ (window-combinations parent horizontal))))
+			      (window--combination-resizable parent horizontal))
 			 (window-min-pixel-size))
 		  ;; Else try to give the new window half the size
 		  ;; of WINDOW (plus an eventual odd pixel).
@@ -5128,7 +5174,7 @@ frame.  The selected window is not changed by this function."
 	       (pixel-size (/ (float new-pixel-size)
 			      (if new-parent old-pixel-size parent-pixel-size)))
 	       (new-parent 0.5)
-	       (resize (/ 1.0 (1+ (window-combinations parent horizontal))))
+	       (resize (/ 1.0 (1+ (window-combinations parent horizontal t))))
 	       (t (/ (window-normal-size window horizontal) 2.0))))
 
 	(if resize
@@ -8197,10 +8243,13 @@ Return 0 otherwise."
 (defun fit-frame-to-buffer (&optional frame max-height min-height max-width min-width only)
   "Adjust size of FRAME to display the contents of its buffer exactly.
 FRAME can be any live frame and defaults to the selected one.
-Fit only if FRAME's root window is live.  MAX-HEIGHT, MIN-HEIGHT,
-MAX-WIDTH and MIN-WIDTH specify bounds on the new total size of
-FRAME's root window.  MIN-HEIGHT and MIN-WIDTH default to the values of
-`window-min-height' and `window-min-width' respectively.
+Fit only if FRAME's root window is live.
+
+MAX-HEIGHT, MIN-HEIGHT, MAX-WIDTH and MIN-WIDTH specify bounds on
+the new total size of FRAME's root window.  MIN-HEIGHT and
+MIN-WIDTH default to the values of `window-min-height' and
+`window-min-width' respectively.  These arguments are specified
+in the canonical character width and height of FRAME.
 
 If the optional argument ONLY is `vertically', resize the frame
 vertically only.  If ONLY is `horizontally', resize the frame
