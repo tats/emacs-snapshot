@@ -617,36 +617,62 @@ The following %-sequences are provided:
 %h Remaining battery charge time in hours
 %t Remaining battery charge time in the form `h:min'"
   (let* ((os-name (car (split-string
-			(shell-command-to-string "/usr/bin/uname"))))
-	 (apm-flag (if (equal os-name "OpenBSD") "P" "s"))
-	 (apm-cmd (concat "/usr/sbin/apm -ablm" apm-flag))
-	 (apm-output (split-string (shell-command-to-string apm-cmd)))
-	 ;; Battery status
-	 (battery-status
-	  (let ((stat (string-to-number (nth 0 apm-output))))
-	    (cond ((eq stat 0) '("high" . ""))
-		  ((eq stat 1) '("low" . "-"))
-		  ((eq stat 2) '("critical" . "!"))
-		  ((eq stat 3) '("charging" . "+"))
-		  ((eq stat 4) '("absent" . nil)))))
-	 ;; Battery percentage
-	 (battery-percentage (nth 1 apm-output))
-	 ;; Battery life
-	 (battery-life (nth 2 apm-output))
-	 ;; AC status
-	 (line-status
-	  (let ((ac (string-to-number (nth 3 apm-output))))
-	    (cond ((eq ac 0) "disconnected")
-		  ((eq ac 1) "connected")
-		  ((eq ac 2) "backup power"))))
-	 ;; Advanced power savings mode
-	 (apm-mode
-	  (let ((apm (string-to-number (nth 4 apm-output))))
-	    (if (string= os-name "OpenBSD")
-		(cond ((eq apm 0) "manual")
-		      ((eq apm 1) "automatic")
-		      ((eq apm 2) "cool running"))
-	      (if (eq apm 1) "on" "off"))))
+                        ;; FIXME: Can't we use something like `system-type'?
+                        (shell-command-to-string "/usr/bin/uname"))))
+         (apm-flag (pcase os-name
+                     ("OpenBSD" "mP")
+                     ("FreeBSD" "st")
+                     (_         "ms")))
+         (apm-cmd (concat "/usr/sbin/apm -abl" apm-flag))
+         (apm-output (split-string (shell-command-to-string apm-cmd)))
+         (indices (pcase os-name
+                    ;; FreeBSD's manpage documents that multiple
+                    ;; outputs are ordered by "the order in which
+                    ;; they're listed in the manpage", which is alphabetical
+                    ;; and is also the order in which we pass them.
+                    ("FreeBSD" '((ac . 0)
+                                 (battery-status . 1)
+                                 (battery-percent . 2)
+                                 (apm-mode . 3)
+                                 (battery-life . 4)))
+                    ;; For NetBSD and OpenBSD, the manpage doesn't document
+                    ;; the order.  The previous code used this order, so let's
+                    ;; assume it's right.
+                    (_         '((ac . 3)
+                                 (battery-status . 0)
+                                 (battery-percent . 1)
+                                 (apm-mode . 4)
+                                 (battery-life . 2)))))
+         ;; Battery status
+         (battery-status
+          (pcase (string-to-number
+                  (nth (alist-get 'battery-status indices) apm-output))
+            (0 '("high" . ""))
+            (1 '("low" . "-"))
+            (2 '("critical" . "!"))
+            (3 '("charging" . "+"))
+            (4 '("absent" . nil))))
+         ;; Battery percentage
+         (battery-percentage
+          (nth (alist-get 'battery-percent indices) apm-output))
+         ;; Battery life
+         (battery-life (nth (alist-get 'battery-life indices) apm-output))
+         ;; AC status
+         (line-status
+          (pcase (string-to-number (nth (alist-get 'ac indices) apm-output))
+            (0 "disconnected")
+            (1 "connected")
+            (2 "backup power")))
+         ;; Advanced power savings mode
+         (apm-mode
+          (let ((apm (string-to-number
+                      (nth (alist-get 'apm-mode indices) apm-output))))
+            (if (string= os-name "OpenBSD")
+                (pcase apm
+                  (0 "manual")
+                  (1 "automatic")
+		  (2 "cool running"))
+	      (if (eql apm 1) "on" "off"))))
 	 seconds minutes hours remaining-time)
     (unless (member battery-life '("unknown" "-1"))
       (if (member os-name '("OpenBSD" "NetBSD"))

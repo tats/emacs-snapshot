@@ -236,6 +236,13 @@ regular expression was previously invalid, but is now accepted:
 ---
 ** New input methods 'hawaiian-postfix' and 'hawaiian-prefix'.
 
+---
+** New input methods for several variants of the Sami language.
+The Sami input methods include: 'norwegian-sami-prefix',
+'bergsland-hasselbrink-sami-prefix', 'southern-sami-prefix',
+'ume-sami-prefix', 'northern-sami-prefix', 'inari-sami-prefix',
+'skolt-sami-prefix', and 'kildin-sami-prefix'.
+
 +++
 ** In Japanese environments that do not specify encodings and are not
 based on MS-Windows, the default encoding is now utf-8 instead of
@@ -916,7 +923,7 @@ been instrumented by Edebug.
 the XTerm window title.  This feature is experimental and is disabled
 by default.
 
-** grep
+** Grep
 
 +++
 *** rgrep, lgrep and zrgrep now hide part of the command line
@@ -1186,6 +1193,17 @@ the 128...255 range, as expected.
 *** New value of 'minibuffer' frame parameter 'child-frame'.
 This allows to create and parent immediately a minibuffer-only child
 frame when making a frame.
+
+** Tabulated List mode
+
++++
+** New user options for tabulated list sort indicators.
+You can now customize which sorting indicator character to display
+near the current column in Tabulated Lists (see variables
+'tabulated-list-gui-sort-indicator-asc',
+'tabulated-list-gui-sort-indicator-desc',
+'tabulated-list-tty-sort-indicator-asc', and
+'tabulated-list-tty-sort-indicator-desc').
 
 
 * New Modes and Packages in Emacs 27.1
@@ -1717,6 +1735,14 @@ as Emacs subprocesses, which by now is not supported on modern
 versions of MS-Windows.  Set this variable to 50 if for some reason
 you need the old behavior (and please report such situations to Emacs
 developers).
+
+---
+** New variable 'w32-multibyte-code-page'.
+This variable holds the value of the multibyte code page used by the
+system.  It is usually zero, which indicates that 'w32-ansi-code-page'
+is being used, except in Far Eastern locales.  When this variable is
+non-zero, Emacs at startup sets 'locale-coding-system' to the
+corresponding encoding, instead of using 'w32-ansi-code-page'.
 
 +++
 ** On NS the behaviour of drag and drop can now be modified by use of

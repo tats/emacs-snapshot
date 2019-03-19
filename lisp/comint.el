@@ -1618,8 +1618,8 @@ Go to the history element by the absolute history position HIST-POS."
 (defun comint-within-quotes (beg end)
   "Return t if the number of quotes between BEG and END is odd.
 Quotes are single and double."
-  (let ((countsq (comint-how-many-region "\\(^\\|[^\\\\]\\)'" beg end))
-	(countdq (comint-how-many-region "\\(^\\|[^\\\\]\\)\"" beg end)))
+  (let ((countsq (comint-how-many-region "\\(^\\|[^\\]\\)'" beg end))
+	(countdq (comint-how-many-region "\\(^\\|[^\\]\\)\"" beg end)))
     (or (= (mod countsq 2) 1) (= (mod countdq 2) 1))))
 
 (defun comint-how-many-region (regexp beg end)
@@ -2071,20 +2071,6 @@ Make backspaces delete the previous character."
 
 	    (goto-char (process-mark process))
 	    (set-marker comint-last-output-start (point))
-
-            ;; Try to skip repeated prompts, which can occur as a result of
-            ;; commands sent without inserting them in the buffer.
-            (let ((bol (save-excursion (forward-line 0) (point)))) ;No fields.
-              (when (and (not (bolp))
-                         (looking-back comint-prompt-regexp bol))
-                (let* ((prompt (buffer-substring bol (point)))
-                       (prompt-re (concat "\\`" (regexp-quote prompt))))
-                  (while (string-match prompt-re string)
-                    (setq string (substring string (match-end 0)))))))
-            (while (string-match (concat "\\(^" comint-prompt-regexp
-                                         "\\)\\1+")
-                                 string)
-              (setq string (replace-match "\\1" nil nil string)))
 
 	    ;; insert-before-markers is a bad thing. XXX
 	    ;; Luckily we don't have to use it any more, we use

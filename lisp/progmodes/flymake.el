@@ -420,7 +420,7 @@ region is invalid."
                        (beg)
                        (progn
                          (end-of-line)
-                         (skip-chars-backward " \t\f\t\n" beg)
+                         (skip-chars-backward " \t\f\n" beg)
                          (if (eq (point) beg)
                              (line-beginning-position 2)
                            (point)))))
@@ -1005,7 +1005,9 @@ Do it only if `flymake-no-changes-timeout' is non-nil."
     (setq
      flymake-timer
      (run-with-idle-timer
-      (encode-time flymake-no-changes-timeout)
+      ;; This can use encode-time instead of seconds-to-time,
+      ;; once we can assume Emacs 27 or later.
+      (seconds-to-time flymake-no-changes-timeout)
       nil
       (lambda (buffer)
         (when (buffer-live-p buffer)
