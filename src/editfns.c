@@ -2836,6 +2836,25 @@ usage: (save-restriction &rest BODY)  */)
   return unbind_to (count, val);
 }
 
+/* i18n (internationalization).  */
+
+DEFUN ("ngettext", Fngettext, Sngettext, 3, 3, 0,
+       doc: /* Return the translation of MSGID (plural MSGID_PLURAL) depending on N.
+MSGID is the singular form of the string to be converted;
+use it as the key for the search in the translation catalog.
+MSGID_PLURAL is the plural form.  Use N to select the proper translation.
+If no message catalog is found, MSGID is returned if N is equal to 1,
+otherwise MSGID_PLURAL.  */)
+  (Lisp_Object msgid, Lisp_Object msgid_plural, Lisp_Object n)
+{
+  CHECK_STRING (msgid);
+  CHECK_STRING (msgid_plural);
+  CHECK_INTEGER (n);
+
+  /* Placeholder implementation until we get our act together.  */
+  return EQ (n, make_fixnum (1)) ? msgid : msgid_plural;
+}
+
 DEFUN ("message", Fmessage, Smessage, 1, MANY, 0,
        doc: /* Display a message at the bottom of the screen.
 The message also goes into the `*Messages*' buffer, if `message-log-max'
@@ -3086,7 +3105,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			      : FLT_RADIX == 16 ? 4
 			      : -1)),
 
-   /* Maximum number of bytes (including terminating null) generated
+   /* Maximum number of bytes (including terminating NUL) generated
       by any format, if precision is no more than USEFUL_PRECISION_MAX.
       On all practical hosts, %Lf is the worst case.  */
    SPRINTF_BUFSIZE = (sizeof "-." + (LDBL_MAX_10_EXP + 1)
@@ -4553,6 +4572,8 @@ it to be non-nil.  */);
   defsubr (&Sinsert_and_inherit_before_markers);
   defsubr (&Sinsert_char);
   defsubr (&Sinsert_byte);
+
+  defsubr (&Sngettext);
 
   defsubr (&Suser_login_name);
   defsubr (&Sgroup_name);

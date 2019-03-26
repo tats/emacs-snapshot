@@ -37,6 +37,12 @@ functions 'json-serialize', 'json-insert', 'json-parse-string', and
 'json-parse-buffer' are typically much faster than their Lisp
 counterparts from json.el.
 
+** Several configure options now accept an option-argument 'ifavailable'.
+For example, './configure --with-xpm=ifavailable' now configures Emacs
+to attempt to use libxpm but to continue building even if libxpm is absent.
+The other affected options are --with-gif, --with-gnutls, --with-jpeg,
+--with-png, and --with-tiff.
+
 ** The etags program now uses the C library's regular expression matcher
 when possible, and a compatible regex substitute otherwise.  This will
 let developers maintain Emacs's own regex code without having to also
@@ -370,6 +376,12 @@ region using a given replacement-function in a non-destructive manner
 arguments mitigating performance issues when operating on huge
 buffers.
 
+** The command 'delete-indentation' now operates on the active region.
+If the region is active, the command joins all the lines in the
+region.  When there's no active region, the command works on the
+current and the previous or the next line, as before.
+
++++
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
@@ -389,6 +401,9 @@ buffers.
 ** seq.el
 New convenience functions 'seq-first' and 'seq-rest' give easy access
 to respectively the first and all but the first elements of sequences.
+
+The new predicate function 'seq-contains-p' should be used instead of
+the now obsolete 'seq-contains'.
 
 ---
 ** Follow mode
@@ -495,6 +510,10 @@ and compares their entire trees.
 
 *** New user option 'vc-hg-revert-switches' specifies switches to pass
 to hg revert.
+
+*** 'C-x v M D' ('vc-diff-mergebase') and 'C-x v M L' ('vc-log-mergebase')
+print diffs and logs between the merge base (common ancestor) of two
+given revisions.
 
 ** Diff mode
 +++
@@ -661,6 +680,10 @@ mouse click event, and is intended to be bound to a mouse event.
 *** Changing 'xref-marker-ring-length' works after 'xref.el' is loaded.
 Previously, setting 'xref-marker-ring-length' would only take effect
 if set before 'xref.el' was loaded.
+
+---
+*** xref-find-definitions now sets the mark at the buffer position
+where it was invoked
 
 ** Ecomplete
 
@@ -985,6 +1008,11 @@ default, and not just the opening element.
 
 ** Eshell
 
+*** TAB completion uses the standard completion-at-point rather than pcomplete
+Its UI is slightly different but can be customized to behave similarly,
+e.g. Pcomplete's default cycling can be obtained with
+(setq completion-cycle-threshold 5).
+
 ---
 *** Expansion of history event designators is disabled by default.
 To restore the old behavior, use
@@ -1197,7 +1225,7 @@ frame when making a frame.
 ** Tabulated List mode
 
 +++
-** New user options for tabulated list sort indicators.
+*** New user options for tabulated list sort indicators.
 You can now customize which sorting indicator character to display
 near the current column in Tabulated Lists (see variables
 'tabulated-list-gui-sort-indicator-asc',
@@ -1336,8 +1364,23 @@ they are now allocated like any other pseudovector.  As a result, the
 'misc' component, and the 'misc-objects-consed' variable has been
 removed.
 
++++
+** Reversed character ranges are no longer permitted in rx.
+Previously, ranges where the starting character is greater than the
+ending character were silently omitted.
+For example, '(rx (any "@z-a" (?9 . ?0)))' would match '@' only.
+Now, such rx expressions generate an error.
+
 
 * Lisp Changes in Emacs 27.1
+
+** i18n (internationalization)
+
+*** ngettext can be used now to return the right plural form
+according to the given numeric value.
+
++++
+** inhibit-null-byte-detection is renamed to inhibit-nul-byte-detection
 
 +++
 ** 'self-insert-command' takes the char to insert as (optional) argument.

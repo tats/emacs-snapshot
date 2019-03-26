@@ -890,6 +890,8 @@ In the latter case, VC mode is deactivated for this buffer."
     (define-key map "L" 'vc-print-root-log)
     (define-key map "I" 'vc-log-incoming)
     (define-key map "O" 'vc-log-outgoing)
+    (define-key map "ML" 'vc-log-mergebase)
+    (define-key map "MD" 'vc-diff-mergebase)
     (define-key map "m" 'vc-merge)
     (define-key map "r" 'vc-retrieve-tag)
     (define-key map "s" 'vc-create-tag)
@@ -950,8 +952,7 @@ In the latter case, VC mode is deactivated for this buffer."
     (bindings--define-key map [separator2] menu-bar-separator)
     (bindings--define-key map [vc-insert-header]
       '(menu-item "Insert Header" vc-insert-headers
-		  :help "Insert headers into a file for use with a version control system.
-"))
+		  :help "Insert headers into a file for use with a version control system."))
     (bindings--define-key map [vc-revert]
       '(menu-item "Revert to Base Version" vc-revert
 		  :help "Revert working copies of the selected file set to their repository contents"))

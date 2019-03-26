@@ -1937,7 +1937,7 @@ struct bidi_string_data {
   Lisp_Object lstring;		/* Lisp string to reorder, or nil */
   const unsigned char *s;	/* string data, or NULL if reordering buffer */
   ptrdiff_t schars;		/* the number of characters in the string,
-				   excluding the terminating null */
+				   excluding the terminating NUL */
   ptrdiff_t bufpos;		/* buffer position of lstring, or 0 if N/A */
   bool_bf from_disp_str : 1;	/* True means the string comes from a
 				   display property */
@@ -2957,7 +2957,6 @@ struct image
 
 #ifdef USE_CAIRO
   void *cr_data;
-  void *cr_data2;
 #endif
 #ifdef HAVE_X_WINDOWS
   /* X images of the image, corresponding to the above Pixmaps.

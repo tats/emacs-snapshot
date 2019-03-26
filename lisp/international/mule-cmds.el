@@ -2430,7 +2430,7 @@ See `set-language-info-alist' for use in programs."
     ("ind" . "Latin-1") ; MS-Windows Indonesian
     ("sme" . "UTF-8") ; MS-Windows Northern Sami (Norway)
     ("smf" . "UTF-8") ; MS-Windows Northern Sami (Sweden)
-    ("smg" . "ITF-8") ; MS-Windows Northern Sami (Finland)
+    ("smg" . "UTF-8") ; MS-Windows Northern Sami (Finland)
     ("kdi" "Kannada" utf-8) ; MS-Windows Kannada
     ("mar" "Devanagari" utf-8) ; MS-Windows Marathi
     ("khm" "Khmer" utf-8) ; MS-Windows Khmer

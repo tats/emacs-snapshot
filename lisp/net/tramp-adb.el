@@ -78,9 +78,6 @@ It is used for TCP/IP devices."
 (tramp--with-startup
  (add-to-list 'tramp-methods
 	      `(,tramp-adb-method
-                ;; Used in `tramp-handle-shell-command'.
-                (tramp-remote-shell      "/system/bin/sh")
-                (tramp-remote-shell-args ("-c"))
 	        (tramp-tmpdir            "/data/local/tmp")
                 (tramp-default-port      5555)))
 
@@ -1302,7 +1299,6 @@ connection if a previous connection has died for some reason."
   '((shell-file-name . "/system/bin/sh")
     (shell-command-switch . "-c"))
   "Default connection-local variables for remote adb connections.")
-(add-to-list 'tramp-connection-local-safe-shell-file-names "/system/bin/sh")
 
 ;; `connection-local-set-profile-variables' and
 ;; `connection-local-set-profiles' exists since Emacs 26.1.

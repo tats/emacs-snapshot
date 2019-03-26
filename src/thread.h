@@ -65,7 +65,7 @@ struct thread_state
   /* m_stack_bottom must be the first non-Lisp field.  */
   /* An address near the bottom of the stack.
      Tells GC how to save a copy of the stack.  */
-  char *m_stack_bottom;
+  char const *m_stack_bottom;
 #define stack_bottom (current_thread->m_stack_bottom)
 
   /* The address of an object near the C stack top, used to determine
@@ -75,7 +75,7 @@ struct thread_state
      error in Emacs.  If the C function F calls G which calls H which
      calls ... F, then at least one of the functions in the chain
      should set this to the address of a local variable.  */
-  void *stack_top;
+  void const *stack_top;
 
   struct catchtag *m_catchlist;
 #define catchlist (current_thread->m_catchlist)
@@ -111,8 +111,8 @@ struct thread_state
   struct buffer *m_current_buffer;
 #define current_buffer (current_thread->m_current_buffer)
 
-  /* Every call to re_match_2, etc., must pass &search_regs as the regs
-     argument unless you can show it is unnecessary (i.e., if re_match_2
+  /* Every call to re_search, etc., must pass &search_regs as the regs
+     argument unless you can show it is unnecessary (i.e., if re_search
      is certainly going to be called again before region-around-match
      can be called).
 
