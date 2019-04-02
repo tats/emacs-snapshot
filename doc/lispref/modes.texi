@@ -1291,16 +1291,10 @@ You can thus get the full benefit of adaptive filling
 Turning on Text mode runs the normal hook `text-mode-hook'."
 @end group
 @group
-  (set (make-local-variable 'text-mode-variant) t)
-  (set (make-local-variable 'require-final-newline)
-       mode-require-final-newline)
-  (set (make-local-variable 'indent-line-function) 'indent-relative))
+  (setq-local text-mode-variant t)
+  (setq-local require-final-newline mode-require-final-newline))
 @end group
 @end smallexample
-
-@noindent
-(The last line is redundant nowadays, since @code{indent-relative} is
-the default value, and we'll delete it in a future version.)
 
 @cindex @file{lisp-mode.el}
   The three Lisp modes (Lisp mode, Emacs Lisp mode, and Lisp Interaction

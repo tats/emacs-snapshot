@@ -118,6 +118,26 @@ BODY should be a list of Lisp expressions.
   ;; depend on backquote.el.
   (list 'function (cons 'lambda cdr)))
 
+(defmacro setq-default (&rest args)
+  "Set the default value of variable VAR to VALUE.
+VAR, the variable name, is literal (not evaluated);
+VALUE is an expression: it is evaluated and its value returned.
+The default value of a variable is seen in buffers
+that do not have their own values for the variable.
+
+More generally, you can use multiple variables and values, as in
+  (setq-default VAR VALUE VAR VALUE...)
+This sets each VAR's default value to the corresponding VALUE.
+The VALUE for the Nth VAR can refer to the new default values
+of previous VARs.
+
+\(setq-default [VAR VALUE]...)"
+  (declare (debug setq))
+  (let ((exps nil))
+    (while args
+      (push `(set-default ',(pop args) ,(pop args)) exps))
+    `(progn . ,(nreverse exps))))
+
 (defmacro setq-local (var val)
   "Set variable VAR to value VAL in current buffer."
   ;; Can't use backquote here, it's too early in the bootstrap.
@@ -756,9 +776,31 @@ Elements of ALIST that are not conses are ignored."
 If KEY is not found in ALIST, return DEFAULT.
 Use TESTFN to lookup in the alist if non-nil.  Otherwise, use `assq'.
 
-This is a generalized variable suitable for use with `setf'.
+You can use `alist-get' in PLACE expressions.  This will modify
+an existing association (more precisely, the first one if
+multiple exist), or add a new element to the beginning of ALIST,
+destructively modifying the list stored in ALIST.
+
+Example:
+
+   (setq foo '((a . 0)))
+   (setf (alist-get 'a foo) 1
+         (alist-get 'b foo) 2)
+
+   foo => ((b . 2) (a . 1))
+
+
 When using it to set a value, optional argument REMOVE non-nil
-means to remove KEY from ALIST if the new value is `eql' to DEFAULT."
+means to remove KEY from ALIST if the new value is `eql' to
+DEFAULT (more precisely the first found association will be
+deleted from the alist).
+
+Example:
+
+  (setq foo '((a . 1) (b . 2)))
+  (setf (alist-get 'b foo nil 'remove) nil)
+
+  foo => ((a . 1))"
   (ignore remove) ;;Silence byte-compiler.
   (let ((x (if (not testfn)
                (assq key alist)

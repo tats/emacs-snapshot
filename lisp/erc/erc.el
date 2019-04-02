@@ -2522,10 +2522,7 @@ Returns NICK unmodified unless `erc-lurker-trim-nicks' is
 non-nil."
   (if erc-lurker-trim-nicks
       (replace-regexp-in-string
-       (format "[%s]"
-               (mapconcat (lambda (char)
-                            (regexp-quote (char-to-string char)))
-                          erc-lurker-ignore-chars ""))
+       (regexp-opt-charset (string-to-list erc-lurker-ignore-chars))
        "" nick)
     nick))
 

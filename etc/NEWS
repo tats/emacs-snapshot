@@ -1233,6 +1233,11 @@ near the current column in Tabulated Lists (see variables
 'tabulated-list-tty-sort-indicator-asc', and
 'tabulated-list-tty-sort-indicator-desc').
 
+** Text mode
+
++++
+*** 'text-mode-variant' is now obsolete, use 'derived-mode-p' instead.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1370,6 +1375,15 @@ Previously, ranges where the starting character is greater than the
 ending character were silently omitted.
 For example, '(rx (any "@z-a" (?9 . ?0)))' would match '@' only.
 Now, such rx expressions generate an error.
+
++++
+** 'text-mode' no longer sets the value of 'indent-line-function'.
+The global value of 'indent-line-function', which defaults to
+'indent-relative', will no longer be reset locally when turning on
+'text-mode'.
+
+To get back the old behavior, add a function to 'text-mode-hook' which
+performs (setq-local indent-line-function #'indent-relative).
 
 
 * Lisp Changes in Emacs 27.1
@@ -1718,9 +1732,9 @@ the process.  That way 'make-process' can start remote processes.
 +++
 ** Emacs now supports resizing (scaling) of images without ImageMagick.
 All modern systems are supported by this feature.  (On GNU and Unix
-systems, the XRender extension to X11 is required for this to be
-available; the configure script will test for it and, if found, enable
-scaling.)
+systems, Cairo drawing or the XRender extension to X11 is required for
+this to be available; the configure script will test for it and, if
+found, enable scaling.)
 
 The new function 'image-scaling-p' can be used to test whether any
 given frame supports resizing.

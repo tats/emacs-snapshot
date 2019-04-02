@@ -2334,32 +2334,30 @@ dump_fwd_kboard_obj (struct dump_context *ctx,
 }
 
 static dump_off
-dump_fwd (struct dump_context *ctx, union Lisp_Fwd *fwd)
+dump_fwd (struct dump_context *ctx, lispfwd fwd)
 {
-#if CHECK_STRUCTS && !defined (HASH_Lisp_Fwd_5227B18E87)
-# error "Lisp_Fwd changed. See CHECK_STRUCTS comment."
-#endif
 #if CHECK_STRUCTS && !defined (HASH_Lisp_Fwd_Type_9CBA6EE55E)
 # error "Lisp_Fwd_Type changed. See CHECK_STRUCTS comment."
 #endif
+  void const *p = fwd.fwdptr;
   dump_off offset;
 
   switch (XFWDTYPE (fwd))
     {
     case Lisp_Fwd_Int:
-      offset = dump_fwd_int (ctx, &fwd->u_intfwd);
+      offset = dump_fwd_int (ctx, p);
       break;
     case Lisp_Fwd_Bool:
-      offset = dump_fwd_bool (ctx, &fwd->u_boolfwd);
+      offset = dump_fwd_bool (ctx, p);
       break;
     case Lisp_Fwd_Obj:
-      offset = dump_fwd_obj (ctx, &fwd->u_objfwd);
+      offset = dump_fwd_obj (ctx, p);
       break;
     case Lisp_Fwd_Buffer_Obj:
-      offset = dump_fwd_buffer_obj (ctx, &fwd->u_buffer_objfwd);
+      offset = dump_fwd_buffer_obj (ctx, p);
       break;
     case Lisp_Fwd_Kboard_Obj:
-      offset = dump_fwd_kboard_obj (ctx, &fwd->u_kboard_objfwd);
+      offset = dump_fwd_kboard_obj (ctx, p);
       break;
     default:
       emacs_abort ();
@@ -2372,20 +2370,20 @@ static dump_off
 dump_blv (struct dump_context *ctx,
           const struct Lisp_Buffer_Local_Value *blv)
 {
-#if CHECK_STRUCTS && !defined (HASH_Lisp_Buffer_Local_Value_066F33A92E)
+#if CHECK_STRUCTS && !defined HASH_Lisp_Buffer_Local_Value_3C363FAC3C
 # error "Lisp_Buffer_Local_Value changed. See CHECK_STRUCTS comment."
 #endif
   struct Lisp_Buffer_Local_Value out;
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, blv, local_if_set);
   DUMP_FIELD_COPY (&out, blv, found);
-  if (blv->fwd)
-    dump_field_fixup_later (ctx, &out, blv, &blv->fwd);
+  if (blv->fwd.fwdptr)
+    dump_field_fixup_later (ctx, &out, blv, &blv->fwd.fwdptr);
   dump_field_lv (ctx, &out, blv, &blv->where, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, blv, &blv->defcell, WEIGHT_STRONG);
   dump_field_lv (ctx, &out, blv, &blv->valcell, WEIGHT_STRONG);
   dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
-  if (blv->fwd)
+  if (blv->fwd.fwdptr)
     dump_remember_fixup_ptr_raw
       (ctx,
        offset + dump_offsetof (struct Lisp_Buffer_Local_Value, fwd),
@@ -2437,7 +2435,7 @@ dump_symbol (struct dump_context *ctx,
              Lisp_Object object,
              dump_off offset)
 {
-#if CHECK_STRUCTS && !defined (HASH_Lisp_Symbol_60EA1E748E)
+#if CHECK_STRUCTS && !defined HASH_Lisp_Symbol_999DC26DEC
 # error "Lisp_Symbol changed. See CHECK_STRUCTS comment."
 #endif
 #if CHECK_STRUCTS && !defined (HASH_symbol_redirect_ADB4F5B113)
@@ -2761,7 +2759,7 @@ dump_hash_table (struct dump_context *ctx,
 static dump_off
 dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
 {
-#if CHECK_STRUCTS && !defined HASH_buffer_AE2C8CE357
+#if CHECK_STRUCTS && !defined HASH_buffer_2CEE653E74
 # error "buffer changed. See CHECK_STRUCTS comment."
 #endif
   struct buffer munged_buffer = *in_buffer;
@@ -2873,6 +2871,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
 
   DUMP_FIELD_COPY (out, buffer, prevent_redisplay_optimizations_p);
   DUMP_FIELD_COPY (out, buffer, clip_changed);
+  DUMP_FIELD_COPY (out, buffer, inhibit_buffer_hooks);
 
   dump_field_lv_rawptr (ctx, out, buffer, &buffer->overlays_before,
                         Lisp_Vectorlike, WEIGHT_NORMAL);
@@ -4623,7 +4622,8 @@ dump_discard_mem (void *mem, size_t size)
       /* Discard COWed pages.  */
       (void) VirtualFree (mem, size, MEM_DECOMMIT);
       /* Release the commit charge for the mapping.  */
-      (void) VirtualProtect (mem, size, PAGE_NOACCESS, NULL);
+      DWORD old_prot;
+      (void) VirtualProtect (mem, size, PAGE_NOACCESS, &old_prot);
 #elif VM_SUPPORTED == VM_POSIX
 # ifdef HAVE_POSIX_MADVISE
       /* Discard COWed pages.  */

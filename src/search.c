@@ -198,11 +198,13 @@ static struct regexp_cache *
 compile_pattern (Lisp_Object pattern, struct re_registers *regp,
 		 Lisp_Object translate, bool posix, bool multibyte)
 {
-  struct regexp_cache *cp, **cpp;
+  struct regexp_cache *cp, **cpp, **lru_nonbusy;
 
-  for (cpp = &searchbuf_head; ; cpp = &cp->next)
+  for (cpp = &searchbuf_head, lru_nonbusy = NULL; ; cpp = &cp->next)
     {
       cp = *cpp;
+      if (!cp->busy)
+        lru_nonbusy = cpp;
       /* Entries are initialized to nil, and may be set to nil by
 	 compile_pattern_1 if the pattern isn't valid.  Don't apply
 	 string accessors in those cases.  However, compile_pattern_1
@@ -222,13 +224,14 @@ compile_pattern (Lisp_Object pattern, struct re_registers *regp,
 	  && cp->buf.charset_unibyte == charset_unibyte)
 	break;
 
-      /* If we're at the end of the cache, compile into the nil cell
-	 we found, or the last (least recently used) cell with a
-	 string value.  */
+      /* If we're at the end of the cache, compile into the last
+	 (least recently used) non-busy cell in the cache.  */
       if (cp->next == 0)
 	{
-          if (cp->busy)
+          if (!lru_nonbusy)
             error ("Too much matching reentrancy");
+          cpp = lru_nonbusy;
+          cp = *cpp;
 	compile_it:
           eassert (!cp->busy);
 	  compile_pattern_1 (cp, pattern, translate, posix);
@@ -316,7 +319,10 @@ looking_at_1 (Lisp_Object string, bool posix)
 		  ZV_BYTE - BEGV_BYTE);
 
   if (i == -2)
-    matcher_overflow ();
+    {
+      unbind_to (count, Qnil);
+      matcher_overflow ();
+    }
 
   val = (i >= 0 ? Qt : Qnil);
   if (preserve_match_data && i >= 0)
@@ -1195,6 +1201,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          pos_byte - BEGV_BYTE);
       if (val == -2)
         {
+          unbind_to (count, Qnil);
           matcher_overflow ();
         }
       if (val >= 0)
@@ -1240,6 +1247,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          lim_byte - BEGV_BYTE);
       if (val == -2)
         {
+          unbind_to (count, Qnil);
           matcher_overflow ();
         }
       if (val >= 0)
@@ -3059,18 +3067,14 @@ If optional arg RESEAT is non-nil, make markers on LIST point nowhere.  */)
 static void
 save_search_regs (void)
 {
-  if (!search_regs_saved)
+  if (saved_search_regs.num_regs == 0)
     {
-      saved_search_regs.num_regs = search_regs.num_regs;
-      saved_search_regs.start = search_regs.start;
-      saved_search_regs.end = search_regs.end;
+      saved_search_regs = search_regs;
       saved_last_thing_searched = last_thing_searched;
       last_thing_searched = Qnil;
       search_regs.num_regs = 0;
       search_regs.start = 0;
       search_regs.end = 0;
-
-      search_regs_saved = 1;
     }
 }
 
@@ -3078,19 +3082,17 @@ save_search_regs (void)
 void
 restore_search_regs (void)
 {
-  if (search_regs_saved)
+  if (saved_search_regs.num_regs != 0)
     {
       if (search_regs.num_regs > 0)
 	{
 	  xfree (search_regs.start);
 	  xfree (search_regs.end);
 	}
-      search_regs.num_regs = saved_search_regs.num_regs;
-      search_regs.start = saved_search_regs.start;
-      search_regs.end = saved_search_regs.end;
+      search_regs = saved_search_regs;
       last_thing_searched = saved_last_thing_searched;
       saved_last_thing_searched = Qnil;
-      search_regs_saved = 0;
+      saved_search_regs.num_regs = 0;
     }
 }
 

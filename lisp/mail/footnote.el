@@ -363,7 +363,9 @@ Use Unicode characters for footnoting."
     ("ק" "ר" "ש" "ת" "תק" "תר" "תש" "תת" "תתק")))
 
 (defconst footnote-hebrew-numeric-regex
-  (concat "[" (apply #'concat (apply #'append footnote-hebrew-numeric)) "']+"))
+  (let ((numchars (string-to-list
+		   (apply #'concat (apply #'append footnote-hebrew-numeric)))))
+    (concat (regexp-opt-charset (cons ?' numchars)) "+")))
 ;; (defconst footnote-hebrew-numeric-regex "\\([אבגדהוזחט]'\\)?\\(ת\\)?\\(ת\\)?\\([קרשת]\\)?\\([טיכלמנסעפצ]\\)?\\([אבגדהוזחט]\\)?")
 
 (defun footnote--hebrew-numeric (n)
@@ -457,9 +459,19 @@ Conversion is done based upon the current selected style."
 
 (defun footnote--current-regexp ()
   "Return the regexp of the index of the current style."
-  (concat (nth 2 (or (assq footnote-style footnote-style-alist)
-		     (nth 0 footnote-style-alist)))
-	  "*"))
+  (let ((regexp (nth 2 (or (assq footnote-style footnote-style-alist)
+			   (nth 0 footnote-style-alist)))))
+    (concat
+     ;; Hack to avoid repetition of repetition.
+     ;; FIXME: I'm not sure the added * makes sense at all; there is
+     ;; always a single number within the footnote-{start,end}-tag pairs.
+     ;; Worse, the code goes on and adds yet another + later on, in
+     ;; footnote-refresh-footnotes, just in case. That makes even less sense.
+     ;; Likely, both the * and the extra + should go away.
+     (if (string-match "[^\\]\\\\\\{2\\}*[*+?]\\'" regexp)
+	 (substring regexp 0 -1)
+       regexp)
+     "*")))
 
 (defun footnote--refresh-footnotes (&optional index-regexp)
   "Redraw all footnotes.
