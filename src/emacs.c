@@ -217,6 +217,8 @@ static unsigned long heap_bss_diff;
    output a warning in dump-emacs.  */
 #define MAX_HEAP_BSS_DIFF (1024*1024)
 
+void *__dso_handle = NULL;
+
 
 #ifdef HAVE_WINDOW_SYSTEM
 extern Lisp_Object Vinitial_window_system;
