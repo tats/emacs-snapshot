@@ -495,6 +495,7 @@ struct dump_context
 
   Lisp_Object old_purify_flag;
   Lisp_Object old_post_gc_hook;
+  Lisp_Object old_process_environment;
 
 #ifdef REL_ALLOC
   bool blocked_ralloc;
@@ -1776,6 +1777,8 @@ dump_roots (struct dump_context *ctx)
   visit_static_gc_roots (visitor);
 }
 
+#define PDUMPER_MAX_OBJECT_SIZE 2048
+
 static dump_off
 field_relpos (const void *in_start, const void *in_field)
 {
@@ -1783,7 +1786,15 @@ field_relpos (const void *in_start, const void *in_field)
   ptrdiff_t in_field_val = (ptrdiff_t) in_field;
   eassert (in_start_val <= in_field_val);
   ptrdiff_t relpos = in_field_val - in_start_val;
-  eassert (relpos < 1024); /* Sanity check.  */
+  /* The following assertion attempts to detect bugs whereby IN_START
+     and IN_FIELD don't point to the same object/structure, on the
+     assumption that a too-large difference between them is
+     suspicious.  As of Apr 2019 the largest object we dump -- 'struct
+     buffer' -- is slightly smaller than 1KB, and we want to leave
+     some margin for future extensions.  If the assertion below is
+     ever violated, make sure the two pointers indeed point into the
+     same object, and if so, enlarge the value of PDUMPER_MAX_OBJECT_SIZE.  */
+  eassert (relpos < PDUMPER_MAX_OBJECT_SIZE);
   return (dump_off) relpos;
 }
 
@@ -2691,7 +2702,7 @@ dump_hash_table (struct dump_context *ctx,
                  Lisp_Object object,
                  dump_off offset)
 {
-#if CHECK_STRUCTS && !defined (HASH_Lisp_Hash_Table_73C9BFB7D1)
+#if CHECK_STRUCTS && !defined HASH_Lisp_Hash_Table_EF95ED06FF
 # error "Lisp_Hash_Table changed. See CHECK_STRUCTS comment."
 #endif
   const struct Lisp_Hash_Table *hash_in = XHASH_TABLE (object);
@@ -2759,7 +2770,7 @@ dump_hash_table (struct dump_context *ctx,
 static dump_off
 dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
 {
-#if CHECK_STRUCTS && !defined HASH_buffer_2CEE653E74
+#if CHECK_STRUCTS && !defined HASH_buffer_E34A11C6B9
 # error "buffer changed. See CHECK_STRUCTS comment."
 #endif
   struct buffer munged_buffer = *in_buffer;
@@ -3593,6 +3604,8 @@ dump_unwind_cleanup (void *data)
     r_alloc_inhibit_buffer_relocation (0);
 #endif
   Vpurify_flag = ctx->old_purify_flag;
+  Vpost_gc_hook = ctx->old_post_gc_hook;
+  Vprocess_environment = ctx->old_process_environment;
 }
 
 /* Return DUMP_OFFSET, making sure it is within the heap.  */
@@ -4024,12 +4037,6 @@ types.  */)
   Lisp_Object symbol = intern ("command-line-processed");
   specbind (symbol, Qnil);
 
-  /* Reset process-environment -- this is for when they re-dump a
-     pdump-restored emacs, since set_initial_environment wants always
-     to cons it from scratch.  */
-  Vprocess_environment = Qnil;
-  garbage_collect ();
-
   CHECK_STRING (filename);
   filename = Fexpand_file_name (filename, Qnil);
   filename = ENCODE_FILE (filename);
@@ -4090,6 +4097,12 @@ types.  */)
   /* Make sure various weird things are less likely to happen.  */
   ctx->old_post_gc_hook = Vpost_gc_hook;
   Vpost_gc_hook = Qnil;
+
+  /* Reset process-environment -- this is for when they re-dump a
+     pdump-restored emacs, since set_initial_environment wants always
+     to cons it from scratch.  */
+  ctx->old_process_environment = Vprocess_environment;
+  Vprocess_environment = Qnil;
 
   ctx->fd = emacs_open (SSDATA (filename),
                         O_RDWR | O_TRUNC | O_CREAT, 0666);

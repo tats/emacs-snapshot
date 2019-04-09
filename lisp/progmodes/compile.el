@@ -77,7 +77,7 @@ If this is buffer-local in the destination buffer, Emacs obeys
 that value, otherwise it uses the value in the *compilation*
 buffer.  This enables a major-mode to specify its own value.")
 
-(defvar compilation-parse-errors-filename-function nil
+(defvar compilation-parse-errors-filename-function #'identity
   "Function to call to post-process filenames while parsing error messages.
 It takes one arg FILENAME which is the name of a file as found
 in the compilation output, and should return a transformed file name
@@ -86,18 +86,18 @@ or a buffer, the one which was compiled.")
 ;; match data.
 
 ;;;###autoload
-(defvar compilation-process-setup-function nil
+(defvar compilation-process-setup-function #'ignore
   "Function to call to customize the compilation process.
 This function is called immediately before the compilation process is
 started.  It can be used to set any variables or functions that are used
 while processing the output of the compilation process.")
 
 ;;;###autoload
-(defvar compilation-buffer-name-function nil
+(defvar compilation-buffer-name-function #'compilation--default-buffer-name
   "Function to compute the name of a compilation buffer.
 The function receives one argument, the name of the major mode of the
 compilation buffer.  It should return a string.
-If nil, compute the name with `(concat \"*\" (downcase major-mode) \"*\")'.")
+By default, it returns `(concat \"*\" (downcase name-of-mode) \"*\")'.")
 
 ;;;###autoload
 (defvar compilation-finish-functions nil
@@ -558,6 +558,10 @@ of lines.  COLUMN can also be of the form (COLUMN . END-COLUMN)
 meaning a range of columns starting on LINE and ending on
 END-LINE, if that matched.
 
+LINE, END-LINE, COL, and END-COL can also be functions of no argument
+that return the corresponding line or column number.  They can assume REGEXP
+has just been matched, and should correspondingly preserve this match data.
+
 TYPE is 2 or nil for a real error or 1 for warning or 0 for info.
 TYPE can also be of the form (WARNING . INFO).  In that case this
 will be equivalent to 1 if the WARNING'th subexpression matched
@@ -717,8 +721,9 @@ This only affects platforms that support asynchronous processes (see
 Then every error line will have a debug text property with the matcher that
 fit this line and the match data.  Use `describe-text-properties'.")
 
-(defvar compilation-exit-message-function nil "\
-If non-nil, called when a compilation process dies to return a status message.
+(defvar compilation-exit-message-function
+  (lambda (_process-status exit-status msg) (cons msg exit-status))
+  "If non-nil, called when a compilation process dies to return a status message.
 This should be a function of three arguments: process status, exit status,
 and exit message; it returns a cons (MESSAGE . MODELINE) of the strings to
 write into the compilation buffer, and to put in its mode line.")
@@ -1105,23 +1110,27 @@ POS and RES.")
 	  (setq file '("*unknown*")))))
     ;; All of these fields are optional, get them only if we have an index, and
     ;; it matched some part of the message.
-    (and line
-	 (setq line (match-string-no-properties line))
-	 (setq line (string-to-number line)))
-    (and end-line
-	 (setq end-line (match-string-no-properties end-line))
-	 (setq end-line (string-to-number end-line)))
-    (if col
-        (if (functionp col)
-            (setq col (funcall col))
-          (and
-           (setq col (match-string-no-properties col))
-           (setq col (string-to-number col)))))
-    (if (and end-col (functionp end-col))
-        (setq end-col (funcall end-col))
-      (if (and end-col (setq end-col (match-string-no-properties end-col)))
-          (setq end-col (- (string-to-number end-col) -1))
-        (if end-line (setq end-col -1))))
+    (setq line
+          (if (functionp line) (funcall line)
+            (and line
+	         (setq line (match-string-no-properties line))
+                 (string-to-number line))))
+    (setq end-line
+          (if (functionp end-line) (funcall end-line)
+            (and end-line
+	         (setq end-line (match-string-no-properties end-line))
+                 (string-to-number end-line))))
+    (setq col
+          (if (functionp col) (funcall col)
+            (and col
+                 (setq col (match-string-no-properties col))
+                 (string-to-number col))))
+    (setq end-col
+          (or (if (functionp end-col) (funcall end-col)
+                (and end-col
+                     (setq end-col (match-string-no-properties end-col))
+                     (- (string-to-number end-col) -1)))
+              (and end-line -1)))
     (if (consp type)			; not a static type, check what it is.
 	(setq type (or (and (car type) (match-end (car type)) 1)
 		       (and (cdr type) (match-end (cdr type)) 0)
@@ -1222,12 +1231,12 @@ FMTS is a list of format specs for transforming the file name.
     (setq loc (compilation-assq line (compilation--file-struct->loc-tree
                                       file-struct)))
     (setq end-loc
-    (if end-line
+          (if end-line
               (compilation-assq
                end-col (compilation-assq
                         end-line (compilation--file-struct->loc-tree
                                   file-struct)))
-      (if end-col			; use same line element
+            (if end-col			; use same line element
                 (compilation-assq end-col loc))))
     (setq loc (compilation-assq col loc))
     ;; If they are new, make the loc(s) reference the file they point to.
@@ -1370,92 +1379,70 @@ to `compilation-error-regexp-alist' if RULES is nil."
       (if (consp line)	(setq end-line (cdr line) line (car line)))
       (if (consp col)	(setq end-col (cdr col)	  col (car col)))
 
-      (if (functionp line)
-          ;; The old compile.el had here an undocumented hook that
-          ;; allowed `line' to be a function that computed the actual
-          ;; error location.  Let's do our best.
-          (progn
-            (goto-char start)
-            (while (re-search-forward pat end t)
-              (save-match-data
-                (when compilation-debug
-                  (font-lock-append-text-property
-                   (match-beginning 0) (match-end 0)
-                   'compilation-debug (vector 'functionp item)))
-                (add-text-properties
-                 (match-beginning 0) (match-end 0)
-                 (compilation--compat-error-properties
-                  (funcall line (cons (match-string file)
-                                      (cons default-directory
-                                            (nthcdr 4 item)))
-                           (if col (match-string col))))))
+      (unless (or (null (nth 5 item)) (integerp (nth 5 item)))
+        (error "HYPERLINK should be an integer: %s" (nth 5 item)))
+
+      (goto-char start)
+      (while (re-search-forward pat end t)
+        (when (setq props (compilation-error-properties
+                           file line end-line col end-col (or type 2) fmt))
+
+          (when (integerp file)
+            (let ((this-type (if (consp type)
+                                 (compilation-type type)
+                               (or type 2))))
+              (compilation--note-type this-type)
+
               (compilation--put-prop
-               file 'font-lock-face compilation-error-face)))
+               file 'font-lock-face
+               (symbol-value (aref [compilation-info-face
+                                    compilation-warning-face
+                                    compilation-error-face]
+                                   this-type)))))
 
-        (unless (or (null (nth 5 item)) (integerp (nth 5 item)))
-          (error "HYPERLINK should be an integer: %s" (nth 5 item)))
+          (compilation--put-prop
+           line 'font-lock-face compilation-line-face)
+          (compilation--put-prop
+           end-line 'font-lock-face compilation-line-face)
 
-        (goto-char start)
-        (while (re-search-forward pat end t)
-          (when (setq props (compilation-error-properties
-                             file line end-line col end-col (or type 2) fmt))
+          (compilation--put-prop
+           col 'font-lock-face compilation-column-face)
+          (compilation--put-prop
+           end-col 'font-lock-face compilation-column-face)
 
-            (when (integerp file)
-              (let ((this-type (if (consp type)
-                                   (compilation-type type)
-                                 (or type 2))))
-                (compilation--note-type this-type)
-
-                (compilation--put-prop
-                 file 'font-lock-face
-                 (symbol-value (aref [compilation-info-face
-                                      compilation-warning-face
-                                      compilation-error-face]
-                                     this-type)))))
-
-            (compilation--put-prop
-             line 'font-lock-face compilation-line-face)
-            (compilation--put-prop
-             end-line 'font-lock-face compilation-line-face)
-
-            (compilation--put-prop
-             col 'font-lock-face compilation-column-face)
-            (compilation--put-prop
-             end-col 'font-lock-face compilation-column-face)
-
-	    ;; Obey HIGHLIGHT.
-            (dolist (extra-item (nthcdr 6 item))
-              (let ((mn (pop extra-item)))
-                (when (match-beginning mn)
-                  (let ((face (eval (car extra-item))))
-                    (cond
-                     ((null face))
-                     ((or (symbolp face) (stringp face))
-                      (put-text-property
-                       (match-beginning mn) (match-end mn)
-                       'font-lock-face face))
-		     ((and (listp face)
-			   (eq (car face) 'face)
-			   (or (symbolp (cadr face))
-			       (stringp (cadr face))))
-                      (compilation--put-prop mn 'font-lock-face (cadr face))
-                      (add-text-properties
-                       (match-beginning mn) (match-end mn)
-                       (nthcdr 2 face)))
-                     (t
-                      (error "Don't know how to handle face %S"
-                             face)))))))
-            (let ((mn (or (nth 5 item) 0)))
-              (when compilation-debug
-                (font-lock-append-text-property
-                 (match-beginning 0) (match-end 0)
-                 'compilation-debug (vector 'std item props)))
-              (add-text-properties
-               (match-beginning mn) (match-end mn)
-               (cddr props))
+	  ;; Obey HIGHLIGHT.
+          (dolist (extra-item (nthcdr 6 item))
+            (let ((mn (pop extra-item)))
+              (when (match-beginning mn)
+                (let ((face (eval (car extra-item))))
+                  (cond
+                   ((null face))
+                   ((or (symbolp face) (stringp face))
+                    (put-text-property
+                     (match-beginning mn) (match-end mn)
+                     'font-lock-face face))
+		   ((and (listp face)
+			 (eq (car face) 'face)
+			 (or (symbolp (cadr face))
+			     (stringp (cadr face))))
+                    (compilation--put-prop mn 'font-lock-face (cadr face))
+                    (add-text-properties
+                     (match-beginning mn) (match-end mn)
+                     (nthcdr 2 face)))
+                   (t
+                    (error "Don't know how to handle face %S"
+                           face)))))))
+          (let ((mn (or (nth 5 item) 0)))
+            (when compilation-debug
               (font-lock-append-text-property
-               (match-beginning mn) (match-end mn)
-               'font-lock-face (cadr props)))))))))
+               (match-beginning 0) (match-end 0)
+               'compilation-debug (vector 'std item props)))
+            (add-text-properties
+             (match-beginning mn) (match-end mn)
+             (cddr props))
+            (font-lock-append-text-property
+             (match-beginning mn) (match-end mn)
+             'font-lock-face (cadr props))))))))
 
 (defvar compilation--parsed -1)
 (make-variable-buffer-local 'compilation--parsed)
@@ -1576,19 +1563,22 @@ point on its location in the *compilation* buffer."
   :version "20.3")
 
 
-(defun compilation-buffer-name (name-of-mode mode-command name-function)
+(defun compilation-buffer-name (name-of-mode _mode-command name-function)
   "Return the name of a compilation buffer to use.
 If NAME-FUNCTION is non-nil, call it with one argument NAME-OF-MODE
 to determine the buffer name.
 Likewise if `compilation-buffer-name-function' is non-nil.
-If current buffer has the major mode MODE-COMMAND,
+If current buffer has the NAME-OF-MODE major mode,
 return the name of the current buffer, so that it gets reused.
 Otherwise, construct a buffer name from NAME-OF-MODE."
-  (cond (name-function
-	 (funcall name-function name-of-mode))
-	(compilation-buffer-name-function
-	 (funcall compilation-buffer-name-function name-of-mode))
-	((eq mode-command major-mode)
+  (funcall (or name-function
+	       compilation-buffer-name-function
+               #'compilation--default-buffer-name)
+           name-of-mode))
+
+(defun compilation--default-buffer-name (name-of-mode)
+  (cond ((or (eq major-mode (intern-soft name-of-mode))
+             (eq major-mode (intern-soft (concat name-of-mode "-mode"))))
 	 (buffer-name))
 	(t
 	 (concat "*" (downcase name-of-mode) "*"))))
@@ -2066,8 +2056,7 @@ by replacing the first word, e.g., `compilation-scroll-output' from
 			    (if (boundp 'byte-compile-bound-variables)
 				(memq (cdr v) byte-compile-bound-variables)))
 			`(set (make-local-variable ',(car v)) ,(cdr v))))
-		 '(compilation-buffer-name-function
-		   compilation-directory-matcher
+		 '(compilation-directory-matcher
 		   compilation-error
 		   compilation-error-regexp-alist
 		   compilation-error-regexp-alist-alist
@@ -2792,7 +2781,8 @@ TRUE-DIRNAME is the `file-truename' of DIRNAME, if given."
 	;; If compilation-parse-errors-filename-function is
 	;; defined, use it to process the filename.  The result might be a
 	;; buffer.
-	(when compilation-parse-errors-filename-function
+	(unless (memq compilation-parse-errors-filename-function
+                      '(nil identity))
           (save-match-data
 	    (setq filename
 		  (funcall compilation-parse-errors-filename-function
@@ -2836,29 +2826,6 @@ TRUE-DIRNAME is the `file-truename' of DIRNAME, if given."
 (defvar compilation-parsing-end (make-marker))
 (defvar compilation-error-list nil)
 (defvar compilation-old-error-list nil)
-
-(defun compilation--compat-error-properties (err)
-  "Map old-style error ERR to new-style message."
-  ;; Old-style structure is (MARKER (FILE DIR) LINE COL) or
-  ;; (MARKER . MARKER).
-  (let ((dst (cdr err)))
-    (if (markerp dst)
-	`(compilation-message ,(compilation--make-message
-                                (cons nil (compilation--make-cdrloc
-                                           nil nil dst))
-                                2 nil)
-	  help-echo "mouse-2: visit the source location"
-	  keymap compilation-button-map
-	  mouse-face highlight)
-      ;; Too difficult to do it by hand: dispatch to the normal code.
-      (let* ((file (pop dst))
-	     (line (pop dst))
-	     (col (pop dst))
-	     (filename (pop file))
-	     (dirname (pop file))
-	     (fmt (pop file)))
-	(compilation-internal-error-properties
-	 (cons filename dirname) line nil col nil 2 fmt)))))
 
 (defun compilation--compat-parse-errors (limit)
   (when compilation-parse-errors-function

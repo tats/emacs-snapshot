@@ -2801,14 +2801,14 @@ for all methods.  Resulting data are derived from default settings."
 	 :port method :require '(:port) :max most-positive-fixnum))))
 
 ;; Generic function.
-(defun tramp-parse-group (regexp match-level skip-regexp)
+(defun tramp-parse-group (regexp match-level skip-chars)
    "Return a (user host) tuple allowed to access.
 User is always nil."
    (let (result)
      (when (re-search-forward regexp (point-at-eol) t)
        (setq result (list nil (match-string match-level))))
      (or
-      (> (skip-chars-forward skip-regexp) 0)
+      (> (skip-chars-forward skip-chars) 0)
       (forward-line 1))
      result))
 
@@ -2864,7 +2864,7 @@ User is always nil."
    (tramp-parse-group
     (concat "\\(?:^[ \t]*Host\\)" "\\|" "\\(?:^.+\\)"
 	    "\\|" "\\(" tramp-host-regexp "\\)")
-    1 "[ \t]+"))
+    1 " \t"))
 
 ;; Generic function.
 (defun tramp-parse-shostkeys-sknownhosts (dirname regexp)
@@ -3881,7 +3881,7 @@ of."
       (tramp-check-for-regexp proc tramp-password-prompt-regexp)
       (tramp-message vec 3 "Sending %s" (match-string 1))
       ;; We don't call `tramp-send-string' in order to hide the
-      ;; password from the debug buffer.
+      ;; password from the debug buffer and the traces.
       (process-send-string
        proc (concat (tramp-read-passwd proc) tramp-local-end-of-line))
       ;; Hide password prompt.
@@ -4171,12 +4171,20 @@ The STRING is expected to use Unix line-endings, but the lines sent to
 the remote host use line-endings as defined in the variable
 `tramp-rsh-end-of-line'.  The communication buffer is erased before sending."
   (let* ((p (tramp-get-connection-process vec))
-	 (chunksize (tramp-get-connection-property p "chunksize" nil)))
+	 (chunksize (tramp-get-connection-property p "chunksize" nil))
+	 ;; We do not want to run timers.
+	 (tl timer-list)
+         (stimers (with-timeout-suspend))
+	 timer-list timer-idle-list)
     (unless p
       (tramp-error
        vec 'file-error "Can't send string to remote host -- not logged in"))
     (tramp-set-connection-property p "last-cmd-time" (current-time))
     (tramp-message vec 10 "%s" string)
+    ;; Enable our progress reporter.
+    (dolist (timer tl)
+      (if (eq (timer--function timer) #'tramp-progress-reporter-update)
+          (push timer timer-list)))
     (with-current-buffer (tramp-get-connection-buffer vec)
       ;; Clean up the buffer.  We cannot call `erase-buffer' because
       ;; narrowing might be in effect.
@@ -4189,17 +4197,33 @@ the remote host use line-endings as defined in the variable
 		  (string-equal (substring string -1) tramp-rsh-end-of-line))
 	(setq string (concat string tramp-rsh-end-of-line)))
       ;; Send the string.
-      (if (and chunksize (not (zerop chunksize)))
-	  (let ((pos 0)
-		(end (length string)))
-	    (while (< pos end)
-	      (tramp-message
-	       vec 10 "Sending chunk from %s to %s"
-	       pos (min (+ pos chunksize) end))
-	      (process-send-string
-	       p (substring string pos (min (+ pos chunksize) end)))
-	      (setq pos (+ pos chunksize))))
-	(process-send-string p string)))))
+      (with-local-quit
+	(if (and chunksize (not (zerop chunksize)))
+	    (let ((pos 0)
+		  (end (length string)))
+	      (while (< pos end)
+		(tramp-message
+		 vec 10 "Sending chunk from %s to %s"
+		 pos (min (+ pos chunksize) end))
+		(process-send-string
+		 p (substring string pos (min (+ pos chunksize) end)))
+		(setq pos (+ pos chunksize))))
+	  (process-send-string p string)))
+      ;; Reenable the timers.
+      (with-timeout-unsuspend stimers))))
+
+(defun tramp-process-sentinel (proc event)
+  "Flush file caches and remove shell prompt."
+  (unless (process-live-p proc)
+    (let ((vec (process-get proc 'vector))
+	  (prompt (tramp-get-connection-property proc "prompt" nil)))
+      (when vec
+	(tramp-message vec 5 "Sentinel called: `%S' `%s'" proc event)
+        (tramp-flush-connection-properties proc)
+        (tramp-flush-directory-properties vec ""))
+      (goto-char (point-max))
+      (when (and prompt (re-search-backward (regexp-quote prompt) nil t))
+	(delete-region (point) (point-max))))))
 
 (defun tramp-get-inode (vec)
   "Returns the virtual inode number.

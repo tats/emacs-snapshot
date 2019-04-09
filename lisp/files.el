@@ -2705,9 +2705,8 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.dbk\\'" . xml-mode)
      ("\\.dtd\\'" . sgml-mode)
      ("\\.ds\\(ss\\)?l\\'" . dsssl-mode)
-     ("\\.jsm?\\'" . javascript-mode)
+     ("\\.js[mx]?\\'" . javascript-mode)
      ("\\.json\\'" . javascript-mode)
-     ("\\.jsx\\'" . js-jsx-mode)
      ("\\.[ds]?vh?\\'" . verilog-mode)
      ("\\.by\\'" . bovine-grammar-mode)
      ("\\.wy\\'" . wisent-grammar-mode)
@@ -6316,7 +6315,7 @@ See also `auto-save-file-name-p'."
       ;; We do this on all platforms, because even if we are not
       ;; running on DOS/Windows, the current directory may be on a
       ;; mounted VFAT filesystem, such as a USB memory stick.
-      (while (string-match "[^A-Za-z0-9-_.~#+]" buffer-name limit)
+      (while (string-match "[^A-Za-z0-9_.~#+-]" buffer-name limit)
 	(let* ((character (aref buffer-name (match-beginning 0)))
 	       (replacement
                 ;; For multibyte characters, this will produce more than
