@@ -110,6 +110,15 @@ If non-nil, the value is passed directly to `recenter'."
   :type 'hook
   :group 'next-error)
 
+(defcustom next-error-verbose t
+  "If non-nil, `next-error' always outputs the current error buffer.
+If nil, the message is output only when the error buffer
+changes."
+  :group 'next-error
+  :type 'boolean
+  :safe #'booleanp
+  :version "27.1")
+
 (defvar next-error-highlight-timer nil)
 
 (defvar next-error-overlay-arrow-position nil)
@@ -312,21 +321,27 @@ To control which errors are matched, customize the variable
       ;; We know here that next-error-function is a valid symbol we can funcall
       (with-current-buffer buffer
         (funcall next-error-function (prefix-numeric-value arg) reset)
-        (next-error-found buffer (current-buffer))
-        (message "%s locus from %s"
-                 (cond (reset                             "First")
-                       ((eq (prefix-numeric-value arg) 0) "Current")
-                       ((< (prefix-numeric-value arg) 0)  "Previous")
-                       (t                                 "Next"))
-                 next-error-last-buffer)))))
+        (let ((prev next-error-last-buffer))
+          (next-error-found buffer (current-buffer))
+          (when (or next-error-verbose
+                    (not (eq prev next-error-last-buffer)))
+            (message "%s locus from %s"
+                     (cond (reset                             "First")
+                           ((eq (prefix-numeric-value arg) 0) "Current")
+                           ((< (prefix-numeric-value arg) 0)  "Previous")
+                           (t                                 "Next"))
+                     next-error-last-buffer)))))))
 
 (defun next-error-internal ()
   "Visit the source code corresponding to the `next-error' message at point."
   (let ((buffer (current-buffer)))
     ;; We know here that next-error-function is a valid symbol we can funcall
     (funcall next-error-function 0 nil)
-    (next-error-found buffer (current-buffer))
-    (message "Current locus from %s" next-error-last-buffer)))
+    (let ((prev next-error-last-buffer))
+      (next-error-found buffer (current-buffer))
+      (when (or next-error-verbose
+                (not (eq prev next-error-last-buffer)))
+        (message "Current locus from %s" next-error-last-buffer)))))
 
 (defun next-error-found (&optional from-buffer to-buffer)
   "Function to call when the next locus is found and displayed.
@@ -3336,6 +3351,16 @@ is output."
   :group 'shell
   :version "26.1")
 
+(defcustom shell-command-width nil
+  "Number of display columns available for asynchronous shell command output.
+If nil, use the shell default number (usually 80 columns).
+If a positive integer, tell the shell to use that number of columns for
+command output."
+  :type '(choice (const :tag "Use system limit" nil)
+                 (integer :tag "Fixed width" :value 80))
+  :group 'shell
+  :version "27.1")
+
 (defcustom shell-command-dont-erase-buffer nil
   "If non-nil, output buffer is not erased between shell commands.
 Also, a non-nil value sets the point in the output buffer
@@ -3599,8 +3624,13 @@ impose the use of a shell (with its need to quote arguments)."
 		(with-current-buffer buffer
                   (shell-command--save-pos-or-erase)
 		  (setq default-directory directory)
-                  (setq proc
-                        (start-process-shell-command "Shell" buffer command))
+		  (let ((process-environment
+			 (if (natnump shell-command-width)
+			     (cons (format "COLUMNS=%d" shell-command-width)
+				   process-environment)
+			   process-environment)))
+		    (setq proc
+			  (start-process-shell-command "Shell" buffer command)))
 		  (setq mode-line-process '(":%s"))
 		  (require 'shell) (shell-mode)
                   (set-process-sentinel proc #'shell-command-sentinel)
@@ -8205,6 +8235,9 @@ These functions are called in order with three arguments:
 CHOICE - the string to insert in the buffer,
 BUFFER - the buffer in which the choice should be inserted,
 BASE-POSITION - where to insert the completion.
+
+Functions should also accept and ignore a potential fourth
+argument, passed for backwards compatibility.
 
 If a function in the list returns non-nil, that function is supposed
 to have inserted the CHOICE in the BUFFER, and possibly exited

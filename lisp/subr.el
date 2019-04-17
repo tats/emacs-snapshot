@@ -604,6 +604,11 @@ If N is omitted or nil, remove the last element."
 	   (if (> n 0) (setcdr (nthcdr (- (1- m) n) list) nil))
 	   list))))
 
+;; The function's definition was moved to fns.c,
+;; but it's easier to set properties here.
+(put 'proper-list-p 'pure t)
+(put 'proper-list-p 'side-effect-free 'error-free)
+
 (defun delete-dups (list)
   "Destructively remove `equal' duplicates from LIST.
 Store the result in LIST and return it.  LIST must be a proper list.
@@ -779,9 +784,9 @@ Elements of ALIST that are not conses are ignored."
   alist)
 
 (defun alist-get (key alist &optional default remove testfn)
-  "Return the value associated with KEY in ALIST.
+  "Find the first element of ALIST whose `car' equals KEY and return its `cdr'.
 If KEY is not found in ALIST, return DEFAULT.
-Use TESTFN to lookup in the alist if non-nil.  Otherwise, use `assq'.
+Equality with KEY is tested by TESTFN, defaulting to `eq'.
 
 You can use `alist-get' in PLACE expressions.  This will modify
 an existing association (more precisely, the first one if

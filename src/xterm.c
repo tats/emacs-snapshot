@@ -922,16 +922,17 @@ x_set_frame_alpha (struct frame *f)
   else
     alpha = f->alpha[1];
 
+  if (alpha < 0.0)
+    return;
+
   if (FLOATP (Vframe_alpha_lower_limit))
     alpha_min = XFLOAT_DATA (Vframe_alpha_lower_limit);
   else if (FIXNUMP (Vframe_alpha_lower_limit))
     alpha_min = (XFIXNUM (Vframe_alpha_lower_limit)) / 100.0;
 
-  if (alpha < 0.0)
-    return;
-  else if (alpha > 1.0)
+  if (alpha > 1.0)
     alpha = 1.0;
-  else if (0.0 <= alpha && alpha < alpha_min && alpha_min <= 1.0)
+  else if (alpha < alpha_min && alpha_min <= 1.0)
     alpha = alpha_min;
 
   opac = alpha * OPAQUE;
@@ -2988,6 +2989,7 @@ x_draw_glyph_string_box (struct glyph_string *s)
 }
 
 
+#ifndef USE_CAIRO
 static void
 x_composite_image (struct glyph_string *s, Pixmap dest,
                    int srcX, int srcY, int dstX, int dstY,
@@ -3027,6 +3029,7 @@ x_composite_image (struct glyph_string *s, Pixmap dest,
 	     srcX, srcY,
 	     width, height, dstX, dstY);
 }
+#endif	/* !USE_CAIRO */
 
 
 /* Draw foreground of image glyph string S.  */
@@ -3334,7 +3337,9 @@ x_draw_image_glyph_string (struct glyph_string *s)
   int box_line_hwidth = eabs (s->face->box_line_width);
   int box_line_vwidth = max (s->face->box_line_width, 0);
   int height;
+#ifndef USE_CAIRO
   Pixmap pixmap = None;
+#endif
 
   height = s->height;
   if (s->slice.y == 0)
@@ -12513,7 +12518,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
         dpy = DEFAULT_GDK_DISPLAY ();
 
-#if ! GTK_CHECK_VERSION (2, 90, 0)
+#ifndef HAVE_GTK3
         /* Load our own gtkrc if it exists.  */
         {
           const char *file = "~/.emacs.d/gtkrc";

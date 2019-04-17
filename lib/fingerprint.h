@@ -1,4 +1,4 @@
-/* Dummy fingerprint
+/* Header file for the Emacs build fingerprint.
 
 Copyright (C) 2016, 2018-2019 Free Software Foundation, Inc.
 
@@ -17,7 +17,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "fingerprint.h"
+#ifndef EMACS_FINGERPRINT_H
+#define EMACS_FINGERPRINT_H
 
-/* Dummy fingerprint to use as hash input.  */
-const uint8_t fingerprint[32] = { 0 };
+/* We generate fingerprint.c and fingerprint.o from all the sources in
+   Emacs.  This way, we have a unique value that we can use to pair
+   data files (like a portable dump image) with a specific build of
+   Emacs.  */
+extern unsigned char const fingerprint[32];
+
+#endif

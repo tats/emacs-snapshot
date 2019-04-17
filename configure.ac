@@ -379,8 +379,12 @@ if test "$with_dumping" = "unexec" && test "$with_unexec" = "no"; then
 fi
 
 if test "$with_pdumper" = "yes"; then
-    AC_DEFINE(HAVE_PDUMPER, 1, [Define to build with portable dumper support])
+  AC_DEFINE([HAVE_PDUMPER], 1, [Define to build with portable dumper support])
+  HAVE_PDUMPER=yes
+else
+  HAVE_PDUMPER=no
 fi
+AC_SUBST([HAVE_PDUMPER])
 
 DUMPING=$with_dumping
 AC_SUBST(DUMPING)
@@ -537,19 +541,21 @@ fi)
 
 AC_ARG_ENABLE(checking,
 [AS_HELP_STRING([--enable-checking@<:@=LIST@:>@],
-		[enable expensive run-time checks.  With LIST,
+		[enable expensive checks.  With LIST,
 		 enable only specific categories of checks.
 		 Categories are: all,yes,no.
 		 Flags are: stringbytes, stringoverrun, stringfreelist,
-		 xmallocoverrun, conslist, glyphs])],
+		 structs, xmallocoverrun, conslist, glyphs])],
 [ac_checking_flags="${enableval}"],[])
 IFS="${IFS= 	}"; ac_save_IFS="$IFS"; IFS="$IFS,"
+CHECK_STRUCTS=false
 for check in $ac_checking_flags
 do
 	case $check in
 	# these set all the flags to specific states
 	yes)		ac_enable_checking=1 ;;
 	no)		ac_enable_checking= ;
+			CHECK_STRUCTS=false
 			ac_gc_check_stringbytes= ;
 	                ac_gc_check_string_overrun= ;
 	                ac_gc_check_string_free_list= ;
@@ -557,6 +563,7 @@ do
 	                ac_gc_check_cons_list= ;
 			ac_glyphs_debug= ;;
 	all)		ac_enable_checking=1 ;
+			CHECK_STRUCTS=true
 			ac_gc_check_stringbytes=1 ;
 	                ac_gc_check_string_overrun=1 ;
 	                ac_gc_check_string_free_list=1 ;
@@ -567,6 +574,7 @@ do
 	stringbytes)	ac_gc_check_stringbytes=1 ;;
 	stringoverrun)	ac_gc_check_string_overrun=1 ;;
 	stringfreelist) ac_gc_check_string_free_list=1 ;;
+	structs)	CHECK_STRUCTS=true ;;
 	xmallocoverrun)	ac_xmalloc_overrun=1 ;;
 	conslist)	ac_gc_check_cons_list=1 ;;
 	glyphs)		ac_glyphs_debug=1 ;;
@@ -579,6 +587,15 @@ if test x$ac_enable_checking != x ; then
   AC_DEFINE(ENABLE_CHECKING, 1,
 [Define to 1 if expensive run-time data type and consistency checks are enabled.])
 fi
+if $CHECK_STRUCTS; then
+  AC_DEFINE([CHECK_STRUCTS], 1,
+    [Define this to check whether someone updated the portable dumper
+     code after changing the layout of a structure that it uses.
+     If you change one of these structures, check that the pdumper.c
+     code is still valid, and update the pertinent hash in pdumper.c
+     by manually copying the hash from the newly-generated dmpstruct.h.])
+fi
+AC_SUBST([CHECK_STRUCTS])
 if test x$ac_gc_check_stringbytes != x ; then
   AC_DEFINE(GC_CHECK_STRING_BYTES, 1,
 [Define this temporarily to hunt a bug.  If defined, the size of
@@ -2671,8 +2688,8 @@ check_gtk2=no
 gtk3_pkg_errors=
 if test "${opsys}" != "mingw32"; then
   if test "${with_gtk3}" = "yes" || test "${with_gtk}" = "yes" || test "$USE_X_TOOLKIT" = "maybe"; then
-    GLIB_REQUIRED=2.28
-    GTK_REQUIRED=3.0
+    GLIB_REQUIRED=2.37.5
+    GTK_REQUIRED=3.10
     GTK_MODULES="gtk+-3.0 >= $GTK_REQUIRED glib-2.0 >= $GLIB_REQUIRED"
 
     dnl Checks for libraries.
@@ -2699,8 +2716,8 @@ if test "${opsys}" != "mingw32"; then
   fi
 
   if test "${with_gtk2}" = "yes" || test "$check_gtk2" = "yes"; then
-    GLIB_REQUIRED=2.10
-    GTK_REQUIRED=2.10
+    GLIB_REQUIRED=2.28
+    GTK_REQUIRED=2.24
     GTK_MODULES="gtk+-2.0 >= $GTK_REQUIRED glib-2.0 >= $GLIB_REQUIRED"
 
     dnl Checks for libraries.
@@ -2787,30 +2804,8 @@ if test "${HAVE_GTK}" = "yes"; then
     AC_CHECK_FUNCS(gtk_file_selection_new)
   fi
 
-  dnl Same as above for gtk_handle_box.
-  HAVE_GTK_HANDLE_BOX=no
-  AC_CHECK_DECL(GTK_TYPE_HANDLE_BOX, HAVE_GTK_HANDLE_BOX=yes,
-                   HAVE_GTK_HANDLE_BOX=no, [AC_INCLUDES_DEFAULT
-#include <gtk/gtk.h>])
-  if test "$HAVE_GTK_HANDLE_BOX" = yes; then
-    AC_CHECK_FUNCS(gtk_handle_box_new)
-  fi
-
-  dnl Same as above for gtk_tearoff_menu_item.
-  HAVE_GTK_TEAROFF_MENU_ITEM=no
-  AC_CHECK_DECL(GTK_TYPE_TEAROFF_MENU_ITEM, HAVE_GTK_TEAROFF_MENU_ITEM=yes,
-                   HAVE_GTK_TEAROFF_MENU_ITEM=no, [AC_INCLUDES_DEFAULT
-#include <gtk/gtk.h>])
-  if test "$HAVE_GTK_TEAROFF_MENU_ITEM" = yes; then
-    AC_CHECK_FUNCS(gtk_tearoff_menu_item_new)
-  fi
-
-  dnl Check for functions introduced in 2.14 and later.
-  AC_CHECK_FUNCS(gtk_widget_get_window gtk_widget_set_has_window \
-                 gtk_dialog_get_action_area gtk_widget_get_sensitive \
-                 gtk_widget_get_mapped gtk_adjustment_get_page_size \
-                 gtk_orientable_set_orientation \
-		 gtk_window_set_has_resize_grip)
+  dnl This procedure causes a bug on certain Ubuntu GTK+2 builds
+  AC_CHECK_FUNCS(gtk_window_set_has_resize_grip)
 
  term_header=gtkutil.h
 fi

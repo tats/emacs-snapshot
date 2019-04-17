@@ -600,6 +600,67 @@ It is set to be buffer-local (and t) when in `js-jsx-mode'."
   :safe 'booleanp
   :group 'js)
 
+(defcustom js-jsx-align->-with-< t
+  "When non-nil, “>” will be indented to the opening “<” in JSX.
+
+When this is enabled, JSX indentation looks like this:
+
+  <element
+    attr=\"\"
+  >
+  </element>
+  <input
+  />
+
+When this is disabled, JSX indentation looks like this:
+
+  <element
+    attr=\"\"
+    >
+  </element>
+  <input
+    />"
+  :version "27.1"
+  :type 'boolean
+  :safe 'booleanp
+  :group 'js)
+
+(defcustom js-jsx-indent-level nil
+  "When non-nil, indent JSX by this value, instead of like JS.
+
+Let `js-indent-level' be 4.  When this variable is also set to
+nil, JSX indentation looks like this (consistent):
+
+  return (
+      <element>
+          <element>
+              Hello World!
+          </element>
+      </element>
+  )
+
+Alternatively, when this variable is also set to 2, JSX
+indentation looks like this (different):
+
+  return (
+      <element>
+        <element>
+          Hello World!
+        </element>
+      </element>
+  )"
+  :version "27.1"
+  :type 'integer
+  :safe (lambda (x) (or (null x) (integerp x)))
+  :group 'js)
+;; This is how indentation behaved out-of-the-box until Emacs 27.  JSX
+;; indentation was controlled with `sgml-basic-offset', which defaults
+;; to 2, whereas `js-indent-level' defaults to 4.  Users who had the
+;; same values configured for both their HTML and JS indentation would
+;; luckily get consistent JSX indentation; most others were probably
+;; unhappy.  I’d be surprised if anyone actually wants different
+;; indentation levels, but just in case, here’s a way back to that.
+
 (defcustom js-jsx-attribute-offset 0
   "Specifies a delta for JSXAttribute indentation.
 
@@ -2079,6 +2140,14 @@ JSXElement or a JSXOpeningElement/JSXClosingElement pair."
 ;; `syntax-propertize-rules' loop so the next JSXBoundaryElement can
 ;; be parsed, if any, be it an opening or closing one.
 
+(defun js-jsx--put-syntax-table (start end value)
+  "Set syntax-table text property from START to END as VALUE.
+Redundantly set the value to two properties, syntax-table and
+js-jsx-syntax-table.  Derivative modes that remove syntax-table
+text properties may recover the value from the second property." ; i.e. js2-mode
+  (add-text-properties start end (list 'syntax-table value
+                                       'js-jsx-syntax-table value)))
+
 (defun js-jsx--text-range (beg end)
   "Identify JSXText within a “>/{/}/<” pair."
   (when (> (- end beg) 0)
@@ -2090,7 +2159,7 @@ JSXElement or a JSXOpeningElement/JSXClosingElement pair."
         ;; negate those roles.
         (when (or (= (char-after) ?/) ; comment
                   (= (syntax-class (syntax-after (point))) 7)) ; string quote
-          (put-text-property (point) (1+ (point)) 'syntax-table '(1)))
+          (js-jsx--put-syntax-table (point) (1+ (point)) '(1)))
         (forward-char)))
     ;; Mark JSXText so it can be font-locked as non-keywords.
     (put-text-property beg (1+ beg) 'js-jsx-text (list beg end (current-buffer)))
@@ -2159,7 +2228,7 @@ testing for syntax only valid as JSX."
         (cond
          ((= (char-after) ?>)
           ;; Make the closing “>” a close parenthesis.
-          (put-text-property (point) (1+ (point)) 'syntax-table '(5))
+          (js-jsx--put-syntax-table (point) (1+ (point)) '(5))
           (forward-char)
           (setq unambiguous t)
           (throw 'stop nil))
@@ -2245,7 +2314,7 @@ testing for syntax only valid as JSX."
       ;; Save JSXBoundaryElement’s name’s match data for font-locking.
       (if name-beg (put-text-property name-beg (1+ name-beg) 'js-jsx-tag-name name-match-data))
       ;; Make the opening “<” an open parenthesis.
-      (put-text-property tag-beg (1+ tag-beg) 'syntax-table '(4))
+      (js-jsx--put-syntax-table tag-beg (1+ tag-beg) '(4))
       ;; Prevent “out of range” errors when typing at the end of a buffer.
       (setq tag-end (if (eobp) (1- (point)) (point)))
       ;; Mark beginning and end of tag for font-locking.
@@ -2264,7 +2333,8 @@ testing for syntax only valid as JSX."
   (list
    'js-jsx-tag-beg nil 'js-jsx-tag-end nil 'js-jsx-close-tag-pos nil
    'js-jsx-tag-name nil 'js-jsx-attribute-name nil 'js-jsx-string nil
-   'js-jsx-text nil 'js-jsx-expr nil 'js-jsx-expr-attribute nil)
+   'js-jsx-text nil 'js-jsx-expr nil 'js-jsx-expr-attribute nil
+   'js-jsx-syntax-table nil)
   "Plist of text properties added by `js-syntax-propertize'.")
 
 (defun js-syntax-propertize (start end)
@@ -2689,10 +2759,12 @@ The column calculation is based off of `sgml-calculate-indent'."
      ;; bracket on its own line is indented at the same level as the
      ;; opening angle bracket of the JSXElement.  Otherwise, indent
      ;; JSXAttribute space like SGML.
-     (if (progn
-           (goto-char (nth 2 context))
-           (and (= line (line-number-at-pos))
-                (looking-back "^\\s-*/?>" (line-beginning-position))))
+     (if (and
+          js-jsx-align->-with-<
+          (progn
+            (goto-char (nth 2 context))
+            (and (= line (line-number-at-pos))
+                 (looking-back "^\\s-*/?>" (line-beginning-position)))))
          (progn
            (goto-char (nth 1 context))
            (current-column))
@@ -2706,7 +2778,7 @@ The column calculation is based off of `sgml-calculate-indent'."
 	   (current-column)
          ;; This is the first attribute: indent.
          (goto-char (+ (nth 1 context) js-jsx-attribute-offset))
-         (+ (current-column) js-indent-level))))
+         (+ (current-column) (or js-jsx-indent-level js-indent-level)))))
 
     ('text
      ;; Indent to reflect nesting.
@@ -2715,7 +2787,7 @@ The column calculation is based off of `sgml-calculate-indent'."
         ;; The last line isn’t nested, but the rest are.
         (if (or (not (nth 2 context)) ; Unclosed.
                 (< line (line-number-at-pos (nth 2 context))))
-            js-indent-level
+            (or js-jsx-indent-level js-indent-level)
           0)))
 
     ))
@@ -4483,6 +4555,7 @@ This function is intended for use in `after-change-functions'."
 
   ;; Comments
   (setq-local comment-start "// ")
+  (setq-local comment-start-skip "\\(//+\\|/\\*+\\)\\s *")
   (setq-local comment-end "")
   (setq-local fill-paragraph-function #'js-fill-paragraph)
   (setq-local normal-auto-fill-function #'js-do-auto-fill)
@@ -4508,8 +4581,7 @@ This function is intended for use in `after-change-functions'."
         c-paragraph-separate "$"
         c-block-comment-prefix "* "
         c-line-comment-starter "//"
-        c-comment-start-regexp "/[*/]\\|\\s!"
-        comment-start-skip "\\(//+\\|/\\*+\\)\\s *")
+        c-comment-start-regexp "/[*/]\\|\\s!")
   (setq-local comment-line-break-function #'c-indent-new-comment-line)
   (setq-local c-block-comment-start-regexp "/\\*")
   (setq-local comment-multi-line t)

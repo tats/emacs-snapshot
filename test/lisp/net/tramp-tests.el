@@ -3011,6 +3011,9 @@ They might differ only in access time."
   (setcar (nthcdr 4 attr2) tramp-time-dont-know)
   (equal attr1 attr2))
 
+;; This isn't 100% correct, but better than no explainer at all.
+(put #'tramp--test-file-attributes-equal-p 'ert-explainer #'ert--explain-equal)
+
 (ert-deftest tramp-test19-directory-files-and-attributes ()
   "Check `directory-files-and-attributes'."
   (skip-unless (tramp--test-enabled))
@@ -4079,6 +4082,16 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
       ;; Cleanup.
       (ignore-errors (delete-process proc)))))
 
+(defun tramp--test-shell-command-to-string-asynchronously (command)
+  "Like `shell-command-to-string', but for asynchronous processes."
+  (with-temp-buffer
+    (async-shell-command command (current-buffer))
+    (with-timeout
+        ((if (getenv "EMACS_EMBA_CI") 30 10) (tramp--test-timeout-handler))
+      (while (accept-process-output
+	      (get-buffer-process (current-buffer)) nil nil t)))
+    (buffer-substring-no-properties (point-min) (point-max))))
+
 (ert-deftest tramp-test32-shell-command ()
   "Check `shell-command'."
   :tags '(:expensive-test)
@@ -4094,6 +4107,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  ;; Suppress nasty messages.
 	  (inhibit-message t)
 	  kill-buffer-query-functions)
+
+      ;; Test ordinary `shell-command'.
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
@@ -4114,6 +4129,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name)))
 
+      ;; Test ordinary `async-shell-command'.
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
@@ -4142,6 +4158,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name)))
 
+      ;; Test sending string to `async-shell-command'.
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
@@ -4169,17 +4186,29 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (buffer-string))))
 
 	;; Cleanup.
-	(ignore-errors (delete-file tmp-name))))))
+	(ignore-errors (delete-file tmp-name)))
 
-(defun tramp--test-shell-command-to-string-asynchronously (command)
-  "Like `shell-command-to-string', but for asynchronous processes."
-  (with-temp-buffer
-    (async-shell-command command (current-buffer))
-    (with-timeout
-        ((if (getenv "EMACS_EMBA_CI") 30 10) (tramp--test-timeout-handler))
-      (while (accept-process-output
-	      (get-buffer-process (current-buffer)) nil nil t)))
-    (buffer-substring-no-properties (point-min) (point-max))))
+      ;; Test `shell-command-width' of `async-shell-command'.
+
+      ;; `executable-find' has changed the number of parameters in
+      ;; Emacs 27.1, so we use `apply' for older Emacsen.
+      (when (and (executable-find "tput")
+                 (apply #'executable-find '("tput" 'remote)))
+	(let (shell-command-width)
+	  (should
+	   (string-equal
+	    ;; `frame-width' does not return a proper value.
+	    ;; `process-lines' uses `call-process', it doesn't care
+	    ;; about `shell-command-width'.
+	    (format "%s\n" (car (process-lines "tput" "cols")))
+	    (tramp--test-shell-command-to-string-asynchronously
+	     "tput cols")))
+	  (setq shell-command-width 1024)
+	  (should
+	   (string-equal
+	    "1024\n"
+	    (tramp--test-shell-command-to-string-asynchronously
+	     "tput cols"))))))))
 
 ;; This test is inspired by Bug#23952.
 (ert-deftest tramp-test33-environment-variables ()
@@ -4579,7 +4608,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      ;; skip the test then.
 	      (condition-case nil
 		  (vc-create-repo (car vc-handled-backends))
-		(error (skip-unless nil)))
+		(error (ert-skip "`vc-create-repo' not supported")))
 	      ;; The structure of VC-FILESET is not documented.  Let's
 	      ;; hope it won't change.
 	      (condition-case nil
