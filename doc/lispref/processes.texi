@@ -678,8 +678,11 @@ Initialize the process query flag to @var{query-flag}.
 @xref{Query Before Exit}.
 
 @item :stop @var{stopped}
-If @var{stopped} is non-@code{nil}, start the process in the
-stopped state.
+If provided, @var{stopped} must be @code{nil}; it is an error to use
+any non-@code{nil} value.  The @code{:stop} key is ignored otherwise
+and is retained for compatibility with other process types such as
+pipe processes.  Asynchronous subprocesses never start in the stopped
+state.
 
 @item :filter @var{filter}
 Initialize the process filter to @var{filter}.  If not specified, a
@@ -697,6 +700,19 @@ non-@code{nil} value should be either a buffer or a pipe process
 created with @code{make-pipe-process}, described below.  If
 @var{stderr} is @code{nil}, standard error is mixed with standard
 output, and both are sent to @var{buffer} or @var{filter}.
+
+@cindex standard error process
+If @var{stderr} is a buffer, Emacs will create a pipe process, the
+@dfn{standard error process}.  This process will have the default
+filter (@pxref{Filter Functions}), sentinel (@pxref{Sentinels}), and
+coding systems (@pxref{Default Coding Systems}).  On the other hand,
+it will use @var{query-flag} as its query-on-exit flag (@pxref{Query
+Before Exit}).  It will be associated with the @var{stderr} buffer
+(@pxref{Process Buffers}) and send its output (which is the standard
+error of the main process) there.
+
+If @var{stderr} is a pipe process, Emacs will use it as standard error
+process for the new process.
 
 @item :file-handler @var{file-handler}
 If @var{file-handler} is non-@code{nil}, then look for a file name
@@ -718,7 +734,11 @@ current working directory is the local name component of
 
 Depending on the implementation of the file name handler, it might not
 be possible to apply @var{filter} or @var{sentinel} to the resulting
-process object.  @xref{Filter Functions}, and @ref{Sentinels}.
+process object.  The @code{:stderr} argument cannot be a pipe process,
+file name handlers do not support pipe processes for this.  A buffer
+as @code{:stderr} argument is accepted, its contents is shown without
+the use of pipe processes.  @xref{Filter Functions}, @ref{Sentinels},
+and @ref{Accepting Output}.
 
 Some file name handlers may not support @code{make-process}.  In such
 cases, this function does nothing and returns @code{nil}.
@@ -1878,6 +1898,22 @@ like this:
 @example
 (while (accept-process-output process))
 @end example
+
+If you have passed a non-@code{nil} @var{stderr} to
+@code{make-process}, it will have a standard error process.
+@xref{Asynchronous Processes}.  In that case, waiting for process
+output from the main process doesn't wait for output from the standard
+error process.  To make sure you have received both all of standard
+output and all of standard error from a process, use the following
+code:
+
+@example
+(while (accept-process-output process))
+(while (accept-process-output stderr-process))
+@end example
+
+Reading pending standard error from a process running on a remote host
+is not possible this way.
 
 @node Processes and Threads
 @subsection Processes and Threads

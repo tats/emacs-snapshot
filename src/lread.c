@@ -1019,7 +1019,7 @@ load_error_handler (Lisp_Object data)
   return Qnil;
 }
 
-static _Noreturn void
+static AVOID
 load_error_old_style_backquotes (void)
 {
   if (NILP (Vload_file_name))
@@ -1034,18 +1034,12 @@ load_error_old_style_backquotes (void)
 static void
 load_warn_unescaped_character_literals (Lisp_Object file)
 {
-  if (NILP (Vlread_unescaped_character_literals)) return;
-  CHECK_CONS (Vlread_unescaped_character_literals);
-  Lisp_Object format =
-    build_string ("Loading `%s': unescaped character literals %s detected!");
-  Lisp_Object separator = build_string (", ");
-  Lisp_Object inner_format = build_string ("`?%c'");
-  CALLN (Fmessage,
-         format, file,
-         Fmapconcat (list3 (Qlambda, list1 (Qchar),
-                            list3 (Qformat, inner_format, Qchar)),
-                     Fsort (Vlread_unescaped_character_literals, Qlss),
-                     separator));
+  Lisp_Object warning = call0 (Qbyte_run_unescaped_character_literals_warning);
+  if (!NILP (warning))
+    {
+      AUTO_STRING (format, "Loading `%s': %s");
+      CALLN (Fmessage, format, file, warning);
+    }
 }
 
 DEFUN ("get-load-suffixes", Fget_load_suffixes, Sget_load_suffixes, 0, 0, 0,
@@ -1307,8 +1301,8 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
-  int is_elc;
-  if ((is_elc = suffix_p (found, ".elc")) != 0
+  bool is_elc = suffix_p (found, ".elc");
+  if (is_elc
       /* version = 1 means the file is empty, in which case we can
 	 treat it as not byte-compiled.  */
       || (fd >= 0 && (version = safe_to_load_version (fd)) > 1))
@@ -1445,6 +1439,10 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qinhibit_file_name_operation, Qnil);
   specbind (Qload_in_progress, Qt);
 
+  /* Declare here rather than inside the else-part because the storage
+     might be accessed by the unbind_to call below.  */
+  struct infile input;
+
   if (is_module)
     {
 #ifdef HAVE_MODULES
@@ -1459,7 +1457,6 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      struct infile input;
       input.stream = stream;
       input.lookahead = 0;
       infile = &input;
@@ -1874,7 +1871,7 @@ readevalloop_1 (int old)
 /* Signal an `end-of-file' error, if possible with file name
    information.  */
 
-static _Noreturn void
+static AVOID
 end_of_file_error (void)
 {
   if (STRINGP (Vload_file_name))
@@ -2297,7 +2294,7 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end)
 /* Signal Qinvalid_read_syntax error.
    S is error string of length N (if > 0)  */
 
-static _Noreturn void
+static AVOID
 invalid_syntax (const char *s)
 {
   xsignal1 (Qinvalid_read_syntax, build_string (s));
@@ -5014,9 +5011,9 @@ For internal use only.  */);
   DEFSYM (Qlread_unescaped_character_literals,
           "lread--unescaped-character-literals");
 
-  DEFSYM (Qlss, "<");
-  DEFSYM (Qchar, "char");
-  DEFSYM (Qformat, "format");
+  /* Defined in lisp/emacs-lisp/byte-run.el.  */
+  DEFSYM (Qbyte_run_unescaped_character_literals_warning,
+          "byte-run--unescaped-character-literals-warning");
 
   DEFVAR_BOOL ("load-prefer-newer", load_prefer_newer,
                doc: /* Non-nil means `load' prefers the newest version of a file.

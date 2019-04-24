@@ -342,7 +342,7 @@ section of the Emacs manual or the file BUGS.\n"
 bool fatal_error_in_progress;
 
 #ifdef HAVE_NS
-/* NS autrelease pool, for memory management.  */
+/* NS autorelease pool, for memory management.  */
 static void *ns_pool;
 #endif
 
@@ -370,7 +370,7 @@ using_utf8 (void)
 
 /* Report a fatal error due to signal SIG, output a backtrace of at
    most BACKTRACE_LIMIT lines, and exit.  */
-_Noreturn void
+AVOID
 terminate_due_to_signal (int sig, int backtrace_limit)
 {
   signal (sig, SIG_DFL);

@@ -545,7 +545,7 @@ AC_ARG_ENABLE(checking,
 		 enable only specific categories of checks.
 		 Categories are: all,yes,no.
 		 Flags are: stringbytes, stringoverrun, stringfreelist,
-		 structs, xmallocoverrun, conslist, glyphs])],
+		 structs, glyphs])],
 [ac_checking_flags="${enableval}"],[])
 IFS="${IFS= 	}"; ac_save_IFS="$IFS"; IFS="$IFS,"
 CHECK_STRUCTS=false
@@ -559,24 +559,18 @@ do
 			ac_gc_check_stringbytes= ;
 	                ac_gc_check_string_overrun= ;
 	                ac_gc_check_string_free_list= ;
-	                ac_xmalloc_overrun= ;
-	                ac_gc_check_cons_list= ;
 			ac_glyphs_debug= ;;
 	all)		ac_enable_checking=1 ;
 			CHECK_STRUCTS=true
 			ac_gc_check_stringbytes=1 ;
 	                ac_gc_check_string_overrun=1 ;
 	                ac_gc_check_string_free_list=1 ;
-	                ac_xmalloc_overrun=1 ;
-	                ac_gc_check_cons_list=1 ;
 			ac_glyphs_debug=1 ;;
 	# these enable particular checks
 	stringbytes)	ac_gc_check_stringbytes=1 ;;
 	stringoverrun)	ac_gc_check_string_overrun=1 ;;
 	stringfreelist) ac_gc_check_string_free_list=1 ;;
 	structs)	CHECK_STRUCTS=true ;;
-	xmallocoverrun)	ac_xmalloc_overrun=1 ;;
-	conslist)	ac_gc_check_cons_list=1 ;;
 	glyphs)		ac_glyphs_debug=1 ;;
 	*)	AC_MSG_ERROR(unknown check category $check) ;;
 	esac
@@ -609,14 +603,6 @@ fi
 if test x$ac_gc_check_string_free_list != x ; then
   AC_DEFINE(GC_CHECK_STRING_FREE_LIST, 1,
 [Define this to check the string free list.])
-fi
-if test x$ac_xmalloc_overrun != x ; then
-  AC_DEFINE(XMALLOC_OVERRUN_CHECK, 1,
-[Define this to check for malloc buffer overrun.])
-fi
-if test x$ac_gc_check_cons_list != x ; then
-  AC_DEFINE(GC_CHECK_CONS_LIST, 1,
-[Define this to check for errors in cons list.])
 fi
 if test x$ac_glyphs_debug != x ; then
   AC_DEFINE(GLYPH_DEBUG, 1,
@@ -1067,6 +1053,9 @@ AS_IF([test $gl_gcc_warnings = no],
 
   # Emacs's use of alloca inhibits protecting the stack.
   nw="$nw -Wstack-protector"
+
+  # Emacs's use of __attribute__ ((cold)) causes false alarms with this option.
+  nw="$nw -Wsuggest-attribute=cold"
 
   # Emacs's use of partly-const functions such as Fgnutls_available_p
   # make this option problematic.
@@ -2792,22 +2781,25 @@ if test "${HAVE_GTK}" = "yes"; then
     with_toolkit_scroll_bars=yes
   fi
 
-  dnl  Check if we have the old file selection dialog declared and
-  dnl  in the link library.  In 2.x it may be in the library,
-  dnl  but not declared if deprecated featured has been selected out.
-  dnl  AC_CHECK_DECL checks for a macro, so check for GTK_TYPE_FILE_SELECTION.
-  HAVE_GTK_FILE_SELECTION=no
-  AC_CHECK_DECL(GTK_TYPE_FILE_SELECTION, HAVE_GTK_FILE_SELECTION=yes,
-                   HAVE_GTK_FILE_SELECTION=no, [AC_INCLUDES_DEFAULT
+  term_header=gtkutil.h
+
+  if test "${USE_GTK_TOOLKIT}" = GTK2; then
+
+    dnl  Check if we have the old file selection dialog declared and
+    dnl  in the link library.  In 2.x it may be in the library,
+    dnl  but not declared if deprecated featured has been selected out.
+    dnl  AC_CHECK_DECL checks for a macro, so check for GTK_TYPE_FILE_SELECTION.
+    HAVE_GTK_FILE_SELECTION=no
+    AC_CHECK_DECL(GTK_TYPE_FILE_SELECTION, HAVE_GTK_FILE_SELECTION=yes,
+                     HAVE_GTK_FILE_SELECTION=no, [AC_INCLUDES_DEFAULT
 #include <gtk/gtk.h>])
-  if test "$HAVE_GTK_FILE_SELECTION" = yes; then
-    AC_CHECK_FUNCS(gtk_file_selection_new)
+    if test "$HAVE_GTK_FILE_SELECTION" = yes; then
+      AC_CHECK_FUNCS(gtk_file_selection_new)
+    fi
+
+    dnl This procedure causes a bug on certain Ubuntu GTK+2 builds
+    AC_CHECK_FUNCS(gtk_window_set_has_resize_grip)
   fi
-
-  dnl This procedure causes a bug on certain Ubuntu GTK+2 builds
-  AC_CHECK_FUNCS(gtk_window_set_has_resize_grip)
-
- term_header=gtkutil.h
 fi
 
 
@@ -3320,12 +3312,44 @@ if test "${HAVE_X11}" = "yes"; then
   fi
 fi
 
+HAVE_CAIRO=no
+if test "${HAVE_X11}" = "yes"; then
+  if test "${with_cairo}" != "no"; then
+    CAIRO_REQUIRED=1.12.0
+    CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
+    EMACS_CHECK_MODULES(CAIRO, $CAIRO_MODULE)
+    if test $HAVE_CAIRO = yes; then
+      AC_DEFINE(USE_CAIRO, 1, [Define to 1 if using cairo.])
+    else
+      AC_MSG_ERROR([cairo requested but not found.])
+    fi
+
+    CFLAGS="$CFLAGS $CAIRO_CFLAGS"
+    LIBS="$LIBS $CAIRO_LIBS"
+    AC_SUBST(CAIRO_CFLAGS)
+    AC_SUBST(CAIRO_LIBS)
+  fi
+fi
+
 ### Start of font-backend (under any platform) section.
 # (nothing here yet -- this is a placeholder)
 ### End of font-backend (under any platform) section.
 
 ### Start of font-backend (under X11) section.
 if test "${HAVE_X11}" = "yes"; then
+  if test $HAVE_CAIRO = yes; then
+    dnl Strict linkers fail with
+    dnl ftfont.o: undefined reference to symbol 'FT_New_Face'
+    dnl if -lfreetype is not specified.
+    dnl The following is needed to set FREETYPE_LIBS.
+    EMACS_CHECK_MODULES([FREETYPE], [freetype2])
+
+    test "$HAVE_FREETYPE" = "no" && AC_MSG_ERROR(cairo requires libfreetype)
+
+    EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
+
+    test "$HAVE_FONTCONFIG" = "no" && AC_MSG_ERROR(cairo requires libfontconfig)
+  else
     ## Use -lXft if available, unless '--with-xft=no'.
     HAVE_XFT=maybe
     if test "x${with_x}" = "xno"; then
@@ -3382,6 +3406,7 @@ if test "${HAVE_X11}" = "yes"; then
 
        test "$HAVE_FREETYPE" = "no" && AC_MSG_ERROR(libxft requires libfreetype)
     fi
+  fi				  # $HAVE_CAIRO != yes
 
     HAVE_LIBOTF=no
     if test "${HAVE_FREETYPE}" = "yes"; then
@@ -3434,25 +3459,6 @@ AC_SUBST(LIBOTF_CFLAGS)
 AC_SUBST(LIBOTF_LIBS)
 AC_SUBST(M17N_FLT_CFLAGS)
 AC_SUBST(M17N_FLT_LIBS)
-
-HAVE_CAIRO=no
-if test "${HAVE_X11}" = "yes"; then
-  if test "${with_cairo}" != "no"; then
-    CAIRO_REQUIRED=1.12.0
-    CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
-    EMACS_CHECK_MODULES(CAIRO, $CAIRO_MODULE)
-    if test $HAVE_CAIRO = yes; then
-      AC_DEFINE(USE_CAIRO, 1, [Define to 1 if using cairo.])
-    else
-      AC_MSG_ERROR([cairo requested but not found.])
-    fi
-
-    CFLAGS="$CFLAGS $CAIRO_CFLAGS"
-    LIBS="$LIBS $CAIRO_LIBS"
-    AC_SUBST(CAIRO_CFLAGS)
-    AC_SUBST(CAIRO_LIBS)
-  fi
-fi
 
 if test "${HAVE_X11}" = "yes"; then
   AC_CHECK_HEADER(X11/Xlib-xcb.h,
@@ -5822,4 +5828,12 @@ you can continue to support by using '$0 --with-pop'.])
   esac
 fi
 
-test "$MAKE" = make || AC_MSG_NOTICE([Now you can run '$MAKE'.])
+# Let plain 'make' work.
+test "$MAKE" = make || test -f makefile || cat >makefile <<EOF
+.POSIX:
+MAKE = $MAKE
+all:
+	\$(MAKE) -f Makefile \$?
+.DEFAULT:
+	\$(MAKE) -f Makefile \$<
+EOF

@@ -287,7 +287,7 @@ You should set this variable through Custom."
 	   (dolist (buf (buffer-list))
 	     (with-current-buffer buf
 	       (when (symbol-value 'auto-revert-notify-watch-descriptor)
-		 (auto-revert-notify-rm-watch t))))))
+		 (auto-revert-notify-rm-watch))))))
   :initialize 'custom-initialize-default
   :version "24.4")
 
@@ -326,12 +326,12 @@ the list of old buffers.")
 (add-hook 'find-file-hook
 	  #'auto-revert-find-file-function)
 
-(defvar auto-revert-notify-watch-descriptor-hash-list
+(defvar auto-revert--buffers-by-watch-descriptor
   (make-hash-table :test 'equal)
-  "A hash table collecting all file watch descriptors.
-Hash key is a watch descriptor, hash value is a list of buffers
-which are related to files being watched and carrying the same
-default directory.")
+  "A hash table mapping notification descriptors to lists of buffers.
+The buffers use that descriptor for auto-revert notifications.
+The key is equal to `auto-revert-notify-watch-descriptor' in each
+buffer.")
 
 (defvar-local auto-revert-notify-watch-descriptor nil
   "The file watch descriptor active for the current buffer.")
@@ -371,7 +371,7 @@ without being changed in the part that is already in the buffer."
          'kill-buffer-hook
          #'auto-revert-remove-current-buffer
          nil t))
-    (when auto-revert-notify-watch-descriptor (auto-revert-notify-rm-watch t))
+    (when auto-revert-notify-watch-descriptor (auto-revert-notify-rm-watch))
     (auto-revert-remove-current-buffer))
   (auto-revert-set-timer)
   (when auto-revert-mode
@@ -480,7 +480,7 @@ specifies in the mode line."
     (dolist (buf (buffer-list))
       (with-current-buffer buf
 	(when auto-revert-notify-watch-descriptor
-	  (auto-revert-notify-rm-watch t))))))
+	  (auto-revert-notify-rm-watch))))))
 
 (defun auto-revert-set-timer ()
   "Restart or cancel the timer used by Auto-Revert Mode.
@@ -497,30 +497,20 @@ will use an up-to-date value of `auto-revert-interval'"
 			    auto-revert-interval
 			    'auto-revert-buffers))))
 
-(defun auto-revert-notify-rm-watch (remove-descriptor)
-  "Disable file notification for current buffer's associated file.
-If REMOVE-DESCRIPTOR is non-nil, remove the corresponding notification
-descriptor; otherwise assume that it has already been removed."
-  (when auto-revert-notify-watch-descriptor
-    (maphash
-     (lambda (key value)
-       (when (equal key auto-revert-notify-watch-descriptor)
-	 (setq value (delete (current-buffer) value))
-	 (if value
-	     (puthash key value auto-revert-notify-watch-descriptor-hash-list)
-	   (remhash key auto-revert-notify-watch-descriptor-hash-list)
-           (when remove-descriptor
-	     (ignore-errors
-	       (file-notify-rm-watch auto-revert-notify-watch-descriptor))))))
-     auto-revert-notify-watch-descriptor-hash-list)
-    (remove-hook 'kill-buffer-hook #'auto-revert-notify-rm-watch-callback t))
+(defun auto-revert-notify-rm-watch ()
+  "Disable file notification for current buffer's associated file."
+  (let ((desc auto-revert-notify-watch-descriptor)
+        (table auto-revert--buffers-by-watch-descriptor))
+    (when desc
+      (let ((buffers (delq (current-buffer) (gethash desc table))))
+        (if buffers
+            (puthash desc buffers table)
+          (remhash desc table)))
+      (ignore-errors
+	(file-notify-rm-watch desc))
+      (remove-hook 'kill-buffer-hook #'auto-revert-notify-rm-watch t)))
   (setq auto-revert-notify-watch-descriptor nil
 	auto-revert-notify-modified-p nil))
-
-(defun auto-revert-notify-rm-watch-callback ()
-  "Disable file notification for current buffer's associated file,
-and remove the notification descriptor."
-  (auto-revert-notify-rm-watch t))
 
 (defun auto-revert-notify-add-watch ()
   "Enable file notification for current buffer's associated file."
@@ -544,7 +534,7 @@ and remove the notification descriptor."
                         (gethash key file-notify-descriptors))
                        'auto-revert-notify-handler))
          (setq auto-revert-notify-watch-descriptor key)))
-       auto-revert-notify-watch-descriptor-hash-list)
+       auto-revert--buffers-by-watch-descriptor)
       ;; Create a new watch if needed.
       (unless auto-revert-notify-watch-descriptor
         (setq auto-revert-notify-watch-descriptor
@@ -559,10 +549,9 @@ and remove the notification descriptor."
          auto-revert-notify-watch-descriptor
          (cons (current-buffer)
 	       (gethash auto-revert-notify-watch-descriptor
-		        auto-revert-notify-watch-descriptor-hash-list))
-         auto-revert-notify-watch-descriptor-hash-list)
-        (add-hook 'kill-buffer-hook #'auto-revert-notify-rm-watch-callback
-                  nil t)))))
+		        auto-revert--buffers-by-watch-descriptor))
+         auto-revert--buffers-by-watch-descriptor)
+        (add-hook 'kill-buffer-hook #'auto-revert-notify-rm-watch nil t)))))
 
 ;; If we have file notifications, we want to update the auto-revert buffers
 ;; immediately when a notification occurs. Since file updates can happen very
@@ -596,7 +585,7 @@ no more reverts are possible until the next call of
 	   (file (nth 2 event))
 	   (file1 (nth 3 event)) ;; Target of `renamed'.
 	   (buffers (gethash descriptor
-			     auto-revert-notify-watch-descriptor-hash-list)))
+			     auto-revert--buffers-by-watch-descriptor)))
       ;; Check, that event is meant for us.
       (cl-assert descriptor)
       ;; Since we watch a directory, a file name must be returned.
@@ -605,22 +594,17 @@ no more reverts are possible until the next call of
 
       (if (eq action 'stopped)
           ;; File notification has stopped.  Continue with polling.
-          (cl-dolist (buffer
-                      (if global-auto-revert-mode
-                          (buffer-list) auto-revert-buffer-list))
+          (cl-dolist (buffer buffers)
             (with-current-buffer buffer
-              (when (and (equal descriptor auto-revert-notify-watch-descriptor)
-                         (or
-                          ;; A buffer associated with a file.
-                          (and (stringp buffer-file-name)
-                               (string-equal
-                                (file-name-nondirectory file)
-                                (file-name-nondirectory buffer-file-name)))
-                          ;; A buffer w/o a file, like dired.
-                          (null buffer-file-name)))
-                ;; Since we got a `stopped' event, the notification descriptor
-                ;; is already gone; don't try to remove it.
-                (auto-revert-notify-rm-watch nil))))
+              (when (or
+                     ;; A buffer associated with a file.
+                     (and (stringp buffer-file-name)
+                          (string-equal
+                           (file-name-nondirectory file)
+                           (file-name-nondirectory buffer-file-name)))
+                     ;; A buffer w/o a file, like dired.
+                     (null buffer-file-name))
+                (auto-revert-notify-rm-watch))))
 
         ;; Loop over all buffers, in order to find the intended one.
         (cl-dolist (buffer buffers)

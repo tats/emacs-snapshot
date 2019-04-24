@@ -89,6 +89,14 @@ Options" in the Emacs manual for more information.
 check that the portable dumper code has been updated to match the last
 change to one of the data structures that it relies on.
 
++++
+** The configure options '--enable-checking=conslist' and
+'--enable-checking=xmallocoverrun' have been withdrawn.  The former
+made Emacs irredeemably slow, and the latter made it crash.  Neither
+option was useful with modern debugging tools such as AddressSanitizer.
+(See etc/DEBUG for the details of using the modern replacements of the
+removed configure options.)
+
 ---
 ** Emacs now requires GTK 2.24 and GTK 3.10 for the GTK 2 and GTK 3
 builds respectively.
@@ -409,6 +417,11 @@ current and the previous or the next line, as before.
 ** doc-view-mode
 *** New commands doc-view-presentation and doc-view-fit-window-to-page
 *** Added support for password-protected PDF files
+
+** Ido
+*** New user option 'ido-big-directories' to mark directories whose
+names match certain regular expressions as big.  Ido won't attempt to
+list the contents of such directories when completing file names.
 
 ** map.el
 *** Now also understands plists.
@@ -1509,6 +1522,9 @@ The global value of 'indent-line-function', which defaults to
 
 To get back the old behavior, add a function to 'text-mode-hook' which
 performs (setq-local indent-line-function #'indent-relative).
+
+** 'make-process' no longer accepts a non-nil ':stop' key.  This has
+never worked reliably, and now causes an error.
 
 
 * Lisp Changes in Emacs 27.1

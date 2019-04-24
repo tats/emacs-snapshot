@@ -53,7 +53,7 @@ It is used for TCP/IP devices."
   "When this method name is used, forward all calls to Android Debug Bridge.")
 
 (defcustom tramp-adb-prompt
-  "^[[:digit:]]*|?\\(?:[[:alnum:]\e;[]*@?[[:alnum:]]*[^#\\$]*\\)?[#\\$][[:space:]]"
+  "^[[:digit:]]*|?[[:alnum:]\e;[]*@?[[:alnum:]]*[^#\\$]*[#\\$][[:space:]]"
   "Regexp used as prompt in almquist shell."
   :type 'string
   :version "24.4"
@@ -934,7 +934,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (command (plist-get args :command))
 	    (coding (plist-get args :coding))
 	    (noquery (plist-get args :noquery))
-	    (stop (plist-get args :stop))
 	    (connection-type (plist-get args :connection-type))
 	    (filter (plist-get args :filter))
 	    (sentinel (plist-get args :sentinel))
@@ -1010,9 +1009,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		      ;; Send the command.
 		      (let* ((p (tramp-get-connection-process v)))
                         (tramp-adb-send-command v command nil t) ; nooutput
-			;; Stop process if indicated.
-			(when stop
-			  (stop-process p))
 			;; Set sentinel and filter.
 			(when sentinel
 			  (set-process-sentinel p sentinel))

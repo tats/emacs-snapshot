@@ -4189,17 +4189,13 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	(ignore-errors (delete-file tmp-name)))
 
       ;; Test `shell-command-width' of `async-shell-command'.
-
-      ;; `executable-find' has changed the number of parameters in
-      ;; Emacs 27.1, so we use `apply' for older Emacsen.
-      (when (and (executable-find "tput")
-                 (apply #'executable-find '("tput" 'remote)))
+      ;; Since Emacs 27.1.
+      (when (and (boundp 'shell-command-width)
+		 (zerop (call-process "tput" nil nil nil "cols"))
+                 (zerop (process-file "tput" nil nil nil "cols")))
 	(let (shell-command-width)
 	  (should
 	   (string-equal
-	    ;; `frame-width' does not return a proper value.
-	    ;; `process-lines' uses `call-process', it doesn't care
-	    ;; about `shell-command-width'.
 	    (format "%s\n" (car (process-lines "tput" "cols")))
 	    (tramp--test-shell-command-to-string-asynchronously
 	     "tput cols")))
@@ -4286,7 +4282,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (should-not
 	       (string-match
 		(regexp-quote envvar)
-		(funcall this-shell-command-to-string "set")))))))))
+		(funcall this-shell-command-to-string "env")))))))))
 
 ;; This test is inspired by Bug#27009.
 (ert-deftest tramp-test33-environment-variables-and-port-numbers ()

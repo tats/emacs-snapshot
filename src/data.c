@@ -130,7 +130,7 @@ set_blv_valcell (struct Lisp_Buffer_Local_Value *blv, Lisp_Object val)
   blv->valcell = val;
 }
 
-static _Noreturn void
+static AVOID
 wrong_length_argument (Lisp_Object a1, Lisp_Object a2, Lisp_Object a3)
 {
   Lisp_Object size1 = make_fixnum (bool_vector_size (a1));
@@ -142,7 +142,7 @@ wrong_length_argument (Lisp_Object a1, Lisp_Object a2, Lisp_Object a3)
 	      make_fixnum (bool_vector_size (a3)));
 }
 
-_Noreturn void
+AVOID
 wrong_type_argument (register Lisp_Object predicate, register Lisp_Object value)
 {
   /* If VALUE is not even a valid Lisp object, we'd want to abort here
@@ -230,9 +230,7 @@ for example, (type-of 1) returns `integer'.  */)
 	case PVEC_MARKER: return Qmarker;
 	case PVEC_OVERLAY: return Qoverlay;
 	case PVEC_FINALIZER: return Qfinalizer;
-#ifdef HAVE_MODULES
 	case PVEC_USER_PTR: return Quser_ptr;
-#endif
         case PVEC_WINDOW_CONFIGURATION: return Qwindow_configuration;
         case PVEC_PROCESS: return Qprocess;
         case PVEC_WINDOW: return Qwindow;
@@ -3838,9 +3836,7 @@ syms_of_data (void)
   DEFSYM (Qbool_vector_p, "bool-vector-p");
   DEFSYM (Qchar_or_string_p, "char-or-string-p");
   DEFSYM (Qmarkerp, "markerp");
-#ifdef HAVE_MODULES
   DEFSYM (Quser_ptrp, "user-ptrp");
-#endif
   DEFSYM (Qbuffer_or_string_p, "buffer-or-string-p");
   DEFSYM (Qinteger_or_marker_p, "integer-or-marker-p");
   DEFSYM (Qfboundp, "fboundp");
@@ -3935,9 +3931,7 @@ syms_of_data (void)
   DEFSYM (Qoverlay, "overlay");
   DEFSYM (Qfinalizer, "finalizer");
   DEFSYM (Qmodule_function, "module-function");
-#ifdef HAVE_MODULES
   DEFSYM (Quser_ptr, "user-ptr");
-#endif
   DEFSYM (Qfloat, "float");
   DEFSYM (Qwindow_configuration, "window-configuration");
   DEFSYM (Qprocess, "process");

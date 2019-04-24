@@ -1819,7 +1819,8 @@ The info element is shared with the same element of
   (let ((alist gnus-newsrc-alist)
 	(ohashtb gnus-newsrc-hashtb)
 	info method gname rest methods)
-    (setq gnus-newsrc-hashtb (gnus-make-hashtable (length alist)))
+    (setq gnus-newsrc-hashtb (gnus-make-hashtable (length alist))
+	  gnus-group-list nil)
     (setq alist
 	  (setq gnus-newsrc-alist
 		(if (equal (caar gnus-newsrc-alist)
@@ -2146,14 +2147,14 @@ The info element is shared with the same element of
 	    (if (and (stringp (progn
 				(setq group (read cur)
 				      group
-				      (encode-coding-string
-				       (cond ((numberp group)
-					      (number-to-string group))
-					     ((symbolp group)
-					      (symbol-name group))
-					     ((stringp group)
-					      group))
-				       'latin-1))))
+				      (cond ((numberp group)
+					     (number-to-string group))
+					    ((symbolp group)
+					     (encode-coding-string
+					      (symbol-name group)
+					      'latin-1))
+					    ((stringp group)
+					     group)))))
 		     (numberp (setq max (read cur)))
 		     (numberp (setq min (read cur)))
 		     (null (progn
