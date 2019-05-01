@@ -1042,7 +1042,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
     (c-do-declarators
      limit list not-top
      (if types 'c-decl-type-start 'c-decl-id-start)
-     (lambda (id-start id-end end-pos not-top is-function init-char)
+     (lambda (id-start _id-end end-pos _not-top is-function init-char)
        (if types
 	   ;; Register and fontify the identifier as a type.
 	   (let ((c-promote-possible-types t))
@@ -1549,7 +1549,8 @@ casts and declarations are fontified.  Used on level 2 and higher."
   ;; font-lock-keyword-face.  It always returns NIL to inhibit this and
   ;; prevent a repeat invocation.  See elisp/lispref page "Search-based
   ;; Fontification".
-  (while (search-forward-regexp c-enum-clause-introduction-re limit t)
+  (while (and (< (point) limit)
+	      (search-forward-regexp c-enum-clause-introduction-re limit t))
     (when (save-excursion
 	    (backward-char)
 	    (c-backward-over-enum-header))
@@ -1684,11 +1685,8 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	 (string-start (and (eq (cadr state) 'string)
 			    (car (cddr state))))
 	 (raw-id (and string-start
-		      (save-excursion
-			(goto-char string-start)
-			(and (eq (char-before) ?R)
-			     (looking-at "\"\\([^ ()\\\n\r\t]\\{0,16\\}\\)(")
-			     (match-string-no-properties 1)))))
+		      (c-at-c++-raw-string-opener string-start)
+		      (match-string-no-properties 1)))
 	 (content-start (and raw-id (point))))
     ;; We go round the next loop twice per raw string, once for each "end".
     (while (< (point) limit)
@@ -2853,7 +2851,8 @@ need for `pike-font-lock-extra-types'.")
 			 "\\)\\)\\s *\\)@[A-Za-z_-]+\\(\\s \\|$\\)"))
 	(markup-faces (list c-doc-markup-face-name c-doc-face-name)))
 
-    (while (re-search-forward line-re limit t)
+    (while (and (< (point) limit)
+		(re-search-forward line-re limit t))
       (goto-char (match-end 1))
 
       (if (looking-at autodoc-decl-keywords)

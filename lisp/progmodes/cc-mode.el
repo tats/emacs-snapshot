@@ -1261,7 +1261,8 @@ Note that the style variables are always made local to the buffer."
 		   (memq (char-after) c-string-delims)) ; Ignore an unterminated raw string's (.
 	  ;; Opening " on last line of text (without EOL).
 	  (c-clear-char-property (point) 'syntax-table)
-	  (c-truncate-semi-nonlit-pos-cache (point)))))
+	  (c-truncate-semi-nonlit-pos-cache (point))
+	  (setq c-new-BEG (min c-new-BEG (point))))))
 
      (t (goto-char end)			; point-max
 	(when
@@ -1271,17 +1272,24 @@ Note that the style variables are always made local to the buffer."
 	  (c-clear-char-property (point) 'syntax-table)
 	  (c-truncate-semi-nonlit-pos-cache (point)))))
 
-    (unless (and c-multiline-string-start-char
-		 (not (c-characterp c-multiline-string-start-char)))
+    (unless 
+	(or (and
+	     ;; Don't set c-new-BEG/END if we're in a raw string.
+	     (eq beg-literal-type 'string)
+	     (c-at-c++-raw-string-opener (car beg-limits)))
+	    (and c-multiline-string-start-char
+		 (not (c-characterp c-multiline-string-start-char))))
       (when (and (eq end-literal-type 'string)
 		 (not (eq (char-before (cdr end-limits)) ?\()))
 	(c-clear-char-property (1- (cdr end-limits)) 'syntax-table)
-	(c-truncate-semi-nonlit-pos-cache (1- (cdr end-limits))))
+	(c-truncate-semi-nonlit-pos-cache (1- (cdr end-limits)))
+	(setq c-new-END (max c-new-END (cdr end-limits))))
 
       (when (and (eq beg-literal-type 'string)
 		 (memq (char-after (car beg-limits)) c-string-delims))
 	(c-clear-char-property (car beg-limits) 'syntax-table)
-	(c-truncate-semi-nonlit-pos-cache (car beg-limits))))))
+	(c-truncate-semi-nonlit-pos-cache (car beg-limits))
+	(setq c-new-BEG (min c-new-BEG (car beg-limits)))))))
 
 (defun c-after-change-mark-abnormal-strings (beg end _old-len)
   ;; Mark any unbalanced strings in the region (c-new-BEG c-new-END) with
@@ -1352,6 +1360,7 @@ Note that the style variables are always made local to the buffer."
 	      (car beg-limits))
 	     (t				; comment
 	      (cdr beg-limits))))
+      ;; Handle one string each time around the next while loop.
       (while
 	  (and
 	   (< (point) c-new-END)
@@ -1373,10 +1382,15 @@ Note that the style variables are always made local to the buffer."
 	  (cond
 	   ((memq (char-after (match-end 0)) '(?\n ?\r))
 	    (c-put-char-property (1- (point)) 'syntax-table '(15))
-	    (c-put-char-property (match-end 0) 'syntax-table '(15)))
+	    (c-put-char-property (match-end 0) 'syntax-table '(15))
+	    (setq c-new-BEG (min c-new-BEG (point))
+		  c-new-END (max c-new-END (match-end 0))))
 	   ((or (eq (match-end 0) (point-max))
 		(eq (char-after (match-end 0)) ?\\)) ; \ at EOB
-	    (c-put-char-property (1- (point)) 'syntax-table '(15))))
+	    (c-put-char-property (1- (point)) 'syntax-table '(15))
+	    (setq c-new-BEG (min c-new-BEG (point))
+		  c-new-END (max c-new-END (match-end 0))) ; Do we need c-new-END?
+	    ))
 	  (goto-char (min (1+ (match-end 0)) (point-max))))
 	(setq s nil)))))
 
@@ -1515,9 +1529,12 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-BEG)
 	    (setq c-new-BEG (1- (match-beginning 0)))))
+       ((looking-at "\\\\'")
+	(setq c-new-BEG (min c-new-BEG (1- (point))))
+	(goto-char (match-end 0)))
        ((save-excursion
 	  (not (search-forward "'" c-new-BEG t)))
-	(setq c-new-BEG (1- (point))))
+	(setq c-new-BEG (min c-new-BEG (1- (point)))))
        (t nil)))
 
     (goto-char c-new-END)
@@ -1541,6 +1558,9 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-END)
 	    (setq c-new-END (match-end 0))))
+       ((looking-at "\\\\'")
+	(goto-char (match-end 0))
+	(setq c-new-END (max c-new-END (point))))
        ((equal (c-get-char-property (1- (point)) 'syntax-table) '(1))
 	(when (c-search-forward-char-property-with-value-on-char
 	       'syntax-table '(1) ?\' (c-point 'eoll))
@@ -1609,6 +1629,12 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	      ((looking-at
 		"\\([^\\']\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\
 \\)'") ; balanced quoted expression.
+	       (goto-char (match-end 0)))
+	      ((looking-at "\\\\'")	; Anomalous construct.
+	       (c-invalidate-state-cache (1- (point)))
+	       (c-truncate-semi-nonlit-pos-cache (1- (point)))
+	       (c-put-char-properties-on-char (1- (point)) (+ (point) 2)
+					      'syntax-table '(1) ?')
 	       (goto-char (match-end 0)))
 	      (t
 	       (c-invalidate-state-cache (1- (point)))

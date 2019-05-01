@@ -22,10 +22,17 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <stdint.h>
 #include <stddef.h>
+#include <time.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
 #endif
+
+#if defined EMACS_MODULE_GMP && !defined EMACS_MODULE_HAVE_MPZ_T
+#include <gmp.h>
+#endif
+
+#define EMACS_MAJOR_VERSION @emacs_major_version@
 
 #if defined __cplusplus && __cplusplus >= 201103L
 # define EMACS_NOEXCEPT noexcept
@@ -92,6 +99,12 @@ enum emacs_process_input_result
   /* Module code should return control to Emacs as soon as possible.  */
   emacs_process_input_quit = 1
 };
+
+#ifdef EMACS_MODULE_GMP
+struct emacs_mpz { mpz_t value; };
+#else
+struct emacs_mpz;  /* no definition */
+#endif
 
 struct emacs_env_25
 {

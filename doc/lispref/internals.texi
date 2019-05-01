@@ -1191,6 +1191,17 @@ grow with new Emacs releases.  Given the version of Emacs, the module
 can use only the parts of the module @acronym{API} that existed in
 that version, since those parts are identical in later versions.
 
+@file{emacs-module.h} defines a preprocessor macro
+@code{EMACS_MAJOR_VERSION}.  It expands to an integer literal which is
+the latest major version of Emacs supported by the header.
+@xref{Version Info}.  Note that the value of
+@code{EMACS_MAJOR_VERSION} is a compile-time constant and does not
+represent the version of Emacs that is currently running and has
+loaded your module.  If you want your module to be compatible with
+various versions of @file{emacs-module.h} as well as various versions
+of Emacs, you can use conditional compilation based on
+@code{EMACS_MAJOR_VERSION}.
+
 We recommend that modules always perform the compatibility
 verification, unless they do their job entirely in the initialization
 function, and don't access any Lisp objects or use any Emacs functions
@@ -1387,6 +1398,38 @@ This function returns the value of a Lisp float specified by
 @var{arg}, as a C @code{double} value.
 @end deftypefn
 
+@deftypefn Function struct timespec extract_time (emacs_env *@var{env}, emacs_value @var{time})
+This function, which is available since Emacs 27, interprets
+@var{time} as an Emacs Lisp time value and returns the corresponding
+@code{struct timespec}.  @xref{Time of Day}.  @code{struct timespec}
+represents a timestamp with nanosecond precision.  It has the
+following members:
+
+@table @code
+@item time_t tv_sec
+Whole number of seconds.
+@item long tv_nsec
+Fractional seconds as number of nanoseconds, always less than one
+billion.
+@end table
+
+@noindent
+@xref{Elapsed Time,,,libc}.
+
+If @var{time} has higher precision than nanoseconds, then this
+function truncates it to nanosecond precision towards negative
+infinity.  This function signals an error if @var{time} (truncated to
+nanoseconds) cannot be represented by @code{struct timespec}.  For
+example, if @code{time_t} is a 32-bit integral type, then a @var{time}
+value of ten billion seconds would signal an error, but a @var{time}
+value of 600 picoseconds would get truncated to zero.
+
+If you need to deal with time values that are not representable by
+@code{struct timespec}, or if you want higher precision, call the Lisp
+function @code{encode-time} and work with its return value.
+@xref{Time Conversion}.
+@end deftypefn
+
 @deftypefn Function bool copy_string_contents (emacs_env *@var{env}, emacs_value @var{arg}, char *@var{buf}, ptrdiff_t *@var{len})
 This function stores the UTF-8 encoded text of a Lisp string specified
 by @var{arg} in the array of @code{char} pointed by @var{buf}, which
@@ -1452,6 +1495,18 @@ This function takes a @code{double} argument @var{d} and returns the
 corresponding Emacs floating-point value.
 @end deftypefn
 
+@deftypefn Function emacs_value make_time (emacs_env *@var{env}, struct timespec @var{time})
+This function, which is available since Emacs 27, takes a @code{struct
+timespec} argument @var{time} and returns the corresponding Emacs
+timestamp as a pair @code{(@var{ticks} . @var{hz})}.  @xref{Time of
+Day}.  The return value represents exactly the same timestamp as
+@var{time}: all input values are representable, and there is never a
+loss of precision.  @code{@var{time}.tv_sec} and
+@code{@var{time}.tv_nsec} can be arbitrary values.  In particular,
+there's no requirement that @var{time} be normalized.  This means that
+@code{@var{time}.tv_nsec} can be negative or larger than 999,999,999.
+@end deftypefn
+
 @deftypefn Function emacs_value make_string (emacs_env *@var{env}, const char *@var{str}, ptrdiff_t @var{strlen})
 This function creates an Emacs string from C text string pointed by
 @var{str} whose length in bytes, not including the terminating null
@@ -1463,6 +1518,66 @@ function raises the @code{overflow-error} error condition if
 @var{strlen} is negative or exceeds the maximum length of an Emacs
 string.
 @end deftypefn
+
+If you define the preprocessor macro @code{EMACS_MODULE_GMP} before
+including the header @file{emacs-module.h}, you can also convert
+between Emacs integers and GMP @code{mpz_t} values.  @xref{GMP
+Basics,,,gmp}.  If @code{EMACS_MODULE_GMP} is defined,
+@file{emacs-module.h} wraps @code{mpz_t} in the following structure:
+
+@deftp struct emacs_mpz value
+struct emacs_mpz @{ mpz_t value; @};
+@end deftp
+
+@noindent
+Then you can use the following additional functions:
+
+@deftypefn Function bool extract_big_integer (emacs_env *@var{env}, emacs_value @var{arg}, struct emacs_mpz *@var{result})
+This function, which is available since Emacs 27, extracts the
+integral value of @var{arg} into @var{result}.  @var{result} must not
+be @code{NULL}.  @code{@var{result}->value} must be an initialized
+@code{mpz_t} object.  @xref{Initializing Integers,,,gmp}.  If
+@var{arg} is an integer, Emacs will store its value into
+@code{@var{result}->value}.  After you have finished using
+@code{@var{result}->value}, you should free it using @code{mpz_clear}
+or similar.
+@end deftypefn
+
+@deftypefn Function emacs_value make_big_integer (emacs_env *@var{env}, const struct emacs_mpz *@var{value})
+This function, which is available since Emacs 27, takes an
+arbitrary-sized integer argument and returns a corresponding
+@code{emacs_value} object.  @var{value} must not be @code{NULL}.
+@code{@var{value}->value} must be an initialized @code{mpz_t} object.
+@xref{Initializing Integers,,,gmp}.  Emacs will return a corresponding
+integral object.  After you have finished using
+@code{@var{value}->value}, you should free it using @code{mpz_clear}
+or similar.
+@end deftypefn
+
+The following example uses GMP to calculate the next probable prime
+after a given integer:
+
+@example
+#include <assert.h>
+#include <gmp.h>
+
+#define EMACS_MODULE_GMP
+#include <emacs-module.h>
+
+static emacs_value
+next_prime (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+            void *data)
+@{
+  assert (nargs == 1);
+  emacs_mpz p;
+  mpz_init (p.value);
+  env->extract_big_integer (env, args[0], &p);
+  mpz_nextprime (p.value, p.value);
+  emacs_value result = env->make_big_integer (env, &p);
+  mpz_clear (p.value);
+  return result;
+@}
+@end example
 
 The @acronym{API} does not provide functions to manipulate Lisp data
 structures, for example, create lists with @code{cons} and @code{list}

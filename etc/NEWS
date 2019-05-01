@@ -178,6 +178,10 @@ The default value is 30000, as the previously hard-coded threshold.
 +++
 ** The function 'read-passwd' uses '*' as default character to hide passwords.
 
+** Lexical binding is now used when evaluating interactive Elisp forms
+More specifically, lexical-binding is now used for M-:, --eval, as well
+as in the *scratch* and *ielm* buffers.
+
 ---
 ** The new option 'tooltip-resize-echo-area' avoids truncating tooltip text
 on GUI frames when tooltips are displayed in the echo area.  Instead,
@@ -321,8 +325,20 @@ and directory-local variables.
 longer.
 
 ---
-** next-error-verbose controls when `next-error' outputs a message
-   about the error locus.
+** New variable next-error-verbose controls when `next-error' outputs
+   a message about the error locus.
+
+---
+** New variable grep-search-path defines the directories searched for
+   grep hits (this used to be controlled by compilation-search-path).
+
+---
+** New variable emacs-lisp-compilation-search-path defines the
+   directories searched for byte-compiler error messages (this used to
+   be controlled by compilation-search-path).
+
+** Multicolor fonts such as "Noto Color Emoji" can be displayed on
+Emacs configured with Cairo drawing and linked with cairo >= 1.16.0.
 
 
 * Editing Changes in Emacs 27.1
@@ -1373,6 +1389,16 @@ Packages deriving from 'js-mode' with 'define-derived-mode' should
 call this function to add enabled syntax extensions to their mode
 name, too.
 
+** Autorevert
+
+*** New variable 'auto-revert-avoid-polling' for saving power.
+When set to a non-nil value, buffers in Auto-Revert mode are no longer
+polled for changes periodically.  This reduces the power consumption
+of an idle Emacs, but may fail on some network file systems; set
+'auto-revert-notify-exclude-dir-regexp' to match files where
+notification is not supported.  The new variable currently has no
+effect in 'global-auto-revert-mode'.  The default value is nil.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1910,6 +1936,16 @@ returns a regexp that never matches anything, which is an identity for
 this operation.  Previously, the empty string was returned in this
 case.
 
+** New module environment functions 'make_time' and 'extract_time' to
+convert between timespec structures and Emacs Lisp time values.
+
+** New module environment functions 'make_big_integer' and
+'extract_big_integer' to create and extract arbitrary-size integer
+values.
+
+** emacs-module.h now defines a macro EMACS_MAJOR_VERSION that expands
+to the major version of the latest Emacs supported by the header.
+
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
 
@@ -1956,6 +1992,9 @@ corresponding encoding, instead of using 'w32-ansi-code-page'.
 modifier keys in line with Apples guidelines.  This makes the drag and
 drop behaviour more consistent, as previously the sending application
 was able to 'set' modifiers without the knowledge of the user.
+
+** On NS multicolor font display is enabled again since it is also
+implemented in Emacs on free operating systems via Cairo drawing.
 
 
 ----------------------------------------------------------------------

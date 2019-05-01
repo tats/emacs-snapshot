@@ -70,6 +70,12 @@ To add a new module function, proceed as follows:
 
 #include <config.h>
 
+#ifndef HAVE_GMP
+#include "mini-gmp.h"
+#define EMACS_MODULE_HAVE_MPZ_T
+#endif
+
+#define EMACS_MODULE_GMP
 #include "emacs-module.h"
 
 #include <stdarg.h>
@@ -77,8 +83,10 @@ To add a new module function, proceed as follows:
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "lisp.h"
+#include "bignum.h"
 #include "dynlib.h"
 #include "coding.h"
 #include "keyboard.h"
@@ -215,8 +223,6 @@ static void module_reset_handlerlist (struct handler **);
 static bool value_storage_contains_p (const struct emacs_value_storage *,
                                       emacs_value, ptrdiff_t *);
 static Lisp_Object module_encode (Lisp_Object);
-static Lisp_Object module_decode (Lisp_Object);
-static Lisp_Object module_decode_copy (Lisp_Object);
 
 static bool module_assertions = false;
 
@@ -466,6 +472,30 @@ module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value)
 				   value_to_lisp (value));
 }
 
+/* Function prototype for the module Lisp functions.  */
+typedef emacs_value (*emacs_subr) (emacs_env *, ptrdiff_t,
+				   emacs_value [], void *);
+
+/* Module function.  */
+
+/* A function environment is an auxiliary structure returned by
+   `module_make_function' to store information about a module
+   function.  It is stored in a pseudovector.  Its members correspond
+   to the arguments given to `module_make_function'.  */
+
+struct Lisp_Module_Function
+{
+  union vectorlike_header header;
+
+  /* Fields traced by GC; these must come first.  */
+  Lisp_Object documentation;
+
+  /* Fields ignored by GC.  */
+  ptrdiff_t min_arity, max_arity;
+  emacs_subr subr;
+  void *data;
+} GCALIGNED_STRUCT;
+
 static struct Lisp_Module_Function *
 allocate_module_function (void)
 {
@@ -500,10 +530,7 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
   function->data = data;
 
   if (documentation)
-    {
-      AUTO_STRING (unibyte_doc, documentation);
-      function->documentation = module_decode_copy (unibyte_doc);
-    }
+    function->documentation = build_string_from_utf8 (documentation);
 
   Lisp_Object result;
   XSET_MODULE_FUNCTION (result, function);
@@ -636,8 +663,8 @@ module_make_string (emacs_env *env, const char *str, ptrdiff_t length)
   MODULE_FUNCTION_BEGIN (NULL);
   if (! (0 <= length && length <= STRING_BYTES_BOUND))
     overflow_error ();
-  Lisp_Object lstr = make_unibyte_string (str, length);
-  return lisp_to_value (env, module_decode (lstr));
+  Lisp_Object lstr = make_string_from_utf8 (str, length);
+  return lisp_to_value (env, lstr);
 }
 
 static emacs_value
@@ -735,6 +762,41 @@ module_process_input (emacs_env *env)
   MODULE_FUNCTION_BEGIN (emacs_process_input_quit);
   maybe_quit ();
   return emacs_process_input_continue;
+}
+
+static struct timespec
+module_extract_time (emacs_env *env, emacs_value value)
+{
+  MODULE_FUNCTION_BEGIN ((struct timespec) {0});
+  return lisp_time_argument (value_to_lisp (value));
+}
+
+static emacs_value
+module_make_time (emacs_env *env, struct timespec time)
+{
+  MODULE_FUNCTION_BEGIN (NULL);
+  return lisp_to_value (env, timespec_to_lisp (time));
+}
+
+static void
+module_extract_big_integer (emacs_env *env, emacs_value value,
+                            struct emacs_mpz *result)
+{
+  MODULE_FUNCTION_BEGIN ();
+  Lisp_Object o = value_to_lisp (value);
+  CHECK_INTEGER (o);
+  if (FIXNUMP (o))
+    mpz_set_intmax (result->value, XFIXNUM (o));
+  else
+    mpz_set (result->value, XBIGNUM (o)->value);
+}
+
+static emacs_value
+module_make_big_integer (emacs_env *env, const struct emacs_mpz *value)
+{
+  MODULE_FUNCTION_BEGIN (NULL);
+  mpz_set (mpz[0], value->value);
+  return lisp_to_value (env, make_integer_mpz ());
 }
 
 
@@ -840,6 +902,11 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
 	memory_full (sizeof *args[i]);
     }
 
+  /* The only possibility of getting an error until here is failure to
+     allocate memory for the arguments, but then we already should
+     have signaled an error before.  */
+  eassert (priv.pending_non_local_exit == emacs_funcall_exit_return);
+
   emacs_value ret = func->subr (env, nargs, args, func->data);
 
   eassert (&priv == env->private_members);
@@ -859,6 +926,18 @@ module_function_arity (const struct Lisp_Module_Function *const function)
   ptrdiff_t maxargs = function->max_arity;
   return Fcons (make_fixnum (minargs),
 		maxargs == MANY ? Qmany : make_fixnum (maxargs));
+}
+
+Lisp_Object
+module_function_documentation (const struct Lisp_Module_Function *function)
+{
+  return function->documentation;
+}
+
+module_funcptr
+module_function_address (const struct Lisp_Module_Function *function)
+{
+  return (module_funcptr) function->subr;
 }
 
 
@@ -949,18 +1028,6 @@ static Lisp_Object
 module_encode (Lisp_Object string)
 {
   return code_convert_string (string, Qutf_8_unix, Qt, true, true, true);
-}
-
-static Lisp_Object
-module_decode (Lisp_Object string)
-{
-  return code_convert_string (string, Qutf_8_unix, Qt, false, true, true);
-}
-
-static Lisp_Object
-module_decode_copy (Lisp_Object string)
-{
-  return code_convert_string (string, Qutf_8_unix, Qt, false, false, true);
 }
 
 
@@ -1140,6 +1207,10 @@ initialize_environment (emacs_env *env, struct emacs_env_private *priv)
   env->vec_size = module_vec_size;
   env->should_quit = module_should_quit;
   env->process_input = module_process_input;
+  env->extract_time = module_extract_time;
+  env->make_time = module_make_time;
+  env->extract_big_integer = module_extract_big_integer;
+  env->make_big_integer = module_make_big_integer;
   Vmodule_environments = Fcons (make_mint_ptr (env), Vmodule_environments);
   return env;
 }

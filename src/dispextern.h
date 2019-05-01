@@ -1680,7 +1680,7 @@ struct face
 
   /* True means that colors of this face may not be freed because they
      have been copied bitwise from a base face (see
-     realize_x_face).  */
+     realize_gui_face).  */
   bool_bf colors_copied_bitwise_p : 1;
 
   /* If non-zero, use overstrike (to simulate bold-face).  */
@@ -2897,6 +2897,11 @@ struct redisplay_interface
   void (*clear_frame_area) (struct frame *f, int x, int y,
                             int width, int height);
 
+ /* Clear area of frame F's internal border.  If the internal border
+    face of F has been specified (is not null), fill the area with
+    that face.  */
+  void (*clear_under_internal_border) (struct frame *f);
+
   /* Draw specified cursor CURSOR_TYPE of width CURSOR_WIDTH
      at row GLYPH_ROW on window W if ON_P is true.  If ON_P is
      false, don't draw cursor.  If ACTIVE_P is true, system caret
@@ -3274,19 +3279,19 @@ extern void get_font_ascent_descent (struct font *, int *, int *);
 extern void dump_glyph_string (struct glyph_string *) EXTERNALLY_VISIBLE;
 #endif
 
-extern void x_get_glyph_overhangs (struct glyph *, struct frame *,
-                                   int *, int *);
+extern void gui_get_glyph_overhangs (struct glyph *, struct frame *,
+                                     int *, int *);
 extern struct font *font_for_underline_metrics (struct glyph_string *);
-extern void x_produce_glyphs (struct it *);
+extern void gui_produce_glyphs (struct it *);
 
-extern void x_write_glyphs (struct window *, struct glyph_row *,
-			    struct glyph *, enum glyph_row_area, int);
-extern void x_insert_glyphs (struct window *, struct glyph_row *,
-			     struct glyph *, enum glyph_row_area, int);
-extern void x_clear_end_of_line (struct window *, struct glyph_row *,
-				 enum glyph_row_area, int);
-extern void x_fix_overlapping_area (struct window *, struct glyph_row *,
-                                    enum glyph_row_area, int);
+extern void gui_write_glyphs (struct window *, struct glyph_row *,
+                              struct glyph *, enum glyph_row_area, int);
+extern void gui_insert_glyphs (struct window *, struct glyph_row *,
+                               struct glyph *, enum glyph_row_area, int);
+extern void gui_clear_end_of_line (struct window *, struct glyph_row *,
+                                   enum glyph_row_area, int);
+extern void gui_fix_overlapping_area (struct window *, struct glyph_row *,
+                                      enum glyph_row_area, int);
 extern void draw_phys_cursor_glyph (struct window *,
                                     struct glyph_row *,
                                     enum draw_glyphs_face);
@@ -3294,10 +3299,10 @@ extern void get_phys_cursor_geometry (struct window *, struct glyph_row *,
                                       struct glyph *, int *, int *, int *);
 extern void erase_phys_cursor (struct window *);
 extern void display_and_set_cursor (struct window *, bool, int, int, int, int);
-extern void x_update_cursor (struct frame *, bool);
-extern void x_clear_cursor (struct window *);
-extern void x_draw_vertical_border (struct window *w);
-extern void x_draw_right_divider (struct window *w);
+extern void gui_update_cursor (struct frame *, bool);
+extern void gui_clear_cursor (struct window *);
+extern void gui_draw_vertical_border (struct window *w);
+extern void gui_draw_right_divider (struct window *w);
 
 extern int get_glyph_string_clip_rects (struct glyph_string *,
                                         NativeRectangle *, int);
@@ -3309,11 +3314,11 @@ extern void handle_tool_bar_click (struct frame *,
                                    int, int, bool, int);
 
 extern void expose_frame (struct frame *, int, int, int, int);
-extern bool x_intersect_rectangles (XRectangle *, XRectangle *, XRectangle *);
+extern bool gui_intersect_rectangles (XRectangle *, XRectangle *, XRectangle *);
 #endif	/* HAVE_WINDOW_SYSTEM */
 
 extern void note_mouse_highlight (struct frame *, int, int);
-extern void x_clear_window_mouse_face (struct window *);
+extern void gui_clear_window_mouse_face (struct window *);
 extern void cancel_mouse_face (struct frame *);
 extern bool clear_mouse_face (Mouse_HLInfo *);
 extern bool cursor_in_mouse_face_p (struct window *w);
@@ -3347,20 +3352,22 @@ extern bool buffer_flipping_blocked_p (void);
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-extern ptrdiff_t x_bitmap_pixmap (struct frame *, ptrdiff_t);
-extern void x_reference_bitmap (struct frame *, ptrdiff_t);
-extern ptrdiff_t x_create_bitmap_from_data (struct frame *, char *,
-					    unsigned int, unsigned int);
-extern ptrdiff_t x_create_bitmap_from_file (struct frame *, Lisp_Object);
+extern ptrdiff_t image_bitmap_pixmap (struct frame *, ptrdiff_t);
+extern void image_reference_bitmap (struct frame *, ptrdiff_t);
+extern ptrdiff_t image_create_bitmap_from_data (struct frame *, char *,
+                                                unsigned int, unsigned int);
+extern ptrdiff_t image_create_bitmap_from_file (struct frame *, Lisp_Object);
 #if defined HAVE_XPM && defined HAVE_X_WINDOWS && !defined USE_GTK
 extern ptrdiff_t x_create_bitmap_from_xpm_data (struct frame *, const char **);
 #endif
-#ifndef x_destroy_bitmap
-extern void x_destroy_bitmap (struct frame *, ptrdiff_t);
+#ifndef image_destroy_bitmap
+extern void image_destroy_bitmap (struct frame *, ptrdiff_t);
 #endif
-extern void x_destroy_all_bitmaps (Display_Info *);
+extern void image_destroy_all_bitmaps (Display_Info *);
+#ifdef HAVE_X_WINDOWS
 extern void x_create_bitmap_mask (struct frame *, ptrdiff_t);
-extern Lisp_Object x_find_image_file (Lisp_Object);
+#endif
+extern Lisp_Object image_find_image_file (Lisp_Object);
 
 void x_kill_gs_process (Pixmap, struct frame *);
 struct image_cache *make_image_cache (void);
@@ -3406,6 +3413,9 @@ void x_free_colors (struct frame *, unsigned long *, int);
 
 void update_face_from_frame_parameter (struct frame *, Lisp_Object,
                                        Lisp_Object);
+extern bool tty_defined_color (struct frame *f, const char *, XColor *, bool,
+                               bool);
+
 Lisp_Object tty_color_name (struct frame *, int);
 void clear_face_cache (bool);
 unsigned long load_color (struct frame *, struct face *, Lisp_Object,
@@ -3445,11 +3455,6 @@ void gamma_correct (struct frame *, COLORREF *);
 #endif
 
 #ifdef HAVE_WINDOW_SYSTEM
-
-void x_implicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
-void x_change_tool_bar_height (struct frame *f, int);
-
-extern frame_parm_handler x_frame_parm_handlers[];
 
 extern void start_hourglass (void);
 extern void cancel_hourglass (void);
@@ -3586,23 +3591,21 @@ enum resource_types
 };
 
 extern Display_Info *check_x_display_info (Lisp_Object);
-extern Lisp_Object x_get_arg (Display_Info *, Lisp_Object,
-                              Lisp_Object, const char *, const char *class,
-                              enum resource_types);
-extern Lisp_Object x_frame_get_and_record_arg (struct frame *, Lisp_Object,
-                                               Lisp_Object,
-					       const char *, const char *,
-                                               enum resource_types);
-extern Lisp_Object x_default_parameter (struct frame *, Lisp_Object,
-                                        Lisp_Object, Lisp_Object,
-                                        const char *, const char *,
+extern Lisp_Object gui_display_get_arg (Display_Info *, Lisp_Object,
+                                        Lisp_Object, const char *, const char *,
                                         enum resource_types);
-extern char *x_get_string_resource (XrmDatabase, const char *,
-				    const char *);
+extern Lisp_Object gui_frame_get_and_record_arg (struct frame *, Lisp_Object,
+                                                 Lisp_Object,
+                                                 const char *, const char *,
+                                                 enum resource_types);
+extern Lisp_Object gui_default_parameter (struct frame *, Lisp_Object,
+                                          Lisp_Object, Lisp_Object,
+                                          const char *, const char *,
+                                          enum resource_types);
 
 #ifndef HAVE_NS /* These both used on W32 and X only.  */
-extern bool x_mouse_grabbed (Display_Info *);
-extern void x_redo_mouse_highlight (Display_Info *);
+extern bool gui_mouse_grabbed (Display_Info *);
+extern void gui_redo_mouse_highlight (Display_Info *);
 #endif /* HAVE_NS */
 
 #endif /* HAVE_WINDOW_SYSTEM */

@@ -338,7 +338,7 @@ struct named_merge_point;
 
 static struct face *realize_face (struct face_cache *, Lisp_Object *,
 				  int);
-static struct face *realize_x_face (struct face_cache *, Lisp_Object *);
+static struct face *realize_gui_face (struct face_cache *, Lisp_Object *);
 static struct face *realize_tty_face (struct face_cache *, Lisp_Object *);
 static bool realize_basic_faces (struct frame *);
 static bool realize_default_face (struct frame *);
@@ -772,13 +772,13 @@ load_pixmap (struct frame *f, Lisp_Object name)
       h = XFIXNUM (Fcar (Fcdr (name)));
       bits = Fcar (Fcdr (Fcdr (name)));
 
-      bitmap_id = x_create_bitmap_from_data (f, SSDATA (bits),
-					     w, h);
+      bitmap_id = image_create_bitmap_from_data (f, SSDATA (bits),
+                                                 w, h);
     }
   else
     {
       /* It must be a string -- a file name.  */
-      bitmap_id = x_create_bitmap_from_file (f, name);
+      bitmap_id = image_create_bitmap_from_file (f, name);
     }
   unblock_input ();
 
@@ -893,11 +893,11 @@ tty_lookup_color (struct frame *f, Lisp_Object color, XColor *tty_color,
     return false;
 }
 
-/* A version of defined_color for non-X frames.  */
+/* An implementation of defined_color_hook for tty frames.  */
 
-static bool
+bool
 tty_defined_color (struct frame *f, const char *color_name,
-		   XColor *color_def, bool alloc)
+		   XColor *color_def, bool alloc, bool _makeIndex)
 {
   bool status = true;
 
@@ -923,36 +923,6 @@ tty_defined_color (struct frame *f, const char *color_name,
 
   return status;
 }
-
-
-/* Decide if color named COLOR_NAME is valid for the display
-   associated with the frame F; if so, return the rgb values in
-   COLOR_DEF.  If ALLOC, allocate a new colormap cell.
-
-   This does the right thing for any type of frame.  */
-
-static bool
-defined_color (struct frame *f, const char *color_name, XColor *color_def,
-	       bool alloc)
-{
-  if (!FRAME_WINDOW_P (f))
-    return tty_defined_color (f, color_name, color_def, alloc);
-#ifdef HAVE_X_WINDOWS
-  else if (FRAME_X_P (f))
-    return x_defined_color (f, color_name, color_def, alloc);
-#endif
-#ifdef HAVE_NTGUI
-  else if (FRAME_W32_P (f))
-    return w32_defined_color (f, color_name, color_def, alloc);
-#endif
-#ifdef HAVE_NS
-  else if (FRAME_NS_P (f))
-    return ns_defined_color (f, color_name, color_def, alloc, true);
-#endif
-  else
-    emacs_abort ();
-}
-
 
 /* Given the index IDX of a tty color on frame F, return its name, a
    Lisp string.  */
@@ -998,7 +968,8 @@ face_color_gray_p (struct frame *f, const char *color_name)
   XColor color;
   bool gray_p;
 
-  if (defined_color (f, color_name, &color, false))
+  if (FRAME_TERMINAL (f)->defined_color_hook
+      (f, color_name, &color, false, true))
     gray_p = (/* Any color sufficiently close to black counts as gray.  */
 	      (color.red < 5000 && color.green < 5000 && color.blue < 5000)
 	      ||
@@ -1038,7 +1009,7 @@ face_color_supported_p (struct frame *f, const char *color_name,
 	   && face_color_gray_p (f, color_name)))
     :
 #endif
-    tty_defined_color (f, color_name, &not_used, false);
+    tty_defined_color (f, color_name, &not_used, false, false);
 }
 
 
@@ -1082,9 +1053,10 @@ load_color2 (struct frame *f, struct face *face, Lisp_Object name,
 	   || target_index == LFACE_STRIKE_THROUGH_INDEX
 	   || target_index == LFACE_BOX_INDEX);
 
-  /* if the color map is full, defined_color will return a best match
+  /* if the color map is full, defined_color_hook will return a best match
      to the values in an existing cell. */
-  if (!defined_color (f, SSDATA (name), color, true))
+  if (!FRAME_TERMINAL (f)->defined_color_hook
+      (f, SSDATA (name), color, true, true))
     {
       add_to_log ("Unable to load color \"%s\"", name);
 
@@ -1183,7 +1155,7 @@ load_face_colors (struct frame *f, struct face *face,
   if (!face_color_supported_p (f, SSDATA (bg), false)
       && !NILP (Fbitmap_spec_p (Vface_default_stipple)))
     {
-      x_destroy_bitmap (f, face->stipple);
+      image_destroy_bitmap (f, face->stipple);
       face->stipple = load_pixmap (f, Vface_default_stipple);
     }
 
@@ -3476,8 +3448,8 @@ ordinary `x-get-resource' doesn't take a frame argument.  */)
   CHECK_STRING (class);
   f = decode_live_frame (frame);
   block_input ();
-  value = display_x_get_resource (FRAME_DISPLAY_INFO (f),
-				  resource, class, Qnil, Qnil);
+  value = gui_display_get_resource (FRAME_DISPLAY_INFO (f),
+                                    resource, class, Qnil, Qnil);
   unblock_input ();
   return value;
 }
@@ -4145,7 +4117,7 @@ free_realized_face (struct frame *f, struct face *face)
 #ifdef HAVE_X_WINDOWS
 	  free_face_colors (f, face);
 #endif /* HAVE_X_WINDOWS */
-	  x_destroy_bitmap (f, face->stipple);
+	  image_destroy_bitmap (f, face->stipple);
 	}
 #endif /* HAVE_WINDOW_SYSTEM */
 
@@ -4180,7 +4152,7 @@ prepare_face_for_display (struct frame *f, struct face *face)
       if (face->stipple)
 	{
 	  xgcv.fill_style = FillOpaqueStippled;
-	  xgcv.stipple = x_bitmap_pixmap (f, face->stipple);
+	  xgcv.stipple = image_bitmap_pixmap (f, face->stipple);
 	  mask |= GCFillStyle | GCStipple;
 	}
 #endif
@@ -4235,11 +4207,19 @@ two lists of the form (RED GREEN BLUE) aforementioned. */)
 
   if (!(CONSP (color1) && parse_rgb_list (color1, &cdef1))
       && !(STRINGP (color1)
-	   && defined_color (f, SSDATA (color1), &cdef1, false)))
+           && FRAME_TERMINAL (f)->defined_color_hook (f,
+                                                      SSDATA (color1),
+                                                      &cdef1,
+                                                      false,
+                                                      true)))
     signal_error ("Invalid color", color1);
   if (!(CONSP (color2) && parse_rgb_list (color2, &cdef2))
       && !(STRINGP (color2)
-	   && defined_color (f, SSDATA (color2), &cdef2, false)))
+           && FRAME_TERMINAL (f)->defined_color_hook (f,
+                                                      SSDATA (color2),
+                                                      &cdef2,
+                                                      false,
+                                                      true)))
     signal_error ("Invalid color", color2);
 
   if (NILP (metric))
@@ -4791,9 +4771,9 @@ DEFUN ("face-attributes-as-vector", Fface_attributes_as_vector,
     (2) `close in spirit' to what the attributes specify, if not exact.  */
 
 static bool
-x_supports_face_attributes_p (struct frame *f,
-			      Lisp_Object attrs[LFACE_VECTOR_SIZE],
-			      struct face *def_face)
+gui_supports_face_attributes_p (struct frame *f,
+                                Lisp_Object attrs[LFACE_VECTOR_SIZE],
+                                struct face *def_face)
 {
   Lisp_Object *def_attrs = def_face->lface;
 
@@ -5130,7 +5110,7 @@ face for italic.  */)
     supports = tty_supports_face_attributes_p (f, attrs, def_face);
 #ifdef HAVE_WINDOW_SYSTEM
   else
-    supports = x_supports_face_attributes_p (f, attrs, def_face);
+    supports = gui_supports_face_attributes_p (f, attrs, def_face);
 #endif
 
   return supports ? Qt : Qnil;
@@ -5450,7 +5430,7 @@ realize_default_face (struct frame *f)
 	 acceptable as a font for the default face (perhaps because
 	 auto-scaled fonts are rejected), so we must adjust the frame
 	 font.  */
-      x_set_font (f, LFACE_FONT (lface), Qnil);
+      gui_set_font (f, LFACE_FONT (lface), Qnil);
     }
 #endif
   return true;
@@ -5516,7 +5496,7 @@ realize_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE],
     }
 
   if (FRAME_WINDOW_P (cache->f))
-    face = realize_x_face (cache, attrs);
+    face = realize_gui_face (cache, attrs);
   else if (FRAME_TERMCAP_P (cache->f) || FRAME_MSDOS_P (cache->f))
     face = realize_tty_face (cache, attrs);
   else if (FRAME_INITIAL_P (cache->f))
@@ -5567,14 +5547,14 @@ realize_non_ascii_face (struct frame *f, Lisp_Object font_object,
 
 
 /* Realize the fully-specified face with attributes ATTRS in face
-   cache CACHE for ASCII characters.  Do it for X frame CACHE->f.  If
-   the new face doesn't share font with the default face, a fontname
-   is allocated from the heap and set in `font_name' of the new face,
-   but it is not yet loaded here.  Value is a pointer to the newly
-   created realized face.  */
+   cache CACHE for ASCII characters.  Do it for GUI frame CACHE->f.
+   If the new face doesn't share font with the default face, a
+   fontname is allocated from the heap and set in `font_name' of the
+   new face, but it is not yet loaded here.  Value is a pointer to the
+   newly created realized face.  */
 
 static struct face *
-realize_x_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE])
+realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE])
 {
   struct face *face = NULL;
 #ifdef HAVE_WINDOW_SYSTEM

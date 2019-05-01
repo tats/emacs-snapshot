@@ -234,7 +234,7 @@ static void x_wm_set_window_state (struct frame *, int);
 static void x_wm_set_icon_pixmap (struct frame *, ptrdiff_t);
 static void x_initialize (void);
 
-static bool get_current_wm_state (struct frame *, Window, int *, bool *);
+static bool x_get_current_wm_state (struct frame *, Window, int *, bool *);
 
 /* Flush display of frame F.  */
 
@@ -405,7 +405,7 @@ x_set_cr_source_with_gc_foreground (struct frame *f, GC gc)
 
   XGetGCValues (FRAME_X_DISPLAY (f), gc, GCForeground, &xgcv);
   color.pixel = xgcv.foreground;
-  x_query_color (f, &color);
+  x_query_colors (f, &color, 1);
   cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
 			color.green / 65535.0, color.blue / 65535.0);
 }
@@ -418,7 +418,7 @@ x_set_cr_source_with_gc_background (struct frame *f, GC gc)
 
   XGetGCValues (FRAME_X_DISPLAY (f), gc, GCBackground, &xgcv);
   color.pixel = xgcv.background;
-  x_query_color (f, &color);
+  x_query_colors (f, &color, 1);
   cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
 			color.green / 65535.0, color.blue / 65535.0);
 }
@@ -906,7 +906,7 @@ x_find_topmost_parent (struct frame *f)
 
 #define OPAQUE  0xffffffff
 
-void
+static void
 x_set_frame_alpha (struct frame *f)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
@@ -917,7 +917,7 @@ x_set_frame_alpha (struct frame *f)
   unsigned long opac;
   Window parent;
 
-  if (dpyinfo->x_highlight_frame == f)
+  if (dpyinfo->highlight_frame == f)
     alpha = f->alpha[0];
   else
     alpha = f->alpha[1];
@@ -1168,9 +1168,9 @@ x_update_window_end (struct window *w, bool cursor_on_p,
       if (draw_window_fringes (w, true))
 	{
 	  if (WINDOW_RIGHT_DIVIDER_WIDTH (w))
-	    x_draw_right_divider (w);
+	    gui_draw_right_divider (w);
 	  else
-	    x_draw_vertical_border (w);
+	    gui_draw_vertical_border (w);
 	}
 
       unblock_input ();
@@ -2325,16 +2325,14 @@ x_query_colors (struct frame *f, XColor *colors, int ncolors)
   XQueryColors (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), colors, ncolors);
 }
 
+/* Store F's background color into *BGCOLOR.  */
 
-/* On frame F, translate pixel color to RGB values for the color in
-   COLOR.  Use cached information, if available.  */
-
-void
-x_query_color (struct frame *f, XColor *color)
+static void
+x_query_frame_background_color (struct frame *f, XColor *bgcolor)
 {
-  x_query_colors (f, color, 1);
+  bgcolor->pixel = FRAME_BACKGROUND_PIXEL (f);
+  x_query_colors (f, bgcolor, 1);
 }
-
 
 /* On frame F, translate the color name to RGB values.  Use cached
    information, if possible.
@@ -2499,7 +2497,7 @@ x_copy_color (struct frame *f, unsigned long pixel)
   color.pixel = pixel;
   block_input ();
   /* The color could still be found in the color_cells array.  */
-  x_query_color (f, &color);
+  x_query_colors (f, &color, 1);
   XAllocColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), &color);
   unblock_input ();
 #ifdef DEBUG_X_COLORS
@@ -2540,7 +2538,7 @@ x_alloc_lighter_color (struct frame *f, Display *display, Colormap cmap,
 
   /* Get RGB color values.  */
   color.pixel = *pixel;
-  x_query_color (f, &color);
+  x_query_colors (f, &color, 1);
 
   /* Change RGB values by specified FACTOR.  Avoid overflow!  */
   eassert (factor >= 0);
@@ -3077,7 +3075,7 @@ x_draw_image_foreground (struct glyph_string *s)
 	  image_rect.y = y;
 	  image_rect.width = s->slice.width;
 	  image_rect.height = s->slice.height;
-	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
+	  if (gui_intersect_rectangles (&clip_rect, &image_rect, &r))
             x_composite_image (s, FRAME_X_DRAWABLE (s->f),
 			       s->slice.x + r.x - x, s->slice.y + r.y - y,
                                r.x, r.y, r.width, r.height);
@@ -3091,7 +3089,7 @@ x_draw_image_foreground (struct glyph_string *s)
 	  image_rect.y = y;
 	  image_rect.width = s->slice.width;
 	  image_rect.height = s->slice.height;
-	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
+	  if (gui_intersect_rectangles (&clip_rect, &image_rect, &r))
             x_composite_image (s, FRAME_X_DRAWABLE (s->f), s->slice.x + r.x - x, s->slice.y + r.y - y,
                                r.x, r.y, r.width, r.height);
 
@@ -3578,7 +3576,7 @@ x_draw_underwave (struct glyph_string *s)
   wave_clip.height = wave_height;
   get_glyph_string_clip_rect (s, &string_clip);
 
-  if (!x_intersect_rectangles (&wave_clip, &string_clip, &final_clip))
+  if (!gui_intersect_rectangles (&wave_clip, &string_clip, &final_clip))
     return;
 
   XSetClipRectangles (s->display, s->gc, 0, 0, &final_clip, 1, Unsorted);
@@ -4309,7 +4307,7 @@ x_scroll_run (struct window *w, struct run *run)
   block_input ();
 
   /* Cursor off.  Will be switched on again in x_update_window_end.  */
-  x_clear_cursor (w);
+  gui_clear_cursor (w);
 
 #ifdef USE_CAIRO
   if (FRAME_CR_CONTEXT (f))
@@ -4354,7 +4352,7 @@ x_scroll_run (struct window *w, struct run *run)
 
 
 static void
-frame_highlight (struct frame *f)
+x_frame_highlight (struct frame *f)
 {
   /* We used to only do this if Vx_no_window_manager was non-nil, but
      the ICCCM (section 4.1.6) says that the window's border pixmap
@@ -4370,12 +4368,12 @@ frame_highlight (struct frame *f)
 		    f->output_data.x->border_pixel);
   x_uncatch_errors ();
   unblock_input ();
-  x_update_cursor (f, true);
+  gui_update_cursor (f, true);
   x_set_frame_alpha (f);
 }
 
 static void
-frame_unhighlight (struct frame *f)
+x_frame_unhighlight (struct frame *f)
 {
   /* We used to only do this if Vx_no_window_manager was non-nil, but
      the ICCCM (section 4.1.6) says that the window's border pixmap
@@ -4388,7 +4386,7 @@ frame_unhighlight (struct frame *f)
 			  f->output_data.x->border_tile);
   x_uncatch_errors ();
   unblock_input ();
-  x_update_cursor (f, true);
+  gui_update_cursor (f, true);
   x_set_frame_alpha (f);
 }
 
@@ -4720,29 +4718,29 @@ XTframe_rehighlight (struct frame *frame)
 static void
 x_frame_rehighlight (struct x_display_info *dpyinfo)
 {
-  struct frame *old_highlight = dpyinfo->x_highlight_frame;
+  struct frame *old_highlight = dpyinfo->highlight_frame;
 
   if (dpyinfo->x_focus_frame)
     {
-      dpyinfo->x_highlight_frame
+      dpyinfo->highlight_frame
 	= ((FRAMEP (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame)))
 	   ? XFRAME (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame))
 	   : dpyinfo->x_focus_frame);
-      if (! FRAME_LIVE_P (dpyinfo->x_highlight_frame))
+      if (! FRAME_LIVE_P (dpyinfo->highlight_frame))
 	{
 	  fset_focus_frame (dpyinfo->x_focus_frame, Qnil);
-	  dpyinfo->x_highlight_frame = dpyinfo->x_focus_frame;
+	  dpyinfo->highlight_frame = dpyinfo->x_focus_frame;
 	}
     }
   else
-    dpyinfo->x_highlight_frame = 0;
+    dpyinfo->highlight_frame = 0;
 
-  if (dpyinfo->x_highlight_frame != old_highlight)
+  if (dpyinfo->highlight_frame != old_highlight)
     {
       if (old_highlight)
-	frame_unhighlight (old_highlight);
-      if (dpyinfo->x_highlight_frame)
-	frame_highlight (dpyinfo->x_highlight_frame);
+	x_frame_unhighlight (old_highlight);
+      if (dpyinfo->highlight_frame)
+	x_frame_highlight (dpyinfo->highlight_frame);
     }
 }
 
@@ -4925,7 +4923,7 @@ x_emacs_to_x_modifiers (struct x_display_info *dpyinfo, intmax_t state)
 /* Convert a keysym to its name.  */
 
 char *
-x_get_keysym_name (int keysym)
+get_keysym_name (int keysym)
 {
   char *value;
 
@@ -4962,9 +4960,9 @@ x_get_keysym_name (int keysym)
    the mouse.  */
 
 static Lisp_Object
-construct_mouse_click (struct input_event *result,
-		       const XButtonEvent *event,
-		       struct frame *f)
+x_construct_mouse_click (struct input_event *result,
+                         const XButtonEvent *event,
+                         struct frame *f)
 {
   /* Make the event type NO_EVENT; we'll change that when we decide
      otherwise.  */
@@ -4993,7 +4991,7 @@ construct_mouse_click (struct input_event *result,
    another motion event, so we can check again the next time it moves.  */
 
 static bool
-note_mouse_movement (struct frame *frame, const XMotionEvent *event)
+x_note_mouse_movement (struct frame *frame, const XMotionEvent *event)
 {
   XRectangle *r;
   struct x_display_info *dpyinfo;
@@ -5131,7 +5129,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
 	x_catch_errors (FRAME_X_DISPLAY (*fp));
 
-	if (x_mouse_grabbed (dpyinfo))
+	if (gui_mouse_grabbed (dpyinfo))
 	  {
 	    /* If mouse was grabbed on a frame, give coords for that frame
 	       even if the mouse is now outside it.  */
@@ -7670,7 +7668,7 @@ x_net_wm_state (struct frame *f, Window window)
   Lisp_Object lval = Qnil;
   bool sticky = false;
 
-  get_current_wm_state (f, window, &value, &sticky);
+  x_get_current_wm_state (f, window, &value, &sticky);
 
   switch (value)
     {
@@ -8159,7 +8157,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (event->xunmap.window == tip_window)
         {
           tip_window = None;
-          x_redo_mouse_highlight (dpyinfo);
+          gui_redo_mouse_highlight (dpyinfo);
         }
 
       f = x_top_window_to_frame (dpyinfo, event->xunmap.window);
@@ -8594,12 +8592,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       /* EnterNotify counts as mouse movement,
 	 so update things that depend on mouse position.  */
       if (f && !f->output_data.x->hourglass_p)
-	note_mouse_movement (f, &event->xmotion);
+	x_note_mouse_movement (f, &event->xmotion);
 #ifdef USE_GTK
       /* We may get an EnterNotify on the buttons in the toolbar.  In that
          case we moved out of any highlighted area and need to note this.  */
       if (!f && dpyinfo->last_mouse_glyph_frame)
-        note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
+        x_note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
 #endif
       goto OTHER;
 
@@ -8632,7 +8630,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef USE_GTK
       /* See comment in EnterNotify above */
       else if (dpyinfo->last_mouse_glyph_frame)
-        note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
+        x_note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
 #endif
       goto OTHER;
 
@@ -8646,7 +8644,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         previous_help_echo_string = help_echo_string;
         help_echo_string = Qnil;
 
-	f = (x_mouse_grabbed (dpyinfo) ? dpyinfo->last_mouse_frame
+	f = (gui_mouse_grabbed (dpyinfo) ? dpyinfo->last_mouse_frame
 	     : x_window_to_frame (dpyinfo, event->xmotion.window));
 
         if (hlinfo->mouse_face_hidden)
@@ -8701,7 +8699,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		last_mouse_window = window;
 	      }
 
-            if (!note_mouse_movement (f, &event->xmotion))
+            if (!x_note_mouse_movement (f, &event->xmotion))
 	      help_echo_string = previous_help_echo_string;
           }
         else
@@ -8893,7 +8891,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	dpyinfo->last_mouse_glyph_frame = NULL;
 	x_display_set_last_user_time (dpyinfo, event->xbutton.time);
 
-	if (x_mouse_grabbed (dpyinfo))
+	if (gui_mouse_grabbed (dpyinfo))
 	  f = dpyinfo->last_mouse_frame;
 	else
 	  {
@@ -8909,7 +8907,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		   into a parent frame with the child frame selected and
 		   `no-accept-focus' is not set, select the clicked
 		   frame.  */
-		struct frame *hf = dpyinfo->x_highlight_frame;
+		struct frame *hf = dpyinfo->highlight_frame;
 
 		if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 		  {
@@ -8959,13 +8957,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                           && event->xbutton.time > ignore_next_mouse_click_timeout)
                         {
                           ignore_next_mouse_click_timeout = 0;
-                          construct_mouse_click (&inev.ie, &event->xbutton, f);
+                          x_construct_mouse_click (&inev.ie, &event->xbutton, f);
                         }
                       if (event->type == ButtonRelease)
                         ignore_next_mouse_click_timeout = 0;
                     }
                   else
-                    construct_mouse_click (&inev.ie, &event->xbutton, f);
+                    x_construct_mouse_click (&inev.ie, &event->xbutton, f);
                 }
             if (FRAME_X_EMBEDDED_P (f))
               xembed_send_message (f, event->xbutton.time,
@@ -9526,7 +9524,7 @@ x_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 
 /* Make the x-window of frame F use the gnu icon bitmap.  */
 
-bool
+static bool
 x_bitmap_icon (struct frame *f, Lisp_Object file)
 {
   ptrdiff_t bitmap_id;
@@ -9536,7 +9534,7 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
 
   /* Free up our existing icon bitmap and mask if any.  */
   if (f->output_data.x->icon_bitmap > 0)
-    x_destroy_bitmap (f, f->output_data.x->icon_bitmap);
+    image_destroy_bitmap (f, f->output_data.x->icon_bitmap);
   f->output_data.x->icon_bitmap = 0;
 
   if (STRINGP (file))
@@ -9547,7 +9545,7 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
       if (xg_set_icon (f, file))
 	return false;
 #endif /* USE_GTK */
-      bitmap_id = x_create_bitmap_from_file (f, file);
+      bitmap_id = image_create_bitmap_from_file (f, file);
       x_create_bitmap_mask (f, bitmap_id);
     }
   else
@@ -9577,8 +9575,10 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
 	  /* If all else fails, use the (black and white) xbm image. */
 	  if (rc == -1)
 	    {
-	      rc = x_create_bitmap_from_data (f, (char *) gnu_xbm_bits,
-					      gnu_xbm_width, gnu_xbm_height);
+              rc = image_create_bitmap_from_data (f,
+                                                  (char *) gnu_xbm_bits,
+                                                  gnu_xbm_width,
+                                                  gnu_xbm_height);
 	      if (rc == -1)
 		return true;
 
@@ -9591,7 +9591,7 @@ x_bitmap_icon (struct frame *f, Lisp_Object file)
 	 this increments the ref-count one extra time.
 	 As a result, the GNU bitmap and mask are never freed.
 	 That way, we don't have to worry about allocating it again.  */
-      x_reference_bitmap (f, FRAME_DISPLAY_INFO (f)->icon_bitmap_id);
+      image_reference_bitmap (f, FRAME_DISPLAY_INFO (f)->icon_bitmap_id);
 
       bitmap_id = FRAME_DISPLAY_INFO (f)->icon_bitmap_id;
     }
@@ -9622,7 +9622,7 @@ x_text_icon (struct frame *f, const char *icon_name)
   }
 
   if (f->output_data.x->icon_bitmap > 0)
-    x_destroy_bitmap (f, f->output_data.x->icon_bitmap);
+    image_destroy_bitmap (f, f->output_data.x->icon_bitmap);
   f->output_data.x->icon_bitmap = 0;
   x_wm_set_icon_pixmap (f, 0);
 
@@ -9993,7 +9993,7 @@ x_io_error_quitter (Display *display)
    frame.  If it is negative, generate a new fontset from
    FONT-OBJECT.  */
 
-Lisp_Object
+static Lisp_Object
 x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
   struct font *font = XFONT_OBJECT (font_object);
@@ -10125,7 +10125,7 @@ xim_open_dpy (struct x_display_info *dpyinfo, char *resource_name)
     {
       if (dpyinfo->xim)
 	XCloseIM (dpyinfo->xim);
-      xim = XOpenIM (dpyinfo->display, dpyinfo->xrdb, resource_name,
+      xim = XOpenIM (dpyinfo->display, dpyinfo->rdb, resource_name,
 		     emacs_class);
       dpyinfo->xim = xim;
 
@@ -10224,7 +10224,7 @@ xim_initialize (struct x_display_info *dpyinfo, char *resource_name)
       xim_inst->dpyinfo = dpyinfo;
       xim_inst->resource_name = xstrdup (resource_name);
       ret = XRegisterIMInstantiateCallback
-	(dpyinfo->display, dpyinfo->xrdb, xim_inst->resource_name,
+	(dpyinfo->display, dpyinfo->rdb, xim_inst->resource_name,
 	 emacs_class, xim_instantiate_callback,
 	 /* This is XPointer in XFree86 but (XPointer *)
 	    on Tru64, at least, hence the configure test.  */
@@ -10252,7 +10252,7 @@ xim_close_dpy (struct x_display_info *dpyinfo)
       if (dpyinfo->display)
 	{
 	  Bool ret = XUnregisterIMInstantiateCallback
-	    (dpyinfo->display, dpyinfo->xrdb, xim_inst->resource_name,
+	    (dpyinfo->display, dpyinfo->rdb, xim_inst->resource_name,
 	     emacs_class, xim_instantiate_callback,
 	     (XRegisterIMInstantiateCallback_arg6) xim_inst);
 	  eassert (ret == True);
@@ -10365,10 +10365,10 @@ x_calc_absolute_position (struct frame *f)
 /* CHANGE_GRAVITY is 1 when calling from Fset_frame_position,
    to really change the position, and 0 when calling from
    x_make_frame_visible (in that case, XOFF and YOFF are the current
-   position values).  It is -1 when calling from x_set_frame_parameters,
+   position values).  It is -1 when calling from gui_set_frame_parameters,
    which means, do adjust for borders but don't change the gravity.  */
 
-void
+static void
 x_set_offset (struct frame *f, register int xoff, register int yoff, int change_gravity)
 {
   int modified_top, modified_left;
@@ -10671,10 +10671,10 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
    Return true iff we are not hidden.  */
 
 static bool
-get_current_wm_state (struct frame *f,
-                      Window window,
-                      int *size_state,
-                      bool *sticky)
+x_get_current_wm_state (struct frame *f,
+                        Window window,
+                        int *size_state,
+                        bool *sticky)
 {
   unsigned long actual_size;
   int i;
@@ -10781,7 +10781,7 @@ do_ewmh_fullscreen (struct frame *f)
   int cur;
   bool dummy;
 
-  get_current_wm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy);
+  x_get_current_wm_state (f, FRAME_OUTER_WINDOW (f), &cur, &dummy);
 
   /* Some window managers don't say they support _NET_WM_STATE, but they do say
      they support _NET_WM_STATE_FULLSCREEN.  Try that also.  */
@@ -10922,7 +10922,7 @@ x_handle_net_wm_state (struct frame *f, const XPropertyEvent *event)
   int value = FULLSCREEN_NONE;
   Lisp_Object lval;
   bool sticky = false;
-  bool not_hidden = get_current_wm_state (f, event->window, &value, &sticky);
+  bool not_hidden = x_get_current_wm_state (f, event->window, &value, &sticky);
 
   lval = Qnil;
   switch (value)
@@ -11249,7 +11249,7 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
 	/* Try to restore fullscreen state.  */
 	{
 	  store_frame_param (f, Qfullscreen, fullscreen);
-	  x_set_fullscreen (f, fullscreen, fullscreen);
+	  gui_set_fullscreen (f, fullscreen, fullscreen);
 	}
     }
   else
@@ -11343,7 +11343,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
 
 /* Raise frame F.  */
 
-void
+static void
 x_raise_frame (struct frame *f)
 {
   block_input ();
@@ -11367,9 +11367,18 @@ x_lower_frame (struct frame *f)
     }
 }
 
+static void
+XTframe_raise_lower (struct frame *f, bool raise_flag)
+{
+  if (raise_flag)
+    x_raise_frame (f);
+  else
+    x_lower_frame (f);
+}
+
 /* Request focus with XEmbed */
 
-void
+static void
 xembed_request_focus (struct frame *f)
 {
   /* See XEmbed Protocol Specification at
@@ -11381,7 +11390,7 @@ xembed_request_focus (struct frame *f)
 
 /* Activate frame with Extended Window Manager Hints */
 
-void
+static void
 x_ewmh_activate_frame (struct frame *f)
 {
   /* See Window Manager Specification/Extended Window Manager Hints at
@@ -11400,14 +11409,56 @@ x_ewmh_activate_frame (struct frame *f)
     }
 }
 
-static void
-XTframe_raise_lower (struct frame *f, bool raise_flag)
+static Lisp_Object
+x_get_focus_frame (struct frame *f)
 {
-  if (raise_flag)
-    x_raise_frame (f);
-  else
-    x_lower_frame (f);
+  Lisp_Object lisp_focus;
+
+  struct frame *focus =  FRAME_DISPLAY_INFO (f)->x_focus_frame;
+
+  if (!focus)
+    return Qnil;
+
+  XSETFRAME (lisp_focus, focus);
+  return lisp_focus;
 }
+
+/* In certain situations, when the window manager follows a
+   click-to-focus policy, there seems to be no way around calling
+   XSetInputFocus to give another frame the input focus .
+
+   In an ideal world, XSetInputFocus should generally be avoided so
+   that applications don't interfere with the window manager's focus
+   policy.  But I think it's okay to use when it's clearly done
+   following a user-command.  */
+
+static void
+x_focus_frame (struct frame *f, bool noactivate)
+{
+  Display *dpy = FRAME_X_DISPLAY (f);
+
+  block_input ();
+  x_catch_errors (dpy);
+
+  if (FRAME_X_EMBEDDED_P (f))
+    {
+      /* For Xembedded frames, normally the embedder forwards key
+	 events.  See XEmbed Protocol Specification at
+	 http://freedesktop.org/wiki/Specifications/xembed-spec  */
+      xembed_request_focus (f);
+    }
+  else
+    {
+      XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		      RevertToParent, CurrentTime);
+      if (!noactivate)
+	x_ewmh_activate_frame (f);
+    }
+
+  x_uncatch_errors ();
+  unblock_input ();
+}
+
 
 /* XEmbed implementation.  */
 
@@ -11488,7 +11539,7 @@ x_make_frame_visible (struct frame *f)
 
   block_input ();
 
-  x_set_bitmap_icon (f);
+  gui_set_bitmap_icon (f);
 
   if (! FRAME_VISIBLE_P (f))
     {
@@ -11623,8 +11674,8 @@ x_make_frame_invisible (struct frame *f)
   window = FRAME_OUTER_WINDOW (f);
 
   /* Don't keep the highlight on an invisible frame.  */
-  if (FRAME_DISPLAY_INFO (f)->x_highlight_frame == f)
-    FRAME_DISPLAY_INFO (f)->x_highlight_frame = 0;
+  if (FRAME_DISPLAY_INFO (f)->highlight_frame == f)
+    FRAME_DISPLAY_INFO (f)->highlight_frame = 0;
 
   block_input ();
 
@@ -11665,6 +11716,15 @@ x_make_frame_invisible (struct frame *f)
   unblock_input ();
 }
 
+static void
+x_make_frame_visible_invisible (struct frame *f, bool visible)
+{
+  if (visible)
+    x_make_frame_visible (f);
+  else
+    x_make_frame_invisible (f);
+}
+
 /* Change window state from mapped to iconified.  */
 
 void
@@ -11675,15 +11735,15 @@ x_iconify_frame (struct frame *f)
 #endif
 
   /* Don't keep the highlight on an invisible frame.  */
-  if (FRAME_DISPLAY_INFO (f)->x_highlight_frame == f)
-    FRAME_DISPLAY_INFO (f)->x_highlight_frame = 0;
+  if (FRAME_DISPLAY_INFO (f)->highlight_frame == f)
+    FRAME_DISPLAY_INFO (f)->highlight_frame = 0;
 
   if (FRAME_ICONIFIED_P (f))
     return;
 
   block_input ();
 
-  x_set_bitmap_icon (f);
+  gui_set_bitmap_icon (f);
 
 #if defined (USE_GTK)
   if (FRAME_GTK_OUTER_WIDGET (f))
@@ -11939,8 +11999,8 @@ x_free_frame_resources (struct frame *f)
     dpyinfo->x_focus_frame = 0;
   if (f == dpyinfo->x_focus_event_frame)
     dpyinfo->x_focus_event_frame = 0;
-  if (f == dpyinfo->x_highlight_frame)
-    dpyinfo->x_highlight_frame = 0;
+  if (f == dpyinfo->highlight_frame)
+    dpyinfo->highlight_frame = 0;
   if (f == hlinfo->mouse_face_mouse_frame)
     reset_mouse_highlight (hlinfo);
 
@@ -12108,7 +12168,7 @@ x_wm_set_icon_pixmap (struct frame *f, ptrdiff_t pixmap_id)
 
   if (pixmap_id > 0)
     {
-      icon_pixmap = x_bitmap_pixmap (f, pixmap_id);
+      icon_pixmap = image_bitmap_pixmap (f, pixmap_id);
       f->output_data.x->wm_hints.icon_pixmap = icon_pixmap;
       icon_mask = x_bitmap_mask (f, pixmap_id);
       f->output_data.x->wm_hints.icon_mask = icon_mask;
@@ -12682,7 +12742,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
   /* Put the rdb where we can find it in a way that works on
      all versions.  */
-  dpyinfo->xrdb = xrdb;
+  dpyinfo->rdb = xrdb;
 
   dpyinfo->screen = ScreenOfDisplay (dpyinfo->display,
 				     DefaultScreen (dpyinfo->display));
@@ -12713,8 +12773,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 	  AUTO_STRING (privateColormap, "privateColormap");
 	  AUTO_STRING (PrivateColormap, "PrivateColormap");
 	  Lisp_Object value
-	    = display_x_get_resource (dpyinfo, privateColormap,
-				      PrivateColormap, Qnil, Qnil);
+	    = gui_display_get_resource (dpyinfo, privateColormap,
+                                        PrivateColormap, Qnil, Qnil);
 	  if (STRINGP (value)
 	      && (!strcmp (SSDATA (value), "true")
 		  || !strcmp (SSDATA (value), "on")))
@@ -12931,8 +12991,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   {
     AUTO_STRING (synchronous, "synchronous");
     AUTO_STRING (Synchronous, "Synchronous");
-    Lisp_Object value = display_x_get_resource (dpyinfo, synchronous,
-						Synchronous, Qnil, Qnil);
+    Lisp_Object value = gui_display_get_resource (dpyinfo, synchronous,
+                                                  Synchronous, Qnil, Qnil);
     if (STRINGP (value)
 	&& (!strcmp (SSDATA (value), "true")
 	    || !strcmp (SSDATA (value), "on")))
@@ -12942,8 +13002,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   {
     AUTO_STRING (useXIM, "useXIM");
     AUTO_STRING (UseXIM, "UseXIM");
-    Lisp_Object value = display_x_get_resource (dpyinfo, useXIM, UseXIM,
-						Qnil, Qnil);
+    Lisp_Object value = gui_display_get_resource (dpyinfo, useXIM, UseXIM,
+                                                  Qnil, Qnil);
 #ifdef USE_XIM
     if (STRINGP (value)
 	&& (!strcmp (SSDATA (value), "false")
@@ -13074,21 +13134,23 @@ x_activate_timeout_atimer (void)
 
 /* Set up use of X before we make the first connection.  */
 
+extern frame_parm_handler x_frame_parm_handlers[];
+
 static struct redisplay_interface x_redisplay_interface =
   {
     x_frame_parm_handlers,
-    x_produce_glyphs,
-    x_write_glyphs,
-    x_insert_glyphs,
-    x_clear_end_of_line,
+    gui_produce_glyphs,
+    gui_write_glyphs,
+    gui_insert_glyphs,
+    gui_clear_end_of_line,
     x_scroll_run,
     x_after_update_window_line,
     x_update_window_begin,
     x_update_window_end,
     x_flip_and_flush,
-    x_clear_window_mouse_face,
-    x_get_glyph_overhangs,
-    x_fix_overlapping_area,
+    gui_clear_window_mouse_face,
+    gui_get_glyph_overhangs,
+    gui_fix_overlapping_area,
     x_draw_fringe_bitmap,
 #ifdef USE_CAIRO
     x_cr_define_fringe_bitmap,
@@ -13101,6 +13163,7 @@ static struct redisplay_interface x_redisplay_interface =
     x_draw_glyph_string,
     x_define_frame_cursor,
     x_clear_frame_area,
+    x_clear_under_internal_border,
     x_draw_window_cursor,
     x_draw_vertical_window_border,
     x_draw_window_divider,
@@ -13132,13 +13195,13 @@ x_delete_terminal (struct terminal *terminal)
   /* Normally, the display is available...  */
   if (dpyinfo->display)
     {
-      x_destroy_all_bitmaps (dpyinfo);
+      image_destroy_all_bitmaps (dpyinfo);
       XSetCloseDownMode (dpyinfo->display, DestroyAll);
 
       /* Whether or not XCloseDisplay destroys the associated resource
 	 database depends on the version of libX11.  To avoid both
 	 crash and memory leak, we dissociate the database from the
-	 display and then destroy dpyinfo->xrdb ourselves.
+	 display and then destroy dpyinfo->rdb ourselves.
 
 	 Unfortunately, the above strategy does not work in some
 	 situations due to a bug in newer versions of libX11: because
@@ -13158,7 +13221,7 @@ x_delete_terminal (struct terminal *terminal)
       /* We used to call XrmDestroyDatabase from x_delete_display, but
 	 some older versions of libX11 crash if we call it after
 	 closing all the displays.  */
-      XrmDestroyDatabase (dpyinfo->xrdb);
+      XrmDestroyDatabase (dpyinfo->rdb);
 #endif
 
 #ifdef USE_GTK
@@ -13216,19 +13279,41 @@ x_create_terminal (struct x_display_info *dpyinfo)
   terminal->read_socket_hook = XTread_socket;
   terminal->frame_up_to_date_hook = XTframe_up_to_date;
   terminal->buffer_flipping_unblocked_hook = XTbuffer_flipping_unblocked_hook;
+  terminal->defined_color_hook = x_defined_color;
+  terminal->query_frame_background_color = x_query_frame_background_color;
+  terminal->query_colors = x_query_colors;
   terminal->mouse_position_hook = XTmouse_position;
+  terminal->get_focus_frame = x_get_focus_frame;
+  terminal->focus_frame_hook = x_focus_frame;
   terminal->frame_rehighlight_hook = XTframe_rehighlight;
   terminal->frame_raise_lower_hook = XTframe_raise_lower;
+  terminal->frame_visible_invisible_hook = x_make_frame_visible_invisible;
   terminal->fullscreen_hook = XTfullscreen_hook;
+  terminal->iconify_frame_hook = x_iconify_frame;
+  terminal->set_window_size_hook = x_set_window_size;
+  terminal->set_frame_offset_hook = x_set_offset;
+  terminal->set_frame_alpha_hook = x_set_frame_alpha;
+  terminal->set_new_font_hook = x_new_font;
+  terminal->set_bitmap_icon_hook = x_bitmap_icon;
+  terminal->implicit_set_name_hook = x_implicitly_set_name;
   terminal->menu_show_hook = x_menu_show;
+#ifdef HAVE_EXT_MENU_BAR
+  terminal->activate_menubar_hook = x_activate_menubar;
+#endif
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
   terminal->popup_dialog_hook = xw_popup_dialog;
 #endif
+#ifndef HAVE_EXT_TOOL_BAR
+  terminal->change_tool_bar_height_hook = x_change_tool_bar_height;
+#endif
   terminal->set_vertical_scroll_bar_hook = XTset_vertical_scroll_bar;
   terminal->set_horizontal_scroll_bar_hook = XTset_horizontal_scroll_bar;
+  terminal->set_scroll_bar_default_width_hook = x_set_scroll_bar_default_width;
+  terminal->set_scroll_bar_default_height_hook = x_set_scroll_bar_default_height;
   terminal->condemn_scroll_bars_hook = XTcondemn_scroll_bars;
   terminal->redeem_scroll_bar_hook = XTredeem_scroll_bar;
   terminal->judge_scroll_bars_hook = XTjudge_scroll_bars;
+  terminal->get_string_resource_hook = x_get_string_resource;
   terminal->delete_frame_hook = x_destroy_window;
   terminal->delete_terminal_hook = x_delete_terminal;
   /* Other hooks are NULL by default.  */

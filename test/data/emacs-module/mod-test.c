@@ -27,6 +27,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <string.h>
 #include <time.h>
 
+#ifdef HAVE_GMP
+#include <gmp.h>
+#else
+#include "mini-gmp.h"
+#define EMACS_MODULE_HAVE_MPZ_T
+#endif
+
+#define EMACS_MODULE_GMP
 #include <emacs-module.h>
 
 #include "timespec.h"
@@ -366,6 +374,49 @@ Fmod_test_sleep_until (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
   return env->intern (env, "finished");
 }
 
+static emacs_value
+Fmod_test_add_nanosecond (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+                          void *data)
+{
+  assert (nargs == 1);
+  struct timespec time = env->extract_time (env, args[0]);
+  assert (time.tv_nsec >= 0);
+  assert (time.tv_nsec < 2000000000);  /* possible leap second */
+  time.tv_nsec++;
+  return env->make_time (env, time);
+}
+
+static emacs_value
+Fmod_test_nanoseconds (emacs_env *env, ptrdiff_t nargs, emacs_value *args, void *data) {
+  assert (nargs == 1);
+  struct timespec time = env->extract_time (env, args[0]);
+  struct emacs_mpz nanoseconds;
+  assert (LONG_MIN <= time.tv_sec && time.tv_sec <= LONG_MAX);
+  mpz_init_set_si (nanoseconds.value, time.tv_sec);
+  static_assert (1000000000 <= ULONG_MAX, "unsupported architecture");
+  mpz_mul_ui (nanoseconds.value, nanoseconds.value, 1000000000);
+  assert (0 <= time.tv_nsec && time.tv_nsec <= ULONG_MAX);
+  mpz_add_ui (nanoseconds.value, nanoseconds.value, time.tv_nsec);
+  emacs_value result = env->make_big_integer (env, &nanoseconds);
+  mpz_clear (nanoseconds.value);
+  return result;
+}
+
+static emacs_value
+Fmod_test_double (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+                  void *data)
+{
+  assert (nargs == 1);
+  emacs_value arg = args[0];
+  struct emacs_mpz value;
+  mpz_init (value.value);
+  env->extract_big_integer (env, arg, &value);
+  mpz_mul_ui (value.value, value.value, 2);
+  emacs_value result = env->make_big_integer (env, &value);
+  mpz_clear (value.value);
+  return result;
+}
+
 /* Lisp utilities for easier readability (simple wrappers).  */
 
 /* Provide FEATURE to Emacs.  */
@@ -394,6 +445,11 @@ bind_function (emacs_env *env, const char *name, emacs_value Sfun)
 int
 emacs_module_init (struct emacs_runtime *ert)
 {
+  /* Check that EMACS_MAJOR_VERSION is defined and an integral
+     constant.  */
+  char dummy[EMACS_MAJOR_VERSION];
+  assert (27 <= sizeof dummy);
+
   if (ert->size < sizeof *ert)
     {
       fprintf (stderr, "Runtime size of runtime structure (%"pT" bytes) "
@@ -434,6 +490,9 @@ emacs_module_init (struct emacs_runtime *ert)
   DEFUN ("mod-test-invalid-finalizer", Fmod_test_invalid_finalizer, 0, 0,
          NULL, NULL);
   DEFUN ("mod-test-sleep-until", Fmod_test_sleep_until, 2, 2, NULL, NULL);
+  DEFUN ("mod-test-add-nanosecond", Fmod_test_add_nanosecond, 1, 1, NULL, NULL);
+  DEFUN ("mod-test-nanoseconds", Fmod_test_nanoseconds, 1, 1, NULL, NULL);
+  DEFUN ("mod-test-double", Fmod_test_double, 1, 1, NULL, NULL);
 
 #undef DEFUN
 
