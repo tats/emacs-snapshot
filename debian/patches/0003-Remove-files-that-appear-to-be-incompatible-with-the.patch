@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 06da415..79bcc88 100644
+index 21362a9..de49fac 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=
@@ -53,7 +53,7 @@ index 06da415..79bcc88 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -965,11 +966,11 @@ check check-maybe check-expensive check-all:
+@@ -963,11 +964,11 @@ $(CHECK_TARGETS):
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 06da415..79bcc88 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -990,9 +991,7 @@ info-dir:
+@@ -988,9 +989,7 @@ info-dir:
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index 06da415..79bcc88 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1014,14 +1013,10 @@ ${srcdir}/info/dir:
+@@ -1012,14 +1011,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index 06da415..79bcc88 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1039,14 +1034,10 @@ install-pdf:
+@@ -1037,14 +1032,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -190,10 +190,10 @@ index a03efaf..8800638 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index d1f4735..abdfd9c 100644
+index 4dfe471..91683d8 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -294,6 +294,14 @@ view-help-file
+@@ -296,6 +296,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
