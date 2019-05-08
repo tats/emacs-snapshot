@@ -378,6 +378,16 @@ static Lisp_Object list_of_error;
 	   && (*BYTE_POS_ADDR (IT_BYTEPOS (*it)) == ' '			\
 	       || *BYTE_POS_ADDR (IT_BYTEPOS (*it)) == '\t'))))		\
 
+/* Test all the conditions needed to print the fill column indicator.  */
+#define FILL_COLUMN_INDICATOR_NEEDED(it)			\
+  Vdisplay_fill_column_indicator			\
+  && (it->continuation_lines_width == 0)			\
+  && (!NILP (Vdisplay_fill_column_indicator_column))		\
+  && FIXNATP (Vdisplay_fill_column_indicator_character)		\
+  && ((EQ (Vdisplay_fill_column_indicator_column, Qt)		\
+       && FIXNATP (BVAR (current_buffer, fill_column)))		\
+      || (FIXNATP (Vdisplay_fill_column_indicator_column)))
+
 /* True means print newline to stdout before next mini-buffer message.  */
 
 bool noninteractive_need_newline;
@@ -18030,12 +18040,14 @@ try_window_reusing_current_matrix (struct window *w)
 
 	  if (run.height > 0 && run.current_y != run.desired_y)
 	    {
+#ifdef HAVE_WINDOW_SYSTEM
 	      update_begin (f);
-	      FRAME_RIF (f)->update_window_begin_hook (w);
+	      gui_update_window_begin (w);
 	      FRAME_RIF (f)->clear_window_mouse_face (w);
 	      FRAME_RIF (f)->scroll_run_hook (w, &run);
-	      FRAME_RIF (f)->update_window_end_hook (w, false, false);
+	      gui_update_window_end (w, false, false);
 	      update_end (f);
+#endif
 	    }
 
 	  /* Shift current matrix down by nrows_scrolled lines.  */
@@ -18194,12 +18206,14 @@ try_window_reusing_current_matrix (struct window *w)
 
       if (run.height)
 	{
+#ifdef HAVE_WINDOW_SYSTEM
 	  update_begin (f);
-	  FRAME_RIF (f)->update_window_begin_hook (w);
+	  gui_update_window_begin (w);
 	  FRAME_RIF (f)->clear_window_mouse_face (w);
 	  FRAME_RIF (f)->scroll_run_hook (w, &run);
-	  FRAME_RIF (f)->update_window_end_hook (w, false, false);
+	  gui_update_window_end (w, false, false);
 	  update_end (f);
+#endif
 	}
 
       /* Adjust Y positions of reused rows.  */
@@ -19147,10 +19161,12 @@ try_window_id (struct window *w)
 
       if (FRAME_WINDOW_P (f))
 	{
-	  FRAME_RIF (f)->update_window_begin_hook (w);
+#ifdef HAVE_WINDOW_SYSTEM
+	  gui_update_window_begin (w);
 	  FRAME_RIF (f)->clear_window_mouse_face (w);
 	  FRAME_RIF (f)->scroll_run_hook (w, &run);
-	  FRAME_RIF (f)->update_window_end_hook (w, false, false);
+	  gui_update_window_end (w, false, false);
+#endif
 	}
       else
 	{
@@ -20146,15 +20162,59 @@ append_space_for_newline (struct it *it, bool default_face_p)
 	  it->what = IT_CHARACTER;
 	  memset (&it->position, 0, sizeof it->position);
 	  it->object = Qnil;
-	  it->c = it->char_to_display = ' ';
 	  it->len = 1;
 
+	  int local_default_face_id =
+	    lookup_basic_face (it->w, it->f, DEFAULT_FACE_ID);
+	  struct face* default_face =
+	    FACE_FROM_ID_OR_NULL (it->f, local_default_face_id);
+
+	  /* Corner case for when display-fill-column-indicator-mode
+	     is active and the extra character should be added in the
+	     same place than the line.  */
+	  if ((it->w->pseudo_window_p == 0)
+	      && FILL_COLUMN_INDICATOR_NEEDED(it))
+	    {
+	       int fill_column_indicator_column = -1;
+
+	       if (EQ (Vdisplay_fill_column_indicator_column, Qt))
+	         fill_column_indicator_column =
+		   XFIXNAT (BVAR (current_buffer, fill_column));
+	       else
+		 fill_column_indicator_column =
+		   XFIXNAT (Vdisplay_fill_column_indicator_column);
+
+	       struct font *font =
+	         default_face->font ?
+		   default_face->font : FRAME_FONT (it->f);
+	       const int char_width =
+	         font->average_width ?
+		   font->average_width : font->space_width;
+
+	       const int column_x =
+		 char_width * fill_column_indicator_column +
+		   it->lnum_pixel_width;
+
+	       if (it->current_x == column_x)
+	         {
+	           it->c = it->char_to_display =
+		     XFIXNAT (Vdisplay_fill_column_indicator_character);
+	           it->face_id =
+		     merge_faces (it->w, Qfill_column_indicator,
+		                  0, saved_face_id);
+	           face = FACE_FROM_ID(it->f, it->face_id);
+	           goto produce_glyphs;
+	         }
+	    }
+
+	  it->c = it->char_to_display = ' ';
 	  /* If the default face was remapped, be sure to use the
 	     remapped face for the appended newline.  */
 	  if (default_face_p)
-	    it->face_id = lookup_basic_face (it->w, it->f, DEFAULT_FACE_ID);
+	    it->face_id = local_default_face_id;
 	  else if (it->face_before_selective_p)
 	    it->face_id = it->saved_face_id;
+
 	  face = FACE_FROM_ID (it->f, it->face_id);
 	  it->face_id = FACE_FOR_CHAR (it->f, face, 0, -1, Qnil);
 	  /* In R2L rows, we will prepend a stretch glyph that will
@@ -20168,6 +20228,7 @@ append_space_for_newline (struct it *it, bool default_face_p)
 	      && saved_x + FRAME_COLUMN_WIDTH (it->f) < it->last_visible_x)
 	    it->end_of_box_run_p = false;
 
+	produce_glyphs:
 	  PRODUCE_GLYPHS (it);
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -20316,7 +20377,8 @@ extend_face_to_end_of_line (struct it *it)
 #ifdef HAVE_WINDOW_SYSTEM
       && !face->stipple
 #endif
-      && !it->glyph_row->reversed_p)
+      && !it->glyph_row->reversed_p
+      && !Vdisplay_fill_column_indicator)
     return;
 
   /* Set the glyph row flag indicating that the face of the last glyph
@@ -20368,6 +20430,90 @@ extend_face_to_end_of_line (struct it *it)
 		default_face->id;
 	      it->glyph_row->used[RIGHT_MARGIN_AREA] = 1;
 	    }
+
+	  /* Display fill column indicator if not in modeline or
+	     toolbar and display fill column indicator mode is
+	     active.  */
+	  if ((it->w->pseudo_window_p == 0)
+	      && FILL_COLUMN_INDICATOR_NEEDED(it))
+            {
+	       int fill_column_indicator_column = -1;
+
+	       if (EQ (Vdisplay_fill_column_indicator_column, Qt))
+	         fill_column_indicator_column =
+		   XFIXNAT (BVAR (current_buffer, fill_column));
+	       else
+		 fill_column_indicator_column =
+		   XFIXNAT (Vdisplay_fill_column_indicator_column);
+
+	      struct font *font =
+	        default_face->font ? default_face->font : FRAME_FONT (f);
+	      const int char_width =
+	        font->average_width ?
+		  font->average_width : font->space_width;
+
+	      const int column_x =
+	        char_width * fill_column_indicator_column +
+	          it->lnum_pixel_width;
+
+	      if ((it->current_x <= column_x)
+	          && (column_x <= it->last_visible_x))
+	        {
+	          const char saved_char = it->char_to_display;
+	          const struct text_pos saved_pos = it->position;
+	          const bool saved_avoid_cursor = it->avoid_cursor_p;
+	          const int saved_face_id = it->face_id;
+	          const bool saved_box_start = it->start_of_box_run_p;
+	          Lisp_Object save_object = it->object;
+
+	          /* The stretch width needs to considet the latter
+	             added glyph.  */
+	          const int stretch_width =
+	            column_x - it->current_x - char_width;
+
+	          memset (&it->position, 0, sizeof it->position);
+	          it->avoid_cursor_p = true;
+	          it->object = Qnil;
+
+	          /* Only generate a stretch glyph if there is distance
+	             between current_x and and the indicator position.  */
+	          if (stretch_width > 0)
+		    {
+		      int stretch_ascent = (((it->ascent + it->descent)
+		                             * FONT_BASE (font)) / FONT_HEIGHT (font));
+		      append_stretch_glyph (it, Qnil, stretch_width,
+		                            it->ascent + it->descent,
+		                            stretch_ascent);
+		    }
+
+	          /* Generate the glyph indicator only if
+	             append_space_for_newline didn't already.  */
+	          if (it->current_x < column_x)
+	            {
+		      it->char_to_display =
+	                XFIXNAT (Vdisplay_fill_column_indicator_character);
+	              it->face_id =
+	                merge_faces (it->w, Qfill_column_indicator,
+	                             0, saved_face_id);
+	              PRODUCE_GLYPHS (it);
+	            }
+
+	          /* Restore the face after the indicator was generated.  */
+	          it->face_id = saved_face_id;
+
+	          /* If there is space after the indicator generate an
+	             extra empty glyph to restore the face.  Issue was
+	             observed in X systems.  */
+	          it->char_to_display = ' ';
+	          PRODUCE_GLYPHS (it);
+
+	          it->char_to_display = saved_char;
+	          it->position = saved_pos;
+	          it->avoid_cursor_p = saved_avoid_cursor;
+	          it->start_of_box_run_p = saved_box_start;
+	          it->object = save_object;
+	        }
+            }
 	}
 #ifdef HAVE_WINDOW_SYSTEM
       if (it->glyph_row->reversed_p)
@@ -20376,7 +20522,7 @@ extend_face_to_end_of_line (struct it *it)
 	     rightmost glyph will be drawn flushed all the way to the
 	     right margin of the window.  The stretch glyph that will
 	     occupy the empty space, if any, to the left of the
-	     glyphs.  */
+	     glyph.  */
 	  struct font *font = face->font ? face->font : FRAME_FONT (f);
 	  struct glyph *row_start = it->glyph_row->glyphs[TEXT_AREA];
 	  struct glyph *row_end = row_start + it->glyph_row->used[TEXT_AREA];
@@ -20489,10 +20635,47 @@ extend_face_to_end_of_line (struct it *it)
 	it->face_id = default_face->id;
       else
 	it->face_id = face->id;
-      PRODUCE_GLYPHS (it);
 
-      while (it->current_x <= it->last_visible_x)
-	PRODUCE_GLYPHS (it);
+      /* Display fill-column indicator if needed.  */
+      if (FILL_COLUMN_INDICATOR_NEEDED(it))
+	{
+	  int fill_column_indicator_column = -1;
+
+	  /* Vdisplay_fill_column_indicator_column accepts the special
+	     value t to use the default fill-column variable.  The
+	     conditions are all defined in the macro
+	     FILL_COLUMN_INDICATOR_NEEDED.  */
+	  if (EQ (Vdisplay_fill_column_indicator_column, Qt))
+	    fill_column_indicator_column =
+	      XFIXNAT (BVAR (current_buffer, fill_column)) + it->lnum_pixel_width;
+	  else
+	    fill_column_indicator_column =
+	      XFIXNAT (Vdisplay_fill_column_indicator_column) + it->lnum_pixel_width;
+
+	  do
+	    {
+	      if (it->current_x == fill_column_indicator_column)
+	        {
+		  const int saved_face_id = it->face_id;
+		  it->face_id =
+		    merge_faces (it->w, Qfill_column_indicator, 0, saved_face_id);
+		  it->c = it->char_to_display =
+		    XFIXNAT (Vdisplay_fill_column_indicator_character);
+		  PRODUCE_GLYPHS (it);
+		  it->face_id = saved_face_id;
+		  it->c = it->char_to_display = ' ';
+	        }
+	      else
+		PRODUCE_GLYPHS (it);
+	    } while (it->current_x <= it->last_visible_x);
+	}
+      else
+	{
+          do
+	    {
+	      PRODUCE_GLYPHS (it);
+            } while (it->current_x <= it->last_visible_x);
+        }
 
       if (WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0
 	  && (it->glyph_row->used[RIGHT_MARGIN_AREA]
@@ -20582,7 +20765,8 @@ highlight_trailing_whitespace (struct it *it)
       if (!row->reversed_p)
 	{
 	  while (glyph >= start
-		 && glyph->type == CHAR_GLYPH
+	         && (glyph->type == CHAR_GLYPH
+	             || glyph->type == STRETCH_GLYPH)
 		 && NILP (glyph->object))
 	    --glyph;
 	}
@@ -23842,7 +24026,8 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 			       ? string_byte_to_char (elt, bytepos)
 			       : bytepos);
 		    spec = decode_mode_spec (it->w, c, field, &string);
-		    multibyte = STRINGP (string) && STRING_MULTIBYTE (string);
+		    eassert (NILP (string) || STRINGP (string));
+		    multibyte = !NILP (string) && STRING_MULTIBYTE (string);
 
 		    switch (mode_line_target)
 		      {
@@ -24518,8 +24703,9 @@ percent99 (ptrdiff_t n, ptrdiff_t d)
 
 /* Return a string for the output of a mode line %-spec for window W,
    generated by character C.  FIELD_WIDTH > 0 means pad the string
-   returned with spaces to that value.  Return a Lisp string in
-   *STRING if the resulting string is taken from that Lisp string.
+   returned with spaces to that value.  Set *STRING to be a Lisp
+   string if the resulting string is taken from that Lisp string;
+   otherwise, set *STRING to Qnil.
 
    Note we operate on the current buffer for most purposes.  */
 
@@ -32657,6 +32843,9 @@ be let-bound around code that needs to disable messages temporarily. */);
   /* Name of a text property which disables line-number display.  */
   DEFSYM (Qdisplay_line_numbers_disable, "display-line-numbers-disable");
 
+  /* Name of the face used to display fill column indicator character.  */
+  DEFSYM (Qfill_column_indicator, "fill-column-indicator");
+
   /* Name and number of the face used to highlight escape glyphs.  */
   DEFSYM (Qescape_glyph, "escape-glyph");
 
@@ -33228,6 +33417,30 @@ either `relative' or `visual'.  */);
   display_line_numbers_widen = false;
   DEFSYM (Qdisplay_line_numbers_widen, "display-line-numbers-widen");
   Fmake_variable_buffer_local (Qdisplay_line_numbers_widen);
+
+  DEFVAR_BOOL ("display-fill-column-indicator", Vdisplay_fill_column_indicator,
+    doc: /* Non-nil means display the fill column indicator.  */);
+  Vdisplay_fill_column_indicator = false;
+  DEFSYM (Qdisplay_fill_column_indicator, "display-fill-column-indicator");
+  Fmake_variable_buffer_local (Qdisplay_fill_column_indicator);
+
+  DEFVAR_LISP ("display-fill-column-indicator-column", Vdisplay_fill_column_indicator_column,
+    doc: /* Column for indicator when `display-fill-column-indicator'
+is non-nil.  The default value is t which means that the indicator
+will use the `fill-column' variable.  If it is set to an integer the
+indicator will be drawn in that column.  */);
+  Vdisplay_fill_column_indicator_column = Qt;
+  DEFSYM (Qdisplay_fill_column_indicator_column, "display-fill-column-indicator-column");
+  Fmake_variable_buffer_local (Qdisplay_fill_column_indicator_column);
+
+  DEFVAR_LISP ("display-fill-column-indicator-character", Vdisplay_fill_column_indicator_character,
+    doc: /* Character to draw the indicator when
+`display-fill-column-indicator' is non-nil.  The default is U+2502 but
+a good alternative is (ascii 124) if the font in fill-column-indicator
+face does not support Unicode characters.  */);
+  Vdisplay_fill_column_indicator_character = Qnil;
+  DEFSYM (Qdisplay_fill_column_indicator_character, "display-fill-column-indicator-character");
+  Fmake_variable_buffer_local (Qdisplay_fill_column_indicator_character);
 
   DEFVAR_BOOL ("inhibit-eval-during-redisplay", inhibit_eval_during_redisplay,
     doc: /* Non-nil means don't eval Lisp during redisplay.  */);

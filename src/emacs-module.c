@@ -101,11 +101,6 @@ To add a new module function, proceed as follows:
 # pragma GCC diagnostic ignored "-Wclobbered"
 #endif
 
-/* This module is lackadaisical about function casts.  */
-#if GNUC_PREREQ (8, 0, 0)
-# pragma GCC diagnostic ignored "-Wcast-function-type"
-#endif
-
 /* We use different strategies for allocating the user-visible objects
    (struct emacs_runtime, emacs_env, emacs_value), depending on
    whether the user supplied the -module-assertions flag.  If
@@ -785,10 +780,7 @@ module_extract_big_integer (emacs_env *env, emacs_value value,
   MODULE_FUNCTION_BEGIN ();
   Lisp_Object o = value_to_lisp (value);
   CHECK_INTEGER (o);
-  if (FIXNUMP (o))
-    mpz_set_intmax (result->value, XFIXNUM (o));
-  else
-    mpz_set (result->value, XBIGNUM (o)->value);
+  mpz_set_integer (result->value, o);
 }
 
 static emacs_value

@@ -2500,6 +2500,18 @@ unwanted effects."
   :group 'basic-faces
   :group 'display-line-numbers)
 
+;; Definition stolen from display-line-numbers.
+(defface fill-column-indicator
+  '((t :inherit shadow :weight normal :slant normal
+       :underline nil :overline nil :strike-through nil
+       :box nil :invert-video nil :stipple nil))
+  "Face for displaying fill column indicator.
+This face is used when `display-fill-column-indicator-mode' is
+non-nil."
+  :version "27.1"
+  :group 'basic-faces
+  :group 'display-fill-column-indicator)
+
 (defface escape-glyph
   '((((background dark)) :foreground "cyan")
     ;; See the comment in minibuffer-prompt for

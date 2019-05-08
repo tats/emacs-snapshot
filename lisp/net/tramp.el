@@ -9,6 +9,7 @@
 ;; Package: tramp
 ;; Version: 2.4.2-pre
 ;; Package-Requires: ((emacs "24.1"))
+;; URL: https://savannah.gnu.org/projects/tramp
 
 ;; This file is part of GNU Emacs.
 
@@ -3639,10 +3640,10 @@ support symbolic links."
 
     (if (and (not current-buffer-p) (integerp asynchronous))
 	(let ((tramp-remote-process-environment
-	       ;; `shell-command-width' has been introduced with Emacs 27.1.
-	       (if (natnump (bound-and-true-p shell-command-width))
+	       ;; `async-shell-command-width' has been introduced with Emacs 27.1.
+	       (if (natnump (bound-and-true-p async-shell-command-width))
 		   (cons (format "COLUMNS=%d"
-				 (bound-and-true-p shell-command-width))
+				 (bound-and-true-p async-shell-command-width))
 			 tramp-remote-process-environment)
 		 tramp-remote-process-environment)))
 	  (prog1
@@ -3853,6 +3854,12 @@ of."
 	 (file-exists-p
 	  (concat (file-remote-p default-directory)
 		  (process-get proc 'watch-name))))))
+
+(defun tramp-file-notify-process-sentinel (proc event)
+  "Call `file-notify-rm-watch'."
+  (unless (process-live-p proc)
+    (tramp-message proc 5 "Sentinel called: `%S' `%s'" proc event)
+    (tramp-compat-funcall 'file-notify-rm-watch proc)))
 
 ;;; Functions for establishing connection:
 
@@ -4870,7 +4877,7 @@ Only works for Bourne-like shells."
 	(tramp-compat-funcall
 	 'tramp-send-command
 	 (process-get proc 'vector)
-	 (format "kill -2 %d" pid))
+	 (format "kill -2 -%d" pid))
 	;; Wait, until the process has disappeared.  If it doesn't,
 	;; fall back to the default implementation.
 	(with-timeout (1 (ignore))

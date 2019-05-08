@@ -41,6 +41,7 @@
 
 ;;; Code:
 
+(require 'cl-seq)
 (require 'dired)
 (require 'ert)
 (require 'ert-x)
@@ -2270,6 +2271,37 @@ This checks also `file-name-as-directory', `file-name-directory',
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name))))))
 
+;; The following test is inspired by Bug#35497.
+(ert-deftest tramp-test10-write-region-file-precious-flag ()
+  "Check that `file-precious-flag' is respected with Tramp in use."
+  (skip-unless (tramp--test-enabled))
+  (skip-unless (tramp--test-sh-p))
+  ;; The bug is fixed in Emacs 27.1.
+  (skip-unless (tramp--test-emacs27-p))
+
+  (let* ((tmp-name (tramp--test-make-temp-name))
+         written-files
+         (advice (lambda (_start _end filename &rest _r)
+                   (push filename written-files))))
+
+    (unwind-protect
+        (with-current-buffer (find-file-noselect tmp-name)
+          ;; Write initial contents.  Adapt `visited-file-modtime'
+          ;; in order to suppress confirmation.
+          (insert "foo")
+          (write-region nil nil tmp-name)
+          (set-visited-file-modtime)
+          ;; Run the test.
+          (advice-add 'write-region :before advice)
+          (setq-local file-precious-flag t)
+          (insert "bar")
+          (should (null (save-buffer)))
+          (should-not (cl-member tmp-name written-files :test #'string=)))
+
+      ;; Cleanup.
+      (ignore-errors (advice-remove 'write-region advice))
+      (ignore-errors (delete-file tmp-name)))))
+
 (ert-deftest tramp-test11-copy-file ()
   "Check `copy-file'."
   (skip-unless (tramp--test-enabled))
@@ -4192,18 +4224,17 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name)))
 
-      ;; Test `shell-command-width' of `async-shell-command'.
-      ;; Since Emacs 27.1.
-      (when (and (boundp 'shell-command-width)
+      ;; Test `async-shell-command-width'.  Since Emacs 27.1.
+      (when (and (boundp 'async-shell-command-width)
 		 (zerop (call-process "tput" nil nil nil "cols"))
                  (zerop (process-file "tput" nil nil nil "cols")))
-	(let (shell-command-width)
+	(let (async-shell-command-width)
 	  (should
 	   (string-equal
 	    (format "%s\n" (car (process-lines "tput" "cols")))
 	    (tramp--test-shell-command-to-string-asynchronously
 	     "tput cols")))
-	  (setq shell-command-width 1024)
+	  (setq async-shell-command-width 1024)
 	  (should
 	   (string-equal
 	    "1024\n"
