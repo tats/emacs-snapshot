@@ -1080,10 +1080,16 @@ the end of the document."
 	  (if no-initial-crlf (skip-chars-forward "\r\n"))
 	  (if (not (looking-at regexp))
 	      (progn
-	   ;; Must not have received the entirety of the chunk header,
+	        ;; Must not have received the entirety of the chunk header,
 		;; need to spin some more.
 		(url-http-debug "Did not see start of chunk @ %d!" (point))
 		(setq read-next-chunk nil))
+            ;; The data we got may have started in the middle of the
+            ;; initial chunk header, so move back to the start of the
+            ;; line and re-compute.
+            (when (= url-http-chunked-counter 0)
+              (beginning-of-line)
+              (looking-at regexp))
  	    (add-text-properties (match-beginning 0) (match-end 0)
 				 (list 'start-open t
 				       'end-open t
@@ -1099,8 +1105,7 @@ the end of the document."
 					  (or url-http-chunked-start
 					      (make-marker))
 					  (match-end 0)))
-;	    (if (not url-http-debug)
-		(delete-region (match-beginning 0) (match-end 0));)
+	    (delete-region (match-beginning 0) (match-end 0))
 	    (url-http-debug "Saw start of chunk %d (length=%d, start=%d"
 			    url-http-chunked-counter url-http-chunked-length
 			    (marker-position url-http-chunked-start))
