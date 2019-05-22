@@ -101,6 +101,10 @@ option was useful with modern debugging tools such as AddressSanitizer.
 (See etc/DEBUG for the details of using the modern replacements of the
 removed configure options.)
 
++++
+** The distribution tarball now has test cases; 'make check' runs them.
+This is intended mostly to help developers.
+
 ---
 ** Emacs now requires GTK 2.24 and GTK 3.10 for the GTK 2 and GTK 3
 builds respectively.
@@ -1283,10 +1287,17 @@ automatically updates.  In the buffer, you can use 's q' or 's e' to
 signal a thread with quit or error respectively, or get a snapshot
 backtrace with 'b'.
 
+
+** thingatpt.el
+
 ---
-** thingatpt.el supports a new "thing" called 'uuid'.
+*** 'thing-at-point' supports a new "thing" called 'uuid'.
 A symbol 'uuid' can be passed to 'thing-at-point' and it returns the
 UUID at point.
+
+---
+*** 'word-at-point' and 'sentence-at-point' accept NO-PROPERTIES.
+Just like 'thing-at-point' itself.
 
 ** Interactive automatic highlighting
 
@@ -1309,6 +1320,12 @@ indicator instead of just the indicator (which is sometimes cryptic).
 when given in a string.  Previously, '(any "\x80-\xff")' would match
 characters U+0080...U+00FF.  Now the expression matches raw bytes in
 the 128...255 range, as expected.
+
+*** The rx 'or' and 'seq' forms no longer require any arguments.
+(or) produces a regexp that never matches anything, while (seq)
+matches the empty string, each being an identity for the operation.
+This also works for their aliases: '|' for 'or'; ':', 'and' and
+'sequence' for 'seq'.
 
 ** Frames
 
@@ -1432,8 +1449,14 @@ When set to a non-nil value, buffers in Auto Revert mode are no longer
 polled for changes periodically.  This reduces the power consumption
 of an idle Emacs, but may fail on some network file systems; set
 'auto-revert-notify-exclude-dir-regexp' to match files where
-notification is not supported.  The new variable currently has no
-effect in 'global-auto-revert-mode'.  The default value is nil.
+notification is not supported.  The default value is nil.
+
+*** New variable 'buffer-auto-revert-by-notification'
+A major mode can declare that notification on the buffer's default
+directory is sufficient to know when updates are required, by setting
+the new variable 'buffer-auto-revert-by-notification' to a non-nil
+value.  Auto Revert mode can use this information to avoid polling the
+buffer periodically when 'auto-revert-avoid-polling' is non-nil.
 
 
 * New Modes and Packages in Emacs 27.1
@@ -1761,6 +1784,11 @@ This option allows to automatically resize minibuffer-only frames
 similarly to how minibuffer windows are resized on "normal" frames.
 
 +++
+** New buffer display action function 'display-buffer-in-direction'.
+This function allows to specify the location of the window chosen by
+'display-buffer' in various ways.
+
++++
 ** New buffer display action alist entry 'dedicated'.
 Such an entry allows to specify the dedicated status of a window
 created by 'display-buffer'.
@@ -1770,6 +1798,16 @@ created by 'display-buffer'.
 Such an entry allows to specify a minimum height of the window used
 for displaying a buffer.  'display-buffer-below-selected' is the only
 action function to respect it at the moment.
+
++++
+** New buffer display action alist entry 'direction'.
+This entry is used to specify the location of the window chosen by
+'display-buffer-in-direction'.
+
++++
+** Additional meaning of display action alist entry 'window'.
+A 'window' entry can now also specify a reference window for
+'display-buffer-in-direction'.
 
 +++
 ** The function 'assoc-delete-all' now takes an optional predicate argument.
@@ -1989,6 +2027,10 @@ made into a regexp by joining them with '\|'.
 returns a regexp that never matches anything, which is an identity for
 this operation.  Previously, the empty string was returned in this
 case.
+
+** New constant 'regexp-unmatchable' contains a never-matching regexp.
+It is a convenient and readable way to specify a regexp that should
+not match anything, and is as fast as any such regexp can be.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

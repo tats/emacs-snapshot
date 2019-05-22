@@ -3,7 +3,6 @@
 ;; Copyright (C) 1999, 2001, 2004-2019 Free Software Foundation, Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
-;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: comm, data, processes
 
 ;; This file is part of GNU Emacs.
@@ -529,6 +528,23 @@ work correctly."
 
 (declare-function gnutls-peer-status "gnutls.c" (proc))
 (declare-function gnutls-negotiate "gnutls.el" t t)
+
+(defun url-http--insert-file-helper (buffer url &optional visit)
+  (with-current-buffer buffer
+    (when (bound-and-true-p url-http-response-status)
+      ;; Don't signal an error if VISIT is non-nil, because
+      ;; 'insert-file-contents' doesn't.  This is required to
+      ;; support, e.g., 'browse-url-emacs', which is a fancy way of
+      ;; visiting the HTML source of a URL: in that case, we want to
+      ;; display a file buffer even if the URL does not exist and
+      ;; 'url-retrieve-synchronously' returns 404 or whatever.
+      (unless (or visit
+                  (and (>= url-http-response-status 200)
+                       (< url-http-response-status 300)))
+        (let ((desc (nth 2 (assq url-http-response-status url-http-codes))))
+          (kill-buffer buffer)
+          ;; Signal file-error per bug#16733.
+          (signal 'file-error (list url desc)))))))
 
 (defun url-http-parse-headers ()
  "Parse and handle HTTP specific headers.

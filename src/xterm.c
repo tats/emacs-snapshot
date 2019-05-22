@@ -201,7 +201,6 @@ enum xembed_message
     XEMBED_ACTIVATE_ACCELERATOR   = 14
   };
 
-static void x_free_cr_resources (struct frame *);
 static bool x_alloc_nearest_color_1 (Display *, Colormap, XColor *);
 static void x_raise_frame (struct frame *);
 static void x_lower_frame (struct frame *);
@@ -298,7 +297,10 @@ record_event (char *locus, int type)
 #ifdef USE_CAIRO
 
 #define FRAME_CR_CONTEXT(f)	((f)->output_data.x->cr_context)
-#define FRAME_CR_SURFACE(f)	((f)->output_data.x->cr_surface)
+#define FRAME_CR_SURFACE_DESIRED_WIDTH(f) \
+  ((f)->output_data.x->cr_surface_desired_width)
+#define FRAME_CR_SURFACE_DESIRED_HEIGHT(f) \
+  ((f)->output_data.x->cr_surface_desired_height)
 
 static struct x_gc_ext_data *
 x_gc_get_ext_data (struct frame *f, GC gc, int create_if_not_found_p)
@@ -333,16 +335,25 @@ x_extension_initialize (struct x_display_info *dpyinfo)
   dpyinfo->ext_codes = ext_codes;
 }
 
-static void
-x_cr_destroy_surface (struct frame *f)
+void
+x_cr_destroy_frame_context (struct frame *f)
 {
-  if (FRAME_CR_SURFACE (f))
+  if (FRAME_CR_CONTEXT (f))
     {
-      cairo_t *cr = FRAME_CR_CONTEXT (f);
-      cairo_surface_destroy (FRAME_CR_SURFACE (f));
-      FRAME_CR_SURFACE (f) = 0;
-      if (cr) cairo_destroy (cr);
+      cairo_destroy (FRAME_CR_CONTEXT (f));
       FRAME_CR_CONTEXT (f) = NULL;
+    }
+}
+
+static void
+x_cr_update_surface_desired_size (struct frame *f, int width, int height)
+{
+  if (FRAME_CR_SURFACE_DESIRED_WIDTH (f) != width
+      || FRAME_CR_SURFACE_DESIRED_HEIGHT (f) != height)
+    {
+      x_cr_destroy_frame_context (f);
+      FRAME_CR_SURFACE_DESIRED_WIDTH (f) = width;
+      FRAME_CR_SURFACE_DESIRED_HEIGHT (f) = height;
     }
 }
 
@@ -353,21 +364,19 @@ x_begin_cr_clip (struct frame *f, GC gc)
 
   if (!cr)
     {
-
-      if (! FRAME_CR_SURFACE (f))
-        {
-	  int scale = 1;
-#ifdef USE_GTK
-	  scale = xg_get_scale (f);
-#endif
-
-	  FRAME_CR_SURFACE (f) =
-	    cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-					scale * FRAME_PIXEL_WIDTH (f),
-					scale * FRAME_PIXEL_HEIGHT (f));
-	}
-      cr = cairo_create (FRAME_CR_SURFACE (f));
-      FRAME_CR_CONTEXT (f) = cr;
+      int width = FRAME_CR_SURFACE_DESIRED_WIDTH (f);
+      int height = FRAME_CR_SURFACE_DESIRED_HEIGHT (f);
+      cairo_surface_t *surface;
+      if (FRAME_X_DOUBLE_BUFFERED_P (f))
+	surface = cairo_xlib_surface_create (FRAME_X_DISPLAY (f),
+					     FRAME_X_RAW_DRAWABLE (f),
+					     FRAME_X_VISUAL (f),
+					     width, height);
+      else
+	surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
+					      width, height);
+      cr = FRAME_CR_CONTEXT (f) = cairo_create (surface);
+      cairo_surface_destroy (surface);
     }
   cairo_save (cr);
 
@@ -395,6 +404,8 @@ void
 x_end_cr_clip (struct frame *f)
 {
   cairo_restore (FRAME_CR_CONTEXT (f));
+  if (FRAME_X_DOUBLE_BUFFERED_P (f))
+    x_mark_frame_dirty (f);
 }
 
 void
@@ -532,11 +543,11 @@ x_cr_draw_frame (cairo_t *cr, struct frame *f)
   width = FRAME_PIXEL_WIDTH (f);
   height = FRAME_PIXEL_HEIGHT (f);
 
-  x_free_cr_resources (f);
+  cairo_t *saved_cr = FRAME_CR_CONTEXT (f);
   FRAME_CR_CONTEXT (f) = cr;
   x_clear_area (f, 0, 0, width, height);
   expose_frame (f, 0, 0, width, height);
-  FRAME_CR_CONTEXT (f) = NULL;
+  FRAME_CR_CONTEXT (f) = saved_cr;
 }
 
 static cairo_status_t
@@ -615,11 +626,11 @@ x_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
 
   while (1)
     {
-      x_free_cr_resources (f);
+      cairo_t *saved_cr = FRAME_CR_CONTEXT (f);
       FRAME_CR_CONTEXT (f) = cr;
       x_clear_area (f, 0, 0, width, height);
       expose_frame (f, 0, 0, width, height);
-      FRAME_CR_CONTEXT (f) = NULL;
+      FRAME_CR_CONTEXT (f) = saved_cr;
 
       if (NILP (frames))
 	break;
@@ -652,35 +663,6 @@ x_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
 }
 
 #endif	/* USE_CAIRO */
-
-static void
-x_free_cr_resources (struct frame *f)
-{
-#ifdef USE_CAIRO
-  if (f == NULL)
-    {
-      Lisp_Object rest, frame;
-      FOR_EACH_FRAME (rest, frame)
-	if (FRAME_X_P (XFRAME (frame)))
-	  x_free_cr_resources (XFRAME (frame));
-    }
-  else
-    {
-      cairo_t *cr = FRAME_CR_CONTEXT (f);
-
-      if (cr)
-	{
-	  cairo_surface_t *surface = cairo_get_target (cr);
-
-	  if (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_XLIB)
-	    {
-	      cairo_destroy (cr);
-	      FRAME_CR_CONTEXT (f) = NULL;
-	    }
-	}
-    }
-#endif
-}
 
 static void
 x_set_clip_rectangles (struct frame *f, GC gc, XRectangle *rectangles, int n)
@@ -996,41 +978,7 @@ x_set_frame_alpha (struct frame *f)
 static void
 x_update_begin (struct frame *f)
 {
-#ifdef USE_CAIRO
-  if (FRAME_TOOLTIP_P (f) && !FRAME_VISIBLE_P (f))
-    return;
-
-  if (! FRAME_CR_SURFACE (f))
-    {
-      int width, height;
-#ifdef USE_GTK
-      if (FRAME_GTK_WIDGET (f))
-        {
-          GdkWindow *w = gtk_widget_get_window (FRAME_GTK_WIDGET (f));
-	  int scale = xg_get_scale (f);
-	  width = scale * gdk_window_get_width (w);
-	  height = scale * gdk_window_get_height (w);
-        }
-      else
-#endif
-        {
-          width = FRAME_PIXEL_WIDTH (f);
-          height = FRAME_PIXEL_HEIGHT (f);
-          if (! FRAME_EXTERNAL_TOOL_BAR (f))
-            height += FRAME_TOOL_BAR_HEIGHT (f);
-          if (! FRAME_EXTERNAL_MENU_BAR (f))
-            height += FRAME_MENU_BAR_HEIGHT (f);
-        }
-
-      if (width > 0 && height > 0)
-        {
-          block_input();
-          FRAME_CR_SURFACE (f) = cairo_image_surface_create
-            (CAIRO_FORMAT_ARGB32, width, height);
-          unblock_input();
-        }
-    }
-#endif /* USE_CAIRO */
+  /* Nothing to do.  */
 }
 
 /* Draw a vertical window border from (x,y0) to (x,y1)  */
@@ -1122,6 +1070,11 @@ show_back_buffer (struct frame *f)
   if (FRAME_X_DOUBLE_BUFFERED_P (f))
     {
 #ifdef HAVE_XDBE
+#ifdef USE_CAIRO
+      cairo_t *cr = FRAME_CR_CONTEXT (f);
+      if (cr)
+	cairo_surface_flush (cairo_get_target (cr));
+#endif
       XdbeSwapInfo swap_info;
       memset (&swap_info, 0, sizeof (swap_info));
       swap_info.swap_window = FRAME_X_WINDOW (f);
@@ -1158,30 +1111,33 @@ x_update_end (struct frame *f)
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
 
 #ifdef USE_CAIRO
-  if (FRAME_CR_SURFACE (f))
+  if (!FRAME_X_DOUBLE_BUFFERED_P (f))
     {
-      cairo_t *cr;
-      cairo_surface_t *surface;
-      int width, height;
-
       block_input ();
-      width = FRAME_PIXEL_WIDTH (f);
-      height = FRAME_PIXEL_HEIGHT (f);
-      if (! FRAME_EXTERNAL_TOOL_BAR (f))
-	height += FRAME_TOOL_BAR_HEIGHT (f);
-      if (! FRAME_EXTERNAL_MENU_BAR (f))
-	height += FRAME_MENU_BAR_HEIGHT (f);
-      surface = cairo_xlib_surface_create (FRAME_X_DISPLAY (f),
-					   FRAME_X_DRAWABLE (f),
-					   FRAME_DISPLAY_INFO (f)->visual,
-					   width,
-					   height);
-      cr = cairo_create (surface);
-      cairo_surface_destroy (surface);
+      cairo_surface_t *source_surface = cairo_get_target (FRAME_CR_CONTEXT (f));
+      if (source_surface)
+	{
+	  cairo_t *cr;
+	  cairo_surface_t *surface;
+	  int width, height;
 
-      cairo_set_source_surface (cr, FRAME_CR_SURFACE (f), 0, 0);
-      cairo_paint (cr);
-      cairo_destroy (cr);
+	  width = FRAME_PIXEL_WIDTH (f);
+	  height = FRAME_PIXEL_HEIGHT (f);
+	  if (! FRAME_EXTERNAL_TOOL_BAR (f))
+	    height += FRAME_TOOL_BAR_HEIGHT (f);
+	  if (! FRAME_EXTERNAL_MENU_BAR (f))
+	    height += FRAME_MENU_BAR_HEIGHT (f);
+	  surface = cairo_xlib_surface_create (FRAME_X_DISPLAY (f),
+					       FRAME_X_DRAWABLE (f),
+					       FRAME_X_VISUAL (f),
+					       width, height);
+	  cr = cairo_create (surface);
+	  cairo_surface_destroy (surface);
+
+	  cairo_set_source_surface (cr, source_surface, 0, 0);
+	  cairo_paint (cr);
+	  cairo_destroy (cr);
+	}
       unblock_input ();
     }
 #endif
@@ -1643,13 +1599,8 @@ x_compute_glyph_string_overhangs (struct glyph_string *s)
 
       if (s->first_glyph->type == CHAR_GLYPH)
 	{
-	  unsigned *code = alloca (sizeof (unsigned) * s->nchars);
 	  struct font *font = s->font;
-	  int i;
-
-	  for (i = 0; i < s->nchars; i++)
-	    code[i] = (s->char2b[i].byte1 << 8) | s->char2b[i].byte2;
-	  font->driver->text_extents (font, code, s->nchars, &metrics);
+	  font->driver->text_extents (font, s->char2b, s->nchars, &metrics);
 	}
       else
 	{
@@ -1875,7 +1826,7 @@ static void
 x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 {
   struct glyph *glyph = s->first_glyph;
-  XChar2b char2b[8];
+  unsigned char2b[8];
   int x, i, j;
 
   /* If first glyph of S has a left box line, start drawing the text
@@ -1926,14 +1877,10 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
       if (str)
 	{
 	  int upper_len = (len + 1) / 2;
-	  unsigned code;
 
 	  /* It is assured that all LEN characters in STR is ASCII.  */
 	  for (j = 0; j < len; j++)
-	    {
-	      code = s->font->driver->encode_char (s->font, str[j]);
-	      STORE_XCHAR2B (char2b + j, code >> 8, code & 0xFF);
-	    }
+            char2b[j] = s->font->driver->encode_char (s->font, str[j]) & 0xFFFF;
 	  s->font->driver->draw (s, 0, upper_len,
 				 x + glyph->slice.glyphless.upper_xoff,
 				 s->ybase + glyph->slice.glyphless.upper_yoff,
@@ -4253,7 +4200,21 @@ x_scroll_run (struct window *w, struct run *run)
   gui_clear_cursor (w);
 
 #ifdef USE_CAIRO
-  if (FRAME_CR_CONTEXT (f))
+  if (FRAME_X_DOUBLE_BUFFERED_P (f))
+    {
+      cairo_t *cr = FRAME_CR_CONTEXT (f);
+      if (cr)
+	cairo_surface_flush (cairo_get_target (cr));
+      XCopyArea (FRAME_X_DISPLAY (f),
+		 FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
+		 f->output_data.x->normal_gc,
+		 x, from_y,
+		 width, height,
+		 x, to_y);
+      if (cr)
+	cairo_surface_mark_dirty (cairo_get_target (cr));
+    }
+  else if (FRAME_CR_CONTEXT (f))
     {
       cairo_surface_t *s = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
 						       width, height);
@@ -8230,7 +8191,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
              fit in 81 bytes.  So, we must prepare sufficient
              bytes for copy_buffer.  513 bytes (256 chars for
              two-byte character set) seems to be a fairly good
-             approximation.  -- 2000.8.10 handa@etl.go.jp  */
+             approximation.  -- 2000.8.10 handa@gnu.org  */
           unsigned char copy_buffer[513];
           unsigned char *copy_bufptr = copy_buffer;
           int copy_bufsiz = sizeof (copy_buffer);
@@ -8711,7 +8672,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         font_drop_xrender_surfaces (f);
       unblock_input ();
 #ifdef USE_CAIRO
-      if (f) x_cr_destroy_surface (f);
+      if (f)
+	x_cr_update_surface_desired_size (f, configureEvent.xconfigure.width,
+					  configureEvent.xconfigure.height);
 #endif
 #ifdef USE_GTK
       if (!f
@@ -8725,7 +8688,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           xg_frame_resized (f, configureEvent.xconfigure.width,
                             configureEvent.xconfigure.height);
 #ifdef USE_CAIRO
-          x_cr_destroy_surface (f);
+	  x_cr_update_surface_desired_size (f, configureEvent.xconfigure.width,
+					    configureEvent.xconfigure.height);
 #endif
           f = 0;
         }
@@ -9383,7 +9347,7 @@ x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text
 /* RIF: Define cursor CURSOR on frame F.  */
 
 static void
-x_define_frame_cursor (struct frame *f, Cursor cursor)
+x_define_frame_cursor (struct frame *f, Emacs_Cursor cursor)
 {
   if (!f->pointer_invisible
       && f->output_data.x->current_cursor != cursor)
@@ -11835,7 +11799,9 @@ x_free_frame_resources (struct frame *f)
 	free_frame_xic (f);
 #endif
 
-      x_free_cr_resources (f);
+#ifdef USE_CAIRO
+      x_cr_destroy_frame_context (f);
+#endif
 #ifdef USE_X_TOOLKIT
       if (f->output_data.x->widget)
 	{
@@ -12186,7 +12152,7 @@ x_check_font (struct frame *f, struct font *font)
  ***********************************************************************/
 
 static void
-x_free_pixmap (struct frame *f, Pixmap pixmap)
+x_free_pixmap (struct frame *f, Emacs_Pixmap pixmap)
 {
   XFreePixmap (FRAME_X_DISPLAY (f), pixmap);
 }

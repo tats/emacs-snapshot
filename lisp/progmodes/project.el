@@ -477,6 +477,10 @@ For the arguments list, see `project--read-file-cpd-relative'."
 (defun project--read-file-cpd-relative (prompt
                                         all-files &optional predicate
                                         hist default)
+  "Read a file name, prompting with PROMPT.
+ALL-FILES is a list of possible file name completions.
+PREDICATE, HIST, and DEFAULT have the same meaning as in
+`completing-read'."
   (let* ((common-parent-directory
           (let ((common-prefix (try-completion "" all-files)))
             (if (> (length common-prefix) 0)
@@ -518,7 +522,7 @@ For the arguments list, see `project--read-file-cpd-relative'."
   ;; removing it when it has no matches.  Neither seems natural
   ;; enough.  Removal is confusing; early expansion makes the prompt
   ;; too long.
-  (let* ((new-prompt (if default
+  (let* ((new-prompt (if (and default (not (string-equal default "")))
                          (format "%s (default %s): " prompt default)
                        (format "%s: " prompt)))
          (res (completing-read new-prompt

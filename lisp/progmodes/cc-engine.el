@@ -907,7 +907,7 @@ comment at the start of cc-engine.el for more info."
 	stack
 	;; Regexp which matches "for", "if", etc.
 	(cond-key (or c-opt-block-stmt-key
-		      "a\\`"))	; Doesn't match anything.
+		      regexp-unmatchable))
 	;; Return value.
 	(ret 'same)
 	;; Positions of the last three sexps or bounds we've stopped at.
@@ -4491,6 +4491,30 @@ comment at the start of cc-engine.el for more info."
 		       (goto-char pos))))))
       (< (point) start)))
 
+(defun c-end-of-token (&optional back-limit)
+  ;; Move to the end of the token we're just before or in the middle of.
+  ;; BACK-LIMIT may be used to bound the backward search; if given it's
+  ;; assumed to be at the boundary between two tokens.  Return non-nil if the
+  ;; point is moved, nil otherwise.
+  ;;
+  ;; This function might do hidden buffer changes.
+  (let ((start (point)))
+    (cond ;; ((< (skip-syntax-backward "w_" (1- start)) 0)
+     ;;  (skip-syntax-forward "w_"))
+     ((> (skip-syntax-forward "w_") 0))
+     ((< (skip-syntax-backward ".()" back-limit) 0)
+      (while (< (point) start)
+	(if (looking-at c-nonsymbol-token-regexp)
+	    (goto-char (match-end 0))
+	  ;; `c-nonsymbol-token-regexp' should always match since
+	  ;; we've skipped backward over punctuation or paren
+	  ;; syntax, but move forward in case it doesn't so that
+	  ;; we don't leave point earlier than we started with.
+	  (forward-char))))
+     (t (if (looking-at c-nonsymbol-token-regexp)
+	    (goto-char (match-end 0)))))
+    (> (point) start)))
+
 (defun c-end-of-current-token (&optional back-limit)
   ;; Move to the end of the current token.  Do not move if not in the
   ;; middle of one.  BACK-LIMIT may be used to bound the backward
@@ -5878,9 +5902,14 @@ comment at the start of cc-engine.el for more info."
 	     ;; comment style has removed face properties from a construct,
 	     ;; and is relying on `c-font-lock-declarations' to add them
 	     ;; again.
-	     (and (< (point) cfd-limit)
-		  (looking-at c-doc-line-join-re)
-		  (goto-char (match-end 0)))))
+	     (cond
+	      ((looking-at c-noise-macro-name-re)
+	       (c-forward-noise-clause-not-macro-decl nil)) ; Returns t.
+	      ((looking-at c-noise-macro-with-parens-name-re)
+	       (c-forward-noise-clause-not-macro-decl t)) ; Always returns t.
+	      ((and (< (point) cfd-limit)
+		    (looking-at c-doc-line-join-re))
+	       (goto-char (match-end 0))))))
        ;; Set the position to continue at.  We can avoid going over
        ;; the comments skipped above a second time, but it's possible
        ;; that the comment skipping has taken us past `cfd-prop-match'
@@ -5909,6 +5938,8 @@ comment at the start of cc-engine.el for more info."
   ;; o	The first token after the end of submatch 1 in
   ;;	`c-decl-prefix-or-start-re' when that submatch matches.	 This
   ;;	submatch is typically a (L or R) brace or paren, a ;, or a ,.
+  ;;    As a special case, noise macros are skipped over and the next
+  ;;    token regarded as the spot.
   ;; o	The start of each `c-decl-prefix-or-start-re' match when
   ;;	submatch 1 doesn't match.  This is, for example, the keyword
   ;;	"class" in Pike.
@@ -7214,78 +7245,33 @@ comment at the start of cc-engine.el for more info."
 	  (c-depropertize-raw-strings-in-region found-beg (point))))))
 
 (defun c-maybe-re-mark-raw-string ()
-  ;; When this function is called, point is immediately after a ".  If this "
-  ;; is the characteristic " of of a raw string delimiter, apply the pertinent
-  ;; `syntax-table' text properties to the entire raw string (when properly
-  ;; terminated) or just the delimiter (otherwise).
+  ;; When this function is called, point is immediately after a " which opens
+  ;; a string.  If this " is the characteristic " of of a raw string
+  ;; opener, apply the pertinent `syntax-table' text properties to the
+  ;; entire raw string (when properly terminated) or just the delimiter
+  ;; (otherwise).  In either of these cases, return t, otherwise return nil.
   ;;
-  ;; If the " is in any way part of a raw string, return non-nil.  Otherwise
-  ;; return nil.
   (let ((here (point))
 	in-macro macro-end id Rquote found)
-    (cond
-     ((and
-       (eq (char-before (1- (point))) ?R)
-       (looking-at "\\([^ ()\\\n\r\t]\\{0,16\\}\\)("))
+    (when
+	(and
+	 (eq (char-before (1- (point))) ?R)
+	 (looking-at "\\([^ ()\\\n\r\t]\\{0,16\\}\\)("))
       (save-excursion
 	(setq in-macro (c-beginning-of-macro))
 	(setq macro-end (when in-macro
 			  (c-end-of-macro)
 			  (point) ;; (min (1+ (point)) (point-max))
 			  )))
-      (if (not
+      (when
+	  (not
 	   (c-propertize-raw-string-opener
 	    (match-string-no-properties 1) ; id
 	    (1- (point))		   ; open quote
 	    (match-end 1)		   ; open paren
 	    macro-end))		     ; bound (end of macro) or nil.
-	  (goto-char (or macro-end (point-max))))
-      t)
-     ((save-excursion
-	(and
-	 (search-backward-regexp ")\\([^ ()\\\n\r\t]\\{0,16\\}\\)\"\\="
-				 (c-point 'bol) t)
-	 (setq id (match-string-no-properties 1))
-	 (let* ((quoted-id (regexp-quote id))
-		(quoted-id-depth (regexp-opt-depth quoted-id)))
-	   (while
-	       (and
-		;; Search back for an opening delimiter with identifier `id'.
-		;; A closing delimiter with `id' "blocks" our search.
-		(search-backward-regexp	; This could be slow.
-		 (concat "\\(R\"" quoted-id "(\\)"
-			 "\\|"
-			 "\\()" quoted-id "\"\\)")
-		 nil t)
-		(setq found t)
-		(if (eq (c-in-literal) 'string)
-		    (match-beginning 1)
-		  (match-beginning (+ 2 quoted-id-depth)))))
-	   (and found
-		(null (c-in-literal))
-		(match-beginning 1)))
-	 (setq Rquote (point))))
-      (save-excursion
-	(goto-char Rquote)
-	(setq in-macro (c-beginning-of-macro))
-	(setq macro-end (when in-macro
-			  (c-end-of-macro)
-			  (point))))
-      (if (or (not in-macro)
-	      (<= here macro-end))
-	  (progn
-	    (c-propertize-raw-string-opener
-	     id (1+ (point)) (match-end 1) macro-end)
-	    (goto-char here)
-	    t)
-	(goto-char here)
-	nil))
-
-     (t
-      ;; If the " is in another part of a raw string (whether as part of the
-      ;; identifier, or in the string itself) the `syntax-table' text
-      ;; properties on the raw string will be current.  So, we can use...
-      (c-raw-string-pos)))))
+	(goto-char (or macro-end (point-max))))
+      t)))
 
 
 ;; Handling of small scale constructs like types and names.
@@ -7437,6 +7423,21 @@ comment at the start of cc-engine.el for more info."
   (if (and (eq (char-after) ?\()
 	   (c-go-list-forward))
       (c-forward-syntactic-ws))
+  t)
+
+(defun c-forward-noise-clause-not-macro-decl (maybe-parens)
+  ;; Point is at a noise macro identifier, which, when MAYBE-PARENS is
+  ;; non-nil, optionally takes paren arguments.  Go forward over this name,
+  ;; and when there may be optional parens, any parenthesis expression which
+  ;; follows it, but DO NOT go over any macro declaration which may come
+  ;; between them.  Always return t.
+  (c-end-of-token)
+  (when maybe-parens
+    (let ((here (point)))
+      (c-forward-comments)
+      (if (not (and (eq (char-after) ?\()
+		    (c-go-list-forward)))
+	  (goto-char here))))
   t)
 
 (defun c-forward-keyword-clause (match)
@@ -7646,7 +7647,9 @@ comment at the start of cc-engine.el for more info."
 		(progn
 		  (c-forward-syntactic-ws)
 		  (when (or (and c-record-type-identifiers all-types)
-			    (not (equal c-inside-<>-type-key "\\(a\\`\\)")))
+			    (not (equal c-inside-<>-type-key
+					(concat
+					 "\\(" regexp-unmatchable "\\)"))))
 		    (c-forward-syntactic-ws)
 		    (cond
 		     ((eq (char-after) ??)
@@ -9051,7 +9054,10 @@ This function might do hidden buffer changes."
 	   ((and c-opt-cpp-prefix
 		 (looking-at c-noise-macro-with-parens-name-re))
 	    (setq noise-start (point))
-	    (c-forward-noise-clause)
+	    (while
+		(and
+		  (c-forward-noise-clause)
+		  (looking-at c-noise-macro-with-parens-name-re)))
 	    (setq kwd-clause-end (point))))
 
 	  (when (setq found-type (c-forward-type t)) ; brace-block-too
@@ -9253,7 +9259,7 @@ This function might do hidden buffer changes."
       ;; Skip over type decl prefix operators.  (Note similar code in
       ;; `c-forward-declarator'.)
       (if (and c-recognize-typeless-decls
-	       (equal c-type-decl-prefix-key "a\\`")) ; Regexp which doesn't match
+	       (equal c-type-decl-prefix-key regexp-unmatchable))
 	  (when (eq (char-after) ?\()
 	    (progn
 	      (setq paren-depth (1+ paren-depth))
@@ -10886,7 +10892,7 @@ comment at the start of cc-engine.el for more info."
 	      ;; legal because it's part of a "compound keyword" like
 	      ;; "enum class".	Of course, if c-after-brace-list-key
 	      ;; is nil, we can skip the test.
-	      (or (equal c-after-brace-list-key "a\\`") ; Regexp which doesn't match
+	      (or (equal c-after-brace-list-key regexp-unmatchable)
 		  (save-match-data
 		    (save-excursion
 		      (not

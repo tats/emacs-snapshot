@@ -4,7 +4,6 @@
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
-;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: files
 ;; Package: emacs
 
@@ -2148,6 +2147,7 @@ Keybindings:
     (setq buffer-invisibility-spec (list t)))
   (setq-local revert-buffer-function #'dired-revert)
   (setq-local buffer-stale-function #'dired-buffer-stale-p)
+  (setq-local buffer-auto-revert-by-notification t)
   (setq-local page-delimiter "\n\n")
   (setq-local dired-directory (or dirname default-directory))
   ;; list-buffers uses this to display the dir being edited in this buffer.

@@ -161,12 +161,14 @@ EVENT is the cadr of the event in `file-notify-handle-event'
       (while actions
         (let ((action (pop actions)))
           ;; Send pending event, if it doesn't match.
+          ;; We only handle {renamed,moved}-{from,to} pairs when these
+          ;; arrive in order without anything else in-between.
           (when (and file-notify--pending-event
-                     ;; The cookie doesn't match.
-                     (not (equal (file-notify--event-cookie
-                                  (car file-notify--pending-event))
-                                 (file-notify--event-cookie event)))
                      (or
+                      ;; The cookie doesn't match.
+                      (not (equal (file-notify--event-cookie
+                                   (car file-notify--pending-event))
+                                  (file-notify--event-cookie event)))
                       ;; inotify.
                       (and (eq (nth 1 (car file-notify--pending-event))
                                'moved-from)
@@ -236,11 +238,17 @@ EVENT is the cadr of the event in `file-notify-handle-event'
                       (string-equal
                        (file-notify--watch-filename watch)
                        (file-name-nondirectory file))
+
                       ;; Directory matches.
-                      (string-equal
-                       (file-name-nondirectory file)
-                       (file-name-nondirectory
-                        (file-notify--watch-directory watch)))
+                      ;;  FIXME: What purpose would this condition serve?
+                      ;;  Doesn't it just slip through events for files
+                      ;;  having the same name as the last component of the
+                      ;;  directory of the file that we are really watching?
+                      ;;(string-equal
+                      ;; (file-name-nondirectory file)
+                      ;; (file-name-nondirectory
+                      ;;  (file-notify--watch-directory watch)))
+
                       ;; File1 matches.
                       (and (stringp file1)
                            (string-equal

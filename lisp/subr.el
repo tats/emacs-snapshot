@@ -3,7 +3,6 @@
 ;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2019 Free Software
 ;; Foundation, Inc.
 
-;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
 ;; Package: emacs
 
@@ -5543,5 +5542,9 @@ returned list are in the same order as in TREE.
 ;; Technically, `flatten-list' is a misnomer, but we provide it here
 ;; for discoverability:
 (defalias 'flatten-list 'flatten-tree)
+
+;; The initial anchoring is for better performance in searching matches.
+(defconst regexp-unmatchable "\\`a\\`"
+  "Standard regexp guaranteed not to match any string at all.")
 
 ;;; subr.el ends here

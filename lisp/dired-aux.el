@@ -4,7 +4,6 @@
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
-;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: files
 ;; Package: emacs
 
@@ -2848,6 +2847,8 @@ is part of a file name (i.e., has the text property `dired-filename')."
   (interactive)
   (multi-isearch-files-regexp
    (dired-get-marked-files nil nil 'dired-nondirectory-p nil t)))
+
+(declare-function fileloop-continue "fileloop" ())
 
 ;;;###autoload
 (defun dired-do-search (regexp)
