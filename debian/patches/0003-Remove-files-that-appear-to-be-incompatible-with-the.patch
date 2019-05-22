@@ -134,7 +134,7 @@ index bb831a0..de0d9ee 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index d13dddf..ce9ca8a 100644
+index 0f1fd5d..0749766 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5722,7 +5722,7 @@ AC_DEFUN
@@ -146,7 +146,7 @@ index d13dddf..ce9ca8a 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5775,15 +5775,6 @@ m4_define
+@@ -5774,15 +5774,6 @@ m4_define
  fi
  ])
  
@@ -190,10 +190,10 @@ index a03efaf..8800638 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 42ff375..744cbe3 100644
+index 0677368..eb8a4e9 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -296,6 +296,14 @@ view-help-file
+@@ -295,6 +295,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
