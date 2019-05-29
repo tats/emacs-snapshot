@@ -3,6 +3,7 @@
 ;; Copyright (C) 1985, 1994, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: K. Shane Hartman
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: convenience wp
 
 ;; This file is part of GNU Emacs.
@@ -623,7 +624,6 @@ Leaves the region surrounding the rectangle."
 
 (defvar picture-mode-map
   (let ((map (make-keymap)))
-    (define-key map [remap self-insert-command] 'picture-self-insert)
     (define-key map [remap self-insert-command] 'picture-self-insert)
     (define-key map [remap completion-separator-self-insert-command]
 			  'picture-self-insert)

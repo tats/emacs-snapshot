@@ -2898,8 +2898,9 @@ If there's no description string for VALUE, return nil."
     (?\x9b . "CSI")))
 
 (defun encoded-string-description (str coding-system)
-  "Return a pretty description of STR that is encoded by CODING-SYSTEM."
-  (setq str (string-as-unibyte str))
+  "Return a pretty description of STR that is encoded by CODING-SYSTEM.
+STR should be a unibyte string."
+  (cl-assert (not (multibyte-string-p str)))
   (mapconcat
    (if (and coding-system (eq (coding-system-type coding-system) 'iso-2022))
        ;; Try to get a pretty description for ISO 2022 escape sequences.
@@ -2913,13 +2914,13 @@ If there's no description string for VALUE, return nil."
 If CODING-SYSTEM can't safely encode CHAR, return nil.
 The 3rd optional argument CHARSET, if non-nil, is a charset preferred
 on encoding."
-  (let* ((str1 (string-as-multibyte (string char)))
-	 (str2 (string-as-multibyte (string char char)))
+  (let* ((str1 (string char))
+	 (str2 (string char char))
 	 (found (find-coding-systems-string str1))
 	enc1 enc2 i1 i2)
-    (if (and (consp found)
-	     (eq (car found) 'undecided))
-	str1
+    (if (eq (car-safe found) 'undecided) ;Aka (not (multibyte-string-p str1))
+        ;; `char' is ASCII.
+	(encode-coding-string str1 coding-system)
       (when (memq (coding-system-base coding-system) found)
 	;; We must find the encoded string of CHAR.  But, just encoding
 	;; CHAR will put extra control sequences (usually to designate

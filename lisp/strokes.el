@@ -3,6 +3,7 @@
 ;; Copyright (C) 1997, 2000-2019 Free Software Foundation, Inc.
 
 ;; Author: David Bakhash <cadet@alum.mit.edu>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: lisp, mouse, extensions
 
 ;; This file is part of GNU Emacs.
@@ -154,7 +155,7 @@
 ;; Euna Kim for her help in Korean, and massive thanks to the helpful
 ;; guys on the help instance on athena (zeno, jered, amu, gsstark,
 ;; ghudson, etc) Special thanks to Steve Baur, Kyle Jones, and Hrvoje
-;; Niksic for all their help.  And special thanks to Dave Gillespie
+;; Nikšić for all their help.  And special thanks to Dave Gillespie
 ;; for all the elisp help--he is responsible for helping me use the cl
 ;; macros at (near) max speed.
 

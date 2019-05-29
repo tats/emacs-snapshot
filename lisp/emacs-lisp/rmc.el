@@ -2,6 +2,8 @@
 
 ;; Copyright (C) 2016-2019 Free Software Foundation, Inc.
 
+;; Maintainer: emacs-devel@gnu.org
+
 ;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
@@ -116,7 +118,7 @@ Usage example:
                             choices)))
                   (condition-case nil
                       (let ((cursor-in-echo-area t))
-                        (read-char))
+                        (read-event))
                     (error nil))))
           (setq answer (lookup-key query-replace-map (vector tchar) t))
           (setq tchar

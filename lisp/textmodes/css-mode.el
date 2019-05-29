@@ -844,7 +844,21 @@ cannot be completed sensibly: `custom-ident',
 (defvar css-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [remap info-lookup-symbol] 'css-lookup-symbol)
+    ;; `info-complete-symbol' is not used.
+    (define-key map [remap complete-symbol] 'completion-at-point)
     (define-key map "\C-c\C-f" 'css-cycle-color-format)
+    (easy-menu-define css-menu map "CSS mode menu"
+      '("CSS"
+        :help "CSS-specific features"
+        ["Reformat block" fill-paragraph
+         :help "Reformat declaration block or fill comment at point"]
+        ["Cycle color format" css-cycle-color-format
+         :help "Cycle color at point between different formats"]
+        "-"
+        ["Describe symbol" css-lookup-symbol
+         :help "Display documentation for a CSS symbol"]
+        ["Complete symbol" completion-at-point
+         :help "Complete symbol before point"]))
     map)
   "Keymap used in `css-mode'.")
 
@@ -1607,7 +1621,7 @@ rgb()/rgba()."
 This mode provides syntax highlighting, indentation, completion,
 and documentation lookup for CSS.
 
-Use `\\[complete-symbol]' to complete CSS properties, property values,
+Use `\\[completion-at-point]' to complete CSS properties, property values,
 pseudo-elements, pseudo-classes, at-rules, bang-rules, and HTML
 tags, classes and IDs.  Completion candidates for HTML class
 names and IDs are found by looking through open HTML mode
