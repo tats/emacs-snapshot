@@ -329,6 +329,12 @@ Any terminating `>' or `/' is not matched.")
 (defvar sgml-font-lock-keywords sgml-font-lock-keywords-1
   "Rules for highlighting SGML code.  See also `sgml-tag-face-alist'.")
 
+(defun sgml-font-lock-syntactic-face (state)
+  "`font-lock-syntactic-face-function' for `sgml-mode'."
+  ;; Don't use string face outside of tags.
+  (cond ((and (nth 9 state) (nth 3 state)) font-lock-string-face)
+        ((nth 4 state) font-lock-comment-face)))
+
 (defvar-local sgml--syntax-propertize-ppss nil)
 
 (defun sgml--syntax-propertize-ppss (pos)
@@ -362,10 +368,26 @@ Any terminating `>' or `/' is not matched.")
      ;; if it's outside of tags, but there are too many quotes and
      ;; the resulting number of calls to syntax-ppss made it too slow
      ;; (bug#33887), so we're now careful to leave alone any pair
-     ;; of quotes that doesn't hold a < or > char, which is the vast majority.
-     ("\\(?:\\(?1:\"\\)[^\"<>]*\\|\\(?1:'\\)[^'\"<>]*\\)"
+     ;; of quotes that doesn't hold a < or > char, which is the vast majority:
+     ;; either they're both within a tag (or a comment), in which case it's
+     ;; indeed correct to leave them as is, or they're both outside of tags, in
+     ;; which case they arguably should have punctuation syntax, but it is
+     ;; harmless to let them have string syntax because they won't "hide" any
+     ;; tag or comment from us (and we use the
+     ;; font-lock-syntactic-face-function to make sure those spurious "strings
+     ;; within text" aren't highlighted as strings).
+     ("\\([\"']\\)[^\"'<>]*"
       (1 (if (eq (char-after) (char-after (match-beginning 0)))
+             ;; Fast-track case.
              (forward-char 1)
+           ;; Point has moved to the end of the text we matched after the
+           ;; quote, but this risks overlooking a match to one of the other
+           ;; regexp in the rules.  We could just (goto-char (match-end 1))
+           ;; to solve this, but that would be too easy, so instead we
+           ;; only move back enough to avoid skipping comment ender, which
+           ;; happens to be the only one that we could have overlooked.
+           (when (eq (char-after) ?>)
+             (skip-chars-backward "-"))
            ;; Be careful to call `syntax-ppss' on a position before the one
            ;; we're going to change, so as not to need to flush the data we
            ;; just computed.
@@ -570,7 +592,7 @@ Do \\[describe-key] on the following bindings to discover what they do.
   ;; This is desirable because SGML discards a newline that appears
   ;; immediately after a start tag or immediately before an end tag.
   (setq-local paragraph-start (concat "[ \t]*$\\|\
-[ \t]*</?\\(" sgml-name-re sgml-attrs-re "\\)?>"))
+\[ \t]*</?\\(" sgml-name-re sgml-attrs-re "\\)?>"))
   (setq-local paragraph-separate (concat paragraph-start "$"))
   (setq-local adaptive-fill-regexp "[ \t]*")
   (add-hook 'fill-nobreak-predicate 'sgml-fill-nobreak nil t)
@@ -588,7 +610,9 @@ Do \\[describe-key] on the following bindings to discover what they do.
   (setq font-lock-defaults '((sgml-font-lock-keywords
 			      sgml-font-lock-keywords-1
 			      sgml-font-lock-keywords-2)
-			     nil t))
+                             nil t nil
+                             (font-lock-syntactic-face-function
+                              . sgml-font-lock-syntactic-face)))
   (setq-local syntax-propertize-function #'sgml-syntax-propertize)
   (setq-local facemenu-add-face-function 'sgml-mode-facemenu-add-face-function)
   (setq-local sgml-xml-mode (sgml-xml-guess))

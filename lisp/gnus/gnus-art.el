@@ -41,6 +41,7 @@
 (require 'mm-uu)
 (require 'message)
 (require 'mouse)
+(require 'seq)
 
 (autoload 'gnus-msg-mail "gnus-msg" nil t)
 (autoload 'gnus-button-mailto "gnus-msg")
@@ -4798,11 +4799,10 @@ If a prefix ARG is given, ask for confirmation."
   (interactive "P")
   (dolist (buf (gnus-buffers))
     (with-current-buffer buf
-      (when (derived-mode-p 'gnus-sticky-article-mode)
-	(if (not arg)
-	    (gnus-kill-buffer buf)
-	  (when (yes-or-no-p (concat "Kill buffer " (buffer-name buf) "? "))
-	    (gnus-kill-buffer buf)))))))
+      (and (derived-mode-p 'gnus-sticky-article-mode)
+           (or (not arg)
+               (yes-or-no-p (format "Kill buffer %s? " buf)))
+           (gnus-kill-buffer buf)))))
 
 ;;;
 ;;; Gnus MIME viewing functions
@@ -6978,9 +6978,7 @@ If given a prefix, show the hidden text instead."
 	  ;; doesn't belong in this newsgroup (possibly), so we find its
 	  ;; message-id and request it by id instead of number.
 	  (when (and (numberp article)
-		     gnus-summary-buffer
-		     (get-buffer gnus-summary-buffer)
-		     (gnus-buffer-exists-p gnus-summary-buffer))
+                     (gnus-buffer-live-p gnus-summary-buffer))
 	    (with-current-buffer gnus-summary-buffer
 	      (let ((header (gnus-summary-article-header article)))
 		(when (< article 0)
@@ -7014,11 +7012,9 @@ If given a prefix, show the hidden text instead."
 	  (cond
 	   ;; Refuse to select canceled articles.
 	   ((and (numberp article)
-		 gnus-summary-buffer
-		 (get-buffer gnus-summary-buffer)
-		 (gnus-buffer-exists-p gnus-summary-buffer)
-		 (eq (cdr (with-current-buffer gnus-summary-buffer
-			    (assq article gnus-newsgroup-reads)))
+                 (gnus-buffer-live-p gnus-summary-buffer)
+                 (eq (with-current-buffer gnus-summary-buffer
+                       (cdr (assq article gnus-newsgroup-reads)))
 		     gnus-canceled-mark))
 	    nil)
 	   ;; We first check `gnus-original-article-buffer'.
@@ -8580,11 +8576,9 @@ For example:
     nil)
    (gnus-treat-condition
     (eq gnus-treat-condition val))
-   ((and (listp val)
-	 (stringp (car val)))
-    (apply #'gnus-or (mapcar `(lambda (s)
-			       (string-match s ,(or gnus-newsgroup-name "")))
-			    val)))
+   ((stringp (car-safe val))
+    (let ((name (or gnus-newsgroup-name "")))
+      (seq-some (lambda (s) (string-match-p s name)) val)))
    ((listp val)
     (let ((pred (pop val)))
       (cond

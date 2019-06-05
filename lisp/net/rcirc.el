@@ -39,13 +39,13 @@
 ;; Open a new irc connection with:
 ;; M-x irc RET
 
-;;; Todo:
-
 ;;; Code:
 
 (require 'cl-lib)
 (require 'ring)
 (require 'time-date)
+
+(defconst rcirc-id-string (concat "rcirc on GNU Emacs " emacs-version))
 
 (defgroup rcirc nil
   "Simple IRC client."
@@ -119,35 +119,39 @@ display purposes. If absent, the real server name will be displayed instead."
                                     (:channels (repeat string))
                                     (:encryption (choice (const tls)
                                                          (const plain)))
-                                    (:server-alias string))))
-  :group 'rcirc)
+                                    (:server-alias string)))))
 
 (defcustom rcirc-default-port 6667
   "The default port to connect to."
-  :type 'integer
-  :group 'rcirc)
+  :type 'integer)
 
 (defcustom rcirc-default-nick (user-login-name)
   "Your nick."
-  :type 'string
-  :group 'rcirc)
+  :type 'string)
 
 (defcustom rcirc-default-user-name "user"
   "Your user name sent to the server when connecting."
   :version "24.1"                       ; changed default
-  :type 'string
-  :group 'rcirc)
+  :type 'string)
 
 (defcustom rcirc-default-full-name "unknown"
   "The full name sent to the server when connecting."
   :version "24.1"                       ; changed default
-  :type 'string
-  :group 'rcirc)
+  :type 'string)
+
+(defcustom rcirc-default-part-reason rcirc-id-string
+  "The default reason to send when parting from a channel.
+Used when no reason is explicitly given."
+  :type 'string)
+
+(defcustom rcirc-default-quit-reason rcirc-id-string
+  "The default reason to send when quitting a server.
+Used when no reason is explicitly given."
+  :type 'string)
 
 (defcustom rcirc-fill-flag t
   "Non-nil means line-wrap messages printed in channel buffers."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-fill-column nil
   "Column beyond which automatic line-wrapping should happen.
@@ -157,24 +161,21 @@ call it to compute the number of columns."
   :risky t                              ; can get funcalled
   :type '(choice (const :tag "Value of `fill-column'" nil)
 		 (integer :tag "Number of columns")
-		 (function :tag "Function returning the number of columns"))
-  :group 'rcirc)
+                 (function :tag "Function returning the number of columns")))
 
 (defcustom rcirc-fill-prefix nil
   "Text to insert before filled lines.
 If nil, calculate the prefix dynamically to line up text
 underneath each nick."
   :type '(choice (const :tag "Dynamic" nil)
-		 (string :tag "Prefix text"))
-  :group 'rcirc)
+		 (string :tag "Prefix text")))
 
 (defcustom rcirc-url-max-length nil
   "Maximum number of characters in displayed URLs.
 If nil, no maximum is applied."
   :version "27.1"
   :type '(choice (const :tag "No maximum" nil)
-                 (integer :tag "Number of characters"))
-  :group 'rcirc)
+                 (integer :tag "Number of characters")))
 
 (defvar rcirc-ignore-buffer-activity-flag nil
   "If non-nil, ignore activity in this buffer.")
@@ -187,8 +188,7 @@ If nil, no maximum is applied."
 (defcustom rcirc-omit-responses
   '("JOIN" "PART" "QUIT" "NICK")
   "Responses which will be hidden when `rcirc-omit-mode' is enabled."
-  :type '(repeat string)
-  :group 'rcirc)
+  :type '(repeat string))
 
 (defvar rcirc-prompt-start-marker nil)
 
@@ -211,32 +211,27 @@ Uninteresting lines are those whose responses are listed in
 (defcustom rcirc-time-format "%H:%M "
   "Describes how timestamps are printed.
 Used as the first arg to `format-time-string'."
-  :type 'string
-  :group 'rcirc)
+  :type 'string)
 
 (defcustom rcirc-input-ring-size 1024
   "Size of input history ring."
-  :type 'integer
-  :group 'rcirc)
+  :type 'integer)
 
 (defcustom rcirc-read-only-flag t
   "Non-nil means make text in IRC buffers read-only."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-buffer-maximum-lines nil
   "The maximum size in lines for rcirc buffers.
 Channel buffers are truncated from the top to be no greater than this
 number.  If zero or nil, no truncating is done."
   :type '(choice (const :tag "No truncation" nil)
-		 (integer :tag "Number of lines"))
-  :group 'rcirc)
+                 (integer :tag "Number of lines")))
 
 (defcustom rcirc-scroll-show-maximum-output t
   "If non-nil, scroll buffer to keep the point at the bottom of
 the window."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-authinfo nil
   "List of authentication passwords.
@@ -275,21 +270,18 @@ Examples:
                                     (list :tag "QuakeNet"
                                           (const quakenet)
                                           (string :tag "Account")
-                                          (string :tag "Password"))))
-  :group 'rcirc)
+                                          (string :tag "Password")))))
 
 (defcustom rcirc-auto-authenticate-flag t
   "Non-nil means automatically send authentication string to server.
 See also `rcirc-authinfo'."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-authenticate-before-join t
   "Non-nil means authenticate to services before joining channels.
 Currently only works with NickServ on some networks."
   :version "24.1"
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-prompt "> "
   "Prompt string to use in IRC buffers.
@@ -303,19 +295,16 @@ Setting this alone will not affect the prompt;
 use either M-x customize or also call `rcirc-update-prompt'."
   :type 'string
   :set 'rcirc-set-changed
-  :initialize 'custom-initialize-default
-  :group 'rcirc)
+  :initialize 'custom-initialize-default)
 
 (defcustom rcirc-keywords nil
   "List of keywords to highlight in message text."
-  :type '(repeat string)
-  :group 'rcirc)
+  :type '(repeat string))
 
 (defcustom rcirc-ignore-list ()
   "List of ignored nicks.
 Use /ignore to list them, use /ignore NICK to add or remove a nick."
-  :type '(repeat string)
-  :group 'rcirc)
+  :type '(repeat string))
 
 (defvar rcirc-ignore-list-automatic ()
   "List of ignored nicks added to `rcirc-ignore-list' because of renaming.
@@ -326,42 +315,36 @@ parts.")
 (defcustom rcirc-bright-nicks nil
   "List of nicks to be emphasized.
 See `rcirc-bright-nick' face."
-  :type '(repeat string)
-  :group 'rcirc)
+  :type '(repeat string))
 
 (defcustom rcirc-dim-nicks nil
   "List of nicks to be deemphasized.
 See `rcirc-dim-nick' face."
-  :type '(repeat string)
-  :group 'rcirc)
+  :type '(repeat string))
 
 (define-obsolete-variable-alias 'rcirc-print-hooks
   'rcirc-print-functions "24.3")
 (defcustom rcirc-print-functions nil
   "Hook run after text is printed.
 Called with 5 arguments, PROCESS, SENDER, RESPONSE, TARGET and TEXT."
-  :type 'hook
-  :group 'rcirc)
+  :type 'hook)
 
 (defvar rcirc-authenticated-hook nil
   "Hook run after successfully authenticated.")
 
 (defcustom rcirc-always-use-server-buffer-flag nil
   "Non-nil means messages without a channel target will go to the server buffer."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defcustom rcirc-decode-coding-system 'utf-8
   "Coding system used to decode incoming irc messages.
 Set to `undecided' if you want the encoding of the incoming
 messages autodetected."
-  :type 'coding-system
-  :group 'rcirc)
+  :type 'coding-system)
 
 (defcustom rcirc-encode-coding-system 'utf-8
   "Coding system used to encode outgoing irc messages."
-  :type 'coding-system
-  :group 'rcirc)
+  :type 'coding-system)
 
 (defcustom rcirc-coding-system-alist nil
   "Alist to decide a coding system to use for a channel I/O operation.
@@ -380,13 +363,11 @@ and the cdr part is used for encoding."
 						(string :tag "Server Regexp")))
 		:value-type (choice coding-system
 				    (cons (coding-system :tag "Decode")
-					  (coding-system :tag "Encode"))))
-  :group 'rcirc)
+                                          (coding-system :tag "Encode")))))
 
 (defcustom rcirc-multiline-major-mode 'fundamental-mode
   "Major-mode function to use in multiline edit buffers."
-  :type 'function
-  :group 'rcirc)
+  :type 'function)
 
 (defcustom rcirc-nick-completion-format "%s: "
   "Format string to use in nick completions.
@@ -395,16 +376,14 @@ The format string is only used when completing at the beginning
 of a line.  The string is passed as the first argument to
 `format' with the nickname as the second argument."
   :version "24.1"
-  :type 'string
-  :group 'rcirc)
+  :type 'string)
 
 (defcustom rcirc-kill-channel-buffers nil
   "When non-nil, kill channel buffers when the server buffer is killed.
 Only the channel buffers associated with the server in question
 will be killed."
   :version "24.3"
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defvar rcirc-nick nil)
 
@@ -446,7 +425,6 @@ will be killed."
 (defvar rcirc-timeout-seconds 600
   "Kill connection after this many seconds if there is no activity.")
 
-(defconst rcirc-id-string (concat "rcirc on GNU Emacs " emacs-version))
 
 (defvar rcirc-startup-channels nil)
 
@@ -708,8 +686,7 @@ Functions are called with PROCESS and SENTINEL arguments.")
   "The minimum interval in seconds between reconnect attempts.
 When 0, do not auto-reconnect."
   :version "25.1"
-  :type 'integer
-  :group 'rcirc)
+  :type 'integer)
 
 (defvar rcirc-last-connect-time nil
   "The last time the buffer was connected.")
@@ -1176,14 +1153,12 @@ If ALL is non-nil, update prompts in all IRC buffers."
 
 (defcustom rcirc-log-directory "~/.emacs.d/rcirc-log"
   "Directory to keep IRC logfiles."
-  :type 'directory
-  :group 'rcirc)
+  :type 'directory)
 
 (defcustom rcirc-log-flag nil
   "Non-nil means log IRC activity to disk.
 Logfiles are kept in `rcirc-log-directory'."
-  :type 'boolean
-  :group 'rcirc)
+  :type 'boolean)
 
 (defun rcirc-kill-buffer-hook ()
   "Part the channel when killing an rcirc buffer.
@@ -1372,7 +1347,6 @@ Create the buffer if it doesn't exist."
   :lighter " rcirc-mline"
   :keymap rcirc-multiline-minor-mode-map
   :global nil
-  :group 'rcirc
   (setq fill-column rcirc-max-message-length))
 
 (defun rcirc-multiline-minor-submit ()
@@ -1434,8 +1408,7 @@ the of the following escape sequences replaced by the described values:
   %%        A literal `%' character"
   :type '(alist :key-type (choice (string :tag "Type")
 				  (const :tag "Default" t))
-		:value-type string)
-  :group 'rcirc)
+                :value-type string))
 
 (defun rcirc-format-response-string (process sender response target text)
   "Return a nicely-formatted response string, incorporating TEXT
@@ -1517,12 +1490,10 @@ is found by looking up RESPONSE in `rcirc-response-formats'."
 
 (defcustom rcirc-omit-threshold 100
   "Number of lines since last activity from a nick before `rcirc-omit-responses' are omitted."
-  :type 'integer
-  :group 'rcirc)
+  :type 'integer)
 
 (defcustom rcirc-log-process-buffers nil
   "Non-nil if rcirc process buffers should be logged to disk."
-  :group 'rcirc
   :type 'boolean
   :version "24.1")
 
@@ -1715,7 +1686,6 @@ is put into `rcirc-log-directory'.
 
 The filename is then cleaned using `convert-standard-filename' to
 guarantee valid filenames for the current OS."
-  :group 'rcirc
   :type 'function)
 
 (defun rcirc-log (process sender response target text)
@@ -1883,7 +1853,6 @@ This function does not alter the INPUT string."
   :lighter ""
   :keymap rcirc-track-minor-mode-map
   :global t
-  :group 'rcirc
   (or global-mode-string (setq global-mode-string '("")))
   ;; toggle the mode-line channel indicator
   (if rcirc-track-minor-mode
@@ -2227,12 +2196,21 @@ CHANNELS is a comma- or space-separated string of channel names."
 		 (read-string "Channel: "))))
   (rcirc-send-string process (concat "INVITE " nick-channel)))
 
-;; TODO: /part #channel reason, or consider removing #channel altogether
 (defun-rcirc-command part (channel)
-  "Part CHANNEL."
+  "Part CHANNEL.
+CHANNEL should be a string of the form \"#CHANNEL-NAME REASON\".
+If omitted, CHANNEL-NAME defaults to TARGET, and REASON defaults
+to `rcirc-default-part-reason'."
   (interactive "sPart channel: ")
-  (let ((channel (if (> (length channel) 0) channel target)))
-    (rcirc-send-string process (concat "PART " channel " :" rcirc-id-string))))
+  (let ((channel (if (> (length channel) 0) channel target))
+        (msg rcirc-default-part-reason))
+    (when (string-match "\\`\\([&#+!]\\S-+\\)?\\s-*\\(.+\\)?\\'" channel)
+      (when (match-beginning 2)
+        (setq msg (match-string 2 channel)))
+      (setq channel (if (match-beginning 1)
+                        (match-string 1 channel)
+                      target)))
+    (rcirc-send-string process (concat "PART " channel " :" msg))))
 
 (defun-rcirc-command quit (reason)
   "Send a quit message to server with REASON."
@@ -2240,7 +2218,7 @@ CHANNELS is a comma- or space-separated string of channel names."
   (rcirc-send-string process (concat "QUIT :"
 				     (if (not (zerop (length reason)))
 					 reason
-				       rcirc-id-string))))
+                                       rcirc-default-quit-reason))))
 
 (defun-rcirc-command reconnect (_)
   "Reconnect to current server."
@@ -2971,8 +2949,7 @@ Passwords are stored in `rcirc-authinfo' (which see)."
     (((class color) (min-colors 16) (background dark))  :foreground "LightSkyBlue")
     (((class color) (min-colors 8)) :foreground "blue" :weight bold)
     (t :inverse-video t :weight bold))
-  "Rcirc face for my messages."
-  :group 'rcirc-faces)
+  "Rcirc face for my messages.")
 
 (defface rcirc-other-nick	     ; font-lock-variable-name-face
   '((((class grayscale) (background light))
@@ -2985,8 +2962,7 @@ Passwords are stored in `rcirc-authinfo' (which see)."
     (((class color) (min-colors 16) (background dark))  :foreground "LightGoldenrod")
     (((class color) (min-colors 8)) :foreground "yellow" :weight light)
     (t :weight bold :slant italic))
-  "Rcirc face for other users' messages."
-  :group 'rcirc-faces)
+  "Rcirc face for other users' messages.")
 
 (defface rcirc-bright-nick
   '((((class grayscale) (background light))
@@ -2999,13 +2975,11 @@ Passwords are stored in `rcirc-authinfo' (which see)."
     (((class color) (min-colors 16) (background dark))  :foreground "Aquamarine")
     (((class color) (min-colors 8)) :foreground "magenta")
     (t :weight bold :underline t))
-  "Rcirc face for nicks matched by `rcirc-bright-nicks'."
-  :group 'rcirc-faces)
+  "Rcirc face for nicks matched by `rcirc-bright-nicks'.")
 
 (defface rcirc-dim-nick
   '((t :inherit default))
-  "Rcirc face for nicks in `rcirc-dim-nicks'."
-  :group 'rcirc-faces)
+  "Rcirc face for nicks in `rcirc-dim-nicks'.")
 
 (defface rcirc-server			; font-lock-comment-face
   '((((class grayscale) (background light))
@@ -3023,8 +2997,7 @@ Passwords are stored in `rcirc-authinfo' (which see)."
     (((class color) (min-colors 8) (background light)))
     (((class color) (min-colors 8) (background dark)))
     (t :weight bold :slant italic))
-  "Rcirc face for server messages."
-  :group 'rcirc-faces)
+  "Rcirc face for server messages.")
 
 (defface rcirc-server-prefix	 ; font-lock-comment-delimiter-face
   '((default :inherit rcirc-server)
@@ -3034,13 +3007,11 @@ Passwords are stored in `rcirc-authinfo' (which see)."
      :foreground "red")
     (((class color) (min-colors 8) (background dark))
      :foreground "red1"))
-  "Rcirc face for server prefixes."
-  :group 'rcirc-faces)
+  "Rcirc face for server prefixes.")
 
 (defface rcirc-timestamp
   '((t :inherit default))
-  "Rcirc face for timestamps."
-  :group 'rcirc-faces)
+  "Rcirc face for timestamps.")
 
 (defface rcirc-nick-in-message		; font-lock-keyword-face
   '((((class grayscale) (background light)) :foreground "LightGray" :weight bold)
@@ -3051,37 +3022,30 @@ Passwords are stored in `rcirc-authinfo' (which see)."
     (((class color) (min-colors 16) (background dark))  :foreground "Cyan")
     (((class color) (min-colors 8)) :foreground "cyan" :weight bold)
     (t :weight bold))
-  "Rcirc face for instances of your nick within messages."
-  :group 'rcirc-faces)
+  "Rcirc face for instances of your nick within messages.")
 
 (defface rcirc-nick-in-message-full-line '((t :weight bold))
-  "Rcirc face for emphasizing the entire message when your nick is mentioned."
-  :group 'rcirc-faces)
+  "Rcirc face for emphasizing the entire message when your nick is mentioned.")
 
 (defface rcirc-prompt			; comint-highlight-prompt
   '((((min-colors 88) (background dark)) :foreground "cyan1")
     (((background dark)) :foreground "cyan")
     (t :foreground "dark blue"))
-  "Rcirc face for prompts."
-  :group 'rcirc-faces)
+  "Rcirc face for prompts.")
 
 (defface rcirc-track-nick
   '((((type tty)) :inherit default)
     (t :inverse-video t))
-  "Rcirc face used in the mode-line when your nick is mentioned."
-  :group 'rcirc-faces)
+  "Rcirc face used in the mode-line when your nick is mentioned.")
 
 (defface rcirc-track-keyword '((t :weight bold))
-  "Rcirc face used in the mode-line when keywords are mentioned."
-  :group 'rcirc-faces)
+  "Rcirc face used in the mode-line when keywords are mentioned.")
 
 (defface rcirc-url '((t :weight bold))
-  "Rcirc face used to highlight urls."
-  :group 'rcirc-faces)
+  "Rcirc face used to highlight urls.")
 
 (defface rcirc-keyword '((t :inherit highlight))
-  "Rcirc face used to highlight keywords."
-  :group 'rcirc-faces)
+  "Rcirc face used to highlight keywords.")
 
 
 ;; When using M-x flyspell-mode, only check words after the prompt

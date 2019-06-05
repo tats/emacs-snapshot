@@ -1060,7 +1060,7 @@ there's a piece of normal text without having to think much about it.
 and so on.
 
 You can configure the exact way comments get filled and broken, and
-where Emacs does auto-filling (see @pxref{Custom Filling and
+where Emacs does auto-filling (@pxref{Custom Filling and
 Breaking}).  Typically, the style system (@pxref{Styles}) will have
 set this up for you, so you probably won't have to bother.
 
@@ -1478,7 +1478,7 @@ normal, with no @kbd{C-u} prefix).
 @end itemize
 
 You can configure the precise circumstances in which newlines get
-inserted (see @pxref{Custom Auto-newlines}).  Typically, the style
+inserted (@pxref{Custom Auto-newlines}).  Typically, the style
 system (@pxref{Styles}) will have set this up for you, so you probably
 won't have to bother.
 
@@ -6853,7 +6853,7 @@ custom line-up function associated with it.
 @comment !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 To configure macros which you invoke without a terminating @samp{;},
-see @xref{Macros with ;}.
+@pxref{Macros with ;}.
 
 Here are the remaining odds and ends regarding indentation:
 
@@ -7431,13 +7431,15 @@ could amend your C++ Mode hook like this:
 @emph{How do I stop my C++ lambda expressions being indented way over
 to the right?}
 
-Change the offset associated with @code{inlambda} from its default,
-the function @code{c-lineup-inexpr-block}, to 0.  For example, if you
-are setting offsets in a hook function you might include the following
-line:
+This is now the default, so you don't need to do anything.  To restore
+the previous default, indenting lambda expressions to the right of the
+constructs which introduce them, change the offset associated with
+@code{inlambda} from 0 to @code{c-lineup-inexpr-block}.  For example,
+if you are setting offsets in a hook function you might include the
+following line:
 
 @example
-(c-set-offset 'inlambda 0)
+(c-set-offset 'inlambda 'c-lineup-inexpr-block)
 @end example
 
 For details of the different ways you can make this setting,

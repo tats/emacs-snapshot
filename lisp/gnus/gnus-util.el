@@ -34,6 +34,7 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(require 'seq)
 (require 'time-date)
 (require 'text-property-search)
 
@@ -107,12 +108,6 @@ This is a compatibility function for different Emacsen."
 
 (defsubst gnus-goto-char (point)
   (and point (goto-char point)))
-
-(defmacro gnus-buffer-exists-p (buffer)
-  `(let ((buffer ,buffer))
-     (when buffer
-       (funcall (if (stringp buffer) 'get-buffer 'buffer-name)
-		buffer))))
 
 (defun gnus-delete-first (elt list)
   "Delete by side effect the first occurrence of ELT as a member of LIST."
@@ -561,8 +556,12 @@ If N, return the Nth ancestor instead."
 	  (match-string 1 references))))))
 
 (defsubst gnus-buffer-live-p (buffer)
-  "Say whether BUFFER is alive or not."
-  (and buffer (buffer-live-p (get-buffer buffer))))
+  "If BUFFER names a live buffer, return its object; else nil."
+  (and buffer (buffer-live-p (setq buffer (get-buffer buffer)))
+       buffer))
+
+(define-obsolete-function-alias 'gnus-buffer-exists-p
+  'gnus-buffer-live-p "27.1")
 
 (defun gnus-horizontal-recenter ()
   "Recenter the current buffer horizontally."
@@ -1160,20 +1159,13 @@ ARG is passed to the first function."
       (eq (cadr (memq 'gnus-undeletable (text-properties-at b))) t)
     (text-property-any b e 'gnus-undeletable t)))
 
-(defun gnus-or (&rest elems)
-  "Return non-nil if any of the elements are non-nil."
-  (catch 'found
-    (while elems
-      (when (pop elems)
-	(throw 'found t)))))
+(defun gnus-or (&rest elements)
+  "Return non-nil if any one of ELEMENTS is non-nil."
+  (seq-drop-while #'null elements))
 
-(defun gnus-and (&rest elems)
-  "Return non-nil if all of the elements are non-nil."
-  (catch 'found
-    (while elems
-      (unless (pop elems)
-	(throw 'found nil)))
-    t))
+(defun gnus-and (&rest elements)
+  "Return non-nil if all ELEMENTS are non-nil."
+  (not (memq nil elements)))
 
 ;; gnus.el requires mm-util.
 (declare-function mm-disable-multibyte "mm-util")

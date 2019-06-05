@@ -695,7 +695,7 @@ references displayed in the current *xref* buffer."
     ;; suggested by Johan Claesson "to further reduce finger movement":
     (define-key map (kbd ".") #'xref-next-line)
     (define-key map (kbd ",") #'xref-prev-line)
-    (define-key map (kbd "g") #'xref-refresh-results)
+    (define-key map (kbd "g") #'xref-revert-buffer)
     map))
 
 (define-derived-mode xref--xref-buffer-mode special-mode "XREF"
@@ -802,11 +802,9 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
         (setq xref--fetcher fetcher)
         (current-buffer)))))
 
-(defun xref-refresh-results ()
+(defun xref-revert-buffer ()
   "Refresh the search results in the current buffer."
   (interactive)
-  (unless xref--fetcher
-    (user-error "Reverting not supported"))
   (let ((inhibit-read-only t)
         (buffer-undo-list t))
     (save-excursion
@@ -842,7 +840,7 @@ FETCHER is a function of no arguments that returns a list of xref
 values.  It must not depend on the current buffer or selected
 window.
 
-ALIST will include at least the following keys:
+ALIST can include, but limited to, the following keys:
 
 WINDOW for the window that was selected before the current
 command was called.
