@@ -1401,7 +1401,9 @@ when printing the error message."
 (defun byte-compile-callargs-warn (form)
   (let* ((def (or (byte-compile-fdefinition (car form) nil)
 		  (byte-compile-fdefinition (car form) t)))
-         (sig (byte-compile--function-signature (or def (car form))))
+         (sig (cond (def (byte-compile--function-signature def))
+                    ((subrp (symbol-function (car form)))
+                     (subr-arity (symbol-function (car form))))))
 	 (ncall (length (cdr form))))
     ;; Check many or unevalled from subr-arity.
     (if (and (cdr-safe sig)
@@ -2091,8 +2093,9 @@ With argument ARG, insert value in current buffer after the form."
 		 (not (eobp)))
 	  (setq byte-compile-read-position (point)
 		byte-compile-last-position byte-compile-read-position)
-	  (let ((form (read inbuffer))
-                (warning (byte-run--unescaped-character-literals-warning)))
+          (let* ((lread--unescaped-character-literals nil)
+                 (form (read inbuffer))
+                 (warning (byte-run--unescaped-character-literals-warning)))
             (when warning (byte-compile-warn "%s" warning))
 	    (byte-compile-toplevel-file-form form)))
 	;; Compile pending forms at end of file.

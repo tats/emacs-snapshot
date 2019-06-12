@@ -4541,7 +4541,7 @@ Internet informational document describing a standard.  RFCs are
 usually written by technical experts acting on their own initiative,
 and are traditionally written in a pragmatic, experience-driven
 manner.
-}2045.  This section describes the functions for
+}2045 and also in RFC 4648.  This section describes the functions for
 converting to and from this code.
 
 @deffn Command base64-encode-region beg end &optional no-line-break
@@ -4558,6 +4558,16 @@ text, to avoid overlong lines.  However, if the optional argument
 the output is just one long line.
 @end deffn
 
+@deffn Command base64url-encode-region beg end &optional no-pad
+This function is like @code{base64-encode-region}, but it implements
+the URL variant if base 64 encoding, per RFC 4648, and it doesn't
+inserts newline characters into the encoded text, so the output is
+just one long line.
+
+If the optional argument @var{no-pad} is non-@code{nil} then this
+function doesn't generate the padding (@code{=}).
+@end deffn
+
 @defun base64-encode-string string &optional no-line-break
 This function converts the string @var{string} into base 64 code.  It
 returns a string containing the encoded text.  As for
@@ -4570,20 +4580,36 @@ text, to avoid overlong lines.  However, if the optional argument
 the result string is just one long line.
 @end defun
 
-@deffn Command base64-decode-region beg end
+@defun base64url-encode-string string &optional no-pad
+Like @code{base64-encode-string}, but generates the URL variant of
+base 64, and doesn't insert newline characters into the encoded text,
+so the result is just one long line.
+
+If the optional argument @var{no-pad} is non-@code{nil} then this
+function doesn't generate the padding.
+@end defun
+
+@deffn Command base64-decode-region beg end &optional base64url
 This function converts the region from @var{beg} to @var{end} from base
 64 code into the corresponding decoded text.  It returns the length of
 the decoded text.
 
 The decoding functions ignore newline characters in the encoded text.
+
+If optional argument @var{base64url} is is non-@code{nil}, then padding
+is optional, and the URL variant of base 64 encoding is used.
 @end deffn
 
-@defun base64-decode-string string
+@defun base64-decode-string string &optional base64url
 This function converts the string @var{string} from base 64 code into
 the corresponding decoded text.  It returns a unibyte string containing the
 decoded text.
 
 The decoding functions ignore newline characters in the encoded text.
+
+
+If optional argument @var{base64url} is is non-@code{nil}, then padding
+is optional, and the URL variant of base 64 encoding is used.
 @end defun
 
 @node Checksum/Hash

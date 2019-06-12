@@ -30,6 +30,18 @@ arranges for the included mini-gmp library to be built and used.
 The new 'configure' option '--without-libgmp' uses mini-gmp even if a
 suitable libgmp is available.
 
+** Emacs can now use HarfBuzz as its shaping engine.
+The new configure option '--with-harfbuzz' adds support for the
+HarfBuzz text shaping engine.  It is on by default; use './configure
+--without-harfbuzz' to build without it.  The HarfBuzz text shaping is
+available via new font backend drivers 'xfthb' and 'ftcrhb' for Xft
+and Cairo drawings, respectively, and via the 'harfbuzz' backend on
+MS-Windows.  The Harfbuzz text shaping is preferred to the previously
+supported ones, so the font backends that use older shaping engines
+(FLT on GNU and Unix systems and Uniscribe on MS-Windows) are not
+enabled by default; they can be enabled via the 'font-backend' frame
+parameter or via X resources.
+
 ** The new configure option '--with-json' adds support for JSON using
 the Jansson library.  It is on by default; use './configure
 --with-json=no' to build without Jansson support.  The new JSON
@@ -567,6 +579,11 @@ remapped to these, respectively.
 
 +++
 *** New command 'dired-create-empty-file'.
+
+** Find-Dired
+
+*** New customizable variable 'find-dired-refine-function'.
+The default value is 'find-dired-sort-by-filename'.
 
 ** Change Logs and VC
 
@@ -1495,6 +1512,18 @@ the new variable 'buffer-auto-revert-by-notification' to a non-nil
 value.  Auto Revert mode can use this information to avoid polling the
 buffer periodically when 'auto-revert-avoid-polling' is non-nil.
 
+** Bookmarks
+
++++
+*** 'bookmark-file' is now an obsolete alias of
+'bookmark-default-file'.
+
+** Bookmarks
+
+---
+*** 'bookmark-old-default-file' is now an obsolete alias of
+'bookmark-default-file'.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -2051,14 +2080,14 @@ buffer's 'default-directory' and invoke that file name handler to make
 the process.  That way 'make-process' can start remote processes.
 
 +++
-** Emacs now supports resizing (scaling) of images without ImageMagick.
+** Emacs now supports resizing and rotating images without ImageMagick.
 All modern systems are supported by this feature.  (On GNU and Unix
 systems, Cairo drawing or the XRender extension to X11 is required for
 this to be available; the configure script will test for it and, if
 found, enable scaling.)
 
-The new function 'image-scaling-p' can be used to test whether any
-given frame supports resizing.
+The new function 'image-transforms-p' can be used to test whether any
+given frame supports this capability.
 
 +++
 ** '(locale-info 'paper)' now returns the paper size on systems that support it.
@@ -2081,6 +2110,15 @@ case.
 ** New constant 'regexp-unmatchable' contains a never-matching regexp.
 It is a convenient and readable way to specify a regexp that should
 not match anything, and is as fast as any such regexp can be.
+
+++++
+** New functions to handle the URL variant of base-64 encoding.
+New functions 'base64url-encode-string' and 'base64url-encode-region'
+implement the url-variant of base-64 encoding as defined in RFC4648.
+
+The functions 'base64-decode-string' and 'base64-decode-region' now
+accept an optional argument to decode the URL variant of base-64
+encoding.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

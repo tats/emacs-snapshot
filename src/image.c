@@ -207,12 +207,12 @@ image_pix_container_create_from_bitmap_data (struct frame *f,
 }
 
 static cairo_surface_t *
-cr_create_cr_surface_from_image (struct frame *f, struct image *img)
+cr_create_surface_from_pix_containers (Emacs_Pix_Container pimg,
+				       Emacs_Pix_Container mask)
 {
-  Emacs_Pix_Container pimg = img->pixmap;
   cairo_surface_t *surface;
 
-  if (img->mask)
+  if (mask)
     {
       int x, y;
 
@@ -223,28 +223,47 @@ cr_create_cr_surface_from_image (struct frame *f, struct image *img)
 	    int r, g, b;
 
 	    color = GET_PIXEL (pimg, x, y);
-	    alpha = GET_PIXEL (img->mask, x, y);
+	    alpha = GET_PIXEL (mask, x, y);
 	    r = (RED_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
 	    g = (GREEN_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
 	    b = (BLUE_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
 	    PUT_PIXEL (pimg, x, y, ARGB_TO_ULONG (alpha, r, g, b));
 	  }
-      xfree (img->mask->data);
-      img->mask->data = NULL;
+      xfree (mask->data);
+      mask->data = NULL;
     }
-  block_input ();
   surface = cairo_image_surface_create_for_data ((unsigned char *) pimg->data,
-						 (img->mask
-						  ? CAIRO_FORMAT_ARGB32
+						 (mask ? CAIRO_FORMAT_ARGB32
 						  : CAIRO_FORMAT_RGB24),
 						 pimg->width, pimg->height,
 						 pimg->bytes_per_line);
   static const cairo_user_data_key_t key;
   cairo_surface_set_user_data (surface, &key, pimg->data, xfree);
-  unblock_input ();
   pimg->data = NULL;
 
   return surface;
+}
+
+static void
+cr_put_image_to_cr_data (struct image *img)
+{
+  cairo_pattern_t *pattern = NULL;
+  cairo_surface_t *surface = cr_create_surface_from_pix_containers (img->pixmap,
+								    img->mask);
+  if (surface)
+    {
+      pattern = cairo_pattern_create_for_surface (surface);
+      if (img->cr_data)
+	{
+	  cairo_matrix_t matrix;
+	  cairo_pattern_get_matrix (img->cr_data, &matrix);
+	  cairo_pattern_set_matrix (pattern, &matrix);
+	  cairo_pattern_destroy (img->cr_data);
+	}
+      cairo_surface_destroy (surface);
+    }
+
+  img->cr_data = pattern;
 }
 
 #endif	/* USE_CAIRO */
@@ -1150,7 +1169,7 @@ free_image (struct frame *f, struct image *img)
 
       c->images[img->id] = NULL;
 
-#ifdef HAVE_XRENDER
+#if !defined USE_CAIRO && defined HAVE_XRENDER
       if (img->picture)
         XRenderFreePicture (FRAME_X_DISPLAY (f), img->picture);
       if (img->mask_picture)
@@ -1212,14 +1231,20 @@ prepare_image_for_display (struct frame *f, struct image *img)
     img->load_failed_p = ! img->type->load (f, img);
 
 #ifdef USE_CAIRO
-  if (!img->load_failed_p && img->cr_data == NULL)
+  if (!img->load_failed_p)
     {
-      img->cr_data = cr_create_cr_surface_from_image (f, img);
-      if (img->cr_data == NULL)
+      block_input ();
+      if (img->cr_data == NULL || (cairo_pattern_get_type (img->cr_data)
+				   != CAIRO_PATTERN_TYPE_SURFACE))
 	{
-	  img->load_failed_p = 1;
-	  img->type->free (f, img);
+	  cr_put_image_to_cr_data (img);
+	  if (img->cr_data == NULL)
+	    {
+	      img->load_failed_p = 1;
+	      img->type->free (f, img);
+	    }
 	}
+      unblock_input ();
     }
 #elif defined HAVE_X_WINDOWS
   if (!img->load_failed_p)
@@ -1470,7 +1495,7 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 #ifdef USE_CAIRO
   if (img->cr_data)
     {
-      cairo_surface_destroy ((cairo_surface_t *) img->cr_data);
+      cairo_pattern_destroy (img->cr_data);
       img->cr_data = NULL;
     }
 #endif	/* USE_CAIRO */
@@ -1841,7 +1866,7 @@ postprocess_image (struct frame *f, struct image *img)
     }
 }
 
-#if defined (HAVE_IMAGEMAGICK) || defined (HAVE_NATIVE_SCALING)
+#if defined (HAVE_IMAGEMAGICK) || defined (HAVE_NATIVE_TRANSFORMS)
 /* Scale an image size by returning SIZE / DIVISOR * MULTIPLIER,
    safely rounded and clipped to int range.  */
 
@@ -1940,58 +1965,280 @@ compute_image_size (size_t width, size_t height,
   *d_width = desired_width;
   *d_height = desired_height;
 }
-#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_SCALING */
+#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_TRANSFORMS */
+
+typedef double matrix3x3[3][3];
 
 static void
-image_set_image_size (struct frame *f, struct image *img)
+matrix3x3_copy (matrix3x3 a, matrix3x3 b)
 {
-#ifdef HAVE_NATIVE_SCALING
+  memcpy (b, a, sizeof (matrix3x3));
+}
+
+static void
+matrix3x3_mult (matrix3x3 a, matrix3x3 b, matrix3x3 result)
+{
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
+      {
+	double sum = 0;
+	for (int k = 0; k < 3; k++)
+	  sum += a[i][k] * b[k][j];
+	result[i][j] = sum;
+      }
+}
+
+static void
+image_set_rotation (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
+# ifdef HAVE_IMAGEMAGICK
+  /* ImageMagick images are already rotated.  */
+  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
+    return;
+# endif
+
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
+# endif
+
+  int rotation, cos_r, sin_r, width, height;
+
+  Lisp_Object value = image_spec_value (img->spec, QCrotation, NULL);
+  if (! NUMBERP (value))
+    return;
+
+  Lisp_Object reduced_angle = Fmod (value, make_fixnum (360));
+  if (! FLOATP (reduced_angle))
+    rotation = XFIXNUM (reduced_angle);
+  else
+    {
+      rotation = XFLOAT_DATA (reduced_angle);
+      if (rotation != XFLOAT_DATA (reduced_angle))
+	goto not_a_multiple_of_90;
+    }
+
+  if (rotation == 0)
+    return;
+
+  if (rotation == 90)
+    {
+      width = img->height;
+      height = img->width;
+
+      cos_r = 0;
+      sin_r = 1;
+    }
+  else if (rotation == 180)
+    {
+      width = img->width;
+      height = img->height;
+
+      cos_r = -1;
+      sin_r = 0;
+    }
+  else if (rotation == 270)
+    {
+      width = img->height;
+      height = img->width;
+
+      cos_r = 0;
+      sin_r = -1;
+    }
+  else
+    {
+    not_a_multiple_of_90:
+      image_error ("Native image rotation supports "
+		   "only multiples of 90 degrees");
+      return;
+    }
+
+  /* Translate so (0, 0) is in the center of the image.  */
+  matrix3x3 t
+    = { [0][0] = 1,
+				  [1][1] = 1,
+	[2][0] = img->width >> 1, [2][1] = img->height >> 1, [2][2] = 1 };
+  matrix3x3 tmp;
+  matrix3x3_mult (t, tm, tmp);
+
+  /* Rotate.  */
+  matrix3x3 rot = { [0][0] = cos_r, [0][1] = -sin_r,
+		    [1][0] = sin_r, [1][1] = cos_r,
+						     [2][2] = 1 };
+  matrix3x3 tmp2;
+  matrix3x3_mult (rot, tmp, tmp2);
+
+  /* Translate back.  */
+  t[2][0] = - (width >> 1);
+  t[2][1] = - (height >> 1);
+  matrix3x3_mult (t, tmp2, tm);
+
+  img->width = width;
+  img->height = height;
+#endif
+}
+
+static void
+image_set_crop (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
+# ifdef HAVE_IMAGEMAGICK
+  /* ImageMagick images are already cropped.  */
+  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
+    return;
+# endif
+
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
+# endif
+
+  Lisp_Object crop = image_spec_value (img->spec, QCcrop, NULL);
+
+  if (!CONSP (crop))
+    return;
+
+  Lisp_Object w = XCAR (crop), h = Qnil, x = Qnil, y = Qnil;
+  crop = XCDR (crop);
+  if (CONSP (crop))
+    {
+      h = XCAR (crop);
+      crop = XCDR (crop);
+      if (CONSP (crop))
+	{
+	  x = XCAR (crop);
+	  crop = XCDR (crop);
+	  if (CONSP (crop))
+	    y = XCAR (crop);
+	}
+    }
+
+  int width = img->width;
+  if (FIXNATP (w) && XFIXNAT (w) < img->width)
+    width = XFIXNAT (w);
+  int left;
+  if (TYPE_RANGED_FIXNUMP (int, x))
+    {
+      left = XFIXNUM (x);
+      if (left < 0)
+        left = img->width - width + left;
+    }
+  else
+    left = (img->width - width) >> 1;
+
+  int height = img->height;
+  if (FIXNATP (h) && XFIXNAT (h) < img->height)
+    height = XFIXNAT (h);
+  int top;
+  if (TYPE_RANGED_FIXNUMP (int, y))
+    {
+      top = XFIXNUM (y);
+      if (top < 0)
+        top = img->height - height + top;
+    }
+  else
+    top = (img->height - height) >> 1;
+
+  /* Negative values operate from the right and bottom of the image
+     instead of the left and top.  */
+  if (left < 0)
+    {
+      width = img->width + left;
+      left = 0;
+    }
+
+  if (width + left > img->width)
+    width = img->width - left;
+
+  if (top < 0)
+    {
+      height = img->height + top;
+      top = 0;
+    }
+
+  if (height + top > img->height)
+    height = img->height - top;
+
+  matrix3x3 tmp, m = { [0][0] = 1,
+				      [1][1] = 1,
+		       [2][0] = left, [2][1] = top, [2][2] = 1 };
+  matrix3x3_mult (m, tm, tmp);
+  matrix3x3_copy (tmp, tm);
+
+  img->width = width;
+  img->height = height;
+#endif
+}
+
+static void
+image_set_size (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
 # ifdef HAVE_IMAGEMAGICK
   /* ImageMagick images are already the correct size.  */
   if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
     return;
 # endif
 
-  int width, height;
-  compute_image_size (img->width, img->height, img->spec, &width, &height);
-
-# ifdef HAVE_NS
-  ns_image_set_size (img->pixmap, width, height);
-  img->width = width;
-  img->height = height;
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
 # endif
 
-# ifdef USE_CAIRO
+  int width, height;
+
+  compute_image_size (img->width, img->height, img->spec, &width, &height);
+
+  double xscale = img->width / (double) width;
+  double yscale = img->height / (double) height;
+
+  matrix3x3 tmp, rm = { [0][0] = xscale, [1][1] = yscale, [2][2] = 1 };
+  matrix3x3_mult (rm, tm, tmp);
+  matrix3x3_copy (tmp, tm);
+
   img->width = width;
   img->height = height;
-# elif defined HAVE_XRENDER
+#endif
+}
+
+static void
+image_set_transform (struct frame *f, struct image *img, matrix3x3 matrix)
+{
+  /* TODO: Add MS Windows support.  */
+#ifdef HAVE_NATIVE_TRANSFORMS
+# if defined (HAVE_NS)
+  /* Under NS the transform is applied to the drawing surface at
+     drawing time, so store it for later.  */
+  ns_image_set_transform (img->pixmap, matrix);
+# elif defined USE_CAIRO
+  cairo_matrix_t cr_matrix = {matrix[0][0], matrix[0][1], matrix[1][0],
+			      matrix[1][1], matrix[2][0], matrix[2][1]};
+  cairo_pattern_t *pattern = cairo_pattern_create_rgb (0, 0, 0);
+  cairo_pattern_set_matrix (pattern, &cr_matrix);
+  /* Dummy solid color pattern just to record pattern matrix.  */
+  img->cr_data = pattern;
+# elif defined (HAVE_XRENDER)
   if (img->picture)
     {
-      double xscale = img->width / (double) width;
-      double yscale = img->height / (double) height;
-
       XTransform tmat
-	= {{{XDoubleToFixed (xscale), XDoubleToFixed (0), XDoubleToFixed (0)},
-	    {XDoubleToFixed (0), XDoubleToFixed (yscale), XDoubleToFixed (0)},
-	    {XDoubleToFixed (0), XDoubleToFixed (0), XDoubleToFixed (1)}}};
+	= {{{XDoubleToFixed (matrix[0][0]),
+             XDoubleToFixed (matrix[1][0]),
+             XDoubleToFixed (matrix[2][0])},
+	    {XDoubleToFixed (matrix[0][1]),
+             XDoubleToFixed (matrix[1][1]),
+             XDoubleToFixed (matrix[2][1])},
+	    {XDoubleToFixed (matrix[0][2]),
+             XDoubleToFixed (matrix[1][2]),
+             XDoubleToFixed (matrix[2][2])}}};
 
       XRenderSetPictureFilter (FRAME_X_DISPLAY (f), img->picture, FilterBest,
 			       0, 0);
       XRenderSetPictureTransform (FRAME_X_DISPLAY (f), img->picture, &tmat);
-
-      img->width = width;
-      img->height = height;
     }
-# endif
-# ifdef HAVE_NTGUI
-  /* Under HAVE_NTGUI, we will scale the image on the fly, when we
-     draw it.  See w32term.c:x_draw_image_foreground.  */
-  img->width = width;
-  img->height = height;
 # endif
 #endif
 }
-
 
 /* Return the id of image with Lisp specification SPEC on frame F.
    SPEC must be a valid Lisp image specification (see valid_image_p).  */
@@ -2047,7 +2294,14 @@ lookup_image (struct frame *f, Lisp_Object spec)
 	     `:background COLOR'.  */
 	  Lisp_Object ascent, margin, relief, bg;
 	  int relief_bound;
-          image_set_image_size (f, img);
+
+#ifdef HAVE_NATIVE_TRANSFORMS
+          matrix3x3 transform_matrix = { [0][0] = 1, [1][1] = 1, [2][2] = 1 };
+          image_set_size (img, transform_matrix);
+          image_set_crop (img, transform_matrix);
+          image_set_rotation (img, transform_matrix);
+          image_set_transform (f, img, transform_matrix);
+#endif
 
 	  ascent = image_spec_value (spec, QCascent, NULL);
 	  if (FIXNUMP (ascent))
@@ -2523,7 +2777,7 @@ image_create_x_image_and_pixmap (struct frame *f, struct image *img,
   eassert ((!mask_p ? img->pixmap : img->mask) == NO_PIXMAP);
 
   Picture *picture = NULL;
-#ifdef HAVE_XRENDER
+#if !defined USE_CAIRO && defined HAVE_XRENDER
   picture = !mask_p ? &img->picture : &img->mask_picture;
 #endif
   return image_create_x_image_and_pixmap_1 (f, width, height, depth, ximg,
@@ -9673,9 +9927,9 @@ DEFUN ("lookup-image", Flookup_image, Slookup_image, 1, 1, 0,
 			    Initialization
  ***********************************************************************/
 
-DEFUN ("image-scaling-p", Fimage_scaling_p, Simage_scaling_p, 0, 1, 0,
-       doc: /* Test whether FRAME supports resizing images.
-Return t if FRAME supports native scaling, nil otherwise.  */)
+DEFUN ("image-transforms-p", Fimage_transforms_p, Simage_transforms_p, 0, 1, 0,
+       doc: /* Test whether FRAME supports image transformation.
+Return t if FRAME supports native transforms, nil otherwise.  */)
      (Lisp_Object frame)
 {
 #if defined (USE_CAIRO) || defined (HAVE_NS) || defined (HAVE_NTGUI)
@@ -9935,7 +10189,7 @@ non-numeric, there is no explicit limit on the size of images.  */);
   defsubr (&Slookup_image);
 #endif
 
-  defsubr (&Simage_scaling_p);
+  defsubr (&Simage_transforms_p);
 
   DEFVAR_BOOL ("cross-disabled-images", cross_disabled_images,
     doc: /* Non-nil means always draw a cross over disabled images.

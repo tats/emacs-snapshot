@@ -2425,7 +2425,6 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 
     case Lisp_Vectorlike:
       {
-	register int i;
 	ptrdiff_t size = ASIZE (o1);
 	/* Pseudovectors have the type encoded in the size field, so this test
 	   actually checks that the objects have the same type as well as the
@@ -2479,7 +2478,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	      return false;
 	    size &= PSEUDOVECTOR_SIZE_MASK;
 	  }
-	for (i = 0; i < size; i++)
+	for (ptrdiff_t i = 0; i < size; i++)
 	  {
 	    Lisp_Object v1, v2;
 	    v1 = AREF (o1, i);
@@ -2681,8 +2680,12 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 DEFUN ("mapconcat", Fmapconcat, Smapconcat, 3, 3, 0,
        doc: /* Apply FUNCTION to each element of SEQUENCE, and concat the results as strings.
 In between each pair of results, stick in SEPARATOR.  Thus, " " as
-SEPARATOR results in spaces between the values returned by FUNCTION.
-SEQUENCE may be a list, a vector, a bool-vector, or a string.  */)
+  SEPARATOR results in spaces between the values returned by FUNCTION.
+SEQUENCE may be a list, a vector, a bool-vector, or a string.
+SEPARATOR must be a string.
+FUNCTION must be a function of one argument, and must return a value
+  that is a sequence of characters: either a string, or a vector or
+  list of numbers that are valid character codepoints.  */)
   (Lisp_Object function, Lisp_Object sequence, Lisp_Object separator)
 {
   USE_SAFE_ALLOCA;
@@ -3182,33 +3185,11 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 
 #define MIME_LINE_LENGTH 76
 
-#define IS_ASCII(Character) \
-  ((Character) < 128)
-#define IS_BASE64(Character) \
-  (IS_ASCII (Character) && base64_char_to_value[Character] >= 0)
-#define IS_BASE64_IGNORABLE(Character) \
-  ((Character) == ' ' || (Character) == '\t' || (Character) == '\n' \
-   || (Character) == '\f' || (Character) == '\r')
-
-/* Used by base64_decode_1 to retrieve a non-base64-ignorable
-   character or return retval if there are no characters left to
-   process. */
-#define READ_QUADRUPLET_BYTE(retval)	\
-  do					\
-    {					\
-      if (i == length)			\
-	{				\
-	  if (nchars_return)		\
-	    *nchars_return = nchars;	\
-	  return (retval);		\
-	}				\
-      c = from[i++];			\
-    }					\
-  while (IS_BASE64_IGNORABLE (c))
-
-/* Table of characters coding the 64 values.  */
-static const char base64_value_to_char[64] =
+/* Tables of characters coding the 64 values.  */
+static char const base64_value_to_char[2][64] =
 {
+ /* base64 */
+ {
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',	/*  0- 9 */
   'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',	/* 10-19 */
   'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',	/* 20-29 */
@@ -3216,24 +3197,57 @@ static const char base64_value_to_char[64] =
   'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',	/* 40-49 */
   'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',	/* 50-59 */
   '8', '9', '+', '/'					/* 60-63 */
+ },
+ /* base64url */
+ {
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',	/*  0- 9 */
+  'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',	/* 10-19 */
+  'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',	/* 20-29 */
+  'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',	/* 30-39 */
+  'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',	/* 40-49 */
+  'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',	/* 50-59 */
+  '8', '9', '-', '_'					/* 60-63 */
+ }
 };
 
-/* Table of base64 values for first 128 characters.  */
-static const short base64_char_to_value[128] =
+/* Tables of base64 values for bytes.  -1 means ignorable, 0 invalid,
+   positive means 1 + the represented value.  */
+static signed char const base64_char_to_value[2][UCHAR_MAX] =
 {
-  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,	/*   0-  9 */
-  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,	/*  10- 19 */
-  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,	/*  20- 29 */
-  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,	/*  30- 39 */
-  -1,  -1,  -1,  62,  -1,  -1,  -1,  63,  52,  53,	/*  40- 49 */
-  54,  55,  56,  57,  58,  59,  60,  61,  -1,  -1,	/*  50- 59 */
-  -1,  -1,  -1,  -1,  -1,  0,   1,   2,   3,   4,	/*  60- 69 */
-  5,   6,   7,   8,   9,   10,  11,  12,  13,  14,	/*  70- 79 */
-  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,	/*  80- 89 */
-  25,  -1,  -1,  -1,  -1,  -1,  -1,  26,  27,  28,	/*  90- 99 */
-  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,	/* 100-109 */
-  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,	/* 110-119 */
-  49,  50,  51,  -1,  -1,  -1,  -1,  -1			/* 120-127 */
+ /* base64 */
+ {
+  ['\t']= -1, ['\n']= -1, ['\f']= -1, ['\r']= -1, [' '] = -1,
+  ['A'] =  1, ['B'] =  2, ['C'] =  3, ['D'] =  4, ['E'] =  5,
+  ['F'] =  6, ['G'] =  7, ['H'] =  8, ['I'] =  9, ['J'] = 10,
+  ['K'] = 11, ['L'] = 12, ['M'] = 13, ['N'] = 14, ['O'] = 15,
+  ['P'] = 16, ['Q'] = 17, ['R'] = 18, ['S'] = 19, ['T'] = 20,
+  ['U'] = 21, ['V'] = 22, ['W'] = 23, ['X'] = 24, ['Y'] = 25, ['Z'] = 26,
+  ['a'] = 27, ['b'] = 28, ['c'] = 29, ['d'] = 30, ['e'] = 31,
+  ['f'] = 32, ['g'] = 33, ['h'] = 34, ['i'] = 35, ['j'] = 36,
+  ['k'] = 37, ['l'] = 38, ['m'] = 39, ['n'] = 40, ['o'] = 41,
+  ['p'] = 42, ['q'] = 43, ['r'] = 44, ['s'] = 45, ['t'] = 46,
+  ['u'] = 47, ['v'] = 48, ['w'] = 49, ['x'] = 50, ['y'] = 51, ['z'] = 52,
+  ['0'] = 53, ['1'] = 54, ['2'] = 55, ['3'] = 56, ['4'] = 57,
+  ['5'] = 58, ['6'] = 59, ['7'] = 60, ['8'] = 61, ['9'] = 62,
+  ['+'] = 63, ['/'] = 64
+ },
+ /* base64url */
+ {
+  ['\t']= -1, ['\n']= -1, ['\f']= -1, ['\r']= -1, [' '] = -1,
+  ['A'] =  1, ['B'] =  2, ['C'] =  3, ['D'] =  4, ['E'] =  5,
+  ['F'] =  6, ['G'] =  7, ['H'] =  8, ['I'] =  9, ['J'] = 10,
+  ['K'] = 11, ['L'] = 12, ['M'] = 13, ['N'] = 14, ['O'] = 15,
+  ['P'] = 16, ['Q'] = 17, ['R'] = 18, ['S'] = 19, ['T'] = 20,
+  ['U'] = 21, ['V'] = 22, ['W'] = 23, ['X'] = 24, ['Y'] = 25, ['Z'] = 26,
+  ['a'] = 27, ['b'] = 28, ['c'] = 29, ['d'] = 30, ['e'] = 31,
+  ['f'] = 32, ['g'] = 33, ['h'] = 34, ['i'] = 35, ['j'] = 36,
+  ['k'] = 37, ['l'] = 38, ['m'] = 39, ['n'] = 40, ['o'] = 41,
+  ['p'] = 42, ['q'] = 43, ['r'] = 44, ['s'] = 45, ['t'] = 46,
+  ['u'] = 47, ['v'] = 48, ['w'] = 49, ['x'] = 50, ['y'] = 51, ['z'] = 52,
+  ['0'] = 53, ['1'] = 54, ['2'] = 55, ['3'] = 56, ['4'] = 57,
+  ['5'] = 58, ['6'] = 59, ['7'] = 60, ['8'] = 61, ['9'] = 62,
+  ['-'] = 63, ['_'] = 64
+ }
 };
 
 /* The following diagram shows the logical steps by which three octets
@@ -3255,9 +3269,17 @@ static const short base64_char_to_value[128] =
    base64 characters.  */
 
 
-static ptrdiff_t base64_encode_1 (const char *, char *, ptrdiff_t, bool, bool);
+static ptrdiff_t base64_encode_1 (const char *, char *, ptrdiff_t, bool, bool,
+				  bool, bool);
 static ptrdiff_t base64_decode_1 (const char *, char *, ptrdiff_t, bool,
-				  ptrdiff_t *);
+				  bool, ptrdiff_t *);
+
+Lisp_Object base64_encode_region_1 (Lisp_Object, Lisp_Object, bool,
+				    bool, bool);
+
+Lisp_Object base64_encode_string_1(Lisp_Object, bool,
+				   bool, bool);
+
 
 DEFUN ("base64-encode-region", Fbase64_encode_region, Sbase64_encode_region,
        2, 3, "r",
@@ -3266,6 +3288,26 @@ Return the length of the encoded text.
 Optional third argument NO-LINE-BREAK means do not break long lines
 into shorter lines.  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object no_line_break)
+{
+  return base64_encode_region_1(beg, end, NILP (no_line_break), true, false);
+}
+
+
+DEFUN ("base64url-encode-region", Fbase64url_encode_region, Sbase64url_encode_region,
+       2, 3, "r",
+       doc: /* Base64url-encode the region between BEG and END.
+Return the length of the encoded text.
+Optional second argument NO-PAD means do not add padding char =.
+
+This produces the URL variant of base 64 encoding defined in RFC 4648.  */)
+  (Lisp_Object beg, Lisp_Object end, Lisp_Object no_pad)
+{
+  return base64_encode_region_1(beg, end, false, NILP(no_pad), true);
+}
+
+Lisp_Object
+base64_encode_region_1 (Lisp_Object beg, Lisp_Object end, bool line_break,
+			bool pad, bool base64url)
 {
   char *encoded;
   ptrdiff_t allength, length;
@@ -3288,7 +3330,8 @@ into shorter lines.  */)
 
   encoded = SAFE_ALLOCA (allength);
   encoded_length = base64_encode_1 ((char *) BYTE_POS_ADDR (ibeg),
-				    encoded, length, NILP (no_line_break),
+				    encoded, length, line_break,
+				    pad, base64url,
 				    !NILP (BVAR (current_buffer, enable_multibyte_characters)));
   if (encoded_length > allength)
     emacs_abort ();
@@ -3326,6 +3369,26 @@ Optional second argument NO-LINE-BREAK means do not break long lines
 into shorter lines.  */)
   (Lisp_Object string, Lisp_Object no_line_break)
 {
+
+  return base64_encode_string_1(string, NILP (no_line_break), true, false);
+}
+
+DEFUN ("base64url-encode-string", Fbase64url_encode_string, Sbase64url_encode_string,
+       1, 2, 0,
+       doc: /* Base64url-encode STRING and return the result.
+Optional second argument NO-PAD means do not add padding char =.
+
+This produces the URL variant of base 64 encoding defined in RFC 4648.  */)
+  (Lisp_Object string, Lisp_Object no_pad)
+{
+
+  return base64_encode_string_1(string, false, NILP(no_pad), true);
+}
+
+Lisp_Object
+base64_encode_string_1(Lisp_Object string, bool line_break,
+		       bool pad, bool base64url)
+{
   ptrdiff_t allength, length, encoded_length;
   char *encoded;
   Lisp_Object encoded_string;
@@ -3344,7 +3407,8 @@ into shorter lines.  */)
   encoded = SAFE_ALLOCA (allength);
 
   encoded_length = base64_encode_1 (SSDATA (string),
-				    encoded, length, NILP (no_line_break),
+				    encoded, length, line_break,
+				    pad, base64url,
 				    STRING_MULTIBYTE (string));
   if (encoded_length > allength)
     emacs_abort ();
@@ -3363,7 +3427,8 @@ into shorter lines.  */)
 
 static ptrdiff_t
 base64_encode_1 (const char *from, char *to, ptrdiff_t length,
-		 bool line_break, bool multibyte)
+		 bool line_break, bool pad, bool base64url,
+		 bool multibyte)
 {
   int counter = 0;
   ptrdiff_t i = 0;
@@ -3371,6 +3436,7 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
   int c;
   unsigned int value;
   int bytes;
+  char const *b64_value_to_char = base64_value_to_char[base64url];
 
   while (i < length)
     {
@@ -3401,16 +3467,19 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 
       /* Process first byte of a triplet.  */
 
-      *e++ = base64_value_to_char[0x3f & c >> 2];
+      *e++ = b64_value_to_char[0x3f & c >> 2];
       value = (0x03 & c) << 4;
 
       /* Process second byte of a triplet.  */
 
       if (i == length)
 	{
-	  *e++ = base64_value_to_char[value];
-	  *e++ = '=';
-	  *e++ = '=';
+	  *e++ = b64_value_to_char[value];
+	  if (pad)
+	    {
+	      *e++ = '=';
+	      *e++ = '=';
+	    }
 	  break;
 	}
 
@@ -3426,15 +3495,18 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
       else
 	c = from[i++];
 
-      *e++ = base64_value_to_char[value | (0x0f & c >> 4)];
+      *e++ = b64_value_to_char[value | (0x0f & c >> 4)];
       value = (0x0f & c) << 2;
 
       /* Process third byte of a triplet.  */
 
       if (i == length)
 	{
-	  *e++ = base64_value_to_char[value];
-	  *e++ = '=';
+	  *e++ = b64_value_to_char[value];
+	  if (pad)
+	    {
+	      *e++ = '=';
+	    }
 	  break;
 	}
 
@@ -3450,8 +3522,8 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
       else
 	c = from[i++];
 
-      *e++ = base64_value_to_char[value | (0x03 & c >> 6)];
-      *e++ = base64_value_to_char[0x3f & c];
+      *e++ = b64_value_to_char[value | (0x03 & c >> 6)];
+      *e++ = b64_value_to_char[0x3f & c];
     }
 
   return e - to;
@@ -3459,11 +3531,13 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 
 
 DEFUN ("base64-decode-region", Fbase64_decode_region, Sbase64_decode_region,
-       2, 2, "r",
+       2, 3, "r",
        doc: /* Base64-decode the region between BEG and END.
 Return the length of the decoded text.
-If the region can't be decoded, signal an error and don't modify the buffer.  */)
-  (Lisp_Object beg, Lisp_Object end)
+If the region can't be decoded, signal an error and don't modify the buffer.
+Optional third argument BASE64URL determines whether to use the URL variant
+of the base 64 encoding, as defined in RFC 4648.  */)
+     (Lisp_Object beg, Lisp_Object end, Lisp_Object base64url)
 {
   ptrdiff_t ibeg, iend, length, allength;
   char *decoded;
@@ -3488,7 +3562,7 @@ If the region can't be decoded, signal an error and don't modify the buffer.  */
 
   move_gap_both (XFIXNAT (beg), ibeg);
   decoded_length = base64_decode_1 ((char *) BYTE_POS_ADDR (ibeg),
-				    decoded, length,
+				    decoded, length, !NILP (base64url),
 				    multibyte, &inserted_chars);
   if (decoded_length > allength)
     emacs_abort ();
@@ -3522,9 +3596,11 @@ If the region can't be decoded, signal an error and don't modify the buffer.  */
 }
 
 DEFUN ("base64-decode-string", Fbase64_decode_string, Sbase64_decode_string,
-       1, 1, 0,
-       doc: /* Base64-decode STRING and return the result.  */)
-  (Lisp_Object string)
+       1, 2, 0,
+       doc: /* Base64-decode STRING and return the result as a string.
+Optional argument BASE64URL determines whether to use the URL variant of
+the base 64 encoding, as defined in RFC 4648.  */)
+     (Lisp_Object string, Lisp_Object base64url)
 {
   char *decoded;
   ptrdiff_t length, decoded_length;
@@ -3538,8 +3614,9 @@ DEFUN ("base64-decode-string", Fbase64_decode_string, Sbase64_decode_string,
   decoded = SAFE_ALLOCA (length);
 
   /* The decoded result should be unibyte. */
+  ptrdiff_t decoded_chars;
   decoded_length = base64_decode_1 (SSDATA (string), decoded, length,
-				    0, NULL);
+				    !NILP (base64url), 0, &decoded_chars);
   if (decoded_length > length)
     emacs_abort ();
   else if (decoded_length >= 0)
@@ -3556,39 +3633,60 @@ DEFUN ("base64-decode-string", Fbase64_decode_string, Sbase64_decode_string,
 
 /* Base64-decode the data at FROM of LENGTH bytes into TO.  If
    MULTIBYTE, the decoded result should be in multibyte
-   form.  If NCHARS_RETURN is not NULL, store the number of produced
-   characters in *NCHARS_RETURN.  */
+   form.  Store the number of produced characters in *NCHARS_RETURN.  */
 
 static ptrdiff_t
 base64_decode_1 (const char *from, char *to, ptrdiff_t length,
+		 bool base64url,
 		 bool multibyte, ptrdiff_t *nchars_return)
 {
-  ptrdiff_t i = 0;		/* Used inside READ_QUADRUPLET_BYTE */
+  char const *f = from;
+  char const *flim = from + length;
   char *e = to;
-  unsigned char c;
-  unsigned long value;
   ptrdiff_t nchars = 0;
+  signed char const *b64_char_to_value = base64_char_to_value[base64url];
+  unsigned char multibyte_bit = multibyte << 7;
 
-  while (1)
+  while (true)
     {
+      unsigned char c;
+      int v1;
+
       /* Process first byte of a quadruplet. */
 
-      READ_QUADRUPLET_BYTE (e-to);
+      do
+	{
+	  if (f == flim)
+	    {
+	      *nchars_return = nchars;
+	      return e - to;
+	    }
+	  c = *f++;
+	  v1 = b64_char_to_value[c];
+	}
+      while (v1 < 0);
 
-      if (!IS_BASE64 (c))
+      if (v1 == 0)
 	return -1;
-      value = base64_char_to_value[c] << 18;
+      unsigned int value = (v1 - 1) << 18;
 
       /* Process second byte of a quadruplet.  */
 
-      READ_QUADRUPLET_BYTE (-1);
+      do
+	{
+	  if (f == flim)
+	    return -1;
+	  c = *f++;
+	  v1 = b64_char_to_value[c];
+	}
+      while (v1 < 0);
 
-      if (!IS_BASE64 (c))
+      if (v1 == 0)
 	return -1;
-      value |= base64_char_to_value[c] << 12;
+      value += (v1 - 1) << 12;
 
-      c = (unsigned char) (value >> 16);
-      if (multibyte && c >= 128)
+      c = value >> 16 & 0xff;
+      if (c & multibyte_bit)
 	e += BYTE8_STRING (c, e);
       else
 	*e++ = c;
@@ -3596,23 +3694,41 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 
       /* Process third byte of a quadruplet.  */
 
-      READ_QUADRUPLET_BYTE (-1);
+      do
+	{
+	  if (f == flim)
+	    {
+	      if (!base64url)
+		return -1;
+	      *nchars_return = nchars;
+	      return e - to;
+	    }
+	  c = *f++;
+	  v1 = b64_char_to_value[c];
+	}
+      while (v1 < 0);
 
       if (c == '=')
 	{
-	  READ_QUADRUPLET_BYTE (-1);
+	  do
+	    {
+	      if (f == flim)
+		return -1;
+	      c = *f++;
+	    }
+	  while (b64_char_to_value[c] < 0);
 
 	  if (c != '=')
 	    return -1;
 	  continue;
 	}
 
-      if (!IS_BASE64 (c))
+      if (v1 == 0)
 	return -1;
-      value |= base64_char_to_value[c] << 6;
+      value += (v1 - 1) << 6;
 
-      c = (unsigned char) (0xff & value >> 8);
-      if (multibyte && c >= 128)
+      c = value >> 8 & 0xff;
+      if (c & multibyte_bit)
 	e += BYTE8_STRING (c, e);
       else
 	*e++ = c;
@@ -3620,17 +3736,29 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 
       /* Process fourth byte of a quadruplet.  */
 
-      READ_QUADRUPLET_BYTE (-1);
+      do
+	{
+	  if (f == flim)
+	    {
+	      if (!base64url)
+		return -1;
+	      *nchars_return = nchars;
+	      return e - to;
+	    }
+	  c = *f++;
+	  v1 = b64_char_to_value[c];
+	}
+      while (v1 < 0);
 
       if (c == '=')
 	continue;
 
-      if (!IS_BASE64 (c))
+      if (v1 < 0)
 	return -1;
-      value |= base64_char_to_value[c];
+      value += v1 - 1;
 
-      c = (unsigned char) (0xff & value);
-      if (multibyte && c >= 128)
+      c = value & 0xff;
+      if (c & multibyte_bit)
 	e += BYTE8_STRING (c, e);
       else
 	*e++ = c;
@@ -3820,26 +3948,19 @@ HASH_INDEX (struct Lisp_Hash_Table *h, ptrdiff_t idx)
   return XFIXNUM (AREF (h->index, idx));
 }
 
-/* Compare KEY1 and KEY2 in hash table HT using `eql'.  Value is true
-   if KEY1 and KEY2 are the same.  KEY1 and KEY2 must not be eq.  */
+/* Ignore HT and compare KEY1 and KEY2 using 'eql'.
+   Value is true if KEY1 and KEY2 are the same.  */
 
 static bool
 cmpfn_eql (struct hash_table_test *ht,
 	   Lisp_Object key1,
 	   Lisp_Object key2)
 {
-  if (FLOATP (key1)
-      && FLOATP (key2)
-      && same_float (key1, key2))
-    return true;
-  return (BIGNUMP (key1)
-	  && BIGNUMP (key2)
-	  && mpz_cmp (XBIGNUM (key1)->value, XBIGNUM (key2)->value) == 0);
+  return !NILP (Feql (key1, key2));
 }
 
-
-/* Compare KEY1 and KEY2 in hash table HT using `equal'.  Value is
-   true if KEY1 and KEY2 are the same.  */
+/* Ignore HT and compare KEY1 and KEY2 using 'equal'.
+   Value is true if KEY1 and KEY2 are the same.  */
 
 static bool
 cmpfn_equal (struct hash_table_test *ht,
@@ -3850,7 +3971,7 @@ cmpfn_equal (struct hash_table_test *ht,
 }
 
 
-/* Compare KEY1 and KEY2 in hash table HT using HT->user_cmp_function.
+/* Given HT, compare KEY1 and KEY2 using HT->user_cmp_function.
    Value is true if KEY1 and KEY2 are the same.  */
 
 static bool
@@ -3861,9 +3982,8 @@ cmpfn_user_defined (struct hash_table_test *ht,
   return !NILP (call2 (ht->user_cmp_function, key1, key2));
 }
 
-/* Value is a hash code for KEY for use in hash table H which uses
-   `eq' to compare keys.  The hash code returned is guaranteed to fit
-   in a Lisp integer.  */
+/* Ignore HT and return a hash code for KEY which uses 'eq' to compare keys.
+   The hash code is at most INTMASK.  */
 
 static EMACS_UINT
 hashfn_eq (struct hash_table_test *ht, Lisp_Object key)
@@ -3871,9 +3991,8 @@ hashfn_eq (struct hash_table_test *ht, Lisp_Object key)
   return XHASH (key) ^ XTYPE (key);
 }
 
-/* Value is a hash code for KEY for use in hash table H which uses
-   `equal' to compare keys.  The hash code returned is guaranteed to fit
-   in a Lisp integer.  */
+/* Ignore HT and return a hash code for KEY which uses 'equal' to compare keys.
+   The hash code is at most INTMASK.  */
 
 EMACS_UINT
 hashfn_equal (struct hash_table_test *ht, Lisp_Object key)
@@ -3881,9 +4000,8 @@ hashfn_equal (struct hash_table_test *ht, Lisp_Object key)
   return sxhash (key, 0);
 }
 
-/* Value is a hash code for KEY for use in hash table H which uses
-   `eql' to compare keys.  The hash code returned is guaranteed to fit
-   in a Lisp integer.  */
+/* Ignore HT and return a hash code for KEY which uses 'eql' to compare keys.
+   The hash code is at most INTMASK.  */
 
 EMACS_UINT
 hashfn_eql (struct hash_table_test *ht, Lisp_Object key)
@@ -3893,9 +4011,8 @@ hashfn_eql (struct hash_table_test *ht, Lisp_Object key)
 	  : hashfn_eq (ht, key));
 }
 
-/* Value is a hash code for KEY for use in hash table H which uses as
-   user-defined function to compare keys.  The hash code returned is
-   guaranteed to fit in a Lisp integer.  */
+/* Given HT, return a hash code for KEY which uses a user-defined
+   function to compare keys.  The hash code is at most INTMASK.  */
 
 static EMACS_UINT
 hashfn_user_defined (struct hash_table_test *ht, Lisp_Object key)
@@ -4413,7 +4530,7 @@ hash_string (char const *ptr, ptrdiff_t len)
 }
 
 /* Return a hash for string PTR which has length LEN.  The hash
-   code returned is guaranteed to fit in a Lisp integer.  */
+   code returned is at most INTMASK.  */
 
 static EMACS_UINT
 sxhash_string (char const *ptr, ptrdiff_t len)
@@ -5461,6 +5578,8 @@ this variable.  */);
   defsubr (&Sbase64_decode_region);
   defsubr (&Sbase64_encode_string);
   defsubr (&Sbase64_decode_string);
+  defsubr (&Sbase64url_encode_region);
+  defsubr (&Sbase64url_encode_string);
   defsubr (&Smd5);
   defsubr (&Ssecure_hash_algorithms);
   defsubr (&Ssecure_hash);

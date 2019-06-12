@@ -4476,6 +4476,49 @@ This function could be useful in `message-setup-hook'."
 
 (declare-function hashcash-wait-async "hashcash" (&optional buffer))
 
+(defun message--check-continuation-headers ()
+  (message-check 'continuation-headers
+    (goto-char (point-min))
+    (while (re-search-forward "^[^ \t\n][^ \t\n:]*[ \t\n]" nil t)
+      (goto-char (match-beginning 0))
+      (if (y-or-n-p "Fix continuation lines? ")
+          (insert " ")
+        (forward-line 1)
+        (unless (y-or-n-p "Send anyway? ")
+          (error "Failed to send the message"))))))
+
+(defun message--send-mail-maybe-partially ()
+  (if (or (not message-send-mail-partially-limit)
+          (< (buffer-size) message-send-mail-partially-limit)
+          (not (message-y-or-n-p
+                "The message size is too large, split? "
+                t
+                "\
+The message size, "
+                (/ (buffer-size) 1000) "KB, is too large.
+
+Some mail gateways (MTA's) bounce large messages.  To avoid the
+problem, answer `y', and the message will be split into several
+smaller pieces, the size of each is about "
+                (/ message-send-mail-partially-limit 1000)
+                "KB except the last
+one.
+
+However, some mail readers (MUA's) can't read split messages, i.e.,
+mails in message/partially format. Answer `n', and the message will be
+sent in one piece.
+
+The size limit is controlled by `message-send-mail-partially-limit'.
+If you always want Gnus to send messages in one piece, set
+`message-send-mail-partially-limit' to nil.
+")))
+      (progn
+        (message "Sending via mail...")
+        (if message-send-mail-real-function
+            (funcall message-send-mail-real-function)
+          (message-multi-smtp-send-mail)))
+    (message-send-mail-partially)))
+
 (defun message-send-mail (&optional _)
   (require 'mail-utils)
   (let* ((tembuf (message-generate-new-buffer-clone-locals " message temp"))
@@ -4527,17 +4570,7 @@ This function could be useful in `message-setup-hook'."
 	     (if news nil message-deletable-headers)))
 	(message-generate-headers headers))
       ;; Check continuation headers.
-      (message-check 'continuation-headers
-	(goto-char (point-min))
-	(while (re-search-forward "^[^ \t\n][^ \t\n:]*[ \t\n]" nil t)
-	  (goto-char (match-beginning 0))
-	  (if (y-or-n-p "Fix continuation lines? ")
-	      (insert " ")
-	    (forward-line 1)
-	    (unless (y-or-n-p "Send anyway? ")
-	      (error "Failed to send the message")))))
-      ;; Fold too-long header lines.  They should be no longer than
-      ;; 998 octets long.
+      (message--check-continuation-headers)
       (message--fold-long-headers)
       ;; Let the user do all of the above.
       (run-hooks 'message-header-hook))
@@ -4600,36 +4633,7 @@ This function could be useful in `message-setup-hook'."
                          (goto-char (point-min))
                          (not (re-search-forward "[^\000-\377]" nil t)))))
           (mm-disable-multibyte)
-	  (if (or (not message-send-mail-partially-limit)
-		  (< (buffer-size) message-send-mail-partially-limit)
-		  (not (message-y-or-n-p
-			"The message size is too large, split? "
-			t
-			"\
-The message size, "
-			(/ (buffer-size) 1000) "KB, is too large.
-
-Some mail gateways (MTA's) bounce large messages.  To avoid the
-problem, answer `y', and the message will be split into several
-smaller pieces, the size of each is about "
-			(/ message-send-mail-partially-limit 1000)
-			"KB except the last
-one.
-
-However, some mail readers (MUA's) can't read split messages, i.e.,
-mails in message/partially format. Answer `n', and the message will be
-sent in one piece.
-
-The size limit is controlled by `message-send-mail-partially-limit'.
-If you always want Gnus to send messages in one piece, set
-`message-send-mail-partially-limit' to nil.
-")))
-	      (progn
-		(message "Sending via mail...")
-		(if message-send-mail-real-function
-		    (funcall message-send-mail-real-function)
-		  (message-multi-smtp-send-mail)))
-	    (message-send-mail-partially))
+          (message--send-mail-maybe-partially)
 	  (setq options message-options))
       (kill-buffer tembuf))
     (set-buffer mailbuf)
@@ -4637,10 +4641,12 @@ If you always want Gnus to send messages in one piece, set
     (push 'mail message-sent-message-via)))
 
 (defun message--fold-long-headers ()
+  "Fold too-long header lines.
+They should be no longer than 998 octets long."
   (goto-char (point-min))
   (while (not (eobp))
     (when (and (looking-at "[^:]+:")
-	       (> (- (line-end-position) (point)) 998))
+               (> (- (line-end-position) (point)) 998))
       (mail-header-fold-field))
     (forward-line 1)))
 
@@ -5159,18 +5165,7 @@ Otherwise, generate and save a value for `canlock-password' first."
 	   (if (= (length errors) 1) "this" "these")
 	   (if (= (length errors) 1) "" "s")
 	   (mapconcat 'identity errors ", ")))))))
-   ;; Check continuation headers.
-   (message-check 'continuation-headers
-     (goto-char (point-min))
-     (let ((do-posting t))
-       (while (re-search-forward "^[^ \t\n][^ \t\n:]*[ \t\n]" nil t)
-	 (goto-char (match-beginning 0))
-	 (if (y-or-n-p "Fix continuation lines? ")
-	     (insert " ")
-	   (forward-line 1)
-	   (unless (y-or-n-p "Send anyway? ")
-	     (setq do-posting nil))))
-       do-posting))
+   (message--check-continuation-headers)
    ;; Check the Newsgroups & Followup-To headers for syntax errors.
    (message-check 'valid-newsgroups
      (let ((case-fold-search t)

@@ -1739,7 +1739,7 @@ struct face
 #endif
 
   /* The hash value of this face.  */
-  unsigned hash;
+  uintptr_t hash;
 
   /* Next and previous face in hash collision list of face cache.  */
   struct face *next, *prev;
@@ -2988,8 +2988,9 @@ struct redisplay_interface
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-# if defined USE_CAIRO || defined HAVE_XRENDER || defined HAVE_NS || defined HAVE_NTGUI
-#  define HAVE_NATIVE_SCALING
+# if (defined USE_CAIRO || defined HAVE_XRENDER \
+      || defined HAVE_NS || defined HAVE_NTGUI)
+#  define HAVE_NATIVE_TRANSFORMS
 # endif
 
 /* Structure describing an image.  Specific image formats like XBM are
@@ -3015,7 +3016,7 @@ struct image
      synchronized to Pixmap.  */
   XImage *ximg, *mask_img;
 
-# ifdef HAVE_NATIVE_SCALING
+# if !defined USE_CAIRO && defined HAVE_XRENDER
   /* Picture versions of pixmap and mask for compositing.  */
   Picture picture, mask_picture;
 # endif

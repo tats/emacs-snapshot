@@ -3407,7 +3407,8 @@ init_to_row_start (struct it *it, struct window *w, struct glyph_row *row)
 /* Initialize IT for stepping through current_buffer in window W
    starting in the line following ROW, i.e. starting at ROW->end.
    Value is false if there are overlay strings with newlines at ROW's
-   end position.  */
+   end position, or if the following row begins with bidi-reordered
+   characters that could be composed.  */
 
 static bool
 init_to_row_end (struct it *it, struct window *w, struct glyph_row *row)
@@ -3420,7 +3421,20 @@ init_to_row_end (struct it *it, struct window *w, struct glyph_row *row)
 	it->continuation_lines_width
 	  = row->continuation_lines_width + row->pixel_width;
       CHECK_IT (it);
-      success = true;
+      /* Initializing IT in the presense of compositions in reordered
+	 rows is tricky: row->end above will generally cause us to
+	 start at position that is not the first one in the logical
+	 order, and we might therefore miss the composition earlier in
+	 the buffer that affects how glypsh are laid out in this row.
+	 So we punt instead.  Note: the test below works because
+	 get_next_display_element calls get_visually_first_element,
+	 which calls composition_compute_stop_pos, which populates
+	 it->cmp_it.  */
+      if (get_next_display_element (it)
+	  && (it->bidi_it.scan_dir == -1 && it->cmp_it.id >= 0))
+	success = false;
+      else
+	success = true;
     }
 
   return success;
@@ -3618,7 +3632,45 @@ compute_stop_pos (struct it *it)
       /* Set up variables for computing the stop position from text
          property changes.  */
       XSETBUFFER (object, current_buffer);
-      limit = make_fixnum (IT_CHARPOS (*it) + TEXT_PROP_DISTANCE_LIMIT);
+      pos = charpos + TEXT_PROP_DISTANCE_LIMIT;
+      /* Make sure the above arbitrary limit position is not in the
+	 middle of composable text, so we don't break compositions by
+	 submitting the composable text to the shaper in separate
+	 chunks.  We play safe here by assuming that only SPC, TAB,
+	 FF, and NL cannot be in some composition; in particular, most
+	 ASCII punctuation characters could be composed into ligatures.  */
+      if (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+	  && !NILP (Vauto_composition_mode))
+	{
+	  ptrdiff_t endpos = charpos + 10 * TEXT_PROP_DISTANCE_LIMIT;
+	  bool found = false;
+
+	  if (pos > ZV)
+	    pos = ZV;
+	  if (endpos > ZV)
+	    endpos = ZV;
+	  ptrdiff_t bpos = CHAR_TO_BYTE (pos);
+	  while (pos < endpos)
+	    {
+	      int ch;
+	      FETCH_CHAR_ADVANCE_NO_CHECK (ch, pos, bpos);
+	      if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\f')
+		{
+		  found = true;
+		  break;
+		}
+	    }
+	  if (found)
+	    pos--;
+	  else if (it->stop_charpos < endpos)
+	    pos = it->stop_charpos;
+	  else
+	    {
+	      /* Give up and use the original arbitrary limit.  */
+	      pos = charpos + TEXT_PROP_DISTANCE_LIMIT;
+	    }
+	}
+      limit = make_fixnum (pos);
     }
 
   /* Get the interval containing IT's position.  Value is a null
@@ -6941,6 +6993,7 @@ static next_element_function const get_next_element[NUM_IT_METHODS] =
    || ((IT)->cmp_it.stop_pos == (CHARPOS)				\
        && composition_reseat_it (&(IT)->cmp_it, CHARPOS, BYTEPOS,	\
 				 END_CHARPOS, (IT)->w,			\
+				 (IT)->bidi_it.resolved_level,		\
 				 FACE_FROM_ID_OR_NULL ((IT)->f,		\
 						       (IT)->face_id),	\
 				 (IT)->string)))

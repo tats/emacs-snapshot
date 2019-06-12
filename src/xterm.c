@@ -357,6 +357,25 @@ x_cr_update_surface_desired_size (struct frame *f, int width, int height)
     }
 }
 
+static void
+x_cr_gc_clip (cairo_t *cr, struct frame *f, GC gc)
+{
+  if (gc)
+    {
+      struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
+
+      if (gc_ext && gc_ext->n_clip_rects)
+	{
+	  for (int i = 0; i < gc_ext->n_clip_rects; i++)
+	    cairo_rectangle (cr, gc_ext->clip_rects[i].x,
+			     gc_ext->clip_rects[i].y,
+			     gc_ext->clip_rects[i].width,
+			     gc_ext->clip_rects[i].height);
+	  cairo_clip (cr);
+	}
+    }
+}
+
 cairo_t *
 x_begin_cr_clip (struct frame *f, GC gc)
 {
@@ -379,23 +398,7 @@ x_begin_cr_clip (struct frame *f, GC gc)
       cairo_surface_destroy (surface);
     }
   cairo_save (cr);
-
-  if (gc)
-    {
-      struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
-
-      if (gc_ext && gc_ext->n_clip_rects)
-	{
-	  int i;
-
-	  for (i = 0; i < gc_ext->n_clip_rects; i++)
-	    cairo_rectangle (cr, gc_ext->clip_rects[i].x,
-			     gc_ext->clip_rects[i].y,
-			     gc_ext->clip_rects[i].width,
-			     gc_ext->clip_rects[i].height);
-	  cairo_clip (cr);
-	}
-    }
+  x_cr_gc_clip (cr, f, gc);
 
   return cr;
 }
@@ -434,16 +437,127 @@ x_set_cr_source_with_gc_background (struct frame *f, GC gc)
 			color.green / 65535.0, color.blue / 65535.0);
 }
 
+static const cairo_user_data_key_t xlib_surface_key, saved_drawable_key;
+
+static void
+x_cr_destroy_xlib_surface (cairo_surface_t *xlib_surface)
+{
+  if (xlib_surface)
+    {
+      XFreePixmap (cairo_xlib_surface_get_display (xlib_surface),
+		   cairo_xlib_surface_get_drawable (xlib_surface));
+      cairo_surface_destroy (xlib_surface);
+    }
+}
+
+static bool
+x_try_cr_xlib_drawable (struct frame *f, GC gc)
+{
+  cairo_t *cr = FRAME_CR_CONTEXT (f);
+  if (!cr)
+    return true;
+
+  cairo_surface_t *surface = cairo_get_target (cr);
+  switch (cairo_surface_get_type (surface))
+    {
+    case CAIRO_SURFACE_TYPE_XLIB:
+      cairo_surface_flush (surface);
+      return true;
+
+    case CAIRO_SURFACE_TYPE_IMAGE:
+      break;
+
+    default:
+      return false;
+    }
+
+  /* FRAME_CR_CONTEXT (f) is an image surface we can not draw into
+     directly with Xlib.  Set up a Pixmap so we can copy back the
+     result later in x_end_cr_xlib_drawable.  */
+  cairo_surface_t *xlib_surface = cairo_get_user_data (cr, &xlib_surface_key);
+  int width = FRAME_CR_SURFACE_DESIRED_WIDTH (f);
+  int height = FRAME_CR_SURFACE_DESIRED_HEIGHT (f);
+  Pixmap pixmap;
+  if (xlib_surface
+      && cairo_xlib_surface_get_width (xlib_surface) == width
+      && cairo_xlib_surface_get_height (xlib_surface) == height)
+    pixmap = cairo_xlib_surface_get_drawable (xlib_surface);
+  else
+    {
+      pixmap = XCreatePixmap (FRAME_X_DISPLAY (f), FRAME_X_RAW_DRAWABLE (f),
+			      width, height,
+			      DefaultDepthOfScreen (FRAME_X_SCREEN (f)));
+      xlib_surface = cairo_xlib_surface_create (FRAME_X_DISPLAY (f),
+						pixmap, FRAME_X_VISUAL (f),
+						width, height);
+      cairo_set_user_data (cr, &xlib_surface_key, xlib_surface,
+			   (cairo_destroy_func_t) x_cr_destroy_xlib_surface);
+    }
+
+  cairo_t *buf = cairo_create (xlib_surface);
+  cairo_set_source_surface (buf, surface, 0, 0);
+  cairo_matrix_t matrix;
+  cairo_get_matrix (cr, &matrix);
+  cairo_pattern_set_matrix (cairo_get_source (cr), &matrix);
+  cairo_set_operator (buf, CAIRO_OPERATOR_SOURCE);
+  x_cr_gc_clip (buf, f, gc);
+  cairo_paint (buf);
+  cairo_destroy (buf);
+
+  cairo_set_user_data (cr, &saved_drawable_key,
+		       (void *) (uintptr_t) FRAME_X_RAW_DRAWABLE (f), NULL);
+  FRAME_X_RAW_DRAWABLE (f) = pixmap;
+  cairo_surface_flush (xlib_surface);
+
+  return true;
+}
+
+static void
+x_end_cr_xlib_drawable (struct frame *f, GC gc)
+{
+  cairo_t *cr = FRAME_CR_CONTEXT (f);
+  if (!cr)
+    return;
+
+  Drawable saved_drawable
+    = (uintptr_t) cairo_get_user_data (cr, &saved_drawable_key);
+  cairo_surface_t *surface = (saved_drawable
+			      ? cairo_get_user_data (cr, &xlib_surface_key)
+			      : cairo_get_target (cr));
+  struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
+  if (gc_ext && gc_ext->n_clip_rects)
+    for (int i = 0; i < gc_ext->n_clip_rects; i++)
+      cairo_surface_mark_dirty_rectangle (surface, gc_ext->clip_rects[i].x,
+					  gc_ext->clip_rects[i].y,
+					  gc_ext->clip_rects[i].width,
+					  gc_ext->clip_rects[i].height);
+  else
+    cairo_surface_mark_dirty (surface);
+  if (!saved_drawable)
+    return;
+
+  cairo_save (cr);
+  cairo_set_source_surface (cr, surface, 0, 0);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+  x_cr_gc_clip (cr, f, gc);
+  cairo_paint (cr);
+  cairo_restore (cr);
+
+  FRAME_X_RAW_DRAWABLE (f) = saved_drawable;
+  cairo_set_user_data (cr, &saved_drawable_key, NULL, NULL);
+}
+
 /* Fringe bitmaps.  */
 
 static int max_fringe_bmp = 0;
-static cairo_surface_t **fringe_bmp = 0;
+static cairo_pattern_t **fringe_bmp = 0;
 
 static void
 x_cr_define_fringe_bitmap (int which, unsigned short *bits, int h, int wd)
 {
   int i, stride;
   cairo_surface_t *surface;
+  cairo_pattern_t *pattern;
   unsigned char *data;
 
   if (which >= max_fringe_bmp)
@@ -468,10 +582,12 @@ x_cr_define_fringe_bitmap (int which, unsigned short *bits, int h, int wd)
     }
 
   cairo_surface_mark_dirty (surface);
+  pattern = cairo_pattern_create_for_surface (surface);
+  cairo_surface_destroy (surface);
 
   unblock_input ();
 
-  fringe_bmp[which] = surface;
+  fringe_bmp[which] = pattern;
 }
 
 static void
@@ -483,15 +599,14 @@ x_cr_destroy_fringe_bitmap (int which)
   if (fringe_bmp[which])
     {
       block_input ();
-      cairo_surface_destroy (fringe_bmp[which]);
+      cairo_pattern_destroy (fringe_bmp[which]);
       unblock_input ();
     }
   fringe_bmp[which] = 0;
 }
 
 static void
-x_cr_draw_image (struct frame *f, GC gc, cairo_surface_t *image,
-		 int image_width, int image_height,
+x_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
 		 int src_x, int src_y, int width, int height,
 		 int dest_x, int dest_y, bool overlay_p)
 {
@@ -506,31 +621,22 @@ x_cr_draw_image (struct frame *f, GC gc, cairo_surface_t *image,
       cairo_fill_preserve (cr);
     }
 
-  int orig_image_width = cairo_image_surface_get_width (image);
-  if (image_width == 0) image_width = orig_image_width;
-  int orig_image_height = cairo_image_surface_get_height (image);
-  if (image_height == 0) image_height = orig_image_height;
+  cairo_translate (cr, dest_x - src_x, dest_y - src_y);
 
-  cairo_pattern_t *pattern = cairo_pattern_create_for_surface (image);
-  cairo_matrix_t matrix;
-  cairo_matrix_init_scale (&matrix, orig_image_width / (double) image_width,
-			   orig_image_height / (double) image_height);
-  cairo_matrix_translate (&matrix, src_x - dest_x, src_y - dest_y);
-  cairo_pattern_set_matrix (pattern, &matrix);
-
-  cairo_format_t format = cairo_image_surface_get_format (image);
+  cairo_surface_t *surface;
+  cairo_pattern_get_surface (image, &surface);
+  cairo_format_t format = cairo_image_surface_get_format (surface);
   if (format != CAIRO_FORMAT_A8 && format != CAIRO_FORMAT_A1)
     {
-      cairo_set_source (cr, pattern);
+      cairo_set_source (cr, image);
       cairo_fill (cr);
     }
   else
     {
       x_set_cr_source_with_gc_foreground (f, gc);
       cairo_clip (cr);
-      cairo_mask (cr, pattern);
+      cairo_mask (cr, image);
     }
-  cairo_pattern_destroy (pattern);
 
   x_end_cr_clip (f);
 }
@@ -1352,7 +1458,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
 				       : f->output_data.x->cursor_pixel)
 				    : face->foreground));
       XSetBackground (display, gc, face->background);
-      x_cr_draw_image (f, gc, fringe_bmp[p->which], 0, 0, 0, p->dh,
+      x_cr_draw_image (f, gc, fringe_bmp[p->which], 0, p->dh,
 		       p->wd, p->h, p->x, p->y, p->overlay_p);
       XSetForeground (display, gc, gcv.foreground);
       XSetBackground (display, gc, gcv.background);
@@ -1739,20 +1845,65 @@ x_draw_glyph_string_foreground (struct glyph_string *s)
   else
     {
       struct font *font = s->font;
-      int boff = font->baseline_offset;
-      int y;
+#ifdef USE_CAIRO
+      if (!EQ (font->driver->type, Qx)
+	  || x_try_cr_xlib_drawable (s->f, s->gc))
+	{
+#endif	/* USE_CAIRO */
+	  int boff = font->baseline_offset;
+	  int y;
 
-      if (font->vertical_centering)
-	boff = VCENTER_BASELINE_OFFSET (font, s->f) - boff;
+	  if (font->vertical_centering)
+	    boff = VCENTER_BASELINE_OFFSET (font, s->f) - boff;
 
-      y = s->ybase - boff;
-      if (s->for_overlaps
-	  || (s->background_filled_p && s->hl != DRAW_CURSOR))
-	font->driver->draw (s, 0, s->nchars, x, y, false);
+	  y = s->ybase - boff;
+	  if (s->for_overlaps
+	      || (s->background_filled_p && s->hl != DRAW_CURSOR))
+	    font->driver->draw (s, 0, s->nchars, x, y, false);
+	  else
+	    font->driver->draw (s, 0, s->nchars, x, y, true);
+	  if (s->face->overstrike)
+	    font->driver->draw (s, 0, s->nchars, x + 1, y, false);
+#ifdef USE_CAIRO
+	  if (EQ (font->driver->type, Qx))
+	    x_end_cr_xlib_drawable (s->f, s->gc);
+	}
       else
-	font->driver->draw (s, 0, s->nchars, x, y, true);
-      if (s->face->overstrike)
-	font->driver->draw (s, 0, s->nchars, x + 1, y, false);
+	{
+	  /* Fallback for the case that no Xlib Drawable is available
+	     for drawing text with X core fonts.  */
+	  if (!(s->for_overlaps
+		|| (s->background_filled_p && s->hl != DRAW_CURSOR)))
+	    {
+	      int box_line_width = max (s->face->box_line_width, 0);
+
+	      if (s->stippled_p)
+		{
+		  Display *display = FRAME_X_DISPLAY (s->f);
+
+		  /* Fill background with a stipple pattern.  */
+		  XSetFillStyle (display, s->gc, FillOpaqueStippled);
+		  x_fill_rectangle (s->f, s->gc, s->x,
+				    s->y + box_line_width,
+				    s->background_width,
+				    s->height - 2 * box_line_width);
+		  XSetFillStyle (display, s->gc, FillSolid);
+		}
+	      else
+		x_clear_glyph_string_rect (s, s->x, s->y + box_line_width,
+					   s->background_width,
+					   s->height - 2 * box_line_width);
+	    }
+	  for (i = 0; i < s->nchars; ++i)
+	    {
+	      struct glyph *g = s->first_glyph + i;
+	      x_draw_rectangle (s->f,
+				s->gc, x, s->y, g->pixel_width - 1,
+				s->height - 1);
+	      x += g->pixel_width;
+	    }
+	}
+#endif	/* USE_CAIRO */
     }
 }
 
@@ -1785,65 +1936,84 @@ x_draw_composite_glyph_string_foreground (struct glyph_string *s)
 	x_draw_rectangle (s->f, s->gc, x, s->y,
 			s->width - 1, s->height - 1);
     }
-  else if (! s->first_glyph->u.cmp.automatic)
-    {
-      int y = s->ybase;
-
-      for (i = 0, j = s->cmp_from; i < s->nchars; i++, j++)
-	/* TAB in a composition means display glyphs with padding
-	   space on the left or right.  */
-	if (COMPOSITION_GLYPH (s->cmp, j) != '\t')
-	  {
-	    int xx = x + s->cmp->offsets[j * 2];
-	    int yy = y - s->cmp->offsets[j * 2 + 1];
-
-	    font->driver->draw (s, j, j + 1, xx, yy, false);
-	    if (s->face->overstrike)
-	      font->driver->draw (s, j, j + 1, xx + 1, yy, false);
-	  }
-    }
   else
-    {
-      Lisp_Object gstring = composition_gstring_from_id (s->cmp_id);
-      Lisp_Object glyph;
-      int y = s->ybase;
-      int width = 0;
+#ifdef USE_CAIRO
+    if (!EQ (font->driver->type, Qx)
+	|| x_try_cr_xlib_drawable (s->f, s->gc))
+      {
+#endif	/* USE_CAIRO */
+	if (! s->first_glyph->u.cmp.automatic)
+	  {
+	    int y = s->ybase;
 
-      for (i = j = s->cmp_from; i < s->cmp_to; i++)
-	{
-	  glyph = LGSTRING_GLYPH (gstring, i);
-	  if (NILP (LGLYPH_ADJUSTMENT (glyph)))
-	    width += LGLYPH_WIDTH (glyph);
-	  else
-	    {
-	      int xoff, yoff, wadjust;
-
-	      if (j < i)
+	    for (i = 0, j = s->cmp_from; i < s->nchars; i++, j++)
+	      /* TAB in a composition means display glyphs with
+		 padding space on the left or right.  */
+	      if (COMPOSITION_GLYPH (s->cmp, j) != '\t')
 		{
-		  font->driver->draw (s, j, i, x, y, false);
+		  int xx = x + s->cmp->offsets[j * 2];
+		  int yy = y - s->cmp->offsets[j * 2 + 1];
+
+		  font->driver->draw (s, j, j + 1, xx, yy, false);
 		  if (s->face->overstrike)
-		    font->driver->draw (s, j, i, x + 1, y, false);
-		  x += width;
+		    font->driver->draw (s, j, j + 1, xx + 1, yy, false);
 		}
-	      xoff = LGLYPH_XOFF (glyph);
-	      yoff = LGLYPH_YOFF (glyph);
-	      wadjust = LGLYPH_WADJUST (glyph);
-	      font->driver->draw (s, i, i + 1, x + xoff, y + yoff, false);
-	      if (s->face->overstrike)
-		font->driver->draw (s, i, i + 1, x + xoff + 1, y + yoff,
-				    false);
-	      x += wadjust;
-	      j = i + 1;
-	      width = 0;
-	    }
-	}
-      if (j < i)
-	{
-	  font->driver->draw (s, j, i, x, y, false);
-	  if (s->face->overstrike)
-	    font->driver->draw (s, j, i, x + 1, y, false);
-	}
-    }
+	  }
+	else
+	  {
+	    Lisp_Object gstring = composition_gstring_from_id (s->cmp_id);
+	    Lisp_Object glyph;
+	    int y = s->ybase;
+	    int width = 0;
+
+	    for (i = j = s->cmp_from; i < s->cmp_to; i++)
+	      {
+		glyph = LGSTRING_GLYPH (gstring, i);
+		if (NILP (LGLYPH_ADJUSTMENT (glyph)))
+		  width += LGLYPH_WIDTH (glyph);
+		else
+		  {
+		    int xoff, yoff, wadjust;
+
+		    if (j < i)
+		      {
+			font->driver->draw (s, j, i, x, y, false);
+			if (s->face->overstrike)
+			  font->driver->draw (s, j, i, x + 1, y, false);
+			x += width;
+		      }
+		    xoff = LGLYPH_XOFF (glyph);
+		    yoff = LGLYPH_YOFF (glyph);
+		    wadjust = LGLYPH_WADJUST (glyph);
+		    font->driver->draw (s, i, i + 1, x + xoff, y + yoff, false);
+		    if (s->face->overstrike)
+		      font->driver->draw (s, i, i + 1, x + xoff + 1, y + yoff,
+					  false);
+		    x += wadjust;
+		    j = i + 1;
+		    width = 0;
+		  }
+	      }
+	    if (j < i)
+	      {
+		font->driver->draw (s, j, i, x, y, false);
+		if (s->face->overstrike)
+		  font->driver->draw (s, j, i, x + 1, y, false);
+	      }
+	  }
+#ifdef USE_CAIRO
+	if (EQ (font->driver->type, Qx))
+	  x_end_cr_xlib_drawable (s->f, s->gc);
+      }
+    else
+      {
+	/* Fallback for the case that no Xlib Drawable is available
+	   for drawing text with X core fonts.  */
+	if (s->cmp_from == 0)
+	  x_draw_rectangle (s->f, s->gc, x, s->y,
+			    s->width - 1, s->height - 1);
+      }
+#endif	/* USE_CAIRO */
 }
 
 
@@ -2883,10 +3053,7 @@ x_composite_image (struct glyph_string *s, Pixmap dest,
       destination = XRenderCreatePicture (display, dest,
                                           default_format, 0, &attr);
 
-      /* FIXME: It may make sense to use PictOpSrc instead of
-         PictOpOver, as I don't know if we care about alpha values too
-         much here.  */
-      XRenderComposite (display, PictOpOver,
+      XRenderComposite (display, PictOpSrc,
                         s->img->picture, s->img->mask_picture, destination,
                         srcX, srcY,
                         srcX, srcY,
@@ -2932,8 +3099,7 @@ x_draw_image_foreground (struct glyph_string *s)
   if (s->img->cr_data)
     {
       x_set_glyph_string_clipping (s);
-      x_cr_draw_image (s->f, s->gc,
-		       s->img->cr_data, s->img->width, s->img->height,
+      x_cr_draw_image (s->f, s->gc, s->img->cr_data,
 		       s->slice.x, s->slice.y, s->slice.width, s->slice.height,
 		       x, y, true);
       if (!s->img->mask)
