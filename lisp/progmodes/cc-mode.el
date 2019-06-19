@@ -128,6 +128,25 @@
 ;   '
 (require 'cc-fonts) ;)
 
+;; The following three really belong to cc-fonts.el, but they are required
+;; even when cc-fonts.el hasn't been loaded (this happens in XEmacs when
+;; font-lock-mode is nil).
+
+(defvar c-doc-line-join-re regexp-unmatchable)
+;; Matches a join of two lines in a doc comment.
+;; This should not be changed directly, but instead set by
+;; `c-setup-doc-comment-style'.  This variable is used in `c-find-decl-spots'
+;; in (e.g.) autodoc style comments to bridge the gap between a "@\n" at an
+;; EOL and the token following "//!" on the next line.
+
+(defvar c-doc-bright-comment-start-re regexp-unmatchable)
+;; Matches the start of a "bright" comment, one whose contents may be
+;; fontified by, e.g., `c-font-lock-declarations'.
+
+(defvar c-doc-line-join-end-ch nil)
+;; A list of characters, each being a last character of a doc comment marker,
+;; e.g. the ! from pike autodoc's "//!".
+
 
 ;; Other modes and packages which depend on CC Mode should do the
 ;; following to make sure everything is loaded and available for their
@@ -888,7 +907,6 @@ Note that the style variables are always made local to the buffer."
 
 
 ;;; Change hooks, linking with Font Lock and electric-indent-mode.
-
 (defun c-called-from-text-property-change-p ()
   ;; Is the primitive which invoked `before-change-functions' or
   ;; `after-change-functions' one which merely changes text properties?  This
@@ -1250,7 +1268,6 @@ Note that the style variables are always made local to the buffer."
       (re-search-forward "[\n\r]?\\(\\\\\\(.\\|\n\\)\\|[^\\\n\r]\\)*"
 			 nil t)
       ;; We're at an EOLL or point-max.
-      (setq c-new-END (max c-new-END (min (1+ (point)) (point-max))))
       (if (equal (c-get-char-property (point) 'syntax-table) '(15))
 	  (if (memq (char-after) '(?\n ?\r))
 	      ;; Normally terminated invalid string.
@@ -1357,6 +1374,16 @@ Note that the style variables are always made local to the buffer."
 		     (cdr (assq (char-before) c-string-innards-re-alist)) nil t)
 		    (1+ (point)))))
 	   (cll)))
+	 (end-hwm ; the highest position which could possibly be affected by
+		   ; insertion/deletion of string delimiters.
+	  (max
+	   (progn
+	     (goto-char (min (1+ end)	; 1+, in case a NL has become escaped.
+			     (point-max)))
+	     (re-search-forward "\\(\\\\\\(.\\|\n\\|\r\\)\\|[^\\\n\r]\\)*"
+				nil t)
+	     (point))
+	   c-new-END))
 	 s)
       (goto-char
        (cond ((null beg-literal-type)
@@ -1368,13 +1395,13 @@ Note that the style variables are always made local to the buffer."
       ;; Handle one string each time around the next while loop.
       (while
 	  (and
-	   (< (point) c-new-END)
+	   (< (point) end-hwm)
 	   (progn
 	     ;; Skip over any comments before the next string.
 	     (while (progn
-		      (setq s (parse-partial-sexp (point) c-new-END nil
+		      (setq s (parse-partial-sexp (point) end-hwm nil
 						  nil s 'syntax-table))
-		      (and (< (point) c-new-END)
+		      (and (< (point) end-hwm)
 			   (or (not (nth 3 s))
 			       (not (memq (char-before) c-string-delims))))))
 	     ;; We're at the start of a string.
@@ -1672,6 +1699,10 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
     ;; (c-new-BEG c-new-END) will be the region to fontify.
     (setq c-new-BEG beg  c-new-END end)
     (setq c-maybe-stale-found-type nil)
+    ;; A workaround for syntax-ppss's failure to notice syntax-table text
+    ;; property changes.
+    (when (fboundp 'syntax-ppss)
+      (setq c-syntax-table-hwm most-positive-fixnum))
     (save-restriction
       (save-match-data
 	(widen)
@@ -1823,7 +1854,11 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	  (save-excursion
 	    (mapc (lambda (fn)
 		    (funcall fn beg end old-len))
-		  c-before-font-lock-functions)))))))
+		  c-before-font-lock-functions))))))
+  ;; A workaround for syntax-ppss's failure to notice syntax-table text
+  ;; property changes.
+  (when (fboundp 'syntax-ppss)
+    (syntax-ppss-flush-cache c-syntax-table-hwm)))
 
 (defun c-doc-fl-decl-start (pos)
   ;; If the line containing POS is in a doc comment continued line (as defined

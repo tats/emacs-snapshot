@@ -2346,6 +2346,7 @@ This checks also `file-name-as-directory', `file-name-directory',
           ;; Run the test.
           (advice-add 'write-region :before advice)
           (setq-local file-precious-flag t)
+          (setq-local backup-inhibited t)
           (insert "bar")
           (should (null (save-buffer)))
           (should-not (cl-member tmp-name written-files :test #'string=)))
@@ -4172,7 +4173,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (should (numberp (process-get proc 'remote-pid)))
 	  (should (interrupt-process proc))
 	  ;; Let the process accept the interrupt.
-	  (while (accept-process-output proc nil nil 0))
+	  (with-timeout (10 (tramp--test-timeout-handler))
+	    (while (accept-process-output proc nil nil 0)))
 	  (should-not (process-live-p proc))
 	  ;; An interrupted process cannot be interrupted, again.
 	  (should-error (interrupt-process proc) :type 'error))

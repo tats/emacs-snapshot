@@ -2168,9 +2168,7 @@ you can set `feedmail-queue-reminder-alist' to nil."
 	       (let ((inhibit-quit t) (cursor-in-echo-area t) (echo-keystrokes 0))
 		 (read-char-exclusive))))
 	  (if (= user-sez help-char)
-              ;; FIXME: This seems to want to refer to the `helper' argument,
-              ;; but it's quoted so the `helper' arg ends up unused!
-	      (setq answer '(^ . helper))
+	      (setq answer (cons '^ helper))
 	    (if (or (eq user-sez ?\C-m) (eq user-sez ?\C-j) (eq user-sez ?y))
 		(setq user-sez d-char))
 	    ;; these char-to-int things are because of some
@@ -2198,8 +2196,7 @@ you can set `feedmail-queue-reminder-alist' to nil."
   ;; emacs convention is that scroll-up moves text up, window down
   (feedmail-say-debug ">in-> feedmail-scroll-buffer %s" direction)
   (save-selected-window
-    (let ((signal-error-on-buffer-boundary nil) ;FIXME: Unknown var!?
-	  (fqm-window (display-buffer (if buffy buffy (current-buffer)))))
+    (let ((fqm-window (display-buffer (if buffy buffy (current-buffer)))))
       (select-window fqm-window)
       (if (eq direction 'up)
       (if (pos-visible-in-window-p (point-max) fqm-window)

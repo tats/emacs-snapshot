@@ -311,7 +311,43 @@
     (let ((x "a")) (cond ((equal x "a") 'correct)
                          ((equal x "b") 'incorrect)
                          ((equal x "a") 'incorrect)
-                         ((equal x "c") 'incorrect))))
+                         ((equal x "c") 'incorrect)))
+    ;; Multi-value clauses
+    (mapcar (lambda (x) (cond ((eq x 'a) 11)
+                              ((memq x '(b a c d)) 22)
+                              ((eq x 'c) 33)
+                              ((eq x 'e) 44)
+                              ((memq x '(d f g)) 55)
+                              (t 99)))
+            '(a b c d e f g h))
+    (mapcar (lambda (x) (cond ((eql x 1) 11)
+                              ((memq x '(a b c)) 22)
+                              ((memql x '(2 1 4 1e-3)) 33)
+                              ((eq x 'd) 44)
+                              ((eql x #x10000000000000000))))
+            '(1 2 4 1e-3 a b c d 1.0 #x10000000000000000))
+    (mapcar (lambda (x) (cond ((eq x 'a) 11)
+                              ((memq x '(b d)) 22)
+                              ((equal x '(a . b)) 33)
+                              ((member x '(b c 1.5 2.5 "X" (d))) 44)
+                              ((eql x 3.14) 55)
+                              ((memql x '(9 0.5 1.5 q)) 66)
+                              (t 99)))
+            '(a b c d (d) (a . b) "X" 0.5 1.5 3.14 9 9.0))
+    ;; Multi-switch cond form
+    (mapcar (lambda (p) (let ((x (car p)) (y (cadr p)))
+                          (cond ((consp x) 11)
+                                ((eq x 'a) 22)
+                                ((memql x '(b 7 a -3)) 33)
+                                ((equal y "a") 44)
+                                ((memq y '(c d e)) 55)
+                                ((booleanp x) 66)
+                                ((eq x 'q) 77)
+                                ((memq x '(r s)) 88)
+                                ((eq x 't) 99)
+                                (t 999))))
+            '((a c) (b c) (7 c) (-3 c) (nil nil) (t c) (q c) (r c) (s c)
+              (t c) (x "a") (x "c") (x c) (x d) (x e))))
   "List of expression for test.
 Each element will be executed by interpreter and with
 bytecompiled code, and their results compared.")
@@ -685,6 +721,98 @@ literals (Bug#20852)."
       (should (member '(byte-constant 222) lap))
       (should-not (member '(byte-constant 333) lap))
       (should (member '(byte-constant 444) lap)))))
+
+(defun test-suppression (form suppress match)
+  (let ((lexical-binding t)
+        (byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
+    ;; Check that we get a warning without suppression.
+    (with-current-buffer byte-compile-log-buffer
+      (setq-local fill-column 9999)
+      (setq-local warning-fill-column fill-column)
+      (let ((inhibit-read-only t))
+        (erase-buffer)))
+    (test-byte-comp-compile-and-load t form)
+    (with-current-buffer byte-compile-log-buffer
+      (unless match
+        (error "%s" (buffer-string)))
+      (goto-char (point-min))
+      (should (string-match match (buffer-string))))
+    ;; And that it's gone now.
+    (with-current-buffer byte-compile-log-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)))
+    (test-byte-comp-compile-and-load t
+     `(with-suppressed-warnings ,suppress
+        ,form))
+    (with-current-buffer byte-compile-log-buffer
+      (goto-char (point-min))
+      (should-not (string-match match (buffer-string))))
+    ;; Also check that byte compiled forms are identical.
+    (should (equal (byte-compile form)
+                   (byte-compile
+                    `(with-suppressed-warnings ,suppress ,form))))))
+
+(ert-deftest bytecomp-test--with-suppressed-warnings ()
+  (test-suppression
+   '(defvar prefixless)
+   '((lexical prefixless))
+   "global/dynamic var .prefixless. lacks")
+
+  (test-suppression
+   '(defun foo()
+      (let ((nil t))
+        (message-mail)))
+   '((constants nil))
+   "Warning: attempt to let-bind constant .nil.")
+
+  (test-suppression
+   '(progn
+      (defun obsolete ()
+        (declare (obsolete foo "22.1")))
+      (defun zot ()
+        (obsolete)))
+   '((obsolete obsolete))
+   "Warning: .obsolete. is an obsolete function")
+
+  (test-suppression
+   '(progn
+      (defun wrong-params (foo &optional unused)
+        (ignore unused)
+        foo)
+      (defun zot ()
+        (wrong-params 1 2 3)))
+   '((callargs wrong-params))
+   "Warning: wrong-params called with")
+
+  (test-byte-comp-compile-and-load nil
+    (defvar obsolete-variable nil)
+    (make-obsolete-variable 'obsolete-variable nil "24.1"))
+  (test-suppression
+   '(defun zot ()
+      obsolete-variable)
+   '((obsolete obsolete-variable))
+   "obsolete")
+
+  (test-suppression
+   '(defun zot ()
+      (mapcar #'list '(1 2 3))
+      nil)
+   '((mapcar mapcar))
+   "Warning: .mapcar. called for effect")
+
+  (test-suppression
+   '(defun zot ()
+      free-variable)
+   '((free-vars free-variable))
+   "Warning: reference to free variable")
+
+  (test-suppression
+   '(defun zot ()
+      (save-excursion
+        (set-buffer (get-buffer-create "foo"))
+        nil))
+   '((suspicious set-buffer))
+   "Warning: Use .with-current-buffer. rather than"))
 
 ;; Local Variables:
 ;; no-byte-compile: t

@@ -1528,10 +1528,12 @@ be a list of the form returned by `event-start' and `event-end'."
 ;; representation.  This can be useful when one needs to examine
 ;; individual bytes at known offsets from the string beginning.
 ;; (make-obsolete 'string-to-unibyte   "use `encode-coding-string'." "26.1")
+;; string-to-multibyte is also sometimes useful (and there's no good
+;; general replacement for it), so it's also been unobsoleted in Emacs 27.1.
+;; (make-obsolete 'string-to-multibyte "use `decode-coding-string'." "26.1")
 ;; bug#23850
 (make-obsolete 'string-as-unibyte   "use `encode-coding-string'." "26.1")
 (make-obsolete 'string-make-unibyte   "use `encode-coding-string'." "26.1")
-(make-obsolete 'string-to-multibyte "use `decode-coding-string'." "26.1")
 (make-obsolete 'string-as-multibyte "use `decode-coding-string'." "26.1")
 (make-obsolete 'string-make-multibyte "use `decode-coding-string'." "26.1")
 
@@ -4440,25 +4442,28 @@ This function is called directly from the C code."
   (when (string-match-p "/obsolete/\\([^/]*\\)\\'" abs-file)
     ;; Maybe we should just use display-warning?  This seems yucky...
     (let* ((file (file-name-nondirectory abs-file))
-	   (msg (format "Package %s is obsolete!"
-			(substring file 0
-				   (string-match "\\.elc?\\>" file)))))
+           (package (intern (substring file 0
+			               (string-match "\\.elc?\\>" file))
+                            obarray))
+	   (msg (format "Package %s is obsolete" package)))
       ;; Cribbed from cl--compiling-file.
-      (if (and (boundp 'byte-compile--outbuffer)
-	       (bufferp (symbol-value 'byte-compile--outbuffer))
-	       (equal (buffer-name (symbol-value 'byte-compile--outbuffer))
-		      " *Compiler Output*"))
-	  ;; Don't warn about obsolete files using other obsolete files.
-	  (unless (and (stringp byte-compile-current-file)
-		       (string-match-p "/obsolete/[^/]*\\'"
-				       (expand-file-name
-					byte-compile-current-file
-					byte-compile-root-dir)))
-	    (byte-compile-warn "%s" msg))
-	(run-with-timer 0 nil
-			(lambda (msg)
-			  (message "%s" msg))
-                        msg))))
+      (when (or (not (fboundp 'byte-compile-warning-enabled-p))
+                (byte-compile-warning-enabled-p 'obsolete package))
+        (if (and (boundp 'byte-compile--outbuffer)
+	         (bufferp (symbol-value 'byte-compile--outbuffer))
+	         (equal (buffer-name (symbol-value 'byte-compile--outbuffer))
+		        " *Compiler Output*"))
+	    ;; Don't warn about obsolete files using other obsolete files.
+	    (unless (and (stringp byte-compile-current-file)
+		         (string-match-p "/obsolete/[^/]*\\'"
+				         (expand-file-name
+					  byte-compile-current-file
+					  byte-compile-root-dir)))
+	      (byte-compile-warn "%s" msg))
+	  (run-with-timer 0 nil
+			  (lambda (msg)
+			    (message "%s" msg))
+                          msg)))))
 
   ;; Finally, run any other hook.
   (run-hook-with-args 'after-load-functions abs-file))

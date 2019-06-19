@@ -45,7 +45,10 @@ So far, FUNCTION can only be a symbol, not a lambda expression."
 ;; `macro-declaration-function' are both obsolete (as marked at the end of this
 ;; file) but used in many .elc files.
 
-(defvar macro-declaration-function #'macro-declaration-function
+;; We don't use #' here, because it's an obsolete function, and we
+;; can't use `with-suppressed-errors' here due to how this file is
+;; used in the bootstrapping process.
+(defvar macro-declaration-function 'macro-declaration-function
   "Function to process declarations in a macro definition.
 The function will be called with two args MACRO and DECL.
 MACRO is the name of the macro being defined.
@@ -494,6 +497,34 @@ is enabled."
   ;; The implementation for the interpreter is basically trivial.
   (car (last body)))
 
+(defmacro with-suppressed-warnings (_warnings &rest body)
+  "Like `progn', but prevents compiler WARNINGS in BODY.
+
+WARNINGS is an associative list where the first element of each
+item is a warning type, and the rest of the elements in each item
+are symbols they apply to.  For instance, if you want to suppress
+byte compilation warnings about the two obsolete functions `foo'
+and `bar', as well as the function `zot' being called with the
+wrong number of parameters, say
+
+\(with-suppressed-warnings ((obsolete foo bar)
+                           (callargs zot))
+  (foo (bar))
+  (zot 1 2))
+
+The warnings that can be suppressed are a subset of the warnings
+in `byte-compile-warning-types'; see this variable for a fuller
+explanation of the warning types.  The types that can be
+suppressed with this macro are `free-vars', `callargs',
+`redefine', `obsolete', `interactive-only', `lexical', `mapcar',
+`constants' and `suspicious'.
+
+For the `mapcar' case, only the `mapcar' function can be used in
+the symbol list.  For `suspicious', only `set-buffer' can be used."
+  (declare (debug (sexp &optional body)) (indent 1))
+  ;; The implementation for the interpreter is basically trivial.
+  `(progn ,@body))
+
 
 (defun byte-run--unescaped-character-literals-warning ()
   "Return a warning about unescaped character literals.
@@ -508,6 +539,14 @@ Otherwise, return nil.  For internal use only."
                                    sorted ", ")
                         (mapconcat (lambda (char) (format "`?\\%c'" char))
                                    sorted ", ")))))
+
+(defun byte-compile-info-string (&rest args)
+  "Format ARGS in a way that looks pleasing in the compilation output."
+  (format "  %-9s%s" "INFO" (apply #'format args)))
+
+(defun byte-compile-info-message (&rest args)
+  "Message format ARGS in a way that looks pleasing in the compilation output."
+  (message "%s" (apply #'byte-compile-info-string args)))
 
 
 ;; I nuked this because it's not a good idea for users to think of using it.

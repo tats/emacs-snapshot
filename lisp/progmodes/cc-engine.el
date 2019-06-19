@@ -379,6 +379,8 @@ comment at the start of cc-engine.el for more info."
 	      nil)))
 
       (when (and (car c-macro-cache)
+		 (> (point) (car c-macro-cache)) ; in case we have a
+						 ; zero-sized region.
 		 (bolp)
 		 (not (eq (char-before (1- (point))) ?\\)))
 	(setcdr c-macro-cache (point))
@@ -2493,18 +2495,6 @@ comment at the start of cc-engine.el for more info."
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar c-semi-lit-near-cache nil)
-(make-variable-buffer-local 'c-semi-lit-near-cache)
-;; A list of up to six recent results from `c-semi-pp-to-literal'.  Each
-;; element is a cons of the buffer position and the `parse-partial-sexp' state
-;; at that position.
-
-(defvar c-semi-near-cache-limit 1)
-(make-variable-buffer-local 'c-semi-near-cache-limit)
-;; An upper limit on valid entries in `c-semi-lit-near-cache'.  This is
-;; reduced by buffer changes, and increased by invocations of
-;; `c-semi-pp-to-literal'.
-
 (defvar c-lit-pos-cache nil)
 (make-variable-buffer-local 'c-lit-pos-cache)
 ;; A list of elements in descending order of POS of one of the forms:
@@ -2707,6 +2697,18 @@ comment at the start of cc-engine.el for more info."
 	    (setq c-lit-pos-cache-limit (point)))
 
 	(cons (point) state)))))
+
+(defvar c-semi-lit-near-cache nil)
+(make-variable-buffer-local 'c-semi-lit-near-cache)
+;; A list of up to six recent results from `c-semi-pp-to-literal'.  Each
+;; element is a cons of the buffer position and the `parse-partial-sexp' state
+;; at that position.
+
+(defvar c-semi-near-cache-limit 1)
+(make-variable-buffer-local 'c-semi-near-cache-limit)
+;; An upper limit on valid entries in `c-semi-lit-near-cache'.  This is
+;; reduced by buffer changes, and increased by invocations of
+;; `c-semi-pp-to-literal'.
 
 (defun c-semi-trim-near-cache ()
   ;; Remove stale entries in `c-semi-lit-near-cache', i.e. those
@@ -5639,6 +5641,7 @@ comment at the start of cc-engine.el for more info."
     (let ((pos (or start-pos (point)))
 	  (count how-far)
 	  (s (parse-partial-sexp (point) (point)))) ; null state
+      (goto-char pos)
       (while (and (not (eobp))
 		  (> count 0))
 	;; Scan over counted characters.
@@ -7256,9 +7259,7 @@ comment at the start of cc-engine.el for more info."
 	    ;; (c-put-char-property open-paren 'syntax-table '(1))
 	    )
 	  (goto-char bound))
-	nil)
-  ;; Ensure the opening delimiter will get refontified.
-    (c-font-lock-flush (1- open-quote) (1+ open-paren))))
+	nil)))
 
 (defun c-after-change-unmark-raw-strings (beg end _old-len)
   ;; This function removes `syntax-table' text properties from any raw strings
@@ -7347,7 +7348,7 @@ comment at the start of cc-engine.el for more info."
 	(goto-char (cadr c-old-beg-rs))
 	(when (looking-at c-c++-raw-string-opener-1-re)
 	  (setq id (match-string-no-properties 1))
-	  (when (re-search-forward (concat ")" id "\"") nil t) ; No bound.
+	  (when (search-forward (concat ")" id "\"") nil t) ; No bound.
 	    (setq c-new-END (point-max))
 	    (c-clear-char-properties (cadr c-old-beg-rs) c-new-END
 				     'syntax-table)
@@ -8602,53 +8603,58 @@ comment at the start of cc-engine.el for more info."
        (throw 'level nil))
      (c-backward-syntactic-ws)))
 
-(defun c-back-over-member-initializers ()
+(defun c-back-over-member-initializers (&optional limit)
   ;; Test whether we are in a C++ member initializer list, and if so, go back
   ;; to the introducing ":", returning the position of the opening paren of
   ;; the function's arglist.  Otherwise return nil, leaving point unchanged.
-  (let ((here (point))
-	(paren-state (c-parse-state))
-	pos level-plausible at-top-level res)
-    ;; Assume tentatively that we're at the top level.  Try to go back to the
-    ;; colon we seek.
-    (setq res
-	  (catch 'done
-	    (setq level-plausible
-		  (catch 'level
-		    (c-backward-syntactic-ws)
-		    (when (memq (char-before) '(?\) ?}))
-		      (when (not (c-go-list-backward))
-			(throw 'done nil))
-		      (c-backward-syntactic-ws))
-		    (when (c-back-over-compound-identifier)
-		      (c-backward-syntactic-ws))
-		    (c-back-over-list-of-member-inits)
-		    (and (eq (char-before) ?:)
-			 (save-excursion
-			   (c-backward-token-2)
-			   (not (looking-at c-:$-multichar-token-regexp)))
-			 (c-just-after-func-arglist-p))))
-
-	    (while (and (not (and level-plausible
-				  (setq at-top-level (c-at-toplevel-p))))
-			(setq pos (c-pull-open-brace paren-state))) ; might be a paren.
+  ;; LIMIT, if non-nil, is a limit for the backward search.
+  (save-restriction
+    (let ((here (point))
+	  (paren-state (c-parse-state))	; Do this outside the narrowing for
+					; performance reasons.
+	  pos level-plausible at-top-level res)
+      (if limit (narrow-to-region limit (point)))
+      ;; Assume tentatively that we're at the top level.  Try to go back to the
+      ;; colon we seek.
+      (setq res
+	    (catch 'done
 	      (setq level-plausible
 		    (catch 'level
-		      (goto-char pos)
 		      (c-backward-syntactic-ws)
-		      (when (not (c-back-over-compound-identifier))
-			(throw 'level nil))
-		      (c-backward-syntactic-ws)
+		      (when (memq (char-before) '(?\) ?}))
+			(when (not (c-go-list-backward))
+			  (throw 'done nil))
+			(c-backward-syntactic-ws))
+		      (when (c-back-over-compound-identifier)
+			(c-backward-syntactic-ws))
 		      (c-back-over-list-of-member-inits)
 		      (and (eq (char-before) ?:)
 			   (save-excursion
 			     (c-backward-token-2)
 			     (not (looking-at c-:$-multichar-token-regexp)))
-			   (c-just-after-func-arglist-p)))))
+			   (c-just-after-func-arglist-p))))
 
-	    (and at-top-level level-plausible)))
-    (or res (goto-char here))
-    res))
+	      (while (and (not (and level-plausible
+				    (setq at-top-level (c-at-toplevel-p))))
+			  (setq pos (c-pull-open-brace paren-state)) ; might be a paren.
+			  (or (null limit) (>= pos limit)))
+		(setq level-plausible
+		      (catch 'level
+			(goto-char pos)
+			(c-backward-syntactic-ws)
+			(when (not (c-back-over-compound-identifier))
+			  (throw 'level nil))
+			(c-backward-syntactic-ws)
+			(c-back-over-list-of-member-inits)
+			(and (eq (char-before) ?:)
+			     (save-excursion
+			       (c-backward-token-2)
+			       (not (looking-at c-:$-multichar-token-regexp)))
+			     (c-just-after-func-arglist-p)))))
+
+	      (and at-top-level level-plausible)))
+      (or res (goto-char here))
+      res)))
 
 (defun c-forward-class-decl ()
   "From the beginning of a struct/union, etc. move forward to

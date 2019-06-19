@@ -398,16 +398,15 @@ contents of field NAME is matched against PAT, or they can be of
 If EXTRA, include that in the string returned to represent the symbol."
   (cl-check-type obj eieio-object)
   (format "#<%s %s%s>" (eieio-object-class obj)
-	  (eieio-object-name-string obj) (or extra "")))
+	  (eieio-object-name-string obj)
+          (cond
+           ((null extra)
+            "")
+           ((listp extra)
+            (concat " " (mapconcat #'identity extra " ")))
+           (t
+            extra))))
 (define-obsolete-function-alias 'object-name #'eieio-object-name "24.4")
-
-(cl-defgeneric eieio-object-set-name-string (obj name)
-  "Set the string which is OBJ's NAME."
-  (declare (obsolete "inherit from `eieio-named' and use (setf (slot-value OBJ \\='object-name) NAME) instead" "25.1"))
-  (cl-check-type name string)
-  (setf (gethash obj eieio--object-names) name))
-(define-obsolete-function-alias
-  'object-set-name-string 'eieio-object-set-name-string "24.4")
 
 (defun eieio-object-class (obj)
   "Return the class struct defining OBJ."
@@ -820,15 +819,6 @@ first and modify the returned object.")
   ;; No cleanup... yet.
   nil)
 
-(cl-defgeneric object-print (this &rest _strings)
-  "Pretty printer for object THIS.
-
-It is sometimes useful to put a summary of the object into the
-default #<notation> string when using EIEIO browsing tools.
-Implement this method to customize the summary."
-  (declare (obsolete cl-print-object "26.1"))
-  (format "%S" this))
-
 (cl-defmethod object-print ((this eieio-default-superclass) &rest strings)
   "Pretty printer for object THIS.  Call function `object-name' with STRINGS.
 The default method for printing object THIS is to use the
@@ -843,11 +833,23 @@ When passing in extra strings from child classes, always remember
 to prepend a space."
   (eieio-object-name this (apply #'concat strings)))
 
+(cl-defgeneric object-print (this &rest _strings)
+  "Pretty printer for object THIS.
 
-(cl-defmethod cl-print-object ((object eieio-default-superclass) stream)
-  "Default printer for EIEIO objects."
-  ;; Fallback to the old `object-print'.
-  (princ (object-print object) stream))
+It is sometimes useful to put a summary of the object into the
+default #<notation> string when using EIEIO browsing tools.
+Implement this method to customize the summary."
+  (declare (obsolete cl-print-object "26.1"))
+  (format "%S" this))
+
+(with-suppressed-warnings ((obsolete object-print))
+  (cl-defmethod cl-print-object ((object eieio-default-superclass) stream)
+    "Default printer for EIEIO objects."
+    ;; Fallback to the old `object-print'.  There should be no
+    ;; `object-print' methods in the Emacs tree, but there may be some
+    ;; out-of-tree.
+    (princ (object-print object) stream)))
+
 
 (defvar eieio-print-depth 0
   "The current indentation depth while printing.

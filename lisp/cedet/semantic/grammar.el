@@ -37,9 +37,9 @@
 (require 'semantic/grammar-wy)
 (require 'semantic/idle)
 (require 'help-fns)
+(require 'semantic/analyze)
 
 (declare-function semantic-momentary-highlight-tag "semantic/decorate")
-(declare-function semantic-analyze-context "semantic/analyze")
 (declare-function semantic-analyze-tags-of-class-list
 		  "semantic/analyze/complete")
 
@@ -1878,7 +1878,6 @@ Optional argument COLOR determines if color is added to the text."
 (define-mode-local-override semantic-analyze-current-context
   semantic-grammar-mode (point)
   "Provide a semantic analysis object describing a context in a grammar."
-  (require 'semantic/analyze)
   (if (semantic-grammar-in-lisp-p)
       (with-mode-local emacs-lisp-mode
 	(semantic-analyze-current-context point))
@@ -1899,7 +1898,6 @@ Optional argument COLOR determines if color is added to the text."
 
       (setq context-return
 	    (semantic-analyze-context
-	     "context-for-semantic-grammar"
 	     :buffer (current-buffer)
 	     :scope nil
 	     :bounds bounds
@@ -1920,7 +1918,7 @@ Optional argument COLOR determines if color is added to the text."
       (with-mode-local emacs-lisp-mode
 	(semantic-analyze-possible-completions context))
     (with-current-buffer (oref context buffer)
-      (let* ((prefix (car (oref context :prefix)))
+      (let* ((prefix (car (oref context prefix)))
 	     (completetext (cond ((semantic-tag-p prefix)
 				  (semantic-tag-name prefix))
 				 ((stringp prefix)

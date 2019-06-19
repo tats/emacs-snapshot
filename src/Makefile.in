@@ -297,7 +297,7 @@ W32_RES_LINK=@W32_RES_LINK@
 ## Empty if !HAVE_X_WINDOWS
 ## xfont.o ftfont.o xftfont.o ftxfont.o if HAVE_XFT
 ## xfont.o ftfont.o ftxfont.o if HAVE_FREETYPE
-## ftfont.o ftcrfont.o if USE_CAIRO
+## xfont.o ftfont.o ftcrfont.o if USE_CAIRO
 ## else xfont.o
 ## if HAVE_HARFBUZZ, hbfont.o is added regardless of the rest
 FONT_OBJ=@FONT_OBJ@
@@ -359,6 +359,11 @@ AM_V_at = $(am__v_at_@AM_V@)
 am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
 am__v_at_1 =
+
+AM_V_NO_PD = $(am__v_NO_PD_@AM_V@)
+am__v_NO_PD_ = $(am__v_NO_PD_@AM_DEFAULT_V@)
+am__v_NO_PD_0 = --no-print-directory
+am__v_NO_PD_1 =
 
 bootstrap_exe = ../src/bootstrap-emacs$(EXEEXT)
 ifeq ($(DUMPING),pdumper)
@@ -776,7 +781,8 @@ tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS
 ## bootstrap-emacs$(EXEEXT) as an order-only prerequisite.
 
 %.elc: %.el | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	@$(MAKE) -C ../lisp EMACS="$(bootstrap_exe)" THEFILE=$< $<c
+	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="$(bootstrap_exe)"\
+		THEFILE=$< $<c
 
 ## VCSWITNESS points to the file that holds info about the current checkout.
 ## We use it as a heuristic to decide when to rebuild loaddefs.el.

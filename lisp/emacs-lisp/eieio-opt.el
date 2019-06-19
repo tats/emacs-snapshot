@@ -32,6 +32,10 @@
 (require 'find-func)
 (require 'speedbar)
 
+;; We require cl-extra here instead of cl-lib because we need the
+;; internal `cl--describe-class' function.
+(require 'cl-extra)
+
 ;;; Code:
 ;;;###autoload
 (defun eieio-browse (&optional root-class)
@@ -155,8 +159,7 @@ are not abstract."
 	  (insert "\n\n[Class description not available until class definition is loaded.]\n")
 	(save-excursion
 	  (insert (propertize "\n\nClass description:\n" 'face 'bold))
-	  (eieio-help-class ctr))
-	))))
+	  (cl--describe-class ctr))))))
 
 
 ;;; METHOD STATS

@@ -36,6 +36,7 @@
 (require 'semantic/ctxt)
 (require 'semantic/decorate)
 (require 'semantic/format)
+(require 'semantic/analyze)
 
 (eval-when-compile (require 'semantic/find))
 
@@ -43,7 +44,6 @@
 
 (declare-function semantic-analyze-tag-references "semantic/analyze/refs")
 (declare-function semantic-analyze-refs-impl "semantic/analyze/refs")
-(declare-function semantic-analyze-find-tag "semantic/analyze")
 (declare-function semantic-analyze-tag-type "semantic/analyze/fcn")
 (declare-function semantic-tag-external-class "semantic/sort")
 (declare-function imenu--mouse-menu "imenu")
@@ -594,7 +594,6 @@ Makes C/C++ language like assumptions."
 
 	;; Get the data type, and try to find that.
         ((semantic-tag-type tag)
-	 (require 'semantic/analyze)
 	 (let ((scope (semantic-calculate-scope (point))))
 	   (semantic-analyze-tag-type tag scope))
 	 )
@@ -718,6 +717,22 @@ yanked to."
             (message "Use C-y to recover the yank the text of %s."
                      (semantic-tag-name ft))))))
 
+(cl-defstruct (senator-register
+               (:constructor nil)
+               (:constructor senator-make-register (foreign-tag)))
+  foreign-tag)
+
+(cl-defmethod register-val-jump-to ((data senator-register) _arg)
+  (let ((ft (senator-register-foreign-tag data)))
+    (switch-to-buffer (semantic-tag-buffer ft))
+    (goto-char (semantic-tag-start ft))))
+
+(cl-defmethod register-val-describe ((data senator-register) _verbose)
+  (cl-prin1-to-string (senator-register-foreign-tag data)))
+
+(cl-defmethod register-val-insert ((data senator-register))
+  (semantic-insert-foreign-tag (senator-register-foreign-tag data)))
+
 ;;;###autoload
 (defun senator-copy-tag-to-register (register &optional kill-flag)
   "Copy the current tag into REGISTER.
@@ -733,13 +748,7 @@ if available."
   (semantic-fetch-tags)
   (let ((ft (semantic-obtain-foreign-tag)))
     (when ft
-      (set-register
-       register (registerv-make
-                 ft
-                 :insert-func #'semantic-insert-foreign-tag
-                 :jump-func (lambda (v)
-                              (switch-to-buffer (semantic-tag-buffer v))
-                              (goto-char (semantic-tag-start v)))))
+      (set-register register (senator-make-register ft))
       (if kill-flag
           (kill-region (semantic-tag-start ft)
                        (semantic-tag-end ft))))))

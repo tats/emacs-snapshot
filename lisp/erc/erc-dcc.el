@@ -47,9 +47,6 @@
 ;;  /dcc get nick [file] - Accept DCC offer from nick
 ;;  /dcc list - List all DCC offers/connections
 ;;  /dcc send nick file - Offer DCC SEND to nick
-;;
-;; Please note that offering DCC connections (offering chats and sending
-;; files) is only supported with Emacs 22.
 
 ;;; Code:
 
@@ -354,7 +351,6 @@ created subprocess, or nil."
                                         :buffer nil
                                         :host (erc-dcc-host)
                                         :service port
-                                        :nowait t
                                         :noquery nil
                                         :filter filter
                                         :sentinel sentinel
@@ -814,8 +810,8 @@ bytes sent."
          ?s (number-to-string (- sent-marker (point-min))))
         (setq erc-dcc-list (delete elt erc-dcc-list))
         (set-buffer-modified-p nil)
-        (kill-buffer (current-buffer))
-        (delete-process proc))
+        (delete-process proc)
+        (kill-buffer (current-buffer)))
        ((<= confirmed-marker sent-marker)
         (while (and (< (- sent-marker confirmed-marker)
                        (or erc-dcc-pump-bytes
@@ -828,8 +824,8 @@ bytes sent."
                  (marker-position confirmed-marker)
                  (marker-position sent-marker)))
         (set-buffer-modified-p nil)
-        (kill-buffer (current-buffer))
-        (delete-process proc))))))
+        (delete-process proc)
+        (kill-buffer (current-buffer)))))))
 
 (defun erc-dcc-display-send (proc)
   (erc-display-message
@@ -921,10 +917,7 @@ filter and a process sentinel, and making the connection."
       (buffer-disable-undo (current-buffer))
       ;; This is necessary to have the buffer saved as-is in GNU
       ;; Emacs.
-      ;; XEmacs change: We don't have `set-buffer-multibyte', setting
-      ;; coding system to 'binary below takes care of us.
-      (when (fboundp 'set-buffer-multibyte)
-        (set-buffer-multibyte nil))
+      (set-buffer-multibyte nil)
 
       (setq mode-line-process '(":%s")
             buffer-read-only t)
@@ -979,8 +972,9 @@ rather than every 1024 byte block, but nobody seems to care."
     (let ((inhibit-read-only t)
           received-bytes)
       (goto-char (point-max))
-      (if str
-          (insert (string-make-unibyte str)))
+      (when str
+        (cl-assert (not (multibyte-string-p str)))
+        (insert str))
 
       (when (> (point-max) erc-dcc-receive-cache)
         (erc-dcc-append-contents (current-buffer) erc-dcc-file-name))

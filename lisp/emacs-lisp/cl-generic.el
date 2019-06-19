@@ -238,6 +238,7 @@ DEFAULT-BODY, if present, is used as the body of a default method.
       (push `(,args ,@options-and-methods) methods))
     (when (eq 'setf (car-safe name))
       (require 'gv)
+      (declare-function gv-setter "gv" (name))
       (setq name (gv-setter (cadr name))))
     `(prog1
          (progn
@@ -443,12 +444,13 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       (setq args (pop body)))
     (when (eq 'setf (car-safe name))
       (require 'gv)
+      (declare-function gv-setter "gv" (name))
       (setq name (gv-setter (cadr name))))
     (pcase-let* ((`(,uses-cnm . ,fun) (cl--generic-lambda args body)))
       `(progn
          ,(and (get name 'byte-obsolete-info)
                (or (not (fboundp 'byte-compile-warning-enabled-p))
-                   (byte-compile-warning-enabled-p 'obsolete))
+                   (byte-compile-warning-enabled-p 'obsolete name))
                (let* ((obsolete (get name 'byte-obsolete-info)))
                  (macroexp--warn-and-return
                   (macroexp--obsolete-warning name obsolete "generic function")

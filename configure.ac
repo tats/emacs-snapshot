@@ -430,7 +430,7 @@ OPTION_DEFAULT_ON([png],[don't compile with PNG image support])
 OPTION_DEFAULT_ON([rsvg],[don't compile with SVG image support])
 OPTION_DEFAULT_ON([lcms2],[don't compile with Little CMS support])
 OPTION_DEFAULT_ON([libsystemd],[don't compile with libsystemd support])
-OPTION_DEFAULT_OFF([cairo],[compile with Cairo drawing (experimental)])
+OPTION_DEFAULT_OFF([cairo],[compile with Cairo drawing])
 OPTION_DEFAULT_ON([xml2],[don't compile with XML parsing support])
 OPTION_DEFAULT_OFF([imagemagick],[compile with ImageMagick image support])
 OPTION_DEFAULT_ON([json], [don't compile with native JSON support])
@@ -3316,7 +3316,7 @@ fi
 HAVE_CAIRO=no
 if test "${HAVE_X11}" = "yes"; then
   if test "${with_cairo}" != "no"; then
-    CAIRO_REQUIRED=1.12.0
+    CAIRO_REQUIRED=1.8.0
     CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
     EMACS_CHECK_MODULES(CAIRO, $CAIRO_MODULE)
     if test $HAVE_CAIRO = yes; then

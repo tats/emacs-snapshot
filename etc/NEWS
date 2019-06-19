@@ -49,6 +49,10 @@ functions 'json-serialize', 'json-insert', 'json-parse-string', and
 'json-parse-buffer' are typically much faster than their Lisp
 counterparts from json.el.
 
+** The configure option --with-cairo is no longer experimental.
+This builds Emacs with Cairo drawing, and supports built-in printing
+when Emacs is built with GTK+.
+
 ** Emacs no longer defaults to using ImageMagick to display images,
 due to security and stability concerns.  To override the default, use
 'configure --with-imagemagick'.
@@ -515,6 +519,9 @@ In the current follow group of windows, "ghost" cursors are no longer
 displayed in the non-selected follow windows.  To get the old behavior
 back, customize 'follow-hide-ghost-cursors' to nil.
 
++++
+** New variable 'warning-fill-column' for 'display-warning'.
+
 ** Windmove
 
 *** 'windmove-create-window' when non-nil makes a new window on moving off
@@ -881,6 +888,11 @@ This option controls whether and how to use Gnus search groups as
 ---
 *** 'erc-button-google-url' has been renamed to 'erc-button-search-url'
 and its value has been changed to Duck Duck Go.
+
+---
+*** `erc-send-pre-hook' and `erc-send-this' have been obsoleted.  The
+variable to use instead to alter text to be sent is now
+`erc-pre-send-functions'.
 
 ** EUDC
 
@@ -1514,15 +1526,12 @@ buffer periodically when 'auto-revert-avoid-polling' is non-nil.
 
 ** Bookmarks
 
-+++
-*** 'bookmark-file' is now an obsolete alias of
-'bookmark-default-file'.
-
-** Bookmarks
-
 ---
-*** 'bookmark-old-default-file' is now an obsolete alias of
-'bookmark-default-file'.
+*** 'bookmark-file' and 'bookmark-old-default-file' are now obsolete
+aliases of 'bookmark-default-file'.
+
+*** New user option 'bookmark-watch-bookmark-file'.
+When non-nil, watch whether the bookmark file has changed on disk.
 
 
 * New Modes and Packages in Emacs 27.1
@@ -1623,10 +1632,10 @@ fixnum for such arguments.
 ** Some functions and variables obsolete since Emacs 22 have been removed:
 archive-mouse-extract, assoc-ignore-case, assoc-ignore-representation,
 backward-text-line, blink-cursor, bookmark-exit-hooks,
-comint-use-prompt-regexp-instead-of-fields, compilation-finish-function,
-count-text-lines, cperl-vc-header-alist, custom-face-save-command,
-cvs-display-full-path, cvs-fileinfo->full-path, delete-frame-hook,
-derived-mode-class, describe-char-after, describe-project,
+c-opt-op-identitier-prefix, comint-use-prompt-regexp-instead-of-fields,
+compilation-finish-function, count-text-lines, cperl-vc-header-alist,
+custom-face-save-command, cvs-display-full-path, cvs-fileinfo->full-path,
+delete-frame-hook, derived-mode-class, describe-char-after, describe-project,
 desktop-basefilename, desktop-buffer-handlers, desktop-buffer-misc-functions,
 desktop-buffer-modes-to-save, desktop-enable, desktop-load-default,
 dired-omit-files-p, disabled-command-hook, dungeon-mode-map,
@@ -1691,6 +1700,14 @@ valid event type.
 
 
 * Lisp Changes in Emacs 27.1
+
++++
+** The new macro `with-suppressed-warnings' can be used to suppress
+specific byte-compile warnings.
+
+---
+** The new function `byte-compile-info-message' can be used to output
+informational messages that look pleasing during the Emacs build.
 
 +++
 ** The 'append' arg of 'add-hook' is generalized to a finer notion of 'depth'
@@ -2064,11 +2081,11 @@ The history of variable names read by 'read-variable' is recorded in
 the new variable 'custom-variable-history'.
 
 ---
-** The function 'string-to-unibyte' is no longer declared obsolete.
-We have found that there are legitimate use cases for this function,
-where there's no better alternative.  We believe that the incorrect
-uses of this function all but disappeared by now, so we are
-un-obsoleting it.
+** The function 'string-to-unibyte' and `string-to-multibyte' are no
+longer declared obsolete.  We have found that there are legitimate use
+cases for these functions, where there's no better alternative.  We
+believe that the incorrect uses of these functions all but disappeared
+by now, so we are un-obsoleting it.
 
 +++
 ** New function 'group-name' returns a group name corresponding to GID.

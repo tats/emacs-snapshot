@@ -1204,7 +1204,9 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	  ((save-excursion
 	     (goto-char match-pos)
 	     (and (memq (char-before match-pos) '(?\( ?\,))
-		  (c-go-up-list-backward match-pos)
+		  (c-go-up-list-backward match-pos
+					  ; c-determine-limit is too slow, here.
+					 (max (- (point) 2000) (point-min)))
 		  (eq (char-after) ?\()
 		  (let ((type (c-get-char-property (point) 'c-type)))
 		    (or (memq type '(c-decl-arg-start c-decl-type-start))
@@ -1605,7 +1607,9 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	  c-recognize-knr-p)		; Strictly speaking, bogus, but it
 					; speeds up lisp.h tremendously.
       (save-excursion
-	(when (not (c-back-over-member-initializers))
+	(when (not (c-back-over-member-initializers
+		    (max (- (point) 2000) (point-min)))) ; c-determine-limit
+							 ; is too slow, here.
 	  (unless (or (eobp)
 		      (looking-at "\\s(\\|\\s)"))
 	    (forward-char))
@@ -2580,18 +2584,18 @@ need for `pike-font-lock-extra-types'.")
 
 ;;; Doc comments.
 
-(defvar c-doc-line-join-re regexp-unmatchable)
-;; Matches a join of two lines in a doc comment.
+(cc-bytecomp-defvar c-doc-line-join-re)
+;; matches a join of two lines in a doc comment.
 ;; This should not be changed directly, but instead set by
 ;; `c-setup-doc-comment-style'.  This variable is used in `c-find-decl-spots'
 ;; in (e.g.) autodoc style comments to bridge the gap between a "@\n" at an
 ;; EOL and the token following "//!" on the next line.
 
-(defvar c-doc-bright-comment-start-re regexp-unmatchable)
+(cc-bytecomp-defvar c-doc-bright-comment-start-re)
 ;; Matches the start of a "bright" comment, one whose contents may be
 ;; fontified by, e.g., `c-font-lock-declarations'.
 
-(defvar c-doc-line-join-end-ch nil)
+(cc-bytecomp-defvar c-doc-line-join-end-ch)
 ;; A list of characters, each being a last character of a doc comment marker,
 ;; e.g. the ! from pike autodoc's "//!".
 

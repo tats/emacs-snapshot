@@ -1768,6 +1768,7 @@ You must have the \"hashcash\" binary installed, see `hashcash-path'."
 
 ;;; Internal variables.
 
+(defvar message-inhibit-body-encoding nil)
 (defvar message-sending-message "Sending...")
 (defvar message-buffer-list nil)
 (defvar message-this-is-news nil)
@@ -5164,8 +5165,8 @@ Otherwise, generate and save a value for `canlock-password' first."
 	   "Really post to %s unknown group%s: %s? "
 	   (if (= (length errors) 1) "this" "these")
 	   (if (= (length errors) 1) "" "s")
-	   (mapconcat 'identity errors ", ")))))))
-   (message--check-continuation-headers)
+	   (mapconcat #'identity errors ", ")))))))
+   (progn (message--check-continuation-headers) t)
    ;; Check the Newsgroups & Followup-To headers for syntax errors.
    (message-check 'valid-newsgroups
      (let ((case-fold-search t)
@@ -7577,8 +7578,6 @@ is for the internal use."
   (setq rmail-enable-mime-composing t)
   (setq rmail-insert-mime-forwarded-message-function
 	'message-forward-rmail-make-body))
-
-(defvar message-inhibit-body-encoding nil)
 
 ;;;###autoload
 (defun message-resend (address)
