@@ -209,11 +209,7 @@ That is tag names plus names defined in tag attribute `:rest'."
 (defsubst semantic-grammar-item-value (item)
   "Return symbol or character value of ITEM string."
   (if (string-match semantic-grammar-lex-c-char-re item)
-      (let ((c (read (concat "?" (substring item 1 -1)))))
-        (if (featurep 'xemacs)
-            ;; Handle characters as integers in XEmacs like in GNU Emacs.
-            (char-int c)
-          c))
+      (read (concat "?" (substring item 1 -1)))
     (intern item)))
 
 (defun semantic-grammar-prologue ()
@@ -276,6 +272,10 @@ foo.by it is foo-by."
              (ext  (file-name-extension file))
              (i    (string-match (format "\\([.]\\)%s\\'" ext) file)))
         (concat (substring file 0 i) "-" ext))))
+
+(defun semantic-grammar-expected-conflicts ()
+  "Return the number of expected shift/reduce conflicts in the package."
+  (semantic-grammar-tag-symbols 'expectedconflicts))
 
 (defsubst semantic-grammar-languagemode ()
   "Return the %languagemode value as a list of symbols or nil."
@@ -529,6 +529,14 @@ Also load the specified macro libraries."
   "Insert declaration of constant NAME with VALUE and DOCSTRING."
   (let ((start (point)))
     (insert (format "(defconst %s\n%s%S)\n\n" name value docstring))
+    (save-excursion
+      (goto-char start)
+      (indent-sexp))))
+
+(defun semantic-grammar-insert-defconst-with-eval (name value docstring)
+  "Insert declaration of constant NAME with VALUE and DOCSTRING."
+  (let ((start (point)))
+    (insert (format "(eval-and-compile (defconst %s\n%s%S))\n\n" name value docstring))
     (save-excursion
       (goto-char start)
       (indent-sexp))))
@@ -821,12 +829,6 @@ Block definitions are read from the current table of lexical types."
   :group 'semantic
   :type 'regexp)
 
-(defsubst semantic-grammar-noninteractive ()
-  "Return non-nil if running without interactive terminal."
-  (if (featurep 'xemacs)
-      (noninteractive)
-    noninteractive))
-
 (defun semantic-grammar-create-package (&optional force uptodate)
   "Create package Lisp code from grammar in current buffer.
 If the Lisp code seems up to date, do nothing (if UPTODATE
@@ -890,6 +892,12 @@ Lisp code."
 
         (insert "\n;;; Declarations\n;;\n")
 
+        (semantic-grammar-insert-defconst-with-eval
+         (concat semantic--grammar-package "--expected-conflicts")
+         (with-current-buffer semantic--grammar-input-buffer
+           (format "%s\n" (car (semantic-grammar-expected-conflicts))))
+         "The number of expected shift/reduce conflicts in this grammar.")
+
         ;; `eval-defun' is not necessary to reset `defconst' values.
         (semantic-grammar-insert-defconst
          (semantic-grammar-keywordtable)
@@ -933,7 +941,7 @@ Lisp code."
 
       ;; If running in batch mode, there is nothing more to do.
       ;; Save the generated file and quit.
-      (if (semantic-grammar-noninteractive)
+      (if noninteractive
           (let ((version-control t)
                 (delete-old-versions t)
                 (make-backup-files t)
@@ -987,7 +995,7 @@ Return non-nil if there were no errors, nil if errors."
 		       (vc-handled-backends nil))
 		   (setq semanticdb-new-database-class 'semanticdb-project-database)
 		   (semantic-mode 1)
-		   (semantic-grammar-create-package)))
+		   (semantic-grammar-create-package t)))
              (error
               (message "%s" (error-message-string err))
               nil))))
@@ -1014,7 +1022,7 @@ For example, to process grammar files in current directory, invoke:
   \"emacs -batch -f semantic-grammar-batch-build-packages .\".
 
 See also the variable `semantic-grammar-file-regexp'."
-  (or (semantic-grammar-noninteractive)
+  (or noninteractive
       (error "\
 `semantic-grammar-batch-build-packages' must be used with -batch"
              ))
@@ -1263,10 +1271,8 @@ common grammar menu."
   "Setup a mode local grammar menu.
 MODE-MENU is an optional specific menu whose items are appended to the
 common grammar menu."
-  (let ((menu (intern (format "%s-menu" major-mode))))
-    (if (featurep 'xemacs)
-        (semantic-grammar-setup-menu-xemacs menu mode-menu)
-      (semantic-grammar-setup-menu-emacs menu mode-menu))))
+  (semantic-grammar-setup-menu-emacs
+   (intern (format "%s-menu" major-mode)) mode-menu))
 
 (defsubst semantic-grammar-in-lisp-p ()
   "Return non-nil if point is in Lisp code."
@@ -1286,9 +1292,9 @@ the change bounds to encompass the whole nonterminal tag."
                      (semantic-edits-os overlay)
                      (semantic-edits-oe overlay)))))
     (if (semantic-tag-of-class-p outer 'nonterminal)
-        (semantic-overlay-move overlay
-                               (semantic-tag-start outer)
-                               (semantic-tag-end outer)))))
+        (move-overlay overlay
+                      (semantic-tag-start outer)
+                      (semantic-tag-end outer)))))
 
 (define-derived-mode semantic-grammar-mode
   fundamental-mode "Semantic Grammar Framework"

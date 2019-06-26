@@ -5000,6 +5000,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
   Lisp_Object form;
   Lisp_Object location, value;
   struct text_pos start_pos = *position;
+  void *itdata = NULL;
 
   /* If SPEC is a list of the form `(when FORM . VALUE)', evaluate FORM.
      If the result is non-nil, use VALUE instead of SPEC.  */
@@ -5029,7 +5030,11 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
       specbind (Qobject, object);
       specbind (Qposition, make_fixnum (CHARPOS (*position)));
       specbind (Qbuffer_position, make_fixnum (bufpos));
+      /* Save and restore the bidi cache, since FORM could be crazy
+	 enough to re-enter redisplay, e.g., by calling 'message'.  */
+      itdata = bidi_shelve_cache ();
       form = safe_eval (form);
+      bidi_unshelve_cache (itdata, false);
       form = unbind_to (count, form);
     }
 
@@ -5069,8 +5074,10 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		     Value is the new height.  */
 		  struct face *face = FACE_FROM_ID (it->f, it->face_id);
 		  Lisp_Object height;
+		  itdata = bidi_shelve_cache ();
 		  height = safe_call1 (it->font_height,
 				       face->lface[LFACE_HEIGHT_INDEX]);
+		  bidi_unshelve_cache (itdata, false);
 		  if (NUMBERP (height))
 		    new_height = XFLOATINT (height);
 		}
@@ -5092,7 +5099,9 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		  struct face *face = FACE_FROM_ID (it->f, it->face_id);
 
 		  specbind (Qheight, face->lface[LFACE_HEIGHT_INDEX]);
+		  itdata = bidi_shelve_cache ();
 		  value = safe_eval (it->font_height);
+		  bidi_unshelve_cache (itdata, false);
 		  value = unbind_to (count, value);
 
 		  if (NUMBERP (value))
@@ -10696,10 +10705,22 @@ message_to_stderr (Lisp_Object m)
       else
 	s = m;
 
-      fwrite (SDATA (s), SBYTES (s), 1, stderr);
+      /* We want to write this out with a single fwrite call so that
+	 output doesn't interleave with other processes writing to
+	 stderr at the same time. */
+      {
+	int length = min (INT_MAX, SBYTES (s) + 1);
+	char *string = xmalloc (length);
+
+	memcpy (string, SSDATA (s), length - 1);
+	string[length - 1] = '\n';
+	fwrite (string, 1, length, stderr);
+	xfree (string);
+      }
     }
-  if (!cursor_in_echo_area)
+  else if (!cursor_in_echo_area)
     fputc ('\n', stderr);
+
   fflush (stderr);
 }
 
@@ -10845,11 +10866,11 @@ vmessage (const char *m, va_list ap)
       if (m)
 	{
 	  if (noninteractive_need_newline)
-	    putc ('\n', stderr);
+	    fputc ('\n', stderr);
 	  noninteractive_need_newline = false;
 	  vfprintf (stderr, m, ap);
 	  if (!cursor_in_echo_area)
-	    fprintf (stderr, "\n");
+	    fputc ('\n', stderr);
 	  fflush (stderr);
 	}
     }
@@ -24320,9 +24341,7 @@ store_mode_line_string (const char *string, Lisp_Object lisp_string,
 
   if (string != NULL)
     {
-      len = strlen (string);
-      if (precision > 0 && len > precision)
-	len = precision;
+      len = strnlen (string, precision <= 0 ? SIZE_MAX : precision);
       lisp_string = make_string (string, len);
       if (NILP (props))
 	props = mode_line_string_face_prop;

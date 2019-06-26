@@ -620,13 +620,12 @@ If ARG is non-nil, instead prompt for connection parameters."
 (defun rcirc-prompt-for-encryption (server-plist)
   "Prompt the user for the encryption method to use.
 SERVER-PLIST is the property list for the server."
-  (let ((msg "Encryption (default %s): ")
-        (choices '("plain" "tls"))
+  (let ((choices '("plain" "tls"))
         (default (or (plist-get server-plist :encryption)
-                     'plain)))
+                     "plain")))
     (intern
-     (completing-read (format msg default)
-                      choices nil t nil nil (symbol-name default)))))
+     (completing-read (format "Encryption (default %s): " default)
+                      choices nil t nil nil default))))
 
 (defun rcirc-keepalive ()
   "Send keep alive pings to active rcirc processes.
@@ -775,22 +774,33 @@ Function is called with PROCESS, COMMAND, SENDER, ARGS and LINE.")
     (rcirc-process-server-response-1 process text)))
 
 (defun rcirc-process-server-response-1 (process text)
-  (if (string-match "^\\(:\\([^ ]+\\) \\)?\\([^ ]+\\) \\(.+\\)$" text)
+  ;; See https://tools.ietf.org/html/rfc2812#section-2.3.1.  We're a
+  ;; bit more accepting than the RFC: We allow any non-space
+  ;; characters in the command name, multiple spaces between
+  ;; arguments, and allow the last argument to omit the leading ":",
+  ;; even if there are less than 15 arguments.
+  (if (string-match "^\\(:\\([^ ]+\\) \\)?\\([^ ]+\\)" text)
       (let* ((user (match-string 2 text))
 	     (sender (rcirc-user-nick user))
              (cmd (match-string 3 text))
-             (args (match-string 4 text))
+             (cmd-end (match-end 3))
+             (args nil)
              (handler (intern-soft (concat "rcirc-handler-" cmd))))
-        (string-match "^\\([^:]*\\):?\\(.+\\)?$" args)
-        (let* ((args1 (match-string 1 args))
-               (args2 (match-string 2 args))
-               (args (delq nil (append (split-string args1 " " t)
-				       (list args2)))))
+        (cl-loop with i = cmd-end
+                 repeat 14
+                 while (eql i (string-match " +\\([^: ][^ ]*\\)" text i))
+                 do (progn (push (match-string 1 text) args)
+                           (setq i (match-end 0)))
+                 finally
+                 (progn (if (eql i (string-match " +:?" text i))
+                            (push (substring text (match-end 0)) args)
+                          (cl-assert (= i (length text))))
+                        (cl-callf nreverse args)))
         (if (not (fboundp handler))
             (rcirc-handler-generic process cmd sender args text)
           (funcall handler process sender args text))
         (run-hook-with-args 'rcirc-receive-message-functions
-                            process cmd sender args text)))
+                            process cmd sender args text))
     (message "UNHANDLED: %s" text)))
 
 (defvar rcirc-responses-no-activity '("305" "306")

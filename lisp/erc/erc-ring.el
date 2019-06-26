@@ -46,11 +46,10 @@
 (define-erc-module ring nil
   "Stores input in a ring so that previous commands and messages can
 be recalled using M-p and M-n."
-  ((push 'erc-add-to-input-ring erc-pre-send-functions)
+  ((add-hook 'erc-pre-send-functions 'erc-add-to-input-ring)
    (define-key erc-mode-map "\M-p" 'erc-previous-command)
    (define-key erc-mode-map "\M-n" 'erc-next-command))
-  ((setq erc-pre-send-functions (delq 'erc-add-to-input-ring
-                                      erc-pre-send-functions))
+  ((remove-hook 'erc-pre-send-functions 'erc-add-to-input-ring)
    (define-key erc-mode-map "\M-p" 'undefined)
    (define-key erc-mode-map "\M-n" 'undefined)))
 
@@ -72,12 +71,11 @@ Call this function when setting up the mode."
     (setq erc-input-ring (make-ring comint-input-ring-size)))
   (setq erc-input-ring-index nil))
 
-(defun erc-add-to-input-ring (s)
+(defun erc-add-to-input-ring (state)
   "Add string S to the input ring and reset history position."
   (unless erc-input-ring (erc-input-ring-setup))
-  (ring-insert erc-input-ring s)
-  (setq erc-input-ring-index nil)
-  s)
+  (ring-insert erc-input-ring (erc-input-string state))
+  (setq erc-input-ring-index nil))
 
 (defun erc-clear-input-ring ()
   "Remove all entries from the input ring, then call garbage-collect.

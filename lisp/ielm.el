@@ -122,38 +122,30 @@ such as `edebug-defun' to work with such inputs."
   :type 'hook
   :group 'ielm)
 
-(defvar * nil
-  "Most recent value evaluated in IELM.")
+;; We define these symbols (that are only used buffer-locally in ielm
+;; buffers) this way to avoid having them be defined in the global
+;; Emacs namespace.
+(defvar *)
+(put '* 'variable-documentation "Most recent value evaluated in IELM.")
 
-(defvar ** nil
-  "Second-most-recent value evaluated in IELM.")
+(defvar **)
+(put '** 'variable-documentation "Second-most-recent value evaluated in IELM.")
 
-(defvar *** nil
-  "Third-most-recent value evaluated in IELM.")
+(defvar ***)
+(put '*** 'variable-documentation "Third-most-recent value evaluated in IELM.")
 
 (defvar ielm-match-data nil
   "Match data saved at the end of last command.")
 
-(defvar *1 nil
-  "During IELM evaluation, most recent value evaluated in IELM.
-Normally identical to `*'.  However, if the working buffer is an IELM
-buffer, distinct from the process buffer, then `*' gives the value in
-the working buffer, `*1' the value in the process buffer.
-The intended value is only accessible during IELM evaluation.")
-
-(defvar *2 nil
-  "During IELM evaluation, second-most-recent value evaluated in IELM.
-Normally identical to `**'.  However, if the working buffer is an IELM
-buffer, distinct from the process buffer, then `**' gives the value in
-the working buffer, `*2' the value in the process buffer.
-The intended value is only accessible during IELM evaluation.")
-
-(defvar *3 nil
-  "During IELM evaluation, third-most-recent value evaluated in IELM.
-Normally identical to `***'.  However, if the working buffer is an IELM
-buffer, distinct from the process buffer, then `***' gives the value in
-the working buffer, `*3' the value in the process buffer.
-The intended value is only accessible during IELM evaluation.")
+;; During IELM evaluation, *1 is the most recent value evaluated in
+;; IELM.  Normally identical to `*'.  However, if the working buffer
+;; is an IELM buffer, distinct from the process buffer, then `*' gives
+;; the value in the working buffer, `*1' the value in the process
+;; buffer.  The intended value is only accessible during IELM
+;; evaluation.  *2 and *3 are the same for ** and ***.
+(defvar *1)
+(defvar *2)
+(defvar *3)
 
 ;;; System variables
 

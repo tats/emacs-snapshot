@@ -678,7 +678,7 @@ reversed."
       (viper-get-ex-token)
       (cond ((memq ex-token-type '(command end-mark))
 	     (if address (setq ex-addresses (cons address ex-addresses)))
-	     (viper-deactivate-mark)
+	     (deactivate-mark)
 	     (let ((cmd (ex-cmd-assoc ex-token ex-token-alist)))
 	       (if (null cmd)
 		   (error "`%s': %s" ex-token viper-BadExCommand))
@@ -881,8 +881,7 @@ reversed."
 	     (if (null ex-token)
 		 (exchange-point-and-mark)
 	       (goto-char
-		(viper-register-to-point
-		 (viper-int-to-char (1+ (- ex-token ?a))) 'enforce-buffer)))
+		(viper-register-to-point (1+ (- ex-token ?a)) 'enforce-buffer)))
 	     (setq address (point-marker)))))
     address))
 
@@ -1085,7 +1084,7 @@ reversed."
 (defun viper-handle-! ()
   (interactive)
   (if (and (string=
-	    (buffer-string) (viper-abbreviate-file-name default-directory))
+	    (buffer-string) (abbreviate-file-name default-directory))
 	   (member ex-token '("read" "write")))
       (erase-buffer))
   (insert "!"))
@@ -1174,7 +1173,7 @@ reversed."
 	    (princ "\n=============\n")
 	    (princ "\nThe numbers can be given as counts to :next. ")
 	    (princ "\n\nPress any key to continue...\n\n"))
-	  (viper-read-event))))))
+	  (read-event))))))
 
 ;; Ex cd command.  Default directory of this buffer changes
 (defun ex-cd ()
@@ -1263,7 +1262,7 @@ reversed."
   (if (not file)
       (viper-get-ex-file))
   (cond ((and (string= ex-file "") buffer-file-name)
-	 (setq ex-file  (viper-abbreviate-file-name (buffer-file-name))))
+	 (setq ex-file  (abbreviate-file-name (buffer-file-name))))
 	((string= ex-file "")
 	 (error viper-NoFileSpecified)))
 
@@ -1480,7 +1479,7 @@ reversed."
           (error "`%s' requires a following letter" ex-token))))
     (save-excursion
       (goto-char (car ex-addresses))
-      (point-to-register (viper-int-to-char (1+ (- char ?a)))))))
+      (point-to-register (1+ (- char ?a))))))
 
 
 
@@ -1547,7 +1546,7 @@ reversed."
     (if (not (viper-buffer-live-p buf))
 	(error "Didn't find buffer %S or file %S"
 	       file-or-buffer-name
-	       (viper-abbreviate-file-name
+	       (abbreviate-file-name
 		(expand-file-name file-or-buffer-name))))
 
     (if (equal buf (current-buffer))
@@ -1562,7 +1561,7 @@ reversed."
       ;; setup buffer
       (if (setq wind (viper-get-visible-buffer-window buf))
 	  ()
-	(setq wind (get-lru-window (if (featurep 'xemacs) nil 'visible)))
+	(setq wind (get-lru-window 'visible))
 	(set-window-buffer wind buf))
 
       (if (viper-window-display-p)
@@ -1884,17 +1883,15 @@ reversed."
   (condition-case nil
       (progn
 	(pop-to-buffer (get-buffer-create "*info*"))
-	(info (if (featurep 'xemacs) "viper.info" "viper"))
+	(info "viper")
 	(message "Type `i' to search for a specific topic"))
     (error (beep 1)
 	   (with-output-to-temp-buffer " *viper-info*"
 	     (princ (format "
 The Info file for Viper does not seem to be installed.
 
-This file is part of the standard distribution of %sEmacs.
-Please contact your system administrator. "
-			    (if (featurep 'xemacs) "X" "")
-			    ))))))
+This file is part of the standard distribution of Emacs.
+Please contact your system administrator. "))))))
 
 ;; Ex source command.
 ;; Loads the file specified as argument or viper-custom-file-name.
@@ -2016,7 +2013,9 @@ Please contact your system administrator. "
     (condition-case conds
 	(progn
 	  (if (string= tag "")
-	      (find-tag ex-tag t)
+              ;; If we have an *xref* window, `next-error' will take
+              ;; us to the next definition.
+	      (next-error)
 	    (xref-find-definitions-other-window ex-tag))
 	  (viper-change-state-to-vi))
       (error
@@ -2089,9 +2088,7 @@ Please contact your system administrator. "
 	      ;; create temp buffer for the region
 	      (setq temp-buf (get-buffer-create " *ex-write*"))
 	      (set-buffer temp-buf)
-	      (if (featurep 'xemacs)
-		  (set-visited-file-name ex-file)
-		(set-visited-file-name ex-file 'noquery))
+	      (set-visited-file-name ex-file 'noquery)
 	      (erase-buffer)
 	      (if (and file-exists ex-append)
 		  (insert-file-contents ex-file))
@@ -2130,7 +2127,7 @@ Please contact your system administrator. "
 
 (defun ex-write-info (exists file-name beg end)
   (message "`%s'%s %d lines, %d characters"
-	   (viper-abbreviate-file-name file-name)
+	   (abbreviate-file-name file-name)
 	   (if exists "" " [New file]")
 	   (count-lines beg (min (1+ end) (point-max)))
 	   (- end beg)))
@@ -2226,9 +2223,9 @@ Type `mak ' (including the space) to run make with no args."
 	lines file info)
     (setq lines (count-lines (point-min) (viper-line-pos 'end))
 	  file (cond ((buffer-file-name)
-		      (concat (viper-abbreviate-file-name (buffer-file-name)) ":"))
+		      (concat (abbreviate-file-name (buffer-file-name)) ":"))
 		     ((buffer-file-name (buffer-base-buffer))
-		      (concat (viper-abbreviate-file-name (buffer-file-name (buffer-base-buffer))) " (indirect buffer):"))
+		      (concat (abbreviate-file-name (buffer-file-name (buffer-base-buffer))) " (indirect buffer):"))
 		     (t (concat (buffer-name) " [Not visiting any file]:")))
 	  info (format "line=%d/%d pos=%d/%d col=%d %s"
 		       (if (= pos1 pos2)
@@ -2245,7 +2242,7 @@ Type `mak ' (including the space) to run make with no args."
 	(with-output-to-temp-buffer " *viper-info*"
 	  (princ (concat "\n" file "\n\n\t" info "\n\n")))
 	(let ((inhibit-quit t))
-	  (viper-set-unread-command-events (viper-read-event)))
+	  (viper-set-unread-command-events (read-event)))
 	(kill-buffer " *viper-info*")))
     ))
 

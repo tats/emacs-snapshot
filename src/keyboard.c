@@ -7331,7 +7331,7 @@ menu_separator_name_p (const char *label)
 {
   if (!label)
     return 0;
-  else if (strlen (label) > 3
+  else if (strnlen (label, 4) == 4
 	   && memcmp (label, "--", 2) == 0
 	   && label[2] != '-')
     {
@@ -8248,13 +8248,13 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
       Lisp_Object tcapt = PROP (TOOL_BAR_ITEM_CAPTION);
       const char *label = SYMBOLP (tkey) ? SSDATA (SYMBOL_NAME (tkey)) : "";
       const char *capt = STRINGP (tcapt) ? SSDATA (tcapt) : "";
-      ptrdiff_t max_lbl =
-	2 * max (0, min (tool_bar_max_label_size, STRING_BYTES_BOUND / 2));
-      char *buf = xmalloc (max_lbl + 1);
+      ptrdiff_t max_lbl_size =
+	2 * max (0, min (tool_bar_max_label_size, STRING_BYTES_BOUND / 2)) + 1;
+      char *buf = xmalloc (max_lbl_size);
       Lisp_Object new_lbl;
-      ptrdiff_t caption_len = strlen (capt);
+      ptrdiff_t caption_len = strnlen (capt, max_lbl_size);
 
-      if (caption_len <= max_lbl && capt[0] != '\0')
+      if (0 < caption_len && caption_len < max_lbl_size)
         {
           strcpy (buf, capt);
           while (caption_len > 0 && buf[caption_len - 1] == '.')
@@ -8263,7 +8263,8 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 	  label = capt = buf;
         }
 
-      if (strlen (label) <= max_lbl && label[0] != '\0')
+      ptrdiff_t label_len = strnlen (label, max_lbl_size);
+      if (0 < label_len && label_len < max_lbl_size)
         {
           ptrdiff_t j;
           if (label != buf)
@@ -8296,6 +8297,19 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
   /* See if the binding is a keymap.  Give up if it is.  */
   if (CONSP (get_keymap (PROP (TOOL_BAR_ITEM_BINDING), 0, 1)))
     return 0;
+
+  /* If there is a key binding, add it to the help, which will be
+     displayed as a tooltip for this entry. */
+  Lisp_Object binding = PROP (TOOL_BAR_ITEM_BINDING);
+  Lisp_Object keys = Fwhere_is_internal (binding, Qnil, Qt, Qnil, Qnil);
+  if (!NILP (keys))
+    {
+      AUTO_STRING (beg, "  (");
+      AUTO_STRING (end, ")");
+      Lisp_Object orig = PROP (TOOL_BAR_ITEM_HELP);
+      Lisp_Object desc = Fkey_description (keys, Qnil);
+      set_prop (TOOL_BAR_ITEM_HELP, CALLN (Fconcat, orig, beg, desc, end));
+    }
 
   /* Enable or disable selection of item.  */
   if (!EQ (PROP (TOOL_BAR_ITEM_ENABLED_P), Qt))

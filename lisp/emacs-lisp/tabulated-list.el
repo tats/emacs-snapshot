@@ -73,6 +73,11 @@ frames."
   :type 'character
   :version "27.1")
 
+(defface tabulated-list-fake-header
+  '((t :overline t :underline t :weight bold))
+  "Face used on fake header lines."
+  :version "27.1")
+
 ;; The reason `tabulated-list-format' and other variables are
 ;; permanent-local is to make it convenient to switch to a different
 ;; major mode, switch back, and have the original Tabulated List data
@@ -195,6 +200,8 @@ If ADVANCE is non-nil, move forward by one line afterwards."
     (define-key map "n" 'next-line)
     (define-key map "p" 'previous-line)
     (define-key map "S" 'tabulated-list-sort)
+    (define-key map "}" 'tabulated-list-widen-current-column)
+    (define-key map "{" 'tabulated-list-narrow-current-column)
     (define-key map [follow-link] 'mouse-face)
     (define-key map [mouse-2] 'mouse-select-window)
     map)
@@ -306,7 +313,6 @@ Populated by `tabulated-list-init-header'.")
     (setq cols (apply 'concat (nreverse cols)))
     (if tabulated-list-use-header-line
 	(setq header-line-format cols)
-      (setq header-line-format nil)
       (setq-local tabulated-list--header-string cols))))
 
 (defun tabulated-list-print-fake-header ()
@@ -320,7 +326,8 @@ Do nothing if `tabulated-list--header-string' is nil."
           (move-overlay tabulated-list--header-overlay (point-min) (point))
         (setq-local tabulated-list--header-overlay
                     (make-overlay (point-min) (point))))
-      (overlay-put tabulated-list--header-overlay 'face 'underline))))
+      (overlay-put tabulated-list--header-overlay
+                   'face 'tabulated-list-fake-header))))
 
 (defsubst tabulated-list-header-overlay-p (&optional pos)
   "Return non-nil if there is a fake header.
@@ -644,6 +651,39 @@ With a numeric prefix argument N, sort the Nth column."
       (setq tabulated-list-sort-key (cons name nil)))
     (tabulated-list-init-header)
     (tabulated-list-print t)))
+
+(defun tabulated-list-widen-current-column (&optional n)
+  "Widen the current tabulated-list column by N chars.
+Interactively, N is the prefix numeric argument, and defaults to
+1."
+  (interactive "p")
+  (let ((start (current-column))
+        (nb-cols (length tabulated-list-format))
+        (col-nb 0)
+        (total-width 0)
+        (found nil)
+        col-width)
+    (while (and (not found)
+                (< col-nb nb-cols))
+      (if (> start
+             (setq total-width
+                   (+ total-width
+                      (setq col-width
+                            (cadr (aref tabulated-list-format
+                                        col-nb))))))
+          (setq col-nb (1+ col-nb))
+        (setq found t)
+        (setf (cadr (aref tabulated-list-format col-nb))
+              (max 1 (+ col-width n)))
+        (tabulated-list-print t)
+        (tabulated-list-init-header)))))
+
+(defun tabulated-list-narrow-current-column (&optional n)
+  "Narrow the current tabulated list column by N chars.
+Interactively, N is the prefix numeric argument, and defaults to
+1."
+  (interactive "p")
+  (tabulated-list-widen-current-column (- n)))
 
 (defvar tabulated-list--current-lnum-width nil)
 (defun tabulated-list-watch-line-number-width (_window)

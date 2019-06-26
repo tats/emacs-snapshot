@@ -332,10 +332,9 @@ If so, return the true (non-nil) value returned by PREDICATE.
 
 ;;;###autoload
 (defun cl-isqrt (x)
-  "Return the integer square root of the argument."
+  "Return the integer square root of the (integer) argument."
   (if (and (integerp x) (> x 0))
-      (let ((g (cond ((<= x 100) 10) ((<= x 10000) 100)
-		     ((<= x 1000000) 1000) (t x)))
+      (let ((g (ash 2 (/ (logb x) 2)))
 	    g2)
 	(while (< (setq g2 (/ (+ g (/ x g)) 2)) g)
 	  (setq g g2))
@@ -938,7 +937,6 @@ Outputs to the current buffer."
 (run-hooks 'cl-extra-load-hook)
 
 ;; Local variables:
-;; byte-compile-dynamic: t
 ;; generated-autoload-file: "cl-loaddefs.el"
 ;; End:
 

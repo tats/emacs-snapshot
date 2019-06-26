@@ -1055,11 +1055,14 @@ anyway."
 
 (defcustom erc-pre-send-functions nil
   "List of functions called to possibly alter the string that is sent.
-The functions are called with one argument, the string, and
-should return a string.
+The functions are called with one argument, a `erc-input' struct,
+and should alter that struct.
 
-To suppress the string completely, one of the functions should
-return nil."
+The struct has three slots:
+
+  `string': The current input string.
+  `insertp': Whether the string should be inserted into the erc buffer.
+  `sendp': Whether the string should be sent to the irc server."
   :group 'erc
   :type '(repeat function)
   :version "27.1")
@@ -1073,7 +1076,7 @@ if they wish to avoid insertion of a particular string.")
   "Send the text to the target or not.
 Functions on `erc-send-pre-hook' can set this variable to nil
 if they wish to avoid sending of a particular string.")
-(make-obsolete-variable 'erc-insert-this 'erc-pre-send-functions "27.1")
+(make-obsolete-variable 'erc-send-this 'erc-pre-send-functions "27.1")
 
 (defcustom erc-insert-modify-hook ()
   "Insertion hook for functions that will change the text's appearance.
@@ -2440,11 +2443,7 @@ If STRING is nil, the function does nothing."
               ((null (car elt))         ; (nil PROPERTY VALUE BEG . END)
                (let ((cons (nthcdr 3 elt)))
                  (cl-incf (car cons) shift)
-                 (cl-incf (cdr cons) shift)))
-              ((and (featurep 'xemacs)
-                    (extentp (car elt))) ; (EXTENT START END)
-               (cl-incf (nth 1 elt) shift)
-               (cl-incf (nth 2 elt) shift)))
+                 (cl-incf (cdr cons) shift))))
         (setq list (cdr list))))))
 
 (defvar erc-valid-nick-regexp "[]a-zA-Z^[;\\`_{}|][]^[;\\`_{}|a-zA-Z0-9-]*"
@@ -3495,7 +3494,6 @@ If S is non-nil, it will be used as the quit reason."
 
 (defun erc-quit-reason-various (s)
   "Choose a quit reason based on S (a string)."
-  (when (featurep 'xemacs) (require 'poe))
   (let ((res (car (assoc-default (or s "")
                                  erc-quit-reason-various-alist 'string-match))))
     (cond
@@ -3523,7 +3521,6 @@ If S is non-nil, it will be used as the quit reason."
 
 (defun erc-part-reason-various (s)
   "Choose a part reason based on S (a string)."
-  (when (featurep 'xemacs) (require 'poe))
   (let ((res (car (assoc-default (or s "")
                                  erc-part-reason-various-alist 'string-match))))
     (cond
@@ -3624,8 +3621,7 @@ the message given by REASON."
 
 (defun erc-cmd-SV ()
   "Say the current ERC and Emacs version into channel."
-  (erc-send-message (format "I'm using ERC with %s %s (%s%s)%s."
-                            (if (featurep 'xemacs) "XEmacs" "GNU Emacs")
+  (erc-send-message (format "I'm using ERC with GNU Emacs %s (%s%s)%s."
                             emacs-version
                             system-configuration
                             (concat
@@ -3966,9 +3962,7 @@ If FACE is non-nil, it will be used to propertize the prompt.  If it is nil,
   (let ((minibuffer-allow-text-properties t)
         (read-map minibuffer-local-map))
     (insert (read-from-minibuffer "Message: "
-                                  (string (if (featurep 'xemacs)
-                                              last-command-char
-                                            last-command-event))
+                                  (string last-command-event)
 				  read-map))
     (erc-send-current-line)))
 
@@ -5437,6 +5431,9 @@ submitted line to be intentional."
 (defvar erc-command-regexp "^/\\([A-Za-z']+\\)\\(\\s-+.*\\|\\s-*\\)$"
   "Regular expression used for matching commands in ERC.")
 
+(cl-defstruct erc-input
+  string insertp sendp)
+
 (defun erc-send-input (input)
   "Treat INPUT as typed in by the user.  It is assumed that the input
 and the prompt is already deleted.
@@ -5458,35 +5455,40 @@ This returns non-nil only if we actually send anything."
     (with-suppressed-warnings ((lexical str))
       (defvar str))
     (let ((str input)
-          (erc-insert-this t))
-      (setq erc-send-this t)
+          (erc-insert-this t)
+	  (erc-send-this t)
+	  state)
       ;; The calling convention of `erc-send-pre-hook' is that it
       ;; should change the dynamic variable `str' or set
       ;; `erc-send-this' to nil.  This has now been deprecated:
       ;; Instead `erc-pre-send-functions' is used as a filter to do
       ;; allow both changing and suppressing the string.
       (run-hook-with-args 'erc-send-pre-hook input)
+      (setq state (make-erc-input :string str
+				  :insertp erc-insert-this
+				  :sendp erc-send-this))
       (dolist (func erc-pre-send-functions)
 	;; The functions can return nil to inhibit sending.
-	(when str
-	  (setq str (funcall func str))))
-      (when (and erc-send-this
-		 str)
-        (if (or (string-match "\n" str)
-                (not (string-match erc-command-regexp str)))
-            (mapc
-             (lambda (line)
-               (mapc
-                (lambda (line)
-                  ;; Insert what has to be inserted for this.
-                  (erc-display-msg line)
-                  (erc-process-input-line (concat line "\n")
-                                          (null erc-flood-protect) t))
-                (or (and erc-flood-protect (erc-split-line line))
-                    (list line))))
-             (split-string str "\n"))
-          (erc-process-input-line (concat str "\n") t nil))
-        t)))))
+	(funcall func state))
+      (when (and (erc-input-sendp state)
+		 erc-send-this)
+	(let ((string (erc-input-string state)))
+          (if (or (string-match "\n" string)
+                  (not (string-match erc-command-regexp string)))
+              (mapc
+               (lambda (line)
+		 (mapc
+                  (lambda (line)
+                    ;; Insert what has to be inserted for this.
+		    (when (erc-input-insertp state)
+                      (erc-display-msg line))
+                    (erc-process-input-line (concat line "\n")
+                                            (null erc-flood-protect) t))
+                  (or (and erc-flood-protect (erc-split-line line))
+                      (list line))))
+               (split-string string "\n"))
+            (erc-process-input-line (concat string "\n") t nil))
+          t))))))
 
 (defun erc-display-command (line)
   (when erc-insert-this
@@ -5755,8 +5757,6 @@ If \"l\" is pressed, `erc-set-channel-limit' gets called.
 If \"k\" is pressed, `erc-set-channel-key' gets called.
 Anything else will be sent to `erc-toggle-channel-mode'."
   (interactive "kChannel mode (RET to set more than one): ")
-  (when (featurep 'xemacs)
-    (setq key (char-to-string (event-to-character (aref key 0)))))
   (cond ((equal key "\C-g")
          (keyboard-quit))
         ((equal key "\C-m")
@@ -6400,14 +6400,9 @@ if `erc-away' is non-nil."
                        (funcall erc-header-line-face-method))
                       (t
                        'erc-header-line))))
-      (cond ((featurep 'xemacs)
-             (setq modeline-buffer-identification
-                   (list (format-spec erc-mode-line-format spec)))
-             (setq modeline-process (list process-status)))
-            (t
-             (setq mode-line-buffer-identification
-                   (list (format-spec erc-mode-line-format spec)))
-             (setq mode-line-process (list process-status))))
+      (setq mode-line-buffer-identification
+            (list (format-spec erc-mode-line-format spec)))
+      (setq mode-line-process (list process-status))
       (when (boundp 'header-line-format)
         (let ((header (if erc-header-line-format
                           (format-spec erc-header-line-format spec)
@@ -6435,9 +6430,7 @@ if `erc-away' is non-nil."
                          (if face
                              (erc-propertize header 'face face)
                            header)))))))
-    (if (featurep 'xemacs)
-        (redraw-modeline)
-      (force-mode-line-update))))
+    (force-mode-line-update)))
 
 (defun erc-update-mode-line (&optional buffer)
   "Update the mode line in BUFFER.

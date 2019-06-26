@@ -177,21 +177,20 @@ does not appear in the ERC buffer after the user presses ENTER.")
   "This mode distinguishes non-commands.
 Commands listed in `erc-insert-this' know how to display
 themselves."
-  ((push 'erc-send-distinguish-noncommands erc-pre-send-functions))
-  ((setq erc-pre-send-functions (delq 'erc-send-distinguish-noncommands
-                                      erc-pre-send-functions))))
+  ((add-hook 'erc-pre-send-functions 'erc-send-distinguish-noncommands))
+  ((remove-hook 'erc-pre-send-functions 'erc-send-distinguish-noncommands)))
 
-(defun erc-send-distinguish-noncommands (str)
-  "If STR is an ERC non-command, set `erc-insert-this' to nil."
-  (let* ((command (erc-extract-command-from-line str))
+(defun erc-send-distinguish-noncommands (state)
+  "If STR is an ERC non-command, set `insertp' in STATE to nil."
+  (let* ((string (erc-input-string state))
+         (command (erc-extract-command-from-line string))
          (cmd-fun (and command
                        (car command))))
-    (if (and cmd-fun
-             (not (string-match "\n.+$" str))
-             (memq cmd-fun erc-noncommands-list))
-        ;; Inhibit sending this string.
-        nil
-      str)))
+    (when (and cmd-fun
+               (not (string-match "\n.+$" string))
+               (memq cmd-fun erc-noncommands-list))
+      ;; Inhibit sending this string.
+      (setf (erc-input-insertp state) nil))))
 
 ;;; IRC control character processing.
 (defgroup erc-control-characters nil

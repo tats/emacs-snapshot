@@ -1316,7 +1316,7 @@ the root directory.  */)
 
   /* Now concatenate the directory and name to new space in the stack frame.  */
   tlen = length + file_name_as_directory_slop + (nmlim - nm) + 1;
-  eassert (tlen > file_name_as_directory_slop + 1);
+  eassert (tlen >= file_name_as_directory_slop + 1);
 #ifdef DOS_NT
   /* Reserve space for drive specifier and escape prefix, since either
      or both may need to be inserted.  (The Microsoft x86 compiler
@@ -2599,13 +2599,13 @@ This is what happens in interactive use with M-x.  */)
 
 DEFUN ("make-symbolic-link", Fmake_symbolic_link, Smake_symbolic_link, 2, 3,
        "FMake symbolic link to file: \nGMake symbolic link to file %s: \np",
-       doc: /* Make a symbolic link to TARGET, named NEWNAME.
-If NEWNAME is a directory name, make a like-named symbolic link under
-NEWNAME.
+       doc: /* Make a symbolic link to TARGET, named LINKNAME.
+If LINKNAME is a directory name, make a like-named symbolic link under
+LINKNAME.
 
-Signal a `file-already-exists' error if a file NEWNAME already exists
+Signal a `file-already-exists' error if a file LINKNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
-An integer third arg means request confirmation if NEWNAME already
+An integer third arg means request confirmation if LINKNAME already
 exists, and expand leading "~" or strip leading "/:" in TARGET.
 This happens for interactive use with M-x.  */)
   (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_already_exists)

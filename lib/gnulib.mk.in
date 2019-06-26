@@ -72,6 +72,7 @@
 #  byteswap \
 #  c-ctype \
 #  c-strcase \
+#  canonicalize-lgpl \
 #  careadlinkat \
 #  close-stream \
 #  copy-file-range \
@@ -119,6 +120,7 @@
 #  mkostemp \
 #  mktime \
 #  nstrftime \
+#  pathmax \
 #  pipe2 \
 #  pselect \
 #  pthread_sigmask \
@@ -135,6 +137,7 @@
 #  stddef \
 #  stdio \
 #  stpcpy \
+#  strnlen \
 #  strtoimax \
 #  symlink \
 #  sys_stat \
@@ -484,6 +487,8 @@ GTK_CFLAGS = @GTK_CFLAGS@
 GTK_LIBS = @GTK_LIBS@
 GTK_OBJ = @GTK_OBJ@
 GZIP_PROG = @GZIP_PROG@
+HARFBUZZ_CFLAGS = @HARFBUZZ_CFLAGS@
+HARFBUZZ_LIBS = @HARFBUZZ_LIBS@
 HAVE_ALLOCA_H = @HAVE_ALLOCA_H@
 HAVE_ALPHASORT = @HAVE_ALPHASORT@
 HAVE_ATOLL = @HAVE_ATOLL@
@@ -1070,7 +1075,9 @@ gl_GNULIB_ENABLED_dirfd = @gl_GNULIB_ENABLED_dirfd@
 gl_GNULIB_ENABLED_euidaccess = @gl_GNULIB_ENABLED_euidaccess@
 gl_GNULIB_ENABLED_getdtablesize = @gl_GNULIB_ENABLED_getdtablesize@
 gl_GNULIB_ENABLED_getgroups = @gl_GNULIB_ENABLED_getgroups@
+gl_GNULIB_ENABLED_malloca = @gl_GNULIB_ENABLED_malloca@
 gl_GNULIB_ENABLED_open = @gl_GNULIB_ENABLED_open@
+gl_GNULIB_ENABLED_pathmax = @gl_GNULIB_ENABLED_pathmax@
 gl_GNULIB_ENABLED_strtoll = @gl_GNULIB_ENABLED_strtoll@
 gl_LIBOBJS = @gl_LIBOBJS@
 gl_LTLIBOBJS = @gl_LTLIBOBJS@
@@ -1242,6 +1249,17 @@ libgnu_a_SOURCES += c-strcase.h c-strcasecmp.c c-strncasecmp.c
 
 endif
 ## end   gnulib module c-strcase
+
+## begin gnulib module canonicalize-lgpl
+ifeq (,$(OMIT_GNULIB_MODULE_canonicalize-lgpl))
+
+
+EXTRA_DIST += canonicalize-lgpl.c
+
+EXTRA_libgnu_a_SOURCES += canonicalize-lgpl.c
+
+endif
+## end   gnulib module canonicalize-lgpl
 
 ## begin gnulib module careadlinkat
 ifeq (,$(OMIT_GNULIB_MODULE_careadlinkat))
@@ -1980,6 +1998,18 @@ EXTRA_libgnu_a_SOURCES += lstat.c
 endif
 ## end   gnulib module lstat
 
+## begin gnulib module malloca
+ifeq (,$(OMIT_GNULIB_MODULE_malloca))
+
+ifneq (,$(gl_GNULIB_ENABLED_malloca))
+libgnu_a_SOURCES += malloca.c
+
+endif
+EXTRA_DIST += malloca.h
+
+endif
+## end   gnulib module malloca
+
 ## begin gnulib module memmem-simple
 ifeq (,$(OMIT_GNULIB_MODULE_memmem-simple))
 
@@ -2078,6 +2108,15 @@ EXTRA_DIST += openat.h
 
 endif
 ## end   gnulib module openat-h
+
+## begin gnulib module pathmax
+ifeq (,$(OMIT_GNULIB_MODULE_pathmax))
+
+
+EXTRA_DIST += pathmax.h
+
+endif
+## end   gnulib module pathmax
 
 ## begin gnulib module pipe2
 ifeq (,$(OMIT_GNULIB_MODULE_pipe2))
@@ -2770,6 +2809,17 @@ EXTRA_DIST += string.in.h
 
 endif
 ## end   gnulib module string
+
+## begin gnulib module strnlen
+ifeq (,$(OMIT_GNULIB_MODULE_strnlen))
+
+
+EXTRA_DIST += strnlen.c
+
+EXTRA_libgnu_a_SOURCES += strnlen.c
+
+endif
+## end   gnulib module strnlen
 
 ## begin gnulib module strtoimax
 ifeq (,$(OMIT_GNULIB_MODULE_strtoimax))

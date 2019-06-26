@@ -161,12 +161,6 @@ If optional LEFT is non-nil insert spaces on left."
   (not (zerop (logand (aref x (/ i wisent-BITS-PER-WORD))
                       (ash 1 (% i wisent-BITS-PER-WORD))))))
 
-(defsubst wisent-noninteractive ()
-  "Return non-nil if running without interactive terminal."
-  (if (featurep 'xemacs)
-      (noninteractive)
-    noninteractive))
-
 (defvar wisent-debug-flag nil
   "Non-nil means enable some debug stuff.")
 
@@ -2263,26 +2257,34 @@ warning is given if there are either more or fewer conflicts, or if
 there are any reduce/reduce conflicts."
   :group 'wisent
   :type '(choice (const nil) integer))
+(make-obsolete-variable 'wisent-expected-conflicts
+                        "use %expectedconflicts in the .wy file instead"
+                        "27.1")
 
 (defun wisent-total-conflicts ()
   "Report the total number of conflicts."
-  (unless (and (zerop rrc-total)
-               (or (zerop src-total)
-                   (= src-total (or wisent-expected-conflicts 0))))
-    (let* ((src (wisent-source))
-           (src (if src (concat " in " src) ""))
-           (msg (format "Grammar%s contains" src)))
-      (if (> src-total 0)
+  (let* ((src (wisent-source))
+         (symbol (intern (format "wisent-%s--expected-conflicts"
+                                 (replace-regexp-in-string "\\.el$" "" src))
+                         obarray)))
+    (when (or (not (zerop rrc-total))
+              (and (not (zerop src-total))
+                   (not (= src-total (or wisent-expected-conflicts 0)))
+                   (or (not (boundp symbol))
+                       (not (equal (symbol-value symbol) src-total)))))
+      (let* ((src (if src (concat " in " src) ""))
+             (msg (format "Grammar%s contains" src)))
+        (when (and (> src-total 0))
           (setq msg (format "%s %d shift/reduce conflict%s"
                             msg src-total (if (> src-total 1)
                                               "s" ""))))
-      (if (and (> src-total 0) (> rrc-total 0))
-          (setq msg (format "%s and" msg)))
-      (if (> rrc-total 0)
-        (setq msg (format "%s %d reduce/reduce conflict%s"
-                          msg rrc-total (if (> rrc-total 1)
-                                            "s" ""))))
-      (message msg))))
+        (if (and (> src-total 0) (> rrc-total 0))
+            (setq msg (format "%s and" msg)))
+        (if (> rrc-total 0)
+            (setq msg (format "%s %d reduce/reduce conflict%s"
+                              msg rrc-total (if (> rrc-total 1)
+                                                "s" ""))))
+        (message msg)))))
 
 (defun wisent-print-conflicts ()
   "Report conflicts."
@@ -2654,7 +2656,7 @@ Report detailed information if `wisent-verbose-flag' or
     (wisent-print-grammar)
     (wisent-print-states))
   ;; Append output to log file when running in batch mode
-  (when (wisent-noninteractive)
+  (when noninteractive
     (wisent-append-to-log-file)
     (wisent-clear-log)))
 

@@ -176,8 +176,6 @@ See the 'test' directory for examples.
 ** In Emacs Info, examples of using Customize should be clickable
    and they should create Custom buffers.
 
-** The toolbar should show keyboard equivalents in its tooltips.
-
 ** Add function to redraw the tool bar.
 
 ** Redesign the load-history data structure so it can cope better
@@ -560,9 +558,8 @@ from the emacsclient process.
   snmp-mode [?], soundex [should be interactive?], strokes [start from
   the web page], talk, thingatpt [interactive functions?], type-break,
   vcursor, xscheme, zone-mode [?], mlconvert [?], iso-cvt,
-  feedmail [?], uce, gametree, page-ext,
-  refbib, refer, scribe, texinfo, underline,
-  cmacexp, hideif, mantemp [obsolete?], pcomplete, xml,
+  feedmail [?], uce, gametree, page-ext, refbib, refer, scribe,
+  texinfo, underline, cmacexp, hideif, pcomplete, xml,
   cvs-status (should be described in PCL-CVS manual); other progmodes,
   probably in separate manual.
 

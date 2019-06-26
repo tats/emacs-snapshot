@@ -134,6 +134,16 @@ default to `point-min' and `point-max' respectively."
                            (overlay-end overlay))))
       (buffer-substring-no-properties (point-min) (point-max)))))
 
+(defun python-virt-bin (&optional virt-root)
+  "Return the virtualenv bin dir, starting from VIRT-ROOT.
+If nil, VIRT-ROOT defaults to `python-shell-virtualenv-root'.
+The name of this directory depends on `system-type'."
+  (expand-file-name
+   (concat
+    (file-name-as-directory (or virt-root
+                                python-shell-virtualenv-root))
+    (if (eq system-type 'windows-nt) "Scripts" "bin"))))
+
 
 ;;; Tests for your tests, so you can test while you test.
 
@@ -1339,6 +1349,24 @@ this is an arbitrarily
      (python-indent-region (point-min) (point-max))
      (should (string= (buffer-substring-no-properties (point-min) (point-max))
                       expected)))))
+
+
+;;; Autofill
+
+(ert-deftest python-auto-fill-docstring ()
+  (python-tests-with-temp-buffer
+   "\
+def some_function(arg1,
+                  arg2):
+    \"\"\"
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+   (auto-fill-mode +1)
+   (goto-char (point-max))
+   (newline)
+   (search-backward "Lorem")
+   (let ((docindent (current-indentation)))
+     (forward-line 1)
+     (should (= docindent (current-indentation))))))
 
 
 ;;; Mark
@@ -2686,7 +2714,7 @@ if x:
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
     (should (equal new-exec-path
-                   (list (expand-file-name "/env/bin") "/path0")))))
+                   (list (python-virt-bin) "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-3 ()
   "Test complete `python-shell-virtualenv-root' modification."
@@ -2695,7 +2723,7 @@ if x:
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
     (should (equal new-exec-path
-                   (list (expand-file-name "/env/bin")
+                   (list (python-virt-bin)
                          "/path1" "/path2" "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-4 ()
@@ -2706,7 +2734,7 @@ if x:
          (python-shell-virtualenv-root "/env")
          (new-exec-path (python-shell-calculate-exec-path)))
     (should (equal new-exec-path
-                   (list (expand-file-name "/env/bin")
+                   (list (python-virt-bin)
                          "/path1" "/path2" "/path0")))))
 
 (ert-deftest python-shell-calculate-exec-path-5 ()
@@ -2736,7 +2764,7 @@ if x:
          (python-shell-virtualenv-root "/env"))
     (python-shell-with-environment
      (should (equal exec-path
-                    (list (expand-file-name "/env/bin")
+                    (list (python-virt-bin)
                           "/path1" "/path2" "/path0")))
       (should (not (getenv "PYTHONHOME")))
       (should (string= (getenv "VIRTUAL_ENV") "/env")))
@@ -2752,7 +2780,7 @@ if x:
          (python-shell-virtualenv-root "/env"))
     (python-shell-with-environment
       (should (equal (python-shell-calculate-exec-path)
-                     (list (expand-file-name "/env/bin")
+                     (list (python-virt-bin)
                            "/path1" "/path2" "/remote1" "/remote2")))
       (let ((process-environment (python-shell-calculate-process-environment)))
         (should (not (getenv "PYTHONHOME")))

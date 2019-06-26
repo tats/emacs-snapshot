@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 
 #include <c-ctype.h>
+#include <pathmax.h>
 #include <utimens.h>
 
 #include "lisp.h"
@@ -262,10 +263,10 @@ get_current_dir_name_or_unreachable (void)
   ptrdiff_t dirsize_max = min (PTRDIFF_MAX, SIZE_MAX) - 1;
 
   /* The maximum size of a buffer for a file name, including the
-     terminating NUL.  This is bounded by MAXPATHLEN, if available.  */
+     terminating NUL.  This is bounded by PATH_MAX, if available.  */
   ptrdiff_t bufsize_max = dirsize_max;
-#ifdef MAXPATHLEN
-  bufsize_max = min (bufsize_max, MAXPATHLEN);
+#ifdef PATH_MAX
+  bufsize_max = min (bufsize_max, PATH_MAX);
 #endif
 
 # if HAVE_GET_CURRENT_DIR_NAME && !BROKEN_GET_CURRENT_DIR_NAME
@@ -281,7 +282,7 @@ get_current_dir_name_or_unreachable (void)
       pwd = get_current_dir_name ();
       if (pwd)
 	{
-	  if (strlen (pwd) < dirsize_max)
+	  if (strnlen (pwd, dirsize_max) < dirsize_max)
 	    return pwd;
 	  free (pwd);
 	  errno = ERANGE;
@@ -298,7 +299,7 @@ get_current_dir_name_or_unreachable (void)
      sometimes a nicer name, and using it may avoid a fatal error if a
      parent directory is searchable but not readable.  */
   if (pwd
-      && (pwdlen = strlen (pwd)) < bufsize_max
+      && (pwdlen = strnlen (pwd, bufsize_max)) < bufsize_max
       && IS_DIRECTORY_SEP (pwd[pwdlen && IS_DEVICE_SEP (pwd[1]) ? 2 : 0])
       && stat (pwd, &pwdstat) == 0
       && stat (".", &dotstat) == 0
@@ -1067,16 +1068,6 @@ emacs_set_tty (int fd, struct emacs_tty *settings, bool flushp)
 static int old_fcntl_owner[FD_SETSIZE];
 #endif /* F_SETOWN */
 
-/* This may also be defined in stdio,
-   but if so, this does no harm,
-   and using the same name avoids wasting the other one's space.  */
-
-#if defined (USG)
-unsigned char _sobuf[BUFSIZ+8];
-#else
-char _sobuf[BUFSIZ];
-#endif
-
 /* Initialize the terminal mode on all tty devices that are currently
    open. */
 
@@ -1296,14 +1287,7 @@ init_sys_modes (struct tty_display_info *tty_out)
     }
 #endif /* F_GETOWN */
 
-#ifdef _IOFBF
-  /* This symbol is defined on recent USG systems.
-     Someone says without this call USG won't really buffer the file
-     even with a call to setbuf. */
-  setvbuf (tty_out->output, (char *) _sobuf, _IOFBF, sizeof _sobuf);
-#else
-  setbuf (tty_out->output, (char *) _sobuf);
-#endif
+  setvbuf (tty_out->output, NULL, _IOFBF, BUFSIZ);
 
   if (tty_out->terminal->set_terminal_modes_hook)
     tty_out->terminal->set_terminal_modes_hook (tty_out->terminal);
@@ -3034,11 +3018,11 @@ list_system_processes (void)
 
   Lisp_Object proclist = Qnil;
 
-  if (sysctl (mib, 3, NULL, &len, NULL, 0) != 0)
+  if (sysctl (mib, 3, NULL, &len, NULL, 0) != 0 || len == 0)
     return proclist;
 
   procs = xmalloc (len);
-  if (sysctl (mib, 3, procs, &len, NULL, 0) != 0)
+  if (sysctl (mib, 3, procs, &len, NULL, 0) != 0 || len == 0)
     {
       xfree (procs);
       return proclist;
@@ -3632,7 +3616,7 @@ system_process_attributes (Lisp_Object pid)
   CONS_TO_INTEGER (pid, int, proc_id);
   mib[3] = proc_id;
 
-  if (sysctl (mib, 4, &proc, &proclen, NULL, 0) != 0)
+  if (sysctl (mib, 4, &proc, &proclen, NULL, 0) != 0 || proclen == 0)
     return attrs;
 
   attrs = Fcons (Fcons (Qeuid, INT_TO_INTEGER (proc.ki_uid)), attrs);
@@ -3755,7 +3739,7 @@ system_process_attributes (Lisp_Object pid)
 
   mib[2] = KERN_PROC_ARGS;
   len = MAXPATHLEN;
-  if (sysctl (mib, 4, args, &len, NULL, 0) == 0)
+  if (sysctl (mib, 4, args, &len, NULL, 0) == 0 && len != 0)
     {
       int i;
       for (i = 0; i < len; i++)
@@ -3801,7 +3785,7 @@ system_process_attributes (Lisp_Object pid)
   CONS_TO_INTEGER (pid, int, proc_id);
   mib[3] = proc_id;
 
-  if (sysctl (mib, 4, &proc, &proclen, NULL, 0) != 0)
+  if (sysctl (mib, 4, &proc, &proclen, NULL, 0) != 0 || proclen == 0)
     return attrs;
 
   uid = proc.kp_eproc.e_ucred.cr_uid;

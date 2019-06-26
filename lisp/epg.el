@@ -41,7 +41,7 @@
 (defvar epg-agent-file nil)
 (defvar epg-agent-mtime nil)
 
-;; from gnupg/include/cipher.h
+;; from gnupg/common/openpgpdefs.h
 (defconst epg-cipher-algorithm-alist
   '((0 . "NONE")
     (1 . "IDEA")
@@ -56,16 +56,20 @@
     (12 . "CAMELLIA256")
     (110 . "DUMMY")))
 
-;; from gnupg/include/cipher.h
+;; from gnupg/common/openpgpdefs.h
 (defconst epg-pubkey-algorithm-alist
   '((1 . "RSA")
     (2 . "RSA_E")
     (3 . "RSA_S")
     (16 . "ELGAMAL_E")
     (17 . "DSA")
-    (20 . "ELGAMAL")))
+    (18 . "ECDH")
+    (19 . "ECDSA")
+    (20 . "ELGAMAL")
+    (22 . "EDDSA")
+    (110 . "PRIVATE10")))
 
-;; from gnupg/include/cipher.h
+;; from gnupg/common/openpgpdefs.h
 (defconst epg-digest-algorithm-alist
   '((1 . "MD5")
     (2 . "SHA1")
@@ -73,14 +77,16 @@
     (8 . "SHA256")
     (9 . "SHA384")
     (10 . "SHA512")
-    (11 . "SHA224")))
+    (11 . "SHA224")
+    (110 . "PRIVATE10")))
 
-;; from gnupg/include/cipher.h
+;; from gnupg/common/openpgpdefs.h
 (defconst epg-compress-algorithm-alist
   '((0 . "NONE")
     (1 . "ZIP")
     (2 . "ZLIB")
-    (3 . "BZIP2")))
+    (3 . "BZIP2")
+    (110 . "PRIVATE10")))
 
 (defconst epg-invalid-recipients-reason-alist
   '((0 . "No specific reason given")
@@ -770,9 +776,7 @@ callback data (if any)."
 	     (user-id (match-string 2 string))
 	     (entry (assoc key-id epg-user-id-alist)))
 	(condition-case nil
-	    (setq user-id (decode-coding-string
-			   (epg--decode-percent-escape user-id)
-			   'utf-8))
+	    (setq user-id (epg--decode-percent-escape-as-utf-8 user-id))
 	  (error))
 	(if entry
 	    (setcdr entry user-id)
@@ -899,9 +903,7 @@ callback data (if any)."
 	(condition-case nil
 	    (if (eq (epg-context-protocol context) 'CMS)
 		(setq user-id (epg-dn-from-string user-id))
-	      (setq user-id (decode-coding-string
-			     (epg--decode-percent-escape user-id)
-			     'utf-8)))
+	      (setq user-id (epg--decode-percent-escape-as-utf-8 user-id)))
 	  (error))
 	(if entry
 	    (setcdr entry user-id)
@@ -1177,9 +1179,7 @@ callback data (if any)."
 	     (user-id (match-string 2 string))
 	     (entry (assoc key-id epg-user-id-alist)))
 	(condition-case nil
-	    (setq user-id (decode-coding-string
-			   (epg--decode-percent-escape user-id)
-			   'utf-8))
+	    (setq user-id (epg--decode-percent-escape-as-utf-8 user-id))
 	  (error))
 	(if entry
 	    (setcdr entry user-id)
@@ -2020,6 +2020,7 @@ If you are unsure, use synchronous version of this function
     (epg-reset context)))
 
 (defun epg--decode-percent-escape (string)
+  (setq string (string-to-unibyte string))
   (let ((index 0))
     (while (string-match "%\\(\\(%\\)\\|\\([0-9A-Fa-f][0-9A-Fa-f]\\)\\)"
 			 string index)
@@ -2027,10 +2028,14 @@ If you are unsure, use synchronous version of this function
 	  (setq string (replace-match "%" t t string)
 		index (1- (match-end 0)))
 	(setq string (replace-match
-		      (string (string-to-number (match-string 3 string) 16))
+		      (byte-to-string
+                       (string-to-number (match-string 3 string) 16))
 		      t t string)
 	      index (- (match-end 0) 2))))
     string))
+
+(defun epg--decode-percent-escape-as-utf-8 (string)
+  (decode-coding-string (epg--decode-percent-escape string) 'utf-8))
 
 (defun epg--decode-hexstring (string)
   (let ((index 0))

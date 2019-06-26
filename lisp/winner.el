@@ -28,13 +28,7 @@
 ;; windows) so that the changes can be "undone" using the command
 ;; `winner-undo'.  By default this one is bound to the key sequence
 ;; ctrl-c left.  If you change your mind (while undoing), you can
-;; press ctrl-c right (calling `winner-redo').  Even though it uses
-;; some features of Emacs20.3, winner.el should also work with
-;; Emacs19.34 and XEmacs20, provided that the installed version of
-;; custom is not obsolete.
-
-;; Winner mode was improved August 1998.
-;; Further improvements February 2002.
+;; press ctrl-c right (calling `winner-redo').
 
 ;;; Code:
 
@@ -297,8 +291,17 @@ You may want to include buffer names such as *Help*, *Apropos*,
       ;; Restore points
       (dolist (win (winner-sorted-window-list))
         (unless (and (pop alive)
-                     (setf (window-point win)
-                           (winner-get-point (window-buffer win) win))
+                     (let* ((buf   (window-buffer win))
+                            (pos   (winner-get-point (window-buffer win) win))
+                            (entry (assq buf (window-prev-buffers win))))
+                       ;; Try to restore point of buffer in the selected
+                       ;; window (Bug#23621).
+                       (let ((marker (nth 2 entry)))
+                         (when (and switch-to-buffer-preserve-window-point
+                                    marker
+                                    (not (= marker pos)))
+                           (setq pos marker))
+                         (setf (window-point win) pos)))
                      (not (member (buffer-name (window-buffer win))
                                   winner-boring-buffers)))
           (push win xwins)))            ; delete this window

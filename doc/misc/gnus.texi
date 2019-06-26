@@ -10154,6 +10154,17 @@ partial article, and want to see the complete article instead, then
 the @kbd{A C} command (@code{gnus-summary-show-complete-article}) will
 do so.
 
+@item w
+@itemx A w
+@kindex w @r{(Summary)}
+@kindex A w @r{(Summary)}
+@cindex web
+@cindex url
+@findex gnus-summary-browse-url
+Scan the article buffer for links, and offer them to the user for
+browsing with @code{browse-url}.  By default, only scan the article
+body; with a prefix arg, also scan the article headers.
+
 @end table
 
 
@@ -26703,12 +26714,6 @@ Gnus understands all @sc{gnus} startup files.
 Overall, a casual user who hasn't written much code that depends on
 @sc{gnus} internals should suffer no problems.  If problems occur,
 please let me know by issuing that magic command @kbd{M-x gnus-bug}.
-
-@vindex gnus-bug-create-help-buffer
-If you are in the habit of sending bug reports @emph{very} often, you
-may find the helpful help buffer annoying after a while.  If so, set
-@code{gnus-bug-create-help-buffer} to @code{nil} to avoid having it pop
-up at you.
 
 
 @node Conformity

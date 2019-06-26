@@ -1960,7 +1960,10 @@ CFLAGS="$CFLAGS -x objective-c"
 GNU_OBJC_CFLAGS=
 LIBS_GNUSTEP=
 if test "${with_ns}" != no; then
-  if test "${opsys}" = darwin; then
+  # macfont.o requires macuvs.h which is absent after 'make extraclean',
+  # so avoid NS_IMPL_COCOA if macuvs.h is absent.
+  # Even a headless Emacs can build macuvs.h, so this should let you bootstrap.
+  if test "${opsys}" = darwin && test -f "$srcdir/src/macuvs.h"; then
      NS_IMPL_COCOA=yes
      ns_appdir=`pwd`/nextstep/Emacs.app
      ns_appbindir=${ns_appdir}/Contents/MacOS
@@ -3350,6 +3353,8 @@ if test "${HAVE_X11}" = "yes"; then
     EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
 
     test "$HAVE_FONTCONFIG" = "no" && AC_MSG_ERROR(cairo requires libfontconfig)
+    dnl For the "Does Emacs use" message at the end.
+    HAVE_XFT=no
   else
     ## Use -lXft if available, unless '--with-xft=no'.
     HAVE_XFT=maybe

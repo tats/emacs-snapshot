@@ -125,6 +125,9 @@ This is intended mostly to help developers.
 ** Emacs now requires GTK 2.24 and GTK 3.10 for the GTK 2 and GTK 3
 builds respectively.
 
+---
+** The toolbar now shows the equivalent key binding in its tooltips.
+
 
 * Startup Changes in Emacs 27.1
 
@@ -472,6 +475,28 @@ current and the previous or the next line, as before.
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+---
+** telnet-mode
+*** Reverting a buffer in `telnet-mode' will restart a closed
+connection.
+
+** goto-addr
+*** A way to more conveniently specify what URI address schemes that
+should be ignored have been added via the
+`goto-address-uri-schemes-ignored' variable.
+
++++
+** tex-mode
+*** 'latex-noindent-commands' controls indentation of certain commands.
+You can use this new variable to control indentation of arguments of
+\emph, \footnote, and similar commands.
+
+** byte compiler
+*** byte-compile-dynamic is now obsolete
+This is because on the one hand it suffers from various misbehaviors in corner
+cases that have plagued it for years, and on the other experiments indicated
+that it doesn't bring any measurable benefit.
+
 ** compile.el
 ---
 *** In 'compilation-error-regexp-alist', 'line' (and 'end-line') can
@@ -575,6 +600,9 @@ The mode is automatically enabled in files that start with the
 use the new 'fileloop-initialize' and 'fileloop-continue' functions
 instead.
 
++++
+*** etags is now able to read Zstandard-compressed files.
+
 ** bibtex
 
 ---
@@ -587,10 +615,23 @@ remapped to these, respectively.
 +++
 *** New command 'dired-create-empty-file'.
 
++++
+*** New command and keystroke `dired-number-of-marked-files' bound to
+`* N'.
+
+*** The marking commands now report how many files were marked by the
+command itself, not how many files are marked in total.
+
 ** Find-Dired
 
 *** New customizable variable 'find-dired-refine-function'.
 The default value is 'find-dired-sort-by-filename'.
+
+*** New sorting options for the variable 'find-ls-option'.
+
+---
+*** Zstandard compression is now supported for 'dired-do-compress' and
+'dired-do-compress-to'.
 
 ** Change Logs and VC
 
@@ -791,6 +832,9 @@ early init file.
 
 *** New function 'package-activate-all'.
 
+---
+*** Imenu support has been added to `package-menu-mode'.
+
 ** Info
 
 ---
@@ -878,6 +922,11 @@ See the concept index in the Gnus manual for the 'match-list' entry.
 article(s) to a pre-existing Message buffer, or create a new Message
 buffer with the article(s) attached.
 
++++
+*** A new Gnus summary mode command, 'w'
+('gnus-summary-browse-url') scans the article buffer for URLs, and
+offers them to the user to open with 'browse-url'.
+
 ---
 *** New option 'nnir-notmuch-filter-group-names-function'.
 This option controls whether and how to use Gnus search groups as
@@ -922,6 +971,9 @@ This attribute is meant to tell screen readers to ignore a tag.
 
 ---
 *** 'shr-tag-ol' now respects the ordered list 'start' attribute.
+
+---
+*** The <code ...> tag is now handled.
 
 ** Htmlfontify
 
@@ -1111,6 +1163,8 @@ Clicking on the button with ellipsis unhides it.
 The abbreviation can be disabled by the new option
 'grep-find-abbreviate'.  The new command
 'grep-find-toggle-abbreviation' toggles it interactively.
+
+*** 'grep-find-use-xargs' is now customizable with sorting options.
 
 ** ERT
 
@@ -1387,11 +1441,17 @@ when given in a string.  Previously, '(any "\x80-\xff")' would match
 characters U+0080...U+00FF.  Now the expression matches raw bytes in
 the 128...255 range, as expected.
 
+---
 *** The rx 'or' and 'seq' forms no longer require any arguments.
 (or) produces a regexp that never matches anything, while (seq)
 matches the empty string, each being an identity for the operation.
 This also works for their aliases: '|' for 'or'; ':', 'and' and
 'sequence' for 'seq'.
+
+---
+*** 'regexp' and new 'literal' accept arbitrary lisp as arguments.
+In this case, 'rx' will generate code which produces a regexp string
+at run time, instead of a constant string.
 
 ** Frames
 
@@ -1419,6 +1479,11 @@ near the current column in Tabulated Lists (see variables
 'tabulated-list-gui-sort-indicator-desc',
 'tabulated-list-tty-sort-indicator-asc', and
 'tabulated-list-tty-sort-indicator-desc').
+
++++
+*** Two new commands and keystrokes have been added to the tabulated
+list mode: `w' (which widens the current column) and `c' which makes
+the current column contract.
 
 ** Text mode
 
@@ -1524,6 +1589,25 @@ the new variable 'buffer-auto-revert-by-notification' to a non-nil
 value.  Auto Revert mode can use this information to avoid polling the
 buffer periodically when 'auto-revert-avoid-polling' is non-nil.
 
+** auth-source-pass
+
++++
+*** New customizable variable 'auth-source-pass-filename'.
+Allows setting the path to the password-store, defaults to
+~/.password-store.
+
++++
+*** New customizable variable 'auth-source-pass-port-separator'.
+Specifies separator between host and port, defaults to colon ":".
+
+---
+*** Minimize the number of decryptions during password lookup.
+This makes the package usable with physical tokens requiring touching
+a sensor for every decryption.
+
+---
+*** 'auth-source-pass-get' is now autoloaded.
+
 ** Bookmarks
 
 ---
@@ -1532,6 +1616,11 @@ aliases of 'bookmark-default-file'.
 
 *** New user option 'bookmark-watch-bookmark-file'.
 When non-nil, watch whether the bookmark file has changed on disk.
+
+---
+** The mantemp.el library is now marked obsolete.
+This library generates manual C++ template instantiations.  It should
+no longer be useful on modern compilers, which do this automatically.
 
 
 * New Modes and Packages in Emacs 27.1
@@ -2136,6 +2225,15 @@ implement the url-variant of base-64 encoding as defined in RFC4648.
 The functions 'base64-decode-string' and 'base64-decode-region' now
 accept an optional argument to decode the URL variant of base-64
 encoding.
+
++++
+** The function 'file-size-human-readable' accepts more optional arguments.
+The new third argument is a string put between the number and unit; it
+defaults to the empty string.  The new fourth argument is a string
+representing the unit to use; it defaults to "B" when the second
+argument is 'iec' and the empty string otherwise.  We recomment a
+space or non-breaking space as third argument, and "B" as fourth
+argument, circumstances allowing.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

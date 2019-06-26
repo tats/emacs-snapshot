@@ -538,7 +538,7 @@ Subexpression 2 must end right before the \\n.")
 ;;; Macros must be defined before they are used, for the byte compiler.
 
 (defmacro dired-mark-if (predicate msg)
-  "Mark all files for which PREDICATE evals to non-nil.
+  "Mark files for PREDICATE, according to `dired-marker-char'.
 PREDICATE is evaluated on each line, with point at beginning of line.
 MSG is a noun phrase for the type of files being marked.
 It should end with a noun that can be pluralized by adding `s'.
@@ -558,13 +558,13 @@ Return value is the number of files marked, or nil if none were marked."
 		   "")))
       (goto-char (point-min))
       (while (not (eobp))
-        (if ,predicate
-            (progn
-              (delete-char 1)
-              (insert dired-marker-char)
-              (setq count (1+ count))))
+        (when ,predicate
+          (unless (= (following-char) dired-marker-char)
+            (delete-char 1)
+            (insert dired-marker-char)
+            (setq count (1+ count))))
         (forward-line 1))
-      (if ,msg (message "%s %s%s %s%s."
+      (when ,msg (message "%s %s%s %s%s"
                         count
                         ,msg
                         (dired-plural-s count)
@@ -1669,6 +1669,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     (define-key map "*/" 'dired-mark-directories)
     (define-key map "*@" 'dired-mark-symlinks)
     (define-key map "*%" 'dired-mark-files-regexp)
+    (define-key map "*N" 'dired-number-of-marked-files)
     (define-key map "*c" 'dired-change-marks)
     (define-key map "*s" 'dired-mark-subdir-files)
     (define-key map "*m" 'dired-mark)
@@ -1815,6 +1816,9 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     (define-key map [menu-bar immediate revert-buffer]
       '(menu-item "Refresh" revert-buffer
 		  :help "Update contents of shown directories"))
+    (define-key map [menu-bar immediate dired-number-of-marked-files]
+      '(menu-item "#Marked Files" dired-number-of-marked-files
+		  :help "Display the number and size of the marked files"))
 
     (define-key map [menu-bar immediate dashes]
       '("--"))
@@ -3606,6 +3610,30 @@ object files--just `.o' will mark more than you might think."
 	  (let ((fn (dired-get-filename t t)))
 	    (and fn (string-match-p regexp fn))))
      "matching file")))
+
+(defun dired-number-of-marked-files ()
+  "Display the number and total size of the marked files."
+  (interactive)
+  (let* ((files (dired-get-marked-files nil nil nil t))
+         (nmarked
+          (cond ((null (cdr files))
+                 0)
+                ((and (= (length files) 2)
+                      (eq (car files) t))
+                 1)
+                (t
+                 (length files))))
+         (size (cl-loop for file in files
+                        when (stringp file)
+                        sum (file-attribute-size (file-attributes file)))))
+    (if (zerop nmarked)
+        (message "No marked files"))
+    (message "%d marked file%s (%sB total size)"
+             nmarked
+             (if (= nmarked 1)
+                 ""
+               "s")
+             (file-size-human-readable size))))
 
 (defun dired-mark-files-containing-regexp (regexp &optional marker-char)
   "Mark all files with contents containing REGEXP for use in later commands.
