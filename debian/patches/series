@@ -12,3 +12,5 @@
 0012-ibuffer-filter-inclusion-3-regexp-quote-directory.patch
 0013-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
 0014-Fix-an-eshell-ls-dired-test-for-non-recent-files.patch
+0015-Ignore-color-fonts-when-using-Xft.patch
+0016-Port-FC_COLOR-change-to-older-fontconfig.patch
