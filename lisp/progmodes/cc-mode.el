@@ -226,6 +226,15 @@ control).  See \"cc-mode.el\" for more info."
 	    (if (boundp 'c-comment-continuation-stars)
 		(setq c-block-comment-prefix c-comment-continuation-stars))
 	    (add-hook 'change-major-mode-hook 'c-leave-cc-mode-mode)
+	    ;; Connect up with Emacs's electric-pair-mode
+	    (eval-after-load "elec-pair"
+	      '(when (boundp 'electric-pair-inhibit-predicate)
+		 (dolist (buf (buffer-list))
+		   (with-current-buffer buf
+		     (when c-buffer-is-cc-mode
+		       (make-local-variable 'electric-pair-inhibit-predicate)
+		       (setq electric-pair-inhibit-predicate
+			     #'c-electric-pair-inhibit-predicate))))))
 	    (setq c-initialization-ok t)
 	    ;; Connect up with Emacs's electric-indent-mode, for >= Emacs 24.4
             (when (fboundp 'electric-indent-local-mode)
@@ -552,6 +561,17 @@ that requires a literal mode spec at compile time."
   (make-local-variable 'adaptive-fill-mode)
   (make-local-variable 'adaptive-fill-regexp)
   (make-local-variable 'fill-paragraph-handle-comment)
+
+  (setq c-buffer-is-cc-mode mode)
+
+  ;; Prepare for the use of `electric-pair-mode'.  Note: if this mode is not
+  ;; yet loaded, `electric-pair-inhibit-predicate' will get set from an
+  ;; `eval-after-load' form in `c-initialize-cc-mode' when elec-pair.elc is
+  ;; loaded.
+  (when (boundp 'electric-pair-inhibit-predicate)
+    (make-local-variable 'electric-pair-inhibit-predicate)
+    (setq electric-pair-inhibit-predicate
+	  #'c-electric-pair-inhibit-predicate))
 
   ;; now set their values
   (set (make-local-variable 'parse-sexp-ignore-comments) t)
@@ -934,7 +954,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) end)
@@ -944,7 +965,8 @@ Note that the style variables are always made local to the buffer."
       (setq m-beg (point))
       (c-end-of-macro))
     (when (and ss-found (> (point) end))
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) c-new-END)
@@ -952,7 +974,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value
        m-beg (point) 'syntax-table '(1)))))
 
@@ -1262,11 +1285,31 @@ Note that the style variables are always made local to the buffer."
 	  (setq c-new-BEG (min (car beg-limits) c-new-BEG))))
 
      ((< end (point-max))
-      (goto-char (1+ end))	; might be a newline.
-      ;; In the following regexp, the initial \n caters for a newline getting
-      ;; joined to a preceding \ by the removal of what comes between.
-      (re-search-forward "[\n\r]?\\(\\\\\\(.\\|\n\\)\\|[^\\\n\r]\\)*"
-			 nil t)
+      ;; Have we just escaped a newline by deleting characters?
+      (if (and (eq end-literal-type 'string)
+	       (memq (char-after end) '(?\n ?\r)))
+	  (cond
+	   ;; Are we escaping a newline by deleting stuff between \ and \n?
+	   ((and (> end beg)
+		 (progn
+		   (goto-char end)
+		   (eq (logand (skip-chars-backward "\\\\" beg) 1) 1)))
+	    (c-clear-char-property end 'syntax-table)
+	    (c-truncate-lit-pos-cache end)
+	    (goto-char (1+ end)))
+	   ;; Are we unescaping a newline by inserting stuff between \ and \n?
+	   ((and (eq end beg)
+		 (progn
+		   (goto-char end)
+		   (eq (logand (skip-chars-backward "\\\\") 1) 1)))
+	    (goto-char (1+ end))) ; To after the NL which is being unescaped.
+	   (t
+	    (goto-char end)))
+	(goto-char end))
+
+      ;; Move to end of logical line (as it will be after the change, or as it
+      ;; was before unescaping a NL.)
+      (re-search-forward "\\(\\\\\\(.\\|\n\\|\r\\)\\|[^\\\n\r]\\)*" nil t)
       ;; We're at an EOLL or point-max.
       (if (equal (c-get-char-property (point) 'syntax-table) '(15))
 	  (if (memq (char-after) '(?\n ?\r))
@@ -1426,6 +1469,54 @@ Note that the style variables are always made local to the buffer."
 	  (goto-char (min (1+ (match-end 0)) (point-max))))
 	(setq s nil)))))
 
+(defun c-after-change-escape-NL-in-string (beg end _old_len)
+  ;; If a backslash has just been inserted into a string, and this quotes an
+  ;; existing newline, remove the string fence syntax-table text properties
+  ;; on what has become the tail of the string.
+  ;;
+  ;; POINT is undefined both at entry to and exit from this function, the
+  ;; buffer will have been widened, and match data will have been saved.
+  ;;
+  ;; This function is called exclusively as an after-change function via
+  ;; `c-before-font-lock-functions'.  In C++ Mode, it should come before
+  ;; `c-after-change-unmark-raw-strings' in that lang variable.
+  (let (lit-start)		       ; Don't calculate this till we have to.
+    (when
+	(and (> end beg)
+	     (memq (char-after end) '(?\n ?\r))
+	     (progn (goto-char end)
+		    (eq (logand (skip-chars-backward "\\\\") 1) 1))
+	     (progn (goto-char end)
+		    (setq lit-start (c-literal-start)))
+	     (memq (char-after lit-start) c-string-delims)
+	     (or (not (c-major-mode-is 'c++-mode))
+		 (progn
+		   (goto-char lit-start)
+		   (and (not (and (eq (char-before) ?R)
+				  (looking-at c-c++-raw-string-opener-1-re)))
+			(not (and (eq (char-after) ?\()
+				  (equal (c-get-char-property
+					  (point) 'syntax-table)
+					 '(15))))))
+		 (save-excursion
+		   (c-beginning-of-macro))))
+      (goto-char (1+ end))		; After the \
+      ;; Search forward for a closing ".
+      (when (and (re-search-forward "\\(\\\\\\(.\\|\n\\)\\|[^\"\\\n\r]\\)*"
+				    nil t)
+		 (eq (char-after) ?\")
+		 (equal (c-get-char-property (point) 'syntax-table) '(15)))
+	(c-clear-char-property end 'syntax-table)
+	(c-truncate-lit-pos-cache end)
+	(c-clear-char-property (point) 'syntax-table)
+	(forward-char)			; to after the "
+	(when
+	    (and
+	     ;; Search forward for an end of logical line.
+	     (re-search-forward "\\(\\\\\\(.\\|\n\\)\\|[^\\\n\r]\\)*" nil t)
+	     (memq (char-after) '(?\n ?\r)))
+	  (c-clear-char-property (point) 'syntax-table))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parsing of quotes.
 ;;
@@ -1442,7 +1533,7 @@ Note that the style variables are always made local to the buffer."
 (defconst c-maybe-quoted-number-head
   (concat
    "\\(0\\("
-       "\\([Xx]\\([0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*'?\\)?\\)"
+       "\\([Xx]\\([[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*'?\\)?\\)"
        "\\|"
        "\\([Bb]\\([01]\\('[01]\\|[01]\\)*'?\\)?\\)"
        "\\|"
@@ -1462,7 +1553,7 @@ Note that the style variables are always made local to the buffer."
     (save-excursion
       (let ((here (point))
 	    found)
-	(skip-chars-backward "0-9a-fA-F'")
+	(skip-chars-backward "[:xdigit:]'")
 	(if (and (memq (char-before) '(?x ?X))
 		 (eq (char-before (1- (point))) ?0))
 	    (backward-char 2))
@@ -1476,7 +1567,7 @@ Note that the style variables are always made local to the buffer."
 (defconst c-maybe-quoted-number-tail
   (concat
    "\\("
-       "\\([xX']?[0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*\\)"
+       "\\([xX']?[[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*\\)"
    "\\|"
        "\\([bB']?[01]\\('[01]\\|[01]\\)*\\)"
    "\\|"
@@ -1496,7 +1587,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 (defconst c-maybe-quoted-number
   (concat
    "\\(0\\("
-       "\\([Xx][0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*\\)"
+       "\\([Xx][[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*\\)"
        "\\|"
        "\\([Bb][01]\\('[01]\\|[01]\\)*\\)"
        "\\|"
@@ -1514,9 +1605,9 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   (when c-has-quoted-numbers
     (save-excursion
       (let ((here (point))
-	    (bound (progn (skip-chars-forward "0-9a-fA-F'") (point))))
+	    (bound (progn (skip-chars-forward "[:xdigit:]'") (point))))
 	(goto-char here)
-	(when (< (skip-chars-backward "0-9a-fA-F'") 0)
+	(when (< (skip-chars-backward "[:xdigit:]'") 0)
 	  (if (and (memq (char-before) '(?x ?X))
 		   (eq (char-before (1- (point))) ?0))
 	      (backward-char 2))
@@ -1557,7 +1648,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(if (>= (point) c-new-BEG)
 	    (setq c-new-BEG (match-beginning 0))))
        ((looking-at
-	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)'")
+	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)'")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-BEG)
 	    (setq c-new-BEG (1- (match-beginning 0)))))
@@ -1586,7 +1677,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(if (> (match-end 0) c-new-END)
 	    (setq c-new-END (match-end 0))))
        ((looking-at
-	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)'")
+	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)'")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-END)
 	    (setq c-new-END (match-end 0))))
@@ -1606,8 +1697,8 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
      ((c-quoted-number-tail-after-point)
       (setq c-new-END (match-end 0)))
      ((looking-at
-       "\\(\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\|.\\)?\
-\\('\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)\\)*'")
+       "\\(\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\|.\\)?\
+\\('\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)\\)*'")
       (setq c-new-END (match-end 0))))
 
     ;; Remove the '(1) syntax-table property from any "'"s within (c-new-BEG
@@ -1659,7 +1750,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 					      'c-digit-separator t ?')
 	       (goto-char num-end))
 	      ((looking-at
-		"\\([^\\']\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\
+		"\\([^\\']\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\
 \\)'") ; balanced quoted expression.
 	       (goto-char (match-end 0)))
 	      ((looking-at "\\\\'")	; Anomalous construct.
@@ -2182,6 +2273,26 @@ This function is called from `c-common-init', once per mode initialization."
   (when c-buffer-is-cc-mode
     (setq c-electric-flag electric-indent-mode)
     (c-update-modeline)))
+
+
+;; Connection with Emacs's electric-pair-mode
+(defun c-electric-pair-inhibit-predicate (char)
+  "Return t to inhibit the insertion of a second copy of CHAR.
+
+At the time of call, point is just after the newly inserted CHAR.
+
+When CHAR is \", t will be returned unless the \" is marked with
+a string fence syntax-table text property.  For other characters,
+the default value of `electric-pair-inhibit-predicate' is called
+and its value returned.
+
+This function is the appropriate value of
+`electric-pair-inhibit-predicate' for CC Mode modes, which mark
+invalid strings with such a syntax table text property on the
+opening \" and the next unescaped end of line."
+  (if (eq char ?\")
+      (not (equal (get-text-property (1- (point)) 'syntax-table) '(15)))
+    (funcall (default-value 'electric-pair-inhibit-predicate) char)))
 
 
 ;; Support for C

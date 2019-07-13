@@ -402,12 +402,15 @@ $ autoconf
 @end group
 @end example
 
-
+@ifset installchapter
 @c Installation chapter is necessary only in case of standalone
 @c installation.
-@ifset installchapter
 @include trampinst.texi
 @end ifset
+@ifclear installchapter
+See the file @file{INSTALL} in that directory for further information
+how to install @value{tramp}.
+@end ifclear
 
 
 @node Quick Start Guide
@@ -709,25 +712,28 @@ Inline methods can work in situations where an external transfer
 program is unavailable.  Inline methods also work when transferring
 files between different @emph{user identities} on the same host.
 
-@cindex @command{uuencode}
-@cindex @command{mimencode}
 @cindex base-64 encoding
-
+@cindex base-64 encoding
+@cindex uu encoding
+@vindex tramp-remote-coding-commands
 @value{tramp} checks the remote host for the availability and
-usability of @command{mimencode} (part of the @command{metamail}
-package) or @command{uuencode}.  @value{tramp} uses the first reliable
-command it finds.  @value{tramp}'s search path can be customized, see
-@ref{Remote programs}.
+usability of one of the commands defined in
+@code{tramp-remote-coding-commands}.  @value{tramp} uses the first
+reliable command it finds.  @value{tramp}'s search path can be
+customized, see @ref{Remote programs}.
 
-In case both @command{mimencode} and @command{uuencode} are
-unavailable, @value{tramp} first transfers a small Perl program to the
-remote host, and then tries that program for encoding and decoding.
+In case none of the commands are unavailable, @value{tramp} first
+transfers a small Perl program to the remote host, and then tries that
+program for encoding and decoding.
 
 @vindex tramp-inline-compress-start-size
+@vindex tramp-inline-compress-commands
 To increase transfer speeds for large text files, use compression
 before encoding.  The user option
 @code{tramp-inline-compress-start-size} specifies the file size for
-such optimization.
+such optimization.  This feature depends on the availability and
+usability of one of the commands defined in
+@code{tramp-inline-compress-commands}.
 
 @table @asis
 @item @option{rsh}
@@ -3134,9 +3140,9 @@ be achieved by adding the environment variable @env{COLUMNS} to
 
 @value{tramp} is integrated into @file{eshell.el}, which enables
 interactive eshell sessions on remote hosts at the command prompt.
-You must add the module @code{em-tramp} to @code{eshell-modules-list}.
-Here's a sample interaction after opening @kbd{M-x eshell @key{RET}}
-on a remote host:
+You must add the module @code{eshell-tramp} to
+@code{eshell-modules-list}.  Here's a sample interaction after opening
+@kbd{M-x eshell @key{RET}} on a remote host:
 
 @example
 @group
@@ -3269,10 +3275,13 @@ This command flushes all connection related objects.  @option{vec} is
 the internal representation of a remote connection.  When called
 interactively, this command lists active remote connections in the
 minibuffer.  Each connection is of the format
-@file{@trampfn{method,user@@host,}}.  Flushing remote connections also
-cleans the password cache (@pxref{Password handling}), file cache,
-connection cache (@pxref{Connection caching}), recentf cache
-(@pxref{File Conveniences, , , emacs}), and connection buffers.
+@file{@trampfn{method,user@@host,}}.
+
+Flushing remote connections also cleans the password cache
+(@pxref{Password handling}), file cache, connection cache
+(@pxref{Connection caching}), and recentf cache (@pxref{File
+Conveniences, , , emacs}).  It also deletes session timers
+(@pxref{Predefined connection information}) and connection buffers.
 @end deffn
 
 @deffn Command tramp-cleanup-this-connection
@@ -3290,7 +3299,7 @@ proxy definitions (@pxref{Ad-hoc multi-hops}).
 @deffn Command tramp-cleanup-all-buffers
 Just as for @code{tramp-cleanup-all-connections}, all remote
 connections and ad-hoc proxy definition are cleaned up in addition to
-killing buffers related to that remote connection.
+killing all buffers related to remote connections.
 @end deffn
 
 
@@ -4204,10 +4213,8 @@ directory to the cache:
 
 @lisp
 @group
-@c `with-eval-after-load' has been introduced with Emacs 24.4.  Shall
-@c be used when appropriate.
-(eval-after-load "filecache"
-  '(file-cache-add-directory
+(with-eval-after-load 'filecache
+  (file-cache-add-directory
     "@trampfn{ssh,news@@news.my.domain,/opt/news/etc/}"))
 @end group
 @end lisp

@@ -7,6 +7,7 @@
 ;;      Emmanuel Briot  <briot@gnat.com>
 ;; Maintainer: Stephen Leake <stephen_leake@stephe-leake.org>
 ;; Keywords: languages ada
+;; Version: 4.0
 
 ;; This file is part of GNU Emacs.
 
@@ -909,7 +910,7 @@ the 4 file locations can be clicked on and jumped to."
 			       change))
 	    (replace-match "'A'"))
 	  (goto-char from)
-	  (while (re-search-forward "\\(#[0-9a-fA-F]*#\\)" to t)
+	  (while (re-search-forward "\\(#[[:xdigit:]]*#\\)" to t)
 	    (setq change (cons (list (match-beginning 1)
 				     (length (match-string 1))
 				     (match-string 1))
@@ -1013,7 +1014,7 @@ If PARSE-RESULT is non-nil, use it instead of calling `parse-partial-sexp'."
 
 (defsubst ada-in-numeric-literal-p ()
   "Return t if point is after a prefix of a numeric literal."
-  (looking-back "\\([0-9]+#[0-9a-fA-F_]+\\)" (line-beginning-position)))
+  (looking-back "\\([0-9]+#[[:xdigit:]_]+\\)" (line-beginning-position)))
 
 ;;------------------------------------------------------------------
 ;; Contextual menus
@@ -5213,7 +5214,7 @@ Return nil if no body was found."
      '("<<\\(\\sw+\\)>>" 1 font-lock-constant-face)
 
      ;; Highlight based-numbers (R. Reagan <robin-reply@reagans.org>)
-     (list "\\([0-9]+#[0-9a-fA-F_]+#\\)" '(1 font-lock-constant-face t))
+     (list "\\([0-9]+#[[:xdigit:]_]+#\\)" '(1 font-lock-constant-face t))
 
      ;; Ada unnamed numerical constants
      (list "\\W\\([-+]?[0-9._]+\\)\\>" '(1 font-lock-constant-face))

@@ -183,6 +183,12 @@ loads files during completion of 'C-h f' and 'C-h v' according to
 
 ** emacsclient
 
+*** Previously, when an alternate editor is started
+(--alternate-editor/-a), and there was an --eval switch, these
+parameters were used as file names for the alternate editor.
+emacsclient will now instead start the alternate editor without these
+parameters.
+
 +++
 *** emacsclient now supports the 'EMACS_SOCKET_NAME' environment variable.
 The behavior is identical to 'EMACS_SERVER_FILE', in that the
@@ -436,7 +442,8 @@ interface that's more like functions like 'search-forward'.
 
 ---
 ** More commands support noncontiguous rectangular regions, namely
-'upcase-dwim', 'downcase-dwim', 'replace-string', 'replace-regexp'.
+'upcase-dwim', 'downcase-dwim', 'replace-string', 'replace-regexp',
+and 'delimit-columns-region'.
 
 +++
 ** When asked to visit a large file, Emacs now offers visiting it literally.
@@ -474,6 +481,14 @@ current and the previous or the next line, as before.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
++++
+** winner
+*** A new variable, `winner-boring-buffers-regexp', has been added.
+
+** table
+** `table-generate-source' and friends now support outputting wiki and
+mediawiki format tables.
 
 ---
 ** telnet-mode
@@ -675,6 +690,12 @@ to Hg revert.
 print diffs and logs between the merge base (common ancestor) of two
 given revisions.
 
++++
+*** The new `d' command (`vc-dir-delete-files-no-vc') in `vc-dir-mode'
+buffers will delete the marked files (or if no files are marked, the
+file under point).  This command does not notify the VC backend, and
+is mostly useful for unregistered files.
+
 ** Diff mode
 +++
 *** Hunks are now automatically refined by font-lock.
@@ -738,6 +759,10 @@ the Nth argument counting from the last one.  Thus 'C-c .' can now
 better emulate 'M-.' in both Bash and zsh, since the former counts
 from the beginning of the arguments, while the latter counts from the
 end.
+
++++
+*** 'comint-run' can now accept a list of switches to pass to the program.
+'C-u M-x comint-run' will prompt for the switches interactively.
 
 ** SQL
 
@@ -973,7 +998,7 @@ This attribute is meant to tell screen readers to ignore a tag.
 *** 'shr-tag-ol' now respects the ordered list 'start' attribute.
 
 ---
-*** The <code ...> tag is now handled.
+*** The following tags are now handled: <code>, <abbr>, and <acronym>.
 
 ** Htmlfontify
 
@@ -1096,6 +1121,12 @@ highlight in one iteration while processing the full buffer.
 'C-M-w' in isearch changed from 'isearch-del-char' to the new function
 'isearch-yank-symbol-or-char'.  'isearch-del-char' is now bound to
 'C-M-d'.
+
++++
+'M-s h l' invokes highlight-lines-matching-regexp using the search
+string to highlight lines matching the search string.  This is similar
+to the existing binding 'M-s h r' (highlight-regexp) that highlights
+JUST the search string.
 
 +++
 *** New variable 'isearch-yank-on-move' provides options 't' and 'shift'
@@ -1360,6 +1391,22 @@ are formatted as MIME digests.
 *** 'message-forward-included-headers' has changed its default to
 exclude most headers when forwarding.
 
+*** 'mml-secure-openpgp-sign-with-sender' sets also "gpg --sender"
+When 'mml-secure-openpgp-sign-with-sender' is non-nil message sender's
+email address (in addition to its old behaviour) will also be used to
+set gpg's "--sender email@domain" option.
+
+The option is useful for two reasons when verifying the signature:
+
+ 1. GnuPG's TOFU statistics are updated for the specific user id
+    (email) only. See gpg(1) man page about "--sender".
+
+ 2. GnuPG's --auto-key-retrieve functionality can use WKD (web key
+    directory) method for finding the signer's key. You need GnuPG
+    2.2.17 to fully benefit from this feature. See gpg(1) man page for
+    "--auto-key-retrieve".
+
+---
 ** EasyPG
 
 ---
@@ -1372,6 +1419,13 @@ It now applies to epg functions as well as epa functions.
 been removed.  Use 'encode-coding-string', 'decode-coding-string', and
 'select-safe-coding-system' instead.
 
+*** 'epg-context' structure supports now 'sender' slot
+The value of the new 'sender' slot (if a string) is used to set gpg's
+--sender option. This feature is used by
+'mml-secure-openpgp-sign-with-sender'. See gpg(1) manual page about
+"--sender" for more information.
+
+---
 ** Rmail
 
 +++
@@ -1622,6 +1676,14 @@ When non-nil, watch whether the bookmark file has changed on disk.
 This library generates manual C++ template instantiations.  It should
 no longer be useful on modern compilers, which do this automatically.
 
+** Ispell
+
+---
+*** New hook 'ispell-change-dictionary-hook'.
+This runs after changing the dictionary and could be used to
+automatically spellcheck a buffer when changing language without
+needing to advice 'ispell-change-dictionary'.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1649,6 +1711,14 @@ expansion to backtrace buffers produced by the Lisp debugger, Edebug
 and ERT.  See the node "(elisp) Backtraces" in the Elisp manual for
 documentation of the new mode and its commands.
 
++++
+** so-long.el helps to mitigate performance problems with long lines.
+When 'global-so-long-mode' has been enabled, visiting a file with very
+long lines will (subject to configuration) cause the user's preferred
+'so-long-action' to be automatically invoked (by default, the buffer's
+major mode is replaced by 'so-long-mode').  In extreme cases this can
+prevent delays of several minutes, and make Emacs responsive almost
+immediately.  Type 'M-x so-long-commentary' for full documentation.
 
 * Incompatible Lisp Changes in Emacs 27.1
 
@@ -1787,8 +1857,16 @@ never worked reliably, and now causes an error.
 This is consistent with the fact that nil, though a symbol, is not a
 valid event type.
 
+---
+** The obsolete package xesam.el (since Emacs 24) has been removed.
+
 
 * Lisp Changes in Emacs 27.1
+
+** defcustom now takes a :local keyword that can be either t or
+`permanent', which mean that the variable should be automatically
+buffer-local.  `permanent' also sets the variable's
+`permanent-local' property.
 
 +++
 ** The new macro `with-suppressed-warnings' can be used to suppress
@@ -2187,13 +2265,13 @@ the process.  That way 'make-process' can start remote processes.
 
 +++
 ** Emacs now supports resizing and rotating images without ImageMagick.
-All modern systems are supported by this feature.  (On GNU and Unix
-systems, Cairo drawing or the XRender extension to X11 is required for
-this to be available; the configure script will test for it and, if
-found, enable scaling.)
+All modern systems support this feature.  (On GNU and Unix systems,
+Cairo drawing or the XRender extension to X11 is required for this to
+be available; the configure script will test for it and, if found,
+enable scaling.)
 
 The new function 'image-transforms-p' can be used to test whether any
-given frame supports this capability.
+given frame supports these capabilities.
 
 +++
 ** '(locale-info 'paper)' now returns the paper size on systems that support it.
@@ -2234,6 +2312,13 @@ representing the unit to use; it defaults to "B" when the second
 argument is 'iec' and the empty string otherwise.  We recomment a
 space or non-breaking space as third argument, and "B" as fourth
 argument, circumstances allowing.
+
++++
+** `format-spec' has been expanded with several modifiers to allow
+greater flexibility when customizing variables.  The modifiers include
+zero-padding, upper- and lower-casing, and limiting the length of the
+interpolated strings.  The function has now also been documented in
+the Emacs Lisp manual.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

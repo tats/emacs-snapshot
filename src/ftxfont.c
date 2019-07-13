@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
-#include <stdio.h>
 #include <X11/Xlib.h>
 
 #include "lisp.h"
@@ -336,8 +335,8 @@ struct font_driver const ftxfont_driver =
   .list = ftxfont_list,
   .match = ftxfont_match,
   .list_family = ftfont_list_family,
-  .open = ftxfont_open,
-  .close = ftxfont_close,
+  .open_font = ftxfont_open,
+  .close_font = ftxfont_close,
   .has_char = ftfont_has_char,
   .encode_char = ftfont_encode_char,
   .text_extents = ftfont_text_extents,

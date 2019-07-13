@@ -799,10 +799,10 @@ last valid position in OBJECT.  */)
       else
 	CHECK_FIXNUM_COERCE_MARKER (limit);
 
-      if (XFIXNAT (position) >= XFIXNAT (limit))
+      if (XFIXNUM (position) >= XFIXNUM (limit))
 	{
 	  position = limit;
-	  if (XFIXNAT (position) > ZV)
+	  if (XFIXNUM (position) > ZV)
 	    XSETFASTINT (position, ZV);
 	}
       else
@@ -881,16 +881,17 @@ first valid position in OBJECT.  */)
       else
 	CHECK_FIXNUM_COERCE_MARKER (limit);
 
-      if (XFIXNAT (position) <= XFIXNAT (limit))
+      if (XFIXNUM (position) <= XFIXNUM (limit))
 	{
 	  position = limit;
-	  if (XFIXNAT (position) < BEGV)
+	  if (XFIXNUM (position) < BEGV)
 	    XSETFASTINT (position, BEGV);
 	}
       else
 	{
 	  Lisp_Object initial_value
-	    = Fget_char_property (make_fixnum (XFIXNAT (position) - 1),
+	    = Fget_char_property (make_fixnum (XFIXNUM (position)
+					       - (0 <= XFIXNUM (position))),
 				  prop, object);
 
 	  while (true)
@@ -970,13 +971,13 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   next = next_interval (i);
 
   while (next && intervals_equal (i, next)
-	 && (NILP (limit) || next->position < XFIXNAT (limit)))
+	 && (NILP (limit) || next->position < XFIXNUM (limit)))
     next = next_interval (next);
 
   if (!next
       || (next->position
 	  >= (FIXNUMP (limit)
-	      ? XFIXNAT (limit)
+	      ? XFIXNUM (limit)
 	      : (STRINGP (object)
 		 ? SCHARS (object)
 		 : BUF_ZV (XBUFFER (object))))))
@@ -1019,13 +1020,13 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   next = next_interval (i);
   while (next
 	 && EQ (here_val, textget (next->plist, prop))
-	 && (NILP (limit) || next->position < XFIXNAT (limit)))
+	 && (NILP (limit) || next->position < XFIXNUM (limit)))
     next = next_interval (next);
 
   if (!next
       || (next->position
 	  >= (FIXNUMP (limit)
-	      ? XFIXNAT (limit)
+	      ? XFIXNUM (limit)
 	      : (STRINGP (object)
 		 ? SCHARS (object)
 		 : BUF_ZV (XBUFFER (object))))))
@@ -1069,13 +1070,13 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   previous = previous_interval (i);
   while (previous && intervals_equal (previous, i)
 	 && (NILP (limit)
-	     || (previous->position + LENGTH (previous) > XFIXNAT (limit))))
+	     || (previous->position + LENGTH (previous) > XFIXNUM (limit))))
     previous = previous_interval (previous);
 
   if (!previous
       || (previous->position + LENGTH (previous)
 	  <= (FIXNUMP (limit)
-	      ? XFIXNAT (limit)
+	      ? XFIXNUM (limit)
 	      : (STRINGP (object) ? 0 : BUF_BEGV (XBUFFER (object))))))
     return limit;
   else
@@ -1122,13 +1123,13 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   while (previous
 	 && EQ (here_val, textget (previous->plist, prop))
 	 && (NILP (limit)
-	     || (previous->position + LENGTH (previous) > XFIXNAT (limit))))
+	     || (previous->position + LENGTH (previous) > XFIXNUM (limit))))
     previous = previous_interval (previous);
 
   if (!previous
       || (previous->position + LENGTH (previous)
 	  <= (FIXNUMP (limit)
-	      ? XFIXNAT (limit)
+	      ? XFIXNUM (limit)
 	      : (STRINGP (object) ? 0 : BUF_BEGV (XBUFFER (object))))))
     return limit;
   else
@@ -1141,6 +1142,18 @@ static Lisp_Object
 add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 		       Lisp_Object properties, Lisp_Object object,
 		       enum property_set_type set_type) {
+  /* Ensure we run the modification hooks for the right buffer,
+     without switching buffers twice (bug 36190).  FIXME: Switching
+     buffers is slow and often unnecessary.  */
+  if (BUFFERP (object) && XBUFFER (object) != current_buffer)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_current_buffer ();
+      set_buffer_internal (XBUFFER (object));
+      return unbind_to (count, add_text_properties_1 (start, end, properties,
+						      object, set_type));
+    }
+
   INTERVAL i, unchanged;
   ptrdiff_t s, len;
   bool modified = false;
@@ -1342,6 +1355,19 @@ Lisp_Object
 set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
 		     Lisp_Object object, Lisp_Object coherent_change_p)
 {
+  /* Ensure we run the modification hooks for the right buffer,
+     without switching buffers twice (bug 36190).  FIXME: Switching
+     buffers is slow and often unnecessary.  */
+  if (BUFFERP (object) && XBUFFER (object) != current_buffer)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_current_buffer ();
+      set_buffer_internal (XBUFFER (object));
+      return unbind_to (count,
+			set_text_properties (start, end, properties,
+					     object, coherent_change_p));
+    }
+
   INTERVAL i;
   bool first_time = true;
 
@@ -1353,8 +1379,8 @@ set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
   /* If we want no properties for a whole string,
      get rid of its intervals.  */
   if (NILP (properties) && STRINGP (object)
-      && XFIXNAT (start) == 0
-      && XFIXNAT (end) == SCHARS (object))
+      && EQ (start, make_fixnum (0))
+      && EQ (end, make_fixnum (SCHARS (object))))
     {
       if (!string_intervals (object))
 	return Qnil;
@@ -1412,6 +1438,20 @@ void
 set_text_properties_1 (Lisp_Object start, Lisp_Object end,
 		       Lisp_Object properties, Lisp_Object object, INTERVAL i)
 {
+  /* Ensure we run the modification hooks for the right buffer,
+     without switching buffers twice (bug 36190).  FIXME: Switching
+     buffers is slow and often unnecessary.  */
+  if (BUFFERP (object) && XBUFFER (object) != current_buffer)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_current_buffer ();
+      set_buffer_internal (XBUFFER (object));
+
+      set_text_properties_1 (start, end, properties, object, i);
+      unbind_to (count, Qnil);
+      return;
+    }
+
   INTERVAL prev_changed = NULL;
   ptrdiff_t s = XFIXNUM (start);
   ptrdiff_t len = XFIXNUM (end) - s;
@@ -1494,6 +1534,19 @@ Return t if any property was actually removed, nil otherwise.
 Use `set-text-properties' if you want to remove all text properties.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object properties, Lisp_Object object)
 {
+  /* Ensure we run the modification hooks for the right buffer,
+     without switching buffers twice (bug 36190).  FIXME: Switching
+     buffers is slow and often unnecessary.  */
+  if (BUFFERP (object) && XBUFFER (object) != current_buffer)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_current_buffer ();
+      set_buffer_internal (XBUFFER (object));
+      return unbind_to (count,
+			Fremove_text_properties (start, end, properties,
+						 object));
+    }
+
   INTERVAL i, unchanged;
   ptrdiff_t s, len;
   bool modified = false;
@@ -1606,6 +1659,20 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.
 Return t if any property was actually removed, nil otherwise.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object list_of_properties, Lisp_Object object)
 {
+  /* Ensure we run the modification hooks for the right buffer,
+     without switching buffers twice (bug 36190).  FIXME: Switching
+     buffers is slow and often unnecessary.  */
+  if (BUFFERP (object) && XBUFFER (object) != current_buffer)
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      record_unwind_current_buffer ();
+      set_buffer_internal (XBUFFER (object));
+      return unbind_to (count,
+			Fremove_list_of_text_properties (start, end,
+							 list_of_properties,
+							 object));
+    }
+
   INTERVAL i, unchanged;
   ptrdiff_t s, len;
   bool modified = false;

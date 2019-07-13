@@ -23,7 +23,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/param.h>
@@ -42,6 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "pdumper.h"
 #include "window.h"
+#include "sysstdio.h"
 #include "systime.h"
 #include "thread.h"
 #include "bignum.h"
@@ -329,7 +329,7 @@ dump_fingerprint (const char *label, unsigned char const *xfingerprint)
   fprintf (stderr, "%s: ", label);
   for (int i = 0; i < 32; ++i)
     fprintf (stderr, "%02x", (unsigned) xfingerprint[i]);
-  fprintf (stderr, "\n");
+  putc ('\n', stderr);
 }
 
 /* Format of an Emacs portable dump file.  All offsets are relative to
@@ -1404,9 +1404,9 @@ print_paths_to_root_1 (struct dump_context *ctx,
       referrers = XCDR (referrers);
       Lisp_Object repr = Fprin1_to_string (referrer, Qnil);
       for (int i = 0; i < level; ++i)
-        fputc (' ', stderr);
+	putc (' ', stderr);
       fwrite (SDATA (repr), 1, SBYTES (repr), stderr);
-      fputc ('\n', stderr);
+      putc ('\n', stderr);
       print_paths_to_root_1 (ctx, referrer, level + 1);
     }
 }
@@ -3061,10 +3061,7 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
 #if CHECK_STRUCTS && !defined (HASH_Lisp_Type_E2AD97D3F7)
 # error "Lisp_Type changed. See CHECK_STRUCTS comment in config.h."
 #endif
-#ifdef ENABLE_CHECKING
-  /* Vdead is extern only when ENABLE_CHECKING.  */
-  eassert (!EQ (object, Vdead));
-#endif
+  eassert (!EQ (object, dead_object ()));
 
   dump_off offset = dump_recall_object (ctx, object);
   if (offset > 0)
@@ -4101,7 +4098,8 @@ types.  */)
   ctx->header.magic[0] = '!'; /* Note that dump is incomplete.  */
 
   verify (sizeof (fingerprint) == sizeof (ctx->header.fingerprint));
-  memcpy (ctx->header.fingerprint, fingerprint, sizeof (fingerprint));
+  for (int i = 0; i < sizeof fingerprint; i++)
+    ctx->header.fingerprint[i] = fingerprint[i];
 
   const dump_off header_start = ctx->offset;
   dump_fingerprint ("dumping fingerprint", ctx->header.fingerprint);
@@ -4226,14 +4224,14 @@ types.  */)
   dump_seek (ctx, 0);
   dump_write (ctx, &ctx->header, sizeof (ctx->header));
 
-  fprintf (stderr, "Dump complete\n");
   fprintf (stderr,
-           "Byte counts: header=%lu hot=%lu discardable=%lu cold=%lu\n",
+	   ("Dump complete\n"
+	    "Byte counts: header=%lu hot=%lu discardable=%lu cold=%lu\n"
+	    "Reloc counts: hot=%u discardable=%u\n"),
            (unsigned long) (header_end - header_start),
            (unsigned long) (hot_end - hot_start),
            (unsigned long) (discardable_end - ctx->header.discardable_start),
-           (unsigned long) (cold_end - ctx->header.cold_start));
-  fprintf (stderr, "Reloc counts: hot=%u discardable=%u\n",
+           (unsigned long) (cold_end - ctx->header.cold_start),
            number_hot_relocations,
            number_discardable_relocations);
 
@@ -5359,9 +5357,12 @@ pdumper_load (const char *dump_filename)
 
   err = PDUMPER_LOAD_VERSION_MISMATCH;
   verify (sizeof (header->fingerprint) == sizeof (fingerprint));
-  if (memcmp (header->fingerprint, fingerprint, sizeof (fingerprint)) != 0)
+  unsigned char desired[sizeof fingerprint];
+  for (int i = 0; i < sizeof fingerprint; i++)
+    desired[i] = fingerprint[i];
+  if (memcmp (header->fingerprint, desired, sizeof desired) != 0)
     {
-      dump_fingerprint ("desired fingerprint", fingerprint);
+      dump_fingerprint ("desired fingerprint", desired);
       dump_fingerprint ("found fingerprint", header->fingerprint);
       goto out;
     }

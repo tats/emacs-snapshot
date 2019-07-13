@@ -258,57 +258,81 @@ at the left corner."
 (defun delimit-columns-region (start end)
   "Prettify all columns in a text region.
 
-START and END delimit the text region."
+START and END delimit the text region.
+
+If you have, for example, the following columns:
+
+       a       b       c       d
+       aaaa    bb      ccc     ddddd
+
+Depending on your settings (see below), you then obtain the
+following result:
+
+       [ a   , b  , c      , d     ]
+       [ aaaa, bb , ccc    , ddddd ]
+
+See the `delimit-columns-str-before',
+`delimit-columns-str-after', `delimit-columns-str-separator',
+`delimit-columns-before', `delimit-columns-after',
+`delimit-columns-separator', `delimit-columns-format' and
+`delimit-columns-extra' variables for customization of the
+look. "
   (interactive "*r")
-  (let ((delimit-columns-str-before
-	 (delimit-columns-str delimit-columns-str-before))
-	(delimit-columns-str-separator
-	 (delimit-columns-str delimit-columns-str-separator))
-	(delimit-columns-str-after
-	 (delimit-columns-str delimit-columns-str-after))
-	(delimit-columns-before
-	 (delimit-columns-str delimit-columns-before))
-	(delimit-columns-after
-	 (delimit-columns-str delimit-columns-after))
-	(delimit-columns-start
-         (if (natnump delimit-columns-start)
-	     delimit-columns-start
-	   0))
-	(delimit-columns-end
-	 (if (integerp delimit-columns-end)
-	     delimit-columns-end
-	   1000000))
-	(delimit-columns-limit (make-marker))
-	(the-end (copy-marker end))
-	delimit-columns-max)
-    (when (<= delimit-columns-start delimit-columns-end)
-      (save-excursion
-	(goto-char start)
-	(beginning-of-line)
-	;; get maximum length for each column
-	(and delimit-columns-format
-	     (save-excursion
-	       (while (< (point) the-end)
-		 (delimit-columns-rectangle-max
-		  (prog1
-		      (point)
-		    (end-of-line)))
-		 (forward-char 1))))
-	;; prettify columns
-	(while (< (point) the-end)
-	  (delimit-columns-rectangle-line
-	   (prog1
-	       (point)
-	     (end-of-line)))
-	  (forward-char 1))
-	;; nullify markers
-	(set-marker delimit-columns-limit nil)
-	(set-marker the-end nil)))))
+  (if rectangle-mark-mode
+      ;; Delegate to delimit-columns-rectangle when called with a
+      ;; rectangular region.
+      (delimit-columns-rectangle start end)
+    (let ((delimit-columns-str-before
+           (delimit-columns-str delimit-columns-str-before))
+          (delimit-columns-str-separator
+           (delimit-columns-str delimit-columns-str-separator))
+          (delimit-columns-str-after
+           (delimit-columns-str delimit-columns-str-after))
+          (delimit-columns-before
+           (delimit-columns-str delimit-columns-before))
+          (delimit-columns-after
+           (delimit-columns-str delimit-columns-after))
+          (delimit-columns-start
+           (if (natnump delimit-columns-start)
+               delimit-columns-start
+             0))
+          (delimit-columns-end
+           (if (integerp delimit-columns-end)
+               delimit-columns-end
+             1000000))
+          (delimit-columns-limit (make-marker))
+          (the-end (copy-marker end))
+          delimit-columns-max)
+      (when (<= delimit-columns-start delimit-columns-end)
+        (save-excursion
+          (goto-char start)
+          (beginning-of-line)
+          ;; get maximum length for each column
+          (and delimit-columns-format
+               (save-excursion
+                 (while (< (point) the-end)
+                   (delimit-columns-rectangle-max
+                    (prog1
+                        (point)
+                      (end-of-line)))
+                   (forward-char 1))))
+          ;; prettify columns
+          (while (< (point) the-end)
+            (delimit-columns-rectangle-line
+             (prog1
+                 (point)
+               (end-of-line)))
+            (forward-char 1))
+          ;; nullify markers
+          (set-marker delimit-columns-limit nil)
+          (set-marker the-end nil))))))
 
 
 ;;;###autoload
 (defun delimit-columns-rectangle (start end)
   "Prettify all columns in a text rectangle.
+
+See `delimit-columns-region' for what this entails.
 
 START and END delimit the corners of the text rectangle."
   (interactive "*r")

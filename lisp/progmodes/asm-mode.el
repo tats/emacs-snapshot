@@ -4,7 +4,7 @@
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Maintainer: emacs-devel@gnu.org
-;; Keywords: tools, languages
+;; Keywords: languages
 
 ;; This file is part of GNU Emacs.
 
@@ -26,7 +26,7 @@
 ;; This mode was written by Eric S. Raymond <esr@snark.thyrsus.com>,
 ;; inspired by an earlier asm-mode by Martin Neitzel.
 
-;; This minor mode is based on text mode.  It defines a private abbrev table
+;; This major mode is based on prog mode.  It defines a private abbrev table
 ;; that can be used to save abbrevs for assembler mnemonics.  It binds just
 ;; five keys:
 ;;
@@ -53,7 +53,7 @@
   :group 'languages)
 
 (defcustom asm-comment-char ?\;
-  "The comment-start character assumed by Asm mode."
+  "The `comment-start' character assumed by Asm mode."
   :type 'character
   :group 'asm)
 
@@ -113,7 +113,7 @@ Features a private abbrev table and the following bindings:
 
 \\[asm-colon]\toutdent a preceding label, tab to next tab stop.
 \\[tab-to-tab-stop]\ttab to next tab stop.
-\\[asm-newline]\tnewline, then tab to next tab stop.
+\\[newline-and-indent]\tnewline, then tab to next tab stop.
 \\[asm-comment]\tsmart placement of assembler comments.
 
 The character used for making comments is set by the variable
@@ -187,14 +187,13 @@ Special commands:
       (delete-horizontal-space)
       (tab-to-tab-stop))))
 
-;; Obsolete since Emacs-22.1.
-(defalias 'asm-newline 'newline-and-indent)
+(define-obsolete-function-alias 'asm-newline 'newline-and-indent "27.1")
 
 (defun asm-comment ()
   "Convert an empty comment to a `larger' kind, or start a new one.
 These are the known comment classes:
 
-   1 -- comment to the right of the code (at the comment-column)
+   1 -- comment to the right of the code (at the `comment-column')
    2 -- comment on its own line, indented like code
    3 -- comment on its own line, beginning at the left-most column.
 

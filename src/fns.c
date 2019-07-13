@@ -403,7 +403,14 @@ Symbols are also allowed; their print names are used instead.  */)
     string2 = SYMBOL_NAME (string2);
   CHECK_STRING (string1);
   CHECK_STRING (string2);
+  return string_version_cmp (string1, string2) < 0 ? Qt : Qnil;
+}
 
+/* Return negative, 0, positive if STRING1 is <, =, > STRING2 as per
+   string-version-lessp.  */
+int
+string_version_cmp (Lisp_Object string1, Lisp_Object string2)
+{
   char *p1 = SSDATA (string1);
   char *p2 = SSDATA (string2);
   char *lim1 = p1 + SBYTES (string1);
@@ -415,15 +422,18 @@ Symbols are also allowed; their print names are used instead.  */)
       /* If the strings are identical through their first NUL bytes,
 	 skip past identical prefixes and try again.  */
       ptrdiff_t size = strlen (p1) + 1;
+      eassert (size == strlen (p2) + 1);
       p1 += size;
       p2 += size;
-      if (lim1 < p1)
-	return lim2 < p2 ? Qnil : Qt;
-      if (lim2 < p2)
-	return Qnil;
+      bool more1 = p1 <= lim1;
+      bool more2 = p2 <= lim2;
+      if (!more1)
+	return more2;
+      if (!more2)
+	return -1;
     }
 
-  return cmp < 0 ? Qt : Qnil;
+  return cmp;
 }
 
 DEFUN ("string-collate-lessp", Fstring_collate_lessp, Sstring_collate_lessp, 2, 4, 0,
@@ -2151,9 +2161,13 @@ merge (Lisp_Object org_l1, Lisp_Object org_l2, Lisp_Object pred)
 DEFUN ("plist-get", Fplist_get, Splist_get, 2, 2, 0,
        doc: /* Extract a value from a property list.
 PLIST is a property list, which is a list of the form
-\(PROP1 VALUE1 PROP2 VALUE2...).  This function returns the value
-corresponding to the given PROP, or nil if PROP is not one of the
-properties on the list.  This function never signals an error.  */)
+\(PROP1 VALUE1 PROP2 VALUE2...).
+
+This function returns the value corresponding to the given PROP, or
+nil if PROP is not one of the properties on the list.  The comparison
+with PROP is done using `eq'.
+
+This function never signals an error.  */)
   (Lisp_Object plist, Lisp_Object prop)
 {
   Lisp_Object tail = plist;
@@ -2164,8 +2178,6 @@ properties on the list.  This function never signals an error.  */)
       if (EQ (prop, XCAR (tail)))
 	return XCAR (XCDR (tail));
       tail = XCDR (tail);
-      if (EQ (tail, li.tortoise))
-	break;
     }
 
   return Qnil;
@@ -2208,8 +2220,6 @@ The PLIST is modified by side effects.  */)
 
       prev = tail;
       tail = XCDR (tail);
-      if (EQ (tail, li.tortoise))
-	circular_list (plist);
     }
   CHECK_TYPE (NILP (tail), Qplistp, plist);
   Lisp_Object newcell
@@ -2233,10 +2243,8 @@ It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
 
 DEFUN ("lax-plist-get", Flax_plist_get, Slax_plist_get, 2, 2, 0,
        doc: /* Extract a value from a property list, comparing with `equal'.
-PLIST is a property list, which is a list of the form
-\(PROP1 VALUE1 PROP2 VALUE2...).  This function returns the value
-corresponding to the given PROP, or nil if PROP is not
-one of the properties on the list.  */)
+This function is otherwise like `plist-get', but may signal an error
+if PLIST isn't a valid plist.  */)
   (Lisp_Object plist, Lisp_Object prop)
 {
   Lisp_Object tail = plist;
@@ -2247,8 +2255,6 @@ one of the properties on the list.  */)
       if (! NILP (Fequal (prop, XCAR (tail))))
 	return XCAR (XCDR (tail));
       tail = XCDR (tail);
-      if (EQ (tail, li.tortoise))
-	circular_list (plist);
     }
 
   CHECK_TYPE (NILP (tail), Qplistp, plist);
@@ -2280,8 +2286,6 @@ The PLIST is modified by side effects.  */)
 
       prev = tail;
       tail = XCDR (tail);
-      if (EQ (tail, li.tortoise))
-	circular_list (plist);
     }
   CHECK_TYPE (NILP (tail), Qplistp, plist);
   Lisp_Object newcell = list2 (prop, val);
@@ -2682,7 +2686,7 @@ DEFUN ("mapconcat", Fmapconcat, Smapconcat, 3, 3, 0,
 In between each pair of results, stick in SEPARATOR.  Thus, " " as
   SEPARATOR results in spaces between the values returned by FUNCTION.
 SEQUENCE may be a list, a vector, a bool-vector, or a string.
-SEPARATOR must be a string.
+SEPARATOR must be a string, a vector, or a list of characters.
 FUNCTION must be a function of one argument, and must return a value
   that is a sequence of characters: either a string, or a vector or
   list of numbers that are valid character codepoints.  */)
@@ -2992,8 +2996,9 @@ suppressed.  */)
       Vautoload_queue = Qt;
 
       /* Load the file.  */
-      tem = Fload (NILP (filename) ? Fsymbol_name (feature) : filename,
-		   noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
+      tem = save_match_data_load
+	(NILP (filename) ? Fsymbol_name (feature) : filename,
+	 noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
 
       /* If load failed entirely, return nil.  */
       if (NILP (tem))
@@ -3045,8 +3050,6 @@ The value is actually the tail of PLIST whose car is PROP.  */)
       tail = XCDR (tail);
       if (! CONSP (tail))
 	break;
-      if (EQ (tail, li.tortoise))
-	circular_list (tail);
     }
   CHECK_TYPE (NILP (tail), Qplistp, plist);
   return Qnil;
@@ -4232,6 +4235,12 @@ void
 hash_table_rehash (struct Lisp_Hash_Table *h)
 {
   ptrdiff_t size = HASH_TABLE_SIZE (h);
+
+  /* These structures may have been purecopied and shared
+     (bug#36447).  */
+  h->next = Fcopy_sequence (h->next);
+  h->index = Fcopy_sequence (h->index);
+  h->hash = Fcopy_sequence (h->hash);
 
   /* Recompute the actual hash codes for each entry in the table.
      Order is still invalid.  */

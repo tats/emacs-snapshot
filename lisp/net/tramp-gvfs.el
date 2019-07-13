@@ -161,6 +161,7 @@
    (add-to-list 'tramp-default-host-alist
 	        '("\\`gdrive\\'" nil ,(match-string 2 user-mail-address)))))
 
+;;;###tramp-autoload
 (defcustom tramp-gvfs-zeroconf-domain "local"
   "Zeroconf domain to be used for discovering services, like host names."
   :group 'tramp
@@ -724,12 +725,7 @@ is no information where to trace the message.")
     (tramp-message tramp-gvfs-dbus-event-vector 6 "%S" event)
     (tramp-error tramp-gvfs-dbus-event-vector 'file-error "%s" (cadr err))))
 
-;; `dbus-event-error-hooks' has been renamed to
-;; `dbus-event-error-functions' in Emacs 24.3.
-(add-hook
- (if (boundp 'dbus-event-error-functions)
-     'dbus-event-error-functions 'dbus-event-error-hooks)
- #'tramp-gvfs-dbus-event-error)
+(add-hook 'dbus-event-error-functions #'tramp-gvfs-dbus-event-error)
 
 
 ;; File name primitives.
@@ -769,6 +765,8 @@ file names."
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
+	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	  (tramp-error v 'file-error "File is a directory %s" newname))
 
 	(if (or (and equal-remote
 		     (tramp-get-connection-property v "direct-copy-failed" nil))
@@ -942,7 +940,7 @@ file names."
 	;; Send command.
 	(tramp-gvfs-send-command
 	 v "gvfs-ls" "-h" "-n" "-a"
-	 (mapconcat #'identity tramp-gvfs-file-attributes ",")
+	 (string-join tramp-gvfs-file-attributes ",")
 	 (tramp-gvfs-url-file-name directory))
 	;; Parse output.
 	(with-current-buffer (tramp-get-connection-buffer v)
@@ -1183,7 +1181,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	  (tramp-error
 	   v 'file-notify-error "Monitoring not supported for `%s'" file-name)
 	(tramp-message
-	 v 6 "Run `%s', %S" (mapconcat #'identity (process-command p) " ") p)
+	 v 6 "Run `%s', %S" (string-join (process-command p) " ") p)
 	(process-put p 'vector v)
 	(process-put p 'events events)
 	(process-put p 'watch-name localname)
@@ -1997,15 +1995,12 @@ VEC is used only for traces."
        (list user host)))
    (zeroconf-list-services service)))
 
-;; We use the TRIM argument of `split-string', which exist since Emacs
-;; 24.4.  I mask this for older Emacs versions, there is no harm.
 (defun tramp-gvfs-parse-device-names (service)
   "Return a list of (user host) tuples allowed to access.
 This uses \"avahi-browse\" in case D-Bus is not enabled in Avahi."
   (let ((result
 	 (ignore-errors
-	   (tramp-compat-funcall
-	    'split-string
+	   (split-string
 	    (shell-command-to-string (format "avahi-browse -trkp %s" service))
 	    "[\n\r]+" 'omit "^\\+;.*$"))))
     (delete-dups
@@ -2013,8 +2008,7 @@ This uses \"avahi-browse\" in case D-Bus is not enabled in Avahi."
       (lambda (x)
 	(let* ((list (split-string x ";"))
 	       (host (nth 6 list))
-	       (text (tramp-compat-funcall
-		      'split-string (nth 9 list) "\" \"" 'omit "\""))
+	       (text (split-string (nth 9 list) "\" \"" 'omit "\""))
 	       user)
 	  ;; A user is marked in a TXT field like "u=guest".
 	  (while text

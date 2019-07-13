@@ -753,6 +753,7 @@ This is like `describe-bindings', but displays only Isearch keys."
     (define-key map [?\C-\M-%] 'isearch-query-replace-regexp)
     (define-key map "\M-so" 'isearch-occur)
     (define-key map "\M-shr" 'isearch-highlight-regexp)
+    (define-key map "\M-shl" 'isearch-highlight-lines-matching-regexp)
 
     ;; The key translations defined in the C-x 8 prefix should add
     ;; characters to the search string.  See iso-transl.el.
@@ -1039,6 +1040,9 @@ Type \\[isearch-occur] to run `occur' that shows\
  the last search string.
 Type \\[isearch-highlight-regexp] to run `highlight-regexp'\
  that highlights the last search string.
+Type \\[isearch-highlight-lines-matching-regexp] to run
+ `highlight-lines-matching-regexp'\ that highlights lines
+ matching the last search string.
 
 Type \\[isearch-describe-bindings] to display all Isearch key bindings.
 Type \\[isearch-describe-key] to display documentation of Isearch key.
@@ -1992,13 +1996,17 @@ Turning on character-folding turns off regexp mode.")
   (setq isearch-regexp (not isearch-regexp))
   (if isearch-regexp (setq isearch-regexp-function nil)))
 
+(defvar isearch-message-properties minibuffer-prompt-properties
+  "Text properties that are added to the isearch prompt.")
+
 (defun isearch--momentary-message (string)
   "Print STRING at the end of the isearch prompt for 1 second"
   (let ((message-log-max nil))
     (message "%s%s%s"
              (isearch-message-prefix nil isearch-nonincremental)
              isearch-message
-             (propertize (format " [%s]" string) 'face 'minibuffer-prompt)))
+             (apply #'propertize (format " [%s]" string)
+                    isearch-message-properties)))
   (sit-for 1))
 
 (isearch-define-mode-toggle lax-whitespace " " nil
@@ -2339,12 +2347,12 @@ characters in that string."
 
 (declare-function hi-lock-read-face-name "hi-lock" ())
 
-(defun isearch-highlight-regexp ()
-  "Run `highlight-regexp' with regexp from the current search string.
-It exits Isearch mode and calls `hi-lock-face-buffer' with its regexp
-argument from the last search regexp or a quoted search string,
-and reads its face argument using `hi-lock-read-face-name'."
-  (interactive)
+(defun isearch--highlight-regexp-or-lines (hi-lock-func)
+  "Run HI-LOCK-FUNC to exit isearch, leaving the matches highlighted.
+This is the internal function used by `isearch-highlight-regexp'
+and `isearch-highlight-lines-matching-regexp' to invoke
+HI-LOCK-FUNC (either `highlight-regexp' or `highlight-lines-matching-regexp',
+respectively)."
   (let (
 	;; Set `isearch-recursive-edit' to nil to prevent calling
 	;; `exit-recursive-edit' in `isearch-done' that terminates
@@ -2373,8 +2381,22 @@ and reads its face argument using `hi-lock-read-face-name'."
 			      (regexp-quote s))))
 			isearch-string ""))
 		      (t (regexp-quote isearch-string)))))
-    (hi-lock-face-buffer regexp (hi-lock-read-face-name)))
+    (funcall hi-lock-func regexp (hi-lock-read-face-name)))
   (and isearch-recursive-edit (exit-recursive-edit)))
+
+(defun isearch-highlight-regexp ()
+  "Exit Isearch mode and call `highlight-regexp'.
+The arguments passed to `highlight-regexp' are the regexp from
+the last search and the face from `hi-lock-read-face-name'."
+  (interactive)
+  (isearch--highlight-regexp-or-lines 'highlight-regexp))
+
+(defun isearch-highlight-lines-matching-regexp ()
+  "Exit Isearch mode and call `highlight-lines-matching-regexp'.
+The arguments passed to `highlight-lines-matching-regexp' are the
+regexp from the last search and the face from `hi-lock-read-face-name'."
+  (interactive)
+  (isearch--highlight-regexp-or-lines 'highlight-lines-matching-regexp))
 
 
 (defun isearch-delete-char ()
@@ -3202,18 +3224,18 @@ the word mode."
 			(concat " [" current-input-method-title "]: "))
 		     ": ")
 		   )))
-    (propertize (concat (isearch-lazy-count-format)
+    (apply #'propertize (concat (isearch-lazy-count-format)
                         (upcase (substring m 0 1)) (substring m 1))
-		'face 'minibuffer-prompt)))
+	   isearch-message-properties)))
 
 (defun isearch-message-suffix (&optional c-q-hack)
-  (propertize (concat (if c-q-hack "^Q" "")
+  (apply #'propertize (concat (if c-q-hack "^Q" "")
 		      (isearch-lazy-count-format 'suffix)
 		      (if isearch-error
 			  (concat " [" isearch-error "]")
 			"")
 		      (or isearch-message-suffix-add ""))
-	      'face 'minibuffer-prompt))
+	 isearch-message-properties))
 
 (defun isearch-lazy-count-format (&optional suffix-p)
   "Format the current match number and the total number of matches.

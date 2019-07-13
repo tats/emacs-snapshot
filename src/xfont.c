@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <X11/Xlib.h>
 
@@ -1107,8 +1106,8 @@ struct font_driver const xfont_driver =
   .list = xfont_list,
   .match = xfont_match,
   .list_family = xfont_list_family,
-  .open = xfont_open,
-  .close = xfont_close,
+  .open_font = xfont_open,
+  .close_font = xfont_close,
   .prepare_face = xfont_prepare_face,
   .has_char = xfont_has_char,
   .encode_char = xfont_encode_char,

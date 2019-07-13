@@ -4,7 +4,7 @@
 
 ;; Author: Karl Fogel <kfogel@red-bean.com>
 ;; Created: July, 1993
-;; Keywords: bookmarks, placeholders, annotations
+;; Keywords: convenience
 
 ;; This file is part of GNU Emacs.
 
@@ -36,9 +36,6 @@
 
 ;;; Misc comments:
 ;;
-;; If variable bookmark-use-annotations is non-nil, an annotation is
-;; queried for when setting a bookmark.
-;;
 ;; The bookmark list is sorted lexically by default, but you can turn
 ;; this off by setting bookmark-sort-flag to nil.  If it is nil, then
 ;; the list will be presented in the order it is recorded
@@ -52,9 +49,8 @@
 
 
 (defcustom bookmark-use-annotations nil
-  "If non-nil, saving a bookmark queries for an annotation in a buffer."
-  :type 'boolean
-  :group 'bookmark)
+  "If non-nil, setting a bookmark queries for an annotation in a buffer."
+  :type 'boolean)
 
 
 (defcustom bookmark-save-flag t
@@ -74,14 +70,11 @@ behavior.)
 
 To specify the file in which to save them, modify the variable
 `bookmark-default-file'."
-  :type '(choice (const nil) integer (other t))
-  :group 'bookmark)
+  :type '(choice (const nil) integer (other t)))
 
 
 (define-obsolete-variable-alias 'bookmark-old-default-file
   'bookmark-default-file "27.1")
-
-
 (define-obsolete-variable-alias 'bookmark-file 'bookmark-default-file "27.1")
 (defcustom bookmark-default-file
   (locate-user-emacs-file "bookmarks" ".emacs.bmk")
@@ -89,8 +82,7 @@ To specify the file in which to save them, modify the variable
   ;; The current default file is defined via the internal variable
   ;; `bookmark-bookmarks-timestamp'.  This does not affect the value
   ;; of `bookmark-default-file'.
-  :type 'file
-  :group 'bookmark)
+  :type 'file)
 
 (defcustom bookmark-watch-bookmark-file t
   "If non-nil watch the default bookmark file.
@@ -111,35 +103,30 @@ just use the value of `version-control'."
   :type '(choice (const :tag "If existing" nil)
                  (const :tag "Never" never)
                  (const :tag "Use value of option `version-control'" nospecial)
-                 (other :tag "Always" t))
-  :group 'bookmark)
+                 (other :tag "Always" t)))
 
 
 (defcustom bookmark-completion-ignore-case t
   "Non-nil means bookmark functions ignore case in completion."
-  :type 'boolean
-  :group 'bookmark)
+  :type 'boolean)
 
 
 (defcustom bookmark-sort-flag t
   "Non-nil means that bookmarks will be displayed sorted by bookmark name.
 Otherwise they will be displayed in LIFO order (that is, most
 recently set ones come first, oldest ones come last)."
-  :type 'boolean
-  :group 'bookmark)
+  :type 'boolean)
 
 
 (defcustom bookmark-automatically-show-annotations t
   "Non-nil means show annotations when jumping to a bookmark."
-  :type 'boolean
-  :group 'bookmark)
+  :type 'boolean)
 
 (defcustom bookmark-bmenu-use-header-line t
   "Non-nil means to use an immovable header line.
 This is as opposed to inline text at the top of the buffer."
   :version "24.4"
-  :type 'boolean
-  :group 'bookmark)
+  :type 'boolean)
 
 (defconst bookmark-bmenu-inline-header-height 2
   "Number of lines used for the *Bookmark List* header.
@@ -153,36 +140,30 @@ This includes the annotations column.")
 (defcustom bookmark-bmenu-file-column 30
   "Column at which to display filenames in a buffer listing bookmarks.
 You can toggle whether files are shown with \\<bookmark-bmenu-mode-map>\\[bookmark-bmenu-toggle-filenames]."
-  :type 'integer
-  :group 'bookmark)
+  :type 'integer)
 
 
 (defcustom bookmark-bmenu-toggle-filenames t
   "Non-nil means show filenames when listing bookmarks.
 A non-nil value may result in truncated bookmark names."
-  :type 'boolean
-  :group 'bookmark)
+  :type 'boolean)
 
 (defface bookmark-menu-bookmark
   '((t (:weight bold)))
-  "Face used to highlight bookmark names in bookmark menu buffers."
-  :group 'bookmark)
+  "Face used to highlight bookmark names in bookmark menu buffers.")
 
 (defcustom bookmark-menu-length 70
   "Maximum length of a bookmark name displayed on a popup menu."
-  :type 'integer
-  :group 'bookmark)
+  :type 'integer)
 
 ;; FIXME: Is it really worth a customization option?
 (defcustom bookmark-search-delay 0.2
   "Time before `bookmark-bmenu-search' updates the display."
-  :group 'bookmark
   :type  'number)
 
 (defface bookmark-menu-heading
   '((t (:inherit font-lock-type-face)))
   "Face used to highlight the heading in bookmark menu buffers."
-  :group 'bookmark
   :version "22.1")
 
 
@@ -282,8 +263,6 @@ defaults to `bookmark-default-file' and MODTIME is its modification time.")
 (defvar bookmark-file-coding-system nil
   "The coding-system of the last loaded or saved bookmark file.")
 
-;; more stuff added by db.
-
 (defvar bookmark-current-bookmark nil
   "Name of bookmark most recently used in the current file.
 It is buffer local, used to make moving a bookmark forward
@@ -314,6 +293,8 @@ This point is in `bookmark-current-buffer'.")
 
 (defvar bookmark-quit-flag nil
   "Non-nil means `bookmark-bmenu-search' quits immediately.")
+(make-obsolete-variable 'bookmark-quit-flag "no longer used" "27.1")
+
 
 ;; Helper functions and macros.
 
@@ -669,7 +650,9 @@ affect point."
             (forward-char -1)
             (read (current-buffer)))
         ;; Else no hope of getting information here.
-        (error "Not bookmark format")))))
+        (if buffer-file-name
+            (error "File not in bookmark format: %s" buffer-file-name)
+          (error "Buffer not in bookmark format: %s" (buffer-name)))))))
 
 
 (defun bookmark-upgrade-version-0-alist (old-list)
@@ -696,18 +679,17 @@ affect point."
 (defun bookmark-upgrade-file-format-from-0 ()
   "Upgrade a bookmark file of format 0 (the original format) to format 1.
 This expects to be called from `point-min' in a bookmark file."
-  (message "Upgrading bookmark format from 0 to %d..."
-           bookmark-file-format-version)
-  (let* ((old-list (bookmark-alist-from-buffer))
+  (let* ((reporter (make-progress-reporter
+                    (format "Upgrading bookmark format from 0 to %d..."
+                     bookmark-file-format-version)))
+         (old-list (bookmark-alist-from-buffer))
          (new-list (bookmark-upgrade-version-0-alist old-list)))
     (delete-region (point-min) (point-max))
     (bookmark-insert-file-format-version-stamp buffer-file-coding-system)
     (pp new-list (current-buffer))
-    (save-buffer))
-  (goto-char (point-min))
-  (message "Upgrading bookmark format from 0 to %d...done"
-           bookmark-file-format-version)
-  )
+    (save-buffer)
+    (goto-char (point-min))
+    (progress-reporter-done reporter)))
 
 
 (defun bookmark-grok-file-format-version ()
@@ -766,18 +748,23 @@ CODING is the symbol of the coding-system in which the file is encoded."
     map))
 
 (defun bookmark-set-internal (prompt name overwrite-or-push)
-  "Interactively set a bookmark named NAME at the current location.
+  "Set a bookmark using specified NAME or prompting with PROMPT.
+The bookmark is set at the current location.
 
-Begin the interactive prompt with PROMPT, followed by a space, a
-generated default name in parentheses, a colon and a space.
+If NAME is non-nil, use it as the name of the new bookmark.  In
+this case, the value of PROMPT is ignored.
 
-If OVERWRITE-OR-PUSH is nil, then error if there is already a
-bookmark named NAME; if `overwrite', then replace any existing
-bookmark if there is one; if `push' then push the new bookmark
-onto the bookmark alist.  The `push' behavior means that among
-bookmarks named NAME, this most recently set one becomes the one in
-effect, but the others are still there, in order, if the topmost one
-is ever deleted."
+Otherwise, prompt the user for the bookmark name.  Begin the
+interactive prompt with PROMPT, followed by a space, a generated
+default name in parentheses, a colon and a space.
+
+OVERWRITE-OR-PUSH controls what happens if there is already a
+bookmark with the same name: nil means signal an error;
+`overwrite' means replace any existing bookmark; `push' means
+push the new bookmark onto the bookmark alist.  The `push'
+behavior means that among bookmarks with the same name, this most
+recently set one becomes the one in effect, but the others are
+still there, in order, if the topmost one is ever deleted."
   (unwind-protect
        (let* ((record (bookmark-make-record))
               ;; `defaults' is a transient element of the
@@ -940,6 +927,8 @@ It takes one argument, the name of the bookmark, as a string.")
 
 (defun bookmark-insert-annotation (bookmark-name-or-record)
   "Insert annotation for BOOKMARK-NAME-OR-RECORD at point."
+  (when (not (bookmark-get-bookmark bookmark-name-or-record t))
+    (error "Invalid bookmark: %s" bookmark-name-or-record))
   (insert (funcall bookmark-edit-annotation-text-func bookmark-name-or-record))
   (let ((annotation (bookmark-get-annotation bookmark-name-or-record)))
     (if (and annotation (not (string-equal annotation "")))
@@ -1452,7 +1441,7 @@ for a file, defaulting to the file defined by variable
 	;; Apparently `pp' has a poor algorithmic complexity, so this
 	;; scales a lot better.  bug#4485.
 	(dolist (i bookmark-alist) (pp i (current-buffer)))
-	(insert ")")
+	(insert ")\n")
 	;; Make sure the specified encoding can safely encode the
 	;; bookmarks.  If it cannot, suggest utf-8-emacs as default.
 	(with-coding-priority '(utf-8-emacs)
@@ -2128,8 +2117,8 @@ To carry out the deletions that you've marked, use \\<bookmark-bmenu-mode-map>\\
 (defun bookmark-bmenu-execute-deletions ()
   "Delete bookmarks flagged `D'."
   (interactive)
-  (message "Deleting bookmarks...")
-  (let ((o-point  (point))
+  (let ((reporter (make-progress-reporter "Deleting bookmarks..."))
+        (o-point  (point))
         (o-str    (save-excursion
                     (beginning-of-line)
                     (unless (= (following-char) ?D)
@@ -2151,8 +2140,7 @@ To carry out the deletions that you've marked, use \\<bookmark-bmenu-mode-map>\\
           (forward-char o-col))
       (goto-char o-point))
     (beginning-of-line)
-    (message "Deleting bookmarks...done")
-    ))
+    (progress-reporter-done reporter)))
 
 
 (defun bookmark-bmenu-rename ()

@@ -157,7 +157,7 @@ static int history_idx;
 /* A tick that's incremented each time something is added to the
    history.  */
 
-static uprintmax_t history_tick;
+static uintmax_t history_tick;
 
 /* Add to the redisplay history how window W has been displayed.
    MSG is a trace containing the information how W's glyph matrix
@@ -176,7 +176,7 @@ add_window_display_history (struct window *w, const char *msg, bool paused_p)
   ++history_idx;
 
   snprintf (buf, sizeof redisplay_history[0].trace,
-	    "%"pMu": window %p (%s)%s\n%s",
+	    "%"PRIuMAX": window %p (%s)%s\n%s",
 	    history_tick++,
 	    ptr,
 	    ((BUFFERP (w->contents)
@@ -203,7 +203,7 @@ add_frame_display_history (struct frame *f, bool paused_p)
   buf = redisplay_history[history_idx].trace;
   ++history_idx;
 
-  sprintf (buf, "%"pMu": update frame %p%s",
+  sprintf (buf, "%"PRIuMAX": update frame %p%s",
 	   history_tick++,
 	   ptr, paused_p ? " ***paused***" : "");
 }
@@ -3126,9 +3126,9 @@ update_frame (struct frame *f, bool force_p, bool inhibit_hairy_id_p)
       if (FRAME_TERMCAP_P (f) || FRAME_MSDOS_P (f))
         {
           if (FRAME_TTY (f)->termscript)
-	    fflush_unlocked (FRAME_TTY (f)->termscript);
+	    fflush (FRAME_TTY (f)->termscript);
 	  if (FRAME_TERMCAP_P (f))
-	    fflush_unlocked (FRAME_TTY (f)->output);
+	    fflush (FRAME_TTY (f)->output);
         }
 
       /* Check window matrices for lost pointers.  */
@@ -3181,8 +3181,8 @@ update_frame_with_menu (struct frame *f, int row, int col)
   update_end (f);
 
   if (FRAME_TTY (f)->termscript)
-    fflush_unlocked (FRAME_TTY (f)->termscript);
-  fflush_unlocked (FRAME_TTY (f)->output);
+    fflush (FRAME_TTY (f)->termscript);
+  fflush (FRAME_TTY (f)->output);
   /* Check window matrices for lost pointers.  */
 #if GLYPH_DEBUG
 #if 0
@@ -4621,7 +4621,7 @@ update_frame_1 (struct frame *f, bool force_p, bool inhibit_id_p,
 		  ptrdiff_t outq = __fpending (display_output);
 		  if (outq > 900
 		      || (outq > 20 && ((i - 1) % preempt_count == 0)))
-		    fflush_unlocked (display_output);
+		    fflush (display_output);
 		}
 	    }
 
@@ -5745,13 +5745,13 @@ when TERMINAL is nil.  */)
 
       if (tty->termscript)
 	{
-	  fwrite_unlocked (SDATA (string), 1, SBYTES (string), tty->termscript);
-	  fflush_unlocked (tty->termscript);
+	  fwrite (SDATA (string), 1, SBYTES (string), tty->termscript);
+	  fflush (tty->termscript);
 	}
       out = tty->output;
     }
-  fwrite_unlocked (SDATA (string), 1, SBYTES (string), out);
-  fflush_unlocked (out);
+  fwrite (SDATA (string), 1, SBYTES (string), out);
+  fflush (out);
   unblock_input ();
   return Qnil;
 }
@@ -5766,7 +5766,7 @@ terminate any keyboard macro currently executing.  */)
   if (!NILP (arg))
     {
       if (noninteractive)
-	putchar_unlocked (07);
+	putchar (07);
       else
 	ring_bell (XFRAME (selected_frame));
     }
@@ -5780,7 +5780,7 @@ void
 bitch_at_user (void)
 {
   if (noninteractive)
-    putchar_unlocked (07);
+    putchar (07);
   else if (!INTERACTIVE)  /* Stop executing a keyboard macro.  */
     {
       const char *msg
@@ -6142,7 +6142,8 @@ init_display_interactive (void)
      using the window system.
 
      If the DISPLAY environment variable is set and nonempty,
-     try to use X, and die with an error message if that doesn't work.  */
+     try to use X, and if that fails output a line to stderr
+     reporting that -nw will be simulated.  */
 
 #ifdef HAVE_X_WINDOWS
   if (! inhibit_window_system && ! display_arg)
@@ -6204,12 +6205,14 @@ init_display_interactive (void)
 #endif
   if (!terminal_type)
     {
+      char const *msg
+	= "Please set the environment variable TERM; see 'tset'.\n";
 #ifdef HAVE_WINDOW_SYSTEM
       if (! inhibit_window_system)
-	fprintf (stderr, "Please set the environment variable DISPLAY or TERM (see 'tset').\n");
-      else
+	msg = ("Please set the environment variable DISPLAY or TERM; "
+	       "see 'tset'.\n");
 #endif /* HAVE_WINDOW_SYSTEM */
-	fprintf (stderr, "Please set the environment variable TERM; see 'tset'.\n");
+      fputs (msg, stderr);
       exit (1);
     }
 

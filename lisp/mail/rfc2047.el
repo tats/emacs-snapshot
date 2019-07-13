@@ -732,28 +732,31 @@ Point moves to the end of the region."
   (save-restriction
     (narrow-to-region b e)
     (goto-char (point-min))
-    (let ((break nil)
-	  (qword-break nil)
-	  (first t)
-	  (bol (save-restriction
-		 (widen)
-		 (point-at-bol))))
+    (let* ((break nil)
+	   (qword-break nil)
+	   (bol (save-restriction
+		  (widen)
+		  (line-beginning-position)))
+           ;; This function is either called with the Header: name in
+           ;; the region or not.  If it's not in the region, then we
+           ;; may already have a space.
+	   (first (or (= bol (point))
+                      (save-restriction
+                        (widen)
+                        (save-excursion
+                          (not (re-search-backward "[ \t]" bol t)))))))
       (while (not (eobp))
 	(when (and (or break qword-break)
 		   (> (- (point) bol) 76))
-	  (goto-char (or break qword-break))
-	  (setq break nil
-		qword-break nil)
-	  (skip-chars-backward " \t")
-	  (if (looking-at "[ \t]")
-	      (insert ?\n)
-	    (insert "\n "))
-	  (setq bol (1- (point)))
-	  ;; Don't break before the first non-LWSP characters.
-	  (skip-chars-forward " \t")
-	  (unless (eobp)
-	    (forward-char 1)))
+          ;; We have a line longer than 76 characters, so break the
+          ;; line.
+          (setq bol (rfc2047--break-line break qword-break)
+                break nil
+		qword-break nil))
+        ;; See whether we're at a point where we can break the line
+        ;; (if it turns out to be too long).
 	(cond
+         ;; New line, so there's nothing to break.
 	 ((eq (char-after) ?\n)
 	  (forward-char 1)
 	  (setq bol (point)
@@ -762,12 +765,19 @@ Point moves to the end of the region."
 	  (skip-chars-forward " \t")
 	  (unless (or (eobp) (eq (char-after) ?\n))
 	    (forward-char 1)))
+         ;; CR in CRLF; shouldn't really as this function shouldn't be
+         ;; called after encoding for line transmission.
 	 ((eq (char-after) ?\r)
 	  (forward-char 1))
+         ;; Whitespace -- possible break point.
 	 ((memq (char-after) '(?  ?\t))
 	  (skip-chars-forward " \t")
-	  (unless first ;; Don't break just after the header name.
+          ;; Don't break just after the header name.
+	  (if first
+              (setq first nil)
 	    (setq break (point))))
+         ;; If the header has been encoded (with RFC2047 encoding,
+         ;; which looks like "=?utf-8?Q?F=C3=B3?=".
 	 ((not break)
 	  (if (not (looking-at "=\\?[^=]"))
 	      (if (eq (char-after) ?=)
@@ -777,23 +787,28 @@ Point moves to the end of the region."
 	    (unless (= (point) b)
 	      (setq qword-break (point)))
 	    (skip-chars-forward "^ \t\n\r")))
+         ;; Look for the next LWSP (i.e., whitespace character).
 	 (t
-	  (skip-chars-forward "^ \t\n\r")))
-	(setq first nil))
+	  (skip-chars-forward "^ \t\n\r"))))
       (when (and (or break qword-break)
 		 (> (- (point) bol) 76))
-	(goto-char (or break qword-break))
-	(setq break nil
-	      qword-break nil)
-	(if (or (> 0 (skip-chars-backward " \t"))
-		(looking-at "[ \t]"))
-	    (insert ?\n)
-	  (insert "\n "))
-	(setq bol (1- (point)))
-	;; Don't break before the first non-LWSP characters.
-	(skip-chars-forward " \t")
-	(unless (eobp)
-	  (forward-char 1))))))
+        ;; Finally, after the loop, we have a line longer than 76
+        ;; characters, so break the line.
+        (rfc2047--break-line break qword-break)))))
+
+(defun rfc2047--break-line (break qword-break)
+  (goto-char (or break qword-break))
+  (skip-chars-backward " \t")
+  (if (looking-at "[ \t]")
+      (insert ?\n)
+    (insert "\n "))
+  (prog1
+      ;; Return beginning-of-line.
+      (1- (point))
+    ;; Don't break before the first non-LWSP characters.
+    (skip-chars-forward " \t")
+    (unless (eobp)
+      (forward-char 1))))
 
 (defun rfc2047-unfold-field ()
   "Fold the current line."

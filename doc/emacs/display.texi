@@ -836,10 +836,10 @@ for instance, programming language modes fontify syntactically
 relevant constructs like comments, strings, and function names.
 
 @findex font-lock-mode
-  Font Lock mode is enabled by default.  To toggle it in the current
-buffer, type @kbd{M-x font-lock-mode}.  A positive numeric argument
-unconditionally enables Font Lock mode, and a negative or zero
-argument disables it.
+  Font Lock mode is enabled by default in major modes that support it.
+To toggle it in the current buffer, type @kbd{M-x font-lock-mode}.  A
+positive numeric argument unconditionally enables Font Lock mode, and
+a negative or zero argument disables it.
 
 @findex global-font-lock-mode
 @vindex global-font-lock-mode
@@ -1172,8 +1172,8 @@ used.
 
 Any other value disables the indicator.  The default value is @code{t}.
 
-@item display-fill-column-indicator-char
-@vindex display-fill-column-indicator-char
+@item display-fill-column-indicator-character
+@vindex display-fill-column-indicator-character
 Specifies the character used for the indicator.  This character can be
 any valid char including unicode ones if the actual font supports
 them.

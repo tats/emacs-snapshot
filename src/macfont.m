@@ -1663,8 +1663,8 @@ static struct font_driver macfont_driver =
   .match = macfont_match,
   .list_family = macfont_list_family,
   .free_entity = macfont_free_entity,
-  .open = macfont_open,
-  .close = macfont_close,
+  .open_font = macfont_open,
+  .close_font = macfont_close,
   .has_char = macfont_has_char,
   .encode_char = macfont_encode_char,
   .text_extents = macfont_text_extents,
@@ -1824,7 +1824,7 @@ macfont_get_open_type_spec (Lisp_Object otf_spec)
               unsigned int tag;
 
               OTF_SYM_TAG (XCAR (val), tag);
-              spec->features[i][j++] = negative ? tag & 0x80000000 : tag;
+              spec->features[i][j++] = negative ? tag | 0x80000000 : tag;
             }
         }
       spec->nfeatures[i] = j;
@@ -2076,7 +2076,7 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
               ptrdiff_t j;
 
               for (j = 0; j < ASIZE (chars); j++)
-                if (TYPE_RANGED_FIXNUMP (UTF32Char, AREF (chars, j))
+                if (RANGED_FIXNUMP (0, AREF (chars, j), MAX_UNICODE_CHAR)
                     && CFCharacterSetIsLongCharacterMember (desc_charset,
                                                             XFIXNAT (AREF (chars, j))))
                   break;
@@ -2709,6 +2709,9 @@ macfont_has_char (Lisp_Object font, int c)
 {
   int result;
   CFCharacterSetRef charset;
+
+  if (c < 0 || c > MAX_UNICODE_CHAR)
+    return false;
 
   block_input ();
   if (FONT_ENTITY_P (font))

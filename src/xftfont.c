@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
-#include <stdio.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 
@@ -644,8 +643,8 @@ struct font_driver const xftfont_driver =
   .list = xftfont_list,
   .match = xftfont_match,
   .list_family = ftfont_list_family,
-  .open = xftfont_open,
-  .close = xftfont_close,
+  .open_font = xftfont_open,
+  .close_font = xftfont_close,
   .prepare_face = xftfont_prepare_face,
   .done_face = xftfont_done_face,
   .has_char = xftfont_has_char,
@@ -700,6 +699,7 @@ syms_of_xftfont_for_pdumper (void)
   xfthbfont_driver.type = Qxfthb;
   xfthbfont_driver.list = xfthbfont_list;
   xfthbfont_driver.match = xfthbfont_match;
+  xfthbfont_driver.otf_capability = hbfont_otf_capability,
   xfthbfont_driver.shape = hbfont_shape;
   xfthbfont_driver.combining_capability = hbfont_combining_capability;
   xfthbfont_driver.begin_hb_font = xfthbfont_begin_hb_font;

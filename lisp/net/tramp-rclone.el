@@ -42,6 +42,7 @@
 (defconst tramp-rclone-method "rclone"
   "When this method name is used, forward all calls to rclone mounts.")
 
+;;;###tramp-autoload
 (defcustom tramp-rclone-program "rclone"
   "Name of the rclone program."
   :group 'tramp
@@ -214,6 +215,8 @@ file names."
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
+	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	  (tramp-error v 'file-error "File is a directory %s" newname))
 
 	(if (or (and t1 (not (tramp-rclone-file-name-p filename)))
 		(and t2 (not (tramp-rclone-file-name-p newname))))

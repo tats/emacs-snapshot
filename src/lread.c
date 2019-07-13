@@ -490,13 +490,12 @@ readbyte_from_stdio (void)
   block_input ();
 
   /* Interrupted reads have been observed while reading over the network.  */
-  while ((c = getc_unlocked (instream)) == EOF && errno == EINTR
-	 && ferror_unlocked (instream))
+  while ((c = getc (instream)) == EOF && errno == EINTR && ferror (instream))
     {
       unblock_input ();
       maybe_quit ();
       block_input ();
-      clearerr_unlocked (instream);
+      clearerr (instream);
     }
 
   unblock_input ();
@@ -1509,6 +1508,17 @@ Return t if the file exists and loads successfully.  */)
 
   return Qt;
 }
+
+Lisp_Object
+save_match_data_load (Lisp_Object file, Lisp_Object noerror,
+		      Lisp_Object nomessage, Lisp_Object nosuffix,
+		      Lisp_Object must_suffix)
+{
+  ptrdiff_t count = SPECPDL_INDEX ();
+  record_unwind_save_match_data ();
+  Lisp_Object result = Fload (file, noerror, nomessage, nosuffix, must_suffix);
+  return unbind_to (count, result);
+}
 
 static bool
 complete_filename_p (Lisp_Object pathname)
@@ -2209,7 +2219,10 @@ STREAM or the value of `standard-input' may be:
   if (EQ (stream, Qt))
     stream = Qread_char;
   if (EQ (stream, Qread_char))
-    /* FIXME: ?! When is this used !?  */
+    /* FIXME: ?! This is used when the reader is called from the
+       minibuffer without a stream, as in (read).  But is this feature
+       ever used, and if so, why?  IOW, will anything break if this
+       feature is removed !?  */
     return call1 (intern ("read-minibuffer"),
 		  build_string ("Lisp expression: "));
 
@@ -3060,7 +3073,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		  = c = infile->buf[--infile->lookahead];
 	      block_input ();
 	      for (; i < nskip && 0 <= c; i++)
-		saved_doc_string[i] = c = getc_unlocked (instream);
+		saved_doc_string[i] = c = getc (instream);
 	      unblock_input ();
 
 	      saved_doc_string_length = i;

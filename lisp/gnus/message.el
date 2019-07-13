@@ -626,7 +626,7 @@ This may also be a list of regexps."
 		 regexp))
 
 (defcustom message-forward-included-headers
-  '("^From:" "^Subject:" "^Date:")
+  '("^From:" "^Subject:" "^Date:" "^To:" "^Cc:")
   "If non-nil, delete non-matching headers when forwarding a message.
 Only headers that match this regexp will be included.  This
 variable should be a regexp or a list of regexps."
@@ -1987,6 +1987,8 @@ is used by default."
 
 (defun message-fetch-field (header &optional not-all)
   "The same as `mail-fetch-field', only remove all newlines.
+Surrounding whitespace is also removed.
+
 The buffer is expected to be narrowed to just the header of the message;
 see `message-narrow-to-headers-or-head'."
   (let* ((inhibit-point-motion-hooks t)
@@ -1994,7 +1996,9 @@ see `message-narrow-to-headers-or-head'."
     (when value
       (while (string-match "\n[\t ]+" value)
 	(setq value (replace-match " " t t value)))
-      value)))
+      ;; If the initial or final line is blank (just a newline), then
+      ;; we have initial or trailing white space; remove it.
+      (string-trim value))))
 
 (defun message-field-value (header &optional not-all)
   "The same as `message-fetch-field', only narrow to the headers first."
@@ -4643,11 +4647,11 @@ If you always want Gnus to send messages in one piece, set
 
 (defun message--fold-long-headers ()
   "Fold too-long header lines.
-They should be no longer than 998 octets long."
+Each line should be no more than 79 characters long."
   (goto-char (point-min))
   (while (not (eobp))
     (when (and (looking-at "[^:]+:")
-               (> (- (line-end-position) (point)) 998))
+               (> (- (line-end-position) (point)) 79))
       (mail-header-fold-field))
     (forward-line 1)))
 
@@ -8108,7 +8112,13 @@ From headers in the original article."
 	 (emails
 	  (message-tokenize-header
 	   (mail-strip-quoted-names
-	    (mapconcat 'message-fetch-reply-field fields ","))))
+	    (mapconcat
+	     #'identity
+	     (cl-loop for field in fields
+		      for value = (message-fetch-reply-field field)
+		      when value
+		      collect value)
+	     ","))))
 	 (email
           (cond ((functionp message-alternative-emails)
                  (car (cl-remove-if-not message-alternative-emails emails)))

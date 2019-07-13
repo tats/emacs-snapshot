@@ -21,7 +21,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include <limits.h>
-#include <stdio.h>      /* termhooks.h needs this */
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -33,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xterm.h"	/* for all of the X includes */
 #include "frame.h"	/* Need this to get the X window of selected_frame */
 #include "blockinput.h"
+#include "sysstdio.h"	/* TRACE_SELECTION needs this.  */
 #include "termhooks.h"
 #include "keyboard.h"
 #include "pdumper.h"
@@ -63,13 +63,13 @@ static void lisp_data_to_selection_data (struct x_display_info *, Lisp_Object,
 
 #ifdef TRACE_SELECTION
 #define TRACE0(fmt) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid ())
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid ())
 #define TRACE1(fmt, a0) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0)
 #define TRACE2(fmt, a0, a1) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0, a1)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0, a1)
 #define TRACE3(fmt, a0, a1, a2) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0, a1, a2)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0, a1, a2)
 #else
 #define TRACE0(fmt)		(void) 0
 #define TRACE1(fmt, a0)		(void) 0
@@ -2172,9 +2172,10 @@ If the problem persists, set `%s' to nil.");
 static Lisp_Object
 x_clipboard_manager_error_2 (Lisp_Object err)
 {
-  fprintf (stderr, "Error saving to X clipboard manager.\n\
-If the problem persists, set '%s' \
-to nil.\n", "x-select-enable-clipboard-manager");
+  fputs (("Error saving to X clipboard manager.\n"
+	  "If the problem persists,"
+	  " set 'x-select-enable-clipboard-manager' to nil.\n"),
+	 stderr);
   return Qnil;
 }
 

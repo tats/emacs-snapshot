@@ -3098,9 +3098,9 @@ describe_map_compare (const void *aa, const void *bb)
   if (FIXNUMP (a->event) && !FIXNUMP (b->event))
     return -1;
   if (SYMBOLP (a->event) && SYMBOLP (b->event))
-    return (!NILP (Fstring_lessp (a->event, b->event)) ? -1
-	    : !NILP (Fstring_lessp (b->event, a->event)) ? 1
-	    : 0);
+    /* Sort the keystroke names in the "natural" way, with (for
+       instance) "<f2>" coming between "<f1>" and "<f11>".  */
+    return string_version_cmp (SYMBOL_NAME (a->event), SYMBOL_NAME (b->event));
   return 0;
 }
 

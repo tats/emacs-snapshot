@@ -745,16 +745,22 @@ a directory's file name are accepted.  If DEFAULT-DIRECTORY is nil or
 missing, the current buffer's value of `default-directory' is used.
 NAME should be a string that is a valid file name for the underlying
 filesystem.
-File name components that are `.' are removed, and
-so are file name components followed by `..', along with the `..' itself;
-note that these simplifications are done without checking the resulting
-file names in the file system.
-Multiple consecutive slashes are collapsed into a single slash,
-except at the beginning of the file name when they are significant (e.g.,
-UNC file names on MS-Windows.)
-An initial `~/' expands to your home directory.
-An initial `~USER/' expands to USER's home directory.
-See also the function `substitute-in-file-name'.
+
+File name components that are `.' are removed, and so are file name
+components followed by `..', along with the `..' itself; note that
+these simplifications are done without checking the resulting file
+names in the file system.
+
+Multiple consecutive slashes are collapsed into a single slash, except
+at the beginning of the file name when they are significant (e.g., UNC
+file names on MS-Windows.)
+
+An initial \"~\" in NAME expands to your home directory.
+
+An initial \"~USER\" in NAME expands to USER's home directory.  If
+USER doesn't exist, \"~USER\" is not expanded.
+
+To do other file name substitutions, see `substitute-in-file-name'.
 
 For technical reasons, this function can return correct but
 non-intuitive results for the root directory; for instance,
@@ -804,7 +810,22 @@ the root directory.  */)
 
   /* Use the buffer's default-directory if DEFAULT_DIRECTORY is omitted.  */
   if (NILP (default_directory))
-    default_directory = BVAR (current_buffer, directory);
+    {
+      Lisp_Object dir = BVAR (current_buffer, directory);
+      /* The buffer's default-directory should be absolute.  If it
+	 isn't, try to expand it relative to invocation-directory.
+	 But we have to be careful to avoid an infinite loop, because
+	 the code in emacs.c that sets Vinvocation_directory might
+	 call Fexpand_file_name.  */
+      if (STRINGP (dir))
+	{
+	  if (!NILP (Ffile_name_absolute_p (dir)))
+	    default_directory = dir;
+	  else if (STRINGP (Vinvocation_directory)
+		   && !NILP (Ffile_name_absolute_p (Vinvocation_directory)))
+	    default_directory = Fexpand_file_name (dir, Vinvocation_directory);
+	}
+    }
   if (! STRINGP (default_directory))
     {
 #ifdef DOS_NT
@@ -2666,7 +2687,7 @@ On Unix, absolute file names start with `/'.  */)
 }
 
 DEFUN ("file-exists-p", Ffile_exists_p, Sfile_exists_p, 1, 1, 0,
-       doc: /* Return t if file FILENAME exists (whether or not you can read it.)
+       doc: /* Return t if file FILENAME exists (whether or not you can read it).
 See also `file-readable-p' and `file-attributes'.
 This returns nil for a symlink to a nonexistent file.
 Use `file-symlink-p' to test for such links.  */)
@@ -3477,18 +3498,43 @@ enum { READ_BUF_SIZE = MAX_ALLOCA };
 static void
 decide_coding_unwind (Lisp_Object unwind_data)
 {
-  Lisp_Object multibyte, undo_list, buffer;
-
-  multibyte = XCAR (unwind_data);
-  unwind_data = XCDR (unwind_data);
-  undo_list = XCAR (unwind_data);
-  buffer = XCDR (unwind_data);
+  Lisp_Object multibyte = XCAR (unwind_data);
+  Lisp_Object tmp = XCDR (unwind_data);
+  Lisp_Object undo_list = XCAR (tmp);
+  Lisp_Object buffer = XCDR (tmp);
 
   set_buffer_internal (XBUFFER (buffer));
+
+  /* We're about to "delete" the text by moving it back into the gap.
+     So move markers that set-auto-coding might have created to BEG,
+     just in case.  */
   adjust_markers_for_delete (BEG, BEG_BYTE, Z, Z_BYTE);
   adjust_overlays_for_delete (BEG, Z - BEG);
   set_buffer_intervals (current_buffer, NULL);
   TEMP_SET_PT_BOTH (BEG, BEG_BYTE);
+
+  /* In case of a non-local exit from set_auto_coding_function, in order not
+     to end up with potentially invalid byte sequences in a multibyte buffer,
+     we have the following options:
+     1- decode the bytes in some arbitrary coding-system.
+     2- erase the buffer.
+     3- leave the buffer unibyte (which is actually the same as option (1)
+        where the coding-system is `raw-text-unix`).
+     Here we choose 2.  */
+
+  /* Move the bytes back to (the beginning of) the gap.
+     In general this may have to move all the bytes, but here
+     this can't move more bytes than were moved during the execution
+     of Vset_auto_coding_function, which is normally 0 (because it
+     normally doesn't modify the buffer).  */
+  move_gap_both (Z, Z_BYTE);
+  ptrdiff_t inserted = Z_BYTE - BEG_BYTE;
+  GAP_SIZE += inserted;
+  ZV = Z = GPT = BEG;
+  ZV_BYTE = Z_BYTE = GPT_BYTE = BEG_BYTE;
+
+  /* Pass the new `inserted` back.  */
+  XSETCAR (unwind_data, make_fixnum (inserted));
 
   /* Now we are safe to change the buffer's multibyteness directly.  */
   bset_enable_multibyte_characters (current_buffer, multibyte);
@@ -3741,6 +3787,7 @@ by calling `format-decode', which see.  */)
 	  CHECK_CODING_SYSTEM (Vcoding_system_for_read);
 	  Fset (Qbuffer_file_coding_system, Vcoding_system_for_read);
 	}
+      eassert (inserted == 0);
       goto notfound;
     }
 
@@ -3767,7 +3814,10 @@ by calling `format-decode', which see.  */)
       not_regular = 1;
 
       if (! NILP (visit))
-	goto notfound;
+        {
+          eassert (inserted == 0);
+	  goto notfound;
+        }
 
       if (! NILP (replace) || ! NILP (beg) || ! NILP (end))
 	xsignal2 (Qfile_error,
@@ -4435,19 +4485,6 @@ by calling `format-decode', which see.  */)
   if (how_much < 0)
     report_file_error ("Read error", orig_filename);
 
-  /* Make the text read part of the buffer.  */
-  GAP_SIZE -= inserted;
-  GPT      += inserted;
-  GPT_BYTE += inserted;
-  ZV       += inserted;
-  ZV_BYTE  += inserted;
-  Z        += inserted;
-  Z_BYTE   += inserted;
-
-  if (GAP_SIZE > 0)
-    /* Put an anchor to ensure multi-byte form ends at gap.  */
-    *GPT_ADDR = 0;
-
  notfound:
 
   if (NILP (coding_system))
@@ -4457,6 +4494,7 @@ by calling `format-decode', which see.  */)
 
 	 Note that we can get here only if the buffer was empty
 	 before the insertion.  */
+      eassert (Z == BEG);
 
       if (!NILP (Vcoding_system_for_read))
 	coding_system = Vcoding_system_for_read;
@@ -4467,15 +4505,20 @@ by calling `format-decode', which see.  */)
 	     enable-multibyte-characters directly here without taking
 	     care of marker adjustment.  By this way, we can run Lisp
 	     program safely before decoding the inserted text.  */
-	  Lisp_Object unwind_data;
+          Lisp_Object multibyte
+            = BVAR (current_buffer, enable_multibyte_characters);
+          Lisp_Object unwind_data
+            = Fcons (multibyte,
+                     Fcons (BVAR (current_buffer, undo_list),
+			    Fcurrent_buffer ()));
 	  ptrdiff_t count1 = SPECPDL_INDEX ();
 
-	  unwind_data = Fcons (BVAR (current_buffer, enable_multibyte_characters),
-			       Fcons (BVAR (current_buffer, undo_list),
-				      Fcurrent_buffer ()));
 	  bset_enable_multibyte_characters (current_buffer, Qnil);
 	  bset_undo_list (current_buffer, Qt);
 	  record_unwind_protect (decide_coding_unwind, unwind_data);
+
+          /* Make the text read part of the buffer.  */
+          insert_from_gap_1 (inserted, inserted, false);
 
 	  if (inserted > 0 && ! NILP (Vset_auto_coding_function))
 	    {
@@ -4493,9 +4536,10 @@ by calling `format-decode', which see.  */)
 	      if (CONSP (coding_system))
 		coding_system = XCAR (coding_system);
 	    }
+          /* Move the text back to the gap.  */
 	  unbind_to (count1, Qnil);
-	  inserted = Z_BYTE - BEG_BYTE;
-	}
+          inserted = XFIXNUM (XCAR (unwind_data));
+        }
 
       if (NILP (coding_system))
 	coding_system = Qundecided;
@@ -4528,22 +4572,27 @@ by calling `format-decode', which see.  */)
 	}
     }
 
-  coding.dst_multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  eassert (PT == GPT);
+
+  coding.dst_multibyte
+    = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   if (CODING_MAY_REQUIRE_DECODING (&coding)
       && (inserted > 0 || CODING_REQUIRE_FLUSHING (&coding)))
     {
-      move_gap_both (PT, PT_BYTE);
-      GAP_SIZE += inserted;
-      ZV_BYTE -= inserted;
-      Z_BYTE -= inserted;
-      ZV -= inserted;
-      Z -= inserted;
-      decode_coding_gap (&coding, inserted, inserted);
+      /* Now we have all the new bytes at the beginning of the gap,
+         but `decode_coding_gap` can't have them at the beginning of the gap,
+         so we need to move them.  */
+      memmove (GAP_END_ADDR - inserted, GPT_ADDR, inserted);
+      decode_coding_gap (&coding, inserted);
       inserted = coding.produced_char;
       coding_system = CODING_ID_NAME (coding.id);
     }
   else if (inserted > 0)
     {
+      /* Make the text read part of the buffer.  */
+      eassert (NILP (BVAR (current_buffer, enable_multibyte_characters)));
+      insert_from_gap_1 (inserted, inserted, false);
+
       invalidate_buffer_caches (current_buffer, PT, PT + inserted);
       adjust_after_insert (PT, PT_BYTE, PT + inserted, PT_BYTE + inserted,
 			   inserted);
@@ -4720,7 +4769,7 @@ by calling `format-decode', which see.  */)
 	      Lisp_Object tem = XCAR (old_undo);
 	      if (CONSP (tem) && FIXNUMP (XCAR (tem))
 		  && FIXNUMP (XCDR (tem))
-		  && XFIXNAT (XCDR (tem)) == PT + old_inserted)
+		  && XFIXNUM (XCDR (tem)) == PT + old_inserted)
 		XSETCDR (tem, make_fixnum (PT + inserted));
 	    }
 	}
@@ -5392,7 +5441,7 @@ a_write (int desc, Lisp_Object string, ptrdiff_t pos,
       tem = Fcar_safe (Fcar (*annot));
       nextpos = pos - 1;
       if (FIXNUMP (tem))
-	nextpos = XFIXNAT (tem);
+	nextpos = XFIXNUM (tem);
 
       /* If there are no more annotations in this range,
 	 output the rest of the range all at once.  */
@@ -5803,12 +5852,12 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	  {
 	    block_input ();
 	    if (!NILP (BVAR (b, filename)))
-	      fwrite_unlocked (SDATA (BVAR (b, filename)), 1,
-			       SBYTES (BVAR (b, filename)), stream);
-	    putc_unlocked ('\n', stream);
-	    fwrite_unlocked (SDATA (BVAR (b, auto_save_file_name)), 1,
-			     SBYTES (BVAR (b, auto_save_file_name)), stream);
-	    putc_unlocked ('\n', stream);
+	      fwrite (SDATA (BVAR (b, filename)), 1,
+		      SBYTES (BVAR (b, filename)), stream);
+	    putc ('\n', stream);
+	    fwrite (SDATA (BVAR (b, auto_save_file_name)), 1,
+		    SBYTES (BVAR (b, auto_save_file_name)), stream);
+	    putc ('\n', stream);
 	    unblock_input ();
 	  }
 
@@ -5850,9 +5899,9 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 		&& FIXNUMP (BVAR (b, save_length))
 		/* A short file is likely to change a large fraction;
 		   spare the user annoying messages.  */
-		&& XFIXNAT (BVAR (b, save_length)) > 5000
+		&& XFIXNUM (BVAR (b, save_length)) > 5000
 		&& (growth_factor * (BUF_Z (b) - BUF_BEG (b))
-		    < (growth_factor - 1) * XFIXNAT (BVAR (b, save_length)))
+		    < (growth_factor - 1) * XFIXNUM (BVAR (b, save_length)))
 		/* These messages are frequent and annoying for `*mail*'.  */
 		&& !NILP (BVAR (b, filename))
 		&& NILP (no_message))
@@ -6003,7 +6052,7 @@ effect except for flushing STREAM's data.  */)
 
   binmode = NILP (mode) ? O_TEXT : O_BINARY;
   if (fp != stdin)
-    fflush_unlocked (fp);
+    fflush (fp);
 
   return (set_binary_mode (fileno (fp), binmode) == O_BINARY) ? Qt : Qnil;
 }

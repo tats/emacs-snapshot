@@ -155,7 +155,15 @@ cid: URL as the argument.")
 
 (defface shr-selected-link
   '((t :inherit shr-link :background "red"))
-  "Face for link elements."
+  "Temporary face for externally visited link elements.
+When a link is visited with an external browser, the link
+temporarily blinks with this face."
+  :version "27.1"
+  :group 'shr)
+
+(defface shr-abbreviation
+  '((t :inherit underline :underline (:style wave)))
+  "Face for <abbr> elements."
   :version "27.1"
   :group 'shr)
 
@@ -1469,6 +1477,21 @@ ones, in case fg and bg are nil."
       (put-text-property start (1+ start) 'shr-target-id shr-target-id))
     (when url
       (shr-urlify (or shr-start start) (shr-expand-url url) title))))
+
+(defun shr-tag-abbr (dom)
+  (when-let* ((title (dom-attr dom 'title))
+	      (start (point)))
+    (shr-generic dom)
+    (shr-add-font start (point) 'shr-abbreviation)
+    (add-text-properties
+     start (point)
+     (list
+      'help-echo title
+      'mouse-face 'highlight))))
+
+(defun shr-tag-acronym (dom)
+  ;; `acronym' is deprecated in favor of `abbr'.
+  (shr-tag-abbr dom))
 
 (defun shr-tag-object (dom)
   (unless shr-inhibit-images

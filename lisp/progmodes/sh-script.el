@@ -582,7 +582,7 @@ This is buffer-local in every such buffer.")
     ;; actually spaces are only supported in let/(( ... ))
     (ksh88 . ,(concat "\\<\\([[:alnum:]_]+\\)\\(\\[.+\\]\\)?"
                       "[ \t]*\\(?:[-+*/%&|~^]\\|<<\\|>>\\)?="))
-    (bash . "\\<\\([[:alnum:]_]+\\)\\(\\[.+\\]\\)?\\+?=")
+    (bash . "\\<\\([[:alnum:]_]+\\)\\([.+]\\)?\\+?=")
     (rc . "\\<\\([[:alnum:]_*]+\\)[ \t]*=")
     (sh . "\\<\\([[:alnum:]_]+\\)="))
   "Regexp for the variable name and what may follow in an assignment.
@@ -1625,9 +1625,9 @@ with your script for an edit-interpret-debug cycle."
   (setq-local defun-prompt-regexp
               (concat
                "^\\("
-               "\\(function[ \t]\\)?[ \t]*[[:alnum:]]+[ \t]*([ \t]*)"
+               "\\(function[ \t]\\)?[ \t]*[[:alnum:]_]+[ \t]*([ \t]*)"
                "\\|"
-               "function[ \t]+[[:alnum:]]+[ \t]*\\(([ \t]*)\\)?"
+               "function[ \t]+[[:alnum:]_]+[ \t]*\\(([ \t]*)\\)?"
                "\\)[ \t]*"))
   (setq-local add-log-current-defun-function #'sh-current-defun-name)
   (add-hook 'completion-at-point-functions

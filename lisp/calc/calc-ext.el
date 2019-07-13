@@ -2138,7 +2138,7 @@ calc-kill calc-kill-region calc-yank))))
 (defalias 'math-numberp #'Math-numberp)
 
 ;;; True if A is a complex number or angle.  [P x] [Public]
-(defalias 'math-scalarp #'#'Math-scalarp)
+(defalias 'math-scalarp #'Math-scalarp)
 
 ;;; True if A is a vector.  [P x] [Public]
 (defalias 'math-vectorp #'Math-vectorp)
@@ -2967,13 +2967,13 @@ If X is not an error form, return 1."
 
    ;; C language hexadecimal notation
    ((and (eq calc-language 'c)
-	 (string-match "^0[xX]\\([0-9a-fA-F]+\\)$" s))
+	 (string-match "^0[xX]\\([[:xdigit:]]+\\)$" s))
     (let ((digs (math-match-substring s 1)))
       (math-read-radix digs 16)))
 
    ;; Pascal language hexadecimal notation
    ((and (eq calc-language 'pascal)
-	 (string-match "^\\$\\([0-9a-fA-F]+\\)$" s))
+	 (string-match "^\\$\\([[:xdigit:]]+\\)$" s))
     (let ((digs (math-match-substring s 1)))
       (math-read-radix digs 16)))
 

@@ -4559,10 +4559,7 @@ commands:
 	  (current-buffer))))))
 
 (defun gnus-article-stop-animations ()
-  (dolist (timer (and (boundp 'timer-list)
-		      timer-list))
-    (when (eq (timer--function timer) 'image-animate-timeout)
-      (cancel-timer timer))))
+  (cancel-function-timers 'image-animate-timeout))
 
 (defun gnus-stop-downloads ()
   (when (boundp 'url-queue)
@@ -7426,10 +7423,10 @@ must return `mid', `mail', `invalid' or `ask'."
     (-2.0  . "^[0-9]")
     (-1.0  . "^[0-9][0-9]")
     ;;
-    ;; -3.0 /^[0-9][0-9a-fA-F]{2,2}/;
-    (-3.0  . "^[0-9][0-9a-fA-F][0-9a-fA-F][^0-9a-fA-F]")
-    ;; -5.0 /^[0-9][0-9a-fA-F]{3,3}/;
-    (-5.0  . "^[0-9][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][^0-9a-fA-F]")
+    ;; -3.0 /^[0-9][[:xdigit:]]{2,2}/;
+    (-3.0  . "^[0-9][[:xdigit:]][[:xdigit:]][^[:xdigit:]]")
+    ;; -5.0 /^[0-9][[:xdigit:]]{3,3}/;
+    (-5.0  . "^[0-9][[:xdigit:]][[:xdigit:]][[:xdigit:]][^[:xdigit:]]")
     ;;
     (-3.0  .  "[0-9][0-9][0-9][0-9][0-9][^0-9].*@") ;; "[0-9]{5,}.*\@"
     (-3.0  .  "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][^0-9].*@")

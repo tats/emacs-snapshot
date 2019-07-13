@@ -285,7 +285,7 @@ the original string if not."
 	      (string-match "\\(\\`\\|[^\\]\\)\\(\\\\\\\\\\)*\\\\[,#]" to)))
 	(setq to (nreverse (delete "" (cons to list))))
 	(replace-match-string-symbols to)
-	(cons 'replace-eval-replacement
+	(cons #'replace-eval-replacement
 	      (if (cdr to)
 		  (cons 'concat to)
 		(car to))))
@@ -543,7 +543,7 @@ for Lisp calls." "22.1"))
 	     (if (use-region-p) (region-beginning))
 	     (if (use-region-p) (region-end))
 	     (if (use-region-p) (region-noncontiguous-p))))))
-  (perform-replace regexp (cons 'replace-eval-replacement to-expr)
+  (perform-replace regexp (cons #'replace-eval-replacement to-expr)
 		   t 'literal delimited nil nil start end nil region-noncontiguous-p))
 
 (defun map-query-replace-regexp (regexp to-strings &optional n start end region-noncontiguous-p)
@@ -2471,7 +2471,8 @@ characters."
             replacements     nil))
      ((stringp (car replacements)) ; If it isn't a string, it must be a cons
       (or repeat-count (setq repeat-count 1))
-      (setq replacements (cons 'replace-loop-through-replacements
+      ;; This is a hand-made `iterator'.
+      (setq replacements (cons #'replace-loop-through-replacements
                                (vector repeat-count repeat-count
                                        replacements replacements)))))
 
@@ -2596,6 +2597,11 @@ characters."
 		;; Commands not setting `done' need to adjust
 		;; `real-match-data'.
 		(while (not done)
+		  ;; This sets match-data only for the next hook and
+		  ;; replace-highlight that calls `sit-for' from
+		  ;; isearch-lazy-highlight-new-loop whose redisplay
+		  ;; might clobber match-data. So subsequent code should
+		  ;; use only real-match-data, not match-data (bug#36328).
 		  (set-match-data real-match-data)
                   (run-hooks 'replace-update-post-hook) ; Before `replace-highlight'.
                   (replace-highlight
@@ -2608,14 +2614,14 @@ characters."
                     (setq last-was-undo nil
                           real-match-data
                           (save-excursion
-                            (goto-char (match-beginning 0))
+                            (goto-char (nth 0 real-match-data))
                             (looking-at search-string)
                             (match-data t real-match-data))))
                   ;; Matched string and next-replacement-replaced
                   ;; stored in stack.
                   (setq search-string-replaced (buffer-substring-no-properties
-                                                (match-beginning 0)
-                                                (match-end 0))
+                                                (nth 0 real-match-data)
+                                                (nth 1 real-match-data))
                         next-replacement-replaced
                         (query-replace-descr
                          (save-match-data

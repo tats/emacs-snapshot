@@ -4,7 +4,7 @@
 
 ;; Author: Pavel Kobyakov <pk_at_work@yahoo.com>
 ;; Maintainer: João Távora <joaotavora@gmail.com>
-;; Version: 1.0.6
+;; Version: 1.0.8
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: c languages tools
 
@@ -344,10 +344,16 @@ diagnostics at BEG."
 (flymake--diag-accessor flymake-diagnostic-buffer flymake--diag-buffer buffer)
 (flymake--diag-accessor flymake-diagnostic-text flymake--diag-text text)
 (flymake--diag-accessor flymake-diagnostic-type flymake--diag-type type)
-(flymake--diag-accessor flymake-diagnostic-beg flymake--diag-beg beg)
-(flymake--diag-accessor flymake-diagnostic-end flymake--diag-end end)
 (flymake--diag-accessor flymake-diagnostic-backend flymake--diag-backend backend)
 (flymake--diag-accessor flymake-diagnostic-data flymake--diag-data backend)
+
+(defun flymake-diagnostic-beg (diag)
+  "Get Flymake diagnostic DIAG's start position."
+  (overlay-start (flymake--diag-overlay diag)))
+
+(defun flymake-diagnostic-end (diag)
+  "Get Flymake diagnostic DIAG's end position."
+  (overlay-end (flymake--diag-overlay diag)))
 
 (cl-defun flymake--overlays (&key beg end filter compare key)
   "Get flymake-related overlays.
@@ -604,10 +610,11 @@ associated `flymake-category' return DEFAULT."
 
 (defun flymake--highlight-line (diagnostic)
   "Highlight buffer with info in DIGNOSTIC."
-  (when-let* ((type (flymake--diag-type diagnostic))
-              (ov (make-overlay
-                   (flymake--diag-beg diagnostic)
-                   (flymake--diag-end diagnostic))))
+  (let ((type (or (flymake--diag-type diagnostic)
+                  :error))
+        (ov (make-overlay
+             (flymake--diag-beg diagnostic)
+             (flymake--diag-end diagnostic))))
     ;; First set `category' in the overlay
     ;;
     (overlay-put ov 'category
@@ -696,6 +703,14 @@ backend is operating normally.")
   "Tell if Flymake has running backends in this buffer"
   (flymake-running-backends))
 
+;; FIXME: clone of `isearch-intesects-p'! Make this an util.
+(defun flymake--intersects-p (start0 end0 start1 end1)
+  "Return t if regions START0..END0 and START1..END1 intersect."
+  (or (and (>= start0 start1) (<  start0 end1))
+      (and (>  end0 start1)   (<= end0 end1))
+      (and (>= start1 start0) (<  start1 end0))
+      (and (>  end1 start0)   (<= end1 end0))))
+
 (cl-defun flymake--handle-report (backend token report-action
                                           &key explanation force region
                                           &allow-other-keys)
@@ -743,9 +758,12 @@ report applies to that region."
           (cond
            (region
             (cl-loop for diag in (flymake--backend-state-diags state)
-                     if (or (> (flymake--diag-end diag) (car region))
-                            (< (flymake--diag-beg diag) (cdr region)))
-                     do (delete-overlay (flymake--diag-overlay diag))
+                     for ov = (flymake--diag-overlay diag)
+                     if (or (not (overlay-buffer ov))
+                            (flymake--intersects-p
+                             (overlay-start ov) (overlay-end ov)
+                             (car region) (cdr region)))
+                     do (delete-overlay ov)
                      else collect diag into surviving
                      finally (setf (flymake--backend-state-diags state)
                                    surviving)))
@@ -1282,8 +1300,8 @@ default) no filter is applied."
       (with-selected-window
           (display-buffer (current-buffer) other-window)
         (goto-char (flymake--diag-beg diag))
-        (pulse-momentary-highlight-region (flymake--diag-beg diag)
-                                          (flymake--diag-end diag)
+        (pulse-momentary-highlight-region (flymake-diagnostic-beg diag)
+                                          (flymake-diagnostic-end diag)
                                           'highlight))
       (current-buffer))))
 

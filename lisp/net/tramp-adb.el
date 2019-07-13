@@ -35,12 +35,14 @@
 
 (require 'tramp)
 
+;;;###tramp-autoload
 (defcustom tramp-adb-program "adb"
   "Name of the Android Debug Bridge program."
   :group 'tramp
   :version "24.4"
   :type 'string)
 
+;;;###tramp-autoload
 (defcustom tramp-adb-connect-if-not-connected nil
   "Try to run `adb connect' if provided device is not connected currently.
 It is used for TCP/IP devices."
@@ -52,6 +54,7 @@ It is used for TCP/IP devices."
 (defconst tramp-adb-method "adb"
   "When this method name is used, forward all calls to Android Debug Bridge.")
 
+;;;###tramp-autoload
 (defcustom tramp-adb-prompt
   "^[[:digit:]]*|?[[:alnum:]\e;[]*@?[[:alnum:]]*[^#\\$]*[#\\$][[:space:]]"
   "Regexp used as prompt in almquist shell."
@@ -257,17 +260,15 @@ pass to the OPERATION."
 	      (setq thisstep (pop steps))
 	      (tramp-message
 	       v 5 "Check %s"
-	       (mapconcat #'identity
-			  (append '("") (reverse result) (list thisstep))
-			  "/"))
+	       (string-join
+		(append '("") (reverse result) (list thisstep)) "/"))
 	      (setq symlink-target
 		    (tramp-compat-file-attribute-type
 		     (file-attributes
 		      (tramp-make-tramp-file-name
-		       v (mapconcat #'identity
-				    (append
-				     '("") (reverse result) (list thisstep))
-				    "/")))))
+		       v
+		       (string-join
+			(append '("") (reverse result) (list thisstep)) "/")))))
 	      (cond ((string= "." thisstep)
 		     (tramp-message v 5 "Ignoring step `.'"))
 		    ((string= ".." thisstep)
@@ -302,9 +303,9 @@ pass to the OPERATION."
 	    ;; Combine list to form string.
 	    (setq result
 		  (if result
-		      (mapconcat #'identity (cons "" result) "/")
+		      (string-join (cons "" result) "/")
 		    "/"))
-	    (when (and is-dir (or (string= "" result)
+	    (when (and is-dir (or (string-empty-p result)
 				  (not (string= (substring result -1) "/"))))
 	      (setq result (concat result "/"))))
 
@@ -479,7 +480,7 @@ Emacs dired can't find files."
 		 #'tramp-adb-ls-output-time-less-p
 	       #'tramp-adb-ls-output-name-less-p))))
       (delete-region (point-min) (point-max))
-      (insert "  " (mapconcat #'identity sorted-lines "\n  ")))
+      (insert "  " (string-join sorted-lines "\n  ")))
     ;; Add final newline.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))))
@@ -708,15 +709,16 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (let ((t1 (tramp-tramp-file-p filename))
 	  (t2 (tramp-tramp-file-p newname)))
       (with-parsed-tramp-file-name (if t1 filename newname) nil
+	(when (and (not ok-if-already-exists) (file-exists-p newname))
+	  (tramp-error v 'file-already-exists newname))
+	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	  (tramp-error v 'file-error "File is a directory %s" newname))
+
 	(with-tramp-progress-reporter
 	    v 0 (format "Copying %s to %s" filename newname)
-
 	  (if (and t1 t2 (tramp-equal-remote filename newname))
 	      (let ((l1 (tramp-compat-file-local-name filename))
 		    (l2 (tramp-compat-file-local-name newname)))
-		(when (and (not ok-if-already-exists)
-			   (file-exists-p newname))
-		  (tramp-error v 'file-already-exists newname))
 		;; We must also flush the cache of the directory,
 		;; because `file-attributes' reads the values from
 		;; there.
@@ -787,17 +789,18 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (let ((t1 (tramp-tramp-file-p filename))
 	  (t2 (tramp-tramp-file-p newname)))
       (with-parsed-tramp-file-name (if t1 filename newname) nil
+	(when (and (not ok-if-already-exists) (file-exists-p newname))
+	  (tramp-error v 'file-already-exists newname))
+	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	  (tramp-error v 'file-error "File is a directory %s" newname))
+
 	(with-tramp-progress-reporter
 	    v 0 (format "Renaming %s to %s" filename newname)
-
 	  (if (and t1 t2
 		   (tramp-equal-remote filename newname)
 		   (not (file-directory-p filename)))
 	      (let ((l1 (tramp-compat-file-local-name filename))
 		    (l2 (tramp-compat-file-local-name newname)))
-		(when (and (not ok-if-already-exists)
-			   (file-exists-p newname))
-		  (tramp-error v 'file-already-exists newname))
 		;; We must also flush the cache of the directory, because
 		;; `file-attributes' reads the values from there.
 		(tramp-flush-file-properties v (file-name-directory l1))
@@ -1232,7 +1235,7 @@ connection if a previous connection has died for some reason."
 		 (prompt (md5 (concat (prin1-to-string process-environment)
 				      (current-time-string)))))
 	    (tramp-message
-	     vec 6 "%s" (mapconcat #'identity (process-command p) " "))
+	     vec 6 "%s" (string-join (process-command p) " "))
 	    ;; Wait for initial prompt.  On some devices, it needs an
 	    ;; initial RET, in order to get it.
             (sleep-for 0.1)
@@ -1300,16 +1303,15 @@ connection if a previous connection has died for some reason."
 
 ;; `connection-local-set-profile-variables' and
 ;; `connection-local-set-profiles' exists since Emacs 26.1.
-(eval-after-load "shell"
-  '(progn
-     (tramp-compat-funcall
-      'connection-local-set-profile-variables
-      'tramp-adb-connection-local-default-profile
-      tramp-adb-connection-local-default-profile)
-     (tramp-compat-funcall
-      'connection-local-set-profiles
-      `(:application tramp :protocol ,tramp-adb-method)
-      'tramp-adb-connection-local-default-profile)))
+(with-eval-after-load 'shell
+  (tramp-compat-funcall
+   'connection-local-set-profile-variables
+   'tramp-adb-connection-local-default-profile
+   tramp-adb-connection-local-default-profile)
+  (tramp-compat-funcall
+   'connection-local-set-profiles
+   `(:application tramp :protocol ,tramp-adb-method)
+   'tramp-adb-connection-local-default-profile))
 
 (add-hook 'tramp-unload-hook
 	  (lambda ()

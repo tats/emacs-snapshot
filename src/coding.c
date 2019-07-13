@@ -284,7 +284,6 @@ encode_coding_XXX (struct coding_system *coding)
 /*** 1. Preamble ***/
 
 #include <config.h>
-#include <stdio.h>
 
 #ifdef HAVE_WCHAR_H
 #include <wchar.h>
@@ -7324,9 +7323,13 @@ produce_annotation (struct coding_system *coding, ptrdiff_t pos)
    In this case, if CODING->src_pos is positive, it is a position of
    the source text in the buffer, otherwise, the source text is in the
    gap area of the buffer, and CODING->src_pos specifies the offset of
-   the text from GPT (which must be the same as PT).  If this is the
-   same buffer as CODING->dst_object, CODING->src_pos must be
-   negative.
+   the text from the end of the gap (and GPT must be equal to PT).
+
+   When the text is taken from the gap, it can't be at the beginning
+   of the gap because the new decoded text is progressively acumulated
+   at the beginning of the gap before it gets inserted at PT (this way,
+   as the output grows, the input shrinks, so we only need to allocate
+   enough space for `max(IN, OUT)` instead of `IN + OUT`).
 
    If CODING->src_object is a string, CODING->src_pos is an index to
    that string.
@@ -7892,23 +7895,26 @@ coding_restore_undo_list (Lisp_Object arg)
   bset_undo_list (buf, undo_list);
 }
 
+/* Decode the *last* BYTES of the gap and insert them at point.  */
 void
-decode_coding_gap (struct coding_system *coding,
-		   ptrdiff_t chars, ptrdiff_t bytes)
+decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object attrs;
 
+  eassert (GPT_BYTE == PT_BYTE);
+
   coding->src_object = Fcurrent_buffer ();
-  coding->src_chars = chars;
+  coding->src_chars = bytes;
   coding->src_bytes = bytes;
-  coding->src_pos = -chars;
+  coding->src_pos = -bytes;
   coding->src_pos_byte = -bytes;
-  coding->src_multibyte = chars < bytes;
+  coding->src_multibyte = false;
   coding->dst_object = coding->src_object;
   coding->dst_pos = PT;
   coding->dst_pos_byte = PT_BYTE;
-  coding->dst_multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  eassert (coding->dst_multibyte
+           == !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
   coding->head_ascii = -1;
   coding->detected_utf8_bytes = coding->detected_utf8_chars = -1;
@@ -7922,7 +7928,7 @@ decode_coding_gap (struct coding_system *coding,
       && NILP (CODING_ATTR_POST_READ (attrs))
       && NILP (get_translation_table (attrs, 0, NULL)))
     {
-      chars = coding->head_ascii;
+      ptrdiff_t chars = coding->head_ascii;
       if (chars < 0)
 	chars = check_ascii (coding);
       if (chars != bytes)

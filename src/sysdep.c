@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 
 #include <c-ctype.h>
+#include <close-stream.h>
 #include <pathmax.h>
 #include <utimens.h>
 
@@ -1471,7 +1472,7 @@ reset_sys_modes (struct tty_display_info *tty_out)
 {
   if (noninteractive)
     {
-      fflush_unlocked (stdout);
+      fflush (stdout);
       return;
     }
   if (!tty_out->term_initted)
@@ -1494,11 +1495,11 @@ reset_sys_modes (struct tty_display_info *tty_out)
       tty_turn_off_insert (tty_out);
 
       for (int i = cursorX (tty_out); i < FrameCols (tty_out) - 1; i++)
-	fputc_unlocked (' ', tty_out->output);
+	putc (' ', tty_out->output);
     }
 
   cmgoto (tty_out, FrameRows (tty_out) - 1, 0);
-  fflush_unlocked (tty_out->output);
+  fflush (tty_out->output);
 
   if (tty_out->terminal->reset_terminal_modes_hook)
     tty_out->terminal->reset_terminal_modes_hook (tty_out->terminal);
@@ -2768,6 +2769,25 @@ safe_strsignal (int code)
   return signame;
 }
 
+/* Close standard output and standard error, reporting any write
+   errors as best we can.  This is intended for use with atexit.  */
+void
+close_output_streams (void)
+{
+  if (close_stream (stdout) != 0)
+    {
+      emacs_perror ("Write error to standard output");
+      _exit (EXIT_FAILURE);
+    }
+
+  /* Do not close stderr if addresses are being sanitized, as the
+     sanitizer might report to stderr after this function is invoked.  */
+  if (ADDRESS_SANITIZER
+      ? fflush (stderr) != 0 || ferror (stderr)
+      : close_stream (stderr) != 0)
+    _exit (EXIT_FAILURE);
+}
+
 #ifndef DOS_NT
 /* For make-serial-process  */
 int
@@ -3164,7 +3184,7 @@ procfs_ttyname (int rdev)
       char minor[25];	/* 2 32-bit numbers + dash */
       char *endp;
 
-      for (; !feof_unlocked (fdev) && !ferror_unlocked (fdev); name[0] = 0)
+      for (; !feof (fdev) && !ferror (fdev); name[0] = 0)
 	{
 	  if (fscanf (fdev, "%*s %s %u %s %*s\n", name, &major, minor) >= 3
 	      && major == MAJOR (rdev))
@@ -3214,7 +3234,7 @@ procfs_get_total_memory (void)
 	    break;
 
 	  case 0:
-	    while ((c = getc_unlocked (fmem)) != EOF && c != '\n')
+	    while ((c = getc (fmem)) != EOF && c != '\n')
 	      continue;
 	    done = c == EOF;
 	    break;
@@ -3249,7 +3269,7 @@ system_process_attributes (Lisp_Object pid)
   char *cmdline = NULL;
   ptrdiff_t cmdline_size;
   char c;
-  printmax_t proc_id;
+  intmax_t proc_id;
   int ppid, pgrp, sess, tty, tpgid, thcount;
   uid_t uid;
   gid_t gid;
@@ -3264,7 +3284,7 @@ system_process_attributes (Lisp_Object pid)
 
   CHECK_NUMBER (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);
-  sprintf (procfn, "/proc/%"pMd, proc_id);
+  sprintf (procfn, "/proc/%"PRIdMAX, proc_id);
   if (stat (procfn, &st) < 0)
     return attrs;
 
@@ -3485,7 +3505,7 @@ system_process_attributes (Lisp_Object pid)
   struct psinfo pinfo;
   int fd;
   ssize_t nread;
-  printmax_t proc_id;
+  intmax_t proc_id;
   uid_t uid;
   gid_t gid;
   Lisp_Object attrs = Qnil;
@@ -3494,7 +3514,7 @@ system_process_attributes (Lisp_Object pid)
 
   CHECK_NUMBER (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);
-  sprintf (procfn, "/proc/%"pMd, proc_id);
+  sprintf (procfn, "/proc/%"PRIdMAX, proc_id);
   if (stat (procfn, &st) < 0)
     return attrs;
 

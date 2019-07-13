@@ -6288,6 +6288,10 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
 
   f->output_data.x->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
 
+  gui_default_parameter (f, parms, Qinhibit_double_buffering, Qnil,
+                         "inhibitDoubleBuffering", "InhibitDoubleBuffering",
+                         RES_TYPE_BOOLEAN);
+
   gui_figure_window_size (f, parms, false, &x_width, &x_height);
 
   {
@@ -6962,6 +6966,7 @@ Text larger than the specified size is clipped.  */)
 
   w->must_be_updated_p = true;
   update_single_window (w);
+  flush_frame (tip_f);
   set_buffer_internal_1 (old_buffer);
   unbind_to (count_1, Qnil);
   windows_or_buffers_changed = old_windows_or_buffers_changed;

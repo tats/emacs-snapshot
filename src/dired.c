@@ -20,7 +20,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#include <stdio.h>
 #include <sys/stat.h>
 
 #ifdef HAVE_PWD_H
@@ -937,7 +936,7 @@ file_attributes (int fd, char const *name,
 
   int err = EINVAL;
 
-#ifdef O_PATH
+#if defined O_PATH && !defined HAVE_CYGWIN_O_PATH_BUG
   int namefd = openat (fd, name, O_PATH | O_CLOEXEC | O_NOFOLLOW);
   if (namefd < 0)
     err = errno;
