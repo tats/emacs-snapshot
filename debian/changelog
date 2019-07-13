@@ -2,6 +2,12 @@ emacs-snapshot (2:20190713+emacs-26.1-6380-ged29d9fe528-1) unstable; urgency=med
 
   * New snapshot
 
+ -- Dima Kogan <dima@secretsauce.net>  Sat, 13 Jul 2019 12:23:38 -0700
+
+emacs-snapshot (2:20190713+emacs-26.1-6380-ged29d9fe528-1) unstable; urgency=medium
+
+  * New snapshot
+
  -- Dima Kogan <dima@secretsauce.net>  Sat, 13 Jul 2019 10:42:57 -0700
 
 emacs-snapshot (2:20190619+emacs-26.1-5851-gd3a7f3e6cd0-1) unstable; urgency=medium
