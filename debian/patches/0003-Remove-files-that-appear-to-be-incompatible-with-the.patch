@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 21362a9..de49fac 100644
+index aa11e6b..a1b6052 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=
@@ -53,7 +53,7 @@ index 21362a9..de49fac 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -963,11 +964,11 @@ $(CHECK_TARGETS):
+@@ -965,11 +966,11 @@ $(CHECK_TARGETS):
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 21362a9..de49fac 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -988,9 +989,7 @@ info-dir:
+@@ -990,9 +991,7 @@ info-dir:
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index 21362a9..de49fac 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1012,14 +1011,10 @@ ${srcdir}/info/dir:
+@@ -1014,14 +1013,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index 21362a9..de49fac 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1037,14 +1032,10 @@ install-pdf:
+@@ -1039,14 +1034,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -134,10 +134,10 @@ index bb831a0..de0d9ee 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index be5c4e3..5c3140b 100644
+index c093d86..5d30849 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5758,7 +5758,7 @@ AC_DEFUN
+@@ -5766,7 +5766,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index be5c4e3..5c3140b 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5810,15 +5810,6 @@ m4_define
+@@ -5818,15 +5818,6 @@ m4_define
  fi
  ])
  
@@ -190,7 +190,7 @@ index a03efaf..8800638 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 42ff375..744cbe3 100644
+index 039d0c4..2037588 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -296,6 +296,14 @@ view-help-file

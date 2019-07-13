@@ -5,11 +5,11 @@ Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
 These are OS X specific, and were removed for now, due to uncertainty
 over the licensing.
 ---
- admin/unidata/Makefile.in | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ admin/unidata/Makefile.in | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index 31efba0..eb8bea5 100644
+index 9e74b85..631be81 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
 @@ -56,17 +56,12 @@ am__v_at_1 =
@@ -31,10 +31,3 @@ index 31efba0..eb8bea5 100644
  
  %.elc: %.el
  	$(AM_V_ELC)${emacs} -f batch-byte-compile $<
-@@ -117,5 +112,5 @@ maintainer-clean:
- ## change and it slows down bootstrap (a tiny bit).
- ## Cf leim/ja-dic (which is much slower).
- extraclean:
--	rm -f ${top_srcdir}/src/macuvs.h ${unidir}/charscript.el*
-+	rm -f ${unidir}/charscript.el*
- 	rm -f ${unifiles} ${unidir}/charprop.el
