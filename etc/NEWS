@@ -183,18 +183,14 @@ loads files during completion of 'C-h f' and 'C-h v' according to
 
 ** emacsclient
 
-*** Previously, when an alternate editor is started
-(--alternate-editor/-a), and there was an --eval switch, these
-parameters were used as file names for the alternate editor.
-emacsclient will now instead start the alternate editor without these
-parameters.
+*** emacsclient no longer passes --eval arguments to an alternate editor.
+Previously, --eval arguments were passed as file names to any
+alternate editor started by --alternate-editor/-a.
 
 +++
-*** emacsclient now supports the 'EMACS_SOCKET_NAME' environment variable.
-The behavior is identical to 'EMACS_SERVER_FILE', in that the
-command-line value specified via '--socket-name' will override the
-environment, and the natural default to 'TMPDIR', then "/tmp", continues
-to apply.
+*** emacsclient now supports an 'EMACS_SOCKET_NAME' environment variable.
+The command-line argument '--socket-name' overrides it.
+(The same behavior as for the pre-existing 'EMACS_SERVER_FILE' variable.)
 
 +++
 *** Emacs and emacsclient now default to "$XDG_RUNTIME_DIR/emacs"
@@ -304,6 +300,9 @@ regular expression was previously invalid, but is now accepted:
 ** New input methods 'hawaiian-postfix' and 'hawaiian-prefix'.
 
 ---
+** New input methods 'georgian-qwerty' and 'georgian-nuskhuri'.
+
+---
 ** New input methods for several variants of the Sami language.
 The Sami input methods include: 'norwegian-sami-prefix',
 'bergsland-hasselbrink-sami-prefix', 'southern-sami-prefix',
@@ -398,6 +397,10 @@ mode they are described in the manual "(emacs) Display".
 +++
 ** 'progress-reporter-update' accepts a suffix string to display.
 
+---
+** New variable 'xref-file-name-display' controls the display of file
+names in xref buffers.
+** New variable `file-size-function' controls how file sizes are displayed
 
 
 * Editing Changes in Emacs 27.1
@@ -691,10 +694,18 @@ print diffs and logs between the merge base (common ancestor) of two
 given revisions.
 
 +++
-*** The new `d' command (`vc-dir-delete-files-no-vc') in `vc-dir-mode'
+*** The new `d' command (`vc-dir-clean-files') in `vc-dir-mode'
 buffers will delete the marked files (or if no files are marked, the
 file under point).  This command does not notify the VC backend, and
 is mostly useful for unregistered files.
+
+*** New command 'vc-log-search' asks for a pattern string, searches
+it in the revision log, and displays matched log entries in the
+log buffer.  For example, 'M-x vc-log-search RET bug#36644 RET'
+displays all entries whose log messages match the bug number.
+With a prefix argument asks for a command, so for example,
+'C-u M-x vc-log-search RET git log -1 f302475 RET' will display
+just one log entry found by its revision number.
 
 ** Diff mode
 +++
@@ -1684,6 +1695,20 @@ This runs after changing the dictionary and could be used to
 automatically spellcheck a buffer when changing language without
 needing to advice 'ispell-change-dictionary'.
 
+** scroll-lock
+
+---
+*** New command 'scroll-lock-next-line-always-scroll'.
+This command is bound to 'S-down' and scrolls the buffer up in
+particular when the end of the buffer is visible in the window.
+
+** mwheel.el
+
+---
+*** 'mwheel-install' is now obsolete.
+Use 'mouse-wheel-mode' instead.  Note that 'mouse-wheel-mode' is
+already enabled by default on most graphical displays.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1721,6 +1746,10 @@ prevent delays of several minutes, and make Emacs responsive almost
 immediately.  Type 'M-x so-long-commentary' for full documentation.
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** The REGEXP in 'magic-mode-alist' is now matched case-sensitively.
+Likewise for 'magic-fallback-mode-alist'.
 
 +++
 ** add-hook does not always add to the front or the end any more.
@@ -2319,6 +2348,10 @@ greater flexibility when customizing variables.  The modifiers include
 zero-padding, upper- and lower-casing, and limiting the length of the
 interpolated strings.  The function has now also been documented in
 the Emacs Lisp manual.
+
++++
+** `directory-files-recursively' can now take an optional PREDICATE
+parameter to control descending into subdirectories.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

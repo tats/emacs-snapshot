@@ -266,11 +266,13 @@ The string is used in `tramp-methods'.")
  (add-to-list 'tramp-methods
               '("sudo"
                 (tramp-login-program        "sudo")
-                ;; The password template must be masked.  Otherwise, it could be
-                ;; interpreted as password prompt if the remote host echoes the command.
+                ;; The password template must be masked.  Otherwise,
+                ;; it could be interpreted as password prompt if the
+                ;; remote host echoes the command.
                 (tramp-login-args           (("-u" "%u") ("-s") ("-H")
 				             ("-p" "P\"\"a\"\"s\"\"s\"\"w\"\"o\"\"r\"\"d\"\":")))
-                ;; Local $SHELL could be a nasty one, like zsh or fish.  Let's override it.
+                ;; Local $SHELL could be a nasty one, like zsh or
+                ;; fish.  Let's override it.
                 (tramp-login-env            (("SHELL") ("/bin/sh")))
                 (tramp-remote-shell         "/bin/sh")
                 (tramp-remote-shell-login   ("-l"))
@@ -2304,7 +2306,8 @@ The method used must be an out-of-band method."
 
 	;; Check which ones of source and target are Tramp files.
 	(setq source (funcall
-		      (if (and (file-directory-p filename)
+		      (if (and (string-equal method "rsync")
+			       (file-directory-p filename)
 			       (not (file-exists-p newname)))
 			  #'file-name-as-directory
 			#'identity)
@@ -3701,7 +3704,7 @@ Fall back to normal file name handler if no Tramp handler exists."
 	;; once.  Therefore, we apply the handler directly.
 	(when (member (cl-caadr object) events)
 	  (tramp-compat-funcall
-	   'file-notify-handle-event
+	   (lookup-key special-event-map [file-notify])
 	   `(file-notify ,object file-notify-callback)))))
 
     ;; Save rest of the string.
@@ -3752,7 +3755,7 @@ file-notify events."
 	;; once.  Therefore, we apply the handler directly.
 	(when (member (cl-caadr object) events)
 	  (tramp-compat-funcall
-	   'file-notify-handle-event
+	   (lookup-key special-event-map [file-notify])
 	   `(file-notify ,object file-notify-callback)))))
 
     ;; Save rest of the string.
@@ -3788,7 +3791,7 @@ file-notify events."
 	;; once.  Therefore, we apply the handler directly.
 	(when (member (cl-caadr object) events)
 	  (tramp-compat-funcall
-	   'file-notify-handle-event
+	   (lookup-key special-event-map [file-notify])
 	   `(file-notify ,object file-notify-callback)))))))
 
 (defun tramp-sh-handle-file-system-info (filename)
@@ -4557,25 +4560,24 @@ Goes through the list `tramp-inline-compress-commands'."
 	   "Checking local compress commands `%s', `%s' for sanity"
 	   compress decompress)
           (with-temp-buffer
-            (unless
-                (and
-	         (zerop
-	          (tramp-call-local-coding-command
-	           (format
-	            "echo %s | %s | %s" magic
-	            ;; Windows shells need the program file name after
-	            ;; the pipe symbol be quoted if they use forward
-	            ;; slashes as directory separators.
-	            (mapconcat
-	             #'tramp-unquote-shell-quote-argument
-                     (split-string compress) " ")
-	            (mapconcat
-	             #'tramp-unquote-shell-quote-argument
-                     (split-string decompress) " "))
-	           nil t))
-	         (string-match
-	          (concat "^" (regexp-quote magic) "$") (buffer-string)))
-              (throw 'next nil)))
+            (unless (zerop
+	             (tramp-call-local-coding-command
+	              (format
+	               "echo %s | %s | %s" magic
+	               ;; Windows shells need the program file name
+	               ;; after the pipe symbol be quoted if they use
+	               ;; forward slashes as directory separators.
+	               (mapconcat
+			#'tramp-unquote-shell-quote-argument
+			(split-string compress) " ")
+	               (mapconcat
+			#'tramp-unquote-shell-quote-argument
+			(split-string decompress) " "))
+	              nil t))
+              (throw 'next nil))
+	    (goto-char (point-min))
+	    (unless (looking-at-p (regexp-quote magic))
+	      (throw 'next nil)))
           (tramp-message
 	   vec 5
 	   "Checking remote compress commands `%s', `%s' for sanity"
@@ -4585,7 +4587,7 @@ Goes through the list `tramp-inline-compress-commands'."
 	    (throw 'next nil))
 	  (with-current-buffer (tramp-get-buffer vec)
 	    (goto-char (point-min))
-	    (unless (looking-at (regexp-quote magic))
+	    (unless (looking-at-p (regexp-quote magic))
 	      (throw 'next nil)))
 	  (setq found t)))
 

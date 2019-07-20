@@ -2446,7 +2446,10 @@ the bug number, and browsing the URL must return mbox output."
     ;; Pass DEF as the value of COLLECTION instead of DEF because:
     ;; a) null input should not cause DEF to be returned and
     ;; b) TAB and M-n still work this way.
-    (completing-read-multiple "Bug IDs: " (and def (list (format "%s" def))))))
+    (or (completing-read-multiple
+	 (format "Bug IDs%s: " (if def (format " (default %s)" def) ""))
+	 (and def (list (format "%s" def))))
+	def)))
 
 (defun gnus-read-ephemeral-bug-group (ids mbox-url &optional window-conf)
   "Browse bug reports with IDS in an ephemeral group.
@@ -3811,7 +3814,7 @@ group line."
      (newsrc
       ;; Toggle subscription flag.
       (gnus-group-change-level
-       newsrc (if level level (if (<= (gnus-info-level (nth 2 newsrc))
+       newsrc (if level level (if (<= (gnus-info-level (nth 1 newsrc))
 				      gnus-level-subscribed)
 				  (1+ gnus-level-subscribed)
 				gnus-level-default-subscribed)))

@@ -812,13 +812,22 @@ The path separator is colon in GNU and GNU-like systems."
                  (lambda (f) (and (file-directory-p f) 'dir-ok)))
     (error "No such directory found via CDPATH environment variable"))))
 
-(defun directory-files-recursively (dir regexp &optional include-directories)
+(defun directory-files-recursively (dir regexp
+                                        &optional include-directories predicate)
   "Return list of all files under DIR that have file names matching REGEXP.
-This function works recursively.  Files are returned in \"depth first\"
-order, and files from each directory are sorted in alphabetical order.
-Each file name appears in the returned list in its absolute form.
-Optional argument INCLUDE-DIRECTORIES non-nil means also include in the
-output directories whose names match REGEXP."
+This function works recursively.  Files are returned in \"depth
+first\" order, and files from each directory are sorted in
+alphabetical order.  Each file name appears in the returned list
+in its absolute form.
+
+Optional argument INCLUDE-DIRECTORIES non-nil means also include
+in the output directories whose names match REGEXP.
+
+PREDICATE can be either nil (which means that all subdirectories
+are descended into), t (which means that subdirectories that
+can't be read are ignored), or a function (which is called with
+name name of the subdirectory and should return non-nil if the
+subdirectory is to be descended into)."
   (let* ((result nil)
 	 (files nil)
          (dir (directory-file-name dir))
@@ -832,10 +841,20 @@ output directories whose names match REGEXP."
 	    (let* ((leaf (substring file 0 (1- (length file))))
 		   (full-file (concat dir "/" leaf)))
 	      ;; Don't follow symlinks to other directories.
-	      (unless (file-symlink-p full-file)
-		(setq result
-		      (nconc result (directory-files-recursively
-				     full-file regexp include-directories))))
+	      (when (and (not (file-symlink-p full-file))
+                         ;; Allow filtering subdirectories.
+                         (or (eq predicate nil)
+                             (eq predicate t)
+                             (funcall predicate full-file)))
+                (let ((sub-files
+                       (if (eq predicate t)
+                           (condition-case _
+                               (directory-files-recursively
+				full-file regexp include-directories)
+                             (file-error nil))
+                         (directory-files-recursively
+			  full-file regexp include-directories))))
+		  (setq result (nconc result sub-files))))
 	      (when (and include-directories
 			 (string-match regexp leaf))
 		(setq result (nconc result (list full-file)))))
@@ -2945,9 +2964,9 @@ associated with that interpreter in `interpreter-mode-alist'.")
   "Alist of buffer beginnings vs. corresponding major mode functions.
 Each element looks like (REGEXP . FUNCTION) or (MATCH-FUNCTION . FUNCTION).
 After visiting a file, if REGEXP matches the text at the beginning of the
-buffer, or calling MATCH-FUNCTION returns non-nil, `normal-mode' will
-call FUNCTION rather than allowing `auto-mode-alist' to decide the buffer's
-major mode.
+buffer (case-sensitively), or calling MATCH-FUNCTION returns non-nil,
+`normal-mode' will call FUNCTION rather than allowing `auto-mode-alist' to
+decide the buffer's major mode.
 
 If FUNCTION is nil, then it is not called.  (That is a way of saying
 \"allow `auto-mode-alist' to decide for these files.\")")
@@ -2979,9 +2998,9 @@ If FUNCTION is nil, then it is not called.  (That is a way of saying
   "Like `magic-mode-alist' but has lower priority than `auto-mode-alist'.
 Each element looks like (REGEXP . FUNCTION) or (MATCH-FUNCTION . FUNCTION).
 After visiting a file, if REGEXP matches the text at the beginning of the
-buffer, or calling MATCH-FUNCTION returns non-nil, `normal-mode' will
-call FUNCTION, provided that `magic-mode-alist' and `auto-mode-alist'
-have not specified a mode for this file.
+buffer (case-sensitively), or calling MATCH-FUNCTION returns non-nil,
+`normal-mode' will call FUNCTION, provided that `magic-mode-alist' and
+`auto-mode-alist' have not specified a mode for this file.
 
 If FUNCTION is nil, then it is not called.")
 (put 'magic-fallback-mode-alist 'risky-local-variable t)
@@ -3098,7 +3117,8 @@ we don't actually set it to the same mode the buffer already has."
                              ((functionp re)
                               (funcall re))
                              ((stringp re)
-                              (looking-at re))
+                              (let ((case-fold-search nil))
+                                (looking-at re)))
                              (t
                               (error
                                "Problem in magic-mode-alist with element %s"
@@ -3159,7 +3179,8 @@ we don't actually set it to the same mode the buffer already has."
                                            ((functionp re)
                                             (funcall re))
                                            ((stringp re)
-                                            (looking-at re))
+                                            (let ((case-fold-search nil))
+                                              (looking-at re)))
                                            (t
                                             (error
                                              "Problem with magic-fallback-mode-alist element: %s"
@@ -6677,16 +6698,21 @@ This variable is obsolete; Emacs no longer uses it."
 			"ignored, as Emacs uses `file-system-info' instead"
 			"27.1")
 
-(defun get-free-disk-space (dir)
-  "Return the amount of free space on directory DIR's file system.
-The return value is a string describing the amount of free
-space (normally, the number of free 1KB blocks).
+(defcustom file-size-function #'file-size-human-readable
+  "Function that transforms the number of bytes into a human-readable string."
+  :type '(choice
+          (const :tag "default" file-size-human-readable)
+          (const :tag "iec"
+           (lambda (size) (file-size-human-readable size 'iec " ")))
+          (function :tag "Custom function")))
 
+(defun get-free-disk-space (dir)
+  "String describing the amount of free space on DIR's file system.
 If DIR's free space cannot be obtained, this function returns nil."
   (save-match-data
     (let ((avail (nth 2 (file-system-info dir))))
       (if avail
-	  (format "%.0f" (/ avail 1024))))))
+          (funcall file-size-function avail)))))
 
 ;; The following expression replaces `dired-move-to-filename-regexp'.
 (defvar directory-listing-before-filename-regexp

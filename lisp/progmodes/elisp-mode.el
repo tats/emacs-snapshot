@@ -219,6 +219,18 @@ Comments in the form will be lost."
   :type 'hook
   :group 'lisp)
 
+(defun emacs-lisp-set-electric-text-pairs ()
+  "Set `electric-pair-text-pairs' for all `emacs-lisp-mode' buffers."
+  (defvar electric-pair-text-pairs)
+  (let ((elisp-pairs (append '((?\` . ?\') (?‘ . ?’))
+                             electric-pair-text-pairs)))
+    (save-current-buffer
+      (dolist (buf (buffer-list))
+        (set-buffer buf)
+        (when (derived-mode-p 'emacs-lisp-mode)
+          (setq-local electric-pair-text-pairs elisp-pairs)))))
+  (remove-hook 'electric-pair-mode-hook #'emacs-lisp-set-electric-text-pairs))
+
 ;;;###autoload
 (define-derived-mode emacs-lisp-mode prog-mode "Emacs-Lisp"
   "Major mode for editing Lisp code to run in Emacs.
@@ -231,12 +243,12 @@ Blank lines separate paragraphs.  Semicolons start comments.
   (defvar project-vc-external-roots-function)
   (lisp-mode-variables nil nil 'elisp)
   (add-hook 'after-load-functions #'elisp--font-lock-flush-elisp-buffers)
-  (unless noninteractive
-    (require 'elec-pair)
-    (defvar electric-pair-text-pairs)
-    (setq-local electric-pair-text-pairs
-                (append '((?\` . ?\') (?‘ . ?’)) electric-pair-text-pairs))
-    (setq-local electric-quote-string t))
+  (if (boundp 'electric-pair-text-pairs)
+      (setq-local electric-pair-text-pairs
+                  (append '((?\` . ?\') (?‘ . ?’))
+                          electric-pair-text-pairs))
+    (add-hook 'electric-pair-mode-hook #'emacs-lisp-set-electric-text-pairs))
+  (setq-local electric-quote-string t)
   (setq imenu-case-fold-search nil)
   (add-function :before-until (local 'eldoc-documentation-function)
                 #'elisp-eldoc-documentation-function)
@@ -1177,14 +1189,11 @@ POS specifies the starting position where EXP was found and defaults to point."
                 "(def\\(?:var\\|const\\|custom\\)[ \t\n]+\\([^; '()\n\t]+\\)"
                 pos t)
           (let ((var (intern (match-string 1))))
-            (and (not (special-variable-p var))
-                 (save-excursion
-                   (let ((syntax (syntax-ppss (match-beginning 0))))
-                     ;; Top-level.
-                     (and (zerop (car syntax))
-                          ;; Not in a comment or string.
-                          (null (nth 8 syntax)))))
-                 (push var vars))))
+            (unless (or (special-variable-p var)
+                        (syntax-ppss-toplevel-pos
+                         (save-excursion
+                           (syntax-ppss (match-beginning 0)))))
+              (push var vars))))
         `(progn ,@(mapcar (lambda (v) `(defvar ,v)) vars) ,exp)))))
 
 (defun eval-last-sexp (eval-last-sexp-arg-internal)

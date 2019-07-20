@@ -20,11 +20,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef EMACS_SYSSTDIO_H
 #define EMACS_SYSSTDIO_H
 
+#include <stdarg.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include "unlocked-io.h"
 
 extern FILE *emacs_fopen (char const *, char const *);
+extern void errputc (int);
+extern void verrprintf (char const *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
+extern void errwrite (void const *, ptrdiff_t);
 extern void close_output_streams (void);
 
 #if O_BINARY
@@ -33,6 +38,10 @@ extern void close_output_streams (void);
 #else
 # define FOPEN_BINARY ""
 # define FOPEN_TEXT ""
+#endif
+
+#ifndef PIPE_BUF
+ #define PIPE_BUF MAX_ALLOCA
 #endif
 
 #endif /* EMACS_SYSSTDIO_H */

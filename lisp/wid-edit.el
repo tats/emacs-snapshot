@@ -56,6 +56,7 @@
 
 ;;; Code:
 (require 'cl-lib)
+(eval-when-compile (require 'subr-x)) 	; when-let
 
 ;;; Compatibility.
 
@@ -830,6 +831,13 @@ button end points."
     (when field
       (delete-overlay field))
     (mapc 'widget-leave-text (widget-get widget :children))))
+
+(defun widget-text (widget)
+  "Get the text representation of the widget."
+  (when-let ((from (widget-get widget :from))
+             (to (widget-get widget :to)))
+    (when (eq (marker-buffer from) (marker-buffer to)) ; is this check necessary?
+      (buffer-substring-no-properties from to))))
 
 ;;; Keymap and Commands.
 

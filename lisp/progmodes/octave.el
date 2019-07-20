@@ -198,6 +198,7 @@ newline or semicolon after an else or end keyword."
 (defcustom octave-block-offset 2
   "Extra indentation applied to statements in Octave block structures."
   :type 'integer)
+(put 'octave-block-offset 'safe-local-variable 'integerp)
 
 (defvar octave-block-comment-start
   (concat (make-string 2 octave-comment-char) " ")
@@ -1630,12 +1631,7 @@ code line."
            (paren-pos (cadr ppss))
            (fn (save-excursion
                  (if (and paren-pos
-                          ;; PAREN-POS must be after the prompt
-                          (>= paren-pos
-                              (if (eq (get-buffer-process (current-buffer))
-                                      inferior-octave-process)
-                                  (process-mark inferior-octave-process)
-                                (point-min)))
+                          ;; PAREN-POS must be after the prompt.
                           (or (not (eq (get-buffer-process (current-buffer))
                                        inferior-octave-process))
                               (< (process-mark inferior-octave-process)

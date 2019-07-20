@@ -578,11 +578,12 @@ This is buffer-local in every such buffer.")
   :group 'sh-script)
 
 (defcustom sh-assignment-regexp
+  ;; The "\\[.+\\]" matches the "[index]" in "arrayvar[index]=value".
   `((csh . "\\<\\([[:alnum:]_]+\\)\\(\\[.+\\]\\)?[ \t]*[-+*/%^]?=")
     ;; actually spaces are only supported in let/(( ... ))
     (ksh88 . ,(concat "\\<\\([[:alnum:]_]+\\)\\(\\[.+\\]\\)?"
                       "[ \t]*\\(?:[-+*/%&|~^]\\|<<\\|>>\\)?="))
-    (bash . "\\<\\([[:alnum:]_]+\\)\\([.+]\\)?\\+?=")
+    (bash . "\\<\\([[:alnum:]_]+\\)\\(\\[.+\\]\\)?\\+?=")
     (rc . "\\<\\([[:alnum:]_*]+\\)[ \t]*=")
     (sh . "\\<\\([[:alnum:]_]+\\)="))
   "Regexp for the variable name and what may follow in an assignment.
@@ -4340,6 +4341,7 @@ option followed by a colon `:' if the option accepts an argument."
 				t)
 	     (match-string 1))))))
 
+(put 'sh-assignment 'delete-selection t)
 
 (defun sh-maybe-here-document (arg)
   "Insert self.  Without prefix, following unquoted `<' inserts here document.
