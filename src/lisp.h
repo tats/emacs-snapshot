@@ -1024,6 +1024,20 @@ builtin_lisp_symbol (int index)
   return make_lisp_symbol (&lispsym[index]);
 }
 
+INLINE bool
+c_symbol_p (struct Lisp_Symbol *sym)
+{
+  char *bp = (char *) lispsym;
+  char *sp = (char *) sym;
+  if (PTRDIFF_MAX < INTPTR_MAX)
+    return bp <= sp && sp < bp + sizeof lispsym;
+  else
+    {
+      ptrdiff_t offset = sp - bp;
+      return 0 <= offset && offset < sizeof lispsym;
+    }
+}
+
 INLINE void
 (CHECK_SYMBOL) (Lisp_Object x)
 {
@@ -2225,6 +2239,8 @@ INLINE int
 
 /* The structure of a Lisp hash table.  */
 
+struct Lisp_Hash_Table;
+
 struct hash_table_test
 {
   /* Name of the function used to compare keys.  */
@@ -2237,10 +2253,10 @@ struct hash_table_test
   Lisp_Object user_cmp_function;
 
   /* C function to compare two keys.  */
-  bool (*cmpfn) (struct hash_table_test *t, Lisp_Object, Lisp_Object);
+  Lisp_Object (*cmpfn) (Lisp_Object, Lisp_Object, struct Lisp_Hash_Table *);
 
   /* C function to compute hash code.  */
-  EMACS_UINT (*hashfn) (struct hash_table_test *t, Lisp_Object);
+  Lisp_Object (*hashfn) (Lisp_Object, struct Lisp_Hash_Table *);
 };
 
 struct Lisp_Hash_Table
@@ -2258,8 +2274,8 @@ struct Lisp_Hash_Table
      weakness of the table.  */
   Lisp_Object weak;
 
-  /* Vector of hash codes.  If hash[I] is nil, this means that the
-     I-th entry is unused.  */
+  /* Vector of hash codes.
+     If the I-th entry is unused, then hash[I] should be nil.  */
   Lisp_Object hash;
 
   /* Vector used to chain entries.  If entry I is free, next[I] is the
@@ -2287,7 +2303,12 @@ struct Lisp_Hash_Table
 
   /* True if the table can be purecopied.  The table cannot be
      changed afterwards.  */
-  bool pure;
+  bool purecopy;
+
+  /* True if the table is mutable.  Ordinarily tables are mutable, but
+     pure tables are not, and while a table is being mutated it is
+     immutable for recursive attempts to mutate it.  */
+  bool mutable;
 
   /* Resize hash table when number of entries / table size is >= this
      ratio.  */
@@ -2302,6 +2323,7 @@ struct Lisp_Hash_Table
 
   /* Vector of keys and values.  The key of item I is found at index
      2 * I, the value is found at index 2 * I + 1.
+     If the key is equal to Qunbound, then this slot is unused.
      This is gc_marked specially if the table is weak.  */
   Lisp_Object key_and_value;
 
@@ -2366,7 +2388,7 @@ void hash_table_rehash (struct Lisp_Hash_Table *h);
 INLINE bool
 hash_rehash_needed_p (const struct Lisp_Hash_Table *h)
 {
-  return h->count < 0;
+  return NILP (h->hash);
 }
 
 INLINE void
@@ -3149,6 +3171,7 @@ enum specbind_tag {
 				   Its elements are potential Lisp_Objects.  */
   SPECPDL_UNWIND_PTR,		/* Likewise, on void *.  */
   SPECPDL_UNWIND_INT,		/* Likewise, on int.  */
+  SPECPDL_UNWIND_INTMAX,	/* Likewise, on intmax_t.  */
   SPECPDL_UNWIND_EXCURSION,	/* Likewise, on an execursion.  */
   SPECPDL_UNWIND_VOID,		/* Likewise, with no arg.  */
   SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
@@ -3184,6 +3207,11 @@ union specbinding
       void (*func) (int);
       int arg;
     } unwind_int;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      void (*func) (intmax_t);
+      intmax_t arg;
+    } unwind_intmax;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
       Lisp_Object marker, window;
@@ -3591,13 +3619,14 @@ extern void hexbuf_digest (char *, void const *, int);
 extern char *extract_data_from_object (Lisp_Object, ptrdiff_t *, ptrdiff_t *);
 EMACS_UINT hash_string (char const *, ptrdiff_t);
 EMACS_UINT sxhash (Lisp_Object, int);
-EMACS_UINT hashfn_eql (struct hash_table_test *ht, Lisp_Object key);
-EMACS_UINT hashfn_equal (struct hash_table_test *ht, Lisp_Object key);
+Lisp_Object hashfn_eql (Lisp_Object, struct Lisp_Hash_Table *);
+Lisp_Object hashfn_equal (Lisp_Object, struct Lisp_Hash_Table *);
+Lisp_Object hashfn_user_defined (Lisp_Object, struct Lisp_Hash_Table *);
 Lisp_Object make_hash_table (struct hash_table_test, EMACS_INT, float, float,
                              Lisp_Object, bool);
-ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, EMACS_UINT *);
+ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
-		    EMACS_UINT);
+		    Lisp_Object);
 void hash_remove_from_table (struct Lisp_Hash_Table *, Lisp_Object);
 extern struct hash_table_test const hashtest_eq, hashtest_eql, hashtest_equal;
 extern void validate_subarray (Lisp_Object, Lisp_Object, Lisp_Object,
@@ -3763,10 +3792,9 @@ extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-typedef uintptr_t byte_ct;  /* System byte counts reported by GC.  */
-extern byte_ct consing_since_gc;
-extern byte_ct gc_relative_threshold;
-extern byte_ct const memory_full_cons_threshold;
+typedef intptr_t object_ct; /* Signed type of object counts reported by GC.  */
+#define OBJECT_CT_MAX INTPTR_MAX
+extern object_ct consing_until_gc;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif
@@ -4112,6 +4140,7 @@ extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);
 extern void record_unwind_protect_int (void (*) (int), int);
+extern void record_unwind_protect_intmax (void (*) (intmax_t), intmax_t);
 extern void record_unwind_protect_void (void (*) (void));
 extern void record_unwind_protect_excursion (void);
 extern void record_unwind_protect_nothing (void);
@@ -4993,10 +5022,7 @@ struct for_each_tail_internal
 INLINE void
 maybe_gc (void)
 {
-  if ((consing_since_gc > gc_cons_threshold
-       && consing_since_gc > gc_relative_threshold)
-      || (!NILP (Vmemory_full)
-	  && consing_since_gc > memory_full_cons_threshold))
+  if (consing_until_gc < 0)
     garbage_collect ();
 }
 

@@ -1527,7 +1527,9 @@ Note that the style variables are always made local to the buffer."
 			   (or (not (nth 3 s))
 			       (not (memq (char-before) c-string-delims))))))
 	     ;; We're at the start of a string.
-	     (memq (char-before) c-string-delims)))
+	     (and (memq (char-before) c-string-delims)
+		  (not (nth 4 s)))))	; Check we're actually out of the
+					; comment. not stuck at EOB
 	(unless (and (c-major-mode-is 'c++-mode)
 		     (c-maybe-re-mark-raw-string))
 	  (if (c-unescaped-nls-in-string-p (1- (point)))
@@ -2158,9 +2160,11 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   ;; count as being in a declarator (on pragmatic grounds).
   (goto-char pos)
   (let ((lit-start (c-literal-start))
-	pos1)
+	enclosing-attribute pos1)
     (unless lit-start
       (c-backward-syntactic-ws)
+      (when (setq enclosing-attribute (c-slow-enclosing-c++-attribute))
+	(goto-char (car enclosing-attribute))) ; Only happens in C++ Mode.
       (when (setq pos1 (c-on-identifier))
 	(goto-char pos1)
 	(let ((lim (save-excursion

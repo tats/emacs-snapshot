@@ -1135,9 +1135,12 @@ print (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  ptrdiff_t i;
 
 	  for (i = 0; i < HASH_TABLE_SIZE (h); ++i)
-	    if (!NILP (HASH_HASH (h, i))
-		&& EQ (HASH_VALUE (h, i), Qt))
-	      Fremhash (HASH_KEY (h, i), Vprint_number_table);
+            {
+              Lisp_Object key =  HASH_KEY (h, i);
+	      if (!EQ (key, Qunbound)
+		  && EQ (HASH_VALUE (h, i), Qt))
+	        Fremhash (key, Vprint_number_table);
+            }
 	}
     }
 
@@ -1575,10 +1578,10 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	print_object (Fhash_table_rehash_threshold (obj),
 		      printcharfun, escapeflag);
 
-	if (h->pure)
+	if (h->purecopy)
 	  {
 	    print_c_string (" purecopy ", printcharfun);
-	    print_object (h->pure ? Qt : Qnil, printcharfun, escapeflag);
+	    print_object (h->purecopy ? Qt : Qnil, printcharfun, escapeflag);
 	  }
 
 	print_c_string (" data ", printcharfun);
@@ -1593,13 +1596,16 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 
 	printchar ('(', printcharfun);
 	for (ptrdiff_t i = 0; i < size; i++)
-	  if (!NILP (HASH_HASH (h, i)))
-	    {
-	      if (i) printchar (' ', printcharfun);
-	      print_object (HASH_KEY (h, i), printcharfun, escapeflag);
-	      printchar (' ', printcharfun);
-	      print_object (HASH_VALUE (h, i), printcharfun, escapeflag);
-	    }
+          {
+            Lisp_Object key = HASH_KEY (h, i);
+	    if (!EQ (key, Qunbound))
+	      {
+	        if (i) printchar (' ', printcharfun);
+	        print_object (key, printcharfun, escapeflag);
+	        printchar (' ', printcharfun);
+	        print_object (HASH_VALUE (h, i), printcharfun, escapeflag);
+	      }
+          }
 
 	if (size < real_size)
 	  print_c_string (" ...", printcharfun);

@@ -270,7 +270,7 @@ textual parts.")
 		  (forward-line)
 		  (null (looking-at-p
 			 ;; We're expecting a mail header.
-			 "^[!-9;-~]+: "))))
+			 "^[!-9;-~]+:[[:space:]]"))))
 	    (delete-region (line-beginning-position)
 			   (1+ (line-end-position)))
 	  (setq lines nil)
@@ -1340,7 +1340,7 @@ If LIMIT, first try to limit the search to the N last articles."
 		    (progn (end-of-line)
 			   (skip-chars-backward " \r\"")
 			   (point)))))
-	(unless (member '%NoSelect flags)
+	(unless (member '%Noselect flags)
           (let* ((group (utf7-decode (if (stringp group) group
                                        (format "%s" group)) t))
                  (group (cond ((or (not prefix)
@@ -1702,18 +1702,19 @@ If LIMIT, first try to limit the search to the N last articles."
 	     (cdr (or (assoc (caddr type) flags) ; %Flagged
 		      (assoc (intern (cadr type) obarray) flags)
 		      (assoc (cadr type) flags))))) ; "\Flagged"
-	(setq marks (delq ticks marks))
-	(pop ticks)
-	;; Add the new marks we got.
-	(setq ticks (gnus-add-to-range ticks new-marks))
-	;; Remove the marks from messages that don't have them.
-	(setq ticks (gnus-remove-from-range
-		     ticks
-		     (gnus-compress-sequence
-		      (gnus-sorted-complement existing new-marks))))
-	(when ticks
-	  (push (cons (car type) ticks) marks)))
-      (gnus-info-set-marks info marks t))
+	(when new-marks
+	  (setq marks (delq ticks marks))
+	  (pop ticks)
+	  ;; Add the new marks we got.
+	  (setq ticks (gnus-add-to-range ticks new-marks))
+	  ;; Remove the marks from messages that don't have them.
+	  (setq ticks (gnus-remove-from-range
+		       ticks
+		       (gnus-compress-sequence
+			(gnus-sorted-complement existing new-marks))))
+	  (when ticks
+	    (push (cons (car type) ticks) marks))
+	  (gnus-info-set-marks info marks t))))
     ;; Add vanished to the list of unexisting articles.
     (when vanished
       (let* ((old-unexists (assq 'unexist marks))
@@ -1798,19 +1799,17 @@ If LIMIT, first try to limit the search to the N last articles."
 		 (goto-char start)
 		 (setq permanent-flags
 		       (if (equal command "SELECT")
-			   (and (search-forward "PERMANENTFLAGS "
-						(or end (point-min)) t)
+			   (and (search-forward "PERMANENTFLAGS " end t)
 				(read (current-buffer)))
 			 'not-scanned))
 		 (goto-char start)
 		 (setq uidnext
-		       (and (search-forward "UIDNEXT "
-					    (or end (point-min)) t)
+		       (and (search-forward "UIDNEXT " end t)
 			    (read (current-buffer))))
 		 (goto-char start)
 		 (setq uidvalidity
 		       (and (re-search-forward "UIDVALIDITY \\([0-9]+\\)"
-					       (or end (point-min)) t)
+					       end t)
 			    ;; Store UIDVALIDITY as a string, as it's
 			    ;; too big for 32-bit Emacsen, usually.
 			    (match-string 1)))
@@ -1818,12 +1817,12 @@ If LIMIT, first try to limit the search to the N last articles."
 		 (setq vanished
 		       (and (eq flag-sequence 'qresync)
 			    (re-search-forward "^\\* VANISHED .*? \\([0-9:,]+\\)"
-					       (or end (point-min)) t)
+					       end t)
 			    (match-string 1)))
 		 (goto-char start)
 		 (setq highestmodseq
 		       (and (re-search-forward "HIGHESTMODSEQ \\([0-9]+\\)"
-					    (or end (point-min)) t)
+					       end t)
 			    (match-string 1)))
 		 (goto-char end)
 		 (forward-line -1))

@@ -67,6 +67,8 @@
 (require 'gnus-util)
 (require 'gmm-utils)
 (require 'mm-decode)
+(require 'shr)
+(require 'url)
 (require 'nnoo)
 (eval-when-compile
   (require 'subr-x))
@@ -9434,11 +9436,17 @@ With optional ARG, move across that many fields."
       (goto-char (point-max)))
     (widget-backward arg)))
 
+(defcustom gnus-collect-urls-primary-text "Link"
+  "The widget text for the default link in `gnus-summary-browse-url'."
+  :version "27.1"
+  :type 'string
+  :group 'gnus-article-various)
+
 (defun gnus-collect-urls ()
   "Return the list of URLs in the buffer after (point).
-The 1st element is the one named 'Link', if any."
-  (let ((pt (point)) urls link)
-    (while (progn (widget-move 1)
+The 1st element is the widget named by `gnus-collect-urls-primary-text'."
+  (let ((pt (point)) urls primary)
+    (while (progn (widget-move 1 t) ; no echo
 		  ;; `widget-move' wraps around to top of buffer.
 		  (> (point) pt))
       (setq pt (point))
@@ -9446,38 +9454,56 @@ The 1st element is the one named 'Link', if any."
                  (u (or (widget-value w)
                         (get-text-property pt 'gnus-string))))
 	(when (string-match-p "\\`[[:alpha:]]+://" u)
-          (if (and (null link) (string= "Link" (widget-text w)))
-              (setq link u)
+          (if (and gnus-collect-urls-primary-text (null primary)
+                   (string= gnus-collect-urls-primary-text (widget-text w)))
+              (setq primary u)
 	    (push u urls)))))
     (setq urls (nreverse urls))
-    (when link
-      (push link urls))
+    (when primary
+      (push primary urls))
     (delete-dups urls)))
 
-(defun gnus-summary-browse-url (arg)
-  "Scan the current article body for links, and offer to browse them.
-With prefix ARG, also collect links from message headers.
+(defun gnus-shorten-url (url max)
+  "Return an excerpt from URL."
+  (if (<= (length url) max)
+      url
+    (let ((parsed (url-generic-parse-url url)))
+      (concat (url-host parsed)
+	      "..."
+	      (substring (url-filename parsed)
+			 (- (length (url-filename parsed))
+			    (max (- max (length (url-host parsed))) 0)))))))
 
-Links are opened using `browse-url'.  If only one link is found,
-browse that directly, otherwise use completion to select a link."
+(defun gnus-summary-browse-url (&optional external)
+  "Scan the current article body for links, and offer to browse them.
+
+Links are opened using `browse-url' unless a prefix argument is
+given: Then `shr-external-browser' is used instead.
+
+If only one link is found, browse that directly, otherwise use
+completion to select a link.  The first link marked in the
+article text with `gnus-collect-urls-primary-text' is the
+default."
   (interactive "P")
   (let (urls target)
     (gnus-summary-select-article)
-    (gnus-configure-windows 'article)
     (gnus-with-article-buffer
-      (if arg
-	  (goto-char (point-min))
-	(article-goto-body)
-	;; Back up a char, in case body starts with a widget.
-	(backward-char))
+      (article-goto-body)
+      ;; Back up a char, in case body starts with a widget.
+      (backward-char)
       (setq urls (gnus-collect-urls))
       (setq target
 	    (cond ((= (length urls) 1)
 		   (car urls))
 		  ((> (length urls) 1)
-		   (completing-read "URL to browse: " urls nil t (car urls)))))
+		   (completing-read (format "URL to browse (default %s): "
+					    (gnus-shorten-url (car urls) 40))
+				    urls nil t nil nil
+				    (car urls)))))
       (if target
-	  (browse-url target)
+	  (if external
+	      (funcall shr-external-browser target)
+	    (browse-url target))
 	(message "No URLs found.")))))
 
 (defun gnus-summary-isearch-article (&optional regexp-p)

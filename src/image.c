@@ -4606,8 +4606,7 @@ xpm_put_color_table_h (Lisp_Object color_table,
                        Lisp_Object color)
 {
   struct Lisp_Hash_Table *table = XHASH_TABLE (color_table);
-  EMACS_UINT hash_code;
-  Lisp_Object chars = make_unibyte_string (chars_start, chars_len);
+  Lisp_Object chars = make_unibyte_string (chars_start, chars_len), hash_code;
 
   hash_lookup (table, chars, &hash_code);
   hash_put (table, chars, color, hash_code);
@@ -9531,10 +9530,13 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   if (base_file)
     g_object_unref (base_file);
   g_object_unref (input_stream);
-  if (err) goto rsvg_error;
+
+  /* Check rsvg_handle too, to avoid librsvg 2.40.13 bug (Bug#36773#26).  */
+  if (!rsvg_handle || err) goto rsvg_error;
 #else
   /* Make a handle to a new rsvg object.  */
   rsvg_handle = rsvg_handle_new ();
+  eassume (rsvg_handle);
 
   /* Set base_uri for properly handling referenced images (via 'href').
      See rsvg bug 596114 - "image refs are relative to curdir, not .svg file"
@@ -9655,7 +9657,8 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   return 1;
 
  rsvg_error:
-  g_object_unref (rsvg_handle);
+  if (rsvg_handle)
+    g_object_unref (rsvg_handle);
   /* FIXME: Use error->message so the user knows what is the actual
      problem with the image.  */
   image_error ("Error parsing SVG image `%s'", img->spec);

@@ -47,6 +47,7 @@ static void sort_vector_copy (Lisp_Object, ptrdiff_t,
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
 static bool internal_equal (Lisp_Object, Lisp_Object,
 			    enum equal_kind, int, Lisp_Object);
+static EMACS_UINT sxhash_bignum (struct Lisp_Bignum *);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
        doc: /* Return the argument unchanged.  */
@@ -2373,7 +2374,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	case Lisp_Cons: case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Hash_Table *h = XHASH_TABLE (ht);
-	    EMACS_UINT hash;
+	    Lisp_Object hash;
 	    ptrdiff_t i = hash_lookup (h, o1, &hash);
 	    if (i >= 0)
 	      { /* `o1' was seen already.  */
@@ -3804,34 +3805,14 @@ CHECK_HASH_TABLE (Lisp_Object x)
 }
 
 static void
-set_hash_key_and_value (struct Lisp_Hash_Table *h, Lisp_Object key_and_value)
-{
-  h->key_and_value = key_and_value;
-}
-static void
-set_hash_next (struct Lisp_Hash_Table *h, Lisp_Object next)
-{
-  h->next = next;
-}
-static void
 set_hash_next_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, ptrdiff_t val)
 {
   gc_aset (h->next, idx, make_fixnum (val));
 }
 static void
-set_hash_hash (struct Lisp_Hash_Table *h, Lisp_Object hash)
-{
-  h->hash = hash;
-}
-static void
 set_hash_hash_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 {
   gc_aset (h->hash, idx, val);
-}
-static void
-set_hash_index (struct Lisp_Hash_Table *h, Lisp_Object index)
-{
-  h->index = index;
 }
 static void
 set_hash_index_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, ptrdiff_t val)
@@ -3951,77 +3932,98 @@ HASH_INDEX (struct Lisp_Hash_Table *h, ptrdiff_t idx)
   return XFIXNUM (AREF (h->index, idx));
 }
 
+/* Restore a hash table's mutability after the critical section exits.  */
+
+static void
+restore_mutability (void *ptr)
+{
+  struct Lisp_Hash_Table *h = ptr;
+  h->mutable = true;
+}
+
+/* Return the result of calling a user-defined hash or comparison
+   function ARGS[0] with arguments ARGS[1] through ARGS[NARGS - 1].
+   Signal an error if the function attempts to modify H, which
+   otherwise might lead to undefined behavior.  */
+
+static Lisp_Object
+hash_table_user_defined_call (ptrdiff_t nargs, Lisp_Object *args,
+			      struct Lisp_Hash_Table *h)
+{
+  if (!h->mutable)
+    return Ffuncall (nargs, args);
+  ptrdiff_t count = inhibit_garbage_collection ();
+  record_unwind_protect_ptr (restore_mutability, h);
+  h->mutable = false;
+  return unbind_to (count, Ffuncall (nargs, args));
+}
+
 /* Ignore HT and compare KEY1 and KEY2 using 'eql'.
    Value is true if KEY1 and KEY2 are the same.  */
 
-static bool
-cmpfn_eql (struct hash_table_test *ht,
-	   Lisp_Object key1,
-	   Lisp_Object key2)
+static Lisp_Object
+cmpfn_eql (Lisp_Object key1, Lisp_Object key2, struct Lisp_Hash_Table *h)
 {
-  return !NILP (Feql (key1, key2));
+  return Feql (key1, key2);
 }
 
 /* Ignore HT and compare KEY1 and KEY2 using 'equal'.
    Value is true if KEY1 and KEY2 are the same.  */
 
-static bool
-cmpfn_equal (struct hash_table_test *ht,
-	     Lisp_Object key1,
-	     Lisp_Object key2)
+static Lisp_Object
+cmpfn_equal (Lisp_Object key1, Lisp_Object key2, struct Lisp_Hash_Table *h)
 {
-  return !NILP (Fequal (key1, key2));
+  return Fequal (key1, key2);
 }
 
 
 /* Given HT, compare KEY1 and KEY2 using HT->user_cmp_function.
    Value is true if KEY1 and KEY2 are the same.  */
 
-static bool
-cmpfn_user_defined (struct hash_table_test *ht,
-		    Lisp_Object key1,
-		    Lisp_Object key2)
+static Lisp_Object
+cmpfn_user_defined (Lisp_Object key1, Lisp_Object key2,
+		    struct Lisp_Hash_Table *h)
 {
-  return !NILP (call2 (ht->user_cmp_function, key1, key2));
+  Lisp_Object args[] = { h->test.user_cmp_function, key1, key2 };
+  return hash_table_user_defined_call (ARRAYELTS (args), args, h);
 }
 
-/* Ignore HT and return a hash code for KEY which uses 'eq' to compare keys.
-   The hash code is at most INTMASK.  */
+/* Ignore HT and return a hash code for KEY which uses 'eq' to compare
+   keys.  */
 
-static EMACS_UINT
-hashfn_eq (struct hash_table_test *ht, Lisp_Object key)
+static Lisp_Object
+hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return XHASH (key) ^ XTYPE (key);
+  return make_fixnum (XHASH (key) ^ XTYPE (key));
 }
 
 /* Ignore HT and return a hash code for KEY which uses 'equal' to compare keys.
    The hash code is at most INTMASK.  */
 
-EMACS_UINT
-hashfn_equal (struct hash_table_test *ht, Lisp_Object key)
+Lisp_Object
+hashfn_equal (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return sxhash (key, 0);
+  return make_fixnum (sxhash (key, 0));
 }
 
 /* Ignore HT and return a hash code for KEY which uses 'eql' to compare keys.
    The hash code is at most INTMASK.  */
 
-EMACS_UINT
-hashfn_eql (struct hash_table_test *ht, Lisp_Object key)
+Lisp_Object
+hashfn_eql (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return ((FLOATP (key) || BIGNUMP (key))
-	  ? hashfn_equal (ht, key)
-	  : hashfn_eq (ht, key));
+  return (FLOATP (key) || BIGNUMP (key) ? hashfn_equal : hashfn_eq) (key, h);
 }
 
 /* Given HT, return a hash code for KEY which uses a user-defined
-   function to compare keys.  The hash code is at most INTMASK.  */
+   function to compare keys.  */
 
-static EMACS_UINT
-hashfn_user_defined (struct hash_table_test *ht, Lisp_Object key)
+Lisp_Object
+hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  Lisp_Object hash = call1 (ht->user_hash_function, key);
-  return hashfn_eq (ht, hash);
+  Lisp_Object args[] = { h->test.user_hash_function, key };
+  Lisp_Object hash = hash_table_user_defined_call (ARRAYELTS (args), args, h);
+  return FIXNUMP (hash) ? hash : make_fixnum (sxhash (hash, 0));
 }
 
 struct hash_table_test const
@@ -4042,9 +4044,27 @@ allocate_hash_table (void)
 }
 
 /* An upper bound on the size of a hash table index.  It must fit in
-   ptrdiff_t and be a valid Emacs fixnum.  */
+   ptrdiff_t and be a valid Emacs fixnum.  This is an upper bound on
+   VECTOR_ELTS_MAX (see alloc.c) and gets as close as we can without
+   violating modularity.  */
 #define INDEX_SIZE_BOUND \
-  ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM, PTRDIFF_MAX / word_size))
+  ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM, \
+		    ((min (PTRDIFF_MAX, SIZE_MAX) \
+		      - header_size - GCALIGNMENT) \
+		     / word_size)))
+
+static ptrdiff_t
+hash_index_size (struct Lisp_Hash_Table *h, ptrdiff_t size)
+{
+  double threshold = h->rehash_threshold;
+  double index_float = size / threshold;
+  ptrdiff_t index_size = (index_float < INDEX_SIZE_BOUND + 1
+	                  ? next_almost_prime (index_float)
+	                  : INDEX_SIZE_BOUND + 1);
+  if (INDEX_SIZE_BOUND < index_size)
+    error ("Hash table too large");
+  return index_size;
+}
 
 /* Create and initialize a new hash table.
 
@@ -4075,13 +4095,11 @@ allocate_hash_table (void)
 Lisp_Object
 make_hash_table (struct hash_table_test test, EMACS_INT size,
 		 float rehash_size, float rehash_threshold,
-		 Lisp_Object weak, bool pure)
+		 Lisp_Object weak, bool purecopy)
 {
   struct Lisp_Hash_Table *h;
   Lisp_Object table;
-  EMACS_INT index_size;
   ptrdiff_t i;
-  double index_float;
 
   /* Preconditions.  */
   eassert (SYMBOLP (test.name));
@@ -4092,14 +4110,6 @@ make_hash_table (struct hash_table_test test, EMACS_INT size,
   if (size == 0)
     size = 1;
 
-  double threshold = rehash_threshold;
-  index_float = size / threshold;
-  index_size = (index_float < INDEX_SIZE_BOUND + 1
-		? next_almost_prime (index_float)
-		: INDEX_SIZE_BOUND + 1);
-  if (INDEX_SIZE_BOUND < max (index_size, 2 * size))
-    error ("Hash table too large");
-
   /* Allocate a table and initialize it.  */
   h = allocate_hash_table ();
 
@@ -4109,12 +4119,13 @@ make_hash_table (struct hash_table_test test, EMACS_INT size,
   h->rehash_threshold = rehash_threshold;
   h->rehash_size = rehash_size;
   h->count = 0;
-  h->key_and_value = make_nil_vector (2 * size);
+  h->key_and_value = make_vector (2 * size, Qunbound);
   h->hash = make_nil_vector (size);
   h->next = make_vector (size, make_fixnum (-1));
-  h->index = make_vector (index_size, make_fixnum (-1));
+  h->index = make_vector (hash_index_size (h, size), make_fixnum (-1));
   h->next_weak = NULL;
-  h->pure = pure;
+  h->purecopy = purecopy;
+  h->mutable = true;
 
   /* Set up the free list.  */
   for (i = 0; i < size - 1; ++i)
@@ -4140,6 +4151,7 @@ copy_hash_table (struct Lisp_Hash_Table *h1)
 
   h2 = allocate_hash_table ();
   *h2 = *h1;
+  h2->mutable = true;
   h2->key_and_value = Fcopy_sequence (h1->key_and_value);
   h2->hash = Fcopy_sequence (h1->hash);
   h2->next = Fcopy_sequence (h1->next);
@@ -4159,68 +4171,54 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
   if (h->next_free < 0)
     {
       ptrdiff_t old_size = HASH_TABLE_SIZE (h);
-      EMACS_INT new_size, index_size, nsize;
-      ptrdiff_t i;
+      EMACS_INT new_size;
       double rehash_size = h->rehash_size;
-      double index_float;
 
       if (rehash_size < 0)
 	new_size = old_size - rehash_size;
       else
 	{
 	  double float_new_size = old_size * (rehash_size + 1);
-	  if (float_new_size < INDEX_SIZE_BOUND + 1)
+	  if (float_new_size < EMACS_INT_MAX)
 	    new_size = float_new_size;
 	  else
-	    new_size = INDEX_SIZE_BOUND + 1;
+	    new_size = EMACS_INT_MAX;
 	}
+      if (PTRDIFF_MAX < new_size)
+	new_size = PTRDIFF_MAX;
       if (new_size <= old_size)
 	new_size = old_size + 1;
-      double threshold = h->rehash_threshold;
-      index_float = new_size / threshold;
-      index_size = (index_float < INDEX_SIZE_BOUND + 1
-		    ? next_almost_prime (index_float)
-		    : INDEX_SIZE_BOUND + 1);
-      nsize = max (index_size, 2 * new_size);
-      if (INDEX_SIZE_BOUND < nsize)
-	error ("Hash table too large to resize");
 
-#ifdef ENABLE_CHECKING
-      if (HASH_TABLE_P (Vpurify_flag)
-	  && XHASH_TABLE (Vpurify_flag) == h)
-	message ("Growing hash table to: %"pI"d", new_size);
-#endif
+      /* Allocate all the new vectors before updating *H, to
+	 avoid problems if memory is exhausted.  larger_vecalloc
+	 finishes computing the size of the replacement vectors.  */
+      Lisp_Object next = larger_vecalloc (h->next, new_size - old_size,
+					  new_size);
+      ptrdiff_t next_size = ASIZE (next);
+      for (ptrdiff_t i = old_size; i < next_size - 1; i++)
+	gc_aset (next, i, make_fixnum (i + 1));
+      gc_aset (next, next_size - 1, make_fixnum (-1));
+      ptrdiff_t index_size = hash_index_size (h, next_size);
 
-      set_hash_key_and_value (h, larger_vector (h->key_and_value,
-						2 * (new_size - old_size), -1));
-      set_hash_hash (h, larger_vector (h->hash, new_size - old_size, -1));
-      set_hash_index (h, make_vector (index_size, make_fixnum (-1)));
-      set_hash_next (h, larger_vecalloc (h->next, new_size - old_size, -1));
+      /* Build the new&larger key_and_value vector, making sure the new
+         fields are initialized to `unbound`.  */
+      Lisp_Object key_and_value
+	= larger_vecalloc (h->key_and_value, 2 * (next_size - old_size),
+			   2 * next_size);
+      for (ptrdiff_t i = ASIZE (h->key_and_value);
+            i < ASIZE (key_and_value); i++)
+        ASET (key_and_value, i, Qunbound);
 
-      /* Update the free list.  Do it so that new entries are added at
-         the end of the free list.  This makes some operations like
-         maphash faster.  */
-      for (i = old_size; i < new_size - 1; ++i)
-	set_hash_next_slot (h, i, i + 1);
-      set_hash_next_slot (h, i, -1);
-
-      if (h->next_free < 0)
-	h->next_free = old_size;
-      else
-	{
-	  ptrdiff_t last = h->next_free;
-	  while (true)
-	    {
-	      ptrdiff_t next = HASH_NEXT (h, last);
-	      if (next < 0)
-		break;
-	      last = next;
-	    }
-	  set_hash_next_slot (h, last, old_size);
-	}
+      Lisp_Object hash = larger_vector (h->hash, next_size - old_size,
+					next_size);
+      h->index = make_vector (index_size, make_fixnum (-1));
+      h->key_and_value = key_and_value;
+      h->hash = hash;
+      h->next = next;
+      h->next_free = old_size;
 
       /* Rehash.  */
-      for (i = 0; i < old_size; ++i)
+      for (ptrdiff_t i = 0; i < old_size; i++)
 	if (!NILP (HASH_HASH (h, i)))
 	  {
 	    EMACS_UINT hash_code = XUFIXNUM (HASH_HASH (h, i));
@@ -4228,6 +4226,11 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 	    set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
 	    set_hash_index_slot (h, start_of_bucket, i);
 	  }
+
+#ifdef ENABLE_CHECKING
+      if (HASH_TABLE_P (Vpurify_flag) && XHASH_TABLE (Vpurify_flag) == h)
+	message ("Growing hash table to: %"pD"d", next_size);
+#endif
     }
 }
 
@@ -4243,19 +4246,18 @@ hash_table_rehash (struct Lisp_Hash_Table *h)
 
   /* These structures may have been purecopied and shared
      (bug#36447).  */
+  Lisp_Object hash = make_nil_vector (size);
   h->next = Fcopy_sequence (h->next);
   h->index = Fcopy_sequence (h->index);
-  h->hash = Fcopy_sequence (h->hash);
 
   /* Recompute the actual hash codes for each entry in the table.
      Order is still invalid.  */
   for (ptrdiff_t i = 0; i < size; ++i)
-    if (!NILP (HASH_HASH (h, i)))
-      {
-        Lisp_Object key = HASH_KEY (h, i);
-        EMACS_UINT hash_code = h->test.hashfn (&h->test, key);
-        set_hash_hash_slot (h, i, make_fixnum (hash_code));
-      }
+    {
+      Lisp_Object key = HASH_KEY (h, i);
+      if (!EQ (key, Qunbound))
+        ASET (hash, i, h->test.hashfn (key, h));
+    }
 
   /* Reset the index so that any slot we don't fill below is marked
      invalid.  */
@@ -4263,9 +4265,9 @@ hash_table_rehash (struct Lisp_Hash_Table *h)
 
   /* Rebuild the collision chains.  */
   for (ptrdiff_t i = 0; i < size; ++i)
-    if (!NILP (HASH_HASH (h, i)))
+    if (!NILP (AREF (hash, i)))
       {
-        EMACS_UINT hash_code = XUFIXNUM (HASH_HASH (h, i));
+        EMACS_UINT hash_code = XUFIXNUM (AREF (hash, i));
         ptrdiff_t start_of_bucket = hash_code % ASIZE (h->index);
         set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
         set_hash_index_slot (h, start_of_bucket, i);
@@ -4275,8 +4277,8 @@ hash_table_rehash (struct Lisp_Hash_Table *h)
   /* Finally, mark the hash table as having a valid hash order.
      Do this last so that if we're interrupted, we retry on next
      access. */
-  eassert (h->count < 0);
-  h->count = -h->count;
+  eassert (hash_rehash_needed_p (h));
+  h->hash = hash;
   eassert (!hash_rehash_needed_p (h));
 }
 
@@ -4285,30 +4287,35 @@ hash_table_rehash (struct Lisp_Hash_Table *h)
    matching KEY, or -1 if not found.  */
 
 ptrdiff_t
-hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, EMACS_UINT *hash)
+hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object *hash)
 {
-  EMACS_UINT hash_code;
   ptrdiff_t start_of_bucket, i;
 
   hash_rehash_if_needed (h);
 
-  hash_code = h->test.hashfn (&h->test, key);
-  eassert ((hash_code & ~INTMASK) == 0);
+  Lisp_Object hash_code = h->test.hashfn (key, h);
   if (hash)
     *hash = hash_code;
 
-  start_of_bucket = hash_code % ASIZE (h->index);
+  start_of_bucket = XUFIXNUM (hash_code) % ASIZE (h->index);
 
   for (i = HASH_INDEX (h, start_of_bucket); 0 <= i; i = HASH_NEXT (h, i))
     if (EQ (key, HASH_KEY (h, i))
 	|| (h->test.cmpfn
-	    && hash_code == XUFIXNUM (HASH_HASH (h, i))
-	    && h->test.cmpfn (&h->test, key, HASH_KEY (h, i))))
+	    && EQ (hash_code, HASH_HASH (h, i))
+	    && !NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
       break;
 
   return i;
 }
 
+static void
+check_mutable_hash_table (Lisp_Object obj, struct Lisp_Hash_Table *h)
+{
+  if (!h->mutable)
+    signal_error ("hash table test modifies table", obj);
+  eassert (!PURE_P (h));
+}
 
 /* Put an entry into hash table H that associates KEY with VALUE.
    HASH is a previously computed hash code of KEY.
@@ -4316,13 +4323,11 @@ hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, EMACS_UINT *hash)
 
 ptrdiff_t
 hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
-	  EMACS_UINT hash)
+	  Lisp_Object hash)
 {
   ptrdiff_t start_of_bucket, i;
 
   hash_rehash_if_needed (h);
-
-  eassert ((hash & ~INTMASK) == 0);
 
   /* Increment count after resizing because resizing may fail.  */
   maybe_resize_hash_table (h);
@@ -4330,15 +4335,17 @@ hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
 
   /* Store key/value in the key_and_value vector.  */
   i = h->next_free;
+  eassert (NILP (HASH_HASH (h, i)));
+  eassert (EQ (Qunbound, (HASH_KEY (h, i))));
   h->next_free = HASH_NEXT (h, i);
   set_hash_key_slot (h, i, key);
   set_hash_value_slot (h, i, value);
 
   /* Remember its hash code.  */
-  set_hash_hash_slot (h, i, make_fixnum (hash));
+  set_hash_hash_slot (h, i, hash);
 
   /* Add new entry to its collision chain.  */
-  start_of_bucket = hash % ASIZE (h->index);
+  start_of_bucket = XUFIXNUM (hash) % ASIZE (h->index);
   set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
   set_hash_index_slot (h, start_of_bucket, i);
   return i;
@@ -4350,9 +4357,8 @@ hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
 void
 hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
 {
-  EMACS_UINT hash_code = h->test.hashfn (&h->test, key);
-  eassert ((hash_code & ~INTMASK) == 0);
-  ptrdiff_t start_of_bucket = hash_code % ASIZE (h->index);
+  Lisp_Object hash_code = h->test.hashfn (key, h);
+  ptrdiff_t start_of_bucket = XUFIXNUM (hash_code) % ASIZE (h->index);
   ptrdiff_t prev = -1;
 
   hash_rehash_if_needed (h);
@@ -4363,8 +4369,8 @@ hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
     {
       if (EQ (key, HASH_KEY (h, i))
 	  || (h->test.cmpfn
-	      && hash_code == XUFIXNUM (HASH_HASH (h, i))
-	      && h->test.cmpfn (&h->test, key, HASH_KEY (h, i))))
+	      && EQ (hash_code, HASH_HASH (h, i))
+	      && !NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
 	{
 	  /* Take entry out of collision chain.  */
 	  if (prev < 0)
@@ -4374,7 +4380,7 @@ hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
 
 	  /* Clear slots in key_and_value and add the slots to
 	     the free list.  */
-	  set_hash_key_slot (h, i, Qnil);
+	  set_hash_key_slot (h, i, Qunbound);
 	  set_hash_value_slot (h, i, Qnil);
 	  set_hash_hash_slot (h, i, Qnil);
 	  set_hash_next_slot (h, i, h->next_free);
@@ -4401,7 +4407,7 @@ hash_clear (struct Lisp_Hash_Table *h)
       for (i = 0; i < size; ++i)
 	{
 	  set_hash_next_slot (h, i, i < size - 1 ? i + 1 : -1);
-	  set_hash_key_slot (h, i, Qnil);
+	  set_hash_key_slot (h, i, Qunbound);
 	  set_hash_value_slot (h, i, Qnil);
 	  set_hash_hash_slot (h, i, Qnil);
 	}
@@ -4460,6 +4466,8 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 
 	  if (remove_entries_p)
 	    {
+              eassert (!remove_p
+                       == (key_known_to_survive_p && value_known_to_survive_p));
 	      if (remove_p)
 		{
 		  /* Take out of collision chain.  */
@@ -4473,9 +4481,10 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 		  h->next_free = i;
 
 		  /* Clear key, value, and hash.  */
-		  set_hash_key_slot (h, i, Qnil);
+		  set_hash_key_slot (h, i, Qunbound);
 		  set_hash_value_slot (h, i, Qnil);
-                  set_hash_hash_slot (h, i, Qnil);
+                  if (!NILP (h->hash))
+                    set_hash_hash_slot (h, i, Qnil);
 
                   eassert (h->count != 0);
                   h->count += h->count > 0 ? -1 : 1;
@@ -4714,7 +4723,7 @@ If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_fixnum (hashfn_eq (NULL, obj));
+  return hashfn_eq (obj, NULL);
 }
 
 DEFUN ("sxhash-eql", Fsxhash_eql, Ssxhash_eql, 1, 1, 0,
@@ -4724,7 +4733,7 @@ If (eql A B), then (= (sxhash-eql A) (sxhash-eql B)).
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_fixnum (hashfn_eql (NULL, obj));
+  return hashfn_eql (obj, NULL);
 }
 
 DEFUN ("sxhash-equal", Fsxhash_equal, Ssxhash_equal, 1, 1, 0,
@@ -4734,7 +4743,7 @@ If (equal A B), then (= (sxhash-equal A) (sxhash-equal B)).
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_fixnum (hashfn_equal (NULL, obj));
+  return hashfn_equal (obj, NULL);
 }
 
 DEFUN ("make-hash-table", Fmake_hash_table, Smake_hash_table, 0, MANY, 0,
@@ -4777,7 +4786,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object test, weak;
-  bool pure;
+  bool purecopy;
   struct hash_table_test testdesc;
   ptrdiff_t i;
   USE_SAFE_ALLOCA;
@@ -4813,7 +4822,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
 
   /* See if there's a `:purecopy PURECOPY' argument.  */
   i = get_key_arg (QCpurecopy, nargs, args, used);
-  pure = i && !NILP (args[i]);
+  purecopy = i && !NILP (args[i]);
   /* See if there's a `:size SIZE' argument.  */
   i = get_key_arg (QCsize, nargs, args, used);
   Lisp_Object size_arg = i ? args[i] : Qnil;
@@ -4864,7 +4873,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
 
   SAFE_FREE ();
   return make_hash_table (testdesc, size, rehash_size, rehash_threshold, weak,
-                          pure);
+			  purecopy);
 }
 
 
@@ -4881,7 +4890,7 @@ DEFUN ("hash-table-count", Fhash_table_count, Shash_table_count, 1, 1, 0,
   (Lisp_Object table)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  hash_rehash_if_needed (h);
+  eassert (h->count >= 0);
   return make_fixnum (h->count);
 }
 
@@ -4953,7 +4962,7 @@ DEFUN ("clrhash", Fclrhash, Sclrhash, 1, 1, 0,
   (Lisp_Object table)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  CHECK_IMPURE (table, h);
+  check_mutable_hash_table (table, h);
   hash_clear (h);
   /* Be compatible with XEmacs.  */
   return table;
@@ -4978,11 +4987,10 @@ VALUE.  In any case, return VALUE.  */)
   (Lisp_Object key, Lisp_Object value, Lisp_Object table)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  CHECK_IMPURE (table, h);
+  check_mutable_hash_table (table, h);
 
-  ptrdiff_t i;
-  EMACS_UINT hash;
-  i = hash_lookup (h, key, &hash);
+  Lisp_Object hash;
+  ptrdiff_t i = hash_lookup (h, key, &hash);
   if (i >= 0)
     set_hash_value_slot (h, i, value);
   else
@@ -4997,7 +5005,7 @@ DEFUN ("remhash", Fremhash, Sremhash, 2, 2, 0,
   (Lisp_Object key, Lisp_Object table)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  CHECK_IMPURE (table, h);
+  check_mutable_hash_table (table, h);
   hash_remove_from_table (h, key);
   return Qnil;
 }
@@ -5012,8 +5020,11 @@ FUNCTION is called with two arguments, KEY and VALUE.
   struct Lisp_Hash_Table *h = check_hash_table (table);
 
   for (ptrdiff_t i = 0; i < HASH_TABLE_SIZE (h); ++i)
-    if (!NILP (HASH_HASH (h, i)))
-      call2 (function, HASH_KEY (h, i), HASH_VALUE (h, i));
+    {
+      Lisp_Object k = HASH_KEY (h, i);
+      if (!EQ (k, Qunbound))
+        call2 (function, k, HASH_VALUE (h, i));
+    }
 
   return Qnil;
 }
