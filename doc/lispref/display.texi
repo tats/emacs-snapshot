@@ -2523,6 +2523,11 @@ face name.  In the vast majority of cases, this is not necessary; the
 usual procedure is to define a face with @code{defface}, and then use
 its name directly.
 
+@cindex face (non-removability of)
+Note that once you have defined a face (usually with @code{defface}),
+you cannot later undefine this face safely, except by restarting
+Emacs.
+
 @defmac defface face spec doc [keyword value]@dots{}
 This macro declares @var{face} as a named face whose default face spec
 is given by @var{spec}.  You should not quote the symbol @var{face},
@@ -3978,7 +3983,9 @@ with its @var{keep-margins} argument @code{nil} or omitted.  However,
 if the optional fifth argument @var{persistent} is non-@code{nil} and
 the other arguments are processed successfully, the values specified
 here unconditionally survive subsequent invocations of
-@code{set-window-buffer}.
+@code{set-window-buffer}.  This can be used to permanently turn off
+fringes in the minibuffer window, consult the description of
+@code{set-window-scroll-bars} for an example (@pxref{Scroll Bars}).
 @end defun
 
 @defun window-fringes &optional window
@@ -4412,6 +4419,23 @@ the other arguments are processed successfully, the values specified
 here unconditionally survive subsequent invocations of
 @code{set-window-buffer}.
 @end defun
+
+Using the @var{persistent} argument of @code{set-window-scroll-bars}
+and @code{set-window-fringes} (@pxref{Fringe Size/Pos}) you can
+reliably and permanently turn off scroll bars and/or fringes in any
+minibuffer window by adding the following snippet to your early init
+file (@pxref{Init File}).
+
+@smallexample
+@group
+(add-hook 'after-make-frame-functions
+          (lambda (frame)
+            (set-window-scroll-bars
+             (minibuffer-window frame) 0 nil 0 nil t)
+            (set-window-fringes
+             (minibuffer-window frame) 0 0 nil t)))
+@end group
+@end smallexample
 
 The following four functions take as argument a live window which
 defaults to the selected one.
@@ -5603,6 +5627,9 @@ The identified of the shape.
 @item :gradient
 If given, this should be the identifier of a previously defined
 gradient object.
+
+@item :clip-path
+Identifier of a clip path.
 @end table
 
 @defun svg-rectangle svg x y width height &rest args
@@ -5650,6 +5677,29 @@ that describe the outer circumference of the polygon.
 @end lisp
 @end defun
 
+@defun svg-path svg commands &rest args
+Add the outline of a shape to @var{svg} according to @var{commands},
+see @ref{SVG Path Commands}.
+
+Coordinates by default are absolute.  To use coordinates relative to
+the last position, or -- initially -- to the origin, set the attribute
+@var{:relative} to @code{t}.  This attribute can be specified for the
+function or for individual commands.  If specified for the function,
+then all commands use relative coordinates by default.  To make an
+individual command use absolute coordinates, set @var{:relative} to
+@code{nil}.
+
+@lisp
+(svg-path svg
+	  '((moveto ((100 . 100)))
+	    (lineto ((200 . 0) (0 . 200) (-200 . 0)))
+	    (lineto ((100 . 100)) :relative nil))
+	  :stroke-color "blue"
+	  :fill-color "lightblue"
+	  :relative t)
+@end lisp
+@end defun
+
 @defun svg-text svg text &rest args
 Add the specified @var{text} to @var{svg}.
 
@@ -5681,6 +5731,30 @@ string containing the image data as raw bytes.  @var{image-type} should be a
 @end lisp
 @end defun
 
+@defun svg-clip-path svg &rest args
+Add a clipping path to @var{svg}.  If applied to a shape via the
+@var{:clip-path} property, parts of that shape which lie outside of
+the clipping path are not drawn.
+
+@lisp
+(let ((clip-path (svg-clip-path svg :id "foo")))
+  (svg-circle clip-path 200 200 175))
+(svg-rectangle svg 50 50 300 300
+               :fill-color "red"
+               :clip-path "url(#foo)")
+@end lisp
+@end defun
+
+@defun svg-node svg tag &rest args
+Add the custom node @var{tag} to @var{svg}.
+
+@lisp
+(svg-node svg
+          'rect
+          :width 300 :height 200 :x 50 :y 100 :fill-color "green")
+@end lisp
+@end defun
+
 @defun svg-remove svg id
 Remove the element with identifier @code{id} from the @code{svg}.
 @end defun
@@ -5701,6 +5775,201 @@ circle:
                   :stroke-color "green")
   (insert-image (svg-image svg)))
 @end lisp
+
+@menu
+* SVG Path Commands::
+@end menu
+
+@subsubheading SVG Path Commands
+
+@cindex svg path commands
+@anchor{SVG Path Commands}
+@dfn{SVG paths} allow creation of complex images by combining lines,
+curves, arcs, and other basic shapes.  The functions described below
+allow invoking SVG path commands from a Lisp program.
+
+@deffn Command moveto points
+Move the pen to the first point in @var{points}.  Additional points
+are connected with lines.  @var{points} is a list of X/Y coordinate
+pairs.  Subsequent @command{moveto} commands represent the start of a
+new @dfn{subpath}.
+
+@lisp
+(svg-path svg '((moveto ((200 . 100) (100 . 200) (0 . 100))))
+          :fill "white" :stroke "black")
+@end lisp
+@end deffn
+
+@deffn Command closepath
+End the current subpath by connecting it back to its initial point.  A
+line is drawn along the connection.
+
+@lisp
+(svg-path svg '((moveto ((200 . 100) (100 . 200) (0 . 100)))
+                (closepath)
+                (moveto ((75 . 125) (100 . 150) (125 . 125)))
+                (closepath))
+          :fill "red" :stroke "black")
+@end lisp
+@end deffn
+
+@deffn Command lineto points
+Draw a line from the current point to the first element in
+@var{points}, a list of X/Y position pairs.  If more than one point is
+specified, draw a polyline.
+@lisp
+(svg-path svg '((moveto ((200 . 100)))
+                (lineto ((100 . 200) (0 . 100))))
+          :fill "yellow" :stroke "red")
+@end lisp
+@end deffn
+
+@deffn Command horizontal-lineto x-coordinates
+Draw a horizontal line from the current point to the first element in
+@var{x-coordinates}.  Specifying multiple coordinates is possible,
+although usually this doesn’t make sense.
+
+@lisp
+(svg-path svg '((moveto ((100 . 200)))
+                (horizontal-lineto (300)))
+          :stroke "green")
+@end lisp
+@end deffn
+
+@deffn Command vertical-lineto y-coordinates
+Draw vertical lines.
+
+@lisp
+(svg-path svg '((moveto ((200 . 100)))
+                (vertical-lineto (300)))
+          :stroke "green")
+@end lisp
+@end deffn
+
+@deffn Command curveto coordinate-sets
+Using the first element in @var{coordinate-sets}, draw a cubic Bézier
+curve from the current point.  If there are multiple coordinate sets,
+draw a polybézier.  Each coordinate set is a list of the form
+@code{(@var{x1} @var{y1} @var{x2} @var{y2} @var{x} @var{y})}, where
+@w{(@var{x}, @var{y})} is the curve’s end point.  @w{(@var{x1},
+@var{y1})} and @w{(@var{x2}, @var{y2})} are control points at the
+beginning and at the end, respectively.
+
+@lisp
+(svg-path svg '((moveto ((100 . 100)))
+                (curveto ((200 100 100 200 200 200)
+                          (300 200 0 100 100 100))))
+          :fill "transparent" :stroke "red")
+@end lisp
+@end deffn
+
+@deffn Command smooth-curveto coordinate-sets
+Using the first element in @var{coordinate-sets}, draw a cubic Bézier
+curve from the current point.  If there are multiple coordinate sets,
+draw a polybézier.  Each coordinate set is a list of the form
+@code{(@var{x2} @var{y2} @var{x} @var{y})}, where @w{(@var{x},
+@var{y})} is the curve’s end point and @w{(@var{x2}, @var{y2})} is the
+corresponding control point.  The first control point is the
+reflection of the second control point of the previous command
+relative to the current point, if that command was @command{curveto}
+or @command{smooth-curveto}.  Otherwise the first control point
+coincides with the current point.
+
+@lisp
+(svg-path svg '((moveto ((100 . 100)))
+                (curveto ((200 100 100 200 200 200)))
+                (smooth-curveto ((0 100 100 100))))
+          :fill "transparent" :stroke "blue")
+@end lisp
+@end deffn
+
+@deffn Command quadratic-bezier-curveto coordinate-sets
+Using the first element in @var{coordinate-sets}, draw a quadratic
+Bézier curve from the current point.  If there are multiple coordinate
+sets, draw a polybézier.  Each coordinate set is a list of the form
+@code{(@var{x1} @var{y1} @var{x} @var{y})}, where @w{(@var{x},
+@var{y})} is the curve’s end point and @w{(@var{x1}, @var{y1})} is the
+control point.
+
+@lisp
+(svg-path svg '((moveto ((200 . 100)))
+                (quadratic-bezier-curveto ((300 100 300 200)))
+                (quadratic-bezier-curveto ((300 300 200 300)))
+                (quadratic-bezier-curveto ((100 300 100 200)))
+                (quadratic-bezier-curveto ((100 100 200 100))))
+          :fill "transparent" :stroke "pink")
+@end lisp
+@end deffn
+
+@deffn Command smooth-quadratic-bezier-curveto coordinate-sets
+Using the first element in @var{coordinate-sets}, draw a quadratic
+Bézier curve from the current point.  If there are multiple coordinate
+sets, draw a polybézier.  Each coordinate set is a list of the form
+@code{(@var{x} @var{y})}, where @w{(@var{x}, @var{y})} is the curve’s
+end point.  The control point is the reflection of the control point
+of the previous command relative to the current point, if that command
+was @command{quadratic-bezier-curveto} or
+@command{smooth-quadratic-bezier-curveto}.  Otherwise the control
+point coincides with the current point.
+
+@lisp
+(svg-path svg '((moveto ((200 . 100)))
+                (quadratic-bezier-curveto ((300 100 300 200)))
+                (smooth-quadratic-bezier-curveto ((200 300)))
+                (smooth-quadratic-bezier-curveto ((100 200)))
+                (smooth-quadratic-bezier-curveto ((200 100))))
+          :fill "transparent" :stroke "lightblue")
+@end lisp
+@end deffn
+
+@deffn Command elliptical-arc coordinate-sets
+Using the first element in @var{coordinate-sets}, draw an elliptical
+arc from the current point.  If there are multiple coordinate sets,
+draw a sequence of elliptical arcs.  Each coordinate set is a list of
+the form @code{(@var{rx} @var{ry} @var{x} @var{y})}, where
+@w{(@var{x}, @var{y})} is the end point of the ellipse, and
+@w{(@var{rx}, @var{ry})} are its radii.  Attributes may be appended to
+the list:
+
+@table @code
+@item :x-axis-rotation
+The angle in degrees by which the x-axis of the ellipse is rotated
+relative to the x-axis of the current coordinate system.
+
+@item :large-arc
+If set to @code{t}, draw an arc sweep greater than or equal to 180
+degrees.  Otherwise, draw an arc sweep smaller than or equal to 180
+degrees.
+
+@item :sweep
+If set to @code{t}, draw an arc in @dfn{positive angle direction}.
+Otherwise, draw it in @dfn{negative angle direction}.
+@end table
+
+@lisp
+(svg-path svg '((moveto ((200 . 250)))
+                (elliptical-arc ((75 75 200 350))))
+          :fill "transparent" :stroke "red")
+(svg-path svg '((moveto ((200 . 250)))
+                (elliptical-arc ((75 75 200 350 :large-arc t))))
+          :fill "transparent" :stroke "green")
+(svg-path svg '((moveto ((200 . 250)))
+                (elliptical-arc ((75 75 200 350 :sweep t))))
+          :fill "transparent" :stroke "blue")
+(svg-path svg '((moveto ((200 . 250)))
+                (elliptical-arc ((75 75 200 350 :large-arc t
+                                     :sweep t))))
+          :fill "transparent" :stroke "gray")
+(svg-path svg '((moveto ((160 . 100)))
+                (elliptical-arc ((40 100 80 0)))
+                (elliptical-arc ((40 100 -40 -70
+                                     :x-axis-rotation -120)))
+                (elliptical-arc ((40 100 -40 70
+                                     :x-axis-rotation -240))))
+          :stroke "pink" :fill "lightblue"
+          :relative t)
+@end lisp
+@end deffn
 
 
 @node Other Image Types
@@ -6473,7 +6742,9 @@ that is the value of that property, passing it the single argument
 @var{button}).  If @var{use-mouse-action} is non-@code{nil}, try to
 invoke the button's @code{mouse-action} property instead of
 @code{action}; if the button has no @code{mouse-action} property, use
-@code{action} as normal.
+@code{action} as normal.  If the @code{button-data} property is
+present in @var{button}, use that as the argument for the
+@code{action} function instead of @var{button}.
 @end defun
 
 @defun button-label button
@@ -6541,14 +6812,16 @@ event's position is used.  If there's no button at @var{pos}, do
 nothing and return @code{nil}, otherwise return @code{t}.
 @end deffn
 
-@deffn Command forward-button n &optional wrap display-message
+@deffn Command forward-button n &optional wrap display-message no-error
 Move to the @var{n}th next button, or @var{n}th previous button if
 @var{n} is negative.  If @var{n} is zero, move to the start of any
 button at point.  If @var{wrap} is non-@code{nil}, moving past either
 end of the buffer continues from the other end.  If
 @var{display-message} is non-@code{nil}, the button's help-echo string
 is displayed.  Any button with a non-@code{nil} @code{skip} property
-is skipped over.  Returns the button found.
+is skipped over.  Returns the button found, and signals an error if no
+buttons can be found.  If @var{no-error} in non-@code{nil}, return nil
+instead of signalling the error.
 @end deffn
 
 @deffn Command backward-button n &optional wrap display-message
@@ -6558,7 +6831,9 @@ button at point.  If @var{wrap} is non-@code{nil}, moving past either
 end of the buffer continues from the other end.  If
 @var{display-message} is non-@code{nil}, the button's help-echo string
 is displayed.  Any button with a non-@code{nil} @code{skip} property
-is skipped over.  Returns the button found.
+is skipped over.  Returns the button found, and signals an error if no
+buttons can be found.  If @var{no-error} in non-@code{nil}, return nil
+instead of signalling the error.
 @end deffn
 
 @defun next-button pos &optional count-current

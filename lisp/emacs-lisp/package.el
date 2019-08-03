@@ -151,6 +151,7 @@
 (require 'tabulated-list)
 (require 'macroexp)
 (require 'url-handlers)
+(require 'browse-url)
 
 (defgroup package nil
   "Manager for Emacs Lisp packages."
@@ -2504,44 +2505,47 @@ The description is read from the installed package files."
 
     (insert "\n")
 
-    (if built-in
-        ;; For built-in packages, get the description from the
-        ;; Commentary header.
-        (let ((fn (locate-file (format "%s.el" name) load-path
-                               load-file-rep-suffixes))
-              (opoint (point)))
-          (insert (or (lm-commentary fn) ""))
-          (save-excursion
-            (goto-char opoint)
-            (when (re-search-forward "^;;; Commentary:\n" nil t)
-              (replace-match ""))
-            (while (re-search-forward "^\\(;+ ?\\)" nil t)
-              (replace-match ""))))
-
-      (if (package-installed-p desc)
-          ;; For installed packages, get the description from the
-          ;; installed files.
-          (insert (package--get-description desc))
-
-        ;; For non-built-in, non-installed packages, get description from
-        ;; the archive.
-        (let* ((basename (format "%s-readme.txt" name))
-               readme-string)
-
-          (package--with-response-buffer (package-archive-base desc)
-            :file basename :noerror t
+    (let ((start-of-description (point)))
+      (if built-in
+          ;; For built-in packages, get the description from the
+          ;; Commentary header.
+          (let ((fn (locate-file (format "%s.el" name) load-path
+                                 load-file-rep-suffixes))
+                (opoint (point)))
+            (insert (or (lm-commentary fn) ""))
             (save-excursion
-              (goto-char (point-max))
-              (unless (bolp)
-                (insert ?\n)))
-            (cl-assert (not enable-multibyte-characters))
-            (setq readme-string
-                  ;; The readme.txt files are defined to contain utf-8 text.
-                  (decode-coding-region (point-min) (point-max) 'utf-8 t))
-            t)
-          (insert (or readme-string
-                      "This package does not provide a description.")))
-        ))))
+              (goto-char opoint)
+              (when (re-search-forward "^;;; Commentary:\n" nil t)
+                (replace-match ""))
+              (while (re-search-forward "^\\(;+ ?\\)" nil t)
+                (replace-match ""))))
+
+        (if (package-installed-p desc)
+            ;; For installed packages, get the description from the
+            ;; installed files.
+            (insert (package--get-description desc))
+
+          ;; For non-built-in, non-installed packages, get description from
+          ;; the archive.
+          (let* ((basename (format "%s-readme.txt" name))
+                 readme-string)
+
+            (package--with-response-buffer (package-archive-base desc)
+              :file basename :noerror t
+              (save-excursion
+                (goto-char (point-max))
+                (unless (bolp)
+                  (insert ?\n)))
+              (cl-assert (not enable-multibyte-characters))
+              (setq readme-string
+                    ;; The readme.txt files are defined to contain utf-8 text.
+                    (decode-coding-region (point-min) (point-max) 'utf-8 t))
+              t)
+            (insert (or readme-string
+                        "This package does not provide a description.")))))
+      ;; Make URLs in the description into links.
+      (goto-char start-of-description)
+      (browse-url-add-buttons))))
 
 (defun package-install-button-action (button)
   (let ((pkg-desc (button-get button 'package-desc)))
@@ -3543,9 +3547,15 @@ shown."
 (defun package-menu-filter (keyword)
   "Filter the *Packages* buffer.
 Show only those items that relate to the specified KEYWORD.
+
 KEYWORD can be a string or a list of strings.  If it is a list, a
 package will be displayed if it matches any of the keywords.
 Interactively, it is a list of strings separated by commas.
+
+KEYWORD can also be used to filter by status or archive name by
+using keywords like \"arc:gnu\" and \"status:available\".
+Statuses available include \"incompat\", \"available\",
+\"built-in\" and \"installed\".
 
 To restore the full package list, type `q'."
   (interactive

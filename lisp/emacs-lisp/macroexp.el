@@ -33,7 +33,8 @@
 (defvar macroexpand-all-environment nil)
 
 (defun macroexp--cons (car cdr original-cons)
-  "Return (CAR . CDR), using ORIGINAL-CONS if possible."
+  "Return ORIGINAL-CONS if the car/cdr of it is `eq' to CAR and CDR, respectively.
+If not, return (CAR . CDR)."
   (if (and (eq car (car original-cons)) (eq cdr (cdr original-cons)))
       original-cons
     (cons car cdr)))
@@ -318,7 +319,8 @@ definitions to shadow the loaded ones for use in file byte-compilation."
     (cons (nreverse decls) body)))
 
 (defun macroexp-progn (exps)
-  "Return an expression equivalent to \\=`(progn ,@EXPS)."
+  "Return EXPS with `progn' prepended.
+If EXPS is a single expression, `progn' is not prepended."
   (if (cdr exps) `(progn ,@exps) (car exps)))
 
 (defun macroexp-unprogn (exp)
@@ -327,7 +329,7 @@ Never returns an empty list."
   (if (eq (car-safe exp) 'progn) (or (cdr exp) '(nil)) (list exp)))
 
 (defun macroexp-let* (bindings exp)
-  "Return an expression equivalent to \\=`(let* ,bindings ,exp)."
+  "Return an expression equivalent to \\=`(let* ,BINDINGS ,EXP)."
   (cond
    ((null bindings) exp)
    ((eq 'let* (car-safe exp)) `(let* (,@bindings ,@(cadr exp)) ,@(cddr exp)))

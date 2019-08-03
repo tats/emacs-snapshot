@@ -1409,15 +1409,17 @@ operators."
 (c-lang-defvar c->-op-without->-cont-regexp
   (c-lang-const c->-op-without->-cont-regexp))
 
-(c-lang-defconst c-multichar->-op-not->>-regexp
-  ;; Regexp matching multichar tokens containing ">", except ">>"
+(c-lang-defconst c-multichar->-op-not->>->>>-regexp
+  ;; Regexp matching multichar tokens containing ">", except ">>" and ">>>"
   t (c-make-keywords-re nil
-      (delete ">>"
-	      (c-filter-ops (c-lang-const c-all-op-syntax-tokens)
-			    t
-			    "\\(.>\\|>.\\)"))))
-(c-lang-defvar c-multichar->-op-not->>-regexp
-  (c-lang-const c-multichar->-op-not->>-regexp))
+      (c--set-difference
+       (c-filter-ops (c-lang-const c-all-op-syntax-tokens)
+		     t
+		     "\\(.>\\|>.\\)")
+       '(">>" ">>>")
+       :test 'string-equal)))
+(c-lang-defvar c-multichar->-op-not->>->>>-regexp
+  (c-lang-const c-multichar->-op-not->>->>>-regexp))
 
 (c-lang-defconst c-:-op-cont-tokens
   ;; A list of second and subsequent characters of all multicharacter tokens
@@ -1540,7 +1542,7 @@ Currently (2016-08) only used in C++ mode."
 
 (c-lang-defconst c-pre-lambda-tokens-re
   ;; Regexp matching any token in the list `c-pre-lambda-tokens'.
-  t (regexp-opt (c-lang-const c-pre-lambda-tokens)))
+  t (c-make-keywords-re t (c-lang-const c-pre-lambda-tokens)))
 (c-lang-defvar c-pre-lambda-tokens-re (c-lang-const c-pre-lambda-tokens-re))
 
 ;;; Syntactic whitespace.
@@ -1652,7 +1654,7 @@ backslash."
 current line, if any, or nil in those languages without block
 comments.  When a match is found, submatch 1 contains the comment
 ender."
-  t "\\(\\*/\\)\\([^*]\\|\\*+[^/]\\)*$"
+  t "\\(\\*/\\)\\([^*]\\|\\*+\\([^*/]\\|$\\)\\)*$"
   awk nil)
 (c-lang-defvar c-last-c-comment-end-on-line-re
 	       (c-lang-const c-last-c-comment-end-on-line-re))
@@ -1662,7 +1664,7 @@ ender."
 current ine, if any, or nil in those languages without block
 comments.  When a match is found, submatch 1 contains the comment
 starter."
-  t "\\(/\\*\\)\\([^*]\\|\\*+[^/]\\)*$"
+  t "\\(/\\*\\)\\([^*]\\|\\*+\\([^*/]\\|$\\)\\)*$"
   awk nil)
 (c-lang-defvar c-last-open-c-comment-start-on-line-re
 	       (c-lang-const c-last-open-c-comment-start-on-line-re))

@@ -340,6 +340,8 @@ The directory name must be absolute, but need not be fully expanded.")
 ;; DOS/Windows-style drive letters in directory names, like in "d:/foo".
 (defvar dired-re-dir (concat dired-re-maybe-mark dired-re-inode-size "d[^:]"))
 (defvar dired-re-sym (concat dired-re-maybe-mark dired-re-inode-size "l[^:]"))
+(defvar dired-re-socket (concat dired-re-maybe-mark dired-re-inode-size
+                                "[bcsp][^:]"))
 (defvar dired-re-exe;; match ls permission string of an executable file
   (mapconcat (lambda (x)
 		(concat dired-re-maybe-mark dired-re-inode-size x))
@@ -445,6 +447,12 @@ Subexpression 2 must end right before the \\n.")
 (defvar dired-symlink-face 'dired-symlink
   "Face name used for symbolic links.")
 
+(defface dired-socket
+  '((t (:inherit font-lock-variable-name-face)))
+  "Face used for sockets, pipes, block devices and char devices."
+  :group 'dired-faces
+  :version "27.1")
+
 (defface dired-ignored
   '((t (:inherit shadow)))
   "Face used for files suffixed with `completion-ignored-extensions'."
@@ -499,6 +507,10 @@ Subexpression 2 must end right before the \\n.")
    ;; Symbolic links.
    (list dired-re-sym
 	 '(".+" (dired-move-to-filename) nil (0 dired-symlink-face)))
+   ;;
+   ;; Sockets, pipes, block devices, char devices.
+   (list dired-re-socket
+	 '(".+" (dired-move-to-filename) nil (0 'dired-socket)))
    ;;
    ;; Files suffixed with `completion-ignored-extensions'.
    '(eval .
@@ -2548,7 +2560,7 @@ See options: `dired-hide-details-hide-symlink-targets' and
   ;; approximate ("anywhere on the line is fine").
   ;; FIXME: This also removes other invisible properties!
   (save-excursion
-    (remove-text-properties
+    (remove-list-of-text-properties
      (progn (goto-char start) (line-end-position))
      (progn (goto-char end) (line-end-position))
      '(invisible))))
@@ -3314,7 +3326,7 @@ or \"* [3 files]\"."
 
 (defun dired-pop-to-buffer (buf)
   "Pop up buffer BUF in a way suitable for Dired."
-  (declare (obsolete nil "24.3"))
+  (declare (obsolete pop-to-buffer "24.3"))
   (let ((split-window-preferred-function
 	 (lambda (window)
 	   (or (and (let ((split-height-threshold 0))
@@ -3630,12 +3642,12 @@ object files--just `.o' will mark more than you might think."
                         sum (file-attribute-size (file-attributes file)))))
     (if (zerop nmarked)
         (message "No marked files"))
-    (message "%d marked file%s (%sB total size)"
+    (message "%d marked file%s (%s total size)"
              nmarked
              (if (= nmarked 1)
                  ""
                "s")
-             (file-size-human-readable size))))
+             (funcall byte-count-to-string-function size))))
 
 (defun dired-mark-files-containing-regexp (regexp &optional marker-char)
   "Mark all files with contents containing REGEXP for use in later commands.

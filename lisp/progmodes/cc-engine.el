@@ -271,6 +271,11 @@
     (setcdr c-macro-cache nil)
     (setq c-macro-cache-start-pos beg
 	  c-macro-cache-syntactic nil
+	  c-macro-cache-no-comment nil))
+   ((and c-macro-cache-start-pos
+	 (< beg c-macro-cache-start-pos))
+    (setq c-macro-cache-start-pos beg
+	  c-macro-cache-syntactic nil
 	  c-macro-cache-no-comment nil))))
 
 (defun c-macro-is-genuine-p ()
@@ -7983,7 +7988,7 @@ comment at the start of cc-engine.el for more info."
 
 		  (if (save-excursion
 			(c-backward-token-2)
-			(looking-at c-multichar->-op-not->>-regexp))
+			(looking-at c-multichar->-op-not->>->>>-regexp))
 		      (progn
 			(goto-char (match-end 0))
 			t)		; Continue the loop.
