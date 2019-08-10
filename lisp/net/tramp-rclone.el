@@ -215,7 +215,8 @@ file names."
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
-	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	(when (and (file-directory-p newname)
+		   (not (tramp-compat-directory-name-p newname)))
 	  (tramp-error v 'file-error "File is a directory %s" newname))
 
 	(if (or (and t1 (not (tramp-rclone-file-name-p filename)))
@@ -244,30 +245,22 @@ file names."
 
 	  (when (and t1 (eq op 'rename))
 	    (with-parsed-tramp-file-name filename v1
-	      (tramp-flush-file-properties
-	       v1 (file-name-directory v1-localname))
 	      (tramp-flush-file-properties v1 v1-localname)
 	      (when (tramp-rclone-file-name-p filename)
 		(tramp-rclone-flush-directory-cache v1)
 		;; The mount point's directory cache might need time
 		;; to flush.
 		(while (file-exists-p filename)
-		  (tramp-flush-file-properties
-		   v1 (file-name-directory v1-localname))
 		  (tramp-flush-file-properties v1 v1-localname)))))
 
 	  (when t2
 	    (with-parsed-tramp-file-name newname v2
-	      (tramp-flush-file-properties
-	       v2 (file-name-directory v2-localname))
 	      (tramp-flush-file-properties v2 v2-localname)
 	      (when (tramp-rclone-file-name-p newname)
 		(tramp-rclone-flush-directory-cache v2)
 		;; The mount point's directory cache might need time
 		;; to flush.
 		(while (not (file-exists-p newname))
-		  (tramp-flush-file-properties
-		   v2 (file-name-directory v2-localname))
 		  (tramp-flush-file-properties v2 v2-localname))))))))))
 
 (defun tramp-rclone-handle-copy-file
@@ -292,7 +285,6 @@ file names."
   "Like `delete-directory' for Tramp files."
   (with-parsed-tramp-file-name (expand-file-name directory) nil
     (delete-directory (tramp-rclone-local-file-name directory) recursive trash)
-    (tramp-flush-file-properties v (file-name-directory localname))
     (tramp-flush-directory-properties v localname)
     (tramp-rclone-flush-directory-cache v)))
 
@@ -300,7 +292,6 @@ file names."
   "Like `delete-file' for Tramp files."
   (with-parsed-tramp-file-name (expand-file-name filename) nil
     (delete-file (tramp-rclone-local-file-name filename) trash)
-    (tramp-flush-file-properties v (file-name-directory localname))
     (tramp-flush-file-properties v localname)
     (tramp-rclone-flush-directory-cache v)))
 

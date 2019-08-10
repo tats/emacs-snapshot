@@ -2696,7 +2696,7 @@ dump_hash_table (struct dump_context *ctx,
                  Lisp_Object object,
                  dump_off offset)
 {
-#if CHECK_STRUCTS && !defined HASH_Lisp_Hash_Table_EF95ED06FF
+#if CHECK_STRUCTS && !defined HASH_Lisp_Hash_Table_BB1ACF756E
 # error "Lisp_Hash_Table changed. See CHECK_STRUCTS comment in config.h."
 #endif
   const struct Lisp_Hash_Table *hash_in = XHASH_TABLE (object);
@@ -4931,7 +4931,10 @@ dump_bitset_set_bit (struct dump_bitset *bitset, size_t bit_number)
 static void
 dump_bitset_clear (struct dump_bitset *bitset)
 {
-  memset (bitset->bits, 0, bitset->number_words * sizeof bitset->bits[0]);
+  /* Skip the memset if bitset->number_words == 0, because then bitset->bits
+     might be NULL and the memset would have undefined behavior.  */
+  if (bitset->number_words)
+    memset (bitset->bits, 0, bitset->number_words * sizeof bitset->bits[0]);
 }
 
 struct pdumper_loaded_dump_private

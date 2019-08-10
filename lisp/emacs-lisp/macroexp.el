@@ -319,8 +319,9 @@ definitions to shadow the loaded ones for use in file byte-compilation."
     (cons (nreverse decls) body)))
 
 (defun macroexp-progn (exps)
-  "Return EXPS with `progn' prepended.
-If EXPS is a single expression, `progn' is not prepended."
+  "Return EXPS (a list of expressions) with `progn' prepended.
+If EXPS is a list with a single expression, `progn' is not
+prepended, but that expression is returned instead."
   (if (cdr exps) `(progn ,@exps) (car exps)))
 
 (defun macroexp-unprogn (exp)
@@ -405,7 +406,10 @@ cases where EXP is a constant."
                         ,bodysym)))))
 
 (defmacro macroexp-let2* (test bindings &rest body)
-  "Bind each binding in BINDINGS as `macroexp-let2' does."
+  "Multiple binding version of `macroexp-let2'.
+
+BINDINGS is a list of elements of the form (SYM EXP).  Each EXP
+can refer to symbols specified earlier in the binding list."
   (declare (indent 2) (debug (sexp (&rest (sexp form)) body)))
   (pcase-exhaustive bindings
     ('nil (macroexp-progn body))

@@ -371,7 +371,6 @@ pass to the OPERATION."
 	    (delete-file newname)))
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
-      (tramp-flush-file-properties v2 (file-name-directory v2-localname))
       (tramp-flush-file-properties v2 v2-localname)
       (unless
 	  (tramp-smb-send-command
@@ -548,7 +547,6 @@ pass to the OPERATION."
 	    ;; When newname did exist, we have wrong cached values.
 	    (when t2
 	      (with-parsed-tramp-file-name newname nil
-		(tramp-flush-file-properties v (file-name-directory localname))
 		(tramp-flush-file-properties v localname))))
 
 	   ;; We must do it file-wise.
@@ -591,12 +589,11 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (when (and (not ok-if-already-exists) (file-exists-p newname))
 	      (tramp-error v 'file-already-exists newname))
 	    (when (and (file-directory-p newname)
-		       (not (directory-name-p newname)))
+		       (not (tramp-compat-directory-name-p newname)))
 	      (tramp-error v 'file-error "File is a directory %s" newname))
 
 	    ;; We must also flush the cache of the directory, because
 	    ;; `file-attributes' reads the values from there.
-	    (tramp-flush-file-properties v (file-name-directory localname))
 	    (tramp-flush-file-properties v localname)
 	    (unless (tramp-smb-get-share v)
 	      (tramp-error
@@ -631,7 +628,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (with-parsed-tramp-file-name directory nil
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
-      (tramp-flush-file-properties v (file-name-directory localname))
       (tramp-flush-directory-properties v localname)
       (unless (tramp-smb-send-command
 	       v (format
@@ -657,7 +653,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (with-parsed-tramp-file-name filename nil
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
-      (tramp-flush-file-properties v (file-name-directory localname))
       (tramp-flush-file-properties v localname)
       (unless (tramp-smb-send-command
 	       v (format
@@ -1154,7 +1149,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	   (format "mkdir \"%s\"" file)))
 	;; We must also flush the cache of the directory, because
 	;; `file-attributes' reads the values from there.
-	(tramp-flush-file-properties v (file-name-directory localname))
 	(tramp-flush-file-properties v localname))
       (unless (file-directory-p directory)
 	(tramp-error v 'file-error "Couldn't make directory %s" directory)))))
@@ -1202,7 +1196,6 @@ component is used as the target of the symlink."
 
 	;; We must also flush the cache of the directory, because
 	;; `file-attributes' reads the values from there.
-	(tramp-flush-file-properties v (file-name-directory localname))
 	(tramp-flush-file-properties v localname)
 
 	(unless
@@ -1341,7 +1334,8 @@ component is used as the target of the symlink."
       (if (tramp-tramp-file-p filename) filename newname) nil
     (when (and (not ok-if-already-exists) (file-exists-p newname))
       (tramp-error v 'file-already-exists newname))
-    (when (and (file-directory-p newname) (not (directory-name-p newname)))
+    (when (and (file-directory-p newname)
+	       (not (tramp-compat-directory-name-p newname)))
       (tramp-error v 'file-error "File is a directory %s" newname))
 
     (with-tramp-progress-reporter
@@ -1358,11 +1352,7 @@ component is used as the target of the symlink."
 
 	      ;; We must also flush the cache of the directory, because
 	      ;; `file-attributes' reads the values from there.
-	      (tramp-flush-file-properties
-	       v1 (file-name-directory v1-localname))
 	      (tramp-flush-file-properties v1 v1-localname)
-	      (tramp-flush-file-properties
-	       v2 (file-name-directory v2-localname))
 	      (tramp-flush-file-properties v2 v2-localname)
 	      (unless (tramp-smb-get-share v2)
 		(tramp-error
@@ -1548,7 +1538,6 @@ errors for shares like \"C$/\", which are common in Microsoft Windows."
 
     ;; We must also flush the cache of the directory, because
     ;; `file-attributes' reads the values from there.
-    (tramp-flush-file-properties v (file-name-directory localname))
     (tramp-flush-file-properties v localname)
     (let ((curbuf (current-buffer))
 	  (tmpfile (tramp-compat-make-temp-file filename)))

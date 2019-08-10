@@ -229,7 +229,7 @@ NOTES:
   "Cache of message subjects for spam messages.
 Actually a hash table holding subjects mapped to t.")
 (defvar gnus-agent-file-name nil)
-(defvar gnus-agent-file-coding-system 'raw-text)
+(defvar gnus-agent-file-coding-system 'utf-8-emacs)
 (defvar gnus-agent-file-loading-cache nil)
 (defvar gnus-agent-total-fetched-hashtb nil)
 (defvar gnus-agent-inhibit-update-total-fetched-for nil)
@@ -406,8 +406,6 @@ manipulated as follows:
 (defun gnus-agent-read-group ()
   "Read a group name in the minibuffer, with completion."
   (let ((def (or (gnus-group-group-name) gnus-newsgroup-name)))
-    (when def
-      (setq def (gnus-group-decoded-name def)))
     (gnus-group-completing-read nil nil t nil nil def)))
 
 ;;; Fetching setup functions.
@@ -1330,7 +1328,10 @@ downloaded into the agent."
       (gnus-make-directory (file-name-directory file))
       (with-temp-file file
 	;; Emacs got problem to match non-ASCII group in multibyte buffer.
-	(mm-disable-multibyte)
+
+	;; FIXME: Is this still an issue now that group names are
+	;; always strings?
+	;(mm-disable-multibyte)
 	(when (file-exists-p file)
 	  (nnheader-insert-file-contents file)
 
@@ -1360,7 +1361,7 @@ downloaded into the agent."
       (gnus-make-directory (file-name-directory file))
       (with-temp-buffer
 	;; Emacs got problem to match non-ASCII group in multibyte buffer.
-	(mm-disable-multibyte)
+	;(mm-disable-multibyte)
 	(when (file-exists-p file)
 	  (nnheader-insert-file-contents file)
 
@@ -1371,18 +1372,6 @@ downloaded into the agent."
               (setq oactive-max (read (current-buffer))	;; max
                     oactive-min (read (current-buffer))) ;; min
 	      (cons oactive-min oactive-max))))))))
-
-(defvar gnus-agent-decoded-group-names nil
-  "Alist of non-ASCII group names and decoded ones.")
-
-(defun gnus-agent-decoded-group-name (group)
-  "Return a decoded group name of GROUP."
-  (or (cdr (assoc group gnus-agent-decoded-group-names))
-      (if (string-match "[^\000-\177]" group)
-	  (let ((decoded (gnus-group-decoded-name group)))
-	    (push (cons group decoded) gnus-agent-decoded-group-names)
-	    decoded)
-	group)))
 
 (defun gnus-agent-group-path (group)
   "Translate GROUP into a file name."
@@ -1395,7 +1384,7 @@ downloaded into the agent."
         (nnheader-translate-file-chars
          (nnheader-replace-duplicate-chars-in-string
           (nnheader-replace-chars-in-string
-           (gnus-group-real-name (gnus-agent-decoded-group-name group))
+           (gnus-group-real-name group)
            ?/ ?_)
           ?. ?_)))
   (if (or nnmail-use-long-file-names
@@ -1409,7 +1398,7 @@ downloaded into the agent."
   ;; unplugged.  The agent must, therefore, use the same directory
   ;; while plugged.
   (nnmail-group-pathname
-   (gnus-group-real-name (gnus-agent-decoded-group-name group))
+   (gnus-group-real-name group)
    (if gnus-command-method
        (gnus-agent-directory)
      (let ((gnus-command-method (gnus-find-method-for-group group)))
@@ -1437,7 +1426,7 @@ downloaded into the agent."
 			     (format " *Gnus agent %s history*"
 				     (gnus-agent-method)))))
 	  gnus-agent-history-buffers)
-    (mm-disable-multibyte) ;; everything is binary
+    ;(mm-disable-multibyte) ;; everything is binary
     (erase-buffer)
     (insert "\n")
     (let ((file (gnus-agent-lib-file "history")))
@@ -1525,8 +1514,7 @@ downloaded into the agent."
           (setq selected-sets (nreverse selected-sets))
 
           (gnus-make-directory dir)
-	  (gnus-message 7 "Fetching articles for %s..."
-			(gnus-agent-decoded-group-name group))
+	  (gnus-message 7 "Fetching articles for %s..." group)
 
           (unwind-protect
               (while (setq articles (pop selected-sets))
@@ -1537,8 +1525,7 @@ downloaded into the agent."
                     (let (article)
                       (while (setq article (pop articles))
                         (gnus-message 10 "Fetching article %s for %s..."
-				      article
-				      (gnus-agent-decoded-group-name group))
+				      article group)
                         (when (or
                                (gnus-backlog-request-article group article
                                                              nntp-server-buffer)
@@ -1875,8 +1862,7 @@ article numbers will be returned."
       (with-current-buffer nntp-server-buffer
         (if articles
             (progn
-	      (gnus-message 8 "Fetching headers for %s..."
-			    (gnus-agent-decoded-group-name group))
+	      (gnus-message 8 "Fetching headers for %s..." group)
 
               ;; Fetch them.
               (gnus-make-directory (nnheader-translate-file-chars
@@ -2707,52 +2693,74 @@ The following commands are available:
   "Read the category alist."
   (setq gnus-category-alist
         (or
-         (with-temp-buffer
-           (ignore-errors
-            (nnheader-insert-file-contents (nnheader-concat gnus-agent-directory "lib/categories"))
-            (goto-char (point-min))
-            ;; This code isn't temp, it will be needed so long as
-            ;; anyone may be migrating from an older version.
+	 (let ((list
+		(with-temp-buffer
+		  (ignore-errors
+		    (nnheader-insert-file-contents (nnheader-concat gnus-agent-directory "lib/categories"))
+		    (goto-char (point-min))
+		    ;; This code isn't temp, it will be needed so long as
+		    ;; anyone may be migrating from an older version.
 
-            ;; Once we're certain that people will not revert to an
-            ;; earlier version, we can take out the old-list code in
-            ;; gnus-category-write.
-            (let* ((old-list (read (current-buffer)))
-                   (new-list (ignore-errors (read (current-buffer)))))
-              (if new-list
-                  new-list
-                ;; Convert from a positional list to an alist.
-                (mapcar
-                 (lambda (c)
-                   (setcdr c
-                           (delq nil
-                                 (gnus-mapcar
-                                  (lambda (valu symb)
-                                    (if valu
-                                        (cons symb valu)))
-                                  (cdr c)
-                                  '(agent-predicate agent-score-file agent-groups))))
-                   c)
-                 old-list)))))
+		    ;; Once we're certain that people will not revert to an
+		    ;; earlier version, we can take out the old-list code in
+		    ;; gnus-category-write.
+		    (let* ((old-list (read (current-buffer)))
+			   (new-list (ignore-errors (read (current-buffer)))))
+		      (if new-list
+			  new-list
+			;; Convert from a positional list to an alist.
+			(mapcar
+			 (lambda (c)
+			   (setcdr c
+				   (delq nil
+					 (gnus-mapcar
+					  (lambda (valu symb)
+					    (if valu
+						(cons symb valu)))
+					  (cdr c)
+					  '(agent-predicate agent-score-file agent-groups))))
+			   c)
+			 old-list)))))))
+	   ;; Possibly decode group names.
+	   (dolist (cat list)
+	     (setf (alist-get 'agent-groups cat)
+		   (mapcar (lambda (g)
+			     (if (string-match-p "[^[:ascii:]]" g)
+				 (decode-coding-string g 'utf-8-emacs)
+			       g))
+			   (alist-get 'agent-groups cat))))
+	   list)
          (list (gnus-agent-cat-make 'default 'short)))))
 
 (defun gnus-category-write ()
   "Write the category alist."
   (setq gnus-category-predicate-cache nil
 	gnus-category-group-cache nil)
-  (gnus-make-directory (nnheader-concat gnus-agent-directory "lib"))
-  (with-temp-file (nnheader-concat gnus-agent-directory "lib/categories")
-    ;; This prin1 is temporary.  It exists so that people can revert
-    ;; to an earlier version of gnus-agent.
-    (prin1 (mapcar (lambda (c)
-              (list (car c)
-                    (cdr (assoc 'agent-predicate c))
-                    (cdr (assoc 'agent-score-file c))
-                    (cdr (assoc 'agent-groups c))))
-                   gnus-category-alist)
-           (current-buffer))
-    (newline)
-    (prin1 gnus-category-alist (current-buffer))))
+  ;; Temporarily encode non-ascii group names when saving to file,
+  ;; pending an upgrade of Gnus' file formats.
+  (let ((gnus-category-alist
+	 (mapcar (lambda (cat)
+		   (setf (alist-get 'agent-groups cat)
+			 (mapcar (lambda (g)
+				   (if (multibyte-string-p g)
+				       (encode-coding-string g 'utf-8-emacs)
+				     g))
+				 (alist-get 'agent-groups cat)))
+		   cat)
+		 (copy-tree gnus-category-alist))))
+   (gnus-make-directory (nnheader-concat gnus-agent-directory "lib"))
+   (with-temp-file (nnheader-concat gnus-agent-directory "lib/categories")
+     ;; This prin1 is temporary.  It exists so that people can revert
+     ;; to an earlier version of gnus-agent.
+     (prin1 (mapcar (lambda (c)
+		      (list (car c)
+			    (cdr (assoc 'agent-predicate c))
+			    (cdr (assoc 'agent-score-file c))
+			    (cdr (assoc 'agent-groups c))))
+                    gnus-category-alist)
+            (current-buffer))
+     (newline)
+     (prin1 gnus-category-alist (current-buffer)))))
 
 (defun gnus-category-edit-predicate (category)
   "Edit the predicate for CATEGORY."
@@ -3058,8 +3066,7 @@ FORCE is equivalent to setting the expiration predicates to true."
   ;; provided a non-nil active
 
   (let ((dir (gnus-agent-group-pathname group))
-	(file-name-coding-system nnmail-pathname-coding-system)
-	(decoded (gnus-agent-decoded-group-name group)))
+	(file-name-coding-system nnmail-pathname-coding-system))
     (gnus-agent-with-refreshed-group
      group
      (when (boundp 'gnus-agent-expire-current-dirs)
@@ -3068,8 +3075,8 @@ FORCE is equivalent to setting the expiration predicates to true."
      (if (and (not force)
 	      (eq 'DISABLE (gnus-agent-find-parameter group
 						      'agent-enable-expiration)))
-	 (gnus-message 5 "Expiry skipping over %s" decoded)
-       (gnus-message 5 "Expiring articles in %s" decoded)
+	 (gnus-message 5 "Expiry skipping over %s" group)
+       (gnus-message 5 "Expiring articles in %s" group)
        (gnus-agent-load-alist group)
        (let* ((bytes-freed 0)
 	      (size-files-deleted 0.0)
@@ -3293,7 +3300,7 @@ line." (point) nov-file)))
 		(keep
 		 (gnus-agent-message 10
 				     "gnus-agent-expire: %s:%d: Kept %s article%s."
-				     decoded article-number keep (if fetch-date " and file" ""))
+				     group article-number keep (if fetch-date " and file" ""))
 		 (when fetch-date
 		   (unless (file-exists-p
 			    (concat dir (number-to-string
@@ -3301,7 +3308,7 @@ line." (point) nov-file)))
 		     (setf (nth 1 entry) nil)
 		     (gnus-agent-message 3 "gnus-agent-expire cleared \
 download flag on %s:%d as the cached article file is missing."
-					 decoded (caar dlist)))
+					 group (caar dlist)))
 		   (unless marker
 		     (gnus-message 1 "gnus-agent-expire detected a \
 missing NOV entry.  Run gnus-agent-regenerate-group to restore it.")))
@@ -3379,12 +3386,12 @@ article alist" type) actions))
 
 		   (when actions
 		     (gnus-agent-message 8 "gnus-agent-expire: %s:%d: %s"
-					 decoded article-number
+					 group article-number
 					 (mapconcat #'identity actions ", ")))))
 		(t
 		 (gnus-agent-message
 		  10 "gnus-agent-expire: %s:%d: Article kept as \
-expiration tests failed." decoded article-number)
+expiration tests failed." group article-number)
 		 (gnus-agent-append-to-list
 		  tail-alist (cons article-number fetch-date)))
 		)
@@ -3835,7 +3842,7 @@ If REREAD is not nil, downloaded articles are marked as unread."
                     (sit-for 1)
                     t)))))
   (when group
-    (gnus-message 5 "Regenerating in %s" (gnus-agent-decoded-group-name group))
+    (gnus-message 5 "Regenerating in %s" group)
     (let* ((gnus-command-method (or gnus-command-method
 				    (gnus-find-method-for-group group)))
 	   (file (gnus-agent-article-name ".overview" group))
@@ -3912,8 +3919,7 @@ If REREAD is not nil, downloaded articles are marked as unread."
 			  (> (car downloaded) (car nov-arts))))
 		 ;; This entry is missing from the overview file
 		 (gnus-message 3 "Regenerating NOV %s %d..."
-			       (gnus-agent-decoded-group-name group)
-			       (car downloaded))
+			       group (car downloaded))
 		 (let ((file (concat dir (number-to-string (car downloaded)))))
 		   (mm-with-unibyte-buffer
 		     (nnheader-insert-file-contents file)

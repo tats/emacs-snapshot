@@ -54,6 +54,7 @@
 
 ;;; Code:
 (eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'subr-x))
 
 (autoload 'vc-find-revision "vc")
 (autoload 'vc-find-revision-no-save "vc")
@@ -1770,20 +1771,27 @@ Whitespace differences are ignored."
 	(if (> (- (car forw) orig) (- orig (car back))) back forw)
       (or back forw))))
 
-(defsubst diff-xor (a b) (if a (if (not b) a) b))
+(define-obsolete-function-alias 'diff-xor 'xor "27.1")
 
 (defun diff-find-source-location (&optional other-file reverse noprompt)
-  "Find out (BUF LINE-OFFSET POS SRC DST SWITCHED).
+  "Find current diff location within the source file.
+OTHER-FILE, if non-nil, means to look at the diff's name and line
+  numbers for the old file.  Furthermore, use `diff-vc-revisions'
+  if it's available.  If `diff-jump-to-old-file' is non-nil, the
+  sense of this parameter is reversed.  If the prefix argument is
+  8 or more, `diff-jump-to-old-file' is set to OTHER-FILE.
+REVERSE, if non-nil, switches the sense of SRC and DST (see below).
+NOPROMPT, if non-nil, means not to prompt the user.
+Return a list (BUF LINE-OFFSET (BEG . END) SRC DST SWITCHED).
 BUF is the buffer corresponding to the source file.
 LINE-OFFSET is the offset between the expected and actual positions
   of the text of the hunk or nil if the text was not found.
-POS is a pair (BEG . END) indicating the position of the text in the buffer.
+\(BEG . END) is a pair indicating the position of the text in the buffer.
 SRC and DST are the two variants of text as returned by `diff-hunk-text'.
   SRC is the variant that was found in the buffer.
-SWITCHED is non-nil if the patch is already applied.
-NOPROMPT, if non-nil, means not to prompt the user."
+SWITCHED is non-nil if the patch is already applied."
   (save-excursion
-    (let* ((other (diff-xor other-file diff-jump-to-old-file))
+    (let* ((other (xor other-file diff-jump-to-old-file))
 	   (char-offset (- (point) (diff-beginning-of-hunk t)))
            ;; Check that the hunk is well-formed.  Otherwise diff-mode and
            ;; the user may disagree on what constitutes the hunk
@@ -1909,7 +1917,7 @@ With a prefix argument, REVERSE the hunk."
 	(insert (car new)))
       ;; Display BUF in a window
       (set-window-point (display-buffer buf) (+ (car pos) (cdr new)))
-      (diff-hunk-status-msg line-offset (diff-xor switched reverse) nil)
+      (diff-hunk-status-msg line-offset (xor switched reverse) nil)
       (when diff-advance-after-apply-hunk
 	(diff-hunk-next))))))
 
@@ -1921,7 +1929,7 @@ With a prefix argument, try to REVERSE the hunk."
   (pcase-let ((`(,buf ,line-offset ,pos ,src ,_dst ,switched)
                (diff-find-source-location nil reverse)))
     (set-window-point (display-buffer buf) (+ (car pos) (cdr src)))
-    (diff-hunk-status-msg line-offset (diff-xor reverse switched) t)))
+    (diff-hunk-status-msg line-offset (xor reverse switched) t)))
 
 
 (defun diff-kill-applied-hunks ()
@@ -1958,7 +1966,7 @@ revision of the file otherwise."
       (pop-to-buffer buf)
       (goto-char (+ (car pos) (cdr src)))
       (when buffer (next-error-found buffer (current-buffer)))
-      (diff-hunk-status-msg line-offset (diff-xor reverse switched) t))))
+      (diff-hunk-status-msg line-offset (xor reverse switched) t))))
 
 
 (defun diff-current-defun ()
@@ -2210,6 +2218,121 @@ Call FUN with two args (BEG and END) for each hunk."
   (let ((inhibit-read-only t))
     (undo arg)))
 
+(defun diff-add-log-current-defuns ()
+  "Return an alist of defun names for the current diff.
+The elements of the alist are of the form (FILE . (DEFUN...)),
+where DEFUN... is a list of function names found in FILE."
+  (save-excursion
+    (goto-char (point-min))
+    (let ((defuns nil)
+          (hunk-end nil)
+          (hunk-mismatch-files nil)
+          (make-defun-context-follower
+           (lambda (goline)
+             (let ((eodefun nil)
+                   (defname nil))
+               (list
+                (lambda () ;; Check for end of current defun.
+                  (when (and eodefun
+                             (funcall goline)
+                             (>= (point) eodefun))
+                    (setq defname nil)
+                    (setq eodefun nil)))
+                (lambda (&optional get-current) ;; Check for new defun.
+                  (if get-current
+                      defname
+                    (when-let* ((def (and (not eodefun)
+                                          (funcall goline)
+                                          (add-log-current-defun)))
+                                (eof (save-excursion (end-of-defun) (point))))
+                      (setq eodefun eof)
+                      (setq defname def)))))))))
+      (while
+          ;; Might need to skip over file headers between diff
+          ;; hunks (e.g., "diff --git ..." etc).
+          (re-search-forward diff-hunk-header-re nil t)
+        (setq hunk-end (save-excursion (diff-end-of-hunk)))
+        (pcase-let* ((filename (substring-no-properties (diff-find-file-name)))
+                     (=lines 0)
+                     (+lines 0)
+                     (-lines 0)
+                     (`(,buf ,line-offset (,beg . ,_end)
+                             (,old-text . ,_old-offset)
+                             (,new-text . ,_new-offset)
+                             ,applied)
+                      ;; Try to use the vc integration of
+                      ;; `diff-find-source-location', unless it
+                      ;; would look for non-existent files like
+                      ;; /dev/null.
+                      (diff-find-source-location
+                       (not (equal "/dev/null"
+                                   (car (diff-hunk-file-names t))))))
+                     (other-buf nil)
+                     (goto-otherbuf
+                      ;; If APPLIED, we have NEW-TEXT in BUF, so we
+                      ;; need to a buffer with OLD-TEXT to follow
+                      ;; -lines.
+                      (lambda ()
+                        (if other-buf (set-buffer other-buf)
+                          (set-buffer (generate-new-buffer " *diff-other-text*"))
+                          (insert (if applied old-text new-text))
+                          (funcall (buffer-local-value 'major-mode buf))
+                          (setq other-buf (current-buffer)))
+                        (goto-char (point-min))
+                        (forward-line (+ =lines -1
+                                         (if applied -lines +lines)))))
+                     (gotobuf (lambda ()
+                                (set-buffer buf)
+                                (goto-char beg)
+                                (forward-line (+ =lines -1
+                                                 (if applied +lines -lines)))))
+                     (`(,=ck-eodefun ,=ck-defun)
+                      (funcall make-defun-context-follower gotobuf))
+                     (`(,-ck-eodefun ,-ck-defun)
+                      (funcall make-defun-context-follower
+                               (if applied goto-otherbuf gotobuf)))
+                     (`(,+ck-eodefun ,+ck-defun)
+                      (funcall make-defun-context-follower
+                               (if applied gotobuf goto-otherbuf))))
+          (unless (eql line-offset 0)
+            (cl-pushnew filename hunk-mismatch-files :test #'equal))
+          ;; Some modes always return nil for `add-log-current-defun',
+          ;; make sure at least the filename is included.
+          (unless (assoc filename defuns)
+            (push (cons filename nil) defuns))
+          (unwind-protect
+              (while (progn (forward-line)
+                            (< (point) hunk-end))
+                (let ((patch-char (char-after)))
+                  (pcase patch-char
+                    (?+ (cl-incf +lines))
+                    (?- (cl-incf -lines))
+                    (?\s (cl-incf =lines)))
+                  (save-current-buffer
+                    (funcall =ck-eodefun)
+                    (funcall +ck-eodefun)
+                    (funcall -ck-eodefun)
+                    (when-let* ((def (cond
+                                      ((eq patch-char ?\s)
+                                       ;; Just updating context defun.
+                                       (ignore (funcall =ck-defun)))
+                                      ;; + or - in existing defun.
+                                      ((funcall =ck-defun t))
+                                      ;; Check added or removed defun.
+                                      (t (funcall (if (eq ?+ patch-char)
+                                                      +ck-defun -ck-defun))))))
+                      (cl-pushnew def (alist-get filename defuns
+                                                 nil nil #'equal)
+                                  :test #'equal)))))
+            (when (buffer-live-p other-buf)
+              (kill-buffer other-buf)))))
+      (when hunk-mismatch-files
+        (message "Diff didn't match for %s."
+                 (mapconcat #'identity hunk-mismatch-files ", ")))
+      (dolist (file-defuns defuns)
+        (cl-callf nreverse (cdr file-defuns)))
+      (nreverse defuns))))
+
 (defun diff-add-change-log-entries-other-window ()
   "Iterate through the current diff and create ChangeLog entries.
 I.e. like `add-change-log-entry-other-window' but applied to all hunks."
@@ -2253,7 +2376,7 @@ fixed, visit it in a buffer."
   (interactive "P")
   (save-excursion
     (goto-char (point-min))
-    (let* ((other (diff-xor other-file diff-jump-to-old-file))
+    (let* ((other (xor other-file diff-jump-to-old-file))
   	   (modified-buffers nil)
   	   (style (save-excursion
   	   	    (when (re-search-forward diff-hunk-header-re nil t)

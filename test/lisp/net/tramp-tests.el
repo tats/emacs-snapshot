@@ -56,6 +56,7 @@
 (declare-function tramp-list-tramp-buffers "tramp-cmds")
 (declare-function tramp-method-out-of-band-p "tramp-sh")
 (declare-function tramp-smb-get-localname "tramp-smb")
+(declare-function tramp-time-diff "tramp")
 (defvar auto-save-file-name-transforms)
 (defvar tramp-connection-properties)
 (defvar tramp-copy-size-limit)
@@ -3084,10 +3085,49 @@ This tests also `access-file', `file-readable-p',
 
 (defsubst tramp--test-file-attributes-equal-p (attr1 attr2)
   "Check, whether file attributes ATTR1 and ATTR2 are equal.
-They might differ only in access time."
-  (setcar (nthcdr 4 attr1) tramp-time-dont-know)
-  (setcar (nthcdr 4 attr2) tramp-time-dont-know)
-  (equal attr1 attr2))
+They might differ only in time attributes or directory size."
+  (let ((attr1 (copy-sequence attr1))
+	(attr2 (copy-sequence attr2))
+	(start-time
+	 (- (float-time
+	     (aref
+	      (ert--stats-test-start-times ert--current-run-stats)
+	      (ert--stats-test-pos ert--current-run-stats (ert-running-test))))
+	    60)))
+    ;; Access time.
+    (setcar (nthcdr 4 attr1) tramp-time-dont-know)
+    (setcar (nthcdr 4 attr2) tramp-time-dont-know)
+    ;; Modification time.  If any of the time values is "don't know",
+    ;; we cannot compare, and we normalize the time stamps.  If the
+    ;; time value is newer than the test start time, normalize it,
+    ;; because due to caching the time stamps could differ slightly (a
+    ;; few seconds).  We use a test start time minus 60 seconds, in
+    ;; order to compensate a possible time offset on local and remote
+    ;; machines.
+    (when (or (tramp-compat-time-equal-p (nth 5 attr1) tramp-time-dont-know)
+	      (tramp-compat-time-equal-p (nth 5 attr2) tramp-time-dont-know))
+      (setcar (nthcdr 5 attr1) tramp-time-dont-know)
+      (setcar (nthcdr 5 attr2) tramp-time-dont-know))
+    (when (< start-time (float-time (nth 5 attr1)))
+      (setcar (nthcdr 5 attr1) tramp-time-dont-know))
+    (when (< start-time (float-time (nth 5 attr2)))
+      (setcar (nthcdr 5 attr2) tramp-time-dont-know))
+    ;; Status change time.  Dito.
+    (when (or (tramp-compat-time-equal-p (nth 6 attr1) tramp-time-dont-know)
+	      (tramp-compat-time-equal-p (nth 6 attr2) tramp-time-dont-know))
+      (setcar (nthcdr 6 attr1) tramp-time-dont-know)
+      (setcar (nthcdr 6 attr2) tramp-time-dont-know))
+    (when (< start-time (float-time (nth 6 attr1)))
+      (setcar (nthcdr 6 attr1) tramp-time-dont-know))
+    (when (< start-time (float-time (nth 6 attr2)))
+      (setcar (nthcdr 6 attr2) tramp-time-dont-know))
+    ;; Size.  Set it to 0 for directories, because it might have
+    ;; changed.  For example the upper directory "../".
+    (when (eq (car attr1) t) (setcar (nthcdr 7 attr1) 0))
+    (when (eq (car attr2) t) (setcar (nthcdr 7 attr2) 0))
+    ;; The check.
+    (unless (equal attr1 attr2) (tramp--test-message "%S\n%S" attr1 attr2))
+    (equal attr1 attr2)))
 
 ;; This isn't 100% correct, but better than no explainer at all.
 (put #'tramp--test-file-attributes-equal-p 'ert-explainer #'ert--explain-equal)
@@ -3112,27 +3152,22 @@ They might differ only in access time."
 	    (write-region "foo" nil (expand-file-name "foo" tmp-name2))
 	    (write-region "bar" nil (expand-file-name "bar" tmp-name2))
 	    (write-region "boz" nil (expand-file-name "boz" tmp-name2))
+
 	    (setq attr (directory-files-and-attributes tmp-name2))
 	    (should (consp attr))
-	    ;; Dumb remote shells without perl(1) or stat(1) are not
-	    ;; able to return the date correctly.  They say "don't know".
 	    (dolist (elt attr)
-	      (unless
-		  (tramp-compat-time-equal-p
-		   (nth
-		    5 (file-attributes (expand-file-name (car elt) tmp-name2)))
-		   tramp-time-dont-know)
-		(should
-		 (tramp--test-file-attributes-equal-p
-		  (file-attributes (expand-file-name (car elt) tmp-name2))
-		  (cdr elt)))))
+	      (should
+	       (tramp--test-file-attributes-equal-p
+		(file-attributes (expand-file-name (car elt) tmp-name2))
+		(cdr elt))))
+
 	    (setq attr (directory-files-and-attributes tmp-name2 'full))
+	    (should (consp attr))
 	    (dolist (elt attr)
-	      (unless (tramp-compat-time-equal-p
-		       (nth 5 (file-attributes (car elt))) tramp-time-dont-know)
-		(should
-		 (tramp--test-file-attributes-equal-p
-		  (file-attributes (car elt)) (cdr elt)))))
+	      (should
+	       (tramp--test-file-attributes-equal-p
+		(file-attributes (car elt)) (cdr elt))))
+
 	    (setq attr (directory-files-and-attributes tmp-name2 nil "^b"))
 	    (should (equal (mapcar #'car attr) '("bar" "boz"))))
 
@@ -3143,7 +3178,13 @@ They might differ only in access time."
   "Check `file-modes'.
 This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
   (skip-unless (tramp--test-enabled))
-  (skip-unless (or (tramp--test-sh-p) (tramp--test-sudoedit-p)))
+  (skip-unless
+   (or (tramp--test-sh-p) (tramp--test-sudoedit-p)
+       ;; Not all tramp-gvfs.el methods support changing the file mode.
+       (and
+	(tramp--test-gvfs-p)
+	(string-match-p
+	 "ftp" (file-remote-p tramp-test-temporary-file-directory 'method)))))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
@@ -3443,7 +3484,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check `set-file-times' and `file-newer-than-file-p'."
   (skip-unless (tramp--test-enabled))
   (skip-unless
-   (or (tramp--test-adb-p) (tramp--test-sh-p) (tramp--test-sudoedit-p)))
+   (or (tramp--test-adb-p) (tramp--test-gvfs-p)
+       (tramp--test-sh-p) (tramp--test-sudoedit-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name1 (tramp--test-make-temp-name nil quoted))

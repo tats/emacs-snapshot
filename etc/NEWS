@@ -351,7 +351,7 @@ respects display actions specified by 'display-buffer-alist' and
 'display-buffer-overriding-action'.
 
 ** New 'flex' completion style
-An implementation of popular "flx/fuzzy/scatter" completion which
+An implementation of popular "flex/fuzzy/scatter" completion which
 matches strings where the pattern appears as a subsequence.  Put
 simply, makes "foo" complete to both "barfoo" and "frodo".  Add 'flex'
 to 'completion-styles' or 'completion-category-overrides' to use it.
@@ -496,6 +496,8 @@ current and the previous or the next line, as before.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** The 'cl' package is now officially deprecated in favor of `cl-lib`.
 
 +++
 ** winner
@@ -658,7 +660,7 @@ remapped to these, respectively.
 command itself, not how many files are marked in total.
 
 ---
-*** A new face, 'dired-socket', is used to highlight sockets, named
+*** A new face, 'dired-special', is used to highlight sockets, named
 pipes, block devices and character devices.
 
 ** Find-Dired
@@ -673,6 +675,10 @@ The default value is 'find-dired-sort-by-filename'.
 'dired-do-compress-to'.
 
 ** Change Logs and VC
+
++++
+*** New command 'log-edit-generate-changelog', bound to C-c C-w.
+This generates ChangeLog entries from the VC fileset diff.
 
 *** Recording ChangeLog entries doesn't require an actual file.
 If a ChangeLog file doesn't exist, and if the new variable
@@ -1340,7 +1346,7 @@ default, and not just the opening element.
 behave similarly, e.g. Pcomplete's default cycling can be obtained
 with '(setq completion-cycle-threshold 5)'.
 
----
++++
 *** Expansion of history event designators is disabled by default.
 To restore the old behavior, use
 
@@ -2074,20 +2080,29 @@ functions like 'process-id' that compute process IDs, and functions like
 ** Time values
 
 +++
+*** New function time 'time-convert' converts Lisp time values
+to Lisp timestamps of various forms, including a new timestamp form
+(TICKS . HZ) where TICKS is an integer and HZ a positive integer
+denoting a clock frequency.
+
++++
 *** Although the default timestamp format is still '(HI LO US PS)',
 it is planned to change in a future Emacs version, to exploit bignums.
 The documentation has been updated to mention that the timestamp
 format may change and that programs should use functions like
-'format-time-string', 'decode-time', and 'encode-time' rather than
+'format-time-string', 'decode-time', and 'time-convert' rather than
 probing the innards of a timestamp directly, or creating a timestamp
 by hand.
 
 +++
-*** 'encode-time' supports a new API '(encode-time TIME &optional FORM)'.
-This can convert decoded times and Lisp time values to Lisp timestamps
-of various forms, including a new timestamp form '(TICKS . HZ)', where
-TICKS is an integer and HZ is a positive integer denoting a clock
-frequency.  The old 'encode-time' API is still supported.
+*** Decoded (calendrical) timestamps now have a new subsecond member.
+This affects functions like decode-time and parse-time-string that
+generate these timestamps, and functions like encode-time that accept
+them.
+
++++
+*** 'encode-time' supports a new API '(encode-time TIME)'.
+The old 'encode-time' API is still supported.
 
 +++
 *** A new package to parse ISO 8601 time, date, durations and
@@ -2116,8 +2131,8 @@ with POSIX.1-2017.
 *** To access (or alter) the elements a decoded time value, the
 'decoded-time-second', 'decoded-time-minute', 'decoded-time-hour',
 'decoded-time-day', 'decoded-time-month', 'decoded-time-year',
-'decoded-time-weekday', 'decoded-time-dst' and 'decoded-time-zone'
-accessors can be used.
+'decoded-time-weekday', 'decoded-time-dst', 'decoded-time-zone',
+and 'decoded-time-subsec' accessors can be used.
 
 *** The new functions 'date-days-in-month' (which will say how many
 days there are in a month in a specific year), 'date-ordinal-to-time'
@@ -2496,6 +2511,13 @@ the Emacs Lisp manual.
 parameter to control descending into subdirectories, and a
 FOLLOW-SYMLINK parameter to say that symbolic links that point to
 other directories should be followed.
+
++++
+** New function 'xor' returns the boolean exclusive-or of its args.
+The function was previously defined in array.el, but has been moved to
+subr.el so that it is available by default.  It now always returns the
+non-nil argument when the other is nil.  Several duplicates of 'xor'
+in other packages are now obsolete aliases of 'xor'.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems

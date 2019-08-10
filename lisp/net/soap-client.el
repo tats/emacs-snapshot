@@ -561,7 +561,8 @@ gMonthDay, gDay or gMonth.
 Return a list in a format (SEC MINUTE HOUR DAY MONTH YEAR
 SEC-FRACTION DATATYPE ZONE).  This format is meant to be similar
 to that returned by `decode-time' (and compatible with
-`encode-time').  The differences are the DOW (day-of-week) field
+`encode-time').  The differences are the SUBSEC (fractional
+seconds) field is omitted, the DOW (day-of-week) field
 is replaced with SEC-FRACTION, a float representing the
 fractional seconds, and the DST (daylight savings time) field is
 replaced with DATATYPE, a symbol representing the XSD primitive
@@ -636,6 +637,7 @@ disallows them."
       (error "Invalid or unsupported time: %s" date-time-string))
     ;; Return a value in a format similar to that returned by decode-time, and
     ;; suitable for (apply #'encode-time ...).
+    ;; FIXME: Nobody uses this idiosyncratic value.  Perhaps stop returning it?
     (list second minute hour day month year second-fraction datatype
           (if has-time-zone
               (* (rng-xsd-time-to-seconds

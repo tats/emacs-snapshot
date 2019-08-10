@@ -644,9 +644,9 @@ FIXME: multiple comma-separated values should be allowed!"
         ;; create the decoded date-time
         ;; FIXME!?!
 	(let ((decoded-time (list second minute hour day month year
-				  nil -1 zone)))
+				  nil -1 zone 0)))
 	  (condition-case nil
-	      (decode-time (encode-time decoded-time 'integer))
+	      (decode-time (encode-time decoded-time))
 	    (error
 	     (message "Cannot decode \"%s\"" isodatetimestring)
 	     ;; Hope for the best....

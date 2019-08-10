@@ -1440,7 +1440,7 @@ default values are used."
 		     :method method :user user :domain domain :host host
 		     :port port :localname localname :hop hop))
 	  ;; The method must be known.
-	  (unless (or (tramp-completion-mode-p)
+	  (unless (or nodefault (tramp-completion-mode-p)
 		      (string-equal method tramp-default-method-marker)
 		      (assoc method tramp-methods))
 	    (tramp-user-error
@@ -3006,7 +3006,6 @@ User is always nil."
 			  localname)))))
 	  (tramp-error v 'file-already-exists newname)
 	(delete-file newname)))
-    (tramp-flush-file-properties v (file-name-directory localname))
     (tramp-flush-file-properties v localname)
     (copy-file
      filename newname 'ok-if-already-exists 'keep-time
@@ -3772,9 +3771,16 @@ of."
 		     (format "File %s exists; overwrite anyway? " filename)))))
       (tramp-error v 'file-already-exists filename))
 
-    (let ((tmpfile (tramp-compat-make-temp-file filename)))
+    (let ((tmpfile (tramp-compat-make-temp-file filename))
+	  (modes (save-excursion (tramp-default-file-modes filename))))
       (when (and append (file-exists-p filename))
 	(copy-file filename tmpfile 'ok))
+      ;; The permissions of the temporary file should be set.  If
+      ;; FILENAME does not exist (eq modes nil) it has been
+      ;; renamed to the backup file.  This case `save-buffer'
+      ;; handles permissions.
+      ;; Ensure that it is still readable.
+      (set-file-modes tmpfile (logior (or modes 0) #o0400))
       ;; We say `no-message' here because we don't want the visited file
       ;; modtime data to be clobbered from the temp file.  We call
       ;; `set-visited-file-modtime' ourselves later on.
@@ -3787,7 +3793,6 @@ of."
 	 (tramp-error
 	  v 'file-error "Couldn't write region to `%s'" filename))))
 
-    (tramp-flush-file-properties v (file-name-directory localname))
     (tramp-flush-file-properties v localname)
 
     ;; Set file modification time.

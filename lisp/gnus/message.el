@@ -836,14 +836,13 @@ symbol `never', the posting is not allowed.  If it is the symbol
 		 (const ask)))
 
 (defcustom message-sendmail-f-is-evil
-  (if (boundp 'mail-specify-envelope-from)
-      (not mail-specify-envelope-from)
-    nil)
+  ;; FIXME: This is related to `mail-specify-envelope-from' but works
+  ;; differently (bug#36937).
+  nil
   "Non-nil means don't add \"-f username\" to the sendmail command line.
 Doing so would be even more evil than leaving it out."
   :group 'message-sending
   :link '(custom-manual "(message)Mail Variables")
-  :version "27.1"
   :type 'boolean)
 
 (defcustom message-sendmail-envelope-from
@@ -1894,7 +1893,6 @@ You must have the \"hashcash\" binary installed, see `hashcash-path'."
 (autoload 'gnus-delay-article "gnus-delay")
 (autoload 'gnus-extract-address-components "gnus-util")
 (autoload 'gnus-find-method-for-group "gnus")
-(autoload 'gnus-group-decoded-name "gnus-group")
 (autoload 'gnus-group-name-charset "gnus-group")
 (autoload 'gnus-group-name-decode "gnus-group")
 (autoload 'gnus-groups-from-server "gnus")
@@ -5628,7 +5626,7 @@ In posting styles use `(\"Expires\" (make-expires-date 30))'."
 	  (concat
 	   msg-id (if msg-id " (")
 	   (if (car name)
-	       (if (string-match "[^\000-\177]" (car name))
+	       (if (string-match "[^[:ascii:]]" (car name))
 		   ;; Quote a string containing non-ASCII characters.
 		   ;; It will make the RFC2047 encoder cause an error
 		   ;; if there are special characters.
@@ -7285,12 +7283,11 @@ news, Source is the list of newsgroups is was posted to."
   (let* ((group (message-fetch-field "newsgroups"))
 	 (from (message-fetch-field "from"))
 	 (prefix
-	  (if group
-	      (gnus-group-decoded-name group)
-	    (or (and from (or
-			   (car (gnus-extract-address-components from))
-			   (cadr (gnus-extract-address-components from))))
-		"(nowhere)"))))
+	  (or group
+	      (or (and from (or
+			     (car (gnus-extract-address-components from))
+			     (cadr (gnus-extract-address-components from))))
+		  "(nowhere)"))))
     (concat "["
 	    (if message-forward-decoded-p
 		prefix
@@ -7304,10 +7301,9 @@ Source is the sender, and if the original message was news, Source is
 the list of newsgroups is was posted to."
   (let* ((group (message-fetch-field "newsgroups"))
 	 (prefix
-	  (if group
-	      (gnus-group-decoded-name group)
-	    (or (message-fetch-field "from")
-		"(nowhere)"))))
+	  (or group
+	      (or (message-fetch-field "from")
+		  "(nowhere)"))))
     (concat "["
 	    (if message-forward-decoded-p
 		prefix

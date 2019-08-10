@@ -10068,10 +10068,6 @@ Note: this function also decodes single byte encodings like
 	       (char-to-string (string-to-number byte 16)))
 	     (cdr (split-string hex "%")) ""))
 
-(defun org-xor (a b)
-  "Exclusive or."
-  (if a (not b) b))
-
 (defun org-fixup-message-id-for-http (s)
   "Replace special characters in a message id, so it can be used in an http query."
   (when (string-match "%" s)
@@ -17292,10 +17288,10 @@ The command returns the inserted time stamp."
     (put-text-property beg end 'display str)))
 
 (defun org-fix-decoded-time (time)
-  "Set 0 instead of nil for the first 6 elements of time.
+  "Set 0 instead of nil for the time-related elements of time.
 Don't touch the rest."
   (let ((n 0))
-    (mapcar (lambda (x) (if (< (setq n (1+ n)) 7) (or x 0) x)) time)))
+    (mapcar (lambda (x) (if (or (< (setq n (1+ n)) 7) (= n 10)) (or x 0) x)) time)))
 
 (defun org-time-stamp-to-now (timestamp-string &optional seconds)
   "Difference between TIMESTAMP-STRING and now in days.
@@ -17779,13 +17775,13 @@ NODEFAULT, hour and minute fields will be nil if not given."
 	       (string-to-number (match-string 4 s))
 	       (string-to-number (match-string 3 s))
 	       (string-to-number (match-string 2 s))
-	       nil nil nil))
+	       nil nil nil 0))
 	((string-match "^<[^>]+>$" s)
 	 ;; FIXME: `decode-time' needs to be called with ZONE as its
 	 ;; second argument.  However, this requires at least Emacs
 	 ;; 25.1.  We can do it when we switch to this version as our
 	 ;; minimal requirement.
-	 (decode-time (encode-time (org-matcher-time s))))
+	 (decode-time (org-matcher-time s)))
 	(t (error "Not a standard Org time string: %s" s))))
 
 (defun org-timestamp-up (&optional arg)
