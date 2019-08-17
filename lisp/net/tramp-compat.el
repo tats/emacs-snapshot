@@ -136,6 +136,14 @@ looked up, a numeric value, either an integer or a float, is
 returned."
       (nth 3 attributes))))
 
+(defalias 'tramp-compat-file-attribute-access-time
+  (if (fboundp 'file-attribute-access-time)
+      #'file-attribute-access-time
+    (lambda (attributes)
+      "The last access time in ATTRIBUTES returned by `file-attributes'.
+This a Lisp timestamp in the style of `current-time'."
+      (nth 4 attributes))))
+
 (defalias 'tramp-compat-file-attribute-modification-time
   (if (fboundp 'file-attribute-modification-time)
       #'file-attribute-modification-time
@@ -144,6 +152,16 @@ returned."
 This is the time of the last change to the file's contents, and
 is a Lisp timestamp in the style of `current-time'."
       (nth 5 attributes))))
+
+(defalias 'tramp-compat-file-attribute-status-change-time
+  (if (fboundp 'file-attribute-status-change-time)
+      #'file-attribute-status-change-time
+    (lambda (attributes)
+      "The status modification time in ATTRIBUTES returned by `file-attributes'.
+This is the time of last change to the file's attributes: owner
+and group, access mode bits, etc., and is a Lisp timestamp in the
+style of `current-time'."
+      (nth 6 attributes))))
 
 (defalias 'tramp-compat-file-attribute-size
   (if (fboundp 'file-attribute-size)
@@ -209,24 +227,31 @@ If NAME is a remote file name and TOP is nil, check the local part of NAME."
 	(string-prefix-p "/:" (tramp-compat-file-local-name name))))))
 
 (defalias 'tramp-compat-file-name-quote
-  (if (fboundp 'file-name-quote)
+  (if (and
+       (fboundp 'file-name-quote)
+       (equal (tramp-compat-funcall 'func-arity #'file-name-quote) '(1 . 2)))
       #'file-name-quote
-    (lambda (name)
+    (lambda (name &optional top)
       "Add the quotation prefix \"/:\" to file NAME.
-If NAME is a remote file name, the local part of NAME is quoted."
-      (if (tramp-compat-file-name-quoted-p name)
-	  name
-	(concat
-	 (file-remote-p name) "/:" (tramp-compat-file-local-name name))))))
+If NAME is a remote file name and TOP is nil, the local part of NAME is quoted."
+      (let ((file-name-handler-alist (unless top file-name-handler-alist)))
+	(if (tramp-compat-file-name-quoted-p name top)
+            name
+	  (concat
+	   (file-remote-p name) "/:" (tramp-compat-file-local-name name)))))))
 
 (defalias 'tramp-compat-file-name-unquote
-  (if (fboundp 'file-name-unquote)
+  (if (and
+       (fboundp 'file-name-unquote)
+       (equal (tramp-compat-funcall 'func-arity #'file-name-unquote) '(1 . 2)))
       #'file-name-unquote
-    (lambda (name)
+    (lambda (name &optional top)
       "Remove quotation prefix \"/:\" from file NAME.
-If NAME is a remote file name, the local part of NAME is unquoted."
-      (let ((localname (tramp-compat-file-local-name name)))
-	(when (tramp-compat-file-name-quoted-p localname)
+If NAME is a remote file name and TOP is nil, the local part of
+NAME is unquoted."
+      (let* ((file-name-handler-alist (unless top file-name-handler-alist))
+             (localname (tramp-compat-file-local-name name)))
+	(when (tramp-compat-file-name-quoted-p localname top)
 	  (setq
 	   localname (if (= (length localname) 2) "/" (substring localname 2))))
 	(concat (file-remote-p name) localname)))))

@@ -368,29 +368,54 @@ lo_time (time_t t)
   return make_fixnum (t & ((1 << LO_TIME_BITS) - 1));
 }
 
+/* When converting a double to a fraction TICKS / HZ, HZ is equal to
+   FLT_RADIX * P where 0 <= P < FLT_RADIX_POWER_SIZE.  The tiniest
+   nonzero double uses the maximum P.  */
+enum { flt_radix_power_size = DBL_MANT_DIG - DBL_MIN_EXP + 1 };
+
+/* A integer vector of size flt_radix_power_size.  The Pth entry
+   equals FLT_RADIX**P.  */
+static Lisp_Object flt_radix_power;
+
 /* Convert T into an Emacs time *RESULT, truncating toward minus infinity.
    Return zero if successful, an error number otherwise.  */
 static int
 decode_float_time (double t, struct lisp_time *result)
 {
-  if (!isfinite (t))
-    return isnan (t) ? EINVAL : EOVERFLOW;
-  /* Actual hz unknown; guess TIMESPEC_HZ.  */
-  mpz_set_d (mpz[1], t);
-  mpz_set_si (mpz[0], floor ((t - trunc (t)) * TIMESPEC_HZ));
-  mpz_addmul_ui (mpz[0], mpz[1], TIMESPEC_HZ);
-  result->ticks = make_integer_mpz ();
-  result->hz = timespec_hz;
-  return 0;
-}
+  Lisp_Object ticks, hz;
+  if (t == 0)
+    {
+      ticks = make_fixnum (0);
+      hz = make_fixnum (1);
+    }
+  else
+    {
+      int exponent = ilogb (t);
+      if (exponent == FP_ILOGBNAN)
+	return EINVAL;
 
-/* Compute S + NS/TIMESPEC_HZ as a double.
-   Calls to this function suffer from double-rounding;
-   work around some of the problem by using long double.  */
-static double
-s_ns_to_double (long double s, long double ns)
-{
-  return s + ns / TIMESPEC_HZ;
+      /* An enormous or infinite T would make SCALE < 0 which would make
+	 HZ < 1, which the (TICKS . HZ) representation does not allow.  */
+      if (DBL_MANT_DIG - 1 < exponent)
+	return EOVERFLOW;
+
+      /* min so we don't scale tiny numbers as if they were normalized.  */
+      int scale = min (DBL_MANT_DIG - 1 - exponent, flt_radix_power_size - 1);
+
+      double scaled = scalbn (t, scale);
+      eassert (trunc (scaled) == scaled);
+      ticks = double_to_integer (scaled);
+      hz = AREF (flt_radix_power, scale);
+      if (NILP (hz))
+	{
+	  mpz_ui_pow_ui (mpz[0], FLT_RADIX, scale);
+	  hz = make_integer_mpz ();
+	  ASET (flt_radix_power, scale, hz);
+	}
+    }
+  result->ticks = ticks;
+  result->hz = hz;
+  return 0;
 }
 
 /* Make a 4-element timestamp (HI LO US PS) from TICKS and HZ.
@@ -520,69 +545,111 @@ timespec_to_lisp (struct timespec t)
   return Fcons (timespec_ticks (t), timespec_hz);
 }
 
-/* From what should be a valid timestamp (TICKS . HZ), generate the
-   corresponding time values.
+/* Return NUMERATOR / DENOMINATOR, rounded to the nearest double.
+   Arguments must be Lisp integers, and DENOMINATOR must be nonzero.  */
+static double
+frac_to_double (Lisp_Object numerator, Lisp_Object denominator)
+{
+  intmax_t intmax_numerator;
+  if (FASTER_TIMEFNS && EQ (denominator, make_fixnum (1))
+      && integer_to_intmax (numerator, &intmax_numerator))
+    return intmax_numerator;
+
+  verify (FLT_RADIX == 2 || FLT_RADIX == 16);
+  enum { LOG2_FLT_RADIX = FLT_RADIX == 2 ? 1 : 4 };
+  mpz_t *n = bignum_integer (&mpz[0], numerator);
+  mpz_t *d = bignum_integer (&mpz[1], denominator);
+  ptrdiff_t nbits = mpz_sizeinbase (*n, 2);
+  ptrdiff_t dbits = mpz_sizeinbase (*d, 2);
+  eassume (0 < nbits);
+  eassume (0 < dbits);
+  ptrdiff_t ndig = (nbits + LOG2_FLT_RADIX - 1) / LOG2_FLT_RADIX;
+  ptrdiff_t ddig = (dbits + LOG2_FLT_RADIX - 1) / LOG2_FLT_RADIX;
+
+  /* Scale with SCALE when doing integer division.  That is, compute
+     (N * FLT_RADIX**SCALE) / D [or, if SCALE is negative, N / (D *
+     FLT_RADIX**-SCALE)] as a bignum, convert the bignum to double,
+     then divide the double by FLT_RADIX**SCALE.  */
+  ptrdiff_t scale = ddig - ndig + DBL_MANT_DIG + 1;
+  if (scale < 0)
+    {
+      mpz_mul_2exp (mpz[1], *d, - (scale * LOG2_FLT_RADIX));
+      d = &mpz[1];
+    }
+  else
+    {
+      /* min so we don't scale tiny numbers as if they were normalized.  */
+      scale = min (scale, flt_radix_power_size - 1);
+
+      mpz_mul_2exp (mpz[0], *n, scale * LOG2_FLT_RADIX);
+      n = &mpz[0];
+    }
+
+  mpz_t *q = &mpz[2];
+  mpz_t *r = &mpz[3];
+  mpz_tdiv_qr (*q, *r, *n, *d);
+
+  /* The amount to add to the absolute value of *Q so that truncating
+     it to double will round correctly.  */
+  int incr;
+
+  /* Round the quotient before converting it to double.
+     If the quotient is less than FLT_RADIX ** DBL_MANT_DIG,
+     round to the nearest integer; otherwise, it is less than
+     FLT_RADIX ** (DBL_MANT_DIG + 1) and round it to the nearest
+     multiple of FLT_RADIX.  Break ties to even.  */
+  if (mpz_sizeinbase (*q, 2) < DBL_MANT_DIG * LOG2_FLT_RADIX)
+    {
+      /* Converting to double will use the whole quotient so add 1 to
+	 its absolute value as per round-to-even; i.e., if the doubled
+	 remainder exceeds the denominator, or exactly equals the
+	 denominator and adding 1 would make the quotient even.  */
+      mpz_mul_2exp (*r, *r, 1);
+      int cmp = mpz_cmpabs (*r, *d);
+      incr = cmp > 0 || (cmp == 0 && (FASTER_TIMEFNS && FLT_RADIX == 2
+				      ? mpz_odd_p (*q)
+				      : mpz_tdiv_ui (*q, FLT_RADIX) & 1));
+    }
+  else
+    {
+      /* Converting to double will discard the quotient's low-order digit,
+	 so add FLT_RADIX to its absolute value as per round-to-even.  */
+      int lo_2digits = mpz_tdiv_ui (*q, FLT_RADIX * FLT_RADIX);
+      eassume (0 <= lo_2digits && lo_2digits < FLT_RADIX * FLT_RADIX);
+      int lo_digit = lo_2digits % FLT_RADIX;
+      incr = ((lo_digit > FLT_RADIX / 2
+	       || (lo_digit == FLT_RADIX / 2 && FLT_RADIX % 2 == 0
+		   && ((lo_2digits / FLT_RADIX) & 1
+		       || mpz_sgn (*r) != 0)))
+	      ? FLT_RADIX : 0);
+    }
+
+  /* Increment the absolute value of the quotient by INCR.  */
+  if (!FASTER_TIMEFNS || incr != 0)
+    (mpz_sgn (*n) < 0 ? mpz_sub_ui : mpz_add_ui) (*q, *q, incr);
+
+  return scalbn (mpz_get_d (*q), -scale);
+}
+
+/* From a valid timestamp (TICKS . HZ), generate the corresponding
+   time values.
 
    If RESULT is not null, store into *RESULT the converted time.
    Otherwise, store into *DRESULT the number of seconds since the
-   start of the POSIX Epoch.  Unsuccessful calls may or may not store
-   results.
+   start of the POSIX Epoch.
 
-   Return zero if successful, an error number if (TICKS . HZ) would not
-   be a valid new-format timestamp.  */
+   Return zero, which indicates success.  */
 static int
 decode_ticks_hz (Lisp_Object ticks, Lisp_Object hz,
 		 struct lisp_time *result, double *dresult)
 {
-  int ns;
-  mpz_t *q = &mpz[0];
-
-  if (! (INTEGERP (ticks)
-	 && ((FIXNUMP (hz) && 0 < XFIXNUM (hz))
-	     || (BIGNUMP (hz) && 0 < mpz_sgn (XBIGNUM (hz)->value)))))
-    return EINVAL;
-
   if (result)
     {
       result->ticks = ticks;
       result->hz = hz;
     }
   else
-    {
-      if (FASTER_TIMEFNS && EQ (hz, timespec_hz))
-	{
-	  if (FIXNUMP (ticks))
-	    {
-	      verify (1 < TIMESPEC_HZ);
-	      EMACS_INT s = XFIXNUM (ticks) / TIMESPEC_HZ;
-	      ns = XFIXNUM (ticks) % TIMESPEC_HZ;
-	      if (ns < 0)
-		s--, ns += TIMESPEC_HZ;
-	      *dresult = s_ns_to_double (s, ns);
-	      return 0;
-	    }
-	  ns = mpz_fdiv_q_ui (*q, XBIGNUM (ticks)->value, TIMESPEC_HZ);
-	}
-      else if (FASTER_TIMEFNS && EQ (hz, make_fixnum (1)))
-	{
-	  ns = 0;
-	  if (FIXNUMP (ticks))
-	    {
-	      *dresult = XFIXNUM (ticks);
-	      return 0;
-	    }
-	  q = &XBIGNUM (ticks)->value;
-	}
-      else
-	{
-	  mpz_mul_ui (*q, *bignum_integer (&mpz[1], ticks), TIMESPEC_HZ);
-	  mpz_fdiv_q (*q, *q, *bignum_integer (&mpz[1], hz));
-	  ns = mpz_fdiv_q_ui (*q, *q, TIMESPEC_HZ);
-	}
-
-      *dresult = s_ns_to_double (mpz_get_d (*q), ns);
-    }
-
+    *dresult = frac_to_double (ticks, hz);
   return 0;
 }
 
@@ -594,9 +661,17 @@ enum timeform
    TIMEFORM_HI_LO_US, /* seconds plus microseconds (HI LO US) */
    TIMEFORM_NIL, /* current time in nanoseconds */
    TIMEFORM_HI_LO_US_PS, /* seconds plus micro and picoseconds (HI LO US PS) */
+   /* These two should be last; see timeform_sub_ps_p.  */
    TIMEFORM_FLOAT, /* time as a float */
    TIMEFORM_TICKS_HZ /* fractional time: HI is ticks, LO is ticks per second */
   };
+
+/* True if Lisp times of form FORM can express sub-picosecond timestamps.  */
+static bool
+timeform_sub_ps_p (enum timeform form)
+{
+  return TIMEFORM_FLOAT <= form;
+}
 
 /* From the valid form FORM and the time components HIGH, LOW, USEC
    and PSEC, generate the corresponding time value.  If LOW is
@@ -621,7 +696,10 @@ decode_time_components (enum timeform form,
       return EINVAL;
 
     case TIMEFORM_TICKS_HZ:
-      return decode_ticks_hz (high, low, result, dresult);
+      if (INTEGERP (high)
+	  && (!NILP (Fnatnump (low)) && !EQ (low, make_fixnum (0))))
+	return decode_ticks_hz (high, low, result, dresult);
+      return EINVAL;
 
     case TIMEFORM_FLOAT:
       {
@@ -636,17 +714,8 @@ decode_time_components (enum timeform form,
       }
 
     case TIMEFORM_NIL:
-      {
-	struct timespec now = current_timespec ();
-	if (result)
-	  {
-	    result->ticks = timespec_ticks (now);
-	    result->hz = timespec_hz;
-	  }
-	else
-	  *dresult = s_ns_to_double (now.tv_sec, now.tv_nsec);
-	return 0;
-      }
+      return decode_ticks_hz (timespec_ticks (current_timespec ()),
+			      timespec_hz, result, dresult);
 
     default:
       break;
@@ -955,8 +1024,8 @@ lispint_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 
 /* Given Lisp operands A and B, add their values, and return the
    result as a Lisp timestamp that is in (TICKS . HZ) form if either A
-   or B are in that form, (HI LO US PS) form otherwise.  Subtract
-   instead of adding if SUBTRACT.  */
+   or B are in that form or are floats, (HI LO US PS) form otherwise.
+   Subtract instead of adding if SUBTRACT.  */
 static Lisp_Object
 time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 {
@@ -971,7 +1040,16 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 
   enum timeform aform, bform;
   struct lisp_time ta = lisp_time_struct (a, &aform);
-  struct lisp_time tb = lisp_time_struct (b, &bform);
+
+  /* Subtract nil from nil correctly, and handle other eq values
+     quicker while we're at it.  Compare here rather than earlier, to
+     handle NaNs and check formats.  */
+  struct lisp_time tb;
+  if (EQ (a, b))
+    bform = aform, tb = ta;
+  else
+    tb = lisp_time_struct (b, &bform);
+
   Lisp_Object ticks, hz;
 
   if (FASTER_TIMEFNS && EQ (ta.hz, tb.hz))
@@ -1012,11 +1090,14 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
     }
 
   /* Return an integer if the timestamp resolution is 1,
-     otherwise the (TICKS . HZ) form if either argument is that way,
-     otherwise the (HI LO US PS) form for backward compatibility.  */
+     otherwise the (TICKS . HZ) form if !CURRENT_TIME_LIST or if
+     either input form supports timestamps that cannot be expressed
+     exactly in (HI LO US PS) form, otherwise the (HI LO US PS) form
+     for backward compatibility.  */
   return (EQ (hz, make_fixnum (1))
 	  ? ticks
-	  : aform == TIMEFORM_TICKS_HZ || bform == TIMEFORM_TICKS_HZ
+	  : (!CURRENT_TIME_LIST
+	     || timeform_sub_ps_p (aform) || timeform_sub_ps_p (bform))
 	  ? Fcons (ticks, hz)
 	  : ticks_hz_list4 (ticks, hz));
 }
@@ -1056,8 +1137,9 @@ time_cmp (Lisp_Object a, Lisp_Object b)
 
   struct lisp_time ta = lisp_time_struct (a, 0);
 
-  /* Compare nil to nil correctly, and other eq values while we're at it.
-     Compare here rather than earlier, to handle NaNs and check formats.  */
+  /* Compare nil to nil correctly, and handle other eq values quicker
+     while we're at it.  Compare here rather than earlier, to handle
+     NaNs and check formats.  */
   if (EQ (a, b))
     return 0;
 
@@ -1295,8 +1377,8 @@ usage: (format-time-string FORMAT-STRING &optional TIME ZONE)  */)
 			     t, zone, &tm);
 }
 
-DEFUN ("decode-time", Fdecode_time, Sdecode_time, 0, 2, 0,
-       doc: /* Decode a time value as (SEC MINUTE HOUR DAY MONTH YEAR DOW DST UTCOFF SUBSEC).
+DEFUN ("decode-time", Fdecode_time, Sdecode_time, 0, 3, 0,
+       doc: /* Decode a time value as (SEC MINUTE HOUR DAY MONTH YEAR DOW DST UTCOFF).
 The optional TIME is the time value to convert.  See
 `format-time-string' for the various forms of a time value.
 
@@ -1306,29 +1388,33 @@ the TZ environment variable.  It can also be a list (as from
 `current-time-zone') or an integer (the UTC offset in seconds) applied
 without consideration for daylight saving time.
 
+The optional FORM specifies the form of the SEC member.  If `integer',
+SEC is an integer; if t, SEC uses the same resolution as TIME.  An
+omitted or nil FORM is currently treated like `integer', but this may
+change in future Emacs versions.
+
 To access (or alter) the elements in the time value, the
 `decoded-time-second', `decoded-time-minute', `decoded-time-hour',
 `decoded-time-day', `decoded-time-month', `decoded-time-year',
-`decoded-time-weekday', `decoded-time-dst', `decoded-time-zone' and
-`decoded-time-subsec' accessors can be used.
+`decoded-time-weekday', `decoded-time-dst' and `decoded-time-zone'
+accessors can be used.
 
-The list has the following ten members: SEC is an integer between 0
-and 60; SEC is 60 for a leap second, which only some operating systems
-support.  MINUTE is an integer between 0 and 59.  HOUR is an integer
+The list has the following nine members: SEC is an integer or
+Lisp timestamp representing a nonnegative value less than 60
+\(or less than 61 if the operating system supports leap seconds).
+MINUTE is an integer between 0 and 59.  HOUR is an integer
 between 0 and 23.  DAY is an integer between 1 and 31.  MONTH is an
 integer between 1 and 12.  YEAR is an integer indicating the
 four-digit year.  DOW is the day of week, an integer between 0 and 6,
 where 0 is Sunday.  DST is t if daylight saving time is in effect,
 nil if it is not in effect, and -1 if daylight saving information is
 not available.  UTCOFF is an integer indicating the UTC offset in
-seconds, i.e., the number of seconds east of Greenwich.  SUBSEC is
-is either 0 or (TICKS . HZ) where HZ is a positive integer clock
-resolution and TICKS is a nonnegative integer less than HZ.  (Note
-that Common Lisp has different meanings for DOW and UTCOFF, and lacks
-SUBSEC.)
+seconds, i.e., the number of seconds east of Greenwich.  (Note that
+Common Lisp has different meanings for DOW and UTCOFF, and its
+SEC is always an integer between 0 and 59.)
 
-usage: (decode-time &optional TIME ZONE)  */)
-  (Lisp_Object specified_time, Lisp_Object zone)
+usage: (decode-time &optional TIME ZONE FORM)  */)
+  (Lisp_Object specified_time, Lisp_Object zone, Lisp_Object form)
 {
   struct lisp_time lt = lisp_time_struct (specified_time, 0);
   struct timespec ts = lisp_to_timespec (lt);
@@ -1360,8 +1446,35 @@ usage: (decode-time &optional TIME ZONE)  */)
       year = make_integer_mpz ();
     }
 
+  Lisp_Object hz = lt.hz, sec;
+  if (EQ (hz, make_fixnum (1)) || !EQ (form, Qt))
+    sec = make_fixnum (local_tm.tm_sec);
+  else
+    {
+      Lisp_Object ticks; /* hz * tm_sec + mod (lt.ticks, hz) */
+      intmax_t n;
+      if (FASTER_TIMEFNS && FIXNUMP (lt.ticks) && FIXNUMP (hz)
+	  && !INT_MULTIPLY_WRAPV (XFIXNUM (hz), local_tm.tm_sec, &n)
+	  && ! (INT_ADD_WRAPV
+		(n, (XFIXNUM (lt.ticks) % XFIXNUM (hz)
+		     + (XFIXNUM (lt.ticks) % XFIXNUM (hz) < 0
+			? XFIXNUM (hz) : 0)),
+		 &n)))
+	ticks = make_int (n);
+      else
+	{
+	  mpz_fdiv_r (mpz[0],
+		      *bignum_integer (&mpz[0], lt.ticks),
+		      *bignum_integer (&mpz[1], hz));
+	  mpz_addmul_ui (mpz[0], *bignum_integer (&mpz[1], hz),
+			 local_tm.tm_sec);
+	  ticks = make_integer_mpz ();
+	}
+      sec = Fcons (ticks, hz);
+    }
+
   return CALLN (Flist,
-		make_fixnum (local_tm.tm_sec),
+		sec,
 		make_fixnum (local_tm.tm_min),
 		make_fixnum (local_tm.tm_hour),
 		make_fixnum (local_tm.tm_mday),
@@ -1374,10 +1487,7 @@ usage: (decode-time &optional TIME ZONE)  */)
 		 ? make_fixnum (tm_gmtoff (&local_tm))
 		 : gmtime_r (&time_spec, &gmt_tm)
 		 ? make_fixnum (tm_diff (&local_tm, &gmt_tm))
-		 : Qnil),
-		(EQ (lt.hz, make_fixnum (1))
-		 ? make_fixnum (0)
-		 : Fcons (integer_mod (lt.ticks, lt.hz), lt.hz)));
+		 : Qnil));
 }
 
 /* Return OBJ - OFFSET, checking that OBJ is a valid integer and that
@@ -1408,7 +1518,7 @@ check_tm_member (Lisp_Object obj, int offset)
 DEFUN ("encode-time", Fencode_time, Sencode_time, 1, MANY, 0,
        doc: /* Convert TIME to a timestamp.
 
-TIME is a list (SECOND MINUTE HOUR DAY MONTH YEAR IGNORED DST ZONE SUBSEC).
+TIME is a list (SECOND MINUTE HOUR DAY MONTH YEAR IGNORED DST ZONE).
 in the style of `decode-time', so that (encode-time (decode-time ...)) works.
 In this list, ZONE can be nil for Emacs local time, t for Universal
 Time, `wall' for system wall clock time, or a string as in the TZ
@@ -1417,23 +1527,16 @@ environment variable.  It can also be a list (as from
 without consideration for daylight saving time.  If ZONE specifies a
 time zone with daylight-saving transitions, DST is t for daylight
 saving time, nil for standard time, and -1 to cause the daylight
-saving flag to be guessed.  SUBSEC is either 0 or a Lisp timestamp
-in (TICKS . HZ) form.
+saving flag to be guessed.
 
 As an obsolescent calling convention, if this function is called with
-6 through 10 arguments, the first 6 arguments are SECOND, MINUTE,
-HOUR, DAY, MONTH, and YEAR, and specify the components of a decoded
-time.  If there are 7 through 9 arguments the *last* argument
-specifies ZONE, and if there are 10 arguments the 9th specifies ZONE
-and the 10th specifies SUBSEC; in either case any other extra
-arguments are ignored, so that (apply #\\='encode-time (decode-time
-...)) works.  In this obsolescent convention, DST, ZONE, and SUBSEC
-default to -1, nil and 0 respectively.
-
-Out-of-range values for SECOND, MINUTE, HOUR, DAY, or MONTH are allowed;
-for example, a DAY of 0 means the day preceding the given month.
-Year numbers less than 100 are treated just like other year numbers.
-If you want them to stand for years in this century, you must do that yourself.
+6 or more arguments, the first 6 arguments are SECOND, MINUTE, HOUR,
+DAY, MONTH, and YEAR, and specify the components of a decoded time,
+where DST assumed to be -1 and FORM is omitted.  If there are more
+than 6 arguments the *last* argument is used as ZONE and any other
+extra arguments are ignored, so that (apply #\\='encode-time
+(decode-time ...)) works.  In this obsolescent convention, DST and
+ZONE default to -1 and nil respectively.
 
 Years before 1970 are not guaranteed to work.  On some systems,
 year values as low as 1901 do work.
@@ -1442,27 +1545,27 @@ usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   struct tm tm;
-  Lisp_Object zone = Qnil, subsec = make_fixnum (0);
+  Lisp_Object zone = Qnil;
   Lisp_Object a = args[0];
+  Lisp_Object secarg, minarg, hourarg, mdayarg, monarg, yeararg;
   tm.tm_isdst = -1;
 
   if (nargs == 1)
     {
       Lisp_Object tail = a;
-      for (int i = 0; i < 10; i++, tail = XCDR (tail))
+      for (int i = 0; i < 9; i++, tail = XCDR (tail))
 	CHECK_CONS (tail);
-      tm.tm_sec  = check_tm_member (XCAR (a), 0); a = XCDR (a);
-      tm.tm_min  = check_tm_member (XCAR (a), 0); a = XCDR (a);
-      tm.tm_hour = check_tm_member (XCAR (a), 0); a = XCDR (a);
-      tm.tm_mday = check_tm_member (XCAR (a), 0); a = XCDR (a);
-      tm.tm_mon  = check_tm_member (XCAR (a), 1); a = XCDR (a);
-      tm.tm_year = check_tm_member (XCAR (a), TM_YEAR_BASE); a = XCDR (a);
+      secarg = XCAR (a); a = XCDR (a);
+      minarg = XCAR (a); a = XCDR (a);
+      hourarg = XCAR (a); a = XCDR (a);
+      mdayarg = XCAR (a); a = XCDR (a);
+      monarg = XCAR (a); a = XCDR (a);
+      yeararg = XCAR (a); a = XCDR (a);
       a = XCDR (a);
       Lisp_Object dstflag = XCAR (a); a = XCDR (a);
-      zone = XCAR (a); a = XCDR (a);
+      zone = XCAR (a);
       if (SYMBOLP (dstflag) && !FIXNUMP (zone) && !CONSP (zone))
 	tm.tm_isdst = !NILP (dstflag);
-      subsec = XCAR (a);
     }
   else if (nargs < 6)
     xsignal2 (Qwrong_number_of_arguments, Qencode_time, make_fixnum (nargs));
@@ -1470,18 +1573,37 @@ usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
     {
       if (6 < nargs)
 	zone = args[nargs - 1];
-      if (9 < nargs)
-	{
-	  zone = args[8];
-	  subsec = args[9];
-	}
-      tm.tm_sec  = check_tm_member (a, 0);
-      tm.tm_min  = check_tm_member (args[1], 0);
-      tm.tm_hour = check_tm_member (args[2], 0);
-      tm.tm_mday = check_tm_member (args[3], 0);
-      tm.tm_mon  = check_tm_member (args[4], 1);
-      tm.tm_year = check_tm_member (args[5], TM_YEAR_BASE);
+      secarg = a;
+      minarg = args[1];
+      hourarg = args[2];
+      mdayarg = args[3];
+      monarg = args[4];
+      yeararg = args[5];
     }
+
+  struct lisp_time lt;
+  decode_lisp_time (secarg, 0, &lt, 0);
+  Lisp_Object hz = lt.hz, sec, subsecticks;
+  if (FASTER_TIMEFNS && EQ (hz, make_fixnum (1)))
+    {
+      sec = lt.ticks;
+      subsecticks = make_fixnum (0);
+    }
+  else
+    {
+      mpz_fdiv_qr (mpz[0], mpz[1],
+		   *bignum_integer (&mpz[0], lt.ticks),
+		   *bignum_integer (&mpz[1], hz));
+      sec = make_integer_mpz ();
+      mpz_swap (mpz[0], mpz[1]);
+      subsecticks = make_integer_mpz ();
+    }
+  tm.tm_sec  = check_tm_member (sec, 0);
+  tm.tm_min  = check_tm_member (minarg, 0);
+  tm.tm_hour = check_tm_member (hourarg, 0);
+  tm.tm_mday = check_tm_member (mdayarg, 0);
+  tm.tm_mon  = check_tm_member (monarg, 1);
+  tm.tm_year = check_tm_member (yeararg, TM_YEAR_BASE);
 
   timezone_t tz = tzlookup (zone, false);
   tm.tm_wday = -1;
@@ -1492,25 +1614,17 @@ usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
   if (tm.tm_wday < 0)
     time_error (mktime_errno);
 
-  if (CONSP (subsec))
-    {
-      Lisp_Object subsecticks = XCAR (subsec);
-      if (INTEGERP (subsecticks))
-	{
-	  struct lisp_time val1 = { INT_TO_INTEGER (value), make_fixnum (1) };
-	  Lisp_Object
-	    hz = XCDR (subsec),
-	    secticks = lisp_time_hz_ticks (val1, hz),
-	    ticks = lispint_arith (secticks, subsecticks, false);
-	  return Fcons (ticks, hz);
-	}
-    }
-  else if (INTEGERP (subsec))
-    return (CURRENT_TIME_LIST && EQ (subsec, make_fixnum (0))
+  if (EQ (hz, make_fixnum (1)))
+    return (CURRENT_TIME_LIST
 	    ? list2 (hi_time (value), lo_time (value))
-	    : lispint_arith (INT_TO_INTEGER (value), subsec, false));
-
-  xsignal2 (Qerror, build_string ("Invalid subsec"), subsec);
+	    : INT_TO_INTEGER (value));
+  else
+    {
+      struct lisp_time val1 = { INT_TO_INTEGER (value), make_fixnum (1) };
+      Lisp_Object secticks = lisp_time_hz_ticks (val1, hz);
+      Lisp_Object ticks = lispint_arith (secticks, subsecticks, false);
+      return Fcons (ticks, hz);
+    }
 }
 
 DEFUN ("time-convert", Ftime_convert, Stime_convert, 1, 2, 0,
@@ -1814,6 +1928,10 @@ syms_of_timefns (void)
   defsubr (&Scurrent_time_string);
   defsubr (&Scurrent_time_zone);
   defsubr (&Sset_time_zone_rule);
+
+  flt_radix_power = make_vector (flt_radix_power_size, Qnil);
+  staticpro (&flt_radix_power);
+
 #ifdef NEED_ZTRILLION_INIT
   pdumper_do_now_and_after_load (syms_of_timefns_for_pdumper);
 #endif

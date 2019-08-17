@@ -4112,12 +4112,17 @@ Also, delete any process that is exited or signaled."
 					 "datagram"
 				       "network")
 				     (if (plist-get contact :server)
-					 (format "server on %s"
-						 (or
-						  (plist-get contact :host)
-						  (plist-get contact :local)))
-				       (format "connection to %s"
-					       (plist-get contact :host))))
+					 (format
+                                          "server on %s"
+					  (if (plist-get contact :host)
+                                              (format "%s:%s"
+						      (plist-get contact :host)
+                                                      (plist-get
+                                                       contact :service))
+					    (plist-get contact :local)))
+				       (format "connection to %s:%s"
+					       (plist-get contact :host)
+					       (plist-get contact :service))))
 			   (format "(serial port %s%s)"
 				   (or (plist-get contact :port) "?")
 				   (let ((speed (plist-get contact :speed)))
@@ -4461,7 +4466,7 @@ retrieved via \\[yank] \\[yank-pop]."
   :version "23.2")
 
 (defcustom kill-do-not-save-duplicates nil
-  "Do not add a new string to `kill-ring' if it duplicates the last one.
+  "If non-nil, don't add a string to `kill-ring' if it duplicates the last one.
 The comparison is done using `equal-including-properties'."
   :type 'boolean
   :group 'killing
@@ -5356,8 +5361,10 @@ BUFFER may be a buffer or a buffer name."
   nil)
 
 (defun append-to-buffer (buffer start end)
-  "Append to specified buffer the text of the region.
-It is inserted into that buffer before its point.
+  "Append to specified BUFFER the text of the region.
+The text is inserted into that buffer before its point.
+BUFFER can be a buffer or the name of a buffer; this
+function will create BUFFER if it doesn't already exist.
 
 When calling from a program, give three arguments:
 BUFFER (or buffer name), START and END.
@@ -5379,8 +5386,10 @@ START and END specify the portion of the current buffer to be copied."
             (set-window-point window (point))))))))
 
 (defun prepend-to-buffer (buffer start end)
-  "Prepend to specified buffer the text of the region.
-It is inserted into that buffer after its point.
+  "Prepend to specified BUFFER the text of the region.
+The text is inserted into that buffer after its point.
+BUFFER can be a buffer or the name of a buffer; this
+function will create BUFFER if it doesn't already exist.
 
 When calling from a program, give three arguments:
 BUFFER (or buffer name), START and END.
@@ -5393,8 +5402,10 @@ START and END specify the portion of the current buffer to be copied."
 	(insert-buffer-substring oldbuf start end)))))
 
 (defun copy-to-buffer (buffer start end)
-  "Copy to specified buffer the text of the region.
-It is inserted into that buffer, replacing existing text there.
+  "Copy to specified BUFFER the text of the region.
+The text is inserted into that buffer, replacing existing text there.
+BUFFER can be a buffer or the name of a buffer; this
+function will create BUFFER if it doesn't already exist.
 
 When calling from a program, give three arguments:
 BUFFER (or buffer name), START and END.
@@ -9071,8 +9082,9 @@ to capitalize ARG words."
                (:copier nil)
                (:type list))
   (second nil :documentation "\
-This is an integer between 0 and 60 (inclusive).  (60 is a leap
-second, which only some operating systems support.)")
+This is an integer or a Lisp timestamp (TICKS . HZ) representing a nonnegative
+number of seconds less than 61.  (If not less than 60, it is a leap second,
+which only some operating systems support.)")
   (minute nil :documentation "This is an integer between 0 and 59 (inclusive).")
   (hour nil :documentation "This is an integer between 0 and 23 (inclusive).")
   (day nil :documentation "This is an integer between 1 and 31 (inclusive).")
@@ -9088,9 +9100,6 @@ available.")
   (zone nil :documentation "\
 This is an integer indicating the UTC offset in seconds, i.e.,
 the number of seconds east of Greenwich.")
-  (subsec nil :documentation "\
-This is 0, or is an integer pair (TICKS . HZ) indicating TICKS/HZ seconds,
-where HZ is positive and TICKS is nonnegative and less than HZ.")
   )
 
 
