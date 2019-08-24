@@ -277,13 +277,17 @@ This expects `auto-revert--messages' to be bound by
 ;  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
 
   (let ((tmpfile (make-temp-file "auto-revert-test"))
+        ;; Try to catch bug#32645.
+        (auto-revert-debug (getenv "EMACS_HYDRA_CI"))
+        (file-notify-debug (getenv "EMACS_HYDRA_CI"))
         buf desc)
     (unwind-protect
 	(progn
           (write-region "any text" nil tmpfile nil 'no-message)
 	  (setq buf (find-file-noselect tmpfile))
 	  (with-current-buffer buf
-            (should-not auto-revert-notify-watch-descriptor)
+            (should-not
+             (file-notify-valid-p auto-revert-notify-watch-descriptor))
             (should (string-equal (buffer-string) "any text"))
             ;; `buffer-stale--default-function' checks for
             ;; `verify-visited-file-modtime'.  We must ensure that
@@ -314,7 +318,8 @@ This expects `auto-revert--messages' to be bound by
             ;; With w32notify, and on emba, the `stopped' events are not sent.
             (or (eq file-notify--library 'w32notify)
                 (getenv "EMACS_EMBA_CI")
-                (should-not auto-revert-notify-watch-descriptor))
+                (should-not
+                 (file-notify-valid-p auto-revert-notify-watch-descriptor)))
 
             ;; Once the file has been recreated, the buffer shall be
             ;; reverted.

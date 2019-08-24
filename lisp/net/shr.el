@@ -719,6 +719,7 @@ size, and full-buffer size."
           (insert "\n")
 	  (shr-indent)
           (when (and (> (1- gap-start) (point-min))
+                     (get-text-property (point) 'shr-url)
                      ;; The link on both sides of the newline are the
                      ;; same...
                      (equal (get-text-property (point) 'shr-url)

@@ -3926,6 +3926,7 @@ select.  The argument ALL-FRAMES has the same meaning as in
 always effectively nil."
   (interactive "p")
   (let* ((window (selected-window))
+         (original-window window)
 	 (function (and (not ignore-window-parameters)
 			(window-parameter window 'other-window)))
 	 old-window old-count)
@@ -3967,6 +3968,10 @@ always effectively nil."
 	      (setq old-count count)))
 	   (t
 	    (setq count (1+ count)))))
+
+        (when (and (eq window original-window)
+                   (called-interactively-p 'interactive))
+          (message "No other window to select"))
 
 	(select-window window)
 	;; Always return nil.
@@ -4260,7 +4265,11 @@ any window whose `no-delete-other-windows' parameter is non-nil."
         (throw 'done nil)))
 
       ;; If WINDOW is the main window of its frame do nothing.
-      (unless (eq window main)
+      (if (eq window main)
+          ;; Give a message to the user if this has been called as a
+          ;; command.
+          (when (called-interactively-p 'interactive)
+            (message "No other windows to delete"))
 	(delete-other-windows-internal window main)
 	(window--check frame))
       ;; Always return nil.
@@ -4839,6 +4848,12 @@ all window-local buffer lists."
 	;; Unrecord BUFFER in WINDOW.
 	(unrecord-window-buffer window buffer)))))
 
+(defcustom quit-window-hook nil
+  "Hook run before performing any other actions in the `quit-window' command."
+  :type 'hook
+  :version "27.1"
+  :group 'windows)
+
 (defun quit-restore-window (&optional window bury-or-kill)
   "Quit WINDOW and deal with its buffer.
 WINDOW must be a live window and defaults to the selected one.
@@ -4962,8 +4977,15 @@ According to information stored in WINDOW's `quit-restore' window
 parameter either (1) delete WINDOW and its frame, (2) delete
 WINDOW, (3) restore the buffer previously displayed in WINDOW,
 or (4) make WINDOW display some other buffer than the present
-one.  If non-nil, reset `quit-restore' parameter to nil."
+one.  If non-nil, reset `quit-restore' parameter to nil.
+
+The functions in `quit-window-hook' will be run before doing
+anything else."
   (interactive "P")
+  ;; Run the hook from the buffer implied to get any buffer-local
+  ;; values.
+  (with-current-buffer (window-buffer (window-normalize-window window))
+    (run-hooks 'quit-window-hook))
   (quit-restore-window window (if kill 'kill 'bury)))
 
 (defun quit-windows-on (&optional buffer-or-name kill frame)

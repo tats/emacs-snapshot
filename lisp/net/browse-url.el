@@ -714,16 +714,18 @@ narrowed."
 	   (and (not (buffer-narrowed-p))
 		(or buffer-file-name
 		    (and (boundp 'dired-directory) dired-directory)))))
-      (or file-name
-	  (progn
-	    (or browse-url-temp-file-name
-		(setq browse-url-temp-file-name
-		      (convert-standard-filename
-		       (make-temp-file
-			(expand-file-name "burl" browse-url-temp-dir)
-			nil ".html"))))
-	    (setq file-name browse-url-temp-file-name)
-	    (write-region (point-min) (point-max) file-name nil 'no-message)))
+      (when (or (not file-name)
+                ;; This can happen when we're looking at a file from a
+                ;; zip file buffer, for instance.
+                (not (file-exists-p file-name)))
+	(unless browse-url-temp-file-name
+	  (setq browse-url-temp-file-name
+		(convert-standard-filename
+		 (make-temp-file
+		  (expand-file-name "burl" browse-url-temp-dir)
+		  nil ".html"))))
+	(setq file-name browse-url-temp-file-name)
+	(write-region (point-min) (point-max) file-name nil 'no-message))
       (browse-url-of-file file-name))))
 
 (defun browse-url-delete-temp-file (&optional temp-file-name)
@@ -779,7 +781,9 @@ as ARGS."
   (interactive (browse-url-interactive-arg "URL: "))
   (unless (called-interactively-p 'interactive)
     (setq args (or args (list browse-url-new-window-flag))))
-  (when (and url-handler-mode (not (file-name-absolute-p url)))
+  (when (and url-handler-mode
+             (not (file-name-absolute-p url))
+             (not (string-match "\\`[a-z]+:" url)))
     (setq url (expand-file-name url)))
   (let ((process-environment (copy-sequence process-environment))
 	(function (or (and (string-match "\\`mailto:" url)

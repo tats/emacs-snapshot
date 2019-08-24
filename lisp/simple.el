@@ -745,16 +745,21 @@ buffer if the variable `delete-trailing-lines' is non-nil."
   ;; Return nil for the benefit of `write-file-functions'.
   nil)
 
-(defun newline-and-indent ()
+(defun newline-and-indent (&optional arg)
   "Insert a newline, then indent according to major mode.
 Indentation is done using the value of `indent-line-function'.
 In programming language modes, this is the same as TAB.
 In some text modes, where TAB inserts a tab, this command indents to the
-column specified by the function `current-left-margin'."
-  (interactive "*")
+column specified by the function `current-left-margin'.
+
+With ARG, perform this action that many times."
+  (interactive "*p")
   (delete-horizontal-space t)
-  (newline nil t)
-  (indent-according-to-mode))
+  (unless arg
+    (setq arg 1))
+  (dotimes (_ arg)
+    (newline nil t)
+    (indent-according-to-mode)))
 
 (defun reindent-then-newline-and-indent ()
   "Reindent current line, insert newline, then indent the new line.
@@ -1582,10 +1587,8 @@ display the result of expression evaluation."
   (let ((minibuffer-completing-symbol t))
     (minibuffer-with-setup-hook
         (lambda ()
-          ;; FIXME: call emacs-lisp-mode?
-          (add-function :before-until (local 'eldoc-documentation-function)
-                        #'elisp-eldoc-documentation-function)
-          (eldoc-mode 1)
+          ;; FIXME: call emacs-lisp-mode (see also
+          ;; `eldoc--eval-expression-setup')?
           (add-hook 'completion-at-point-functions
                     #'elisp-completion-at-point nil t)
           (run-hooks 'eval-expression-minibuffer-setup-hook))
@@ -3941,15 +3944,14 @@ interactively, this is t."
     (when (and error-file (file-exists-p error-file))
       (if (< 0 (file-attribute-size (file-attributes error-file)))
 	  (with-current-buffer (get-buffer-create error-buffer)
-	    (let ((pos-from-end (- (point-max) (point))))
-	      (or (bobp)
-		  (insert "\f\n"))
-	      ;; Do no formatting while reading error file,
-	      ;; because that can run a shell command, and we
-	      ;; don't want that to cause an infinite recursion.
-	      (format-insert-file error-file nil)
-	      ;; Put point after the inserted errors.
-	      (goto-char (- (point-max) pos-from-end)))
+            (goto-char (point-max))
+            ;; Insert a separator if there's already text here.
+	    (unless (bobp)
+	      (insert "\f\n"))
+	    ;; Do no formatting while reading error file,
+	    ;; because that can run a shell command, and we
+	    ;; don't want that to cause an infinite recursion.
+	    (format-insert-file error-file nil)
 	    (and display-error-buffer
 		 (display-buffer (current-buffer)))))
       (delete-file error-file))
