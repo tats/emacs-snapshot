@@ -1,4 +1,4 @@
-;; startup.el --- process Emacs shell arguments  -*- lexical-binding: t -*-
+;;; startup.el --- process Emacs shell arguments  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 1985-1986, 1992, 1994-2019 Free Software Foundation,
 ;; Inc.
@@ -406,7 +406,6 @@ if you have not already set `auto-save-list-file-name' yourself.
 Directories in the prefix will be created if necessary.
 Set this to nil if you want to prevent `auto-save-list-file-name'
 from being initialized."
-  :initialize 'custom-initialize-delay
   :type '(choice (const :tag "Don't record a session's auto save list" nil)
 		 string)
   :group 'auto-save)
@@ -907,16 +906,19 @@ init-file, or to a default value if loading is not possible."
               ;; the name of the file that it loads into
               ;; `user-init-file'.
               (setq user-init-file t)
-              (load (if (equal (file-name-extension init-file-name)
-                               "el")
-                        (file-name-sans-extension init-file-name)
-                      init-file-name)
-                    'noerror 'nomessage)
+	      (when init-file-name
+		(load (if (equal (file-name-extension init-file-name)
+				 "el")
+			  (file-name-sans-extension init-file-name)
+			init-file-name)
+		      'noerror 'nomessage))
 
               (when (and (eq user-init-file t) alternate-filename-function)
                 (let ((alt-file (funcall alternate-filename-function)))
                   (and (equal (file-name-extension alt-file) "el")
                        (setq alt-file (file-name-sans-extension alt-file)))
+		  (unless init-file-name
+		    (setq init-file-name alt-file))
                   (load alt-file 'noerror 'nomessage)))
 
               ;; If we did not find the user's init file, set
@@ -972,18 +974,10 @@ the `--debug-init' option to view a complete error backtrace."
     (when debug-on-error-should-be-set
       (setq debug-on-error debug-on-error-from-init-file))))
 
-(defun find-init-path (fn)
-  "Look in ~/.config/FOO or ~/.FOO for the dotfile or dot directory FOO.
-It is expected that the output will undergo ~ expansion.  Implements the
-XDG convention for dotfiles."
-  (let* ((xdg-path (concat "~" init-file-user "/.config/" fn))
-        (oldstyle-path (concat "~" init-file-user "/." fn))
-        (found-path (if (file-exists-p xdg-path) xdg-path oldstyle-path)))
-    found-path))
-
 (defun command-line ()
   "A subroutine of `normal-top-level'.
 Amongst another things, it parses the command-line arguments."
+ (let (xdg-dir startup-init-directory)
   (setq before-init-time (current-time)
 	after-init-time nil
         command-line-default-directory default-directory)
@@ -1172,6 +1166,21 @@ please check its value")
                                    init-file-user))
                          :error))))
 
+  ;; Calculate the name of the Emacs init directory.
+  ;; This is typically equivalent to ~/.config/emacs if the user is
+  ;; following the XDG convention, and is ~INIT-FILE-USER/.emacs.d
+  ;; on other systems.
+  (setq xdg-dir (concat (or (getenv "XDG_CONFIG_HOME")
+			    (concat "~" init-file-user "/.config"))
+			"/emacs/"))
+  (setq startup-init-directory
+	(if (file-exists-p xdg-dir)
+	    xdg-dir
+	  (let ((emacs-d-dir (concat "~" init-file-user "/.emacs.d/")))
+	    (if (file-exists-p emacs-d-dir)
+		emacs-d-dir
+	      xdg-dir))))
+
   ;; Load the early init file, if found.
   (startup--load-user-init-file
    (lambda ()
@@ -1181,8 +1190,7 @@ please check its value")
       ;; with the .el extension, if the file doesn't exist, not just
       ;; "early-init" without an extension, as it does for ".emacs".
       "early-init.el"
-      (file-name-as-directory
-       (find-init-path "emacs.d")))))
+      startup-init-directory)))
   (setq early-init-file user-init-file)
 
   ;; If any package directory exists, initialize the package system.
@@ -1283,7 +1291,8 @@ please check its value")
   ;; depends on the runtime context, in case some of them depend on
   ;; the window-system features.  Example: blink-cursor-mode.
   (let (current-load-list) ; c-r-s may call defvar, and hence LOADHIST_ATTACH
-    (mapc 'custom-reevaluate-setting custom-delayed-init-variables))
+    (mapc 'custom-reevaluate-setting custom-delayed-init-variables)
+    (setq custom-delayed-init-variables nil))
 
   (normal-erase-is-backspace-setup-frame)
 
@@ -1319,10 +1328,11 @@ please check its value")
     (startup--load-user-init-file
      (lambda ()
        (cond
+	((eq startup-init-directory xdg-dir) nil)
         ((eq system-type 'ms-dos)
          (concat "~" init-file-user "/_emacs"))
         ((not (eq system-type 'windows-nt))
-         (find-init-path "emacs"))
+         (concat "~" init-file-user "/.emacs"))
         ;; Else deal with the Windows situation.
         ((directory-files "~" nil "^\\.emacs\\(\\.elc?\\)?$")
          ;; Prefer .emacs on Windows.
@@ -1339,8 +1349,7 @@ please check its value")
      (lambda ()
        (expand-file-name
         "init"
-        (file-name-as-directory
-         (find-init-path "emacs.d"))))
+        startup-init-directory))
      (not inhibit-default-init))
 
     (when (and deactivate-mark transient-mark-mode)
@@ -1376,14 +1385,6 @@ please check its value")
     (unless (and (eq scalable-fonts-allowed old-scalable-fonts-allowed)
 		 (eq face-ignored-fonts old-face-ignored-fonts))
       (clear-face-cache)))
-
-  ;; Re-evaluate again the predefined variables whose initial value
-  ;; depends on the runtime context, in case the user init file
-  ;; modified user-emacs-directory.  Examples: abbrev-file-name,
-  ;; auto-save-list-file-prefix.
-  (let (current-load-list) ; c-r-s may call defvar, and hence LOADHIST_ATTACH
-    (mapc 'custom-reevaluate-setting custom-delayed-init-variables)
-    (setq custom-delayed-init-variables nil))
 
   (setq after-init-time (current-time))
   ;; Display any accumulated warnings after all functions in
@@ -1464,7 +1465,7 @@ Consider using a subdirectory instead, e.g.: %s"
   (if (and (boundp 'x-session-previous-id)
            (stringp x-session-previous-id))
       (with-no-warnings
-	(emacs-session-restore x-session-previous-id))))
+	(emacs-session-restore x-session-previous-id)))))
 
 (defun x-apply-session-resources ()
   "Apply X resources which specify initial values for Emacs variables.

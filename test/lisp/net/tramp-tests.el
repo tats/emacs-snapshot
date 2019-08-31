@@ -3098,6 +3098,12 @@ They might differ only in time attributes or directory size."
   (let ((attr1 (copy-sequence attr1))
 	(attr2 (copy-sequence attr2))
 	(start-time (- tramp--test-start-time 10)))
+    ;; Link number.  For directories, it includes the number of
+    ;; subdirectories.  Set it to 1.
+    (when (eq (tramp-compat-file-attribute-type attr1) t)
+      (setcar (nthcdr 1 attr1) 1))
+    (when (eq (tramp-compat-file-attribute-type attr2) t)
+      (setcar (nthcdr 1 attr2) 1))
     ;; Access time.
     (setcar (nthcdr 4 attr1) tramp-time-dont-know)
     (setcar (nthcdr 4 attr2) tramp-time-dont-know)
@@ -5147,7 +5153,8 @@ This requires restrictions of file name syntax."
 	   (tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (tramp--test-make-temp-name 'local quoted))
 	   (files (delq nil files))
-	   (process-environment process-environment))
+	   (process-environment process-environment)
+	   (sorted-files (sort (copy-sequence files) #'string-lessp)))
       (unwind-protect
 	  (progn
 	    (make-directory tmp-name1)
@@ -5194,10 +5201,20 @@ This requires restrictions of file name syntax."
 	    ;; Check file names.
 	    (should (equal (directory-files
 			    tmp-name1 nil directory-files-no-dot-files-regexp)
-			   (sort (copy-sequence files) #'string-lessp)))
+			   sorted-files))
 	    (should (equal (directory-files
 			    tmp-name2 nil directory-files-no-dot-files-regexp)
-			   (sort (copy-sequence files) #'string-lessp)))
+			   sorted-files))
+	    (should (equal (mapcar
+			    #'car
+			    (directory-files-and-attributes
+			     tmp-name1 nil directory-files-no-dot-files-regexp))
+			   sorted-files))
+	    (should (equal (mapcar
+			    #'car
+			    (directory-files-and-attributes
+			     tmp-name2 nil directory-files-no-dot-files-regexp))
+			   sorted-files))
 
 	    ;; `substitute-in-file-name' could return different
 	    ;; values.  For `adb', there could be strange file
@@ -5270,7 +5287,10 @@ This requires restrictions of file name syntax."
 		(should-not (file-exists-p file1))))
 
 	    ;; Check, that environment variables are set correctly.
-	    (when (and (tramp--test-expensive-test) (tramp--test-sh-p))
+            ;; We do not run on macOS due to encoding problems.  See
+            ;; Bug#36940.
+	    (when (and (tramp--test-expensive-test) (tramp--test-sh-p)
+		       (not (eq system-type 'darwin)))
 	      (dolist (elt files)
 		(let ((envvar (concat "VAR_" (upcase (md5 elt))))
 		      (elt (encode-coding-string elt coding-system-for-read))

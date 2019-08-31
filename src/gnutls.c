@@ -290,6 +290,7 @@ DEF_DLL_FN (const char *, gnutls_ext_get_name, (unsigned int));
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+static gnutls_free_function *gnutls_free_func;
 
 static bool
 init_gnutls_functions (void)
@@ -428,6 +429,13 @@ init_gnutls_functions (void)
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+  /* gnutls_free is a variable inside GnuTLS, whose value is the
+     "free" function.  So it needs special handling.  */
+  gnutls_free_func = (gnutls_free_function *) GetProcAddress (library,
+							      "gnutls_free");
+  if (!gnutls_free_func)
+    return false;
+
   max_log_level = clip_to_bounds (INT_MIN, global_gnutls_log_level, INT_MAX);
   {
     Lisp_Object name = CAR_SAFE (Fget (Qgnutls, QCloaded_from));
@@ -559,6 +567,11 @@ init_gnutls_functions (void)
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+/* gnutls_free_func is a data pointer to a variable which holds an
+   address of a function.  We use #undef because MinGW64 defines
+   gnutls_free as a macro as well in the GnuTLS headers.  */
+#  undef gnutls_free
+#  define gnutls_free (*gnutls_free_func)
 
 /* This wrapper is called from fns.c, which doesn't know about the
    LOAD_DLL_FN stuff above.  */
@@ -1609,15 +1622,10 @@ string representation.  */)
 	     emacs_gnutls_strerror (err));
     }
 
-  char *out_buf = xmalloc ((out.size + 1) * sizeof (char));
-  memset (out_buf, 0, (out.size + 1) * sizeof (char));
-  memcpy (out_buf, out.data, out.size);
-
-  xfree (out.data);
+  Lisp_Object result = make_string_from_bytes ((char *) out.data, out.size,
+					       out.size);
+  gnutls_free (out.data);
   gnutls_x509_crt_deinit (crt);
-
-  Lisp_Object result = build_string (out_buf);
-  xfree (out_buf);
 
   return result;
 }
