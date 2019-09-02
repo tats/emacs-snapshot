@@ -1,3 +1,11 @@
+emacs (1:26.1+1-3.2+deb10u1~1.gbp47652a) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @47652acd02e12d0a4270e6a1dd24832abafd7ed9 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 02 Sep 2019 17:05:18 -0500
+
 emacs (1:26.1+1-3.2) unstable; urgency=medium
 
   * Non-maintainer upload.
