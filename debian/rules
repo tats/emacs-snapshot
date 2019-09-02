@@ -314,7 +314,15 @@ override_dh_autoreconf:
 override_dh_auto_configure:
 
 debian/stamp-configured: $(autogen_build_files)
-        # If the deps for this target change, start over
+        # If the deps for this target change, start over.
+        # When the "new" keyring is obsolete, update
+        # debian/source/include-binaries.
+	if test "$$(sha1sum etc/package-keyring.gpg | cut -f 1 -d ' ')" \
+	  != 5eda21f010a2d246359efc6450830ac3d500760e; then \
+	  echo 'Unexpected keyring hash - is it obsolete?'; \
+	  false; \
+	fi
+	cp -a debian/etc-package-keyring-new.gpg etc/package-keyring.gpg
 	rm -rf debian/build-src debian/build-gtk debian/build-lucid debian/build-nox
 	mkdir debian/build-src
 	cp -a $$(ls -A | egrep -v '^(\.git|\.pc|debian)$$') debian/build-src
@@ -559,6 +567,8 @@ override_dh_auto_clean: $(persistent_autogen_files)
 
 override_dh_clean: $(persistent_autogen_files)
 	dh_clean
+	cp -a debian/etc-package-keyring-old.gpg \
+	  etc/package-keyring.gpg
 	rm -rf \
 	  debian/stamp-* \
 	  debian/build-lucid \
