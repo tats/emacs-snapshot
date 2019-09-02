@@ -1,3 +1,11 @@
+emacs (1:26.1+1-4~1.gbp1657e8) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @1657e853f47843befa74ae38007ba64f1c98c5cd **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 02 Sep 2019 15:17:32 -0500
+
 emacs (1:26.1+1-3.3) unstable; urgency=medium
 
   * Non-maintainer upload.
