@@ -3083,7 +3083,9 @@ as the value."
 (define-widget 'file 'string
   "A file widget.
 It reads a file name from an editable text field."
-  :completions #'completion-file-name-table
+  :completions (completion-table-case-fold
+                #'completion-file-name-table
+                (not read-file-name-completion-ignore-case))
   :prompt-value 'widget-file-prompt-value
   :format "%{%t%}: %v"
   ;; Doesn't work well with terminating newline.
@@ -3118,6 +3120,11 @@ It reads a file name from an editable text field."
 (define-widget 'directory 'file
   "A directory widget.
 It reads a directory name from an editable text field."
+  :completions (apply-partially #'completion-table-with-predicate
+                                (completion-table-case-fold
+                                 #'completion-file-name-table
+                                 (not read-file-name-completion-ignore-case))
+                                #'directory-name-p 'strict)
   :tag "Directory")
 
 (defvar widget-symbol-prompt-value-history nil
@@ -3333,13 +3340,13 @@ It reads a directory name from an editable text field."
       (condition-case data ;Note: We get a spurious byte-compile warning here.
 	  (progn
 	    ;; Avoid a confusing end-of-file error.
-	    (skip-syntax-forward "\\s-")
+	    (skip-syntax-forward "-")
 	    (if (eobp)
 		(setq err "Empty sexp -- use nil?")
 	      (unless (widget-apply widget :match (read (current-buffer)))
 		(setq err (widget-get widget :type-error))))
 	    ;; Allow whitespace after expression.
-	    (skip-syntax-forward "\\s-")
+	    (skip-syntax-forward "-")
 	    (if (and (not (eobp))
 		     (not err))
 		(setq err (format "Junk at end of expression: %s"

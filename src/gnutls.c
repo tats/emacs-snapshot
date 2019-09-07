@@ -1487,10 +1487,10 @@ returned as the :certificate entry.  */)
 				  (gnutls_kx_get (state)))));
 
   /* Protocol name. */
+  gnutls_protocol_t proto = gnutls_protocol_get_version (state);
   result = nconc2
     (result, list2 (intern (":protocol"),
-		    build_string (gnutls_protocol_get_name
-				  (gnutls_protocol_get_version (state)))));
+		    build_string (gnutls_protocol_get_name (proto))));
 
   /* Cipher name. */
   result = nconc2
@@ -1520,9 +1520,10 @@ returned as the :certificate entry.  */)
 #endif
 
   /* Renegotiation Indication */
-  result = nconc2
-    (result, list2 (intern (":safe-renegotiation"),
-                    gnutls_safe_renegotiation_status (state) ? Qt : Qnil));
+  if (proto <= GNUTLS_TLS1_2)
+    result = nconc2
+      (result, list2 (intern (":safe-renegotiation"),
+		      gnutls_safe_renegotiation_status (state) ? Qt : Qnil));
 
   return result;
 }

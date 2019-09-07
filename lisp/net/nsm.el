@@ -55,7 +55,6 @@ compatibility concerns.
 See the Emacs manual for a description of all things that are
 checked and warned against."
   :version "25.1"
-  :group 'nsm
   :type '(choice (const :tag "Low" low)
                  (const :tag "Medium" medium)
                  (const :tag "High" high)
@@ -76,7 +75,6 @@ connecting to hosts on a local network.
 Make sure you know what you are doing before enabling this
 option."
   :version "27.1"
-  :group 'nsm
   :type '(choice (const :tag "On" t)
                  (const :tag "Off" nil)
                  (function :tag "Custom function")))
@@ -85,7 +83,6 @@ option."
 						 user-emacs-directory)
   "The file the security manager settings will be stored in."
   :version "25.1"
-  :group 'nsm
   :type 'file)
 
 (defcustom nsm-save-host-names nil
@@ -93,7 +90,6 @@ option."
 By default, only hosts that have exceptions have their names
 stored in plain text."
   :version "25.1"
-  :group 'nsm
   :type 'boolean)
 
 (defvar nsm-noninteractive nil
@@ -175,8 +171,7 @@ otherwise.
 See also: `nsm-check-tls-connection', `nsm-save-host-names',
 `nsm-settings-file'"
   :version "27.1"
-  :group 'nsm
-  :type '(repeat (cons (function :tag "Check function")
+  :type '(repeat (list (symbol :tag "Check function")
                        (choice :tag "Level"
                                :value medium
                                (const :tag "Low" low)
@@ -665,17 +660,19 @@ the MD5 Message-Digest and the HMAC-MD5 Algorithms\",
 If this TLS extension is not used, the connection established is
 vulnerable to an attack in which an impersonator can extract
 sensitive information such as HTTP session ID cookies or login
-passwords.
+passwords.  Renegotiation was removed in TLS1.3, so this is only
+checked for earlier protocol versions.
 
 Reference:
 
 E. Rescorla, M. Ray, S. Dispensa, N. Oskov (Feb 2010).  \"Transport
 Layer Security (TLS) Renegotiation Indication Extension\",
 `https://tools.ietf.org/html/rfc5746'"
-  (let ((unsafe-renegotiation (not (plist-get status :safe-renegotiation))))
-    (and unsafe-renegotiation
-         (format-message
-          "safe renegotiation is not supported, connection not protected from impersonators"))))
+  (when (plist-member status :safe-renegotiation)
+    (let ((unsafe-renegotiation (not (plist-get status :safe-renegotiation))))
+      (and unsafe-renegotiation
+           (format-message
+            "safe renegotiation is not supported, connection not protected from impersonators")))))
 
 ;; Compression checks
 
@@ -823,7 +820,7 @@ protocol."
       ;; First format the certificate and warnings.
       (with-current-buffer-window
        buffer nil nil
-       (insert (nsm-format-certificate status))
+       (when status (insert (nsm-format-certificate status)))
        (insert message)
        (goto-char (point-min))
        ;; Fill the first line of the message, which usually

@@ -16,10 +16,10 @@ You can narrow news to a specific version by calling 'view-emacs-news'
 with a prefix argument or by typing 'C-u C-h C-n'.
 
 Temporary note:
-+++ indicates that all necessary documentation updates are complete.
-    (This means all relevant manuals in doc/ AND lisp doc-strings.)
++++ indicates that all relevant manuals in doc/ have been updated.
 --- means no change in the manuals is needed.
-When you add a new item, use the appropriate mark if you are sure it applies,
+When you add a new item, use the appropriate mark if you are sure it
+applies, and please also update docstrings as needed.
 
 
 * Installation Changes in Emacs 27.1
@@ -295,6 +295,14 @@ checked for validity, but no warnings about weak cryptography are
 issued), you can either set 'network-security-protocol-checks' to nil,
 or adjust the elements in that variable to only happen on the 'high'
 security level (assuming you use the 'medium' level).
+
+---
+** New user option 'nsm-trust-local-network'.
+Allows skipping Network Security Manager checks for hosts on your
+local subnet(s).  It defaults to nil.  Usually, there should be no
+need to set this non-nil, and doing that risks opening your local
+network connections to attacks.  So be sure you know what you are
+doing before changing the value.
 
 +++
 ** Native GnuTLS connections can now use client certificates.
@@ -2654,6 +2662,11 @@ system.  It is usually zero, which indicates that 'w32-ansi-code-page'
 is being used, except in Far Eastern locales.  When this variable is
 non-zero, Emacs at startup sets 'locale-coding-system' to the
 corresponding encoding, instead of using 'w32-ansi-code-page'.
+
+---
+** The default value of 'inhibit-compacting-font-caches' is t on MS-Windows.
+Experience shows that compacting font caches causes more trouble on
+MS-Windows than it helps.
 
 +++
 ** On NS the behaviour of drag and drop can now be modified by use of
