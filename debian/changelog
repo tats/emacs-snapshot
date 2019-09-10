@@ -1,3 +1,11 @@
+emacs-non-dfsg (1:26.3+1-1~1.gbp750c0e) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @750c0e59188314bb9700463edae60b052c6a815b **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 09 Sep 2019 19:09:18 -0500
+
 emacs-non-dfsg (1:26.1+1-1) unstable; urgency=medium
 
   * Merge upstream version 26.1. (Closes: 917004)
