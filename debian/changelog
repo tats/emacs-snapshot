@@ -1,10 +1,15 @@
-emacs (1:26.3+1-1~1.gbpcbd0cd) UNRELEASED; urgency=medium
+emacs (1:26.3+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @cbd0cd5751d3793922324a44f0ae1e6d11dec48a **
+  * Merge upstream version 26.3. (Closes: 939737)
 
-  * UNRELEASED
+  * Update debian/copyright for 26.3.
 
- -- Rob Browning <rlb@defaultvalue.org>  Mon, 09 Sep 2019 19:07:17 -0500
+  * Update debian/control for 26.3.
+
+  * Don't override the upstream EPLA packaging key anymore.  Emacs 26.3
+    has the correct version.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 09 Sep 2019 20:17:48 -0500
 
 emacs (1:26.1+1-4) unstable; urgency=high
 
