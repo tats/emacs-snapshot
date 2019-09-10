@@ -1,6 +1,6 @@
 ;;; w32-win.el --- parse switches controlling interface with W32 window system -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1994, 2001-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1994, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: Kevin Gallo
 ;; Keywords: terminals
@@ -169,6 +169,15 @@ the last file dropped is selected."
 ;; we should switch the Emacs Input Method to match the
 ;; new layout/language selected by the user.
 (global-set-key [language-change] 'ignore)
+
+;; Some Windows applications send the 'noname' (VK_NONAME) pseudo-key
+;; to prevent Windows from sleeping.  We want to ignore these key
+;; events, to avoid annoying users by ringing the bell and announcing
+;; that the key is not bound.
+(global-set-key [noname]   'ignore)
+(global-set-key [C-noname] 'ignore)
+(global-set-key [M-noname] 'ignore)
+
 
 (defvar x-resource-name)
 

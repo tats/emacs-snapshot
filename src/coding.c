@@ -1,5 +1,5 @@
 /* Coding system handler (conversion, detection, etc).
-   Copyright (C) 2001-2018 Free Software Foundation, Inc.
+   Copyright (C) 2001-2019 Free Software Foundation, Inc.
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
      2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
@@ -1225,7 +1225,10 @@ detect_coding_utf_8 (struct coding_system *coding,
       ONE_MORE_BYTE (c4);
       if (c4 < 0 || ! UTF_8_EXTRA_OCTET_P (c4))
 	break;
-      if (UTF_8_5_OCTET_LEADING_P (c))
+      if (UTF_8_5_OCTET_LEADING_P (c)
+	  /* If we ever need to increase MAX_CHAR, the below may need
+	     to be reviewed.  */
+	  && c < MAX_MULTIBYTE_LEADING_CODE)
 	{
 	  nchars++;
 	  continue;
@@ -1514,13 +1517,6 @@ encode_coding_utf_8 (struct coding_system *coding)
 
 /* See the above "GENERAL NOTES on `detect_coding_XXX ()' functions".
    Return true if a text is encoded in one of UTF-16 based coding systems.  */
-
-#define UTF_16_HIGH_SURROGATE_P(val) \
-  (((val) & 0xFC00) == 0xD800)
-
-#define UTF_16_LOW_SURROGATE_P(val) \
-  (((val) & 0xFC00) == 0xDC00)
-
 
 static bool
 detect_coding_utf_16 (struct coding_system *coding,
@@ -7786,15 +7782,22 @@ encode_coding (struct coding_system *coding)
   SAFE_FREE ();
 }
 
+/* Code-conversion operations use internal buffers.  There's a single
+   reusable buffer, which is created the first time it is needed, and
+   then never killed.  When this reusable buffer is being used, the
+   reused_workbuf_in_use flag is set.  If we need another conversion
+   buffer while the reusable one is in use (e.g., if code-conversion
+   is reentered when another code-conversion is in progress), we
+   create temporary buffers using the name of the reusable buffer as
+   the base name, see code_conversion_save below.  These temporary
+   buffers are killed when the code-conversion operations that use
+   them return, see code_conversion_restore below.  */
 
-/* Name (or base name) of work buffer for code conversion.  */
+/* A string that serves as name of the reusable work buffer, and as base
+   name of temporary work buffers used for code-conversion operations.  */
 static Lisp_Object Vcode_conversion_workbuf_name;
 
-/* A working buffer used by the top level conversion.  Once it is
-   created, it is never destroyed.  It has the name
-   Vcode_conversion_workbuf_name.  The other working buffers are
-   destroyed after the use is finished, and their names are modified
-   versions of Vcode_conversion_workbuf_name.  */
+/* The reusable working buffer, created once and never killed.  */
 static Lisp_Object Vcode_conversion_reused_workbuf;
 
 /* True iff Vcode_conversion_reused_workbuf is already in use.  */
@@ -9211,22 +9214,22 @@ to the string and treated as in `substring'.  */)
 
 DEFUN ("check-coding-systems-region", Fcheck_coding_systems_region,
        Scheck_coding_systems_region, 3, 3, 0,
-       doc: /* Check if the region is encodable by coding systems.
+       doc: /* Check if text between START and END is encodable by CODING-SYSTEM-LIST.
 
 START and END are buffer positions specifying the region.
 CODING-SYSTEM-LIST is a list of coding systems to check.
 
-The value is an alist ((CODING-SYSTEM POS0 POS1 ...) ...), where
-CODING-SYSTEM is a member of CODING-SYSTEM-LIST and can't encode the
-whole region, POS0, POS1, ... are buffer positions where non-encodable
-characters are found.
-
 If all coding systems in CODING-SYSTEM-LIST can encode the region, the
-value is nil.
+function returns nil.
+
+If some of the coding systems cannot encode the whole region, value is
+an alist, each element of which has the form (CODING-SYSTEM POS1 POS2 ...),
+which means that CODING-SYSTEM cannot encode the text at buffer positions
+POS1, POS2, ...
 
 START may be a string.  In that case, check if the string is
-encodable, and the value contains indices to the string instead of
-buffer positions.  END is ignored.
+encodable, and the value contains character indices into the string
+instead of buffer positions.  END is ignored in this case.
 
 If the current buffer (or START if it is a string) is unibyte, the value
 is nil.  */)
@@ -9395,7 +9398,8 @@ START and END are buffer positions.
 Optional 4th arguments DESTINATION specifies where the decoded text goes.
 If nil, the region between START and END is replaced by the decoded text.
 If buffer, the decoded text is inserted in that buffer after point (point
-does not move).
+does not move).  If that buffer is unibyte, it receives the individual
+bytes of the internal representation of the decoded text.
 In those cases, the length of the decoded text is returned.
 If DESTINATION is t, the decoded text is returned.
 
@@ -9553,7 +9557,9 @@ if the decoding operation is trivial.
 
 Optional fourth arg BUFFER non-nil means that the decoded text is
 inserted in that buffer after point (point does not move).  In this
-case, the return value is the length of the decoded text.
+case, the return value is the length of the decoded text.  If that
+buffer is unibyte, it receives the individual bytes of the internal
+representation of the decoded text.
 
 This function sets `last-coding-system-used' to the precise coding system
 used (which may be different from CODING-SYSTEM if CODING-SYSTEM is

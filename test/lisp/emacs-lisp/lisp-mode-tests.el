@@ -1,6 +1,6 @@
 ;;; lisp-mode-tests.el --- Test Lisp editing commands  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2019 Free Software Foundation, Inc.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -113,6 +113,57 @@ noindent\" 3
       ;; we're indenting ends on the previous line.
       (should (equal (buffer-string) original)))))
 
+(ert-deftest indent-sexp-go ()
+  "Make sure `indent-sexp' doesn't stop after #s."
+  ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=31984.
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (insert "#s(foo\nbar)\n")
+    (goto-char (point-min))
+    (indent-sexp)
+    (should (equal (buffer-string) "\
+#s(foo
+   bar)\n"))))
+
+(ert-deftest indent-sexp-cant-go ()
+  "`indent-sexp' shouldn't error before a sexp."
+  ;; See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=31984#32.
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (insert "(())")
+    (goto-char (1+ (point-min)))
+    ;; Paredit calls `indent-sexp' from this position.
+    (indent-sexp)
+    (should (equal (buffer-string) "(())"))))
+
+(ert-deftest indent-sexp-stop-before-eol-comment ()
+  "`indent-sexp' shouldn't look for more sexps after an eol comment."
+  ;; See https://debbugs.gnu.org/35286.
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (let ((str "() ;;\n  x"))
+      (insert str)
+      (goto-char (point-min))
+      (indent-sexp)
+      ;; The "x" is in the next sexp, so it shouldn't get indented.
+      (should (equal (buffer-string) str)))))
+
+(ert-deftest indent-sexp-stop-before-eol-non-lisp ()
+  "`indent-sexp' shouldn't be too agressive in non-Lisp modes."
+  ;; See https://debbugs.gnu.org/35286#13.
+  (with-temp-buffer
+    (prolog-mode)
+    (let ((str "\
+x(H) -->
+    {y(H)}.
+a(A) -->
+    b(A)."))
+      (insert str)
+      (search-backward "{")
+      (indent-sexp)
+      ;; There's no line-spanning sexp, so nothing should be indented.
+      (should (equal (buffer-string) str)))))
+
 (ert-deftest lisp-indent-region ()
   "Test basics of `lisp-indent-region'."
   (with-temp-buffer
@@ -224,6 +275,20 @@ Expected initialization file: `%s'\"
       (comment-indent)
       (should (equal (buffer-string) correct)))))
 
+(ert-deftest lisp-indent-with-read-only-field ()
+  "Test indentation on line with read-only field (Bug#32014)."
+  (with-temp-buffer
+    (insert (propertize "prompt> " 'field 'output 'read-only t
+                        'rear-nonsticky t 'front-sticky '(read-only)))
+    (insert " foo")
+    (lisp-indent-line)
+    (should (equal (buffer-string) "prompt> foo"))))
+
+(ert-deftest lisp-indent-unfinished-string ()
+  "Don't infloop on unfinished string (Bug#37045)."
+  (with-temp-buffer
+    (insert "\"\n")
+    (lisp-indent-region (point-min) (point-max))))
 
 (provide 'lisp-mode-tests)
 ;;; lisp-mode-tests.el ends here

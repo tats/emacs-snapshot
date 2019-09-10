@@ -1,6 +1,6 @@
 ;;; speedbar --- quick access to files and tags in a frame
 
-;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: file, tags, tools
@@ -700,7 +700,7 @@ singular expression.  This variable will be turned into
 function `speedbar-add-supported-extension' to add a new extension at
 runtime, or use the configuration dialog to set it in your init file.
 If you add an extension to this list, and it does not appear, you may
-need to also modify `completion-ignored-extension' which will also help
+need to also modify `completion-ignored-extensions' which will also help
 file completion."
   :group 'speedbar
   :type '(repeat (regexp :tag "Extension Regexp"))

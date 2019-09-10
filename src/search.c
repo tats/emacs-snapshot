@@ -1,6 +1,6 @@
 /* String search routines for GNU Emacs.
 
-Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2018 Free Software
+Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2019 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -1341,12 +1341,7 @@ search_buffer (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 	}
       else
 	{
-	  /* Converting multibyte to single-byte.
-
-	     ??? Perhaps this conversion should be done in a special way
-	     by subtracting nonascii-insert-offset from each non-ASCII char,
-	     so that only the multibyte chars which really correspond to
-	     the chosen single-byte character set can possibly match.  */
+	  /* Converting multibyte to single-byte.  */
 	  raw_pattern_size = SCHARS (string);
 	  raw_pattern_size_byte = SCHARS (string);
 	  raw_pattern = SAFE_ALLOCA (raw_pattern_size + 1);

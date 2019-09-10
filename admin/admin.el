@@ -1,6 +1,6 @@
 ;;; admin.el --- utilities for Emacs administration
 
-;; Copyright (C) 2001-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -138,7 +138,10 @@ Root must be the root of an Emacs source tree."
                               (if (eq 2 (length newversion)) 0 1))))
          (majorbump (and oldversion (not (equal oldmajor newmajor))))
          (minorbump (and oldversion (not majorbump)
-                         (not (equal (cadr oldversion) (cadr newversion)))))
+                         (or (not (equal (cadr oldversion) (cadr newversion)))
+                             ;; Eg 26.2 -> 26.2.50.
+                             (and (> (length newversion)
+                                     (length oldversion))))))
          (newsfile (expand-file-name "etc/NEWS" root))
          (oldnewsfile (expand-file-name (format "etc/NEWS.%s" oldmajor) root)))
     (unless (> (length newversion) 2)   ; pretest or release candidate?
@@ -261,8 +264,12 @@ ROOT should be the root of an Emacs source tree."
 ROOT should be the root of an Emacs source tree.
 Interactively with a prefix argument, prompt for TYPE.
 Optional argument TYPE is type of output (nil means all)."
-  (interactive (let ((root (read-directory-name "Emacs root directory: "
-						source-directory nil t)))
+  (interactive (let ((root
+                      (if noninteractive
+                          (or (pop command-line-args-left)
+                              default-directory)
+                        (read-directory-name "Emacs root directory: "
+                                             source-directory nil t))))
 		 (list root
 		       (if current-prefix-arg
 			   (completing-read
@@ -348,13 +355,22 @@ Optional argument TYPE is type of output (nil means all)."
     (manual-html-mono texi (expand-file-name (concat name ".html")
 					     html-mono-dir))))
 
+(defvar manual-makeinfo (or (getenv "MAKEINFO") "makeinfo")
+  "The `makeinfo' program to use.")
+
+(defvar manual-texi2pdf (or (getenv "TEXI2PDF") "texi2pdf")
+  "The `texi2pdf' program to use.")
+
+(defvar manual-texi2dvi (or (getenv "TEXI2DVI") "texi2dvi")
+  "The `texi2dvi' program to use.")
+
 (defun manual-html-mono (texi-file dest)
   "Run Makeinfo on TEXI-FILE, emitting mono HTML output to DEST.
 This function also edits the HTML files so that they validate as
 HTML 4.01 Transitional, and pulls in the gnu.org stylesheet using
 the @import directive."
   (make-directory (or (file-name-directory dest) ".") t)
-  (call-process "makeinfo" nil nil nil
+  (call-process manual-makeinfo nil nil nil
 		"-D" "WWW_GNU_ORG"
 		"-I" (expand-file-name "../emacs"
 				       (file-name-directory texi-file))
@@ -382,7 +398,7 @@ the @import directive."
   (unless (file-exists-p texi-file)
     (user-error "Manual file %s not found" texi-file))
   (make-directory dir t)
-  (call-process "makeinfo" nil nil nil
+  (call-process manual-makeinfo nil nil nil
 		"-D" "WWW_GNU_ORG"
 		"-I" (expand-file-name "../emacs"
 				       (file-name-directory texi-file))
@@ -421,7 +437,7 @@ the @import directive."
   "Run texi2pdf on TEXI-FILE, emitting PDF output to DEST."
   (make-directory (or (file-name-directory dest) ".") t)
   (let ((default-directory (file-name-directory texi-file)))
-    (call-process "texi2pdf" nil nil nil
+    (call-process manual-texi2pdf nil nil nil
 		  "-I" "../emacs" "-I" "../misc"
 		  texi-file "-o" dest)))
 
@@ -431,7 +447,7 @@ the @import directive."
   (let ((dvi-dest (concat (file-name-sans-extension dest) ".dvi"))
 	(default-directory (file-name-directory texi-file)))
     ;; FIXME: Use `texi2dvi --ps'?  --xfq
-    (call-process "texi2dvi" nil nil nil
+    (call-process manual-texi2dvi nil nil nil
 		  "-I" "../emacs" "-I" "../misc"
 		  texi-file "-o" dvi-dest)
     (call-process "dvips" nil nil nil dvi-dest "-o" dest)
@@ -683,6 +699,7 @@ style=\"text-align:left\">")
     (if (file-directory-p stem)
 	(delete-directory stem t))
     (make-directory stem)
+    (setq stem (file-name-as-directory stem))
     (copy-file "../doc/misc/texinfo.tex" stem)
     (unless (equal type "emacs")
       (copy-file "../doc/emacs/emacsver.texi" stem)
@@ -705,7 +722,7 @@ style=\"text-align:left\">")
 	  (setq ats t)
 	  (message "Unexpanded: %s" (match-string 0)))
 	(if ats (error "Unexpanded configure variables in Makefile?")))
-      (write-region nil nil (expand-file-name (format "%s/Makefile" stem))
+      (write-region nil nil (expand-file-name (format "%sMakefile" stem))
 		    nil 'silent))
     (call-process "tar" nil nil nil "-cf" tarfile stem)
     (delete-directory stem t)
@@ -717,8 +734,12 @@ style=\"text-align:left\">")
 ROOT should be the root of an Emacs source tree.
 Interactively with a prefix argument, prompt for TYPE.
 Optional argument TYPE is type of output (nil means all)."
-  (interactive (let ((root (read-directory-name "Emacs root directory: "
-						source-directory nil t)))
+  (interactive (let ((root
+                      (if noninteractive
+                          (or (pop command-line-args-left)
+                              default-directory)
+                        (read-directory-name "Emacs root directory: "
+                                             source-directory nil t))))
 		 (list root
 		       (if current-prefix-arg
 			   (completing-read

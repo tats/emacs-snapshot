@@ -1,6 +1,6 @@
 ;;; term.el --- general command interpreter in a window stuff
 
-;; Copyright (C) 1988, 1990, 1992, 1994-1995, 2001-2018 Free Software
+;; Copyright (C) 1988, 1990, 1992, 1994-1995, 2001-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Per Bothner <per@bothner.com>
@@ -32,6 +32,21 @@
 ;; To see what I've modified and where it came from search for '-mm'
 
 ;;; Commentary:
+
+;; This file defines a general command-interpreter-in-a-buffer package
+;; (term mode).  The idea is that you can build specific process-in-a-buffer
+;; modes on top of term mode -- e.g., lisp, shell, scheme, T, soar, ....
+;; This way, all these specific packages share a common base functionality,
+;; and a common set of bindings, which makes them easier to use (and
+;; saves code, implementation time, etc., etc.).
+
+;; If, instead of `term', you call `ansi-term', you get multiple term
+;; buffers, after every new call ansi-term opens a new
+;; "*ansi-term*<xx>" window, where <xx> is, as usual, a number...
+
+;; For hints on converting existing process modes (e.g., tex-mode,
+;; background, dbx, gdb, kermit, prolog, telnet) to use term-mode
+;; instead of shell-mode, see the notes at the end of this file.
 
 ;; Speed considerations and a few caveats
 ;; --------------------------------------
@@ -85,13 +100,6 @@
 ;; # By default nobody can't do anything
 ;; deny	root		*
 ;;
-;;
-;;             ----------------------------------------
-;;
-;;  If, instead of 'term', you call 'ansi-term', you get multiple term
-;; buffers, after every new call ansi-term opens a new *ansi-term*<xx> window,
-;; where <xx> is, as usual, a number...
-;;
 ;;             ----------------------------------------
 ;;
 ;;  With the term-buffer-maximum-size you can finally decide how many
@@ -99,7 +107,6 @@
 ;; usual.
 ;;
 ;;             ----------------------------------------
-;;
 ;;
 ;;  ANSI colorization should work well, I've decided to limit the interpreter
 ;; to five outstanding commands (like ESC [ 01;04;32;41;07m.
@@ -115,38 +122,6 @@
 ;;  - Add hooks to allow raw-mode keys to be configurable
 ;;  - Which keys are better ? \eOA or \e[A ?
 ;;
-;;
-;;  Changes:
-;;
-;; V4.0 January 1997
-;;
-;;   - Huge reworking of the faces code: now we only have roughly 20-30
-;;     faces for everything so we're even faster than the old md-term.el !
-;;   - Finished removing all the J-Shell code.
-;;
-;;  V3.0 January 1997
-;;
-;;  - Now all the supportable ANSI commands work well.
-;;  - Reworked a little the code: much less jsh-inspired stuff
-;;
-;;  V2.3 November
-;;
-;;  - Now all the faces are accessed through an array: much cleaner code.
-;;
-;;  V2.2 November 4 1996
-;;
-;;  - Implemented ANSI output colorization ( a bit rough but enough for
-;;    color_ls )
-;;
-;;  - Implemented a maximum limit for the scroll buffer (stolen from
-;;    comint.el)
-;;
-;;  v2.1 October 28 1996, first public release
-;;
-;;  - Some new keybindings for term-char mode ( notably home/end/...)
-;;  - Directory, hostname and username tracking via ange-ftp
-;;  - Multi-term capability via the ansi-term call
-;;
 ;;  ----------------------------------------------------------------
 ;;  You should/could have something like this in your .emacs to take
 ;;  full advantage of this package
@@ -160,7 +135,6 @@
 ;;  	             (auto-fill-mode -1)
 ;;  	             (setq tab-width 8 ))))
 ;;
-;;
 ;;             ----------------------------------------
 ;;
 ;;  If you want to use color ls the best setup is to have a different file
@@ -170,7 +144,6 @@
 ;; obtain normal white I have to do bold-white :)
 ;;
 ;;             ----------------------------------------
-;;
 ;;
 ;;  # Configuration file for the color ls utility
 ;;  # This file goes in the /etc directory, and must be world readable.
@@ -228,73 +201,64 @@
 ;;  .xbm 01;35
 ;;  .xpm 01;35
 ;;
+;;             ----------------------------------------
+;;
+;; There are actually two methods for directory tracking, one
+;; implemented in `term-command-hook' which sets the directory
+;; according to an escape sequence of the form "\032/<directory>\n".
+;; Some shells like bash will already send this escape sequence when
+;; they detect they are running in Emacs.  This can be configured or
+;; disabled on the Emacs side by setting `term-command-hook' to
+;; a different function.
+;;
+;; The second method is in `term-handle-ansi-terminal-messages' which
+;; sets user, host, and directory according to escape sequences of the
+;; form "\033AnSiTc <directory>\n" (replace the "c" with "u" and "h"
+;; for user and host, respectively).  If the user and host don't
+;; match, it will set directory to a remote one, so it is important to
+;; set user and host correctly first.  See the example bash
+;; configuration below.
 ;;
 ;;             ----------------------------------------
 ;;
-;;  Notice: for directory/host/user tracking you need to have something
-;; like this in your shell startup script (this is for a POSIXish shell
-;; like Bash but should be quite easy to port to other shells)
-;;
-;;             ----------------------------------------
-;;
-;;  # Set HOSTNAME if not already set.
+;;	# Set HOSTNAME if not already set.
 ;;	: ${HOSTNAME=$(uname -n)}
 ;;
-;;  # su does not change this but I'd like it to
-;;
+;;	# su does not change this but I'd like it to
 ;;	USER=$(whoami)
 ;;
-;;  # ...
+;;	# ...
 ;;
 ;;	case $TERM in
 ;;	    eterm*)
 ;;
 ;;		printf '%s\n' \
 ;;		 -------------------------------------------------------------- \
-;;		 "Hello $user" \
+;;		 "Hello $USER" \
 ;;		 "Today is $(date)" \
 ;;		 "We are on $HOSTNAME running $(uname) under Emacs term mode" \
 ;;		 --------------------------------------------------------------
 ;;
-;;		export EDITOR=emacsclient
-;;
 ;;		# The \033 stands for ESC.
 ;;		# There is a space between "AnSiT?" and $whatever.
+;;		printf '\033AnSiTh %s\n' "$HOSTNAME"
+;;		printf '\033AnSiTu %s\n' "$USER"
+;;		printf '\033AnSiTc %s\n' "$PWD"
 ;;
 ;;		cd()    { command cd    "$@"; printf '\033AnSiTc %s\n' "$PWD"; }
 ;;		pushd() { command pushd "$@"; printf '\033AnSiTc %s\n' "$PWD"; }
 ;;		popd()  { command popd  "$@"; printf '\033AnSiTc %s\n' "$PWD"; }
 ;;
-;;		printf '\033AnSiTc %s\n' "$PWD"
-;;		printf '\033AnSiTh %s\n' "$HOSTNAME"
-;;		printf '\033AnSiTu %s\n' "$USER"
-;;
-;;		eval $(dircolors $HOME/.emacs_dircolors)
+;;		# Use custom dircolors in term buffers.
+;;		# eval $(dircolors $HOME/.emacs_dircolors)
 ;;	esac
 ;;
-;;  # ...
+;;	# ...
 ;;
-;;
-
-;;; Original Commentary:
-;; ---------------------
-
-;; The changelog is at the end of this file.
-
-;; Please send me bug reports, bug fixes, and extensions, so that I can
-;; merge them into the master source.
-;;     - Per Bothner (bothner@cygnus.com)
-
-;; This file defines a general command-interpreter-in-a-buffer package
-;; (term mode).  The idea is that you can build specific process-in-a-buffer
-;; modes on top of term mode -- e.g., lisp, shell, scheme, T, soar, ....
-;; This way, all these specific packages share a common base functionality,
-;; and a common set of bindings, which makes them easier to use (and
-;; saves code, implementation time, etc., etc.).
-
-;; For hints on converting existing process modes (e.g., tex-mode,
-;; background, dbx, gdb, kermit, prolog, telnet) to use term-mode
-;; instead of shell-mode, see the notes at the end of this file.
+;; For troubleshooting in Bash, you can check the definition of the
+;; custom functions with the "type" command.  e.g. "type cd".  If you
+;; do not see the expected definition from the config below, then the
+;; directory tracking will not work.
 
 
 ;; Brief Command Documentation:
@@ -302,21 +266,21 @@
 ;; Term Mode Commands: (common to all derived modes, like cmushell & cmulisp
 ;; mode)
 ;;
-;; m-p	    term-previous-input    	  Cycle backwards in input history
-;; m-n	    term-next-input  	    	  Cycle forwards
-;; m-r     term-previous-matching-input  Previous input matching a regexp
-;; m-s     comint-next-matching-input      Next input that matches
+;; M-p     term-previous-input           Cycle backwards in input history
+;; M-n     term-next-input               Cycle forwards
+;; M-r     term-previous-matching-input  Previous input matching a regexp
+;; M-s     comint-next-matching-input    Next input that matches
 ;; return  term-send-input
-;; c-c c-a term-bol                      Beginning of line; skip prompt.
-;; c-d	    term-delchar-or-maybe-eof     Delete char unless at end of buff.
-;; c-c c-u term-kill-input	    	    ^u
-;; c-c c-w backward-kill-word    	    ^w
-;; c-c c-c term-interrupt-subjob 	    ^c
-;; c-c c-z term-stop-subjob	    	    ^z
-;; c-c c-\ term-quit-subjob	    	    ^\
-;; c-c c-o term-kill-output		    Delete last batch of process output
-;; c-c c-r term-show-output		    Show last batch of process output
-;; c-c c-h term-dynamic-list-input-ring  List input history
+;; C-c C-a term-bol                      Beginning of line; skip prompt.
+;; C-d     term-delchar-or-maybe-eof     Delete char unless at end of buff.
+;; C-c C-u term-kill-input               ^u
+;; C-c C-w backward-kill-word            ^w
+;; C-c C-c term-interrupt-subjob         ^c
+;; C-c C-z term-stop-subjob              ^z
+;; C-c C-\ term-quit-subjob              ^\
+;; C-c C-o term-kill-output              Delete last batch of process output
+;; C-c C-r term-show-output              Show last batch of process output
+;; C-c C-h term-dynamic-list-input-ring  List input history
 ;;
 ;; Not bound by default in term-mode
 ;; term-send-invisible			Read a line w/o echo, and send to proc
@@ -326,8 +290,8 @@
 ;; term-replace-by-expanded-filename	Expand and complete filename at point;
 ;;					replace with expanded/completed name.
 ;; term-kill-subjob			No mercy.
-;; term-show-maximum-output            Show as much output as possible.
-;; term-continue-subjob		Send CONT signal to buffer's process
+;; term-show-maximum-output             Show as much output as possible.
+;; term-continue-subjob                 Send CONT signal to buffer's process
 ;;					group.  Useful if you accidentally
 ;;					suspend your process (with C-c C-z).
 
@@ -344,6 +308,7 @@
 (eval-when-compile (require 'cl-lib))
 (require 'ring)
 (require 'ehelp)
+(require 'comint) ; Password regexp.
 
 (declare-function ring-empty-p "ring" (ring))
 (declare-function ring-ref "ring" (ring index))
@@ -1517,6 +1482,31 @@ Using \"emacs\" loses, because bash disables editing if $TERM == emacs.")
   ;; don't define :te=\\E[2J\\E[?47l\\E8:ti=\\E7\\E[?47h\
   "Termcap capabilities supported.")
 
+;; This private hack is for backwards compatibility with Bash 4.3 and earlier.
+;; It can be useful even when running a program other than Bash, as the
+;; program might invoke Bash as an interactive subshell.  See this thread:
+;; https://lists.gnu.org/r/emacs-devel/2018-05/msg00670.html
+;; Remove this hack and its uses once Bash 4.4-or-later is reasonably
+;; universal, because it slows down execution slightly when
+;; term--bash-needs-EMACSp is first called.
+(defvar term--bash-needs-EMACS-status nil
+  "43 if Bash is so old that it needs EMACS set.
+Some other integer if Bash is new or not in use.
+Nil if unknown.")
+(defun term--bash-needs-EMACSp ()
+  "t if Bash is old, nil if it is new or not in use."
+  (eq 43
+      (or term--bash-needs-EMACS-status
+          (setf
+           term--bash-needs-EMACS-status
+           (let ((process-environment
+                  (cons "BASH_ENV" process-environment)))
+             (condition-case nil
+                 (call-process
+                  "bash" nil nil nil "-c"
+                  "case $BASH_VERSION in [0123].*|4.[0123].*) exit 43;; esac")
+               (error 0)))))))
+
 ;; This auxiliary function cranks up the process for term-exec in
 ;; the appropriate environment.
 
@@ -1534,12 +1524,6 @@ Using \"emacs\" loses, because bash disables editing if $TERM == emacs.")
 	   (format term-termcap-format "TERMCAP="
 		   term-term-name term-height term-width)
 
-	   ;; This is for backwards compatibility with Bash 4.3 and earlier.
-	   ;; Remove this hack once Bash 4.4-or-later is common, because
-	   ;; it breaks './configure' of some packages that expect it to
-	   ;; say where to find EMACS.
-	   (format "EMACS=%s (term:%s)" emacs-version term-protocol-version)
-
 	   (format "INSIDE_EMACS=%s,term:%s" emacs-version term-protocol-version)
 	   (format "LINES=%d" term-height)
 	   (format "COLUMNS=%d" term-width))
@@ -1551,6 +1535,9 @@ Using \"emacs\" loses, because bash disables editing if $TERM == emacs.")
 	;; escape codes, so we need to see the raw output.  We will have to
 	;; do the decoding by hand on the parts that are made of chars.
 	(coding-system-for-read 'binary))
+    (when (term--bash-needs-EMACSp)
+      (push (format "EMACS=%s (term:%s)" emacs-version term-protocol-version)
+            process-environment))
     (apply 'start-process name buffer
 	   "/bin/sh" "-c"
 	   (format "stty -nl echo rows %d columns %d sane 2>/dev/null;\
@@ -2258,12 +2245,10 @@ applications."
 (defun term-send-invisible (str &optional proc)
   "Read a string without echoing.
 Then send it to the process running in the current buffer.  A new-line
-is additionally sent.  String is not saved on term input history list.
-Security bug: your string can still be temporarily recovered with
-\\[view-lossage]."
+is additionally sent.  String is not saved on term input history list."
   (interactive "P") ; Defeat snooping via C-x esc
   (when (not (stringp str))
-    (setq str (term-read-noecho "Non-echoed text: " t)))
+    (setq str (read-passwd "Non-echoed text: ")))
   (when (not proc)
     (setq proc (get-buffer-process (current-buffer))))
   (if (not proc) (error "Current buffer has no process")
@@ -2271,6 +2256,16 @@ Security bug: your string can still be temporarily recovered with
 				     (cons str nil)))
     (term-send-string proc str)
     (term-send-string proc "\n")))
+
+;; TODO: Maybe combine this with `comint-watch-for-password-prompt'.
+(defun term-watch-for-password-prompt (string)
+  "Prompt in the minibuffer for password and send without echoing.
+Checks if STRING contains a password prompt as defined by
+`comint-password-prompt-regexp'."
+  (when (term-in-line-mode)
+    (when (let ((case-fold-search t))
+            (string-match comint-password-prompt-regexp string))
+      (term-send-invisible (read-passwd string)))))
 
 
 ;;; Low-level process communication
@@ -2750,12 +2745,10 @@ See `term-prompt-regexp'."
 	(setq default-directory
 	      (file-name-as-directory
 	       (if (and (string= term-ansi-at-host (system-name))
-					(string= term-ansi-at-user (user-real-login-name)))
+                        (string= term-ansi-at-user (user-real-login-name)))
 		   (expand-file-name term-ansi-at-dir)
-		 (if (string= term-ansi-at-user (user-real-login-name))
-		     (concat "/" term-ansi-at-host ":" term-ansi-at-dir)
-		   (concat "/" term-ansi-at-user "@" term-ansi-at-host ":"
-			   term-ansi-at-dir)))))
+                 (concat "/-:" term-ansi-at-user "@" term-ansi-at-host ":"
+                         term-ansi-at-dir))))
 
 	;; I'm not sure this is necessary,
 	;; but it's best to be on the safe side.
@@ -2868,11 +2861,12 @@ See `term-prompt-regexp'."
                           ;; next time.
                           (when (= funny str-length)
                             (let ((partial 0))
-                              (while (eq (char-charset (aref decoded-substring
-                                                             (- count 1 partial)))
-                                         'eight-bit)
+                              (while (and (< partial count)
+                                          (eq (char-charset (aref decoded-substring
+                                                                  (- count 1 partial)))
+                                              'eight-bit))
                                 (cl-incf partial))
-                              (when (> partial 0)
+                              (when (> count partial 0)
                                 (setq term-terminal-undecoded-bytes
                                       (substring decoded-substring (- partial)))
                                 (setq decoded-substring
@@ -3129,6 +3123,8 @@ See `term-prompt-regexp'."
 	  (term-handle-deferred-scroll))
 
 	(set-marker (process-mark proc) (point))
+        (when (stringp decoded-substring)
+          (term-watch-for-password-prompt decoded-substring))
 	(when save-point
 	  (goto-char save-point)
 	  (set-marker save-point nil))
@@ -3386,11 +3382,10 @@ option is enabled.  See `term-set-goto-process-mark'."
    ;; \E[B - cursor down (terminfo: cud)
    ((eq char ?B)
     (let ((tcr (term-current-row)))
-      (unless (= tcr (1- term-scroll-end))
+      (unless (>= tcr term-scroll-end)
 	(term-down
-	 (if (> (+ tcr term-terminal-parameter) term-scroll-end)
-	     (- term-scroll-end 1 tcr)
-	   (max 1 term-terminal-parameter)) t))))
+         (min (- term-scroll-end tcr) (max 1 term-terminal-parameter))
+         t))))
    ;; \E[C - cursor right (terminfo: cuf, cuf1)
    ((eq char ?C)
     (term-move-columns

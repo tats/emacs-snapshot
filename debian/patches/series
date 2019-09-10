@@ -6,11 +6,6 @@
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
-0009-An-epg-test-failure-with-recent-GnuPG-versions-has-b.patch
-0010-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
-0011-tramp-test42-remote-load-path-regexp-quote-directory.patch
-0012-ibuffer-filter-inclusion-3-regexp-quote-directory.patch
-0013-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
-0014-Fix-an-eshell-ls-dired-test-for-non-recent-files.patch
-0015-Ignore-color-fonts-when-using-Xft.patch
-0016-Port-FC_COLOR-change-to-older-fontconfig.patch
+0009-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
+0010-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
+0011-Fix-an-eshell-ls-dired-test-for-non-recent-files.patch

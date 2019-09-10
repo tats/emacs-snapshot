@@ -1,6 +1,6 @@
 /* Lisp parsing and input streams.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2018 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1995, 1997-2019 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -735,10 +735,14 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 }
 
 DEFUN ("read-char", Fread_char, Sread_char, 0, 3, 0,
-       doc: /* Read a character from the command input (keyboard or macro).
+       doc: /* Read a character event from the command input (keyboard or macro).
 It is returned as a number.
-If the character has modifiers, they are resolved and reflected to the
-character code if possible (e.g. C-SPC -> 0).
+If the event has modifiers, they are resolved and reflected in the
+returned character code if possible (e.g. C-SPC yields 0 and C-a yields 97).
+If some of the modifiers cannot be reflected in the character code, the
+returned value will include those modifiers, and will not be a valid
+character code: it will fail the `characterp' test.  Use `event-basic-type'
+to recover the character code with the modifiers removed.
 
 If the user generates an event which is not a character (i.e. a mouse
 click or function key event), `read-char' signals an error.  As an
@@ -785,10 +789,14 @@ floating-point value.  */)
 }
 
 DEFUN ("read-char-exclusive", Fread_char_exclusive, Sread_char_exclusive, 0, 3, 0,
-       doc: /* Read a character from the command input (keyboard or macro).
+       doc: /* Read a character event from the command input (keyboard or macro).
 It is returned as a number.  Non-character events are ignored.
-If the character has modifiers, they are resolved and reflected to the
-character code if possible (e.g. C-SPC -> 0).
+If the event has modifiers, they are resolved and reflected in the
+returned character code if possible (e.g. C-SPC yields 0 and C-a yields 97).
+If some of the modifiers cannot be reflected in the character code, the
+returned value will include those modifiers, and will not be a valid
+character code: it will fail the `characterp' test.  Use `event-basic-type'
+to recover the character code with the modifiers removed.
 
 If the optional argument PROMPT is non-nil, display that as a prompt.
 If the optional argument INHERIT-INPUT-METHOD is non-nil and some
@@ -2164,7 +2172,10 @@ STREAM or the value of `standard-input' may be:
   if (EQ (stream, Qt))
     stream = Qread_char;
   if (EQ (stream, Qread_char))
-    /* FIXME: ?! When is this used !?  */
+    /* FIXME: ?! This is used when the reader is called from the
+       minibuffer without a stream, as in (read).  But is this feature
+       ever used, and if so, why?  IOW, will anything break if this
+       feature is removed !?  */
     return call1 (intern ("read-minibuffer"),
 		  build_string ("Lisp expression: "));
 
@@ -2677,7 +2688,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
   int c;
   bool uninterned_symbol = false;
   bool multibyte;
-  char stackbuf[MAX_ALLOCA];
+  char stackbuf[128];  /* Small, as read1 is recursive (Bug#31995).  */
   current_thread->stack_top = stackbuf;
 
   *pch = 0;

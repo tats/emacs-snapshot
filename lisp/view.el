@@ -1,6 +1,6 @@
 ;;; view.el --- peruse file or buffer without editing
 
-;; Copyright (C) 1985, 1989, 1994-1995, 1997, 2000-2018 Free Software
+;; Copyright (C) 1985, 1989, 1994-1995, 1997, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Author: K. Shane Hartman
@@ -386,8 +386,8 @@ and disable it otherwise.  If called from Lisp, enable View mode
 if ARG is omitted or nil.
 
 When View mode is enabled, commands that do not change the buffer
-contents are available as usual.  Kill commands insert text in
-kill buffers but do not delete.  Most other commands beep and
+contents are available as usual.  Kill commands save text but
+do not delete it from the buffer.  Most other commands beep and
 tell the user that the buffer is read-only.
 
 \\<view-mode-map>

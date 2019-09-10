@@ -1,4 +1,4 @@
-From bda90e2ab5203feb938188cbd8e029c9b2a467db Mon Sep 17 00:00:00 2001
+From 411e4cc35d58d3b02dffa6fa83a350666d17f6d9 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 29 Jul 2017 11:50:27 -0500
 Subject: Don't downcase real xref in elisp-mode-tests
@@ -13,10 +13,10 @@ lookups.
  1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/test/lisp/progmodes/elisp-mode-tests.el b/test/lisp/progmodes/elisp-mode-tests.el
-index 941e85bc890..faf45b88ff7 100644
+index bc2d14b9498..26db1cbc102 100644
 --- a/test/lisp/progmodes/elisp-mode-tests.el
 +++ b/test/lisp/progmodes/elisp-mode-tests.el
-@@ -301,11 +301,15 @@
+@@ -311,11 +311,15 @@ xref--case-insensitive
  (defun xref-elisp-test-run (xrefs expected-xrefs)
    (should (= (length xrefs) (length expected-xrefs)))
    (while xrefs
@@ -31,9 +31,9 @@ index 941e85bc890..faf45b88ff7 100644
 +            (copy-xref-elisp-location (oref xref location)))
 +
        ;; Downcase the filenames for case-insensitive file systems.
-       (setf (xref-elisp-location-file (oref xref location))
-             (downcase (xref-elisp-location-file (oref xref location))))
-@@ -315,7 +319,7 @@
+       (when xref--case-insensitive
+         (setf (xref-elisp-location-file (oref xref location))
+@@ -327,7 +331,7 @@ xref-elisp-test-run
  
        (should (equal xref expected-xref))
  

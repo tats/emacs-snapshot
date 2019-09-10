@@ -1,6 +1,6 @@
 ;;; eieio-base.el --- Base classes for EIEIO.  -*- lexical-binding:t -*-
 
-;;; Copyright (C) 2000-2002, 2004-2005, 2007-2018 Free Software
+;;; Copyright (C) 2000-2002, 2004-2005, 2007-2019 Free Software
 ;;; Foundation, Inc.
 
 ;; Author: Eric M. Ludlam  <zappo@gnu.org>
@@ -64,10 +64,18 @@ SLOT-NAME is the offending slot.  FN is the function signaling the error."
     ;; Throw the regular signal.
     (cl-call-next-method)))
 
-(cl-defmethod clone ((obj eieio-instance-inheritor) &rest _params)
+(cl-defmethod clone ((obj eieio-instance-inheritor) &rest params)
   "Clone OBJ, initializing `:parent' to OBJ.
 All slots are unbound, except those initialized with PARAMS."
-  (let ((nobj (cl-call-next-method)))
+  ;; call next method without params as we makeunbound slots anyhow
+  (let ((nobj  (if (stringp (car params))
+                   (cl-call-next-method obj (pop params))
+                 (cl-call-next-method obj))))
+    (dolist (descriptor (eieio-class-slots (class-of nobj)))
+      (let ((slot (eieio-slot-descriptor-name descriptor)))
+        (slot-makeunbound nobj slot)))
+    (when params
+      (shared-initialize nobj params))
     (oset nobj parent-instance obj)
     nobj))
 
@@ -360,32 +368,30 @@ Second, any text properties will be stripped from strings."
 		  proposed-value))))
         ;; For hash-tables and vectors, the top-level `read' will not
         ;; "look inside" member values, so we need to do that
-        ;; explicitly.
+        ;; explicitly.  Because `eieio-override-prin1' is recursive in
+        ;; the case of hash-tables and vectors, we recurse
+        ;; `eieio-persistent-validate/fix-slot-value' here as well.
         ((hash-table-p proposed-value)
          (maphash
           (lambda (key value)
-            (cond ((class-p (car-safe value))
-                   (setf (gethash key proposed-value)
-                         (eieio-persistent-convert-list-to-object
-                          value)))
-                  ((and (consp value)
-                        (eq (car value) 'quote))
-                   (setf (gethash key proposed-value)
-                         (cadr value)))))
+            (setf (gethash key proposed-value)
+                  (if (class-p (car-safe value))
+                      (eieio-persistent-convert-list-to-object
+                       value)
+                    (eieio-persistent-validate/fix-slot-value
+                     class slot value))))
           proposed-value)
          proposed-value)
 
         ((vectorp proposed-value)
          (dotimes (i (length proposed-value))
            (let ((val (aref proposed-value i)))
-            (cond ((class-p (car-safe val))
-                   (aset proposed-value i
-                         (eieio-persistent-convert-list-to-object
-                          (aref proposed-value i))))
-                  ((and (consp val)
-                        (eq (car val) 'quote))
-                   (aset proposed-value i
-                         (cadr val))))))
+             (aset proposed-value i
+                   (if (class-p (car-safe val))
+                       (eieio-persistent-convert-list-to-object
+                        val)
+                     (eieio-persistent-validate/fix-slot-value
+                      class slot val)))))
          proposed-value)
 
 	 ((stringp proposed-value)
@@ -512,16 +518,18 @@ instance."
 All slots are unbound, except those initialized with PARAMS."
   (let* ((newname (and (stringp (car params)) (pop params)))
          (nobj (apply #'cl-call-next-method obj params))
-         (nm (slot-value obj 'object-name)))
-    (eieio-oset obj 'object-name
+         (nm (slot-value nobj 'object-name)))
+    (eieio-oset nobj 'object-name
                 (or newname
-                    (save-match-data
-                      (if (and nm (string-match "-\\([0-9]+\\)" nm))
-                          (let ((num (1+ (string-to-number
-                                          (match-string 1 nm)))))
-                            (concat (substring nm 0 (match-beginning 0))
-                                    "-" (int-to-string num)))
-                        (concat nm "-1")))))
+                    (if (equal nm (slot-value obj 'object-name))
+                        (save-match-data
+                          (if (and nm (string-match "-\\([0-9]+\\)" nm))
+                              (let ((num (1+ (string-to-number
+                                              (match-string 1 nm)))))
+                                (concat (substring nm 0 (match-beginning 0))
+                                        "-" (int-to-string num)))
+                            (concat nm "-1")))
+                      nm)))
     nobj))
 
 (cl-defmethod make-instance ((class (subclass eieio-named)) &rest args)

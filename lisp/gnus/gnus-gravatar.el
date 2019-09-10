@@ -1,6 +1,6 @@
 ;;; gnus-gravatar.el --- Gnus Gravatar support
 
-;; Copyright (C) 2010-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
 
 ;; Author: Julien Danjou <julien@danjou.info>
 ;; Keywords: news
@@ -46,7 +46,8 @@ If nil, default to `gravatar-size'."
   :group 'gnus-gravatar)
 
 (defcustom gnus-gravatar-too-ugly gnus-article-x-face-too-ugly
-  "Regexp matching posters whose avatar shouldn't be shown automatically."
+  "Regexp matching posters whose avatar shouldn't be shown automatically.
+If nil, show all avatars."
   :type '(choice regexp (const nil))
   :version "24.1"
   :group 'gnus-gravatar)

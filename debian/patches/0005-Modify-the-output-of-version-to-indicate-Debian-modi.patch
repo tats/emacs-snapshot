@@ -1,4 +1,4 @@
-From d69466776a75671d6d818b3b4a0be73c54876c3d Mon Sep 17 00:00:00 2001
+From 580b54df0b8bb5d3076830d7ea0b3cbe03bc2065 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:28 -0500
 Subject: Modify the output of (version) to indicate Debian modifications
@@ -12,10 +12,10 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index 3a38b1d83c8..5d1248ac581 100644
+index cb9d0442ccf..11ce4e475db 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
-@@ -62,7 +62,7 @@ Don't use this function in programs to choose actions according
+@@ -62,7 +62,7 @@ emacs-version
  to the system configuration; look at `system-configuration' instead."
    (interactive "P")
    (let ((version-string

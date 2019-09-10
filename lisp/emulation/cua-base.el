@@ -1,6 +1,6 @@
 ;;; cua-base.el --- emulate CUA key bindings
 
-;; Copyright (C) 1997-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2019 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Keywords: keyboard emulations convenience cua
@@ -592,6 +592,7 @@ a cons (TYPE . COLOR), then both properties are affected."
 
 (autoload 'cua-set-rectangle-mark "cua-rect"
   "Start rectangle at mouse click position." t nil)
+(autoload 'cua-toggle-rectangle-mark "cua-rect" nil t)
 
 ;; Stub definitions until it is loaded
 (defvar cua--rectangle)

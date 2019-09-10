@@ -1,6 +1,6 @@
 ;;; subr.el --- basic lisp subroutines for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2018 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -93,12 +93,13 @@ Info node `(elisp)Specification List' for details."
   `(put (quote ,symbol) 'edebug-form-spec (quote ,spec)))
 
 (defmacro lambda (&rest cdr)
-  "Return a lambda expression.
-A call of the form (lambda ARGS DOCSTRING INTERACTIVE BODY) is
-self-quoting; the result of evaluating the lambda expression is the
-expression itself.  The lambda expression may then be treated as a
-function, i.e., stored as the function value of a symbol, passed to
-`funcall' or `mapcar', etc.
+  "Return an anonymous function.
+Under dynamic binding, a call of the form (lambda ARGS DOCSTRING
+INTERACTIVE BODY) is self-quoting; the result of evaluating the
+lambda expression is the expression itself.  Under lexical
+binding, the result is a closure.  Regardless, the result is a
+function, i.e., it may be stored as the function value of a
+symbol, passed to `funcall' or `mapcar', etc.
 
 ARGS should take the same form as an argument list for a `defun'.
 DOCSTRING is an optional documentation string.
@@ -705,6 +706,21 @@ Non-strings in LIST are ignored."
     (setq list (cdr list)))
   list)
 
+(defun assoc-delete-all (key alist)
+  "Delete from ALIST all elements whose car is `equal' to KEY.
+Return the modified alist.
+Elements of ALIST that are not conses are ignored."
+  (while (and (consp (car alist))
+	      (equal (car (car alist)) key))
+    (setq alist (cdr alist)))
+  (let ((tail alist) tail-cdr)
+    (while (setq tail-cdr (cdr tail))
+      (if (and (consp (car tail-cdr))
+	       (equal (car (car tail-cdr)) key))
+	  (setcdr tail (cdr tail-cdr))
+	(setq tail tail-cdr))))
+  alist)
+
 (defun assq-delete-all (key alist)
   "Delete from ALIST all elements whose car is `eq' to KEY.
 Return the modified alist.
@@ -736,9 +752,9 @@ Elements of ALIST that are not conses are ignored."
   alist)
 
 (defun alist-get (key alist &optional default remove testfn)
-  "Return the value associated with KEY in ALIST.
+  "Find the first element of ALIST whose `car' equals KEY and return its `cdr'.
 If KEY is not found in ALIST, return DEFAULT.
-Use TESTFN to lookup in the alist if non-nil.  Otherwise, use `assq'.
+Equality with KEY is tested by TESTFN, defaulting to `eq'.
 
 This is a generalized variable suitable for use with `setf'.
 When using it to set a value, optional argument REMOVE non-nil
@@ -3527,7 +3543,7 @@ is allowed once again.  (Immediately, if `inhibit-quit' is nil.)"
 ;; Don't throw `throw-on-input' on those events by default.
 (setq while-no-input-ignore-events
       '(focus-in focus-out help-echo iconify-frame
-        make-frame-visible selection-request))
+        make-frame-visible selection-request buffer-switch))
 
 (defmacro while-no-input (&rest body)
   "Execute BODY only as long as there's no pending input.
@@ -5207,15 +5223,15 @@ This is the simplest safe way to acquire and release a mutex."
 (defvar definition-prefixes (make-hash-table :test 'equal)
   "Hash table mapping prefixes to the files in which they're used.
 This can be used to automatically fetch not-yet-loaded definitions.
-More specifically, if there is a value of the form (FILES...) for a string PREFIX
-it means that the FILES define variables or functions with names that start
-with PREFIX.
+More specifically, if there is a value of the form (FILES...) for
+a string PREFIX it means that the FILES define variables or functions
+with names that start with PREFIX.
 
 Note that it does not imply that all definitions starting with PREFIX can
 be found in those files.  E.g. if prefix is \"gnus-article-\" there might
-still be definitions of the form \"gnus-article-toto-titi\" in other files, which would
-presumably appear in this table under another prefix such as \"gnus-\"
-or \"gnus-article-toto-\".")
+still be definitions of the form \"gnus-article-toto-titi\" in other files,
+which would presumably appear in this table under another prefix such as
+\"gnus-\" or \"gnus-article-toto-\".")
 
 (defun register-definition-prefixes (file prefixes)
   "Register that FILE uses PREFIXES."

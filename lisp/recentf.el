@@ -1,6 +1,6 @@
 ;;; recentf.el --- setup a menu of recently opened files
 
-;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
 ;; Author: David Ponce <david@dponce.com>
 ;; Created: July 19 1999
@@ -67,7 +67,8 @@ You should define the options of your own filters in this group."
 A nil value means to save the whole list.
 See the command `recentf-save-list'."
   :group 'recentf
-  :type 'integer)
+  :type '(choice (integer :tag "Entries" :value 1)
+		 (const :tag "No Limit" nil)))
 
 (defcustom recentf-save-file (locate-user-emacs-file "recentf" ".recentf")
   "File to save the recent list into."

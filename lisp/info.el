@@ -1,6 +1,6 @@
 ;; info.el --- Info package for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992-2019 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: help
@@ -29,6 +29,15 @@
 ;;  - a node name MAY NOT contain a colon
 ;; This distinction is to support indexing of computer programming
 ;; language terms that may contain ":" but not ": ".
+
+;; The commands in this file should start either with "Info-" or with
+;; "info-".  The capitalized version is for commands that are bound to
+;; keys, and therefore are unlikely to be invoked by name via "M-x";
+;; the lower-case version is for commands invoked by name.  This
+;; arrangement makes completion of "info-" commands work better,
+;; because the "Info-" commands (of which there are a lot) don't get
+;; in the way.  Please adhere to this convention when you add commands
+;; here.
 
 ;;; Code:
 
@@ -4254,8 +4263,9 @@ With a zero prefix arg, put the name inside a function call to `info'."
 ;; We deliberately fontify only ‘..’ quoting, and not `..', because
 ;; the former can be done much more reliably, i.e. without risking
 ;; false positives.
+;; FIXME: It doesn't handle nested quotes.
 (defvar Info-mode-font-lock-keywords
-  '(("‘\\([^’]*\\)’" (1 'Info-quoted))))
+  '(("‘\\([‘’]\\|[^‘’]*\\)’" (1 'Info-quoted))))
 
 ;; Autoload cookie needed by desktop.el
 ;;;###autoload

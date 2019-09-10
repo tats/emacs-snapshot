@@ -1,5 +1,5 @@
 /* Indentation functions.
-   Copyright (C) 1985-1988, 1993-1995, 1998, 2000-2018 Free Software
+   Copyright (C) 1985-1988, 1993-1995, 1998, 2000-2019 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -983,9 +983,10 @@ If specified column is within a character, point goes after that character.
 If it's past end of line, point goes to end of line.
 
 Optional second argument FORCE non-nil means if COLUMN is in the
-middle of a tab character, change it to spaces.
-In addition, if FORCE is t, and the line is too short to reach
-COLUMN, add spaces/tabs to get there.
+middle of a tab character, either change it to spaces (when
+`indent-tabs-mode' is nil), or insert enough spaces before it to reach
+COLUMN (otherwise).  In addition, if FORCE is t, and the line is too short
+to reach COLUMN, add spaces/tabs to get there.
 
 The return value is the current column.  */)
   (Lisp_Object column, Lisp_Object force)
@@ -2147,8 +2148,7 @@ whether or not it is currently displayed in some window.  */)
 	 will sometimes err by one column.  */
       int lnum_width = 0;
       int lnum_pixel_width = 0;
-      if (!NILP (Vdisplay_line_numbers)
-	  && !EQ (Vdisplay_line_numbers, Qvisual))
+      if (!NILP (Vdisplay_line_numbers))
 	line_number_display_width (w, &lnum_width, &lnum_pixel_width);
       SET_TEXT_POS (pt, PT, PT_BYTE);
       itdata = bidi_shelve_cache ();
@@ -2278,7 +2278,9 @@ whether or not it is currently displayed in some window.  */)
 	  overshoot_handled = 1;
 	}
       if (lcols_given)
-	to_x = window_column_x (w, window, extract_float (lcols), lcols);
+	to_x =
+	  window_column_x (w, window, extract_float (lcols), lcols)
+	  + lnum_pixel_width;
       if (nlines <= 0)
 	{
 	  it.vpos = vpos_init;
@@ -2330,12 +2332,6 @@ whether or not it is currently displayed in some window.  */)
 	 an addition to the hscroll amount.  */
       if (lcols_given)
 	{
-	  /* If we are displaying line numbers, we could cross the
-	     line where the width of the line-number display changes,
-	     in which case we need to fix up the pixel coordinate
-	     accordingly.  */
-	  if (lnum_pixel_width > 0)
-	    to_x += it.lnum_pixel_width - lnum_pixel_width;
 	  move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X);
 	  /* If we find ourselves in the middle of an overlay string
 	     which includes a newline after current string position,

@@ -1,6 +1,6 @@
 ;;; nnir.el --- Search mail with various search engines  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
 
 ;; Author: Kai Großjohann <grossjohann@ls6.cs.uni-dortmund.de>
 ;; Swish-e and Swish++ backends by:
@@ -969,6 +969,7 @@ details on the language and supported extensions."
          (mapcar
           #'(lambda (group)
             (let (artlist)
+	      (setq group (nnimap-decode-gnus-group group))
               (condition-case ()
                   (when (nnimap-change-group
                          (gnus-group-short-name group) server)

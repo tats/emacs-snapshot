@@ -1,6 +1,6 @@
 ;;; nxml-mode.el --- a new XML mode  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2003-2004, 2007-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2004, 2007-2019 Free Software Foundation, Inc.
 
 ;; Author: James Clark
 ;; Keywords: wp, hypermedia, languages, XML
@@ -2378,7 +2378,9 @@ With a prefix argument, inserts the character directly."
 (put 'nxml-char-ref 'evaporate t)
 
 (defun nxml-char-ref-display-extra (start end n)
-  (when nxml-char-ref-extra-display
+  (when (and ;; Displaying literal newline is unhelpful.
+         (not (eql n ?\n))
+         nxml-char-ref-extra-display)
     (let ((name (or (get-char-code-property n 'name)
                     (get-char-code-property n 'old-name)))
 	  (glyph-string (and nxml-char-ref-display-glyph-flag
