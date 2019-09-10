@@ -1,6 +1,6 @@
 ;;; autorevert.el --- revert buffers when files on disk change  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-1999, 2001-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1999, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: Anders Lindgren
 ;; Keywords: convenience
@@ -472,7 +472,7 @@ If `global-auto-revert-non-file-buffers' is non-nil, this mode
 may also revert some non-file buffers, as described in the
 documentation of that variable.  It ignores buffers with modes
 matching `global-auto-revert-ignore-modes', and buffers with a
-non-nil vale of `global-auto-revert-ignore-buffer'.
+non-nil value of `global-auto-revert-ignore-buffer'.
 
 When a buffer is reverted, a message is generated.  This can be
 suppressed by setting `auto-revert-verbose' to nil.
@@ -813,7 +813,8 @@ the timer when no buffers need to be checked."
       ;; Check if we should cancel the timer.
       (when (and (not global-auto-revert-mode)
 		 (null auto-revert-buffer-list))
-	(cancel-timer auto-revert-timer)
+        (if (timerp auto-revert-timer)
+            (cancel-timer auto-revert-timer))
 	(setq auto-revert-timer nil)))))
 
 

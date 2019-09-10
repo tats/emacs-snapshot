@@ -1,6 +1,6 @@
 ;;; term-tests.el --- tests for term.el  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2017, 2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -123,6 +123,46 @@ line6\r
     (should (equal (term-test-screen-from-input
                     40 12 (list "\eAnSiTc /f" "oo/\n") 'default-directory)
                    "/foo/"))))
+
+(ert-deftest term-to-margin ()
+  "Test cursor movement at the scroll margin.
+This is a reduced example from GNU nano's initial screen."
+  (let* ((width 10)
+         (x (make-string width ?x))
+         (y (make-string width ?y)))
+    (should (equal (term-test-screen-from-input
+                    width 3
+                    `("\e[1;3r"       ; Setup 3 line scrolling region.
+                      "\e[2;1H"       ; Move to 2nd last line.
+                      ,x              ; Fill with 'x'.
+                      "\r\e[1B"       ; Next line.
+                      ,y))            ; Fill with 'y'.
+                   (concat "\n" x "\n" y)))
+    ;; Same idea, but moving upwards.
+    (should (equal (term-test-screen-from-input
+                    width 3
+                    `("\e[1;3r" "\e[2;1H" ,x "\r\e[1A" ,y))
+                   (concat y "\n" x)))))
+
+(ert-deftest term-decode-partial () ;; Bug#25288.
+  "Test multibyte characters sent into multiple chunks."
+  ;; Set `locale-coding-system' so test will be deterministic.
+  (let* ((locale-coding-system 'utf-8-unix)
+         (string (make-string 7 ?ш))
+         (bytes (encode-coding-string string locale-coding-system)))
+    (should (equal string
+                   (term-test-screen-from-input
+                    40 1 `(,(substring bytes 0 (/ (length bytes) 2))
+                           ,(substring bytes (/ (length bytes) 2))))))))
+
+(ert-deftest term-undecodable-input () ;; Bug#29918.
+  "Undecodable bytes should be passed through without error."
+  (let* ((locale-coding-system 'utf-8-unix) ; As above.
+         (bytes "\376\340\360\370")
+         (string (decode-coding-string bytes locale-coding-system)))
+    (should (equal string
+                   (term-test-screen-from-input
+                    40 1 bytes)))))
 
 (provide 'term-tests)
 

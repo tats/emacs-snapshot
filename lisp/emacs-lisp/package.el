@@ -1,6 +1,6 @@
 ;;; package.el --- Simple package system for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
 ;; Author: Tom Tromey <tromey@redhat.com>
 ;;         Daniel Hackney <dan@haxney.org>
@@ -534,8 +534,8 @@ name (a symbol) and DESC is a `package--bi-desc' structure.")
 (defvar package-alist nil
   "Alist of all packages available for activation.
 Each element has the form (PKG . DESCS), where PKG is a package
-name (a symbol) and DESCS is a non-empty list of `package-desc' structure,
-sorted by decreasing versions.
+name (a symbol) and DESCS is a non-empty list of `package-desc'
+structures, sorted by decreasing versions.
 
 This variable is set automatically by `package-load-descriptor',
 called via `package-initialize'.  To change which packages are
@@ -1241,6 +1241,17 @@ errors."
         (signal 'bad-signature (list sig-file)))
       good-signatures)))
 
+(defun package--buffer-string ()
+  (let ((string (buffer-string)))
+    (when (and buffer-file-coding-system
+               (> (length string) 0))
+      (put-text-property 0 1 'package--cs buffer-file-coding-system string))
+    string))
+
+(defun package--cs (string)
+  (and (> (length string) 0)
+       (get-text-property 0 'package--cs string)))
+
 (defun package--check-signature (location file &optional string async callback unwind)
   "Check signature of the current buffer.
 Download the signature file from LOCATION by appending \".sig\"
@@ -1260,8 +1271,12 @@ Otherwise, an error is signaled.
 
 UNWIND, if provided, is a function to be called after everything
 else, even if an error is signaled."
-  (let ((sig-file (concat file ".sig"))
-        (string (or string (buffer-string))))
+  (let* ((sig-file (concat file ".sig"))
+         (string (or string (package--buffer-string)))
+         (cs (package--cs string)))
+    ;; Re-encode the downloaded file with the coding-system with which
+    ;; it was decoded, so we (hopefully) get the exact same bytes back.
+    (when cs (setq string (encode-coding-string string cs)))
     (package--with-response-buffer location :file sig-file
       :async async :noerror t
       ;; Connection error is assumed to mean "no sig-file".
@@ -1529,23 +1544,26 @@ similar to an entry in `package-alist'.  Save the cached copy to
     :error-form (package--update-downloads-in-progress archive)
     (let* ((location (cdr archive))
            (name (car archive))
-           (content (buffer-string))
+           (content (package--buffer-string))
            (dir (expand-file-name (format "archives/%s" name) package-user-dir))
            (local-file (expand-file-name file dir)))
-      (when (listp (read-from-string content))
+      (when (listp (read content))
         (make-directory dir t)
         (if (or (not package-check-signature)
                 (member name package-unsigned-archives))
             ;; If we don't care about the signature, save the file and
             ;; we're done.
-            (progn (write-region content nil local-file nil 'silent)
+            (progn (let ((coding-system-for-write
+                          (or (package--cs content) 'utf-8)))
+                     (write-region content nil local-file nil 'silent))
                    (package--update-downloads-in-progress archive))
           ;; If we care, check it (perhaps async) and *then* write the file.
           (package--check-signature
            location file content async
            ;; This function will be called after signature checking.
            (lambda (&optional good-sigs)
-             (write-region content nil local-file nil 'silent)
+             (let ((coding-system-for-write (or (package--cs content) 'utf-8)))
+               (write-region content nil local-file nil 'silent))
              ;; Write out good signatures into archive-contents.signed file.
              (when good-sigs
                (write-region (mapconcat #'epg-signature-to-string good-sigs "\n")
@@ -1730,6 +1748,15 @@ if it is still empty."
       (indirect indirect-deps)
       (t        (delete-dups (append direct-deps indirect-deps))))))
 
+(defun package--user-installed-p (package)
+  "Return non-nil if PACKAGE is a user-installed package.
+PACKAGE is the package name, a symbol.  Check whether the package
+was installed into `package-user-dir' where we assume to have
+control over."
+  (let* ((pkg-desc (cadr (assq package package-alist)))
+         (dir (package-desc-dir pkg-desc)))
+    (file-in-directory-p dir package-user-dir)))
+
 (defun package--removable-packages ()
   "Return a list of names of packages no longer needed.
 These are packages which are neither contained in
@@ -1739,7 +1766,9 @@ These are packages which are neither contained in
                          ;; `p' and its dependencies are needed.
                          append (cons p (package--get-deps p)))))
     (cl-loop for p in (mapcar #'car package-alist)
-             unless (memq p needed)
+             unless (or (memq p needed)
+                        ;; Do not auto-remove external packages.
+                        (not (package--user-installed-p p)))
              collect p)))
 
 (defun package--used-elsewhere-p (pkg-desc &optional pkg-list all)
@@ -1825,15 +1854,17 @@ if all the in-between dependencies are also in PACKAGE-LIST."
           (let ((save-silently t))
             (package-unpack pkg-desc))
         ;; If we care, check it and *then* write the file.
-        (let ((content (buffer-string)))
+        (let ((content (package--buffer-string)))
           (package--check-signature
            location file content nil
            ;; This function will be called after signature checking.
            (lambda (&optional good-sigs)
              ;; Signature checked, unpack now.
-             (with-temp-buffer (insert content)
-                               (let ((save-silently t))
-                                 (package-unpack pkg-desc)))
+             (with-temp-buffer
+               (insert content)
+               (setq buffer-file-coding-system (package--cs content))
+               (let ((save-silently t))
+                 (package-unpack pkg-desc)))
              ;; Here the package has been installed successfully, mark it as
              ;; signed if appropriate.
              (when good-sigs
@@ -3414,6 +3445,9 @@ short description."
   ;; Generate the Package Menu.
   (let ((buf (get-buffer-create "*Packages*")))
     (with-current-buffer buf
+      ;; Since some packages have their descriptions include non-ASCII
+      ;; characters...
+      (setq buffer-file-coding-system 'utf-8)
       (package-menu-mode)
 
       ;; Fetch the remote list of packages.

@@ -1,6 +1,6 @@
 ;;; bytecomp-tests.el
 
-;; Copyright (C) 2008-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
 
 ;; Author: Shigeru Fukaya <shigeru.fukaya@gmail.com>
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
@@ -286,7 +286,14 @@
             (t)))
     (let ((a))
       (cond ((eq a 'foo) 'incorrect)
-            ('correct))))
+            ('correct)))
+    ;; Bug#31734
+    (let ((variable 0))
+      (cond
+       ((eq variable 'default)
+	(message "equal"))
+       (t
+	(message "not equal")))))
   "List of expression for test.
 Each element will be executed by interpreter and with
 bytecompiled code, and their results compared.")
@@ -430,6 +437,20 @@ Subtests signal errors if something goes wrong."
     (goto-char (point-min))
     ;; Should not warn that mt--test2 is not known to be defined.
     (should-not (re-search-forward "my--test2" nil t))))
+
+(ert-deftest bytecomp-warn-wrong-args ()
+  (with-current-buffer (get-buffer-create "*Compile-Log*")
+    (let ((inhibit-read-only t)) (erase-buffer))
+    (byte-compile '(remq 1 2 3))
+    (ert-info ((buffer-string) :prefix "buffer: ")
+      (should (re-search-forward "remq.*3.*2")))))
+
+(ert-deftest bytecomp-warn-wrong-args-subr ()
+  (with-current-buffer (get-buffer-create "*Compile-Log*")
+    (let ((inhibit-read-only t)) (erase-buffer))
+    (byte-compile '(safe-length 1 2 3))
+    (ert-info ((buffer-string) :prefix "buffer: ")
+      (should (re-search-forward "safe-length.*3.*1")))))
 
 (ert-deftest test-eager-load-macro-expansion ()
   (test-byte-comp-compile-and-load nil

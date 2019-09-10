@@ -1,6 +1,6 @@
 ;;; process-tests.el --- Testing the process facilities
 
-;; Copyright (C) 2013-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -143,6 +143,35 @@
 		       (point-max))))
     (should (equal "hello stderr!\n"
 		   (mapconcat #'identity (nreverse stderr-output) "")))))
+
+(ert-deftest set-process-filter-t ()
+  "Test setting process filter to t and back." ;; Bug#36591
+  (with-temp-buffer
+    (let* ((print-level nil)
+           (print-length nil)
+           (proc (start-process
+                  "test proc" (current-buffer)
+                  (concat invocation-directory invocation-name)
+                  "-Q" "--batch" "--eval"
+                  (prin1-to-string
+                   '(let (s)
+                      (while (setq s (read-from-minibuffer "$ "))
+                        (princ s)
+                        (princ "\n")))))))
+      (set-process-query-on-exit-flag proc nil)
+      (send-string proc "one\n")
+      (should
+       (accept-process-output proc 1))  ; Read "one".
+      (should (equal (buffer-string) "$ one\n$ "))
+      (set-process-filter proc t)       ; Stop reading from proc.
+      (send-string proc "two\n")
+      (should-not
+       (accept-process-output proc 1))  ; Can't read "two" yet.
+      (should (equal (buffer-string) "$ one\n$ "))
+      (set-process-filter proc nil)     ; Resume reading from proc.
+      (should
+       (accept-process-output proc 1))  ; Read "two" from proc.
+      (should (equal (buffer-string) "$ one\n$ two\n$ ")))))
 
 (ert-deftest start-process-should-not-modify-arguments ()
   "`start-process' must not modify its arguments in-place."

@@ -1,6 +1,6 @@
 ;;; hi-lock.el --- minor mode for interactive automatic highlighting  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2000-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
 
 ;; Author: David M. Koppelman <koppel@ece.lsu.edu>
 ;; Keywords: faces, minor-mode, matching, display
@@ -409,7 +409,11 @@ versions before 22 use the following in your init file:
 (defalias 'highlight-lines-matching-regexp 'hi-lock-line-face-buffer)
 ;;;###autoload
 (defun hi-lock-line-face-buffer (regexp &optional face)
-  "Set face of all lines containing a match of REGEXP to FACE.
+  "Highlight all lines that match REGEXP using FACE.
+The lines that match REGEXP will be displayed by merging
+the attributes of FACE with any other face attributes
+of text in those lines.
+
 Interactively, prompt for REGEXP using `read-regexp', then FACE.
 Use the global history list for FACE.
 

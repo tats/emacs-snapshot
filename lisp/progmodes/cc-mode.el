@@ -1,6 +1,6 @@
 ;;; cc-mode.el --- major mode for editing C and similar languages
 
-;; Copyright (C) 1985, 1987, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2019 Free Software Foundation, Inc.
 
 ;; Authors:    2003- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -1487,6 +1487,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   ;; lock context (etc.) fontification.
   (goto-char pos)
   (let ((lit-start (c-literal-start))
+	old-pos
 	(new-pos pos)
 	capture-opener
 	bod-lim bo-decl)
@@ -1509,10 +1510,15 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
     (while
 	;; Go to a less nested declaration each time round this loop.
 	(and
+	 (setq old-pos (point))
 	 (c-syntactic-skip-backward "^;{}" bod-lim t)
 	 (> (point) bod-lim)
 	 (progn (c-forward-syntactic-ws)
-		(setq bo-decl (point))
+		;; Have we got stuck in a comment at EOB?
+		(not (and (eobp)
+			  (c-literal-start))))
+	 (< (point) old-pos)
+	 (progn (setq bo-decl (point))
 		(or (not (looking-at c-protection-key))
 		    (c-forward-keyword-clause 1)))
 	 (progn
@@ -2214,6 +2220,7 @@ Key bindings:
 
 ;; reporter-submit-bug-report requires sendmail.
 (declare-function mail-position-on-field "sendmail" (field &optional soft))
+(declare-function mail-text "sendmail" ())
 
 (defun c-submit-bug-report ()
   "Submit via mail a bug report on CC Mode."
@@ -2278,9 +2285,26 @@ Key bindings:
 	vars)
       (lambda ()
 	(run-hooks 'c-prepare-bug-report-hook)
+	(let ((hook (get mail-user-agent 'hookvar)))
+	  (if hook
+	      (add-hook hook
+			(lambda ()
+			  (save-excursion
+			    (mail-text)
+			    (unless (looking-at "Package: ")
+			      (insert "Package: " c-mode-bug-package "\n\n"))))
+			nil t)))
 	(save-excursion
 	  (or (mail-position-on-field "X-Debbugs-Package")
-	      (insert c-mode-bug-package)))
+	      (insert c-mode-bug-package))
+	  ;; For mail clients that do not support X- headers.
+	  ;; Sadly reporter-submit-bug-report unconditionally adds
+	  ;; a blank line before SALUTATION, so we can't use that.
+	  ;; It is also sad that reporter offers no way to leave point
+	  ;; after this line we are now inserting.
+	  (mail-text)
+	  (or (looking-at "Package:")
+	      (insert "Package: " c-mode-bug-package)))
 	(insert (format "Buffer Style: %s\nc-emacs-features: %s\n"
 			style c-features)))))))
 

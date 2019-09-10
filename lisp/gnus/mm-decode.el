@@ -1,6 +1,6 @@
 ;;; mm-decode.el --- Functions for decoding MIME things
 
-;; Copyright (C) 1998-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	MORIOKA Tomohiko <morioka@jaist.ac.jp>
@@ -764,7 +764,7 @@ MIME-Version header before proceeding."
         (mb (mm-multibyte-p))
         beg)
     (goto-char (point-min))
-    (search-forward-regexp "^\n" nil t)
+    (search-forward-regexp "^\n" nil 'move) ;; There might be no body.
     (setq beg (point))
     (with-current-buffer
           (generate-new-buffer " *mm*")
@@ -1117,7 +1117,7 @@ external if displayed external."
 	  (mm-remove-part handle)))))))
 
 (defun mm-destroy-parts (handles)
-  "Remove the displayed MIME parts represented by HANDLES."
+  "Destroy the displayed MIME parts represented by HANDLES."
   (if (and (listp handles)
 	   (bufferp (car handles)))
       (mm-destroy-part handles)

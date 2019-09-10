@@ -1,6 +1,6 @@
 ;;; eieio-core.el --- Core implementation for eieio  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1995-1996, 1998-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1995-1996, 1998-2019 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Version: 1.4
@@ -117,9 +117,6 @@ Currently under control of this var:
 (defsubst eieio--object-class-tag (obj)
   (aref obj 0))
 
-(defsubst eieio--object-class (obj)
-  (eieio--object-class-tag obj))
-
 
 ;;; Important macros used internally in eieio.
 
@@ -131,6 +128,12 @@ Currently under control of this var:
       ;; Keep the symbol if class-v is nil, for better error messages.
       (or (cl--find-class class) class)
     class))
+
+(defsubst eieio--object-class (obj)
+  (let ((tag (eieio--object-class-tag obj)))
+    (if eieio-backward-compatibility
+        (eieio--class-object tag)
+      tag)))
 
 (defun class-p (x)
   "Return non-nil if X is a valid class vector.
@@ -163,7 +166,7 @@ Return nil if that option doesn't exist."
 (defun eieio-object-p (obj)
   "Return non-nil if OBJ is an EIEIO object."
   (and (recordp obj)
-       (eieio--class-p (eieio--object-class-tag obj))))
+       (eieio--class-p (eieio--object-class obj))))
 
 (define-obsolete-function-alias 'object-p 'eieio-object-p "25.1")
 

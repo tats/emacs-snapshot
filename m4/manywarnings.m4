@@ -1,5 +1,5 @@
-# manywarnings.m4 serial 13
-dnl Copyright (C) 2008-2018 Free Software Foundation, Inc.
+# manywarnings.m4 serial 13-emacs
+dnl Copyright (C) 2008-2019 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -126,7 +126,6 @@ m4_defun([gl_MANYWARN_ALL_GCC(C)],
     -Wbuiltin-macro-redefined \
     -Wcast-align \
     -Wchar-subscripts \
-    -Wchkp \
     -Wclobbered \
     -Wcomment \
     -Wcomments \
