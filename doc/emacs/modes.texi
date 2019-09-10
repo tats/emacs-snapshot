@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2018 Free Software
+@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Modes
@@ -207,7 +207,7 @@ amount of work you can lose in case of a crash.  @xref{Auto Save}.
 
 @item
 Electric Quote mode automatically converts quotation marks.  For
-example, it requotes text typed @t{`like this'} to text @t{‘like
+example, it requotes text typed @kbd{`like this'} to text @t{‘like
 this’}.  You can control what kind of text it operates in, and you can
 disable it entirely in individual buffers.  @xref{Quotation Marks}.
 

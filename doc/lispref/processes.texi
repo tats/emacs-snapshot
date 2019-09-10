@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2018 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Processes
@@ -451,7 +451,9 @@ present in @var{args}.  To avoid confusion, it may be best to avoid
 absolute file names in @var{args}, but rather to specify all file
 names as relative to @code{default-directory}.  The function
 @code{file-relative-name} is useful for constructing such relative
-file names.
+file names.  Alternatively, you can use @code{file-local-name}
+(@pxref{Magic File Names}) to obtain an absolute file name as seen
+from the remote host's perspective.
 @end defun
 
 @defvar process-file-side-effects
@@ -586,12 +588,11 @@ process}.  After an asynchronous process is created, it runs in
 parallel with Emacs, and Emacs can communicate with it using the
 functions described in the following sections (@pxref{Input to
 Processes}, and @pxref{Output from Processes}).  Note that process
-communication is only partially asynchronous: Emacs sends data to the
-process only when certain functions are called, and Emacs accepts data
-from the process only while waiting for input or for a time delay.
+communication is only partially asynchronous: Emacs sends and receives
+data to and from a process only when those functions are called.
 
-@cindex pty
-@cindex pipe
+@cindex pty, when to use for subprocess communications
+@cindex pipe, when to use for subprocess communications
   An asynchronous process is controlled either via a @dfn{pty}
 (pseudo-terminal) or a @dfn{pipe}.  The choice of pty or pipe is made
 when creating the process, by default based on the value of the
@@ -601,11 +602,12 @@ Shell mode, because they allow for job control (@kbd{C-c}, @kbd{C-z},
 etc.)@: between the process and its children, and because interactive
 programs treat ptys as terminal devices, whereas pipes don't support
 these features.  However, for subprocesses used by Lisp programs for
-internal purposes, it is often better to use a pipe, because pipes are
-more efficient, and because they are immune to stray character
-injections that ptys introduce for large (around 500 byte) messages.
-Also, the total number of ptys is limited on many systems and it is
-good not to waste them.
+internal purposes (i.e., no user interaction with the subprocess is
+required), where significant amounts of data need to be exchanged
+between the subprocess and the Lisp program, it is often better to use
+a pipe, because pipes are more efficient.  Also, the total number of
+ptys is limited on many systems, and it is good not to waste them
+unnecessarily.
 
 @defun make-process &rest args
 This function is the basic low-level primitive for starting
@@ -658,7 +660,9 @@ pipe, or @code{nil} to use the default derived from the value of the
 @code{process-connection-type} variable.  This parameter and the value
 of @code{process-connection-type} are ignored if a non-@code{nil}
 value is specified for the @code{:stderr} parameter; in that case, the
-type will always be @code{pipe}.
+type will always be @code{pipe}.  On systems where ptys are not
+available (MS-Windows), this parameter is likewise ignored, and pipes
+are used unconditionally.
 
 @item :noquery @var{query-flag}
 Initialize the process query flag to @var{query-flag}.
@@ -814,7 +818,12 @@ In the latter case, the local part of @code{default-directory} becomes
 the working directory of the process.
 
 This function does not try to invoke file name handlers for
-@var{program} or for the rest of @var{args}.
+@var{program} or for the rest of @var{args}.  For that reason, if
+@var{program} or any of @var{args} use the remote-file syntax
+(@pxref{Magic File Names}), they must be converted either to file
+names relative to @code{default-directory}, or to names that identify
+the files locally on the remote host, by running them through
+@code{file-local-name}.
 
 Depending on the implementation of the file handler, it might not be
 possible to apply @code{process-filter} or @code{process-sentinel} to
@@ -863,7 +872,8 @@ around the call to these functions.
 Note that the value of this variable is ignored when
 @code{make-process} is called with a non-@code{nil} value of the
 @code{:stderr} parameter; in that case, Emacs will communicate with
-the process using pipes.
+the process using pipes.  It is also ignored if ptys are unavailable
+(MS-Windows).
 
 @smallexample
 @group
@@ -1189,8 +1199,9 @@ the defaulting mechanism (@pxref{Default Coding Systems}).
 because the input buffer is full.  When this happens, the send functions
 wait a short while, accepting output from subprocesses, and then try
 again.  This gives the subprocess a chance to read more of its pending
-input and make space in the buffer.  It also allows filters, sentinels
-and timers to run---so take account of that in writing your code.
+input and make space in the buffer.  It also allows filters (including
+the one currently running), sentinels and timers to run---so take
+account of that in writing your code.
 
   In these functions, the @var{process} argument can be a process or
 the name of a process, or a buffer or buffer name (which stands
@@ -1405,9 +1416,10 @@ output, Emacs won't receive that output.
 
   Output from a subprocess can arrive only while Emacs is waiting: when
 reading terminal input (see the function @code{waiting-for-user-input-p}),
-in @code{sit-for} and @code{sleep-for} (@pxref{Waiting}), and in
-@code{accept-process-output} (@pxref{Accepting Output}).  This
-minimizes the problem of timing errors that usually plague parallel
+in @code{sit-for} and @code{sleep-for} (@pxref{Waiting}), in
+@code{accept-process-output} (@pxref{Accepting Output}), and in
+functions which send data to processes (@pxref{Input to Processes}).
+This minimizes the problem of timing errors that usually plague parallel
 programming.  For example, you can safely create a process and only
 then specify its buffer or filter function; no output can arrive
 before you finish, if the code in between does not call any primitive
@@ -1583,14 +1595,10 @@ outputs directly to the process buffer.
   By default, the error output from the process, if any, is also
 passed to the filter function, unless the destination for the standard
 error stream of the process was separated from the standard output
-when the process was created (@pxref{Output from Processes}).
-
-  The filter function can only be called when Emacs is waiting for
-something, because process output arrives only at such times.  Emacs
-waits when reading terminal input (see the function
-@code{waiting-for-user-input-p}), in @code{sit-for} and
-@code{sleep-for} (@pxref{Waiting}), and in
-@code{accept-process-output} (@pxref{Accepting Output}).
+when the process was created.  Emacs will only call the filter
+function during certain function calls.  @xref{Output from Processes}.
+Note that if any of those functions are called by the filter, the
+filter may be called recursively.
 
   A filter function must accept two arguments: the associated process
 and a string, which is output just received from it.  The function is
@@ -1648,7 +1656,12 @@ text arrives, you could insert a line like the following just before the
 
   To force point to the end of the new output, no matter where it was
 previously, eliminate the variable @code{moving} from the example and
-call @code{goto-char} unconditionally.
+call @code{goto-char} unconditionally.  Note that this doesn't
+necessarily move the window point.  The default filter actually uses
+@code{insert-before-markers} which moves all markers, including the
+window point.  This may move unrelated markers, so it's generally
+better to move the window point explicitly, or set its insertion type
+to @code{t} (@pxref{Window Point}).
 
 @ignore
   In earlier Emacs versions, every filter function that did regular
@@ -1791,7 +1804,8 @@ until output arrives from a process.
 This function allows Emacs to read pending output from processes.  The
 output is given to their filter functions.  If @var{process} is
 non-@code{nil} then this function does not return until some output
-has been received from @var{process}.
+has been received from @var{process} or @var{process} has closed the
+connection.
 
 The arguments @var{seconds} and @var{millisec} let you specify timeout
 periods.  The former specifies a period measured in seconds and the
@@ -1816,9 +1830,31 @@ speech synthesis.
 
 The function @code{accept-process-output} returns non-@code{nil} if it
 got output from @var{process}, or from any process if @var{process} is
-@code{nil}.  It returns @code{nil} if the timeout expired before output
+@code{nil}; this can occur even after a process has exited if the
+corresponding connection contains buffered data.  The function returns
+@code{nil} if the timeout expired or the connection was closed before output
 arrived.
 @end defun
+
+If a connection from a process contains buffered data,
+@code{accept-process-output} can return non-@code{nil} even after the
+process has exited.  Therefore, although the following loop:
+
+@example
+;; This loop contains a bug.
+(while (process-live-p process)
+  (accept-process-output process))
+@end example
+
+@noindent
+will often read all output from @var{process}, it has a race condition
+and can miss some output if @code{process-live-p} returns @code{nil}
+while the connection still contains data.  Better is to write the loop
+like this:
+
+@example
+(while (accept-process-output process))
+@end example
 
 @node Processes and Threads
 @subsection Processes and Threads
