@@ -10,7 +10,7 @@
 @syncodeindex fn cp
 
 @copying
-Copyright @copyright{} 2007--2018 Free Software Foundation, Inc.
+Copyright @copyright{} 2007--2019 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -1015,7 +1015,7 @@ but different to
 
 The value for a byte D-Bus type can be any integer in the range 0
 through 255.  If a character is used as argument, modifiers
-represented outside this range are stripped of.  For example,
+represented outside this range are stripped off.  For example,
 @code{:byte ?x} is equal to @code{:byte ?\M-x}, but it is not equal to
 @code{:byte ?\C-x} or @code{:byte ?\M-\C-x}.
 
@@ -1928,7 +1928,7 @@ This executes @var{forms} exactly like a @code{progn}, except that
 errors can be made visible when @code{dbus-debug} is set to @code{t}.
 @end defspec
 
-Incoming D-Bus messages are handled as Emacs events, see @pxref{Misc
+Incoming D-Bus messages are handled as Emacs events, @pxref{Misc
 Events, , , elisp}.  They are retrieved only, when Emacs runs in
 interactive mode.  The generated event has this form:
 
@@ -1952,7 +1952,7 @@ of the D-Bus object emitting the message.  @var{interface} and
 @var{member} denote the message which has been sent.
 
 @var{handler} is the callback function which has been registered for
-this message (see @pxref{Signals}).  When a @code{dbus-event} event
+this message (@pxref{Signals}).  When a @code{dbus-event} event
 arrives, @var{handler} is called with @var{args} as arguments.
 
 In order to inspect the @code{dbus-event} data, you could extend the

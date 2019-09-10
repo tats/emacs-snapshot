@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2018 Free Software
+@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Building
@@ -150,6 +150,20 @@ hyperlink; you can move point to it and type @key{RET}, or click on it
 with the mouse (@pxref{Mouse References}), to visit the @dfn{locus} of
 the error message in a separate window.  The locus is the specific
 position in a file where that error occurred.
+
+@cindex compilation mode faces
+@vindex compilation-error
+@vindex compilation-warning
+  The appearance of the @file{*compilation*} buffer can be controlled
+by customizing the faces which are used to highlight parts of the
+@file{*compilation*} buffer, e.g., @code{compilation-error} or
+@code{compilation-warning}, for error and warning messages
+respectively.  Note that since those faces inherit from the
+@code{error} and @code{warning} faces, it is also possible to
+customize the parent face directly instead.
+
+  Use @w{@kbd{M-x customize-group RET compilation}} to see the entire
+list of customization variables and faces.
 
 @findex compile-goto-error
 @vindex compilation-auto-jump-to-first-error
@@ -912,6 +926,7 @@ height and width values during the debugging session.
 @cindex GDB User Interface layout
 
 @vindex gdb-many-windows
+@vindex gdb-show-main
   If the variable @code{gdb-many-windows} is @code{nil} (the default),
 @kbd{M-x gdb} normally displays only the GUD interaction buffer.
 However, if the variable @code{gdb-show-main} is also non-@code{nil},
@@ -1010,6 +1025,15 @@ that line without executing the intermediate lines.  This command
 allows you to go backwards, which can be useful for running through
 code that has already executed, in order to examine its execution in
 more detail.
+
+@vindex gdb-mi-decode-strings
+  If the file names of the source files are shown with octal escapes,
+set the variable @code{gdb-mi-decode-strings} to the appropriate
+coding-system, most probably @code{utf-8}.  (This is @code{nil} by
+default because GDB may emit octal escapes in situations where
+decoding is undesirable, and also because the program being debugged
+might use an encoding different from the one used to encode non-ASCII
+file names on your system.)
 
 @node Breakpoints Buffer
 @subsubsection Breakpoints Buffer
@@ -1149,6 +1173,11 @@ also updates the Locals buffer
 @iftex
 (described in the next section).
 @end iftex
+
+@vindex gdb-stack-buffer-addresses
+  If you want the frame address to be shown each stack frame,
+customize the variable @code{gdb-stack-buffer-addresses} to a
+non-@code{nil} value.
 
 @node Other GDB Buffers
 @subsubsection Other GDB Buffers
@@ -1469,6 +1498,12 @@ refers to other functions and variables in its library (loading the
 library lets Emacs properly set up the hyperlinks in the @file{*Help*}
 buffer).  To disable this feature, change the variable
 @code{help-enable-auto-load} to @code{nil}.
+
+@vindex help-enable-completion-auto-load
+Automatic loading also occurs when completing names for
+@code{describe-variable} and @code{describe-function}, based on the
+prefix being completed.  To disable this feature, change the variable
+@code{help-enable-completion-auto-load} to @code{nil}.
 
 @vindex load-dangerous-libraries
 @cindex Lisp files byte-compiled by XEmacs
