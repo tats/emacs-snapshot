@@ -1255,6 +1255,11 @@ highlight in one iteration while processing the full buffer.
 +++
 *** New isearch bindings.
 
+'C-M-z' invokes new function 'isearch-yank-until-char', which yanks
+everything from point up to but not including the specified
+character into the search string.  This is especially useful for
+keyboard macros.
+
 'C-M-w' in isearch changed from 'isearch-del-char' to the new function
 'isearch-yank-symbol-or-char'.  'isearch-del-char' is now bound to
 'C-M-d'.
@@ -1369,6 +1374,10 @@ the Elisp manual for documentation of the new mode and its commands.
 *** Gamegrid now determines its default glyph size based on display
 dimensions, instead of always using 16 pixels.  As a result, Tetris,
 Snake and Pong are more playable on HiDPI displays.
+
+---
+*** 'gamegrid-add-score' can now sort scores from lower to higher.
+This is useful for games where lower scores are better, like time-based games.
 
 ** Filecache
 
@@ -1834,6 +1843,16 @@ aliases of 'bookmark-default-file'.
 
 *** New user option 'bookmark-watch-bookmark-file'.
 When non-nil, watch whether the bookmark file has changed on disk.
+
+---
+*** The old bookmark file format is no longer supported.
+This bookmark file format has not been used in Emacs since at least
+version 19.34, released in 1996, and will no longer be automatically
+converted to the new bookmark file format.
+
+The following functions are now declared obsolete:
+bookmark-grok-file-format-version, bookmark-maybe-upgrade-file-format,
+bookmark-upgrade-file-format-from-0, bookmark-upgrade-version-0-alist
 
 ---
 ** The mantemp.el library is now marked obsolete.
