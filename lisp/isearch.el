@@ -207,8 +207,8 @@ to the search status stack.")
   "Predicate to filter hits of Isearch and replace commands.
 Isearch hits that don't satisfy the predicate will be skipped.
 The value should be a function of two arguments; it will be
-called with the the positions of the start and the end of the
-text matched by Isearch and replace commands.  If this function
+called with the positions of the start and the end of the text
+matched by Isearch and replace commands.  If this function
 returns nil, Isearch and replace commands will continue searching
 without stopping at resp. replacing this match.
 
@@ -1370,7 +1370,6 @@ NOPUSH is t and EDIT is t."
   (remove-hook 'post-command-hook 'isearch-post-command-hook)
   (remove-hook 'mouse-leave-buffer-hook 'isearch-mouse-leave-buffer)
   (remove-hook 'kbd-macro-termination-hook 'isearch-done)
-  (setq isearch-lazy-highlight-start nil)
   (when (buffer-live-p isearch--current-buffer)
     (with-current-buffer isearch--current-buffer
       (setq isearch--current-buffer nil)
@@ -2010,7 +2009,7 @@ Turning on character-folding turns off regexp mode.")
   "Text properties that are added to the isearch prompt.")
 
 (defun isearch--momentary-message (string)
-  "Print STRING at the end of the isearch prompt for 1 second"
+  "Print STRING at the end of the isearch prompt for 1 second."
   (let ((message-log-max nil))
     (message "%s%s%s"
              (isearch-message-prefix nil isearch-nonincremental)
@@ -3970,8 +3969,9 @@ Attempt to do the search exactly the way the pending Isearch would."
 		  (if isearch-lazy-highlight-forward
 		      (setq isearch-lazy-highlight-end (point-min))
 		    (setq isearch-lazy-highlight-start (point-max)))
-		  (run-at-time lazy-highlight-interval nil
-			       'isearch-lazy-highlight-buffer-update))
+		  (setq isearch-lazy-highlight-timer
+			(run-at-time lazy-highlight-interval nil
+				     'isearch-lazy-highlight-buffer-update)))
 	      (setq isearch-lazy-highlight-timer
 		    (run-at-time lazy-highlight-interval nil
 				 'isearch-lazy-highlight-update)))))))))

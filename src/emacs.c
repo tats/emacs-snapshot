@@ -479,9 +479,6 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 
   if (!NILP (Vinvocation_directory))
     {
-      if (NILP (Vpurify_flag) && !NILP (Ffboundp (Qfile_truename)))
-        Vinvocation_directory = call1 (Qfile_truename, Vinvocation_directory);
-
       dir = Vinvocation_directory;
 #ifdef WINDOWSNT
       /* If we are running from the build directory, set DIR to the
@@ -490,8 +487,15 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
       if (SBYTES (dir) > sizeof ("/i386/") - 1
 	  && 0 == strcmp (SSDATA (dir) + SBYTES (dir) - sizeof ("/i386/") + 1,
 			  "/i386/"))
-	dir = Fexpand_file_name (build_string ("../.."), dir);
-#else  /* !WINDOWSNT */
+	{
+	  if (NILP (Vpurify_flag))
+	    {
+	      Lisp_Object file_truename = intern ("file-truename");
+	      if (!NILP (Ffboundp (file_truename)))
+		dir = call1 (file_truename, dir);
+	    }
+	  dir = Fexpand_file_name (build_string ("../.."), dir);
+	}
 #endif
       name = Fexpand_file_name (Vinvocation_name, dir);
       while (1)
@@ -746,7 +750,7 @@ load_pdump_find_executable (char const *argv0, ptrdiff_t *candidate_size)
       candidate[path_part_length] = DIRECTORY_SEP;
       memcpy (candidate + path_part_length + 1, argv0, argv0_length + 1);
       struct stat st;
-      if (check_executable (candidate)
+      if (file_access_p (candidate, X_OK)
 	  && stat (candidate, &st) == 0 && S_ISREG (st.st_mode))
 	return candidate;
       *candidate = '\0';
@@ -923,7 +927,6 @@ load_pdump (int argc, char **argv)
 }
 #endif /* HAVE_PDUMPER */
 
-/* ARGSUSED */
 int
 main (int argc, char **argv)
 {

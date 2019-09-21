@@ -414,6 +414,7 @@ the :notify function can't know the new value.")
 
 (defmacro widget-specify-insert (&rest form)
   "Execute FORM without inheriting any text properties."
+   (declare (debug body))
   `(save-restriction
     (let ((inhibit-read-only t)
 	  (inhibit-modification-hooks t))
@@ -1938,7 +1939,7 @@ the earlier input."
     widget))
 
 (defun widget-field-value-set (widget value)
-  "Set an editable text field WIDGET to VALUE"
+  "Set an editable text field WIDGET to VALUE."
   (let ((from (widget-field-start widget))
 	(to (widget-field-text-end widget))
 	(buffer (widget-field-buffer widget)))
@@ -3050,7 +3051,7 @@ as the value."
   "History of input to `widget-string-prompt-value'.")
 
 (define-widget 'string 'editable-field
-  "A string"
+  "A string."
   :tag "String"
   :format "%{%t%}: %v"
   :complete-function 'ispell-complete-word

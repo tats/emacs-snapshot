@@ -115,7 +115,7 @@ Alternative suggestions are:
   'browse-url-secondary-browser-function "27.1")
 
 (defcustom shr-image-animate t
-  "Non nil means that images that can be animated will be."
+  "Non-nil means that images that can be animated will be."
   :version "24.4"
   :type 'boolean)
 
@@ -1180,7 +1180,23 @@ Return a string with image data."
             ;; so glitches may occur during this transformation.
 	    (shr-dom-to-xml
 	     (libxml-parse-xml-region (point) (point-max)))))
+    ;; SVG images often do not have a specified foreground/background
+    ;; color, so wrap them in styles.
+    (when (eq content-type 'image/svg+xml)
+      (setq data (svg--wrap-svg data)))
     (list data content-type)))
+
+(defun svg--wrap-svg (data)
+  "Add a default foreground colour to SVG images."
+  (let ((size (image-size (create-image data nil t :scaling 1) t)))
+    (with-temp-buffer
+      (insert
+       (format
+        "<svg xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:xi=\"http://www.w3.org/2001/XInclude\" style=\"color: %s;\" viewBox=\"0 0 %d %d\"> <xi:include href=\"data:image/svg+xml;base64,%s\"></xi:include></svg>"
+        (face-foreground 'default)
+        (car size) (cdr size)
+        (base64-encode-string data t)))
+      (buffer-string))))
 
 (defun shr-image-displayer (content-function)
   "Return a function to display an image.

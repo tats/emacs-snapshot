@@ -2132,9 +2132,9 @@ think it does, because \"free\" is pretty hard to define in practice."
   "If file SIZE larger than `large-file-warning-threshold', allow user to abort.
 OP-TYPE specifies the file operation being performed (for message
 to user).  If OFFER-RAW is true, give user the additional option
-to open the file literally. If the user chooses this option,
-`abort-if-file-too-large' returns the symbol `raw'. Otherwise, it
-returns nil or exits non-locally."
+to open the file literally.  If the user chooses this option,
+`abort-if-file-too-large' returns the symbol `raw'.  Otherwise,
+it returns nil or exits non-locally."
   (let ((choice (and large-file-warning-threshold size
 	             (> size large-file-warning-threshold)
                      ;; No point in warning if we can't read it.
@@ -2554,13 +2554,13 @@ unless NOMODES is non-nil."
       (auto-save-mode 1)))
   ;; Make people do a little extra work (C-x C-q)
   ;; before altering a backup file.
-  (when (backup-file-name-p buffer-file-name)
-    (setq buffer-read-only t))
   ;; When a file is marked read-only,
   ;; make the buffer read-only even if root is looking at it.
-  (when (and (file-modes (buffer-file-name))
-	     (zerop (logand (file-modes (buffer-file-name)) #o222)))
-    (setq buffer-read-only t))
+  (unless buffer-read-only
+    (when (or (backup-file-name-p buffer-file-name)
+	      (let ((modes (file-modes (buffer-file-name))))
+		(and modes (zerop (logand modes #o222)))))
+      (setq buffer-read-only t)))
   (unless nomodes
     (when (and view-read-only view-mode)
       (view-mode -1))
@@ -2811,6 +2811,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.docbook\\'" . sgml-mode)
      ("\\.com\\'" . dcl-mode)
      ("/config\\.\\(?:bat\\|log\\)\\'" . fundamental-mode)
+     ("/\\.\\(authinfo\\|netrc\\)\\'" . authinfo-mode)
      ;; Windows candidates may be opened case sensitively on Unix
      ("\\.\\(?:[iI][nN][iI]\\|[lL][sS][tT]\\|[rR][eE][gG]\\|[sS][yY][sS]\\)\\'" . conf-mode)
      ("\\.la\\'" . conf-unix-mode)
@@ -4177,8 +4178,8 @@ This function returns either:
 NODE is assumed to be a cons cell where the car is either a
 string or a symbol representing a mode name.
 
-If it is a mode then the the depth of the mode (ie, how many
-parents that mode has) will be returned.
+If it is a mode then the depth of the mode (ie, how many parents
+that mode has) will be returned.
 
 If it is a string then the length of the string plus 1000 will be
 returned.
@@ -5934,7 +5935,7 @@ This returns non-nil if the current buffer is visiting a readable file
 whose modification time does not match that of the buffer.
 
 This function only handles buffers that are visiting files.
-Non-file buffers need a custom function"
+Non-file buffers need a custom function."
   (and buffer-file-name
        (file-readable-p buffer-file-name)
        (not (buffer-modified-p (current-buffer)))
