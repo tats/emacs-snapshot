@@ -11,12 +11,12 @@ appropriate, etc.
  1 file changed, 4 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index 53408a8..f4c4f8f 100644
+index 3f38f9f..20ecd75 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
 @@ -21,6 +21,10 @@ Temporary note:
- --- means no change in the manuals is needed.
- When you add a new item, use the appropriate mark if you are sure it applies,
+ When you add a new item, use the appropriate mark if you are sure it
+ applies, and please also update docstrings as needed.
  
 +* Debian specific changes to Emacs
 +
