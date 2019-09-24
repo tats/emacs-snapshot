@@ -660,6 +660,12 @@ variable should be a regexp or a list of regexps."
 	       (setq gnus-message-cite-prefix-regexp
 		     (concat "^\\(?:" value "\\)"))))))
 
+(defcustom message-cite-level-function (lambda (s) (cl-count ?> s))
+  "A function to determine the level of cited text.
+The function accepts 1 parameter which is the matched prefix."
+  :type 'function
+  :version "27.1")
+
 (defcustom message-cancel-message "I am canceling my own article.\n"
   "Message to be inserted in the cancel message."
   :group 'message-interface
@@ -1540,17 +1546,57 @@ starting with `not' and followed by regexps."
   "Face used for displaying the separator."
   :group 'message-faces)
 
-(defface message-cited-text
+(defface message-cited-text-1
   '((((class color)
       (background dark))
-     :foreground "LightPink1")
+     (:foreground "LightPink1"))
     (((class color)
       (background light))
-     :foreground "red")
+     (:foreground "red1"))
     (t
-     :bold t))
-  "Face used for displaying cited text names."
+     (:bold t)))
+  "Face used for displaying 1st-level cited text."
   :group 'message-faces)
+
+(defface message-cited-text-2
+  '((((class color)
+      (background dark))
+     (:foreground "forest green"))
+    (((class color)
+      (background light))
+     (:foreground "red4"))
+    (t
+     (:bold t)))
+  "Face used for displaying 2nd-level cited text."
+  :group 'message-faces)
+
+(defface message-cited-text-3
+  '((((class color)
+      (background dark))
+     (:foreground "goldenrod3"))
+    (((class color)
+      (background light))
+     (:foreground "OliveDrab4"))
+    (t
+     (:bold t)))
+  "Face used for displaying 3rd-level cited text."
+  :group 'message-faces)
+
+(defface message-cited-text-4
+  '((((class color)
+      (background dark))
+     (:foreground "chocolate3"))
+    (((class color)
+      (background light))
+     (:foreground "SteelBlue4"))
+    (t
+     (:bold t)))
+  "Face used for displaying 4th-level cited text."
+  :group 'message-faces)
+
+;; backward-compatibility alias
+(put 'message-cited-text 'face-alias 'message-cited-text-1)
+(put 'message-cited-text 'obsolete-face "26.1")
 
 (defface message-mml
   '((((class color)
@@ -1580,48 +1626,84 @@ starting with `not' and followed by regexps."
       (set-match-data (list start (point)))
       (point))))
 
+(defun message-font-lock-make-cited-text-matcher (level maxlevel)
+  "Generate the matcher for cited text.
+LEVEL is the citation level to be matched and MAXLEVEL is the
+number of levels specified in the faces `message-cited-text-*'."
+  (lambda (limit)
+    (let (matched)
+      ;; Keep search until `message-cite-level-function' returns the level
+      ;; we want to match.
+      (while (and (re-search-forward (concat "^\\("
+                                             message-cite-prefix-regexp
+                                             "\\).*")
+                                     limit t)
+		  (not (setq matched
+                             (save-match-data
+                               (= (1- level)
+				  (mod
+                                   (1- (funcall message-cite-level-function
+						(match-string 1)))
+                                   maxlevel)))))))
+      matched)))
+
 (defvar message-font-lock-keywords
-  (let ((content "[ \t]*\\(.+\\(\n[ \t].*\\)*\\)\n?"))
-    `((message-match-to-eoh
-       (,(concat "^\\([Tt]o:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-	(1 'message-header-name)
-	(2 'message-header-to nil t))
-       (,(concat "^\\(^[GBF]?[Cc][Cc]:\\|^[Rr]eply-[Tt]o:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-	(1 'message-header-name)
-	(2 'message-header-cc nil t))
-       (,(concat "^\\([Ss]ubject:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-	(1 'message-header-name)
-	(2 'message-header-subject nil t))
-       (,(concat "^\\([Nn]ewsgroups:\\|Followup-[Tt]o:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-	(1 'message-header-name)
-	(2 'message-header-newsgroups nil t))
-       (,(concat "^\\(X-[A-Za-z0-9-]+:\\|In-Reply-To:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-	(1 'message-header-name)
-	(2 'message-header-xheader))
-       (,(concat "^\\([A-Z][^: \n\t]+:\\)" content)
-	(progn (goto-char (match-beginning 0)) (match-end 0)) nil
-        (1 'message-header-name)
-        (2 'message-header-other nil t)))
-      (,(lambda (limit)
-          (and mail-header-separator
-               (not (equal mail-header-separator ""))
-               (re-search-forward
-                (concat "^" (regexp-quote mail-header-separator) "$")
-                limit t)))
-       0 'message-separator)
-      (,(lambda (limit)
-          (re-search-forward (concat "^\\(?:"
-                                     message-cite-prefix-regexp
-                                     "\\).*")
-                             limit t))
-       0 'message-cited-text)
-      ("<#/?\\(?:multipart\\|part\\|external\\|mml\\|secure\\)[^>]*>"
-       0 'message-mml)))
+  (nconc
+   (let ((content "[ \t]*\\(.+\\(\n[ \t].*\\)*\\)\n?"))
+     `((message-match-to-eoh
+	(,(concat "^\\([Tt]o:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+	 (1 'message-header-name)
+	 (2 'message-header-to nil t))
+	(,(concat "^\\(^[GBF]?[Cc][Cc]:\\|^[Rr]eply-[Tt]o:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+	 (1 'message-header-name)
+	 (2 'message-header-cc nil t))
+	(,(concat "^\\([Ss]ubject:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+	 (1 'message-header-name)
+	 (2 'message-header-subject nil t))
+	(,(concat "^\\([Nn]ewsgroups:\\|Followup-[Tt]o:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+	 (1 'message-header-name)
+	 (2 'message-header-newsgroups nil t))
+	(,(concat "^\\(X-[A-Za-z0-9-]+:\\|In-Reply-To:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+	 (1 'message-header-name)
+	 (2 'message-header-xheader))
+	(,(concat "^\\([A-Z][^: \n\t]+:\\)" content)
+	 (progn (goto-char (match-beginning 0)) (match-end 0)) nil
+         (1 'message-header-name)
+         (2 'message-header-other nil t)))
+       (,(lambda (limit)
+           (and mail-header-separator
+		(not (equal mail-header-separator ""))
+		(re-search-forward
+                 (concat "^" (regexp-quote mail-header-separator) "$")
+                 limit t)))
+	0 'message-separator)
+       ("<#/?\\(?:multipart\\|part\\|external\\|mml\\|secure\\)[^>]*>"
+	0 'message-mml)))
+   ;; Additional font locks to highlight different levels of cited text
+   (let ((maxlevel 1)
+         (level 1)
+         cited-text-face
+         keywords)
+     ;; Compute the max level.
+     (while (setq cited-text-face
+                  (intern-soft (format "message-cited-text-%d" maxlevel)))
+       (setq maxlevel (1+ maxlevel)))
+     (setq maxlevel (1- maxlevel))
+     ;; Generate the keywords.
+     (while (setq cited-text-face
+                  (intern-soft (format "message-cited-text-%d" level)))
+       (setq keywords
+             (cons
+              `(,(message-font-lock-make-cited-text-matcher level maxlevel)
+                (0 ',cited-text-face))
+              keywords))
+       (setq level (1+ level)))
+     keywords))
   "Additional expressions to highlight in Message mode.")
 
 (defvar message-face-alist
@@ -1890,6 +1972,9 @@ You must have the \"hashcash\" binary installed, see `hashcash-path'."
 
 (defvar message-bogus-system-names "\\`localhost\\.\\|\\.local\\'"
   "The regexp of bogus system names.")
+
+(defvar message-encoded-mail-cache nil
+  "After sending a message, the encoded version is cached in this variable.")
 
 (autoload 'gnus-alive-p "gnus-util")
 (autoload 'gnus-delay-article "gnus-delay")
@@ -2805,7 +2890,7 @@ systematically send encrypted emails when possible."
     ["Sort Headers" message-sort-headers t]
     ["Encode non-ASCII domain names" message-idna-to-ascii-rhs t]
     ;; We hide `message-hidden-headers' by narrowing the buffer.
-    ["Show Hidden Headers" widen t]
+    ["Show Hidden Headers" message-widen-and-recenter t]
     ["Goto Body" message-goto-body t]
     ["Goto Signature" message-goto-signature t]))
 
@@ -2974,7 +3059,8 @@ Like `text-mode', but with these additional commands:
   ;; excluding citations and other artifacts.
   ;;
   (set (make-local-variable 'syntax-propertize-function) 'message--syntax-propertize)
-  (set (make-local-variable 'parse-sexp-ignore-comments) t))
+  (set (make-local-variable 'parse-sexp-ignore-comments) t)
+  (setq-local message-encoded-mail-cache nil))
 
 (defun message-setup-fill-variables ()
   "Setup message fill variables."
@@ -3282,6 +3368,12 @@ or in the synonym headers, defined by `message-header-synonyms'."
 
 
 ;;; Various commands
+
+(defun message-widen-and-recenter ()
+  "Widen the buffer and go to the start."
+  (interactive)
+  (widen)
+  (goto-char (point-min)))
 
 (defun message-delete-not-region (beg end)
   "Delete everything in the body of the current message outside of the region."
@@ -4364,6 +4456,14 @@ This function could be useful in `message-setup-hook'."
     (dolist (hdr '("To" "Cc" "Bcc"))
       (let ((addr (message-fetch-field hdr)))
 	(when (stringp addr)
+	  ;; First check for syntactically invalid addresses.
+	  (dolist (address (mail-header-parse-addresses addr t))
+	    (unless (mail-header-parse-addresses address)
+	      (unless (y-or-n-p
+		       (format "Email address %s looks invalid; send anyway?"
+			       address))
+		(user-error "Invalid address %s" address))))
+	  ;; Then check for likely-bogus addresses.
 	  (dolist (bog (message-bogus-recipient-p addr))
 	    (and bog
 		 (not (y-or-n-p
@@ -4589,8 +4689,8 @@ If you always want Gnus to send messages in one piece, set
 	  (insert (with-current-buffer mailbuf
 		    (mml-buffer-substring-no-properties-except-some
 		     (point-min) (point-max))))
-	  ;; Remove some headers.
 	  (message-encode-message-body)
+	  (message--cache-encoded mailbuf)
 	  (save-restriction
 	    (message-narrow-to-headers)
 	    ;; We (re)generate the Lines header.
@@ -4645,6 +4745,14 @@ If you always want Gnus to send messages in one piece, set
     (set-buffer mailbuf)
     (setq message-options options)
     (push 'mail message-sent-message-via)))
+
+(defun message--cache-encoded (mailbuf)
+  ;; Store the encoded buffer data for possible reuse later
+  ;; when doing Fcc/Gcc handling.  This avoids having to do
+  ;; things like re-GPG-encoding secure parts.
+  (let ((encoded (buffer-string)))
+    (with-current-buffer mailbuf
+      (setq message-encoded-mail-cache encoded))))
 
 (defun message--fold-long-headers ()
   "Fold too-long header lines.
@@ -4939,6 +5047,7 @@ Otherwise, generate and save a value for `canlock-password' first."
 		 (mml-buffer-substring-no-properties-except-some
 		  (point-min) (point-max))))
 	      (message-encode-message-body)
+	      (message--cache-encoded messbuf)
 	      ;; Remove some headers.
 	      (save-restriction
 		(message-narrow-to-headers)
@@ -5401,6 +5510,7 @@ The result is a fixnum."
   "Process Fcc headers in the current buffer."
   (let ((case-fold-search t)
 	(buf (current-buffer))
+	(encoded-cache message-encoded-mail-cache)
 	(mml-externalize-attachments message-fcc-externalize-attachments)
 	(file (message-field-value "fcc" t))
 	list)
@@ -5408,7 +5518,11 @@ The result is a fixnum."
       (with-temp-buffer
 	(insert-buffer-substring buf)
 	(message-clone-locals buf)
-	(message-encode-message-body)
+	;; Avoid re-doing things like GPG-encoding secret parts.
+	(if (not encoded-cache)
+	    (message-encode-message-body)
+	  (erase-buffer)
+	  (insert encoded-cache))
 	(save-restriction
 	  (message-narrow-to-headers)
 	  (while (setq file (message-fetch-field "fcc" t))

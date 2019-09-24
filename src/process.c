@@ -3759,7 +3759,8 @@ address.  The symbol `local' specifies the local host.  If specified
 for a server process, it must be a valid name or address for the local
 host, and only clients connecting to that address will be accepted.
 If all interfaces should be bound, an address of \"0.0.0.0\" (for
-ipv4) or \"::\" (for ipv6) can be used.  `local' will use IPv4 by
+IPv4) or \"::\" (for IPv6) can be used.  (On some operating systems,
+using \"::\" listens on both IPv4 and IPv6.)  `local' will use IPv4 by
 default, use a FAMILY of 'ipv6 to override this.
 
 :service SERVICE -- SERVICE is name of the service desired, or an
@@ -5547,8 +5548,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		     through all the channels and check for data.
 		     This is a workaround needed for some versions of
 		     the gnutls library -- 2.12.14 has been confirmed
-		     to need it.  See
-		     http://comments.gmane.org/gmane.emacs.devel/145074 */
+		     to need it.  */
 		  for (channel = 0; channel < FD_SETSIZE; ++channel)
 		    if (! NILP (chan_process[channel]))
 		      {

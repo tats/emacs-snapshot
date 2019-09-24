@@ -133,7 +133,7 @@ Whether the passphrase is cached at all is controlled by
   (when (null smime-keys)
     (customize-variable 'smime-keys)
     (error "No S/MIME keys configured, use customize to add your key"))
-  (smime-sign-buffer (cdr (assq 'keyfile cont)))
+  (smime-sign-buffer (cdar smime-keys))
   (goto-char (point-min))
   (while (search-forward "\r\n" nil t)
     (replace-match "\n" t t))
@@ -363,7 +363,7 @@ Whether the passphrase is cached at all is controlled by
 			  (downcase
 			   (cdr (assq micalg
 				      epg-digest-algorithm-alist))))))
-      (insert "protocol=\"application/pkcs7-signature\"\n")
+      (insert "  protocol=\"application/pkcs7-signature\"\n")
       (insert (format "\n--%s\n" boundary))
       (goto-char (point-max))
       (insert (format "\n--%s\n" boundary))

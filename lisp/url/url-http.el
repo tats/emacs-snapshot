@@ -551,8 +551,9 @@ work correctly."
       ;; display a file buffer even if the URL does not exist and
       ;; 'url-retrieve-synchronously' returns 404 or whatever.
       (unless (or visit
-                  (and (>= url-http-response-status 200)
-                       (< url-http-response-status 300)))
+                  (or (and (>= url-http-response-status 200)
+                           (< url-http-response-status 300))
+                      (= url-http-response-status 304))) ; "Not modified"
         (let ((desc (nth 2 (assq url-http-response-status url-http-codes))))
           (kill-buffer buffer)
           ;; Signal file-error per bug#16733.
@@ -1024,7 +1025,9 @@ should be shown to the user."
                    (setq url-using-proxy
                          (url-generic-parse-url url-using-proxy)))
                  (url-http url-current-object url-callback-function
-                           url-callback-arguments (current-buffer)))))
+                           url-callback-arguments (current-buffer)
+                           (and (string= "https" (url-type url-current-object))
+                                'tls)))))
 	    ((url-http-parse-headers)
 	     (url-http-activate-callback))))))
 
