@@ -276,6 +276,12 @@ used to remove comments before calling the libxml functions to parse
 the data.
 
 +++
+** A new DOM (the XML/HTML document structure returned by functions
+such as 'libxml-parse-html-region') traversal function has been added:
+'dom-search', which takes a DOM and a predicate and returns all nodes
+that match.
+
++++
 ** The Network Security Manager now allows more fine-grained control
 of what checks to run via the 'network-security-protocol-checks'
 variable.
@@ -541,6 +547,11 @@ been removed.
 network connection information (in addition to the host name).
 
 ** The 'cl' package is now officially deprecated in favor of 'cl-lib'.
+
+---
+** desktop
+*** When called interactively with a prefix arg 'C-u', 'desktop-read'
+now prompts the user for the directory containing the desktop file.
 
 +++
 ** winner
@@ -1033,6 +1044,16 @@ Of course it will still find it if you have it in '~/.ecompleterc'.
 ** Gnus
 
 +++
+*** The Gnus user variable 'nnimap-expunge' supports three new values:
+'never' for never expunging messages, 'immediately' for immediately
+expunging deleted messages, and 'on-exit' to expunge deleted articles
+when exiting the group's summary buffer.  Setting 'nnimap-expunge' to
+'nil' or 't' is still supported but not recommended, since it may
+result in Gnus expunging all messages that have been flagged as
+deleted by any IMAP client (rather than just those that have been
+deleted by Gnus).
+
++++
 *** New option 'gnus-use-atomic-windows' makes Gnus window layouts
 atomic.  See the "Atomic Windows" section of the Elisp manual for
 details.
@@ -1093,7 +1114,7 @@ This option controls whether and how to use Gnus search groups as
 'path:' search terms to 'notmuch'.
 
 ---
-+++ The buttons in the Gnus article buffer were formerly widgets
+*** The buttons in the Gnus article buffer were formerly widgets
 (i.e., buttons from widget.el).  This has now changed, and they are
 now buttons (from button.el), and commands like 'TAB' now search for
 buttons instead of widgets.  There should be no user-visible changes,
@@ -1116,6 +1137,12 @@ The variable to use instead to alter text to be sent is now
 *** XEmacs support has been removed.
 
 ** eww/shr
+
++++
+*** The new variable 'shr-cookie-policy' can be used to control when
+to use cookies when fetching embedded images.  The default is to use
+them when the images are from the same domain as the main HTML
+document.
 
 +++
 *** The 'eww' command can now create a new EWW buffer.
@@ -1719,6 +1746,10 @@ This also works for their aliases: '|' for 'or'; ':', 'and' and
 In this case, 'rx' will generate code which produces a regexp string
 at run time, instead of a constant string.
 
+---
+*** New rx extension mechanism: 'rx-define', 'rx-let', 'rx-let-eval'.
+These macros add new forms to the rx notation.
+
 ** Frames
 
 +++
@@ -1750,6 +1781,11 @@ near the current column in Tabulated Lists (see variables
 *** Two new commands and keystrokes have been added to the tabulated
 list mode: 'w' (which widens the current column) and 'c' which makes
 the current column contract.
+
++++
+*** New function 'tabulated-list-clear-all-tags'.
+This function clears all tags from the padding area in the current
+buffer.  Tags are typically added by calling 'tabulated-list-put-tag'.
 
 ** Text mode
 
@@ -1986,6 +2022,19 @@ immediately.  Type 'M-x so-long-commentary' for full documentation.
 * Incompatible Lisp Changes in Emacs 27.1
 
 ---
+** Incomplete destructive splicing support has been removed.
+Support for Common Lisp style destructive splicing (",.") was
+incomplete and broken for a long time.  It has now been removed.
+
+This means that backquote substitution now works for identifiers
+starting with a period (".").  Consider the following example:
+
+    (let ((.foo 42)) `,.foo)
+
+In the past, this would have incorrectly evaluated to '(\,\. foo)',
+but will now instead evaluate to '42'.
+
+---
 ** The REGEXP in 'magic-mode-alist' is now matched case-sensitively.
 Likewise for 'magic-fallback-mode-alist'.
 
@@ -2126,6 +2175,14 @@ ending character were silently omitted.
 For example, '(rx (any "@z-a" (?9 . ?0)))' would match '@' only.
 Now, such 'rx' expressions generate an error.
 
+---
+** Internal 'rx' functions and variables have been removed,
+as a consequence of an improved implementation.  Packages using
+these should use the public 'rx' and 'rx-to-string' instead.
+'rx-constituents' is still available for compatibility, but the new
+extension mechanism is preferred: 'rx-define', 'rx-let' and
+'rx-let-eval'.
+
 +++
 ** 'text-mode' no longer sets the value of 'indent-line-function'.
 The global value of 'indent-line-function', which defaults to
@@ -2145,6 +2202,15 @@ valid event type.
 
 ---
 ** The obsolete package xesam.el (since Emacs 24) has been removed.
+
++++
+** The XBM image handler now accepts a ':stride' argument, which should
+be specified in image specs representing the entire bitmap as a single
+bool vector.
+
++++
+** 'regexp-quote' may return its argument string.
+If the argument needs no quoting, it can be returned instead of a copy.
 
 
 * Lisp Changes in Emacs 27.1
