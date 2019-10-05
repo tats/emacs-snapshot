@@ -445,6 +445,11 @@ RGB triplets with a single hexadecimal digit per component.
 ---
 ** The toolbar now shows the equivalent key binding in its tooltips.
 
+---
+** 'scroll-lock-mode' is now bound to the 'Scroll_Lock' key globally.
+Note that this key binding will not work on MS-Windows systems if
+'w32-scroll-lock-modifier' is non-nil.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -582,6 +587,11 @@ This is because on the one hand it suffers from various misbehaviors in corner
 cases that have plagued it for years, and on the other experiments indicated
 that it doesn't bring any measurable benefit.
 
+---
+*** The 'g' keystroke in *Compile-Log* buffers has been bound to a new
+command that will recompile the file previously compiled with 'M-x
+byte-compile-file' and the like.
+
 ** compile.el
 ---
 *** In 'compilation-error-regexp-alist', 'line' (and 'end-line') can
@@ -607,12 +617,21 @@ its functions.
 *** New commands 'doc-view-presentation' and 'doc-view-fit-window-to-page'.
 *** Added support for password-protected PDF files
 
+*** A new variable 'doc-view-pdftotext-program-args' has been added to
+allow controlling how the conversion to text is done.
+
 ** Ido
 *** New user option 'ido-big-directories' to mark directories whose
 names match certain regular expressions as big.  Ido won't attempt to
 list the contents of such directories when completing file names.
 
 ** Minibuffer
+
++++
+*** A new variable, 'minibuffer-beginning-of-buffer-movement', has
+been introduced to allow controlling how the 'M-<' command works in
+the minibuffer.  If non-nil, point will move to the end of the prompt
+(if point is after the end of the prompt).
 
 ---
 *** Minibuffer now uses 'minibuffer-message' to display error messages
@@ -983,6 +1002,9 @@ early init file.
 ---
 *** Imenu support has been added to 'package-menu-mode'.
 
+---
+*** The package list can now be sorted by version or description.
+
 ** Info
 
 +++
@@ -1042,6 +1064,13 @@ This can be controlled by the new 'ecomplete-sort-predicate' variable.
 Of course it will still find it if you have it in '~/.ecompleterc'.
 
 ** Gnus
+
++++
+*** Two new Gnus summary mode navigation commands have been added,
+bound to the '[' and ']' keys: `gnus-summary-prev-unseen-article' and
+`gnus-summary-next-unseen-article'.  These take you (respectively) to
+the previous unseen or next unseen article.  (These are the ones that
+are marked with "." in the summary mode lines.)
 
 +++
 *** The Gnus user variable 'nnimap-expunge' supports three new values:
@@ -1507,6 +1536,11 @@ variable for remote shells.  It still defaults to "/bin/sh".
 available for output of asynchronous shell commands.
 
 ** Pcomplete
+
+*** The 'pcomplete' command is now obsolete
+The Pcomplete functionality can be obtained via completion-at-point
+instead, by adding pcomplete-completions-at-point to
+completion-at-point-functions.
 
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
@@ -1982,8 +2016,57 @@ and 'gravatar-force-default'.
 *** The built-in ada-mode is now deleted.  The GNU ELPA package is a
 good replacement, even in very large source files.
 
+** Some conversions recommended for 'time-stamp-format' have changed.
+The new documented/recommended %-conversions are closer to those
+used by 'format-time-string' and are compatible at least as far back
+as Emacs 22.1 (released in 2007).
+
+Uppercase abbreviated day name of week: was %3A, now %#a
+Full day name of week: was %:a, now %:A
+Uppercase abbreviated month name: was %3B, now %#b
+Full month name: was %:b, now %:B
+Four-digit year: was %:y, now %Y
+Lowercase timezone name: was %z, now %#Z
+Fully-qualified host name: was %s, now %Q
+Unqualified host name: (was none), now %q
+Login name: was %u, now %l
+User's full name: was %U, now %L
+
+Merely having (add-hook 'before-save-hook 'time-stamp) in your
+Emacs init file does not expose you to this change.  However,
+if you set 'time-stamp-format' or 'time-stamp-pattern' with a
+file-local variable, you may need to update the value.
+
 
 * New Modes and Packages in Emacs 27.1
+
+** 'tab-bar-mode' enables the tab-bar at the top of each frame,
+to switch named persistent window configurations in it using tabs.
+New tab-based keybindings (similar to frame-based commands):
+'C-x 6 2' creates a new tab;
+'C-x 6 0' deletes the current tab;
+'C-x 6 b' switches to buffer in another tab;
+'C-x 6 f' and 'C-x 6 C-f' edit file in another tab;
+'C-TAB' switches to the next tab;
+'S-C-TAB' switches to the previous tab.
+
+Also it's possible to switch named persistent window configurations
+without having graphical access to the tab-bar, even on a tty
+or when 'tab-bar-mode' is disabled, with these commands:
+'tab-new' creates a new window configuration;
+'tab-close' deletes the current window configuration;
+'tab-select' switches to the window configuration by its name;
+'tab-previous' switches to the previous window configuration;
+'tab-next' switches to the next window configuration;
+'tab-list' displays a list of named window configurations for switching.
+
+** 'global-tab-line-mode' enables the tab-line above each window to
+switch buffers in it to previous/next buffers.  Selecting a previous
+window-local tab is the same as running 'C-x <left>' (previous-buffer),
+selecting a next tab switches to the tab available by 'C-x <right>'
+(next-buffer).  Clicking on the plus icon adds a new buffer to the
+window-local tab-line of window buffers.  Using the mouse wheel on the
+tab-line scrolls the window buffers whose names are displayed in tabs.
 
 ** fileloop.el lets one setup multifile operations like search&replace.
 
@@ -2645,6 +2728,11 @@ directories if you ask it for a "file:///dir" URL.  Since this is a
 low-level library, such decisions (if they are to be made at all) are
 left to higher-level functions.
 
+---
+** The url-ns.el library is now marked obsolete.
+This library is used to open configuration files for the long defunct
+web browser Netscape, and is no longer relevant.
+
 ** Image mode
 
 *** New library Exif.
@@ -2652,6 +2740,13 @@ An Exif library has been added that can parse JPEG files and output
 data about creation times and orientation and the like.
 'exif-parse-file' and 'exif-parse-buffer' are the main interface
 functions.
+
+*** New library image-converter.
+If you need to view exotic image formats for which Emacs doesn't have
+native support, customize the new variable 'convert-images-externally'
+to t.  If your system has GraphicsMagick, ImageMagick or 'ffmpeg'
+installed, they will then be used to convert images automatically
+before displaying them.
 
 *** 'image-mode' now uses this library to automatically rotate images
 according to the orientation in the Exif data, if any.
@@ -2667,6 +2762,12 @@ The image parameters 'image-transform-rotation',
 'image-transform-scale' and 'image-transform-resize' are now declared
 buffer-local, so each buffer could have its own values for these
 parameters.
+
++++
+*** Three new 'image-mode' commands have been added: 'm', which marks
+the file in the dired buffer(s) for the directory the file is in; 'u',
+which unmarks the file; and 'w', which pushes the current buffer's file
+name to the kill ring.
 
 +++
 *** The command 'image-rotate' now accepts a prefix argument.

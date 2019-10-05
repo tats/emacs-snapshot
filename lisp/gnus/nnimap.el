@@ -104,17 +104,17 @@ Possible choices are nil (use default methods), `anonymous',
 
 (defvoo nnimap-expunge 'on-exit
   "When to expunge deleted messages.
-If 'never, deleted articles are marked with the IMAP \\Delete
-flag but not automatically expunged. If 'immediately, deleted
+If `never', deleted articles are marked with the IMAP \\Delete
+flag but not automatically expunged. If `immediately', deleted
 articles are immediately expunged (this requires the server to
-support the UID EXPUNGE command). If 'on-exit, deleted articles
-are flagged, and all flagged articles are expunged when the
-group is closed.
+support the UID EXPUNGE command). If `on-exit', deleted articles
+are flagged, and all flagged articles are expunged when the group
+is closed.
 
 For backwards compatibility, this variable may also be set to t
 or nil. If the server supports UID EXPUNGE, both t and nil are
-equivalent to 'immediately. If the server does not support UID
-EXPUNGE nil is equivalent to 'never, while t will immediately
+equivalent to `immediately'. If the server does not support UID
+EXPUNGE nil is equivalent to `never', while t will immediately
 expunge ALL articles that are currently flagged as deleted
 (i.e., potentially not only the article that was just deleted).")
 
@@ -2174,10 +2174,16 @@ Return the server's response to the SELECT or EXAMINE command."
 	    (when (and (not can-move) sequences)
 	      (nnimap-wait-for-response (caar sequences))
 	      ;; And then mark the successful copy actions as deleted,
-	      ;; and possibly expunge them.
-              (nnimap-delete-article
-               (nnimap-parse-copied-articles sequences)))
-            (nnimap-delete-article junk-articles)))))))
+	      ;; and possibly expunge them.  Almost any non-nil
+	      ;; setting of nnimap-expunge should lead to expunging
+	      ;; here.
+	      (let ((nnimap-expunge (and nnimap-expunge
+					 (not (equal nnimap-expunge 'never))
+					 'immediate)))
+		(nnimap-delete-article
+		 (nnimap-parse-copied-articles sequences))))
+	    (when junk-articles
+              (nnimap-delete-article junk-articles))))))))
 
 (defun nnimap-parse-copied-articles (sequences)
   (let (sequence copied range)
