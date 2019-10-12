@@ -453,6 +453,10 @@ Note that this key binding will not work on MS-Windows systems if
 
 * Editing Changes in Emacs 27.1
 
++++
+** The new 'amalgamating-undo-limit' variable can be used to control
+how many changes should be amalgamated when using the 'undo' command.
+
 ---
 ** The 'newline-and-indent' command (commonly bound to 'RET' in many
 modes) now takes an optional numeric argument to specify how many
@@ -559,6 +563,17 @@ network connection information (in addition to the host name).
 now prompts the user for the directory containing the desktop file.
 
 +++
+** display-line-numbers-mode
+
+*** New faces 'line-number-major-tick' and 'line-number-minor-tick',
+and customizable variables 'display-line-numbers-major-tick' and
+'display-line-numbers-minor-tick' can be used to highlight the line
+numbers of lines multiple of certain numbers.
+
+*** New variable `display-line-numbers-offset', when non-zero, adds
+an offset to absolute line numbers.
+
++++
 ** winner
 *** A new variable, 'winner-boring-buffers-regexp', has been added.
 
@@ -601,6 +616,10 @@ be functions.
 nil, but instead of scrolling the current line to the top of the
 screen when there is no left fringe, it inserts a visible arrow before
 column zero.
+---
+*** The new 'compilation-transform-file-match-alist' variable can be used
+to transform file name matches compilation output, and remove known
+false positives being recognised as warnings/errors.
 
 ** cl-lib.el
 +++
@@ -646,6 +665,8 @@ at the end of the active minibuffer.
 *** New generic function 'map-insert'.
 
 +++
+** The 'type' arg can be a list '(hash-table :key1 VAL1 :key2 VAL2 ...)'
+
 ** seq.el
 New convenience functions 'seq-first' and 'seq-rest' give easy access
 to respectively the first and all but the first elements of sequences.
@@ -999,6 +1020,16 @@ early init file.
 
 *** New function 'package-activate-all'.
 
++++
+*** New functions for filtering packages list.
+A new function has been added which allows users to filter the
+packages list by name: 'package-menu-filter-by-name'.  By default, it
+is bound to '/ n'.  Additionally, the function
+'package-menu-fiter-by-keyword' has been renamed from
+'package-menu-filter'.  Its keybinding has also been changed to '/ k'
+(from 'f').  To clear any of the two filters, the user can now call
+the 'package-menu-clear-filter' function, bound to '/ /' by default.
+
 ---
 *** Imenu support has been added to 'package-menu-mode'.
 
@@ -1177,6 +1208,10 @@ document.
 *** The 'eww' command can now create a new EWW buffer.
 Invoking the command with a prefix argument will cause it to create a
 new EWW buffer for the URL instead of reusing the default one.
+
++++
+*** Clicking with the Ctrl key or 'C-u RET' on a link opens a new tab
+when tab-bar-mode is enabled.
 
 +++
 *** The 'd' ('eww-download') command now falls back to current page's URL.
@@ -1534,6 +1569,10 @@ variable for remote shells.  It still defaults to "/bin/sh".
 +++
 *** 'async-shell-command-width' defines the number of display columns
 available for output of asynchronous shell commands.
+
++++
+*** Prompt for shell commands can now show the current directory.
+Customize 'shell-command-prompt-show-cwd' to enable it.
 
 ** Pcomplete
 
@@ -2037,36 +2076,41 @@ Emacs init file does not expose you to this change.  However,
 if you set 'time-stamp-format' or 'time-stamp-pattern' with a
 file-local variable, you may need to update the value.
 
+** mode-local
+*** define-overload is declared obsolete
+
 
 * New Modes and Packages in Emacs 27.1
 
-** 'tab-bar-mode' enables the tab-bar at the top of each frame,
-to switch named persistent window configurations in it using tabs.
-New tab-based keybindings (similar to frame-based commands):
-'C-x 6 2' creates a new tab;
-'C-x 6 0' deletes the current tab;
-'C-x 6 b' switches to buffer in another tab;
-'C-x 6 f' and 'C-x 6 C-f' edit file in another tab;
-'C-TAB' switches to the next tab;
-'S-C-TAB' switches to the previous tab.
+** Tab Bars
 
-Also it's possible to switch named persistent window configurations
-without having graphical access to the tab-bar, even on a tty
-or when 'tab-bar-mode' is disabled, with these commands:
-'tab-new' creates a new window configuration;
-'tab-close' deletes the current window configuration;
-'tab-select' switches to the window configuration by its name;
-'tab-previous' switches to the previous window configuration;
-'tab-next' switches to the next window configuration;
-'tab-list' displays a list of named window configurations for switching.
++++
+*** Tab-Bar mode
+The new command 'tab-bar-mode' enables the tab-bar at the top of each
+frame, where you can use tabs to switch between named persistent
+window configurations.
 
-** 'global-tab-line-mode' enables the tab-line above each window to
-switch buffers in it to previous/next buffers.  Selecting a previous
-window-local tab is the same as running 'C-x <left>' (previous-buffer),
-selecting a next tab switches to the tab available by 'C-x <right>'
+The 'C-x 6' sequence is the new prefix key for tab-related commands:
+'C-x 6 2' creates a new tab; 'C-x 6 0' deletes the current tab;
+'C-x 6 b' switches to buffer in another tab; 'C-x 6 f' and 'C-x 6 C-f'
+edit file in another tab; and 'C-TAB' and 'S-C-TAB' switch to the next
+or previous tab.  You can also switch between tabs and create/delete
+tabs with a mouse.
+
+Tab-related commands are available even when the Tab-Bar mode is
+disabled: by default, they enable Tab-Bar mode in that case.
+
+Read the new Info node "(emacs) Tab Bars" for full description
+of all related features.
+
+*** Tab-Line mode
+The new command 'global-tab-line-mode' enables the tab-line above each
+window, which you can use to switch buffers in the window.  Selecting
+the previous window-local tab is the same as typing 'C-x <LEFT>'
+(previous-buffer), selecting the next tab is the same as 'C-x <RIGHT>'
 (next-buffer).  Clicking on the plus icon adds a new buffer to the
-window-local tab-line of window buffers.  Using the mouse wheel on the
-tab-line scrolls the window buffers whose names are displayed in tabs.
+window-local tab-line of buffers.  Using the mouse wheel on the
+tab-line scrolls tabs that display the window buffers.
 
 ** fileloop.el lets one setup multifile operations like search&replace.
 
@@ -2103,6 +2147,11 @@ immediately.  Type 'M-x so-long-commentary' for full documentation.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** Two-column mode provides its C-x 6 prefix map only after loading
+two-column.el.  Its prefix key F2 is still available globally
+along with C-x 6 used by the tab commands globally.
 
 ---
 ** Incomplete destructive splicing support has been removed.
@@ -2295,8 +2344,28 @@ bool vector.
 ** 'regexp-quote' may return its argument string.
 If the argument needs no quoting, it can be returned instead of a copy.
 
++++
+** Mouse scroll up and down with control key modifier changes font size.
+Previously, the control key modifier was used to scroll up or down by
+an amount which was close to near a full screen.  This is now instead
+available by scrolling with the meta modifier key.
+
+To get the old behaviour back, customize the variable
+'mouse-wheel-scroll-amount', or add the following to your init file:
+
+(customize-set-variable 'mouse-wheel-scroll-amount
+                        '(5 ((shift) . 1) ((control) . nil)))
+
+By default, the font size will be changed in the window that the mouse
+pointer is over.  To change this behaviour, you can customize the
+option 'mouse-wheel-follow-mouse'.  Note that this will also affect
+scrolling.
+
 
 * Lisp Changes in Emacs 27.1
+
+** 'setq-local' can now set an arbitrary number of variables, which
+makes the syntax more like 'setq'.
 
 ** 'reveal-mode' can now also be used for more than to toggle between
 invisible and visible: It can also toggle 'display' properties in

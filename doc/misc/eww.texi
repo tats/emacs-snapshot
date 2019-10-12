@@ -105,7 +105,10 @@ web page hit @kbd{g} (@code{eww-reload}).  Pressing @kbd{w}
 @kindex M-RET
   The @kbd{M-@key{RET}} command (@code{eww-open-in-new-buffer}) opens the
 URL at point in a new EWW buffer, akin to opening a link in a new
-``tab'' in other browsers.
+``tab'' in other browsers.  When @code{global-tab-line-mode} is
+enabled, this buffer is displayed in the tab on the window tab line.
+When @code{tab-bar-mode} is enabled, a new tab is created on the frame
+tab bar.
 
 @findex eww-readable
 @kindex R
@@ -224,9 +227,9 @@ package.  You can list existing cookies with @kbd{C}
 
 @vindex shr-cookie-policy
   Many @acronym{HTML} pages have images embedded in them, and EWW will
-download most these by default.  When fetching images, cookies can be
-sent and received, and these can be used to track users.  To control
-when to send cookies when retrieving these images, the
+download most of these by default.  When fetching images, cookies can
+be sent and received, and these can be used to track users.  To
+control when to send cookies when retrieving these images, the
 @code{shr-cookie-policy} variable can be used.  The default value,
 @code{same-origin}, means that EWW will only send cookies when
 fetching images that originate from the same source as the

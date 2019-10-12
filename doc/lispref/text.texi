@@ -545,25 +545,28 @@ Do not try substituting your own definition of
 loop handles this function specially.
 @end deffn
 
-@deffn Command newline &optional number-of-newlines
+@deffn Command newline &optional number-of-newlines interactive
 This command inserts newlines into the current buffer before point.
 If @var{number-of-newlines} is supplied, that many newline characters
-are inserted.
+are inserted.  In an interactive call, @var{number-of-newlines} is the
+numeric prefix argument.
 
 @cindex newline and Auto Fill mode
-This function calls @code{auto-fill-function} if the current column
-number is greater than the value of @code{fill-column} and
-@var{number-of-newlines} is @code{nil}.  Typically what
+This command calls @code{self-insert-command} to insert newlines,
+which may subsequently break the preceding line by calling
+@code{auto-fill-function} (@pxref{Auto Filling}).  Typically what
 @code{auto-fill-function} does is insert a newline; thus, the overall
 result in this case is to insert two newlines at different places: one
 at point, and another earlier in the line.  @code{newline} does not
 auto-fill if @var{number-of-newlines} is non-@code{nil}.
 
+This command does not run the hook @code{post-self-insert-hook} unless
+called interactively or @var{interactive} is non-@code{nil}.
+
 This command indents to the left margin if that is not zero.
 @xref{Margins}.
 
-The value returned is @code{nil}.  In an interactive call, @var{count}
-is the numeric prefix argument.
+The value returned is @code{nil}.
 @end deffn
 
 @defvar overwrite-mode
@@ -1396,6 +1399,7 @@ appropriate time.
 
 @defun undo-auto-amalgamate
 @cindex amalgamating commands, and undo
+@vindex amalgamating-undo-limit
 The editor command loop automatically calls @code{undo-boundary} just
 before executing each key sequence, so that each undo normally undoes
 the effects of one command.  A few exceptional commands are
@@ -1413,6 +1417,10 @@ will be called in each of the affected buffers.
 This function can be called before an amalgamating command.  It
 removes the previous @code{undo-boundary} if a series of such calls
 have been made.
+
+The maximum number of changes that can be amalgamated is controlled by
+the @code{amalgamating-undo-limit} variable.  If this variable is 1,
+no changes are amalgamated.
 @end defun
 
 @defvar undo-auto-current-boundary-timer
@@ -3730,15 +3738,16 @@ effectively disable them.
 @end defvar
 
 @defvar show-help-function
-@anchor{Help display} If this variable is non-@code{nil}, it specifies a
-function called to display help strings.  These may be @code{help-echo}
-properties, menu help strings (@pxref{Simple Menu Items},
-@pxref{Extended Menu Items}), or tool bar help strings (@pxref{Tool
-Bar}).  The specified function is called with one argument, the help
-string to display, which is passed through
+@anchor{Help display} If this variable is non-@code{nil}, it specifies
+a function called to display help strings.  These may be
+@code{help-echo} properties, menu help strings (@pxref{Simple Menu
+Items}, @pxref{Extended Menu Items}), or tool bar help strings
+(@pxref{Tool Bar}).  The specified function is called with one
+argument, the help string to display, which is passed through
 @code{substitute-command-keys} before being given to the function; see
-@ref{Keys in Documentation}.  Tooltip mode (@pxref{Tooltips,,, emacs,
-The GNU Emacs Manual}) provides an example.
+@ref{Keys in Documentation}.  See the code of Tooltip mode
+(@pxref{Tooltips,,, emacs, The GNU Emacs Manual}) for an example of a
+mode that uses @code{show-help-function}.
 @end defvar
 
 @defvar face-filters-always-match

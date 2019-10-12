@@ -201,10 +201,12 @@ deactivating the mark.  @xref{Shift Selection}.
 @vindex mouse-wheel-progressive-speed
   Some mice have a ``wheel'' which can be used for scrolling.  Emacs
 supports scrolling windows with the mouse wheel, by default, on most
-graphical displays.  To toggle this feature, use @kbd{M-x
-mouse-wheel-mode}.  The variables @code{mouse-wheel-follow-mouse} and
-@code{mouse-wheel-scroll-amount} determine where and by how much
-buffers are scrolled.  The variable
+graphical displays.  There is also support for increasing or
+decreasing the height of the default face, by default bound to
+scrolling with the @key{Ctrl} modifier.  To toggle this feature, use
+@kbd{M-x mouse-wheel-mode}.  The variables
+@code{mouse-wheel-follow-mouse} and @code{mouse-wheel-scroll-amount}
+determine where and by how much buffers are scrolled.  The variable
 @code{mouse-wheel-progressive-speed} determines whether the scroll
 speed is linked to how fast you move the wheel.
 
@@ -1152,7 +1154,7 @@ cursor during dragging.  To suppress such behavior, set the options
 
 @node Menu Bars
 @section Menu Bars
-@cindex Menu Bar mode
+@cindex menu bar mode
 @cindex mode, Menu Bar
 @findex menu-bar-mode
 @vindex menu-bar-mode
@@ -1177,7 +1179,7 @@ menus' visual appearance.
 
 @node Tool Bars
 @section Tool Bars
-@cindex Tool Bar mode
+@cindex tool bar mode
 @cindex mode, Tool Bar
 @cindex icons, toolbar
 
@@ -1217,51 +1219,100 @@ displayed by moving the mouse pointer to the top of the screen.
 
 @node Tab Bars
 @section Tab Bars
-@cindex Tab Bar mode
+@cindex tab bar mode
 @cindex mode, Tab Bar
 @cindex tabs, tabbar
 
-  On graphical displays and on text terminals, Emacs puts a @dfn{tab bar}
-at the top of each frame, just below the menu bar.  This is a row of
-tabs which you can click on with the mouse to switch window configurations.
+  On graphical displays and on text terminals, Emacs can optionally
+display a @dfn{Tab Bar} at the top of each frame, just below the menu
+bar.  The Tab Bar is a row of @dfn{tabs}---buttons that you can click
+to switch between window configurations on that frame.
 
-  Each tab on the tab bar represents a named persistent window
-configuration.  Its name is composed from the names of buffers
-visible in windows of the window configuration.  Clicking on the
-tab name switches the current window configuration to the previously
-used configuration of windows and buffers.
+  Each tab on the Tab Bar represents a named persistent window
+configuration.  Its name is composed from the list of names of buffers
+visible in windows of that window configuration.  Clicking on the tab
+switches to the window configuration recorded by the tab; it is a
+configuration of windows and buffers which was previously used in the
+frame when that tab was the current tab.
 
   If you are using the desktop library to save and restore your
-sessions, the tabs from the tab bar are recorded in the desktop file,
-together with their associated window configurations.
+sessions (@pxref{Saving Emacs Sessions}), the tabs from the Tab Bar are
+recorded in the desktop file, together with their associated window
+configurations, and will be available after restoring the session.
 
 @findex tab-bar-mode
-@vindex tab-bar-mode
   To toggle the use of tab bars, type @kbd{M-x tab-bar-mode}.  This
 command applies to all frames, including frames yet to be created.  To
 control the use of tab bars at startup, customize the variable
 @code{tab-bar-mode}.
 
 @vindex tab-bar-show
-@cindex Tab Bar show
-  This variable is intended to toggle the tab bar automatically.
-When the value is @code{t}, then @code{tab-bar-mode} is enabled when
-using the commands that create new window configurations.  The value
-@code{1} hides the tab bar when it has only one tab, and shows it
-again once more tabs are created.  If @code{nil}, always keep the tab
-bar hidden.  In this case it's still possible to use persistent named
-window configurations without using the tab bar by relying on keyboard
-commands that create a new window configuration (@kbd{M-x tab-new}),
-that switch windows configurations (@kbd{M-x tab-next}, @kbd{M-x
-tab-list}), or delete the existing ones (@kbd{M-x tab-close}).
+  The variable @code{tab-bar-show} controls whether the Tab Bar mode
+is turned on automatically.  If the value is @code{t}, then
+@code{tab-bar-mode} is enabled when using the commands that create new
+tabs.  The value @code{1} hides the tab bar when it has only one tab,
+and shows it again when more tabs are created.  The value @code{nil}
+always keeps the tab bar hidden; in this case it's still possible to
+use persistent named window configurations without using the tab bar
+by typing the related commands: @kbd{M-x tab-new}, @kbd{M-x tab-next},
+@kbd{M-x tab-list}, @kbd{M-x tab-close}, etc.
+
+@kindex C-x 6
+  The prefix key @kbd{C-x 6} is analogous to @kbd{C-x 5}.
+Whereas each @kbd{C-x 5} command pops up a buffer in a different frame
+(@pxref{Creating Frames}), the @kbd{C-x 6} commands use a different
+tab with a different window configuration in the selected frame.
+
+  The various @kbd{C-x 6} commands differ in how they find or create the
+buffer to select:
+
+@table @kbd
+@item C-x 6 2
+@kindex C-x 6 2
+@findex tab-new
+Add a new tab (@code{tab-new}).  You can control the choice of the
+buffer displayed in a new tab by customizing the variable
+@code{tab-bar-new-tab-choice}.
+@item C-x 6 b @var{bufname} @key{RET}
+Select buffer @var{bufname} in another tab.  This runs
+@code{switch-to-buffer-other-tab}.
+@item C-x 6 f @var{filename} @key{RET}
+Visit file @var{filename} and select its buffer in another tab.  This
+runs @code{find-file-other-tab}.  @xref{Visiting}.
+@item C-x 6 d @var{directory} @key{RET}
+Select a Dired buffer for directory @var{directory} in another tab.
+This runs @code{dired-other-tab}.  @xref{Dired}.
+@end table
 
 @vindex tab-bar-new-tab-choice
-@cindex Tab Bar new tab
-  By default, Emacs follows the same behavior as when creating frames,
-to start a new tab with the current buffer, i.e. the buffer
-that was current before calling the command that adds a new tab.
-To start a new tab with other buffers, customize the variable
+  By default, a new tab starts with the current buffer that was
+current before calling the command that adds a new tab.  To start a
+new tab with other buffers, customize the variable
 @code{tab-bar-new-tab-choice}.
+
+  The following commands are used to delete and operate on tabs:
+
+@table @kbd
+@item C-x 6 0
+@kindex C-x 6 0
+@findex tab-close
+Close the selected tab (@code{tab-close}).  It has no effect if there
+is only one tab.
+
+@item C-x 6 o
+@kindex C-x 6 o
+@kindex C-TAB
+@findex tab-next
+Switch to another tab.  If you repeat this command, it cycles through
+all the tabs on the selected frame.  With a positive numeric argument
+N, it switches to the next Nth tab; with a negative argument −N, it
+switches back to the previous Nth tab.
+
+@item C-x 6 1
+@kindex C-x 6 1
+@findex tab-close-other
+Close all tabs on the selected frame, except the selected one.
+@end table
 
 @node Dialog Boxes
 @section Using Dialog Boxes

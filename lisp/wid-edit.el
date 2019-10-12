@@ -58,6 +58,10 @@
 (require 'cl-lib)
 (eval-when-compile (require 'subr-x)) 	; when-let
 
+;; The `string' widget completion uses this.
+(declare-function ispell-get-word "ispell"
+                  (following &optional extra-otherchars))
+
 ;;; Compatibility.
 
 (defun widget-event-point (event)
@@ -1166,7 +1170,7 @@ When not inside a field, signal an error."
                               (plist-get completion-extra-properties
                                          :predicate))))
      (t
-      (error "Not in an editable field")))))
+      (error "No completions available for this field")))))
 ;; We may want to use widget completion in buffers where the major mode
 ;; hasn't added widget-completions-at-point to completion-at-point-functions,
 ;; so it's not really obsolete (yet).
@@ -1174,8 +1178,9 @@ When not inside a field, signal an error."
 
 (defun widget-completions-at-point ()
   (let ((field (widget-field-find (point))))
-    (when field
-      (widget-apply field :completions-function))))
+    (if field
+        (widget-apply field :completions-function)
+      (error "Not in an editable field"))))
 
 ;;; Setting up the buffer.
 
@@ -3073,7 +3078,12 @@ as the value."
   "A string."
   :tag "String"
   :format "%{%t%}: %v"
-  :complete-function 'ispell-complete-word
+  :complete (lambda (widget)
+              (require 'ispell)
+              (let ((start (save-excursion (nth 1 (ispell-get-word nil)))))
+                (if (< start (widget-field-start widget))
+                    (message "No word to complete inside field")
+                  (ispell-complete-word))))
   :prompt-history 'widget-string-prompt-value-history)
 
 (define-widget 'regexp 'string

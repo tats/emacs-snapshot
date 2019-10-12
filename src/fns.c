@@ -49,11 +49,11 @@ static bool internal_equal (Lisp_Object, Lisp_Object,
 			    enum equal_kind, int, Lisp_Object);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
-       doc: /* Return the argument unchanged.  */
+       doc: /* Return the ARGUMENT unchanged.  */
        attributes: const)
-  (Lisp_Object arg)
+  (Lisp_Object argument)
 {
-  return arg;
+  return argument;
 }
 
 DEFUN ("random", Frandom, Srandom, 0, 1, 0,
@@ -3176,8 +3176,14 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 # endif
 # ifdef HAVE_LANGINFO__NL_PAPER_WIDTH
   if (EQ (item, Qpaper))
-    return list2i ((intptr_t) nl_langinfo (_NL_PAPER_WIDTH),
-		   (intptr_t) nl_langinfo (_NL_PAPER_HEIGHT));
+    /* We have to cast twice here: first to a correctly-sized integer,
+       then to int, because that's what nl_langinfo is documented to
+       return for _NO_PAPER_{WIDTH,HEIGHT}.  The first cast doesn't
+       suffice because it could overflow an Emacs fixnum.  This can
+       happen when running under ASan, which fills allocated but
+       uninitialized memory with 0xBE bytes.  */
+    return list2i ((int) (intptr_t) nl_langinfo (_NL_PAPER_WIDTH),
+		   (int) (intptr_t) nl_langinfo (_NL_PAPER_HEIGHT));
 # endif
 #endif	/* HAVE_LANGINFO_CODESET*/
   return Qnil;

@@ -45,6 +45,14 @@ wait this many seconds after Emacs becomes idle before doing an update."
   :group 'display
   :version "22.1")
 
+(defvar amalgamating-undo-limit 20
+  "The maximum number of changes to possibly amalgamate when undoing changes.
+The `undo' command will normally consider \"similar\" changes
+(like inserting characters) to be part of the same change.  This
+is called \"amalgamating\" the changes.  This variable says what
+the maximum number of changes condidered is when amalgamating.  A
+value of 1 means that nothing is amalgamated.")
+
 (defgroup killing nil
   "Killing and yanking commands."
   :group 'editing)
@@ -500,17 +508,18 @@ If `electric-indent-mode' is enabled, this indents the final new line
 that it adds, and reindents the preceding line.  To just insert
 a newline, use \\[electric-indent-just-newline].
 
-Calls `auto-fill-function' if the current column number is greater
-than the value of `fill-column' and ARG is nil.
+If `auto-fill-mode' is enabled, this may cause automatic line
+breaking of the preceding line.  A non-nil ARG inhibits this.
+
 A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
   (interactive "*P\np")
   (barf-if-buffer-read-only)
-  ;; Call self-insert so that auto-fill, abbrev expansion etc. happens.
+  ;; Call self-insert so that auto-fill, abbrev expansion etc. happen.
   ;; Set last-command-event to tell self-insert what to insert.
   (let* ((was-page-start (and (bolp) (looking-at page-delimiter)))
          (beforepos (point))
          (last-command-event ?\n)
-         ;; Don't auto-fill if we have a numeric argument.
+         ;; Don't auto-fill if we have a prefix argument.
          (auto-fill-function (if arg nil auto-fill-function))
          (arg (prefix-numeric-value arg))
          (postproc
@@ -3123,7 +3132,7 @@ behavior."
          (undo-auto--last-boundary-amalgamating-number)))
     (setq undo-auto--this-command-amalgamating t)
     (when last-amalgamating-count
-      (if (and (< last-amalgamating-count 20)
+      (if (and (< last-amalgamating-count amalgamating-undo-limit)
                (eq this-command last-command))
           ;; Amalgamate all buffers that have changed.
           ;; This may be needed for example if some *-change-functions
@@ -3375,6 +3384,13 @@ command output."
   :group 'shell
   :version "27.1")
 
+(defcustom shell-command-prompt-show-cwd nil
+  "If non-nil, show current directory when prompting for a shell command.
+This affects `shell-command' and `async-shell-command'."
+  :type 'boolean
+  :group 'shell
+  :version "27.1")
+
 (defcustom shell-command-dont-erase-buffer nil
   "If non-nil, output buffer is not erased between shell commands.
 Also, a non-nil value sets the point in the output buffer
@@ -3464,7 +3480,12 @@ directly, since it offers more control and does not impose the use of
 a shell (with its need to quote arguments)."
   (interactive
    (list
-    (read-shell-command "Async shell command: " nil nil
+    (read-shell-command (if shell-command-prompt-show-cwd
+                            (format-message "Async shell command in `%s': "
+                                            (abbreviate-file-name
+                                             default-directory))
+                          "Async shell command: ")
+                        nil nil
 			(let ((filename
 			       (cond
 				(buffer-file-name)
@@ -3537,7 +3558,12 @@ impose the use of a shell (with its need to quote arguments)."
 
   (interactive
    (list
-    (read-shell-command "Shell command: " nil nil
+    (read-shell-command (if shell-command-prompt-show-cwd
+                            (format-message "Shell command in `%s': "
+                                            (abbreviate-file-name
+                                             default-directory))
+                          "Shell command: ")
+                        nil nil
 			(let ((filename
 			       (cond
 				(buffer-file-name)

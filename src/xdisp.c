@@ -12746,12 +12746,12 @@ display_tab_bar (struct window *w)
 
   /* Display all items of the tab bar.  */
   items = it.f->tab_bar_items;
-  for (i = 0; i < it.f->n_tab_bar_items; ++i)
+  int j;
+  for (i = 0, j = 0; i < it.f->n_tab_bar_items; ++i, j += TAB_BAR_ITEM_NSLOTS)
     {
-      Lisp_Object string;
+      Lisp_Object string = AREF (items, j + TAB_BAR_ITEM_CAPTION);
 
       /* Stop at nil string.  */
-      string = AREF (items, i * TAB_BAR_ITEM_NSLOTS + TAB_BAR_ITEM_CAPTION);
       if (NILP (string))
 	break;
 
@@ -13180,7 +13180,7 @@ tab_bar_item_info (struct frame *f, struct glyph *glyph,
 		   int *prop_idx, bool *close_p)
 {
   Lisp_Object prop;
-  int charpos;
+  ptrdiff_t charpos;
 
   /* This function can be called asynchronously, which means we must
      exclude any possibility that Fget_text_property signals an
@@ -13256,7 +13256,7 @@ get_tab_bar_item (struct frame *f, int x, int y, struct glyph **glyph,
 
 void
 handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
-		       int modifiers)
+		      int modifiers)
 {
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
   struct window *w = XWINDOW (f->tab_bar_window);
@@ -13419,6 +13419,96 @@ note_tab_bar_highlight (struct frame *f, int x, int y)
 }
 
 #endif /* HAVE_WINDOW_SYSTEM */
+
+/* Find the tab-bar item at X coordinate and return its information.  */
+static Lisp_Object
+tty_get_tab_bar_item (struct frame *f, int x, int *idx, ptrdiff_t *end)
+{
+  ptrdiff_t clen = 0;
+  Lisp_Object caption;
+
+  int i, j;
+  for (i = 0, j = 0; i < f->n_tab_bar_items; i++, j += TAB_BAR_ITEM_NSLOTS)
+    {
+      caption = AREF (f->tab_bar_items, j + TAB_BAR_ITEM_CAPTION);
+      if (NILP (caption))
+	return Qnil;
+      clen += SCHARS (caption);
+      if (x < clen)
+	break;
+    }
+  if (i < f->n_tab_bar_items)
+    {
+      *idx = i;
+      *end = clen;
+      return caption;
+    }
+  else
+    return Qnil;
+}
+
+/* Handle a mouse click at X/Y on the tab bar of TTY frame F.  If the
+   click was on the tab bar and was handled, populate the EVENT
+   structure, store it in keyboard queue, and return true; otherwise
+   return false.  MODIFIERS are event modifiers for generating the tab
+   release event.  */
+bool
+tty_handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
+			  struct input_event *event)
+{
+  /* Did they click on the tab bar?  */
+  if (y < FRAME_MENU_BAR_LINES (f)
+      || y >= FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
+    return false;
+
+  /* Find the tab-bar item where the X,Y coordinates belong.  */
+  int prop_idx;
+  ptrdiff_t clen;
+  Lisp_Object caption = tty_get_tab_bar_item (f, x, &prop_idx, &clen);
+
+  if (NILP (caption))
+    return false;
+
+  if (NILP (AREF (f->tab_bar_items,
+		  prop_idx * TAB_BAR_ITEM_NSLOTS + TAB_BAR_ITEM_ENABLED_P)))
+    return false;
+
+  if (down_p)
+    f->last_tab_bar_item = prop_idx;
+  else
+    {
+      /* Generate a TAB_BAR_EVENT event.  */
+      Lisp_Object frame;
+      Lisp_Object key = AREF (f->tab_bar_items,
+			      prop_idx * TAB_BAR_ITEM_NSLOTS
+			      + TAB_BAR_ITEM_KEY);
+      /* Kludge alert: we assume the last two characters of a tab
+	 label are " x", and treat clicks on those 2 characters as a
+	 Close Tab command.  */
+      eassert (STRINGP (caption));
+      int lastc = SSDATA (caption)[SCHARS (caption) - 1];
+      bool close_p = false;
+      if ((x == clen - 1 || (clen > 1 && x == clen - 2)) && lastc == 'x')
+	close_p = true;
+
+      event->code = 0;
+      XSETFRAME (frame, f);
+      event->kind = TAB_BAR_EVENT;
+      event->frame_or_window = frame;
+      event->arg = frame;
+      kbd_buffer_store_event (event);
+
+      event->kind = TAB_BAR_EVENT;
+      event->frame_or_window = frame;
+      event->arg = key;
+      if (close_p)
+	event->modifiers |= ctrl_modifier;
+      kbd_buffer_store_event (event);
+      f->last_tab_bar_item = -1;
+    }
+
+  return true;
+}
 
 
 
@@ -14065,7 +14155,7 @@ static bool
 tool_bar_item_info (struct frame *f, struct glyph *glyph, int *prop_idx)
 {
   Lisp_Object prop;
-  int charpos;
+  ptrdiff_t charpos;
 
   /* This function can be called asynchronously, which means we must
      exclude any possibility that Fget_text_property signals an
@@ -15587,6 +15677,19 @@ redisplay_internal (void)
 		  STOP_POLLING;
 
 		  pending |= update_frame (f, false, false);
+		  /* On some platforms (at least MS-Windows), the
+		     scroll_run_hook called from scrolling_window
+		     called from update_frame could set the frame's
+		     garbaged flag, in which case we need to redisplay
+		     the frame.  Don't do that on TTY frames, since we
+		     need to keep the garbaged flag in that case when
+		     the frame has been resized.  */
+                  if (FRAME_GARBAGED_P (f))
+		    {
+		      fset_redisplay (f);
+		      f->garbaged = false;
+		      goto retry_frame;
+		    }
 		  f->cursor_type_changed = false;
 		  f->updated_p = true;
 		  f->inhibit_clear_image_cache = false;
@@ -22409,9 +22512,21 @@ maybe_produce_line_number (struct it *it)
   ptrdiff_t start_from, bytepos;
   ptrdiff_t this_line;
   bool first_time = false;
-  ptrdiff_t beg_byte = display_line_numbers_widen ? BEG_BYTE : BEGV_BYTE;
-  ptrdiff_t z_byte = display_line_numbers_widen ? Z_BYTE : ZV_BYTE;
+  ptrdiff_t beg_byte;
+  ptrdiff_t z_byte;
+  bool line_numbers_wide;
   void *itdata = bidi_shelve_cache ();
+
+  if (display_line_numbers_offset
+      && !display_line_numbers_widen
+      && !EQ (Vdisplay_line_numbers, Qvisual)
+      && !EQ (Vdisplay_line_numbers, Qrelative))
+    line_numbers_wide = true;
+  else
+    line_numbers_wide = display_line_numbers_widen;
+
+  beg_byte = line_numbers_wide ? BEG_BYTE : BEGV_BYTE;
+  z_byte = line_numbers_wide ? Z_BYTE : ZV_BYTE;
 
   if (EQ (Vdisplay_line_numbers, Qvisual))
     this_line = display_count_lines_visually (it);
@@ -22427,7 +22542,7 @@ maybe_produce_line_number (struct it *it)
 		 numbers, so we cannot use its data if the user wants
 		 line numbers that disregard narrowing, or if the
 		 buffer's narrowing has just changed.  */
-	      && !(display_line_numbers_widen
+	      && !(line_numbers_wide
 		   && (BEG_BYTE != BEGV_BYTE || Z_BYTE != ZV_BYTE))
 	      && !current_buffer->clip_changed)
 	    {
@@ -22517,6 +22632,8 @@ maybe_produce_line_number (struct it *it)
     lnum_offset = it->pt_lnum;
   else if (EQ (Vdisplay_line_numbers, Qvisual))
     lnum_offset = 0;
+  else if (display_line_numbers_offset)
+    lnum_offset -= display_line_numbers_offset;
 
   /* Under 'relative', display the absolute line number for the
      current line, unless the user requests otherwise.  */
@@ -22554,21 +22671,33 @@ maybe_produce_line_number (struct it *it)
   int width_limit =
     tem_it.last_visible_x - tem_it.first_visible_x
     - 3 * FRAME_COLUMN_WIDTH (it->f);
+
+  tem_it.face_id = lnum_face_id;
+  /* Avoid displaying any face other than line-number on
+     empty lines beyond EOB.  */
+  if (lnum_face_id != current_lnum_face_id
+      && (EQ (Vdisplay_line_numbers, Qvisual)
+	  ? this_line == 0
+	  : this_line == it->pt_lnum)
+      && it->what != IT_EOB)
+    tem_it.face_id = current_lnum_face_id;
+  else if (!beyond_zv)
+    {
+      if (display_line_numbers_major_tick > 0
+	  && (lnum_to_display % display_line_numbers_major_tick == 0))
+	tem_it.face_id = merge_faces (it->w, Qline_number_major_tick,
+				      0, DEFAULT_FACE_ID);
+      else if (display_line_numbers_minor_tick > 0
+	       && (lnum_to_display % display_line_numbers_minor_tick == 0))
+	tem_it.face_id = merge_faces (it->w, Qline_number_minor_tick,
+				      0, DEFAULT_FACE_ID);
+    }
+
   /* Produce glyphs for the line number in a scratch glyph_row.  */
   for (const char *p = lnum_buf; *p; p++)
     {
       /* For continuation lines and lines after ZV, instead of a line
 	 number, produce a blank prefix of the same width.  */
-      if (lnum_face_id != current_lnum_face_id
-	  && (EQ (Vdisplay_line_numbers, Qvisual)
-	      ? this_line == 0
-	      : this_line == it->pt_lnum)
-	  /* Avoid displaying the line-number-current-line face on
-	     empty lines beyond EOB.  */
-	  && it->what != IT_EOB)
-	tem_it.face_id = current_lnum_face_id;
-      else
-	tem_it.face_id = lnum_face_id;
       if (beyond_zv
 	  /* Don't display the same line number more than once.  */
 	  || (!EQ (Vdisplay_line_numbers, Qvisual)
@@ -32704,8 +32833,29 @@ note_mouse_highlight (struct frame *f, int x, int y)
 	  && part != ON_TAB_LINE))
     clear_mouse_face (hlinfo);
 
-  /* Reset help_echo_string. It will get recomputed below.  */
+  /* Reset help_echo_string.  It will get recomputed below.  */
   help_echo_string = Qnil;
+
+  /* Handle tab-bar highlight on mouse-capable TTY frames.  */
+  if (!FRAME_WINDOW_P (f)
+      && (y >= FRAME_MENU_BAR_LINES (f)
+	  && y < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f)))
+    {
+      int prop_idx;
+      ptrdiff_t ignore;
+      Lisp_Object caption = tty_get_tab_bar_item (f, x, &prop_idx, &ignore);
+
+      if (!NILP (caption))
+	{
+	  help_echo_object = help_echo_window = Qnil;
+	  help_echo_pos = -1;
+	  help_echo_string = AREF (f->tab_bar_items,
+				   prop_idx * TAB_BAR_ITEM_NSLOTS
+				   + TAB_BAR_ITEM_HELP);
+	  if (NILP (help_echo_string))
+	    help_echo_string = caption;
+	}
+    }
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* If the cursor is on the internal border of FRAME and FRAME's
@@ -34007,6 +34157,8 @@ be let-bound around code that needs to disable messages temporarily. */);
   /* Names of the faces used to display line numbers.  */
   DEFSYM (Qline_number, "line-number");
   DEFSYM (Qline_number_current_line, "line-number-current-line");
+  DEFSYM (Qline_number_major_tick, "line-number-major-tick");
+  DEFSYM (Qline_number_minor_tick, "line-number-minor-tick");
   /* Name of a text property which disables line-number display.  */
   DEFSYM (Qdisplay_line_numbers_disable, "display-line-numbers-disable");
 
@@ -34573,12 +34725,18 @@ To add a prefix to continuation lines, use `wrap-prefix'.  */);
 
   DEFVAR_LISP ("display-line-numbers", Vdisplay_line_numbers,
     doc: /* Non-nil means display line numbers.
+
 If the value is t, display the absolute number of each line of a buffer
 shown in a window.  Absolute line numbers count from the beginning of
-the current narrowing, or from buffer beginning.  If the value is
-`relative', display for each line not containing the window's point its
-relative number instead, i.e. the number of the line relative to the
-line showing the window's point.
+the current narrowing, or from buffer beginning.  The variable
+`display-line-numbers-offset', if non-zero, is a signed offset added
+to each absolute line number; it also forces line numbers to be counted
+from the beginning of the buffer, as if `display-line-numbers-wide'
+were non-nil.  It has no effect when line numbers are not absolute.
+
+If the value is `relative', display for each line not containing the
+window's point its relative number instead, i.e. the number of the line
+relative to the line showing the window's point.
 
 In either case, line numbers are displayed at the beginning of each
 non-continuation line that displays buffer text, i.e. after each newline
@@ -34619,6 +34777,15 @@ either `relative' or `visual'.  */);
   DEFSYM (Qdisplay_line_numbers_widen, "display-line-numbers-widen");
   Fmake_variable_buffer_local (Qdisplay_line_numbers_widen);
 
+  DEFVAR_INT ("display-line-numbers-offset", display_line_numbers_offset,
+    doc: /* A signed integer added to each absolute line number.
+When this variable is non-zero, line numbers are always counted from
+the beginning of the buffer even if `display-line-numbers-widen' is nil.
+It has no effect when set to 0, or when line numbers are not absolute.  */);
+  display_line_numbers_offset = 0;
+  DEFSYM (Qdisplay_line_numbers_offset, "display-line-numbers-offset");
+  Fmake_variable_buffer_local (Qdisplay_line_numbers_offset);
+
   DEFVAR_BOOL ("display-fill-column-indicator", Vdisplay_fill_column_indicator,
     doc: /* Non-nil means display the fill column indicator.  */);
   Vdisplay_fill_column_indicator = false;
@@ -34641,6 +34808,20 @@ if the font in fill-column-indicator face does not support Unicode characters.  
   Vdisplay_fill_column_indicator_character = Qnil;
   DEFSYM (Qdisplay_fill_column_indicator_character, "display-fill-column-indicator-character");
   Fmake_variable_buffer_local (Qdisplay_fill_column_indicator_character);
+
+  DEFVAR_INT ("display-line-numbers-major-tick", display_line_numbers_major_tick,
+    doc: /* If an integer N > 0, highlight line number of every Nth line.
+The line number is shown with the `line-number-major-tick' face.
+Otherwise, no special highlighting is done every Nth line.
+Note that major ticks take precedence over minor ticks.  */);
+  display_line_numbers_major_tick = 0;
+
+  DEFVAR_INT ("display-line-numbers-minor-tick", display_line_numbers_minor_tick,
+    doc: /* If an integer N > 0, highlight line number of every Nth line.
+The line number is shown with the `line-number-minor-tick' face.
+Otherwise, no special highlighting is done every Nth line.
+Note that major ticks take precedence over minor ticks.  */);
+  display_line_numbers_minor_tick = 0;
 
   DEFVAR_BOOL ("inhibit-eval-during-redisplay", inhibit_eval_during_redisplay,
     doc: /* Non-nil means don't eval Lisp during redisplay.  */);

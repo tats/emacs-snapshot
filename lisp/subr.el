@@ -143,11 +143,35 @@ of previous VARs.
       (push `(set-default ',(pop args) ,(pop args)) exps))
     `(progn . ,(nreverse exps))))
 
-(defmacro setq-local (var val)
-  "Set variable VAR to value VAL in current buffer."
-  ;; Can't use backquote here, it's too early in the bootstrap.
-  (declare (debug (symbolp form)))
-  (list 'set (list 'make-local-variable (list 'quote var)) val))
+(defmacro setq-local (&rest pairs)
+  "Make variables in PAIRS buffer-local and assign them the corresponding values.
+
+PAIRS is a list of variable/value pairs.  For each variable, make
+it buffer-local and assign it the corresponding value.  The
+variables are literal symbols and should not be quoted.
+
+The second VALUE is not computed until after the first VARIABLE
+is set, and so on; each VALUE can use the new value of variables
+set earlier in the ‘setq-local’.  The return value of the
+‘setq-local’ form is the value of the last VALUE.
+
+\(fn [VARIABLE VALUE]...)"
+  (declare (debug setq))
+  (unless (zerop (mod (length pairs) 2))
+    (error "PAIRS must have an even number of variable/value members"))
+  (let ((expr nil))
+    (while pairs
+      (unless (symbolp (car pairs))
+        (error "Attempting to set a non-symbol: %s" (car pairs)))
+      ;; Can't use backquote here, it's too early in the bootstrap.
+      (setq expr
+            (cons
+             (list 'set
+                   (list 'make-local-variable (list 'quote (car pairs)))
+                   (car (cdr pairs)))
+             expr))
+      (setq pairs (cdr (cdr pairs))))
+    (macroexp-progn (nreverse expr))))
 
 (defmacro defvar-local (var val &optional docstring)
   "Define VAR as a buffer-local variable with default value VAL.
@@ -332,9 +356,9 @@ PREFIX is a string, and defaults to \"g\"."
                (setq gensym-counter (1+ gensym-counter)))))
     (make-symbol (format "%s%d" (or prefix "g") num))))
 
-(defun ignore (&rest _ignore)
+(defun ignore (&rest _arguments)
   "Do nothing and return nil.
-This function accepts any number of arguments, but ignores them."
+This function accepts any number of ARGUMENTS, but ignores them."
   (interactive)
   nil)
 
@@ -1238,6 +1262,13 @@ The normal global definition of the character C-x indirects to this keymap.")
 (defalias 'ctl-x-5-prefix ctl-x-5-map)
 (define-key ctl-x-map "5" 'ctl-x-5-prefix)
 
+(defvar ctl-x-6-map (make-sparse-keymap)
+  "Keymap for tab commands.")
+(defalias 'ctl-x-6-prefix ctl-x-6-map)
+(define-key ctl-x-map "6" 'ctl-x-6-prefix)
+(defalias 'ctl-x-t-prefix ctl-x-6-map)
+(define-key ctl-x-map "t" 'ctl-x-t-prefix)
+
 
 ;;;; Event manipulation functions.
 
@@ -1734,7 +1765,9 @@ the hook's buffer-local value rather than its default value."
 The value of the last form in BODY is returned.
 Each element of BINDERS is a list (SYMBOL VALUEFORM) which binds
 SYMBOL to the value of VALUEFORM.
-All symbols are bound before the VALUEFORMs are evalled."
+
+The main difference between this macro and `let'/`let*' is that
+all symbols are bound before any of the VALUEFORMs are evalled."
   ;; Only useful in lexical-binding mode.
   ;; As a special-form, we could implement it more efficiently (and cleanly,
   ;; making the vars actually unbound during evaluation of the binders).
