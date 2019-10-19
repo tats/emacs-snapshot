@@ -2324,8 +2324,8 @@ minibuffer or the echo area.
 Non-zero if this window is a @dfn{pseudo window}.  A pseudo window is
 either a window used to display the menu bar or the tool bar (when
 Emacs uses toolkits that don't display their own menu bar and tool
-bar) or a window showing a tooltip on a tooltip frame.  Pseudo windows
-are in general not accessible from Lisp code.
+bar) or the tab bar or a window showing a tooltip on a tooltip frame.
+Pseudo windows are in general not accessible from Lisp code.
 
 @item parent
 Internally, Emacs arranges windows in a tree; each group of siblings
@@ -2402,7 +2402,7 @@ The value of @code{pointm} at the last redisplay time.
 
 @item force_start
 If this flag is non-@code{nil}, it says that the window has been
-scrolled explicitly by the Lisp program, and the value of the the
+scrolled explicitly by the Lisp program, and the value of the
 window's @code{start} was set for redisplay to honor.  This affects
 what the next redisplay does if point is off the screen: instead of
 scrolling the window to show the text around point, it moves point to

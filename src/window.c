@@ -384,7 +384,7 @@ If FRAME is omitted or nil, it defaults to the selected frame.  */)
 
 DEFUN ("window-minibuffer-p", Fwindow_minibuffer_p,
        Swindow_minibuffer_p, 0, 1, 0,
-       doc: /* Return non-nil if WINDOW is a minibuffer window.
+       doc: /* Return t if WINDOW is a minibuffer window.
 WINDOW must be a valid window and defaults to the selected one.  */)
   (Lisp_Object window)
 {
@@ -1321,8 +1321,10 @@ coordinates_in_window (register struct window *w, int x, int y)
 	       && y < top_y + CURRENT_TAB_LINE_HEIGHT (w)
 	       && (part = ON_TAB_LINE))
 	   || (window_wants_header_line (w)
-	       && y < top_y + CURRENT_TAB_LINE_HEIGHT (w)
-			    + CURRENT_HEADER_LINE_HEIGHT (w)
+	       && y < top_y + CURRENT_HEADER_LINE_HEIGHT (w)
+	       + (window_wants_tab_line (w)
+		  ? CURRENT_TAB_LINE_HEIGHT (w)
+		  : 0)
 	       && (part = ON_HEADER_LINE)))
     {
       /* If it's under/over the scroll bar portion of the mode/header
@@ -7129,10 +7131,11 @@ the return value is nil.  Otherwise the value is t.  */)
 	if (NILP (leaf_windows[i]->contents))
 	  free_window_matrices (leaf_windows[i]);
 
-      /* Allow set_window_size_hook again and apply frame size changes
-	 if needed.  */
+      /* Allow set_window_size_hook again and resize frame's windows
+	 if necessary.  But change frame size only to preserve window
+	 minimum sizes.  */
       f->can_set_window_size = true;
-      adjust_frame_size (f, -1, -1, 1, false, Qset_window_configuration);
+      adjust_frame_size (f, -1, -1, 4, false, Qset_window_configuration);
 
       adjust_frame_glyphs (f);
       unblock_input ();

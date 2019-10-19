@@ -2047,7 +2047,9 @@ recursive function definitions.  Use `cl-labels' for that.  See
 info node `(cl) Function Bindings' for details.
 
 \(fn ((FUNC ARGLIST BODY...) ...) FORM...)"
-  (declare (indent 1) (debug ((&rest (cl-defun)) cl-declarations body)))
+  (declare (indent 1)
+           (debug ((&rest [&or (&define name function-form) (cl-defun)])
+                   cl-declarations body)))
   (let ((binds ()) (newenv macroexpand-all-environment))
     (dolist (binding bindings)
       (let ((var (make-symbol (format "--cl-%s--" (car binding))))
@@ -2576,6 +2578,8 @@ because of a `throw' or error, the PLACEs are set back to their original
 values.  Note that this macro is *not* available in Common Lisp.
 As a special case, if `(PLACE)' is used instead of `(PLACE VALUE)',
 the PLACE is not modified before executing BODY.
+
+See info node `(cl) Function Bindings' for details.
 
 \(fn ((PLACE VALUE) ...) BODY...)"
   (declare (indent 1) (debug ((&rest [&or (symbolp form)

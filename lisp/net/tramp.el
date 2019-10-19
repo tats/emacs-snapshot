@@ -240,10 +240,6 @@ pair of the form (KEY VALUE).  The following KEYs are defined:
     absence of `tramp-copy-args', is an indication that the
     method is capable of multi-hops.
 
-  * `tramp-login-env'
-     A list of environment variables and their values, which will
-     be set when calling `tramp-login-program'.
-
   * `tramp-async-args'
     When an asynchronous process is started, we know already that
     the connection works.  Therefore, we can pass additional
@@ -1926,7 +1922,7 @@ If VAR is nil, then we bind `v' to the structure and `method', `user',
       (tramp-compat-progress-reporter-update reporter value suffix))))
 
 (defmacro with-tramp-progress-reporter (vec level message &rest body)
-  "Executes BODY, spinning a progress reporter with MESSAGE.
+  "Execute BODY, spinning a progress reporter with MESSAGE.
 If LEVEL does not fit for visible messages, there are only traces
 without a visible progress reporter."
   (declare (indent 3) (debug t))
@@ -2597,11 +2593,13 @@ not in completion mode."
 (defun tramp-completion-handle-file-name-completion
   (filename directory &optional predicate)
   "Like `file-name-completion' for Tramp files."
-  (try-completion
-   filename
-   (mapcar #'list (file-name-all-completions filename directory))
-   (when (and predicate (tramp-connectable-p directory))
-     (lambda (x) (funcall predicate (expand-file-name (car x) directory))))))
+  ;; Suppress eager completion on not connected hosts.
+  (let ((non-essential t))
+    (try-completion
+     filename
+     (mapcar #'list (file-name-all-completions filename directory))
+     (when (and predicate (tramp-connectable-p directory))
+       (lambda (x) (funcall predicate (expand-file-name (car x) directory)))))))
 
 ;; I misuse a little bit the `tramp-file-name' structure in order to
 ;; handle completion possibilities for partial methods / user names /

@@ -180,7 +180,6 @@ chasing all links both at the file level and at the levels of the
 containing directories."
   :type 'boolean
   :group 'find-file)
-(put 'find-file-visit-truename 'safe-local-variable 'booleanp)
 
 (defcustom revert-without-query nil
   "Specify which files should be reverted without query.
@@ -337,7 +336,11 @@ Any other non-nil value means ask user whether to add a newline, when saving.
 A value of nil means don't add newlines.
 
 Certain major modes set this locally to the value obtained
-from `mode-require-final-newline'."
+from `mode-require-final-newline'.
+
+This variable is only heeded when visiting files (or saving
+buffers into files they visit).  Writing data to the file system
+with `write-region' and the like is not influenced by this variable."
   :safe #'symbolp
   :type '(choice (const :tag "When visiting" visit)
 		 (const :tag "When saving" t)
@@ -827,7 +830,7 @@ in the output directories whose names match REGEXP.
 PREDICATE can be either nil (which means that all subdirectories
 are descended into), t (which means that subdirectories that
 can't be read are ignored), or a function (which is called with
-name name of the subdirectory and should return non-nil if the
+the name of the subdirectory and should return non-nil if the
 subdirectory is to be descended into).
 
 If FOLLOW-SYMLINKS, symbolic links that point to directories are
@@ -3850,7 +3853,7 @@ It is dangerous if either of these conditions are met:
       (hack-one-local-variable-quotep exp)))
 
 (defun hack-one-local-variable-eval-safep (exp)
-  "Return t if it is safe to eval EXP when it is found in a file."
+  "Return non-nil if it is safe to eval EXP when it is found in a file."
   (or (not (consp exp))
       ;; Detect certain `put' expressions.
       (and (eq (car exp) 'put)
@@ -5390,6 +5393,8 @@ Before and after saving the buffer, this function runs
 (declare-function diff-no-select "diff"
 		  (old new &optional switches no-async buf))
 
+(defvar save-some-buffers--switch-window-callback nil)
+
 (defvar save-some-buffers-action-alist
   `((?\C-r
      ,(lambda (buf)
@@ -5401,6 +5406,11 @@ Before and after saving the buffer, this function runs
         ;; Return nil to ask about BUF again.
         nil)
      ,(purecopy "view this buffer"))
+    (?\C-f
+     ,(lambda (buf)
+        (funcall save-some-buffers--switch-window-callback buf)
+        (setq quit-flag t))
+     ,(purecopy "view this buffer and quit"))
     (?d ,(lambda (buf)
            (if (null (buffer-file-name buf))
                (message "Not applicable: no file")
@@ -5464,69 +5474,79 @@ change the additional actions you can take on files."
   (interactive "P")
   (unless pred
     (setq pred save-some-buffers-default-predicate))
-  (save-window-excursion
-    (let* (queried autosaved-buffers
-	   files-done abbrevs-done)
-      (dolist (buffer (buffer-list))
-	;; First save any buffers that we're supposed to save unconditionally.
-	;; That way the following code won't ask about them.
-	(with-current-buffer buffer
-	  (when (and buffer-save-without-query (buffer-modified-p))
-	    (push (buffer-name) autosaved-buffers)
-	    (save-buffer))))
-      ;; Ask about those buffers that merit it,
-      ;; and record the number thus saved.
-      (setq files-done
-	    (map-y-or-n-p
-             (lambda (buffer)
-	       ;; Note that killing some buffers may kill others via
-	       ;; hooks (e.g. Rmail and its viewing buffer).
-	       (and (buffer-live-p buffer)
-		    (buffer-modified-p buffer)
-                    (not (buffer-base-buffer buffer))
-                    (or
-                     (buffer-file-name buffer)
-                     (with-current-buffer buffer
-                       (or (eq buffer-offer-save 'always)
-                           (and pred buffer-offer-save (> (buffer-size) 0)))))
-                    (or (not (functionp pred))
-                        (with-current-buffer buffer (funcall pred)))
-                    (if arg
-                        t
-                      (setq queried t)
-                      (if (buffer-file-name buffer)
-                          (format "Save file %s? "
-                                  (buffer-file-name buffer))
-                        (format "Save buffer %s? "
-                                (buffer-name buffer))))))
-             (lambda (buffer)
-               (with-current-buffer buffer
-                 (save-buffer)))
-             (buffer-list)
-	     '("buffer" "buffers" "save")
-	     save-some-buffers-action-alist))
-      ;; Maybe to save abbrevs, and record whether
-      ;; we either saved them or asked to.
-      (and save-abbrevs abbrevs-changed
-	   (progn
-	     (if (or arg
-		     (eq save-abbrevs 'silently)
-		     (y-or-n-p (format "Save abbrevs in %s? " abbrev-file-name)))
-		 (write-abbrev-file nil))
-	     ;; Don't keep bothering user if he says no.
-	     (setq abbrevs-changed nil)
-	     (setq abbrevs-done t)))
-      (or queried (> files-done 0) abbrevs-done
-	  (cond
-	   ((null autosaved-buffers)
-            (when (called-interactively-p 'any)
-              (files--message "(No files need saving)")))
-	   ((= (length autosaved-buffers) 1)
-	    (files--message "(Saved %s)" (car autosaved-buffers)))
-	   (t
-	    (files--message "(Saved %d files: %s)"
-                            (length autosaved-buffers)
-                            (mapconcat 'identity autosaved-buffers ", "))))))))
+  (let* ((switched-buffer nil)
+         (save-some-buffers--switch-window-callback
+          (lambda (buffer)
+            (setq switched-buffer buffer)))
+         queried autosaved-buffers
+	 files-done abbrevs-done)
+    (unwind-protect
+        (save-window-excursion
+          (dolist (buffer (buffer-list))
+	    ;; First save any buffers that we're supposed to save
+	    ;; unconditionally.  That way the following code won't ask
+	    ;; about them.
+	    (with-current-buffer buffer
+	      (when (and buffer-save-without-query (buffer-modified-p))
+	        (push (buffer-name) autosaved-buffers)
+	        (save-buffer))))
+          ;; Ask about those buffers that merit it,
+          ;; and record the number thus saved.
+          (setq files-done
+	        (map-y-or-n-p
+                 (lambda (buffer)
+	           ;; Note that killing some buffers may kill others via
+	           ;; hooks (e.g. Rmail and its viewing buffer).
+	           (and (buffer-live-p buffer)
+		        (buffer-modified-p buffer)
+                        (not (buffer-base-buffer buffer))
+                        (or
+                         (buffer-file-name buffer)
+                         (with-current-buffer buffer
+                           (or (eq buffer-offer-save 'always)
+                               (and pred buffer-offer-save
+                                    (> (buffer-size) 0)))))
+                        (or (not (functionp pred))
+                            (with-current-buffer buffer (funcall pred)))
+                        (if arg
+                            t
+                          (setq queried t)
+                          (if (buffer-file-name buffer)
+                              (format "Save file %s? "
+                                      (buffer-file-name buffer))
+                            (format "Save buffer %s? "
+                                    (buffer-name buffer))))))
+                 (lambda (buffer)
+                   (with-current-buffer buffer
+                     (save-buffer)))
+                 (buffer-list)
+	         '("buffer" "buffers" "save")
+	         save-some-buffers-action-alist))
+          ;; Maybe to save abbrevs, and record whether
+          ;; we either saved them or asked to.
+          (and save-abbrevs abbrevs-changed
+	       (progn
+	         (if (or arg
+		         (eq save-abbrevs 'silently)
+		         (y-or-n-p (format "Save abbrevs in %s? "
+                                           abbrev-file-name)))
+		     (write-abbrev-file nil))
+	         ;; Don't keep bothering user if he says no.
+	         (setq abbrevs-changed nil)
+	         (setq abbrevs-done t)))
+          (or queried (> files-done 0) abbrevs-done
+	      (cond
+	       ((null autosaved-buffers)
+                (when (called-interactively-p 'any)
+                  (files--message "(No files need saving)")))
+	       ((= (length autosaved-buffers) 1)
+	        (files--message "(Saved %s)" (car autosaved-buffers)))
+	       (t
+	        (files--message
+                 "(Saved %d files: %s)" (length autosaved-buffers)
+                 (mapconcat 'identity autosaved-buffers ", "))))))
+      (when switched-buffer
+        (pop-to-buffer-same-window switched-buffer)))))
 
 (defun clear-visited-file-modtime ()
   "Clear out records of last mod time of visited file.

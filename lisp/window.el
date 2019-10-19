@@ -3867,7 +3867,7 @@ POSITION defaults to the value of `window-point' of WINDOW."
 	      (+ (nth 1 edges) (nth 1 pos-in-window)))))))
 
 (defun frame-root-window-p (window)
-  "Return non-nil if WINDOW is the root window of its frame."
+  "Return t if WINDOW is the root window of its frame."
   (eq window (frame-root-window window)))
 
 (defun window--subtree (window &optional next)
@@ -4732,13 +4732,16 @@ displayed there."
     ;; Handle case where `buffer-or-name' is nil and the current buffer
     ;; is shown in the selected window.
     (cond
-     ((or buffer-or-name (not (eq buffer (window-buffer)))))
+     ((or buffer-or-name
+          (not (eq buffer (window-buffer)))
+          ;; Don't try to delete the minibuffer window, undedicate it
+          ;; or switch to a previous buffer in it.
+          (window-minibuffer-p)))
      ((window--delete nil t))
      (t
       ;; Switch to another buffer in window.
       (set-window-dedicated-p nil nil)
       (switch-to-prev-buffer nil 'bury)))
-
     ;; Always return nil.
     nil))
 
@@ -4747,31 +4750,33 @@ displayed there."
   (interactive)
   (switch-to-buffer (last-buffer)))
 
-(defun next-buffer ()
-  "In selected window switch to next buffer.
+(defun next-buffer (&optional arg)
+  "In selected window switch to ARGth next buffer.
 Call `switch-to-next-buffer' unless the selected window is the
 minibuffer window or is dedicated to its buffer."
-  (interactive)
+  (interactive "p")
   (cond
    ((window-minibuffer-p)
     (user-error "Cannot switch buffers in minibuffer window"))
    ((eq (window-dedicated-p) t)
     (user-error "Window is strongly dedicated to its buffer"))
    (t
-    (switch-to-next-buffer))))
+    (dotimes (_ (or arg 1))
+      (switch-to-next-buffer)))))
 
-(defun previous-buffer ()
-  "In selected window switch to previous buffer.
+(defun previous-buffer (&optional arg)
+  "In selected window switch to ARGth previous buffer.
 Call `switch-to-prev-buffer' unless the selected window is the
 minibuffer window or is dedicated to its buffer."
-  (interactive)
+  (interactive "p")
   (cond
    ((window-minibuffer-p)
     (user-error "Cannot switch buffers in minibuffer window"))
    ((eq (window-dedicated-p) t)
     (user-error "Window is strongly dedicated to its buffer"))
    (t
-    (switch-to-prev-buffer))))
+    (dotimes (_ (or arg 1))
+      (switch-to-prev-buffer)))))
 
 (defun delete-windows-on (&optional buffer-or-name frame)
   "Delete all windows showing BUFFER-OR-NAME.
@@ -8921,7 +8926,7 @@ accessible position."
        ;; vertically.
        ((and (not (eq fit-window-to-buffer-horizontally 'only))
 	     (not (window-size-fixed-p window 'preserved))
-	     (window-combined-p))
+	     (window-combined-p window))
         (let* ((line-height (window-default-line-height window))
 	       (total-height (window-size window nil pixelwise))
                (min-height

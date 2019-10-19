@@ -1181,18 +1181,19 @@ POS and RES.")
 		       2)))
     ;; Remove matches like /bin/sh and do other file name transforms.
     (save-match-data
-      (let ((transformed nil))
-        (dolist (f file)
-          (let ((match
-                 (cl-loop for (regexp replacement)
-                          in compilation-transform-file-match-alist
-                          when (string-match regexp f)
-                          return (or replacement t))))
-            (cond ((not match)
-                   (push f transformed))
-                  ((stringp match)
-                   (push (replace-match match nil nil f) transformed)))))
-        (setq file (nreverse transformed))))
+      (let ((file-name
+             (and (consp file)
+                  (not (bufferp (car file)))
+                  (if (cdr file)
+                      (expand-file-name (car file) (cdr file))
+                    (car file)))))
+        (cl-loop for (regexp replacement)
+                 in compilation-transform-file-match-alist
+                 when (string-match regexp file-name)
+                 return (if replacement
+                            (setq file (list (replace-match replacement nil nil
+                                                            file-name)))
+                          (setq file nil)))))
     (if (not file)
         ;; If we ignored all the files with errors on this line, then
         ;; return nil.
@@ -2508,6 +2509,8 @@ This is the value of `next-error-function' in Compilation buffers."
 	 (loc (compilation--message->loc msg))
 	 (end-loc (compilation--message->end-loc msg))
 	 (marker (point-marker)))
+    (unless loc
+      (user-error "No next error"))
     (setq compilation-current-error (point-marker)
 	  overlay-arrow-position
 	    (if (bolp)
@@ -2669,10 +2672,11 @@ Actual value is never used, only the text property.")
 
 (defun compilation-tear-down-arrow-spec-in-margin ()
   "Restore compilation-arrow-overlay to not using the margin, which is removed."
-  (overlay-put compilation-arrow-overlay 'before-string nil)
-  (delete-overlay compilation-arrow-overlay)
-  (setq compilation-arrow-overlay nil)
-  (set-window-margins (selected-window) (- (car (window-margins)) 2)))
+  (when (overlayp compilation-arrow-overlay)
+    (overlay-put compilation-arrow-overlay 'before-string nil)
+    (delete-overlay compilation-arrow-overlay)
+    (setq compilation-arrow-overlay nil)
+    (set-window-margins (selected-window) (- (car (window-margins)) 2))))
 
 (defun compilation-set-overlay-arrow (w)
   "Set up, or switch off, the overlay-arrow for window W."
@@ -2820,7 +2824,8 @@ attempts to find a file whose name is produced by (format FMT FILENAME)."
                       (expand-file-name directory)
                     default-directory))
         buffer thisdir fmts name)
-    (if (file-name-absolute-p filename)
+    (if (and filename
+             (file-name-absolute-p filename))
         ;; The file name is absolute.  Use its explicit directory as
         ;; the first in the search path, and strip it from FILENAME.
         (setq filename (abbreviate-file-name (expand-file-name filename))
@@ -2848,8 +2853,11 @@ attempts to find a file whose name is produced by (format FMT FILENAME)."
 	    (and w (progn (compilation-set-window w marker)
                           (compilation-set-overlay-arrow w))))
           (let* ((name (read-file-name
-                        (format "Find this %s in (default %s): "
-                                compilation-error filename)
+                        (format "Find this %s in%s: "
+                                compilation-error
+                                (if filename
+                                    (format " (default %s)" filename)
+                                  ""))
                         spec-dir filename t nil
                         ;; The predicate below is fine when called from
                         ;; minibuffer-complete-and-exit, but it's too
