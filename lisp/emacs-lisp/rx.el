@@ -122,8 +122,26 @@ Each entry is:
                     as the rx form DEF (which can contain members of ARGS).")
 
 (defsubst rx--lookup-def (name)
+  "Current definition of NAME: (DEF) or (ARGS DEF), or nil if none."
   (or (cdr (assq name rx--local-definitions))
       (get name 'rx-definition)))
+
+(defun rx--expand-def (form)
+  "FORM expanded (once) if a user-defined construct; otherwise nil."
+  (cond ((symbolp form)
+         (let ((def (rx--lookup-def form)))
+           (and def
+                (if (cdr def)
+                    (error "Not an `rx' symbol definition: %s" form)
+                  (car def)))))
+        ((consp form)
+         (let* ((op (car form))
+                (def (rx--lookup-def op)))
+           (and def
+                (if (cdr def)
+                    (rx--expand-template
+                     op (cdr form) (nth 0 def) (nth 1 def))
+                  (error "Not an `rx' form definition: %s" op)))))))
 
 ;; TODO: Additions to consider:
 ;; - A construct like `or' but without the match order guarantee,
@@ -155,11 +173,8 @@ Each entry is:
       ((let ((class (cdr (assq sym rx--char-classes))))
          (and class (cons (list (concat "[[:" (symbol-name class) ":]]")) t))))
 
-      ((let ((definition (rx--lookup-def sym)))
-         (and definition
-              (if (cdr definition)
-                  (error "Not an `rx' symbol definition: %s" sym)
-                (rx--translate (nth 0 definition))))))
+      ((let ((expanded (rx--expand-def sym)))
+         (and expanded (rx--translate expanded))))
 
       ;; For compatibility with old rx.
       ((let ((entry (assq sym rx-constituents)))
@@ -210,7 +225,8 @@ each on the form (REGEXP . PRECEDENCE), returning (REGEXP . PRECEDENCE)."
                      'seq)))))))               ; seq ++ seq
 
 (defun rx--translate-seq (body)
-  "Translate a sequence of one or more rx items.  Return (REGEXP . PRECEDENCE)."
+  "Translate a sequence of zero or more rx items.
+Return (REGEXP . PRECEDENCE)."
   (if body
       (let* ((items (mapcar #'rx--translate body))
              (result (car items)))
@@ -231,7 +247,7 @@ each on the form (REGEXP . PRECEDENCE), returning (REGEXP . PRECEDENCE)."
   (null list))
 
 (defun rx--translate-or (body)
-  "Translate an or-pattern of one of more rx items.
+  "Translate an or-pattern of zero or more rx items.
 Return (REGEXP . PRECEDENCE)."
   ;; FIXME: Possible improvements:
   ;;
@@ -258,7 +274,7 @@ Return (REGEXP . PRECEDENCE)."
   ;;        -> (any "@" "%" digit "A-Z" space word)
   ;;        -> "[A-Z@%[:digit:][:space:][:word:]]"
   ;;
-  ;; Problem: If a subpattern is carefully written to to be
+  ;; Problem: If a subpattern is carefully written to be
   ;; optimisable by regexp-opt, how do we prevent the transforms
   ;; above from destroying that property?
   ;; Example: (or "a" (or "abc" "abd" "abe"))
@@ -445,21 +461,23 @@ If NEGATED, negate the sense (thus making it positive)."
     (error "rx `not' form takes exactly one argument"))
   (let ((arg (car body)))
     (cond
-     ((consp arg)
-      (pcase (car arg)
-        ((or 'any 'in 'char) (rx--translate-any      (not negated) (cdr arg)))
-        ('syntax             (rx--translate-syntax   (not negated) (cdr arg)))
-        ('category           (rx--translate-category (not negated) (cdr arg)))
-        ('not                (rx--translate-not      (not negated) (cdr arg)))
-        (_ (error "Illegal argument to rx `not': %S" arg))))
+     ((and (consp arg)
+           (pcase (car arg)
+             ((or 'any 'in 'char)
+              (rx--translate-any      (not negated) (cdr arg)))
+             ('syntax
+              (rx--translate-syntax   (not negated) (cdr arg)))
+             ('category
+              (rx--translate-category (not negated) (cdr arg)))
+             ('not
+              (rx--translate-not      (not negated) (cdr arg))))))
+     ((let ((class (cdr (assq arg rx--char-classes))))
+        (and class
+             (rx--translate-any (not negated) (list class)))))
      ((eq arg 'word-boundary)
       (rx--translate-symbol
        (if negated 'word-boundary 'not-word-boundary)))
-     (t
-      (let ((class (cdr (assq arg rx--char-classes))))
-        (if class
-            (rx--translate-any (not negated) (list class))
-          (error "Illegal argument to rx `not': %s" arg)))))))
+     (t (error "Illegal argument to rx `not': %S" arg)))))
 
 (defun rx--atomic-regexp (item)
   "ITEM is (REGEXP . PRECEDENCE); return a regexp of precedence t."
@@ -873,30 +891,28 @@ can expand to any number of values."
       ((or 'regexp 'regex)      (rx--translate-regexp body))
 
       (op
-       (unless (symbolp op)
-         (error "Bad rx operator `%S'" op))
-       (let ((definition (rx--lookup-def op)))
-         (if definition
-             (if (cdr definition)
-                 (rx--translate
-                  (rx--expand-template
-                   op body (nth 0 definition) (nth 1 definition)))
-               (error "Not an `rx' form definition: %s" op))
+       (cond
+        ((not (symbolp op)) (error "Bad rx operator `%S'" op))
 
-           ;; For compatibility with old rx.
-           (let ((entry (assq op rx-constituents)))
-             (if (progn
-                   (while (and entry (not (consp (cdr entry))))
-                     (setq entry
-                           (if (symbolp (cdr entry))
-                               ;; Alias for another entry.
-                               (assq (cdr entry) rx-constituents)
-                             ;; Wrong type, try further down the list.
-                             (assq (car entry)
-                                   (cdr (memq entry rx-constituents))))))
-                   entry)
-                 (rx--translate-compat-form (cdr entry) form)
-               (error "Unknown rx form `%s'" op)))))))))
+        ((let ((expanded (rx--expand-def form)))
+           (and expanded
+                (rx--translate expanded))))
+
+        ;; For compatibility with old rx.
+        ((let ((entry (assq op rx-constituents)))
+           (and (progn
+                  (while (and entry (not (consp (cdr entry))))
+                    (setq entry
+                          (if (symbolp (cdr entry))
+                              ;; Alias for another entry.
+                              (assq (cdr entry) rx-constituents)
+                            ;; Wrong type, try further down the list.
+                            (assq (car entry)
+                                  (cdr (memq entry rx-constituents))))))
+                  entry)
+                (rx--translate-compat-form (cdr entry) form))))
+
+        (t (error "Unknown rx form `%s'" op)))))))
 
 (defconst rx--builtin-forms
   '(seq sequence : and or | any in char not-char not
@@ -982,7 +998,7 @@ For extending the `rx' notation in FORM, use `rx-define' or `rx-let-eval'."
 (defmacro rx (&rest regexps)
   "Translate regular expressions REGEXPS in sexp form to a regexp string.
 Each argument is one of the forms below; RX is a subform, and RX... stands
-for one or more RXs.  For details, see Info node `(elisp) Rx Notation'.
+for zero or more RXs.  For details, see Info node `(elisp) Rx Notation'.
 See `rx-to-string' for the corresponding function.
 
 STRING         Match a literal string.
@@ -1064,8 +1080,8 @@ Zero-width assertions: these all match the empty string in specific places.
  string-end         At the end of the string or buffer.
                      Alias: buffer-end, eos, eot.
  point              At point.
- word-start         At the beginning of a word.
- word-end           At the end of a word.
+ word-start         At the beginning of a word.  Alias: bow.
+ word-end           At the end of a word.  Alias: eow.
  word-boundary      At the beginning or end of a word.
  not-word-boundary  Not at the beginning or end of a word.
  symbol-start       At the beginning of a symbol.

@@ -34,7 +34,9 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-when-compile
+  (require 'cl-lib)
+  (require 'seq))
 
 
 (defgroup tab-bar nil
@@ -445,36 +447,16 @@ Return its existing value or a new value."
       (explicit-name . ,tab-explicit-name))))
 
 (defun tab-bar--current-tab-index (&optional tabs)
-  ;; FIXME: could be replaced with 1-liner using seq-position
-  (let ((tabs (or tabs (funcall tab-bar-tabs-function)))
-        (i 0))
-    (catch 'done
-      (while tabs
-        (when (eq (car (car tabs)) 'current-tab)
-          (throw 'done i))
-        (setq i (1+ i) tabs (cdr tabs))))))
+  (seq-position (or tabs (funcall tab-bar-tabs-function))
+                'current-tab (lambda (a b) (eq (car a) b))))
 
 (defun tab-bar--tab-index (tab &optional tabs)
-  ;; FIXME: could be replaced with 1-liner using seq-position
-  (let ((tabs (or tabs (funcall tab-bar-tabs-function)))
-        (i 0))
-    (catch 'done
-      (while tabs
-        (when (eq (car tabs) tab)
-          (throw 'done i))
-        (setq i (1+ i) tabs (cdr tabs))))
-    i))
+  (seq-position (or tabs (funcall tab-bar-tabs-function))
+                tab))
 
 (defun tab-bar--tab-index-by-name (name &optional tabs)
-  ;; FIXME: could be replaced with 1-liner using seq-position
-  (let ((tabs (or tabs (funcall tab-bar-tabs-function)))
-        (i 0))
-    (catch 'done
-      (while tabs
-        (when (equal (cdr (assq 'name (car tabs))) name)
-          (throw 'done i))
-        (setq i (1+ i) tabs (cdr tabs))))
-    i))
+  (seq-position (or tabs (funcall tab-bar-tabs-function))
+                name (lambda (a b) (equal (cdr (assq 'name a)) b))))
 
 
 (defun tab-bar-select-tab (&optional arg)
@@ -513,8 +495,7 @@ to the numeric argument.  ARG counts from 1."
           (setf (nth from-index tabs) from-tab))
         (setf (nth to-index tabs) (tab-bar--current-tab (nth to-index tabs))))
 
-      (when tab-bar-mode
-        (force-mode-line-update)))))
+      (force-mode-line-update))))
 
 (defun tab-bar-switch-to-next-tab (&optional arg)
   "Switch to ARGth next tab."
@@ -541,6 +522,31 @@ to the numeric argument.  ARG counts from 1."
                                               (funcall tab-bar-tabs-function)))))
   (tab-bar-select-tab (1+ (tab-bar--tab-index-by-name name))))
 
+(defalias 'tab-bar-select-tab-by-name 'tab-bar-switch-to-tab)
+
+
+(defun tab-bar-move-tab-to (to-index &optional from-index)
+  "Move tab from FROM-INDEX position to new position at TO-INDEX.
+FROM-INDEX defaults to the current tab index.
+FROM-INDEX and TO-INDEX count from 1."
+  (interactive "P")
+  (let* ((tabs (funcall tab-bar-tabs-function))
+         (from-index (or from-index (1+ (tab-bar--current-tab-index tabs))))
+         (from-tab (nth (1- from-index) tabs))
+         (to-index (max 0 (min (1- to-index) (1- (length tabs))))))
+    (setq tabs (delq from-tab tabs))
+    (cl-pushnew from-tab (nthcdr to-index tabs))
+    (set-frame-parameter nil 'tabs tabs)))
+
+(defun tab-bar-move-tab (&optional arg)
+  "Move the current tab ARG positions to the right.
+If a negative ARG, move the current tab ARG positions to the left."
+  (interactive "p")
+  (let* ((tabs (funcall tab-bar-tabs-function))
+         (from-index (or (tab-bar--current-tab-index tabs) 0))
+         (to-index (mod (+ from-index arg) (length tabs))))
+    (tab-bar-move-tab-to (1+ to-index) (1+ from-index))))
+
 
 (defcustom tab-bar-new-tab-to 'right
   "Defines where to create a new tab.
@@ -555,9 +561,11 @@ If `rightmost', create as the last tab."
   :group 'tab-bar
   :version "27.1")
 
-(defun tab-bar-new-tab ()
-  "Add a new tab at the position specified by `tab-bar-new-tab-to'."
-  (interactive)
+(defun tab-bar-new-tab-to (&optional to-index)
+  "Add a new tab at the absolute position TO-INDEX.
+TO-INDEX counts from 1.  If no TO-INDEX is specified, then add
+a new tab at the position specified by `tab-bar-new-tab-to'."
+  (interactive "P")
   (let* ((tabs (funcall tab-bar-tabs-function))
          (from-index (tab-bar--current-tab-index tabs))
          (from-tab (tab-bar--tab)))
@@ -579,11 +587,12 @@ If `rightmost', create as the last tab."
     (when from-index
       (setf (nth from-index tabs) from-tab))
     (let ((to-tab (tab-bar--current-tab))
-          (to-index (pcase tab-bar-new-tab-to
-                      ('leftmost 0)
-                      ('rightmost (length tabs))
-                      ('left (1- (or from-index 1)))
-                      ('right (1+ (or from-index 0))))))
+          (to-index (or (if to-index (1- to-index))
+                        (pcase tab-bar-new-tab-to
+                          ('leftmost 0)
+                          ('rightmost (length tabs))
+                          ('left (1- (or from-index 1)))
+                          ('right (1+ (or from-index 0)))))))
       (setq to-index (max 0 (min (or to-index 0) (length tabs))))
       (cl-pushnew to-tab (nthcdr to-index tabs))
       (when (eq to-index 0)
@@ -595,11 +604,27 @@ If `rightmost', create as the last tab."
                    (and (natnump tab-bar-show)
                         (> (length tabs) tab-bar-show))))
       (tab-bar-mode 1))
-    (if tab-bar-mode
-        (force-mode-line-update)
+
+    (force-mode-line-update)
+    (unless tab-bar-mode
       (message "Added new tab at %s" tab-bar-new-tab-to))))
 
+(defun tab-bar-new-tab (&optional arg)
+  "Create a new tab ARG positions to the right.
+If a negative ARG, create a new tab ARG positions to the left.
+If ARG is zero, create a new tab in place of the current tab."
+  (interactive "P")
+  (if arg
+      (let* ((tabs (funcall tab-bar-tabs-function))
+             (from-index (or (tab-bar--current-tab-index tabs) 0))
+             (to-index (+ from-index (prefix-numeric-value arg))))
+        (tab-bar-new-tab-to (1+ to-index)))
+    (tab-bar-new-tab-to)))
+
 
+(defvar tab-bar-closed-tabs nil
+  "A list of closed tabs to be able to undo their closing.")
+
 (defcustom tab-bar-close-tab-select 'right
   "Defines what tab to select after closing the specified tab.
 If `left', select the adjacent left tab.
@@ -636,14 +661,23 @@ TO-INDEX counts from 1."
         ;; Re-read tabs after selecting another tab
         (setq tabs (funcall tab-bar-tabs-function))))
 
-    (set-frame-parameter nil 'tabs (delq (nth close-index tabs) tabs))
+    (let ((close-tab (nth close-index tabs)))
+      (push `((frame . ,(selected-frame))
+              (index . ,close-index)
+              (tab . ,(if (eq (car close-tab) 'current-tab)
+                          (tab-bar--tab)
+                        close-tab)))
+            tab-bar-closed-tabs)
+      (set-frame-parameter nil 'tabs (delq close-tab tabs)))
 
     (when (and tab-bar-mode
-               (and (natnump tab-bar-show)
-                    (<= (length tabs) tab-bar-show)))
+               (or (<= (length tabs) 1) ; closed the last tab
+                   (and (natnump tab-bar-show)
+                        (<= (length tabs) tab-bar-show))))
       (tab-bar-mode -1))
-    (if tab-bar-mode
-        (force-mode-line-update)
+
+    (force-mode-line-update)
+    (unless tab-bar-mode
       (message "Deleted tab and switched to %s" tab-bar-close-tab-select))))
 
 (defun tab-bar-close-tab-by-name (name)
@@ -660,22 +694,64 @@ TO-INDEX counts from 1."
   (let* ((tabs (funcall tab-bar-tabs-function))
          (current-index (tab-bar--current-tab-index tabs)))
     (when current-index
+      (dotimes (index (length tabs))
+        (unless (eq index current-index)
+          (push `((frame . ,(selected-frame))
+                  (index . ,index)
+                  (tab . ,(nth index tabs)))
+                tab-bar-closed-tabs)))
       (set-frame-parameter nil 'tabs (list (nth current-index tabs)))
+
       (when (and tab-bar-mode
                  (and (natnump tab-bar-show)
                       (<= 1 tab-bar-show)))
         (tab-bar-mode -1))
-      (if tab-bar-mode
-          (force-mode-line-update)
+
+      (force-mode-line-update)
+      (unless tab-bar-mode
         (message "Deleted all other tabs")))))
 
+(defun tab-bar-undo-close-tab ()
+  "Restore the last closed tab."
+  (interactive)
+  ;; Pop out closed tabs that were on already deleted frames
+  (while (and tab-bar-closed-tabs
+              (not (frame-live-p (cdr (assq 'frame (car tab-bar-closed-tabs))))))
+    (pop tab-bar-closed-tabs))
+
+  (if tab-bar-closed-tabs
+      (let* ((closed (pop tab-bar-closed-tabs))
+             (frame (cdr (assq 'frame closed)))
+             (index (cdr (assq 'index closed)))
+             (tab (cdr (assq 'tab closed))))
+        (unless (eq frame (selected-frame))
+          (select-frame-set-input-focus frame))
+
+        (let ((tabs (tab-bar-tabs)))
+          (setq index (max 0 (min index (length tabs))))
+          (cl-pushnew tab (nthcdr index tabs))
+          (when (eq index 0)
+            ;; pushnew handles the head of tabs but not frame-parameter
+            (set-frame-parameter nil 'tabs tabs))
+          (tab-bar-select-tab (1+ index))))
+
+    (message "No more closed tabs to undo")))
+
+
 (defun tab-bar-rename-tab (name &optional arg)
   "Rename the tab specified by its absolute position ARG.
 If no ARG is specified, then rename the current tab.
 ARG counts from 1.
 If NAME is the empty string, then use the automatic name
 function `tab-bar-tab-name-function'."
-  (interactive "sNew name for tab (leave blank for automatic naming): \nP")
+  (interactive
+   (let* ((tabs (funcall tab-bar-tabs-function))
+          (tab-index (or current-prefix-arg (1+ (tab-bar--current-tab-index tabs))))
+          (tab-name (cdr (assq 'name (nth (1- tab-index) tabs)))))
+     (list (read-from-minibuffer
+            "New name for tab (leave blank for automatic naming): "
+            nil nil nil nil tab-name)
+           current-prefix-arg)))
   (let* ((tabs (funcall tab-bar-tabs-function))
          (tab-index (if arg
                         (1- (max 0 (min arg (length tabs))))
@@ -687,32 +763,40 @@ function `tab-bar-tab-name-function'."
                          (funcall tab-bar-tab-name-function))))
     (setf (cdr (assq 'name tab-to-rename)) tab-new-name
           (cdr (assq 'explicit-name tab-to-rename)) tab-explicit-name)
-    (if (tab-bar-mode)
-        (force-mode-line-update)
+
+    (force-mode-line-update)
+    (unless tab-bar-mode
       (message "Renamed tab to '%s'" tab-new-name))))
 
 (defun tab-bar-rename-tab-by-name (tab-name new-name)
   "Rename the tab named TAB-NAME.
 If NEW-NAME is the empty string, then use the automatic name
 function `tab-bar-tab-name-function'."
-  (interactive (list (completing-read "Rename tab by name: "
-                                      (mapcar (lambda (tab)
-                                                (cdr (assq 'name tab)))
-                                              (funcall tab-bar-tabs-function)))
-                     (read-from-minibuffer "New name for tab (leave blank for automatic naming): ")))
-  (tab-bar-rename-tab new-name (tab-bar--tab-index-by-name tab-name)))
+  (interactive
+   (let ((tab-name (completing-read "Rename tab by name: "
+                                    (mapcar (lambda (tab)
+                                              (cdr (assq 'name tab)))
+                                            (funcall tab-bar-tabs-function)))))
+     (list tab-name (read-from-minibuffer
+                     "New name for tab (leave blank for automatic naming): "
+                     nil nil nil nil tab-name))))
+  (tab-bar-rename-tab new-name (1+ (tab-bar--tab-index-by-name tab-name))))
 
 
 ;;; Short aliases
 
-(defalias 'tab-new      'tab-bar-new-tab)
-(defalias 'tab-close    'tab-bar-close-tab)
+(defalias 'tab-new         'tab-bar-new-tab)
+(defalias 'tab-new-to      'tab-bar-new-tab-to)
+(defalias 'tab-close       'tab-bar-close-tab)
 (defalias 'tab-close-other 'tab-bar-close-other-tabs)
-(defalias 'tab-select   'tab-bar-select-tab)
-(defalias 'tab-next     'tab-bar-switch-to-next-tab)
-(defalias 'tab-previous 'tab-bar-switch-to-prev-tab)
-(defalias 'tab-rename   'tab-bar-rename-tab)
-(defalias 'tab-list     'tab-bar-list)
+(defalias 'tab-undo        'tab-bar-undo-close-tab)
+(defalias 'tab-select      'tab-bar-select-tab)
+(defalias 'tab-next        'tab-bar-switch-to-next-tab)
+(defalias 'tab-previous    'tab-bar-switch-to-prev-tab)
+(defalias 'tab-move        'tab-bar-move-tab)
+(defalias 'tab-move-to     'tab-bar-move-tab-to)
+(defalias 'tab-rename      'tab-bar-rename-tab)
+(defalias 'tab-list        'tab-bar-list)
 
 
 ;;; Non-graphical access to frame-local tabs (named window configurations)
@@ -727,7 +811,7 @@ In this list of window configurations you can delete or select them.
 Type ? after invocation to get help on commands available.
 Type q to remove the list of window configurations from the display.
 
-The first column shows `D' for for a window configuration you have
+The first column shows `D' for a window configuration you have
 marked for deletion."
   (interactive)
   (let ((dir default-directory)
@@ -916,8 +1000,7 @@ Then move up one line.  Prefix arg means move that many lines."
             (delete-region (point) (progn (forward-line 1) (point))))))))
   (beginning-of-line)
   (move-to-column tab-bar-list-column)
-  (when tab-bar-mode
-    (force-mode-line-update)))
+  (force-mode-line-update))
 
 (defun tab-bar-list-select ()
   "Select this line's window configuration.
@@ -962,14 +1045,14 @@ Like \\[find-file-other-frame] (which see), but creates a new tab."
           value)
       (switch-to-buffer-other-tab value))))
 
-(define-key ctl-x-6-map "2" 'tab-new)
-(define-key ctl-x-6-map "1" 'tab-close-other)
-(define-key ctl-x-6-map "0" 'tab-close)
-(define-key ctl-x-6-map "o" 'tab-next)
-(define-key ctl-x-6-map "b" 'switch-to-buffer-other-tab)
-(define-key ctl-x-6-map "f" 'find-file-other-tab)
-(define-key ctl-x-6-map "\C-f" 'find-file-other-tab)
-(define-key ctl-x-6-map "r" 'tab-rename)
+(define-key tab-prefix-map "2" 'tab-new)
+(define-key tab-prefix-map "1" 'tab-close-other)
+(define-key tab-prefix-map "0" 'tab-close)
+(define-key tab-prefix-map "o" 'tab-next)
+(define-key tab-prefix-map "b" 'switch-to-buffer-other-tab)
+(define-key tab-prefix-map "f" 'find-file-other-tab)
+(define-key tab-prefix-map "\C-f" 'find-file-other-tab)
+(define-key tab-prefix-map "r" 'tab-rename)
 
 
 (provide 'tab-bar)
