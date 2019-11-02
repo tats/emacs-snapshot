@@ -181,9 +181,12 @@ of[ \t]+\"?\\([a-zA-Z]?:?[^\":\n]+\\)\"?:" 3 2 nil (1))
     (aix
      " in line \\([0-9]+\\) of file \\([^ \n]+[^. \n]\\)\\.? " 2 1)
 
+    ;; Checkstyle task may report its own severity level: "[checkstyle] [ERROR] ..."
+    ;; (see AuditEventDefaultFormatter.java in checkstyle sources).
     (ant
-     "^[ \t]*\\[[^] \n]+\\][ \t]*\\(\\(?:[A-Za-z]:\\\\\\)?[^: \n]+\\):\\([0-9]+\\):\\(?:\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\):\\)?\
-\\( warning\\)?" 1 (2 . 4) (3 . 5) (6))
+     "^[ \t]*\\(?:\\[[^] \n]+\\][ \t]*\\)\\{1,2\\}\\(\\(?:[A-Za-z]:\\)?[^: \n]+\\):\
+\\([0-9]+\\):\\(?:\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\):\\)?\\( warning\\)?"
+     1 (2 . 4) (3 . 5) (6))
 
     (bash
      "^\\([^: \n\t]+\\): line \\([0-9]+\\):" 1 2)
@@ -235,6 +238,16 @@ of[ \t]+\"?\\([a-zA-Z]?:?[^\":\n]+\\)\"?:" 3 2 nil (1))
     (ftnchek
      "\\(^Warning .*\\)? line[ \n]\\([0-9]+\\)[ \n]\\(?:col \\([0-9]+\\)[ \n]\\)?file \\([^ :;\n]+\\)"
      4 2 3 (1))
+
+    ;; Gradle with kotlin-gradle-plugin (see
+    ;; GradleStyleMessagerRenderer.kt in kotlin sources, see
+    ;; https://youtrack.jetbrains.com/issue/KT-34683).
+    (gradle-kotlin
+     ,(concat
+       "^\\(?:\\(w\\)\\|.\\): *"            ;type
+       "\\(\\(?:[A-Za-z]:\\)?[^:\n]+\\): *" ;file
+       "(\\([0-9]+\\), *\\([0-9]+\\))")     ;line, column
+     2 3 4 (1))
 
     (iar
      "^\"\\(.*\\)\",\\([0-9]+\\)\\s-+\\(?:Error\\|Warnin\\(g\\)\\)\\[[0-9]+\\]:"

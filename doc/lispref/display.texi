@@ -2248,11 +2248,10 @@ is equivalent to a Lisp symbol with the same name.}.  Named faces are
 defined using the @code{defface} macro (@pxref{Defining Faces}).
 Emacs comes with several standard named faces (@pxref{Basic Faces}).
 
-  Many parts of Emacs require named faces, and do not accept
-anonymous faces.  These include the functions documented in
-@ref{Attribute Functions}, and the variable @code{font-lock-keywords}
-(@pxref{Search-based Fontification}).  Unless otherwise stated, we
-will use the term @dfn{face} to refer only to named faces.
+  Many parts of Emacs require named faces, but some do not accept
+anonymous faces (e.g., the functions documented in @ref{Attribute
+Functions}).  Unless otherwise stated, we will use the term @dfn{face}
+to refer only to named faces.
 
 @defun facep object
 This function returns a non-@code{nil} value if @var{object} is a
@@ -2834,7 +2833,11 @@ This sets the @code{:stipple} attribute of @var{face} to
 @end deffn
 
 @deffn Command set-face-font face font &optional frame
-This sets the @code{:font} attribute of @var{face} to @var{font}.
+Change the font-related attributes of @var{face} to those of
+@var{font} (a string).  This sets the attributes @code{:family},
+@code{:foundry}, @code{:width}, @code{:height}, @code{:weight}, and
+@code{:slant}.  If @var{frame} is non-@code{nil}, only change the
+attributes on the specified frame.
 @end deffn
 
 @defun set-face-bold face bold-p &optional frame
@@ -3661,7 +3664,10 @@ The font name (a string), in either XLFD, Fontconfig, or GTK+ format.
 @itemx :slant
 @itemx :width
 These have the same meanings as the face attributes of the same name.
-@xref{Face Attributes}.
+@xref{Face Attributes}.  @code{:family} and @code{:foundry} are
+strings, while the other three are symbols.  As example values,
+@code{:slant} may be @code{italic}, @code{:weight} may be @code{bold}
+and @code{:width} may be @code{normal}.
 
 @item :size
 The font size---either a non-negative integer that specifies the pixel

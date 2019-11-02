@@ -389,12 +389,7 @@ Optional argument POINT is where to look for the environment."
 
 (defvar semantic-texi-command-completion-list
   (append (mapcar (lambda (a) (car a)) texinfo-section-list)
-	  (condition-case nil
-	      texinfo-environments
-	    (error
-	     ;; XEmacs doesn't use the above.  Split up its regexp
-	     (split-string texinfo-environment-regexp "\\\\|\\|\\^@\\\\(\\|\\\\)")
-	     ))
+	  texinfo-environments
 	  ;; Is there a better list somewhere?  Here are few
 	  ;; of the top of my head.
 	  "anchor" "asis"
@@ -413,7 +408,7 @@ Optional argument POINT is where to look for the environment."
   "List of commands that we might bother completing.")
 
 (define-mode-local-override semantic-analyze-possible-completions
-  texinfo-mode (context)
+  texinfo-mode (context &rest flags)
   "List smart completions at point.
 Since texinfo is not a programming language the default version is not
 useful.  Instead, look at the current symbol.  If it is a command

@@ -1651,7 +1651,8 @@ The outline level is equal to the verbosity of the Tramp message."
       ;; Furthermore, `outline-regexp' must have the correct value
       ;; already, because it is used by `font-lock-compile-keywords'.
       (let ((default-directory (tramp-compat-temporary-file-directory))
-	    (outline-regexp tramp-debug-outline-regexp))
+	    (outline-regexp tramp-debug-outline-regexp)
+	    signal-hook-function)
 	(outline-mode))
       (set (make-local-variable 'outline-regexp) tramp-debug-outline-regexp)
       (set (make-local-variable 'outline-level) 'tramp-debug-outline-level)
@@ -4660,8 +4661,8 @@ are written with verbosity of 6."
        (setq error (error-message-string err)
 	     result 1)))
     (if (zerop (length error))
-	(tramp-message vec 6 "%d\n%s" result output)
-      (tramp-message vec 6 "%d\n%s\n%s" result output error))
+	(tramp-message vec 6 "%s\n%s" result output)
+      (tramp-message vec 6 "%s\n%s\n%s" result output error))
     result))
 
 (defun tramp-call-process-region

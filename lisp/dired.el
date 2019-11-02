@@ -185,9 +185,9 @@ If a character, new links are unconditionally marked with that character."
 
 (defcustom dired-dwim-target nil
   "If non-nil, Dired tries to guess a default target directory.
-This means: if there is a Dired buffer displayed in the next
-window, use its current directory, instead of this Dired buffer's
-current directory.
+This means: if there is a Dired buffer displayed in one of the most
+recently selected windows, use its current directory, instead of this
+Dired buffer's current directory.
 
 The target is used in the prompt for file copy, rename etc."
   :type 'boolean
@@ -510,16 +510,38 @@ Subexpression 2 must end right before the \\n.")
 		 "[-d]..\\(s\\)......")	; suid
 	 '(1 'dired-set-id))
    (list (concat dired-re-maybe-mark dired-re-inode-size
-		 "[-d].....\\(S\\)...")	; guid
+		 "[-d].....\\([sS]\\)...")	; guid
 	 '(1 'dired-set-id))
    ;;
    ;; Subdirectories.
    (list dired-re-dir
 	 '(".+" (dired-move-to-filename) nil (0 dired-directory-face)))
    ;;
-   ;; Symbolic links.
+   ;; Symbolic link to a directory.
    (list dired-re-sym
-	 '(".+" (dired-move-to-filename) nil (0 dired-symlink-face)))
+         (list (lambda (end)
+                 (when-let* ((file (dired-file-name-at-point))
+                             (truename (ignore-errors (file-truename file))))
+                   (and (file-directory-p truename)
+		        (search-forward-regexp "\\(.+-> ?\\)\\(.+\\)" end t))))
+               '(dired-move-to-filename)
+               nil
+               '(1 dired-symlink-face)
+               '(2 dired-directory-face)))
+   ;;
+   ;; Symbolic link to a non-directory.
+   (list dired-re-sym
+         (list (lambda (end)
+                 (when-let ((file (dired-file-name-at-point)))
+                   (let ((truename (ignore-errors (file-truename file))))
+                     (and (or (not truename)
+		              (not (file-directory-p truename)))
+		          (search-forward-regexp "\\(.+-> ?\\)\\(.+\\)"
+                                                 end t)))))
+               '(dired-move-to-filename)
+               nil
+               '(1 dired-symlink-face)
+               '(2 'default)))
    ;;
    ;; Sockets, pipes, block devices, char devices.
    (list dired-re-special
@@ -3437,7 +3459,7 @@ argument or confirmation)."
 	  (if (eq (car files) t) (cdr files) files))
 	 (remove-text-properties (point-min) (point-max)
 				 '(mouse-face nil help-echo nil))
-	 (setq tab-line-format nil))))))
+	 (setq tab-line-exclude nil))))))
 
 (defun dired-format-columns-of-files (files)
   (let ((beg (point)))
