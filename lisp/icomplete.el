@@ -223,21 +223,7 @@ Last entry becomes the first and can be selected with
       (push (car last) comps)
       (completion--cache-all-sorted-completions beg end comps))))
 
-;;; `ido-mode' emulation
-;;;
-;;; The following "magic-ido" commands can be bound in
-;;; `icomplete-mode-map' to make `icomplete-mode' behave more like
-;;; `ido-mode'.  Evaluate this to try it out.
-;;;
-;;; (let ((imap icomplete-minibuffer-map))
-;;;   (define-key imap (kbd "C-k") 'icomplete-magic-ido-kill)
-;;;   (define-key imap (kbd "C-d") 'icomplete-magic-ido-delete-char)
-;;;   (define-key imap (kbd "RET") 'icomplete-magic-ido-ret)
-;;;   (define-key imap (kbd "DEL") 'icomplete-magic-ido-backward-updir))
-;;;
-;;; For more ido behaviour, you'll probably like this too:
-;;;
-;;;   (setq icomplete-tidy-shadowed-file-names t)
+;;; Helpers for `fido-mode' (or `ido-mode' emulation)
 ;;;
 (defun icomplete-magic-ido-kill ()
   "Kill line or current completion, like `ido-mode'.
@@ -287,20 +273,22 @@ require user confirmation."
       (exit-minibuffer))))
 
 (defun icomplete-magic-ido-ret ()
-  "Exit forcing completion or enter directory, like `ido-mode'."
+  "Exit minibuffer or enter directory, like `ido-mode'."
   (interactive)
   (let* ((beg (icomplete--field-beg))
          (md (completion--field-metadata beg))
          (category (alist-get 'category (cdr md)))
          (dir (and (eq category 'file)
                    (file-name-directory (icomplete--field-string))))
-         (current (and dir
-                       (car (completion-all-sorted-completions))))
-         (probe (and current
+         (current (car (completion-all-sorted-completions)))
+         (probe (and dir current
                      (expand-file-name (directory-file-name current) dir))))
-    (if (and probe (file-directory-p probe) (not (string= current "./")))
-        (icomplete-force-complete)
-      (icomplete-force-complete-and-exit))))
+    (cond ((and probe (file-directory-p probe) (not (string= current "./")))
+           (icomplete-force-complete))
+          (current
+           (icomplete-force-complete-and-exit))
+          (t
+           (exit-minibuffer)))))
 
 (defun icomplete-magic-ido-backward-updir ()
   "Delete char before or go up directory, like `ido-mode'."
@@ -311,6 +299,43 @@ require user confirmation."
     (if (and (eq (char-before) ?/) (eq category 'file))
         (backward-kill-sexp 1)
       (call-interactively 'backward-delete-char))))
+
+(defvar icomplete-fido-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-k") 'icomplete-magic-ido-kill)
+    (define-key map (kbd "C-d") 'icomplete-magic-ido-delete-char)
+    (define-key map (kbd "RET") 'icomplete-magic-ido-ret)
+    (define-key map (kbd "DEL") 'icomplete-magic-ido-backward-updir)
+    (define-key map (kbd "M-j") 'exit-minibuffer)
+    (define-key map (kbd "C-s") 'icomplete-forward-completions)
+    (define-key map (kbd "C-r") 'icomplete-backward-completions)
+    map)
+  "Keymap used by `fido-mode' in the minibuffer.")
+
+(defun icomplete--fido-mode-setup ()
+  "Setup `fido-mode''s minibuffer."
+  (use-local-map (make-composed-keymap icomplete-fido-mode-map
+                                       (current-local-map)))
+  (setq-local icomplete-tidy-shadowed-file-names t
+              icomplete-show-matches-on-no-input t
+              icomplete-hide-common-prefix nil
+              completion-styles '(flex)
+              completion-category-defaults nil))
+
+;;;###autoload
+(define-minor-mode fido-mode
+  "An enhanced `icomplete-mode' that emulates `ido-mode'.
+
+This global minor mode makes minibuffer completion behave
+more like `ido-mode' than regular `icomplete-mode'."
+  :global t :group 'icomplete
+  (remove-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)
+  (remove-hook 'minibuffer-setup-hook #'icomplete--fido-mode-setup)
+  (when fido-mode
+    (icomplete-mode -1)
+    (setq icomplete-mode t)
+    (add-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)
+    (add-hook 'minibuffer-setup-hook #'icomplete--fido-mode-setup)))
 
 ;;;_ > icomplete-mode (&optional prefix)
 ;;;###autoload
@@ -333,6 +358,7 @@ completions:
   (remove-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)
   (remove-hook 'completion-in-region-mode-hook #'icomplete--in-region-setup)
   (when icomplete-mode
+    (fido-mode -1)
     (when icomplete-in-buffer
       (add-hook 'completion-in-region-mode-hook #'icomplete--in-region-setup))
     (add-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)))
@@ -443,11 +469,7 @@ See `icomplete-mode' and `minibuffer-setup-hook'."
                   ;; Don't delay if the completions are known.
                   completion-all-sorted-completions
                   ;; Don't delay if alternatives number is small enough:
-             ;; Not sure why, but such requests seem to come
-               ;; every once in a while.  It's not fully
-               ;; deterministic but `C-x C-f M-DEL M-DEL ...'
-               ;; seems to trigger it fairly often!
-               (while-no-input-ignore-events '(selection-request))     (and (sequencep (icomplete--completion-table))
+                  (and (sequencep (icomplete--completion-table))
                        (< (length (icomplete--completion-table))
                           icomplete-delay-completions-threshold))
                   ;; Delay - give some grace time for next keystroke, before
@@ -550,6 +572,13 @@ matches exist."
 	     (compare (compare-strings name nil nil
 				       most nil nil completion-ignore-case))
 	     (ellipsis (if (char-displayable-p ?…) "…" "..."))
+             ;; `determ' is what we "determined" to be the thing that
+             ;; TAB will complete to.  Also, if we're working with a
+             ;; large prefix (like when finding files), we want to
+             ;; truncate the common prefix away.  `determ-ellipsis'
+             ;; says if we should do it with an `ellipsis'.  Icomplete
+             ;; uses one, Ido doesn't.
+             (determ-ellipsis (if fido-mode "" ellipsis))
 	     (determ (unless (or (eq t compare) (eq t most-try)
 				 (= (setq compare (1- (abs compare)))
 				    (length most)))
@@ -560,8 +589,10 @@ matches exist."
 				 (substring most compare))
                                 ;; Don't bother truncating if it doesn't gain
                                 ;; us at least 2 columns.
-				((< compare (+ 2 (string-width ellipsis))) most)
-				(t (concat ellipsis (substring most compare))))
+				((< compare (+ 2 (string-width determ-ellipsis)))
+				 most)
+				(t (concat determ-ellipsis
+					   (substring most compare))))
 			       close-bracket)))
 	     ;;"-prospects" - more than one candidate
 	     (prospects-len (+ (string-width
@@ -642,6 +673,8 @@ matches exist."
 		    (mapconcat 'identity prospects icomplete-separator)
 		    (and limit (concat icomplete-separator ellipsis))
 		    "}")
+          (put-text-property 1 (1- (length determ))
+                             'face 'icomplete-first-match determ)
 	  (concat determ " [Matched]"))))))
 
 ;;; Iswitchb compatibility

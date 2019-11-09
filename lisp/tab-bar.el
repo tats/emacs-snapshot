@@ -345,11 +345,12 @@ Also add the number of windows in the window configuration."
                                                  'nomini)))
              ", "))
 
+
 (defvar tab-bar-tabs-function #'tab-bar-tabs
   "Function to get a list of tabs to display in the tab bar.
 This function should return a list of alists with parameters
 that include at least the element (name . TAB-NAME).
-For example, '((tab (name . \"Tab 1\")) (current-tab (name . \"Tab 2\")))
+For example, \\='((tab (name . \"Tab 1\")) (current-tab (name . \"Tab 2\")))
 By default, use function `tab-bar-tabs'.")
 
 (defun tab-bar-tabs ()
@@ -372,6 +373,7 @@ Return its existing value or a new value."
       (set-frame-parameter nil 'tabs tabs))
     tabs))
 
+
 (defun tab-bar-make-keymap-1 ()
   "Generate an actual keymap from `tab-bar-map', without caching."
   (let* ((separator (or tab-bar-separator (if window-system " " "|")))
@@ -436,6 +438,25 @@ Return its existing value or a new value."
                   :help "New tab"))))))
 
 
+;; Some window-configuration parameters don't need to be persistent.
+;; Don't save to the desktop file such tab parameters that are saved
+;; as "Unprintable entity" so can't be used after restoring the desktop.
+;; Actually tab-bar-select-tab already can handle unprintable entities,
+;; but it's better not to waste the desktop file with useless data.
+(defun frameset-filter-tabs (current _filtered _parameters saving)
+  (if saving
+      (mapcar (lambda (current)
+                (if (consp current)
+                    (seq-reduce (lambda (current param)
+                                  (assq-delete-all param current))
+                                '(wc wc-point wc-bl wc-bbl wc-history-back wc-history-forward)
+                                (copy-sequence current))
+                  current))
+              current)
+    current))
+
+(push '(tabs . frameset-filter-tabs) frameset-filter-alist)
+
 (defun tab-bar--tab ()
   (let* ((tab (assq 'current-tab (frame-parameter nil 'tabs)))
          (tab-explicit-name (cdr (assq 'explicit-name tab)))
@@ -447,16 +468,14 @@ Return its existing value or a new value."
                  (funcall tab-bar-tab-name-function)))
       (explicit-name . ,tab-explicit-name)
       (time . ,(time-convert nil 'integer))
+      (ws . ,(window-state-get
+              (frame-root-window (selected-frame)) 'writable))
       (wc . ,(current-window-configuration))
       (wc-point . ,(point-marker))
       (wc-bl . ,bl)
       (wc-bbl . ,bbl)
       (wc-history-back . ,(gethash (selected-frame) tab-bar-history-back))
-      (wc-history-forward . ,(gethash (selected-frame) tab-bar-history-forward))
-      (ws . ,(window-state-get
-              (frame-root-window (selected-frame)) 'writable))
-      (ws-bl . ,(mapcar #'buffer-name bl))
-      (ws-bbl . ,(mapcar #'buffer-name bbl)))))
+      (wc-history-forward . ,(gethash (selected-frame) tab-bar-history-forward)))))
 
 (defun tab-bar--current-tab (&optional tab)
   ;; `tab` here is an argument meaning 'use tab as template'. This is
@@ -555,14 +574,7 @@ to the numeric argument.  ARG counts from 1."
                      tab-bar-history-forward)))
 
          (ws
-          (window-state-put ws (frame-root-window (selected-frame)) 'safe)
-
-          (let ((ws-bl (seq-filter #'buffer-live-p
-                                   (mapcar #'get-buffer (cdr (assq 'ws-bl to-tab)))))
-                (ws-bbl (seq-filter #'buffer-live-p
-                                    (mapcar #'get-buffer (cdr (assq 'ws-bbl to-tab))))))
-            (when ws-bl  (set-frame-parameter nil 'buffer-list ws-bl))
-            (when ws-bbl (set-frame-parameter nil 'buried-buffer-list ws-bbl)))))
+          (window-state-put ws (frame-root-window (selected-frame)) 'safe)))
 
         (setq tab-bar-history-omit t)
 
@@ -618,7 +630,7 @@ FROM-INDEX and TO-INDEX count from 1."
   (let* ((tabs (funcall tab-bar-tabs-function))
          (from-index (or from-index (1+ (tab-bar--current-tab-index tabs))))
          (from-tab (nth (1- from-index) tabs))
-         (to-index (max 0 (min (1- to-index) (1- (length tabs))))))
+         (to-index (max 0 (min (1- (or to-index 1)) (1- (length tabs))))))
     (setq tabs (delq from-tab tabs))
     (cl-pushnew from-tab (nthcdr to-index tabs))
     (set-frame-parameter nil 'tabs tabs)
@@ -899,7 +911,7 @@ function `tab-bar-tab-name-function'."
 
 ;;; Tab history mode
 
-(defvar tab-bar-history-limit 3
+(defvar tab-bar-history-limit 10
   "The number of history elements to keep.")
 
 (defvar tab-bar-history-omit nil
@@ -911,27 +923,27 @@ function `tab-bar-tab-name-function'."
 (defvar tab-bar-history-forward (make-hash-table)
   "History of forward changes in every tab per frame.")
 
-(defvar tab-bar-history-current nil
+(defvar tab-bar-history-old nil
   "Window configuration before the current command.")
 
-(defvar tab-bar-history--minibuffer-depth 0
+(defvar tab-bar-history-old-minibuffer-depth 0
   "Minibuffer depth before the current command.")
 
 (defun tab-bar-history--pre-change ()
-  (setq tab-bar-history--minibuffer-depth (minibuffer-depth)
-        tab-bar-history-current
-        `((wc . ,(current-window-configuration))
-          (wc-point . ,(point-marker)))))
+  (setq tab-bar-history-old-minibuffer-depth (minibuffer-depth))
+  ;; Store wc before possibly entering the minibuffer
+  (when (zerop tab-bar-history-old-minibuffer-depth)
+    (setq tab-bar-history-old
+          `((wc . ,(current-window-configuration))
+            (wc-point . ,(point-marker))))))
 
 (defun tab-bar--history-change ()
   (when (and (not tab-bar-history-omit)
-             tab-bar-history-current
-             ;; Entering the minibuffer
-             (zerop tab-bar-history--minibuffer-depth)
-             ;; Exiting the minibuffer
-             (zerop (minibuffer-depth)))
+             tab-bar-history-old
+             ;; Store wc before possibly entering the minibuffer
+             (zerop tab-bar-history-old-minibuffer-depth))
     (puthash (selected-frame)
-             (seq-take (cons tab-bar-history-current
+             (seq-take (cons tab-bar-history-old
                              (gethash (selected-frame) tab-bar-history-back))
                        tab-bar-history-limit)
              tab-bar-history-back))
@@ -947,7 +959,7 @@ function `tab-bar-tab-name-function'."
     (if (window-configuration-p wc)
         (progn
           (puthash (selected-frame)
-                   (cons tab-bar-history-current
+                   (cons tab-bar-history-old
                          (gethash (selected-frame) tab-bar-history-forward))
                    tab-bar-history-forward)
           (set-window-configuration wc)
@@ -964,7 +976,7 @@ function `tab-bar-tab-name-function'."
     (if (window-configuration-p wc)
         (progn
           (puthash (selected-frame)
-                   (cons tab-bar-history-current
+                   (cons tab-bar-history-old
                          (gethash (selected-frame) tab-bar-history-back))
                    tab-bar-history-back)
           (set-window-configuration wc)

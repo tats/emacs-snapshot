@@ -1397,64 +1397,42 @@ which may actually result in an URL rather than a filename."
 ;;
 ;; We want to complete filenames as in read-file-name, but also url's
 ;; which read-file-name-internal would truncate at the "//" string.
-;; The solution here is to replace read-file-name-internal with
-;; `ffap-read-file-or-url-internal', which checks the minibuffer
-;; contents before attempting to complete filenames.
+;; The solution here is to forcefully activate url-handler-mode, which
+;; takes care of it for us.
 
 (defun ffap-read-file-or-url (prompt guess)
   "Read file or URL from minibuffer, with PROMPT and initial GUESS."
   (or guess (setq guess default-directory))
-  (let (dir)
-    ;; Tricky: guess may have or be a local directory, like "w3/w3.elc"
-    ;; or "w3/" or "../el/ffap.el" or "../../../"
-    (unless (ffap-url-p guess)
-      (unless (ffap-file-remote-p guess)
-	(setq guess
-	      (abbreviate-file-name (expand-file-name guess))))
-      (setq dir (file-name-directory guess)))
-    (let ((minibuffer-completing-file-name t)
-	  (completion-ignore-case read-file-name-completion-ignore-case)
-          (fnh-elem (cons ffap-url-regexp 'url-file-handler)))
+  ;; Tricky: guess may have or be a local directory, like "w3/w3.elc"
+  ;; or "w3/" or "../el/ffap.el" or "../../../"
+  (unless (or (ffap-url-p guess)
+              (ffap-file-remote-p guess))
+    (setq guess
+	  (abbreviate-file-name (expand-file-name guess))))
+  (if (and (ffap-url-p guess)
+           ;; Exclude non-filename-like URLs like "mailto:..."
+           (not (string-match "\\`[a-z]+://" guess)))
+      (read-string prompt guess nil nil t)
+    (let ((fnh-elem (cons ffap-url-regexp #'url-file-handler)))
       ;; Explain to `rfn-eshadow' that we can use URLs here.
       (push fnh-elem file-name-handler-alist)
       (unwind-protect
-          (setq guess
-                (let ((default-directory (if dir (expand-file-name dir)
-                                           default-directory)))
-                  (completing-read
-                   prompt
-                   'ffap-read-file-or-url-internal
-                   nil
-                   nil
-                   (if dir (cons guess (length dir)) guess)
-                   'file-name-history
-                   (and buffer-file-name
-                        (abbreviate-file-name buffer-file-name)))))
+          (let* ((dir (file-name-directory guess))
+                 ;; FIXME: If `guess' is "http://a" url-handler
+                 ;; somehow returns "https://a/" for the directory and
+                 ;; "a" for the non-directory!
+                 (broken-dir (> (length dir) (length guess))))
+            (setq guess
+                  (read-file-name prompt (if broken-dir guess dir) nil nil
+                                  (unless broken-dir
+                                    (file-name-nondirectory guess)))))
         ;; Remove the special handler manually.  We used to just let-bind
         ;; file-name-handler-alist to preserve its value, but that caused
         ;; other modifications to be lost (e.g. when Tramp gets loaded
         ;; during the completing-read call).
         (setq file-name-handler-alist (delq fnh-elem file-name-handler-alist))))
     (or (ffap-url-p guess)
-	(substitute-in-file-name guess))))
-
-(defun ffap-read-url-internal (string pred action)
-  "Complete URLs from history, treating given string as valid."
-  (let ((hist (ffap-symbol-value 'url-global-history-hash-table)))
-    (cond
-     ((not action)
-      (or (try-completion string hist pred) string))
-     ((eq action t)
-      (or (all-completions string hist pred) (list string)))
-     ;; action == lambda, documented where?  Tests whether string is a
-     ;; valid "match".  Let us always say yes.
-     (t t))))
-
-(defun ffap-read-file-or-url-internal (string pred action)
-  (let ((url (ffap-url-p string)))
-    (if url
-	(ffap-read-url-internal url pred action)
-      (read-file-name-internal (or string default-directory) pred action))))
+        (substitute-in-file-name guess))))
 
 ;; The rest of this page is just to work with package complete.el.
 ;; This code assumes that you load ffap.el after complete.el.

@@ -202,6 +202,16 @@ the new version of the file again.)
 
 * Changes in Emacs 27.1
 
++++
+** 'next/previous-multiframe-window' have been renamed.
+The new names are as follows:
+
+ 'next-multiframe-window'     -> 'next-window-any-frame'
+ 'previous-multiframe-window' -> 'previous-window-any-frame'
+
+The old function names are maintained as aliases for backward
+compatibility.
+
 ** emacsclient
 
 +++
@@ -320,6 +330,12 @@ Previously, this support was only available when using the external
 'gnutls-cli' command.  Call 'open-network-stream' with
 ':client-certificate t' to trigger looking up of per-server
 certificates via 'auth-source'.
+
++++
+** New user option 'network-stream-use-client-certificates'.
+When non-nil, 'open-network-stream' performs lookups of client
+certificates using 'auth-source' as if ':client-certificate t' were
+specified.  Defaults to t.
 
 +++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
@@ -575,6 +591,11 @@ current and the previous or the next line, as before.
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+---
+** New HTML mode skeleton 'html-id-anchor'.
+This new command (which inserts an <a id="foo">_</a> skeleton) is
+bound to 'C-c C-c #'.
+
 +++
 ** New command 'font-lock-refontify'.
 This is an interactive convenience function to be used when developing
@@ -824,6 +845,9 @@ directories in the destination.
 +++
 *** The non-nil value of 'dired-dwim-target' uses one of the most recently
 visited windows with a Dired buffer instead of the next window.
+
+*** When the new user option 'dired-vc-rename-file' is non-nil,
+Dired performs file renaming using underlying version control system.
 
 ** Find-Dired
 
@@ -1131,6 +1155,14 @@ the 'package-menu-clear-filter' function, bound to '/ /' by default.
 ---
 *** The package list can now be sorted by version or description.
 
++++
+*** In Package Menu, 'g' now updates package data from archives.
+Previously, 'g' invoked 'tabulated-list-revert' which did not update
+the cached archive data.  It is now bound to 'revert-buffer', which
+will now update the data.
+
+'package-menu-refresh' is an obsolete alias for 'revert-buffer'.
+
 ** Info
 
 +++
@@ -1180,6 +1212,16 @@ A new command 'xref-revert-buffer' is bound to 'g'.
 
 ---
 *** Imenu support has been added to 'xref--xref-buffer-mode'.
+
+** Icomplete
+
++++
+*** New minor mode Fido mode.
+This mode is based on Icomplete, and its name stands for "Fake Ido".
+The point of this mode is to be an ido-mode workalike, but provide
+most of the functionality present in Icomplete that is not in
+ido-mode, while being much more compatible with all of Emacs's
+completion facilities.
 
 ** Ecomplete
 
@@ -1403,6 +1445,11 @@ unescaping text.
 The maximum level is used by default; customize
 'font-lock-maximum-decoration' to tone down the decoration.
 
+---
+*** New user option 'python-pdbtrack-kill-buffers'.
+If non-nil, the default, buffers opened during pdbtracking session are
+killed when pdbtracking session is finished.
+
 ** Help
 
 ---
@@ -1438,6 +1485,8 @@ commands repeat the search for the specified occurrence of the search string.
 A negative argument repeats the search in the opposite direction.
 This makes possible also to use a prefix argument for 'M-s .'
 ('isearch-forward-symbol-at-point') to find the next Nth symbol.
+Also a prefix argument is supported for 'isearch-yank-until-char',
+'isearch-yank-word-or-char', 'isearch-yank-symbol-or-char'.
 
 *** To go to the first/last occurrence of the current search string
 is possible now with new commands 'isearch-beginning-of-buffer' and
@@ -2611,6 +2660,11 @@ include functions like 'encode-char' that compute code-points, functions
 like 'file-attributes' that compute file sizes and other attributes,
 functions like 'process-id' that compute process IDs, and functions like
 'user-uid' and 'group-gid' that compute user and group IDs.
+
++++
+** overflow-error is now documented as a subcategory of range-error.
+Formerly it was undocumented, and was (incorrectly) a subcategory
+of domain-error.
 
 ** Time values
 
