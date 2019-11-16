@@ -5174,46 +5174,13 @@ and KILLP is t if a prefix arg was specified."
     ;; Avoid warning about delete-backward-char
     (with-no-warnings (delete-backward-char n killp))))
 
-(defvar read-char-from-minibuffer-history nil
-  "The default history for the `read-char-from-minibuffer' function.")
-
-(defvar read-char-from-minibuffer-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map minibuffer-local-map)
-    (define-key map [remap self-insert-command]
-      'read-char-from-minibuffer-self-insert)
-    map)
-  "Keymap for the `read-char-from-minibuffer' function.")
-
-(defun read-char-from-minibuffer-self-insert ()
-  "Insert the character you type in the minibuffer."
-  (interactive)
-  (delete-minibuffer-contents)
-  (insert (event-basic-type last-command-event))
-  (exit-minibuffer))
-
-(defun read-char-from-minibuffer (prompt)
-  "Read a character from the minibuffer, prompting with string PROMPT.
-Like `read-char', but allows navigating in a history.  The navigation
-commands are `M-p' and `M-n', with `RET' to select a character from
-history."
-  (let ((result
-         (read-from-minibuffer prompt nil
-                               read-char-from-minibuffer-map nil
-                               'read-char-from-minibuffer-history)))
-    (if (> (length result) 0)
-        ;; We have a string (with one character), so return the first one.
-        (elt result 0)
-      ;; The default value is RET.
-      (push "\r" read-char-from-minibuffer-history)
-      ?\r)))
-
 (defun zap-to-char (arg char)
   "Kill up to and including ARGth occurrence of CHAR.
 Case is ignored if `case-fold-search' is non-nil in the current buffer.
 Goes backward if ARG is negative; error if CHAR not found."
   (interactive (list (prefix-numeric-value current-prefix-arg)
-		     (read-char-from-minibuffer "Zap to char: ")))
+		     (read-char-from-minibuffer "Zap to char: "
+						nil 'read-char-history)))
   ;; Avoid "obsolete" warnings for translation-table-for-input.
   (with-no-warnings
     (if (char-table-p translation-table-for-input)
@@ -8691,7 +8658,7 @@ after it has been set up properly in other respects."
       (mapc (lambda (v)
 	      (condition-case ()
 		  (if (symbolp v)
-		      (makunbound v)
+		      (makunbound (make-local-variable v))
 		    (set (make-local-variable (car v)) (cdr v)))
 		(setting-constant nil))) ;E.g. for enable-multibyte-characters.
 	    lvars)
@@ -9098,7 +9065,7 @@ contains the list of implementations currently supported for this command."
              (unless (string-equal val "")
 	       (when (null ,varimp-sym)
 		 (message
-		  "Use C-u M-x %s RET`to select another implementation"
+		  "Use `C-u M-x %s RET' to select another implementation"
 		  ,command-name)
 		 (sit-for 3))
 	       (customize-save-variable ',varimp-sym

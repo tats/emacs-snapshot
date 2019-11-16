@@ -710,6 +710,9 @@ list the contents of such directories when completing file names.
 
 ** Minibuffer
 
+*** Scrolling and recentering commands in the minibuffer are invoked
+on the original window (that was selected before activating the minibuffer).
+
 +++
 *** A new user option, 'minibuffer-beginning-of-buffer-movement', has
 been introduced to allow controlling how the 'M-<' command works in
@@ -719,6 +722,12 @@ the minibuffer.  If non-nil, point will move to the end of the prompt
 ---
 *** Minibuffer now uses 'minibuffer-message' to display error messages
 at the end of the active minibuffer.
+
++++
+*** 'y-or-n-p' now uses the minibuffer to read 'y' or 'n' answer.
+
+*** Some commands that previously used read-char-choice now read
+a character using the minibuffer by read-char-from-minibuffer.
 
 ** map.el
 *** Now also understands plists.
@@ -843,8 +852,8 @@ pipes, block devices and character devices.
 directories in the destination.
 
 +++
-*** The non-nil value of 'dired-dwim-target' uses one of the most recently
-visited windows with a Dired buffer instead of the next window.
+*** 'dired-dwim-target' can be customized to prefer either the next window,
+or one of the most recently visited windows with a Dired buffer.
 
 *** When the new user option 'dired-vc-rename-file' is non-nil,
 Dired performs file renaming using underlying version control system.
@@ -2239,7 +2248,18 @@ and 'gravatar-force-default'.
 *** The built-in ada-mode is now deleted.  The GNU ELPA package is a
 good replacement, even in very large source files.
 
-** Some conversions recommended for 'time-stamp-format' have changed.
+** time-stamp
+
+*** New '%5z' conversion for 'time-stamp-format' gives time zone offset.
+Specifying '%5z' in 'time-stamp-format' or 'time-stamp-pattern'
+expands to the time zone offset, e.g., '+0100'.  The time zone used is
+specified by 'time-stamp-time-zone'.
+
+Because this feature is new in Emacs 27.1, do not use it in the local
+variables section of any file that might be edited by an older version
+of Emacs.
+
+*** Some conversions recommended for 'time-stamp-format' have changed.
 The new documented/recommended %-conversions are closer to those
 used by 'format-time-string' and are compatible at least as far back
 as Emacs 22.1 (released in 2007).
@@ -2263,6 +2283,14 @@ file-local variable, you may need to update the value.
 ** mode-local
 *** Declare 'define-overload' and 'define-child-mode' as obsolete
 *** Rename several internal functions to use a ''mode-local-' prefix
+
+** CC Mode
+
++++
+*** You can now flag "wrong style" comments with font-lock-warning-face.
+To do this, use c-toggle-comment-style, if needed, to set the desired
+default comment style (block or line); then set the option
+c-mark-wrong-style-of-comment to non-nil.
 
 
 * New Modes and Packages in Emacs 27.1
@@ -2556,6 +2584,7 @@ This macro works like 'progn', but messages how long it takes to
 evaluate the body forms.  The value of the last form is the return
 value.
 
++++
 ** New function 'read-char-from-minibuffer'.
 This function works like 'read-char', but uses 'read-from-minibuffer'
 to read a character, so it maintains a history that can be navigated

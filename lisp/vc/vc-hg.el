@@ -40,6 +40,7 @@
 ;; FUNCTION NAME                               STATUS
 ;; BACKEND PROPERTIES
 ;; * revision-granularity                      OK
+;; - update-on-retrieve-tag                    OK
 ;; STATE-QUERYING FUNCTIONS
 ;; * registered (file)                         OK
 ;; * state (file)                              OK
@@ -194,6 +195,7 @@ highlighting the Log View buffer."
 
 (defun vc-hg-revision-granularity () 'repository)
 (defun vc-hg-checkout-model (_files) 'implicit)
+(defun vc-hg-update-on-retrieve-tag () nil)
 
 ;;; State querying functions
 
@@ -576,7 +578,8 @@ Optional arg REVISION is a revision to annotate from."
 (defun vc-hg-retrieve-tag (dir name _update)
   "Retrieve the version tagged by NAME of all registered files at or below DIR."
   (let ((default-directory dir))
-    (vc-hg-command nil 0 nil "update" name)
+    (vc-hg-command nil 0 nil "update" (and (not (equal name ""))
+                                           name))
     ;; TODO: update *vc-change-log* buffer so can see @ if --graph
     ))
 

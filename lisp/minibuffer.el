@@ -715,6 +715,11 @@ If ARGS are provided, then pass MESSAGE through `format-message'."
           (message "%s" message))
         (prog1 (sit-for (or minibuffer-message-timeout 1000000))
           (message nil)))
+    ;; Record message in the *Messages* buffer
+    (let ((inhibit-message t))
+      (if args
+          (apply #'message message args)
+        (message "%s" message)))
     ;; Clear out any old echo-area message to make way for our new thing.
     (message nil)
     (setq message (if (and (null args)
@@ -2236,6 +2241,13 @@ The completion method is determined by `completion-at-point-functions'."
 (let ((map minibuffer-local-map))
   (define-key map "\C-g" 'abort-recursive-edit)
   (define-key map "\M-<" 'minibuffer-beginning-of-buffer)
+
+  (define-key map [remap recenter-top-bottom] 'minibuffer-recenter-top-bottom)
+  (define-key map [remap scroll-up-command] 'minibuffer-scroll-up-command)
+  (define-key map [remap scroll-down-command] 'minibuffer-scroll-down-command)
+  (define-key map [remap scroll-other-window] 'minibuffer-scroll-other-window)
+  (define-key map [remap scroll-other-window-down] 'minibuffer-scroll-other-window-down)
+
   (define-key map "\r" 'exit-minibuffer)
   (define-key map "\n" 'exit-minibuffer))
 
@@ -3496,8 +3508,9 @@ that is non-nil."
                   res
                   (lambda (c1 c2)
                     (or (equal c1 minibuffer-default)
-                        (> (get-text-property 0 'completion-score c1)
-                           (get-text-property 0 'completion-score c2)))))))))
+                        (let ((s1 (get-text-property 0 'completion-score c1))
+                              (s2 (get-text-property 0 'completion-score c2)))
+                          (> (or s1 0) (or s2 0))))))))))
     `(metadata
       (display-sort-function
        . ,(compose-flex-sort-fn
@@ -3669,6 +3682,46 @@ Otherwise move to the start of the buffer."
                (minibuffer-prompt-end))))
   (when (and arg (not (consp arg)))
     (forward-line 1)))
+
+(defmacro with-minibuffer-selected-window (&rest body)
+  "Execute the forms in BODY from the minibuffer in its original window.
+When used in a minibuffer window, select the window selected just before
+the minibuffer was activated, and execute the forms."
+  (declare (indent 0) (debug t))
+  `(let ((window (minibuffer-selected-window)))
+     (when window
+       (with-selected-window window
+         ,@body))))
+
+(defun minibuffer-recenter-top-bottom (&optional arg)
+  "Run `recenter-top-bottom' from the minibuffer in its original window."
+  (interactive "P")
+  (with-minibuffer-selected-window
+    (recenter-top-bottom arg)))
+
+(defun minibuffer-scroll-up-command (&optional arg)
+  "Run `scroll-up-command' from the minibuffer in its original window."
+  (interactive "^P")
+  (with-minibuffer-selected-window
+    (scroll-up-command arg)))
+
+(defun minibuffer-scroll-down-command (&optional arg)
+  "Run `scroll-down-command' from the minibuffer in its original window."
+  (interactive "^P")
+  (with-minibuffer-selected-window
+    (scroll-down-command arg)))
+
+(defun minibuffer-scroll-other-window (&optional arg)
+  "Run `scroll-other-window' from the minibuffer in its original window."
+  (interactive "P")
+  (with-minibuffer-selected-window
+    (scroll-other-window arg)))
+
+(defun minibuffer-scroll-other-window-down (&optional arg)
+  "Run `scroll-other-window-down' from the minibuffer in its original window."
+  (interactive "^P")
+  (with-minibuffer-selected-window
+    (scroll-other-window-down arg)))
 
 (provide 'minibuffer)
 
