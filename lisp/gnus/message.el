@@ -4138,17 +4138,16 @@ It should typically alter the sending method in some way or other."
 	(actions message-exit-actions))
     (when (and (message-send arg)
                (buffer-live-p buf))
-      (message-bury buf)
       (if message-kill-buffer-on-exit
-	  (kill-buffer buf))
+	  (kill-buffer buf)
+	;; Restore the point in the message buffer.
+	(save-window-excursion
+	  (switch-to-buffer buf)
+	  (set-window-point nil position)
+	  (set-marker position nil))
+	(message-bury buf))
       (message-do-actions actions)
-      t)
-    ;; Restore the point in the message buffer.
-    (when (buffer-live-p buf)
-      (save-window-excursion
-	(switch-to-buffer buf)
-	(set-window-point nil position)
-	(set-marker position nil)))))
+      t)))
 
 (defun message-dont-send ()
   "Don't send the message you have been editing.
@@ -4248,9 +4247,9 @@ It should typically alter the sending method in some way or other."
 		(let ((fcc (message-fetch-field "Fcc"))
 		      (gcc (message-fetch-field "Gcc")))
 		  (when (or fcc gcc)
-		    (or (eq message-allow-no-recipients 'always)
-			(and (not (eq message-allow-no-recipients 'never))
-			     (setq dont-barf-on-no-method
+		    (setq dont-barf-on-no-method
+			  (or (eq message-allow-no-recipients 'always)
+			      (and (not (eq message-allow-no-recipients 'never))
 				   (y-or-n-p
 				    (format "No receiver, perform %s anyway? "
 					    (cond ((and fcc gcc) "Fcc and Gcc")

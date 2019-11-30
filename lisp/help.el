@@ -869,7 +869,8 @@ current buffer."
                 (insert "\n\n"
                         ;; FIXME: Can't use eval-when-compile because purified
                         ;; strings lose their text properties :-(
-                        (propertize "\n" 'face '(:height 0.1 :inverse-video t))
+                        (propertize "\n" 'face
+                                    '(:height 0.1 :inverse-video t :extend t))
                         "\n")))
 
             (princ brief-desc)
@@ -878,10 +879,6 @@ current buffer."
             (princ ", which is ")
 	    (describe-function-1 defn)))))))
 
-(defun help--doc-without-fn (mode)
-  ;; Remove the (fn...) thingy at the end of the docstring
-  (replace-regexp-in-string "\n\n(fn[^)]*?)\\'" "" (documentation mode)))
-
 (defun describe-mode (&optional buffer)
   "Display documentation of current major mode and minor modes.
 A brief summary of the minor modes comes first, followed by the
@@ -955,7 +952,8 @@ documentation for the major and minor modes of that buffer."
 				     "no indicator"
 				   (format "indicator%s"
 					   indicator))))
-		  (princ (help--doc-without-fn mode-function)))
+		  (princ (help-split-fundoc (documentation mode-function)
+                                            nil 'doc)))
 		(insert-button pretty-minor-mode
 			       'action (car help-button-cache)
 			       'follow-link t
@@ -985,7 +983,7 @@ documentation for the major and minor modes of that buffer."
                                     nil t)
 		(help-xref-button 1 'help-function-def mode file-name)))))
 	(princ ":\n")
-	(princ (help--doc-without-fn major-mode)))))
+	(princ (help-split-fundoc (documentation major-mode) nil 'doc)))))
   ;; For the sake of IELM and maybe others
   nil)
 
@@ -1380,27 +1378,39 @@ The result, when formatted by `substitute-command-keys', should equal STRING."
 ;; But for various reasons, they are more widely needed, so they were
 ;; moved to this file, which is preloaded.  https://debbugs.gnu.org/17001
 
-(defun help-split-fundoc (docstring def)
+(defun help-split-fundoc (docstring def &optional section)
   "Split a function DOCSTRING into the actual doc and the usage info.
-Return (USAGE . DOC) or nil if there's no usage info, where USAGE info
-is a string describing the argument list of DEF, such as
-\"(apply FUNCTION &rest ARGUMENTS)\".
-DEF is the function whose usage we're looking for in DOCSTRING."
+Return (USAGE . DOC), where USAGE is a string describing the argument
+list of DEF, such as \"(apply FUNCTION &rest ARGUMENTS)\".
+DEF is the function whose usage we're looking for in DOCSTRING.
+With SECTION nil, return nil if there is no usage info; conversely,
+SECTION t means to return (USAGE . DOC) even if there's no usage info.
+When SECTION is \\='usage or \\='doc, return only that part."
   ;; Functions can get the calling sequence at the end of the doc string.
   ;; In cases where `function' has been fset to a subr we can't search for
   ;; function's name in the doc string so we use `fn' as the anonymous
   ;; function name instead.
-  (when (and docstring (string-match "\n\n(fn\\(\\( .*\\)?)\\)\\'" docstring))
-    (let ((doc (unless (zerop (match-beginning 0))
-		 (substring docstring 0 (match-beginning 0))))
-	  (usage-tail (match-string 1 docstring)))
-      (cons (format "(%s%s"
-		    ;; Replace `fn' with the actual function name.
-		    (if (symbolp def)
-			(help--docstring-quote (format "%S" def))
-		      'anonymous)
-		    usage-tail)
-	    doc))))
+  (let* ((found (and docstring
+                     (string-match "\n\n(fn\\(\\( .*\\)?)\\)\\'" docstring)))
+         (doc (if found
+                  (and (memq section '(t nil doc))
+                       (not (zerop (match-beginning 0)))
+                       (substring docstring 0 (match-beginning 0)))
+                docstring))
+         (usage (and found
+                     (memq section '(t nil usage))
+                     (let ((tail (match-string 1 docstring)))
+                       (format "(%s%s"
+                               ;; Replace `fn' with the actual function name.
+                               (if (and (symbolp def) def)
+                                   (help--docstring-quote (format "%S" def))
+                                 'anonymous)
+                               tail)))))
+    (pcase section
+      (`nil (and usage (cons usage doc)))
+      (`t (cons usage doc))
+      (`usage usage)
+      (`doc doc))))
 
 (defun help-add-fundoc-usage (docstring arglist)
   "Add the usage info to DOCSTRING.
@@ -1496,6 +1506,55 @@ the same names as used in the original source code, when possible."
 (defun help--make-usage-docstring (fn arglist)
   (let ((print-escape-newlines t))
     (help--docstring-quote (format "%S" (help--make-usage fn arglist)))))
+
+
+
+;; Just some quote-like characters for now.  TODO: generate this stuff
+;; from official Unicode data.
+(defconst uni-confusables
+  '((#x2018 . "'") ;; LEFT SINGLE QUOTATION MARK
+    (#x2019 . "'") ;; RIGHT SINGLE QUOTATION MARK
+    (#x201B . "'") ;; SINGLE HIGH-REVERSED-9 QUOTATION MARK
+    (#x201C . "\"") ;; LEFT DOUBLE QUOTATION MARK
+    (#x201D . "\"") ;; RIGHT DOUBLE QUOTATION MARK
+    (#x201F . "\"") ;; DOUBLE HIGH-REVERSED-9 QUOTATION MARK
+    (#x301E . "\"") ;; DOUBLE PRIME QUOTATION MARK
+    (#xFF02 . "'") ;; FULLWIDTH QUOTATION MARK
+    (#xFF07 . "'") ;; FULLWIDTH APOSTROPHE
+    ))
+
+(defconst uni-confusables-regexp
+  (concat "[" (mapcar #'car uni-confusables) "]"))
+
+(defun help-uni-confusable-suggestions (string)
+  "Return a message describing confusables in STRING."
+  (let ((i 0)
+        (confusables nil))
+    (while (setq i (string-match uni-confusables-regexp string i))
+      (let ((replacement (alist-get (aref string i) uni-confusables)))
+        (push (aref string i) confusables)
+        (setq string (replace-match replacement t t string))
+        (setq i (+ i (length replacement)))))
+    (when confusables
+      (format-message
+       (if (> (length confusables) 1)
+           "Found confusable characters: %s; perhaps you meant: `%s'?"
+         "Found confusable character: %s, perhaps you meant: `%s'?")
+       (mapconcat (lambda (c) (format-message "`%c'" c))
+                  confusables ", ")
+       string))))
+
+(defun help-command-error-confusable-suggestions (data _context _signal)
+  (pcase data
+    (`(void-variable ,var)
+     (let ((suggestions (help-uni-confusable-suggestions
+                         (symbol-name var))))
+       (when suggestions
+         (princ (concat "\n  " suggestions) t))))
+    (_ nil)))
+
+(add-function :after command-error-function
+              #'help-command-error-confusable-suggestions)
 
 
 (provide 'help)

@@ -227,6 +227,8 @@ typedef struct _REPARSE_DATA_BUFFER {
 #undef connect
 #undef htons
 #undef ntohs
+#undef htonl
+#undef ntohl
 #undef inet_addr
 #undef gethostname
 #undef gethostbyname
@@ -240,7 +242,21 @@ typedef struct _REPARSE_DATA_BUFFER {
 #undef recvfrom
 #undef sendto
 
+/* We need at least XP level for GetAdaptersAddresses stuff.  */
+#if _WIN32_WINNT < 0x0501
+# undef ORIG_WIN32_WINNT
+# define ORIG_WIN32_WINNT _WIN32_WINNT
+# undef _WIN32_WINNT
+# define _WIN32_WINNT 0x0501
+#endif
+
 #include <iphlpapi.h>	/* should be after winsock2.h */
+
+#ifdef ORIG_WIN32_WINNT
+# undef _WIN32_WINNT
+# define _WIN32_WINNT ORIG_WIN32_WINNT
+# undef ORIG_WIN32_WINNT
+#endif
 
 #include <wincrypt.h>
 
@@ -326,6 +342,7 @@ static BOOL g_b_init_set_file_security_a;
 static BOOL g_b_init_set_named_security_info_w;
 static BOOL g_b_init_set_named_security_info_a;
 static BOOL g_b_init_get_adapters_info;
+static BOOL g_b_init_get_adapters_addresses;
 static BOOL g_b_init_reg_open_key_ex_w;
 static BOOL g_b_init_reg_query_value_ex_w;
 static BOOL g_b_init_expand_environment_strings_w;
@@ -503,6 +520,12 @@ typedef BOOL (WINAPI *IsValidSecurityDescriptor_Proc) (PSECURITY_DESCRIPTOR);
 typedef DWORD (WINAPI *GetAdaptersInfo_Proc) (
     PIP_ADAPTER_INFO pAdapterInfo,
     PULONG pOutBufLen);
+typedef DWORD (WINAPI *GetAdaptersAddresses_Proc) (
+    ULONG,
+    ULONG,
+    PVOID,
+    PIP_ADAPTER_ADDRESSES,
+    PULONG);
 
 int (WINAPI *pMultiByteToWideChar)(UINT,DWORD,LPCSTR,int,LPWSTR,int);
 int (WINAPI *pWideCharToMultiByte)(UINT,DWORD,LPCWSTR,int,LPSTR,int,LPCSTR,LPBOOL);
@@ -1366,6 +1389,31 @@ get_adapters_info (PIP_ADAPTER_INFO pAdapterInfo, PULONG pOutBufLen)
   if (s_pfn_Get_Adapters_Info == NULL)
     return ERROR_NOT_SUPPORTED;
   return s_pfn_Get_Adapters_Info (pAdapterInfo, pOutBufLen);
+}
+
+static DWORD WINAPI
+get_adapters_addresses (ULONG family, PIP_ADAPTER_ADDRESSES pAdapterAddresses, PULONG pOutBufLen)
+{
+  static GetAdaptersAddresses_Proc s_pfn_Get_Adapters_Addresses = NULL;
+  HMODULE hm_iphlpapi = NULL;
+
+  if (is_windows_9x () == TRUE)
+    return ERROR_NOT_SUPPORTED;
+
+  if (g_b_init_get_adapters_addresses == 0)
+    {
+      g_b_init_get_adapters_addresses = 1;
+      hm_iphlpapi = LoadLibrary ("Iphlpapi.dll");
+      if (hm_iphlpapi)
+	s_pfn_Get_Adapters_Addresses = (GetAdaptersAddresses_Proc)
+	  get_proc_addr (hm_iphlpapi, "GetAdaptersAddresses");
+    }
+  if (s_pfn_Get_Adapters_Addresses == NULL)
+    return ERROR_NOT_SUPPORTED;
+  ULONG flags = GAA_FLAG_SKIP_ANYCAST
+    | GAA_FLAG_SKIP_MULTICAST
+    | GAA_FLAG_SKIP_DNS_SERVER;
+  return s_pfn_Get_Adapters_Addresses (family, flags, NULL, pAdapterAddresses, pOutBufLen);
 }
 
 static LONG WINAPI
@@ -7414,6 +7462,8 @@ int (PASCAL *pfn_WSACleanup) (void);
 
 u_short (PASCAL *pfn_htons) (u_short hostshort);
 u_short (PASCAL *pfn_ntohs) (u_short netshort);
+u_long (PASCAL *pfn_htonl) (u_long hostlong);
+u_long (PASCAL *pfn_ntohl) (u_long netlong);
 unsigned long (PASCAL *pfn_inet_addr) (const char * cp);
 int (PASCAL *pfn_gethostname) (char * name, int namelen);
 struct hostent * (PASCAL *pfn_gethostbyname) (const char * name);
@@ -7504,6 +7554,8 @@ init_winsock (int load_now)
       LOAD_PROC (shutdown);
       LOAD_PROC (htons);
       LOAD_PROC (ntohs);
+      LOAD_PROC (htonl);
+      LOAD_PROC (ntohl);
       LOAD_PROC (inet_addr);
       LOAD_PROC (gethostname);
       LOAD_PROC (gethostbyname);
@@ -7883,6 +7935,19 @@ sys_ntohs (u_short netshort)
 {
   return (winsock_lib != NULL) ?
     pfn_ntohs (netshort) : netshort;
+}
+u_long
+sys_htonl (u_long hostlong)
+{
+  return (winsock_lib != NULL) ?
+    pfn_htonl (hostlong) : hostlong;
+}
+
+u_long
+sys_ntohl (u_long netlong)
+{
+  return (winsock_lib != NULL) ?
+    pfn_ntohl (netlong) : netlong;
 }
 
 unsigned long
@@ -9381,10 +9446,276 @@ network_interface_get_info (Lisp_Object ifname)
   return res;
 }
 
-Lisp_Object
-network_interface_list (void)
+static bool
+address_prefix_match (int family, struct sockaddr *address,
+		      struct sockaddr *prefix_address, ULONG prefix_len)
 {
-  return network_interface_get_info (Qnil);
+  UINT8 *address_data;
+  UINT8 *prefix_address_data;
+  int i;
+
+  if (family == AF_INET6)
+    {
+      address_data = (UINT8 *) &(((struct sockaddr_in6 *) address)->sin6_addr);
+      prefix_address_data =
+	(UINT8 *) &(((struct sockaddr_in6 *) prefix_address)->sin6_addr);
+    }
+  else
+    {
+      address_data = (UINT8 *) &(((struct sockaddr_in *) address)->sin_addr);
+      prefix_address_data =
+	(UINT8 *) &(((struct sockaddr_in *) prefix_address)->sin_addr);
+    }
+
+  for (i = 0; i < prefix_len >> 3; i++)
+    {
+      if (address_data[i] != prefix_address_data[i])
+	return false;
+    }
+
+  if (prefix_len % 8)
+    return (prefix_address_data[i] ==
+	    (address_data[i] & (0xff << (8 - prefix_len % 8))));
+
+  return true;
+}
+
+Lisp_Object
+network_interface_list (bool full, unsigned short match)
+{
+  ULONG ainfo_len = sizeof (IP_ADAPTER_ADDRESSES);
+  ULONG family = match;
+  IP_ADAPTER_ADDRESSES *adapter, *ainfo = xmalloc (ainfo_len);
+  DWORD retval = get_adapters_addresses (family, ainfo, &ainfo_len);
+  Lisp_Object res = Qnil;
+
+  if (retval == ERROR_BUFFER_OVERFLOW)
+    {
+      ainfo = xrealloc (ainfo, ainfo_len);
+      retval = get_adapters_addresses (family, ainfo, &ainfo_len);
+    }
+
+  if (retval != ERROR_SUCCESS)
+    {
+      xfree (ainfo);
+      return res;
+    }
+
+  /* For the below, we need some winsock functions, so make sure
+     the winsock DLL is loaded.  If we cannot successfully load
+     it, they will have no use of the information we provide,
+     anyway, so punt.  */
+  if (!winsock_lib && !init_winsock (1))
+    return res;
+
+  int eth_count = 0, tr_count = 0, fddi_count = 0, ppp_count = 0;
+  int sl_count = 0, wlan_count = 0, lo_count = 0, ifx_count = 0;
+  int tnl_count = 0;
+  int if_num;
+  char namebuf[MAX_ADAPTER_NAME_LENGTH + 4];
+  static const char *ifmt[] = {
+    "eth%d", "tr%d", "fddi%d", "ppp%d", "sl%d", "wlan%d",
+    "lo%d", "ifx%d", "tunnel%d"
+  };
+  enum {
+    NONE = -1,
+    ETHERNET = 0,
+    TOKENRING = 1,
+    FDDI = 2,
+    PPP = 3,
+    SLIP = 4,
+    WLAN = 5,
+    LOOPBACK = 6,
+    OTHER_IF = 7,
+    TUNNEL = 8
+  } ifmt_idx;
+
+  for (adapter = ainfo; adapter; adapter = adapter->Next)
+    {
+
+      /* Present Unix-compatible interface names, instead of the
+         Windows names, which are really GUIDs not readable by
+         humans.  */
+
+      switch (adapter->IfType)
+        {
+        case IF_TYPE_ETHERNET_CSMACD:
+          /* Windows before Vista reports wireless adapters as
+             Ethernet.  Work around by looking at the Description
+             string.  */
+          {
+          char description[MAX_UTF8_PATH];
+          if (filename_from_utf16 (adapter->Description, description) == 0
+              && strstr (description, "Wireless "))
+            {
+              ifmt_idx = WLAN;
+              if_num = wlan_count++;
+            }
+          else
+            {
+              ifmt_idx = ETHERNET;
+              if_num = eth_count++;
+            }
+          }
+          break;
+        case IF_TYPE_ISO88025_TOKENRING:
+          ifmt_idx = TOKENRING;
+          if_num = tr_count++;
+          break;
+        case IF_TYPE_FDDI:
+          ifmt_idx = FDDI;
+          if_num = fddi_count++;
+          break;
+        case IF_TYPE_PPP:
+          ifmt_idx = PPP;
+          if_num = ppp_count++;
+          break;
+        case IF_TYPE_SLIP:
+          ifmt_idx = SLIP;
+          if_num = sl_count++;
+          break;
+        case IF_TYPE_IEEE80211:
+          ifmt_idx = WLAN;
+          if_num = wlan_count++;
+          break;
+        case IF_TYPE_SOFTWARE_LOOPBACK:
+          ifmt_idx = LOOPBACK;
+          if_num = lo_count++;
+          break;
+        case IF_TYPE_TUNNEL:
+          ifmt_idx = TUNNEL;
+          if_num = tnl_count++;
+          break;
+        default:
+          ifmt_idx = OTHER_IF;
+          if_num = ifx_count++;
+          break;
+        }
+      sprintf (namebuf, ifmt[ifmt_idx], if_num);
+
+      IP_ADAPTER_UNICAST_ADDRESS *address;
+      for (address = adapter->FirstUnicastAddress; address; address = address->Next)
+        {
+          int len;
+          int addr_len;
+          uint32_t *maskp;
+          uint32_t *addrp;
+          Lisp_Object elt = Qnil;
+          struct sockaddr *ifa_addr = address->Address.lpSockaddr;
+
+          if (ifa_addr == NULL)
+            continue;
+          if (match && ifa_addr->sa_family != match)
+            continue;
+
+          struct sockaddr_in ipv4;
+#ifdef AF_INET6
+          struct sockaddr_in6 ipv6;
+#endif
+          struct sockaddr *sin;
+
+          if (ifa_addr->sa_family == AF_INET)
+            {
+              ipv4.sin_family = AF_INET;
+              ipv4.sin_port = 0;
+              DECLARE_POINTER_ALIAS (sin_in, struct sockaddr_in, ifa_addr);
+              addrp = (uint32_t *)&sin_in->sin_addr;
+              maskp = (uint32_t *)&ipv4.sin_addr;
+              sin = (struct sockaddr *)&ipv4;
+              len = sizeof (struct sockaddr_in);
+              addr_len = 1;
+            }
+#ifdef AF_INET6
+          else if (ifa_addr->sa_family == AF_INET6)
+            {
+              ipv6.sin6_family = AF_INET6;
+              ipv6.sin6_port = 0;
+              DECLARE_POINTER_ALIAS (sin_in6, struct sockaddr_in6, ifa_addr);
+              addrp = (uint32_t *)&sin_in6->sin6_addr;
+              maskp = (uint32_t *)&ipv6.sin6_addr;
+              sin = (struct sockaddr *)&ipv6;
+              len = sizeof (struct sockaddr_in6);
+              addr_len = 4;
+            }
+#endif
+          else
+            continue;
+
+          Lisp_Object addr = conv_sockaddr_to_lisp (ifa_addr, len);
+
+          if (full)
+            {
+              /* GetAdaptersAddress returns information in network
+                 byte order, so convert from host to network order
+                 when generating the netmask.  */
+              int i;
+              ULONG numbits;
+	      if (w32_major_version >= 6) /* Vista or later */
+		{
+#if _WIN32_WINNT >= 0x0600
+		  numbits = address->OnLinkPrefixLength;
+#else
+		  /* Kludge alert!  OnLinkPrefixLength is only defined
+		     when compiling for Vista and later.  */
+		  numbits = *(UINT8 *) (&address->LeaseLifetime + 1);
+#endif
+		}
+	      else		/* Windows XP */
+		{
+		  IP_ADAPTER_PREFIX *prefix = adapter->FirstPrefix;
+		  numbits = 0;
+		  for ( ; prefix; prefix = prefix->Next)
+		    {
+		      /* We want the longest matching prefix.  */
+		      if ((prefix->Address.lpSockaddr->sa_family
+			   == ifa_addr->sa_family)
+			  && (prefix->PrefixLength > numbits)
+			  && address_prefix_match (ifa_addr->sa_family,
+						   ifa_addr,
+						   prefix->Address.lpSockaddr,
+						   prefix->PrefixLength))
+			numbits = prefix->PrefixLength;
+		    }
+		  if (!numbits)
+		    numbits = (ifa_addr->sa_family == AF_INET6) ? 128 : 32;
+		}
+              for (i = 0; i < addr_len; i++)
+                {
+                  if (numbits >= 32)
+                    {
+                      maskp[i] = -1U;
+                      numbits -= 32;
+                    }
+                  else if (numbits)
+                    {
+                      maskp[i] = sys_htonl (-1U << (32 - numbits));
+                      numbits = 0;
+                    }
+                  else
+                    {
+                      maskp[i] = 0;
+                    }
+                }
+              elt = Fcons (conv_sockaddr_to_lisp (sin, len), elt);
+              uint32_t mask;
+              for (i = 0; i < addr_len; i++)
+                {
+                  mask = maskp[i];
+                  maskp[i] = (addrp[i] & mask) | ~mask;
+
+                }
+              elt = Fcons (conv_sockaddr_to_lisp (sin, len), elt);
+              elt = Fcons (addr, elt);
+            }
+          else
+            {
+              elt = addr;
+            }
+          res = Fcons (Fcons (build_string (namebuf), elt), res);
+        }
+    }
+  xfree (ainfo);
+  return res;
 }
 
 Lisp_Object
@@ -10099,6 +10430,7 @@ globals_of_w32 (void)
   g_b_init_set_named_security_info_w = 0;
   g_b_init_set_named_security_info_a = 0;
   g_b_init_get_adapters_info = 0;
+  g_b_init_get_adapters_addresses = 0;
   g_b_init_reg_open_key_ex_w = 0;
   g_b_init_reg_query_value_ex_w = 0;
   g_b_init_expand_environment_strings_w = 0;

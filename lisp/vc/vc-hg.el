@@ -432,6 +432,8 @@ If LIMIT is non-nil, show no more than this many entries."
 	     (nconc
 	      (when start-revision (list (format "-r%s:0" start-revision)))
 	      (when limit (list "-l" (format "%s" limit)))
+              (when (eq vc-log-view-type 'with-diff)
+                (list "-p"))
 	      (if shortlog
                   `(,@(if vc-hg-log-graph '("--graph"))
                     "--template"
@@ -1378,10 +1380,12 @@ REV is the revision to check out into WORKFILE."
      )))
 
 (defun vc-hg-log-incoming (buffer remote-location)
+  (vc-setup-buffer buffer)
   (vc-hg-command buffer 1 nil "incoming" "-n" (unless (string= remote-location "")
 						remote-location)))
 
 (defun vc-hg-log-outgoing (buffer remote-location)
+  (vc-setup-buffer buffer)
   (vc-hg-command buffer 1 nil "outgoing" "-n" (unless (string= remote-location "")
 						remote-location)))
 

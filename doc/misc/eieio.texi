@@ -1043,9 +1043,7 @@ make a slot unbound.
 @end defun
 
 @defun eieio-class-name class
-Return a string of the form @samp{#<class myclassname>} which should look
-similar to other Lisp objects like buffers and processes.  Printing a
-class results only in a symbol.
+Return the class name as a symbol.
 @end defun
 
 @defun class-option class option
@@ -1100,11 +1098,6 @@ Just like @code{eieio-class-children}, but with no checks.
 
 @defun same-class-p obj class
 Returns @code{t} if @var{obj}'s class is the same as @var{class}.
-@end defun
-
-@defun same-class-fast-p obj class
-Same as @code{same-class-p} except this is a macro and no type checking
-is performed.
 @end defun
 
 @defun object-of-class-p obj class

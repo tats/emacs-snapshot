@@ -232,8 +232,18 @@ To get the old, less-secure behavior, you can set the
 (Instead you can use Tramp methods to run root commands in a non-root Emacs.)
 
 +++
+** New user option 'what-cursor-show-names'.
+When non-nil, 'what-cursor-position' will show the name of the character
+in addition to the decimal/hex/octal representation.  Default nil.
+
++++
 ** New function 'network-lookup-address-info'.
 This does IPv4 and/or IPv6 address lookups on hostnames.
+
++++
+** 'network-interface-list' can now return IPv4 and IPv6 addresses.
+IPv4 and IPv6 addresses are now returned by default if available,
+optionally including netmask/broadcast address information.
 
 ---
 ** Control of the threshold for using the 'distant-foreground' color.
@@ -336,7 +346,8 @@ certificates via 'auth-source'.
 ** New user option 'network-stream-use-client-certificates'.
 When non-nil, 'open-network-stream' performs lookups of client
 certificates using 'auth-source' as if ':client-certificate t' were
-specified.  Defaults to t.
+specified iff there is no explicit ':client-certificate' parameter.
+Defaults to nil.
 
 +++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
@@ -403,6 +414,16 @@ When non-nil, 'switch-to-buffer' uses 'pop-to-buffer-same-window' that
 respects display actions specified by 'display-buffer-alist' and
 'display-buffer-overriding-action'.
 
++++
+** The option 'switch-to-visible-buffer' is now obsolete.
+Customize 'switch-to-prev-buffer-skip' instead.
+
++++
+** New option 'switch-to-prev-buffer-skip'.
+This option allows to specify the set of buffers that may be shown by
+'switch-to-prev-buffer' and 'switch-to-next-buffer' more stringently
+than the now obsolete 'switch-to-visible-buffer'.
+
 ** New 'flex' completion style
 An implementation of popular "flex/fuzzy/scatter" completion which
 matches strings where the pattern appears as a subsequence.  Put
@@ -416,8 +437,15 @@ to 'completion-styles' or 'completion-category-overrides' to use it.
 The new face attribute ':extend' controls whether to use the face for
 displaying the empty space beyond end of line (EOL) till the edge of
 the window.  By default, this attribute is non-nil only for 'region',
-'secondary-selection', 'hl-line' and diff faces; any other face that
-crosses end of line will not affect the display of the empty space at EOL.
+'secondary-selection', 'hl-line' and some faces of Diff and Ediff
+modes; any other face that crosses end of line will not affect the
+display of the empty space at EOL.  This is to make Emacs behave more
+like other GUI applications with respect to displaying faces that
+cross line boundaries.
+
+Themes that redefine faces should add a non-nil ':extend' attribute to
+the above-mentioned faces, to keep the behavior of the default face
+definitions.
 
 ** Connection-local variables
 
@@ -479,6 +507,10 @@ RGB triplets with a single hexadecimal digit per component.
 
 ---
 ** The toolbar now shows the equivalent key binding in its tooltips.
+
+---
+** The File menu-bar menu was re-arranged: Print menu items moved to
+submenu, and also added the new entries for tabs.
 
 ---
 ** 'scroll-lock-mode' is now bound to the 'Scroll_Lock' key globally.
@@ -584,6 +616,9 @@ region using a given replacement-function in a non-destructive manner
 ** The command 'replace-buffer-contents' now has two optional
 arguments mitigating performance issues when operating on huge
 buffers.
+
++++
+** Dragging 'C-M-mouse-1' now marks rectangular regions.
 
 +++
 ** The command 'delete-indentation' now operates on the active region.
@@ -725,6 +760,10 @@ the minibuffer.  If non-nil, point will move to the end of the prompt
 ---
 *** Minibuffer now uses 'minibuffer-message' to display error messages
 at the end of the active minibuffer.
+
++++
+*** The function 'message' now displays the message at the end of the minibuffer
+when the minibuffer is active.
 
 +++
 *** 'y-or-n-p' now uses the minibuffer to read 'y' or 'n' answer.
@@ -957,6 +996,14 @@ displays all entries whose log messages match the bug number.
 With a prefix argument asks for a command, so for example,
 'C-u M-x vc-log-search RET git log -1 f302475 RET' will display
 just one log entry found by its revision number.
+
++++
+*** It is now possible to display a specific revision given by its ID.
+If you invoke 'C-x v L' ('vc-print-root-log') with a numeric argument
+of 1, as in 'C-1 C-x v L' or 'C-u 1 C-x v L', it asks for a revision
+ID, and shows its log entry together with the diffs introduced by the
+revision's commit.  (For some less capable VCSes, only the log entry
+is shown.)
 
 *** 'C-x v =' can now mimic Magit's diff format.
 Set the new user option 'diff-font-lock-prettify' to t for that, see
@@ -2588,6 +2635,9 @@ pointer is over.  To change this behaviour, you can customize the user
 option 'mouse-wheel-follow-mouse'.  Note that this will also affect
 scrolling.
 
+** Mouse scroll up and down with control key modifier also works on images
+where it scales the image under the mouse pointer.
+
 ---
 ** help-follow-symbol now signals 'user-error' if point (or the
 position pointed to by the argument POS) is not in a symbol.
@@ -2790,6 +2840,11 @@ doing computations on a decoded time structure), 'make-decoded-time'
 filled out), and 'encoded-time-set-defaults' (which fills in nil
 elements as if it's midnight January 1st, 1970) have been added.
 
+** New macros 'debounce' and 'debounce-reduce' postpone function call
+until after specified time have elapsed since the last time it was invoked.
+This improves performance of processing events occurring rapidly
+in quick succession.
+
 ** 'define-minor-mode' automatically documents the meaning of ARG.
 
 +++
@@ -2922,14 +2977,10 @@ and if the new behavior breaks your code please email
 <32252@debbugs.gnu.org>.  Because '%o' and '%x' can now format signed
 integers, they now support the '+' and space flags.
 
-** To avoid confusion caused by "smart quotes", the reader signals an
-error when reading Lisp symbols which begin with one of the following
-quotation characters: ‘’‛“”‟〞＂＇.  A symbol beginning with such a
-character can be written by escaping the quotation character with a
-backslash.  For example:
-
-    (read "‘smart") => (invalid-read-syntax "strange quote" "‘")
-    (read "\\‘smart") == (intern "‘smart")
++++
+** In Emacs Lisp mode, symbols with confusable quotes are highlighted.
+For example, the first character in '‘foo' would be highlighted in
+'font-lock-warning-face'.
 
 +++
 ** Omitting variables after '&optional' and '&rest' is now allowed.
@@ -3222,6 +3273,10 @@ by setting 'undo-inhibit-region' symbol property of that command to
 non-nil.  This is used by 'mouse-drag-region' to make the effect
 easier to undo immediately afterwards.
 
+---
+** When called interactively, next-buffer and previous-buffer now
+signal 'user-error' if there is no buffer to switch to.
+
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
 
@@ -3231,6 +3286,12 @@ Previously it was supported only in the Cygwin-w32 build.
 
 ** Emacs now handles key combinations involving the macOS "command"
 and "option" modifier keys more correctly.
+
+** MacOS modifier key behaviour is now more adjustable.
+The behaviour of the macOS "Option", "Command", "Control" and
+"Function" keys can now be specified separately for use with
+ordinary keys, function keys and mouse clicks.  This allows using them
+in their standard macOS way for composing characters.
 
 ** The special handling of 'frame-title-format' on NS where setting it
 to 't' would enable the macOS proxy icon has been replaced with a

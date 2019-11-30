@@ -2847,6 +2847,7 @@ is nil and `use-dialog-box' is non-nil."
      (t
       (setq prompt (funcall padded prompt))
       (let* ((empty-history '())
+             (enable-recursive-minibuffers t)
              (str (read-from-minibuffer
                    prompt nil
                    (make-composed-keymap y-or-n-p-map query-replace-map)
@@ -4599,31 +4600,31 @@ This function is called directly from the C code."
       ;; discard the file name regexp
       (mapc #'funcall (cdr a-l-element))))
   ;; Complain when the user uses obsolete files.
-  (when (string-match-p "/obsolete/\\([^/]*\\)\\'" abs-file)
+  (when (string-match-p "/obsolete/[^/]*\\'" abs-file)
     ;; Maybe we should just use display-warning?  This seems yucky...
     (let* ((file (file-name-nondirectory abs-file))
            (package (intern (substring file 0
 			               (string-match "\\.elc?\\>" file))
                             obarray))
-	   (msg (format "Package %s is deprecated" package)))
+	   (msg (format "Package %s is deprecated" package))
+	   (fun (lambda (msg) (message "%s" msg))))
       ;; Cribbed from cl--compiling-file.
       (when (or (not (fboundp 'byte-compile-warning-enabled-p))
                 (byte-compile-warning-enabled-p 'obsolete package))
-        (if (and (boundp 'byte-compile--outbuffer)
-	         (bufferp (symbol-value 'byte-compile--outbuffer))
-	         (equal (buffer-name (symbol-value 'byte-compile--outbuffer))
-		        " *Compiler Output*"))
-	    ;; Don't warn about obsolete files using other obsolete files.
-	    (unless (and (stringp byte-compile-current-file)
-		         (string-match-p "/obsolete/[^/]*\\'"
-				         (expand-file-name
-					  byte-compile-current-file
-					  byte-compile-root-dir)))
-	      (byte-compile-warn "%s" msg))
-	  (run-with-idle-timer 0 nil
-			  (lambda (msg)
-			    (minibuffer-message "%s" msg))
-			  msg)))))
+        (cond
+	 ((and (boundp 'byte-compile--outbuffer)
+	       (bufferp (symbol-value 'byte-compile--outbuffer))
+	       (equal (buffer-name (symbol-value 'byte-compile--outbuffer))
+		      " *Compiler Output*"))
+	  ;; Don't warn about obsolete files using other obsolete files.
+	  (unless (and (stringp byte-compile-current-file)
+		       (string-match-p "/obsolete/[^/]*\\'"
+				       (expand-file-name
+					byte-compile-current-file
+					byte-compile-root-dir)))
+	    (byte-compile-warn "%s" msg)))
+         (noninteractive (funcall fun msg)) ;; No timer will be run!
+	 (t (run-with-idle-timer 0 nil fun msg))))))
 
   ;; Finally, run any other hook.
   (run-hook-with-args 'after-load-functions abs-file))

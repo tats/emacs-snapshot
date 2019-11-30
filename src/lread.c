@@ -3571,13 +3571,6 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	    if (! NILP (result) && len == nbytes)
 	      return unbind_to (count, result);
 	  }
-        if (!quoted && multibyte)
-          {
-            int ch = STRING_CHAR ((unsigned char *) read_buffer);
-            if (confusable_symbol_character_p (ch))
-              xsignal2 (Qinvalid_read_syntax, build_string ("strange quote"),
-                        CALLN (Fstring, make_fixnum (ch)));
-          }
 	{
 	  Lisp_Object result;
 	  ptrdiff_t nchars
@@ -4907,8 +4900,8 @@ When `load' is run and the file-name argument matches an element's
 REGEXP-OR-FEATURE, or when `provide' is run and provides the symbol
 REGEXP-OR-FEATURE, the FUNCS in the element are called.
 
-An error in FORMS does not undo the load, but does prevent execution of
-the rest of the FORMS.  */);
+An error in FUNCS does not undo the load, but does prevent calling
+the rest of the FUNCS.  */);
   Vafter_load_alist = Qnil;
 
   DEFVAR_LISP ("load-history", Vload_history,
