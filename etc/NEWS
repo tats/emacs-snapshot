@@ -522,6 +522,12 @@ Note that this key binding will not work on MS-Windows systems if
 key binding with an upper case letter - if you can type it, you can
 bind it.
 
++++
+** 'read-from-minibuffer' now works with buffer-local history variables.
+The HIST argument of 'read-from-minibuffer' now works correctly with
+buffer-local variables.  This means that different buffers can have
+their own separated input history list if desired.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -639,6 +645,17 @@ bound to 'C-c C-c #'.
 This is an interactive convenience function to be used when developing
 font locking for a mode.  It recomputes the font locking data and then
 re-fontifies the buffer.
+
+---
+** Font Lock is smarter about fontifying unterminated strings and comments.
+When you type a quote that starts a string, or a comment delimiter
+that starts a comment, font-lock will not immediately refontify the
+following characters in font-lock-string-face or
+font-lock-comment-face.  Instead, it will delay the fontification
+beyond the current line to give you a chance to close the string or
+comment.  This is controlled by the new customizable variable
+'jit-lock-antiblink-grace', which specifies the delay in seconds.  The
+default is 2 seconds; set to nil to get back the old behavior.
 
 ---
 ** The 'C' command in 'tar-mode' will now preserve the timestamp of
@@ -813,7 +830,8 @@ displays the buffer from the next command in that window.  For example,
 'S-M-right C-h i' displays the "*Info*" buffer in the right window,
 creating the window if necessary.  A special key can be customized to
 display the buffer in the same window, for example, 'S-M-0 C-h e'
-displays the "*Messages*" buffer in the same window.
+displays the "*Messages*" buffer in the same window.  'S-M-t C-h C-n'
+displays NEWS in a new tab.
 
 *** Windmove also supports directional window deletion.
 The new command 'windmove-delete-default-keybindings' binds default
@@ -971,6 +989,15 @@ values.
 *** The Hg (Mercurial) back-end now supports 'vc-region-history'.
 The 'C-x v h' command now works in buffers that visit files controlled
 by Hg.
+
++++
+*** The Hg (Mercurial) back-end now prompts for revision to merge when
+you invoke 'C-x v m' ('vc-merge').
+
+---
+*** The Hg (Mercurial) back-end now use tags, branches and bookmarks
+instead of revision numbers as completion candidates when it prompts
+for a revision.
 
 +++
 *** 'C-u C-x v D' ('vc-root-version-diff') prompts for two revisions
@@ -2839,11 +2866,6 @@ doing computations on a decoded time structure), 'make-decoded-time'
 (for making a decoded time structure with only the given keywords
 filled out), and 'encoded-time-set-defaults' (which fills in nil
 elements as if it's midnight January 1st, 1970) have been added.
-
-** New macros 'debounce' and 'debounce-reduce' postpone function call
-until after specified time have elapsed since the last time it was invoked.
-This improves performance of processing events occurring rapidly
-in quick succession.
 
 ** 'define-minor-mode' automatically documents the meaning of ARG.
 

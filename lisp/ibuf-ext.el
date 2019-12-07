@@ -760,12 +760,11 @@ specification, with the same structure as an element of the list
 	  (i 0))
       (dolist (filtergroup filter-group-alist)
 	(let ((filterset (cdr filtergroup)))
-	  (cl-multiple-value-bind (hip-crowd lamers)
-	      (cl-values-list
-	       (ibuffer-split-list (lambda (bufmark)
-				     (ibuffer-included-in-filters-p (car bufmark)
-								    filterset))
-				   bmarklist))
+	  (cl-destructuring-bind (hip-crowd lamers)
+	      (ibuffer-split-list (lambda (bufmark)
+				    (ibuffer-included-in-filters-p (car bufmark)
+								   filterset))
+				  bmarklist)
 	    (aset vec i hip-crowd)
 	    (cl-incf i)
 	    (setq bmarklist lamers))))
@@ -1862,8 +1861,9 @@ Otherwise buffers whose name matches an element of
          (cond ((and (not all-buffers)
                      (or
                       (memq mode ibuffer-never-search-content-mode)
-                      (cl-some (lambda (x) (string-match x (buffer-name buf)))
-                               ibuffer-never-search-content-name)))
+                      (cl-dolist (x ibuffer-never-search-content-name nil)
+                        (when-let ((found (string-match x (buffer-name buf))))
+                          (cl-return found)))))
                 (setq res nil))
                (t
                 (with-current-buffer buf

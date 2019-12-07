@@ -376,7 +376,9 @@ If NEGATED, negate the sense."
              (push (cons arg arg) conses))
             ((and (symbolp arg)
                   (let ((class (cdr (assq arg rx--char-classes))))
-                    (and class (push class classes)))))
+                    (and class
+                         (or (memq class classes)
+                             (progn (push class classes) t))))))
             (t (error "Invalid rx `any' argument: %s" arg))))
     (let ((items
            ;; Translate strings and conses into nonoverlapping intervals,

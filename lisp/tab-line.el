@@ -415,11 +415,10 @@ variable `tab-line-tabs-function'."
               next-buffers))))
 
 
-(defun tab-line-format ()
+(defun tab-line-format-template (tabs)
   "Template for displaying tab line for selected window."
   (let* ((window (selected-window))
          (selected-buffer (window-buffer window))
-         (tabs (funcall tab-line-tabs-function))
          (separator (or tab-line-separator (if window-system " " "|")))
          (hscroll (window-parameter nil 'tab-line-hscroll))
          (strings
@@ -470,6 +469,14 @@ variable `tab-line-tabs-function'."
        (list (concat separator (when tab-line-new-tab-choice
                                  tab-line-new-button)))))))
 
+(defun tab-line-format ()
+  "Template for displaying tab line for selected window."
+  (let ((tabs (funcall tab-line-tabs-function))
+        (cache (window-parameter nil 'tab-line-cache)))
+    (or (and cache (equal (car cache) tabs) (cdr cache))
+        (cdr (set-window-parameter nil 'tab-line-cache
+               (cons tabs (tab-line-format-template tabs)))))))
+
 
 (defcustom tab-line-auto-hscroll t
   "Allow or disallow automatic horizontal scrolling of the tab line.
@@ -482,10 +489,10 @@ the selected tab visible."
 (defun tab-line-auto-hscroll (strings hscroll)
   (with-temp-buffer
     (let ((truncate-partial-width-windows nil)
-          (truncate-lines nil)
           (inhibit-modification-hooks t)
-          (buffer-undo-list t)
           show-arrows)
+      (setq truncate-lines nil
+            buffer-undo-list t)
       (apply 'insert strings)
       (goto-char (point-min))
       (add-face-text-property (point-min) (point-max) 'tab-line)
