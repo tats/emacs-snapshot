@@ -68,7 +68,7 @@
 
 ;;; Constants
 
-(defconst js--name-start-re (concat "[[:alpha:]_$]")
+(defconst js--name-start-re "[[:alpha:]_$]"
   "Regexp matching the start of a JavaScript identifier, without grouping.")
 
 (defconst js--stmt-delim-chars "^;{}?:")
@@ -2011,7 +2011,7 @@ For use by `syntax-propertize-extend-region-functions'."
 ;; When applying syntax properties, since `js-syntax-propertize' uses
 ;; `syntax-propertize-rules' to parse JSXBoundaryElements iteratively
 ;; and statelessly, whenever we exit such an element, we need to
-;; determine the JSX depth.  If >0, then we know we to apply syntax
+;; determine the JSX depth.  If >0, then we know to apply syntax
 ;; properties to JSXText up until the next JSXBoundaryElement occurs.
 ;; But if the JSX depth is 0, then—importantly—we know to NOT parse
 ;; the following code as JSXText, rather propertize it as regular JS
@@ -2059,24 +2059,26 @@ the match.  Return nil if a match can’t be found."
   (let ((tag-stack 1) tag-pos type last-pos pos)
     (catch 'stop
       (while (and (re-search-forward "<\\s-*" nil t) (not (eobp)))
-        (when (setq tag-pos (match-beginning 0)
-                    type (js-jsx--matched-tag-type))
-          (when last-pos
-            (setq pos (point))
-            (goto-char last-pos)
-            (while (re-search-forward js-jsx--self-closing-re pos 'move)
-              (setq tag-stack (1- tag-stack))))
-          (if (eq type 'close)
-              (progn
-                (setq tag-stack (1- tag-stack))
-                (when (= tag-stack 0)
-                  (throw 'stop tag-pos)))
-            ;; JSXOpeningElements that we know are self-closing aren’t
-            ;; added to the stack at all (because point is already
-            ;; past that syntax).
-            (unless (eq type 'self-closing)
-              (setq tag-stack (1+ tag-stack))))
-          (setq last-pos (point)))))))
+        ;; Not inside a comment or string.
+        (unless (nth 8 (save-excursion (syntax-ppss (match-beginning 0))))
+          (when (setq tag-pos (match-beginning 0)
+                      type (js-jsx--matched-tag-type))
+            (when last-pos
+              (setq pos (point))
+              (goto-char last-pos)
+              (while (re-search-forward js-jsx--self-closing-re pos 'move)
+                (setq tag-stack (1- tag-stack))))
+            (if (eq type 'close)
+                (progn
+                  (setq tag-stack (1- tag-stack))
+                  (when (= tag-stack 0)
+                    (throw 'stop tag-pos)))
+              ;; JSXOpeningElements that we know are self-closing
+              ;; aren’t added to the stack at all (because point is
+              ;; already past that syntax).
+              (unless (eq type 'self-closing)
+                (setq tag-stack (1+ tag-stack))))
+            (setq last-pos (point))))))))
 
 (defun js-jsx--enclosing-tag-pos ()
   "Return beginning and end of a JSXElement about point.

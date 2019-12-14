@@ -3670,7 +3670,7 @@ using that one instead of current buffer's process."
           (save-excursion
             (if (not (re-search-backward
                       (python-rx
-                       (or whitespace open-paren close-paren string-delimiter))
+                       (or whitespace open-paren close-paren string-delimiter simple-operator))
                       line-start
                       t 1))
                 line-start
@@ -3737,9 +3737,9 @@ Pdbtracking would open the file for current stack frame found in pdb output by
 `python-pdbtrack-stacktrace-info-regexp' and add overlay arrow in currently
 inspected line in that file.
 
-After command listed in `python-pdbtrack-continue-command' or
-`python-pdbtrack-exit-command' is sent to pdb, pdbtracking session is
-considered over.  Overlay arrow will be removed from currentry tracked
+After the command listed in `python-pdbtrack-continue-command' or
+`python-pdbtrack-exit-command' is sent to pdb, the pdbtracking session is
+considered over.  The overlay arrow will be removed from the currently tracked
 buffer.  Additionally, if `python-pdbtrack-kill-buffers' is non-nil, all
 files opened by pdbtracking will be killed."
   :type 'boolean
@@ -3856,8 +3856,8 @@ Returns the tracked buffer."
 
 (defun python-pdbtrack-comint-input-filter-function (input)
   "Finish tracking session depending on command in INPUT.
-Commands that must finish tracking session is listed in
-`python-pdbtrack-untracking-commands'."
+Commands that must finish the tracking session are listed in
+`python-pdbtrack-exit-command'."
   (when (and python-pdbtrack-tracked-buffer
              ;; Empty input is sent by C-d or `comint-send-eof'
              (or (string-empty-p input)

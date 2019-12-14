@@ -78,8 +78,6 @@ University of California, as described above. */
  * together with a configuration file containing regexp definitions for etags.
  */
 
-char pot_etags_version[] = "@(#) pot revision number is 17.38.1.4";
-
 #ifdef DEBUG
 #  undef DEBUG
 #  define DEBUG true
@@ -640,7 +638,7 @@ defined in the file.";
 static const char *Erlang_interpreters [] =
   { "escript", NULL };
 
-const char *Forth_suffixes [] =
+static const char *Forth_suffixes [] =
   { "fth", "tok", NULL };
 static const char Forth_help [] =
 "In Forth code, tags are words defined by ':',\n\

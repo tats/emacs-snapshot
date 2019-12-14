@@ -2168,6 +2168,7 @@ face_inherited_attr (struct window *w, struct frame *f,
       if (CONSP (parent_face))
 	{
 	  Lisp_Object tail;
+	  ok = false;
 	  for (tail = parent_face; !NILP (tail); tail = XCDR (tail))
 	    {
 	      ok = get_lface_attributes (w, f, XCAR (tail), inherited_attrs,
@@ -2179,6 +2180,8 @@ face_inherited_attr (struct window *w, struct frame *f,
 	      if (!UNSPECIFIEDP (attr_val))
 		break;
 	    }
+	  if (!ok)	/* bad face? */
+	    break;
 	}
       else
 	{
@@ -6443,6 +6446,10 @@ face_at_string_position (struct window *w, Lisp_Object string,
 
   /* Begin with attributes from the base face.  */
   memcpy (attrs, base_face->lface, sizeof attrs);
+  /* Reset the attribute of the base face used as the filter, because
+     otherwise there's no way for faces to be merged to countermand that.  */
+  if (EQ (attrs[attr_filter], Qt))
+    attrs[attr_filter] = Qnil;
 
   /* Merge in attributes specified via text properties.  */
   if (!NILP (prop))

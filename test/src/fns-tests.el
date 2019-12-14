@@ -237,7 +237,7 @@
   (apply 'concat (make-list o s)))
 
 (defmacro fns-tests--with-region (funcname string &rest args)
-  "Apply FUNCNAME in a temp bufer on the region produced by STRING."
+  "Apply FUNCNAME in a temp buffer on the region produced by STRING."
   (declare (indent 1))
   `(with-temp-buffer
      (insert ,string)
@@ -269,7 +269,7 @@
   (should (equal (base64-encode-string "\x14\xfb\x9c\x03\xd9\x7f") "FPucA9l/")))
 
 (ert-deftest fns-test-base64url-encode-region ()
-  ;; url variant wih padding
+  ;; url variant with padding
   (should (equal (fns-tests--with-region base64url-encode-region "") ""))
   (should (equal (fns-tests--with-region base64url-encode-region "f") "Zg=="))
   (should (equal (fns-tests--with-region base64url-encode-region "fo") "Zm8="))
@@ -311,7 +311,7 @@
                  (fns-tests--string-repeat "FPucA9l_" 10))))
 
 (ert-deftest fns-test-base64url-encode-string ()
-  ;; url variant wih padding
+  ;; url variant with padding
   (should (equal (base64url-encode-string "") ""))
   (should (equal (base64url-encode-string "f") "Zg=="))
   (should (equal (base64url-encode-string "fo") "Zm8="))
@@ -356,7 +356,7 @@
   (should (equal (base64-decode-string "FPucA9l+") "\x14\xfb\x9c\x03\xd9\x7e"))
   (should (equal (base64-decode-string "FPucA9l/") "\x14\xfb\x9c\x03\xd9\x7f"))
 
-  ;; no paddign
+  ;; no padding
   (should (equal (base64-decode-string "" t) ""))
   (should (equal (base64-decode-string "Zg" t) "f"))
   (should (equal (base64-decode-string "Zm8" t) "fo"))
@@ -365,7 +365,7 @@
   (should (equal (base64-decode-string "Zm9vYmE" t) "fooba"))
   (should (equal (base64-decode-string "Zm9vYmFy" t) "foobar"))
 
-  ;; url variant wih padding
+  ;; url variant with padding
   (should (equal (base64-decode-string "") ""))
   (should (equal (base64-decode-string "Zg==" t) "f") )
   (should (equal (base64-decode-string "Zm8=" t) "fo"))

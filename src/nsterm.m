@@ -2290,19 +2290,24 @@ ns_lisp_to_color (Lisp_Object color, NSColor **col)
 
 /* Convert an index into the color table into an RGBA value.  Used in
    xdisp.c:extend_face_to_end_of_line when comparing faces and frame
-   color values.  */
+   color values.  No-op on non-gui frames.  */
 
 unsigned long
 ns_color_index_to_rgba(int idx, struct frame *f)
 {
-  NSColor *col;
-  col = ns_lookup_indexed_color (idx, f);
+  if (FRAME_DISPLAY_INFO (f))
+    {
+      NSColor *col;
+      col = ns_lookup_indexed_color (idx, f);
 
-  EmacsCGFloat r, g, b, a;
-  [col getRed: &r green: &g blue: &b alpha: &a];
+      EmacsCGFloat r, g, b, a;
+      [col getRed: &r green: &g blue: &b alpha: &a];
 
-  return ARGB_TO_ULONG((int)(a*255),
-                       (int)(r*255), (int)(g*255), (int)(b*255));
+      return ARGB_TO_ULONG((int)(a*255),
+                           (int)(r*255), (int)(g*255), (int)(b*255));
+    }
+  else
+    return idx;
 }
 
 void
@@ -2475,7 +2480,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
    -------------------------------------------------------------------------- */
 {
   id view;
-  NSPoint position;
+  NSPoint view_position;
   Lisp_Object frame, tail;
   struct frame *f;
   struct ns_display_info *dpyinfo;
@@ -2498,31 +2503,55 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
       XFRAME (frame)->mouse_moved = 0;
 
   dpyinfo->last_mouse_scroll_bar = nil;
-  f = dpyinfo->ns_focus_frame ? dpyinfo->ns_focus_frame : SELECTED_FRAME ();
-  if (dpyinfo->last_mouse_frame
-      /* While dropping, use the last mouse frame only if there is no
-	 currently focused frame.  */
-      && (!EQ (track_mouse, Qdropping) || !f)
+
+#ifdef NS_IMPL_COCOA
+  /* Find the uppermost Emacs frame under the mouse pointer.
+
+     This doesn't work on GNUstep, although in recent versions there
+     is compatibility code that makes it a noop.  */
+
+  NSPoint screen_position = [NSEvent mouseLocation];
+  NSInteger window_number = 0;
+  do
+    {
+      NSWindow *w;
+
+      window_number = [NSWindow windowNumberAtPoint:screen_position
+                        belowWindowWithWindowNumber:window_number];
+      w = [NSApp windowWithWindowNumber:window_number];
+
+      if (w && [[w delegate] isKindOfClass:[EmacsView class]])
+        f = ((EmacsView *)[w delegate])->emacsframe;
+    }
+  while (window_number > 0 && !f);
+#endif
+
+  if (!f)
+    f = dpyinfo->ns_focus_frame ? dpyinfo->ns_focus_frame : SELECTED_FRAME ();
+
+  /* While dropping, use the last mouse frame only if there is no
+     currently focused frame.  */
+  if (!f
+      && EQ (track_mouse, Qdropping)
+      && dpyinfo->last_mouse_frame
       && FRAME_LIVE_P (dpyinfo->last_mouse_frame))
     f = dpyinfo->last_mouse_frame;
-  else
-    f = dpyinfo->ns_focus_frame ? dpyinfo->ns_focus_frame : SELECTED_FRAME ();
 
   if (f && FRAME_NS_P (f))
     {
       view = FRAME_NS_VIEW (f);
 
-      position = [[view window] mouseLocationOutsideOfEventStream];
-      position = [view convertPoint: position fromView: nil];
-      remember_mouse_glyph (f, position.x, position.y,
+      view_position = [[view window] mouseLocationOutsideOfEventStream];
+      view_position = [view convertPoint: view_position fromView: nil];
+      remember_mouse_glyph (f, view_position.x, view_position.y,
                             &dpyinfo->last_mouse_glyph);
-      NSTRACE_POINT ("position", position);
+      NSTRACE_POINT ("view_position", view_position);
 
       if (bar_window) *bar_window = Qnil;
       if (part) *part = scroll_bar_above_handle;
 
-      if (x) XSETINT (*x, lrint (position.x));
-      if (y) XSETINT (*y, lrint (position.y));
+      if (x) XSETINT (*x, lrint (view_position.x));
+      if (y) XSETINT (*y, lrint (view_position.y));
       if (time)
         *time = dpyinfo->last_mouse_movement_time;
       *fp = f;
@@ -3082,7 +3111,8 @@ ns_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
                 cbits[i] = bits[i];
               img = [[EmacsImage alloc] initFromXBM: cbits width: 8
                                              height: full_height
-                                                 fg: 0 bg: 0];
+                                                 fg: 0 bg: 0
+                                       reverseBytes: NO];
               bimgs[p->which - 1] = img;
               xfree (cbits);
             }
@@ -9432,8 +9462,8 @@ syms_of_nsterm (void)
 
   DEFVAR_LISP ("ns-alternate-modifier", ns_alternate_modifier,
                "This variable describes the behavior of the alternate or option key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 \n\
 Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
@@ -9442,8 +9472,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-right-alternate-modifier", ns_right_alternate_modifier,
                "This variable describes the behavior of the right alternate or option key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 It can also be `left' to use the value of `ns-alternate-modifier' instead.\n\
 \n\
@@ -9453,8 +9483,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-command-modifier", ns_command_modifier,
                "This variable describes the behavior of the command key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 \n\
 Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
@@ -9463,8 +9493,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-right-command-modifier", ns_right_command_modifier,
                "This variable describes the behavior of the right command key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 It can also be `left' to use the value of `ns-command-modifier' instead.\n\
 \n\
@@ -9474,8 +9504,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-control-modifier", ns_control_modifier,
                "This variable describes the behavior of the control key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 \n\
 Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
@@ -9484,8 +9514,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-right-control-modifier", ns_right_control_modifier,
                "This variable describes the behavior of the right control key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 It can also be `left' to use the value of `ns-control-modifier' instead.\n\
 \n\
@@ -9495,8 +9525,8 @@ If `none', the key is ignored by Emacs and retains its standard meaning.");
 
   DEFVAR_LISP ("ns-function-modifier", ns_function_modifier,
                "This variable describes the behavior of the function (fn) key.\n\
-Either SYMBOL, describing the behaviour for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behaviour\n\
+Either SYMBOL, describing the behavior for any event,\n\
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
 separately for ordinary keys, function keys, and mouse events.\n\
 \n\
 Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\

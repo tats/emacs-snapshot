@@ -255,6 +255,10 @@ The default value is 30000, as the previously hard-coded threshold.
 +++
 ** The function 'read-passwd' uses "*" as default character to hide passwords.
 
+** The function 'read-answer' now accepts not only single character
+answers, but also function keys like F1, character events such as C-M-h,
+and control characters like C-h.
+
 ** Lexical binding is now used when evaluating interactive Elisp forms.
 More specifically, lexical-binding is now used for 'M-:', '--eval', as
 well as in the "*scratch*" and "*ielm*" buffers.
@@ -436,16 +440,17 @@ to 'completion-styles' or 'completion-category-overrides' to use it.
 ** New face attribute ':extend' to control face extension at EOL.
 The new face attribute ':extend' controls whether to use the face for
 displaying the empty space beyond end of line (EOL) till the edge of
-the window.  By default, this attribute is non-nil only for 'region',
-'secondary-selection', 'hl-line' and some faces of Diff and Ediff
-modes; any other face that crosses end of line will not affect the
-display of the empty space at EOL.  This is to make Emacs behave more
-like other GUI applications with respect to displaying faces that
-cross line boundaries.
+the window.  By default, this attribute is non-nil only for a small
+number of faces, notably, 'region'; any other face that crosses end of
+line will not affect the display of the empty space at EOL.  This is
+to make Emacs behave more like other GUI applications with respect to
+displaying faces that cross line boundaries.
 
-Themes that redefine faces should add a non-nil ':extend' attribute to
-the above-mentioned faces, to keep the behavior of the default face
-definitions.
+This attribute behaves specially when theme definitions are applied:
+if the theme doesn't specify an explicit value of this attribute for a
+face, the value from the original face definition is inherited.
+Consequently, a theme generally shouldn't specify this attribute
+unless it has a good reason to do so.
 
 ** Connection-local variables
 
@@ -717,7 +722,7 @@ You can use this new user option to control indentation of arguments of
 
 ** byte compiler
 *** 'byte-compile-dynamic' is now obsolete.
-This is because on the one hand it suffers from various misbehaviors in corner
+This is because on the one hand it suffers from misbehavior in corner
 cases that have plagued it for years, and on the other experiments indicated
 that it doesn't bring any measurable benefit.
 
@@ -738,7 +743,7 @@ column zero.
 ---
 *** The new 'compilation-transform-file-match-alist' user option can
 be used to transform file name matches compilation output, and remove
-known false positives being recognised as warnings/errors.
+known false positives being recognized as warnings/errors.
 
 ** cl-lib.el
 +++
@@ -764,9 +769,6 @@ names match certain regular expressions as big.  Ido won't attempt to
 list the contents of such directories when completing file names.
 
 ** Minibuffer
-
-*** Scrolling and recentering commands in the minibuffer are invoked
-on the original window (that was selected before activating the minibuffer).
 
 +++
 *** A new user option, 'minibuffer-beginning-of-buffer-movement', has
@@ -1235,7 +1237,7 @@ early init file.
 A new function has been added which allows users to filter the
 packages list by name: 'package-menu-filter-by-name'.  By default, it
 is bound to '/ n'.  Additionally, the function
-'package-menu-fiter-by-keyword' has been renamed from
+'package-menu-filter-by-keyword' has been renamed from
 'package-menu-filter'.  Its keybinding has also been changed to '/ k'
 (from 'f').  To clear any of the two filters, the user can now call
 the 'package-menu-clear-filter' function, bound to '/ /' by default.
@@ -1267,6 +1269,14 @@ The 'file://' URLs in Info documents can now be followed by passing
 them to the 'browse-url' function, like the other protocols: 'ftp',
 'http', and 'https'.  This allows to have references to local HTML
 files, for example.
+
+---
+** Display of man pages now limits the width for formatting pages.
+The new user option 'Man-width-max' (80 by default) limits the number
+of columns passed to the 'man' program for formatting man pages.  This
+is to enhance readability when man pages are displayed in very wide
+windows (which are customary with today's large displays).
+
 
 ** Xref
 
@@ -1326,7 +1336,7 @@ Of course it will still find it if you have it in "~/.ecompleterc".
 
 ---
 *** 'mm-uu-diff-groups-regexp' now defaults to matching all groups,
-which means that "git am" diffs are recognised everywhere.
+which means that "git am" diffs are recognized everywhere.
 
 +++
 *** Two new Gnus summary mode navigation commands have been added,
@@ -1951,6 +1961,12 @@ GnuTLS manual) is recommended instead.
 
 ** Message
 
+*** Completion of email addresses can use the standard completion UI
+This is controlled by 'message-expand-name-standard-ui'.
+With the standard UI the different sources (ecomplete, bbdb, and eudc)
+are matched together and try to obey 'completion-styles'.
+It should work for other completion front ends like Company.
+
 *** 'message-mode' now supports highlighting citations of different depths.
 This can be customized via the new user option
 'message-cite-level-function' and the new 'message-cited-text-*' faces.
@@ -1977,7 +1993,7 @@ exclude most headers when forwarding.
 
 *** 'mml-secure-openpgp-sign-with-sender' sets also "gpg --sender"
 When 'mml-secure-openpgp-sign-with-sender' is non-nil message sender's
-email address (in addition to its old behaviour) will also be used to
+email address (in addition to its old behavior) will also be used to
 set gpg's "--sender email@domain" option.
 
 The option is useful for two reasons when verifying the signature:
@@ -2100,8 +2116,16 @@ at run time, instead of a constant string.
 These macros add new forms to the rx notation.
 
 +++
-*** 'anychar' is now an alias for 'anything'
+*** 'anychar' is now an alias for 'anything'.
 Both match any single character; 'anychar' is more descriptive.
+
++++
+*** New 'intersection' form for character sets.
+With 'or' and 'not', it can be used to compose character-matching
+expressions from simpler parts.
+
++++
+*** 'not' argument can now be a character or single-char string.
 
 ** Frames
 
@@ -2651,14 +2675,14 @@ Previously, the control key modifier was used to scroll up or down by
 an amount which was close to near a full screen.  This is now instead
 available by scrolling with the meta modifier key.
 
-To get the old behaviour back, customize the user option
+To get the old behavior back, customize the user option
 'mouse-wheel-scroll-amount', or add the following to your init file:
 
 (customize-set-variable 'mouse-wheel-scroll-amount
                         '(5 ((shift) . 1) ((control) . nil)))
 
 By default, the font size will be changed in the window that the mouse
-pointer is over.  To change this behaviour, you can customize the user
+pointer is over.  To change this behavior, you can customize the user
 option 'mouse-wheel-follow-mouse'.  Note that this will also affect
 scrolling.
 
@@ -3309,8 +3333,8 @@ Previously it was supported only in the Cygwin-w32 build.
 ** Emacs now handles key combinations involving the macOS "command"
 and "option" modifier keys more correctly.
 
-** MacOS modifier key behaviour is now more adjustable.
-The behaviour of the macOS "Option", "Command", "Control" and
+** MacOS modifier key behavior is now more adjustable.
+The behavior of the macOS "Option", "Command", "Control" and
 "Function" keys can now be specified separately for use with
 ordinary keys, function keys and mouse clicks.  This allows using them
 in their standard macOS way for composing characters.
@@ -3360,9 +3384,9 @@ fonts.  See the documentation of this function and variable in the
 Emacs manual for more details.
 
 +++
-** On NS the behaviour of drag and drop can now be modified by use of
+** On NS the behavior of drag and drop can now be modified by use of
 modifier keys in line with Apples guidelines.  This makes the drag and
-drop behaviour more consistent, as previously the sending application
+drop behavior more consistent, as previously the sending application
 was able to 'set' modifiers without the knowledge of the user.
 
 ** On NS multicolor font display is enabled again since it is also
