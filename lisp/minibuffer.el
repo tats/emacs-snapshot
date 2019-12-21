@@ -712,16 +712,11 @@ If ARGS are provided, then pass MESSAGE through `format-message'."
       (progn
         (if args
             (apply #'message message args)
-          (message-in-echo-area "%s" message))
+          (message "%s" message))
         (prog1 (sit-for (or minibuffer-message-timeout 1000000))
-          (message-in-echo-area nil)))
-    ;; Record message in the *Messages* buffer
-    (let ((inhibit-message t))
-      (if args
-          (apply #'message message args)
-        (message-in-echo-area "%s" message)))
+          (message nil)))
     ;; Clear out any old echo-area message to make way for our new thing.
-    (message-in-echo-area nil)
+    (message nil)
     (setq message (if (and (null args)
                            (string-match-p "\\` *\\[.+\\]\\'" message))
                       ;; Make sure we can put-text-property.
@@ -1840,7 +1835,7 @@ variables.")
 (defun minibuffer-completion-help (&optional start end)
   "Display a list of possible completions of the current minibuffer contents."
   (interactive)
-  (message-in-echo-area "Making completion list...")
+  (message "Making completion list...")
   (let* ((start (or start (minibuffer-prompt-end)))
          (end (or end (point-max)))
          (string (buffer-substring start end))
@@ -1851,7 +1846,7 @@ variables.")
                        minibuffer-completion-predicate
                        (- (point) start)
                        md)))
-    (message-in-echo-area nil)
+    (message nil)
     (if (or (null completions)
             (and (not (consp (cdr completions)))
                  (equal (car completions) string)))
@@ -3214,69 +3209,69 @@ filter out additional entries (because TABLE might not obey PRED)."
                  (null (ignore-errors (try-completion prefix table pred))))
         ;; The prefix has no completions at all, so we should try and fix
         ;; that first.
-        (let ((substring (substring prefix 0 -1)))
-          (pcase-let ((`(,subpat ,suball ,subprefix ,_subsuffix)
-                       (completion-pcm--find-all-completions
-                        substring table pred (length substring) filter)))
-            (let ((sep (aref prefix (1- (length prefix))))
-                  ;; Text that goes between the new submatches and the
-                  ;; completion substring.
-                  (between nil))
-              ;; Eliminate submatches that don't end with the separator.
-              (dolist (submatch (prog1 suball (setq suball ())))
-                (when (eq sep (aref submatch (1- (length submatch))))
-                  (push submatch suball)))
-              (when suball
-                ;; Update the boundaries and corresponding pattern.
-                ;; We assume that all submatches result in the same boundaries
-                ;; since we wouldn't know how to merge them otherwise anyway.
-                ;; FIXME: COMPLETE REWRITE!!!
-                (let* ((newbeforepoint
-                        (concat subprefix (car suball)
-                                (substring string 0 relpoint)))
-                       (leftbound (+ (length subprefix) (length (car suball))))
-                       (newbounds (completion-boundaries
-                                   newbeforepoint table pred afterpoint)))
-                  (unless (or (and (eq (cdr bounds) (cdr newbounds))
-                                   (eq (car newbounds) leftbound))
-                              ;; Refuse new boundaries if they step over
-                              ;; the submatch.
-                              (< (car newbounds) leftbound))
-                    ;; The new completed prefix does change the boundaries
-                    ;; of the completed substring.
-                    (setq suffix (substring afterpoint (cdr newbounds)))
-                    (setq string
-                          (concat (substring newbeforepoint (car newbounds))
-                                  (substring afterpoint 0 (cdr newbounds))))
-                    (setq between (substring newbeforepoint leftbound
-                                             (car newbounds)))
-                    (setq pattern (completion-pcm--optimize-pattern
-                                   (completion-pcm--string->pattern
-                                    string
-                                    (- (length newbeforepoint)
-                                       (car newbounds))))))
-                  (dolist (submatch suball)
-                    (setq all (nconc
-                               (mapcar
-                                (lambda (s) (concat submatch between s))
-                                (funcall filter
-                                         (completion-pcm--all-completions
-                                          (concat subprefix submatch between)
-                                          pattern table pred)))
-                               all)))
-                  ;; FIXME: This can come in handy for try-completion,
-                  ;; but isn't right for all-completions, since it lists
-                  ;; invalid completions.
-                  ;; (unless all
-                  ;;   ;; Even though we found expansions in the prefix, none
-                  ;;   ;; leads to a valid completion.
-                  ;;   ;; Let's keep the expansions, tho.
-                  ;;   (dolist (submatch suball)
-                  ;;     (push (concat submatch between newsubstring) all)))
-                  ))
-              (setq pattern (append subpat (list 'any (string sep))
-                                    (if between (list between)) pattern))
-              (setq prefix subprefix)))))
+        (pcase-let* ((substring (substring prefix 0 -1))
+                     (`(,subpat ,suball ,subprefix ,_subsuffix)
+                      (completion-pcm--find-all-completions
+                       substring table pred (length substring) filter))
+                     (sep (aref prefix (1- (length prefix))))
+                     ;; Text that goes between the new submatches and the
+                     ;; completion substring.
+                     (between nil))
+          ;; Eliminate submatches that don't end with the separator.
+          (dolist (submatch (prog1 suball (setq suball ())))
+            (when (eq sep (aref submatch (1- (length submatch))))
+              (push submatch suball)))
+          (when suball
+            ;; Update the boundaries and corresponding pattern.
+            ;; We assume that all submatches result in the same boundaries
+            ;; since we wouldn't know how to merge them otherwise anyway.
+            ;; FIXME: COMPLETE REWRITE!!!
+            (let* ((newbeforepoint
+                    (concat subprefix (car suball)
+                            (substring string 0 relpoint)))
+                   (leftbound (+ (length subprefix) (length (car suball))))
+                   (newbounds (completion-boundaries
+                               newbeforepoint table pred afterpoint)))
+              (unless (or (and (eq (cdr bounds) (cdr newbounds))
+                               (eq (car newbounds) leftbound))
+                          ;; Refuse new boundaries if they step over
+                          ;; the submatch.
+                          (< (car newbounds) leftbound))
+                ;; The new completed prefix does change the boundaries
+                ;; of the completed substring.
+                (setq suffix (substring afterpoint (cdr newbounds)))
+                (setq string
+                      (concat (substring newbeforepoint (car newbounds))
+                              (substring afterpoint 0 (cdr newbounds))))
+                (setq between (substring newbeforepoint leftbound
+                                         (car newbounds)))
+                (setq pattern (completion-pcm--optimize-pattern
+                               (completion-pcm--string->pattern
+                                string
+                                (- (length newbeforepoint)
+                                   (car newbounds))))))
+              (dolist (submatch suball)
+                (setq all (nconc
+                           (mapcar
+                            (lambda (s) (concat submatch between s))
+                            (funcall filter
+                                     (completion-pcm--all-completions
+                                      (concat subprefix submatch between)
+                                      pattern table pred)))
+                           all)))
+              ;; FIXME: This can come in handy for try-completion,
+              ;; but isn't right for all-completions, since it lists
+              ;; invalid completions.
+              ;; (unless all
+              ;;   ;; Even though we found expansions in the prefix, none
+              ;;   ;; leads to a valid completion.
+              ;;   ;; Let's keep the expansions, tho.
+              ;;   (dolist (submatch suball)
+              ;;     (push (concat submatch between newsubstring) all)))
+              ))
+          (setq pattern (append subpat (list 'any (string sep))
+                                (if between (list between)) pattern))
+          (setq prefix subprefix)))
       (if (and (null all) firsterror)
           (signal (car firsterror) (cdr firsterror))
         (list pattern all prefix suffix)))))

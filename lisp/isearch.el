@@ -2011,7 +2011,7 @@ Turning on character-folding turns off regexp mode.")
 (defun isearch--momentary-message (string)
   "Print STRING at the end of the isearch prompt for 1 second."
   (let ((message-log-max nil))
-    (message-in-echo-area "%s%s%s"
+    (message "%s%s%s"
              (isearch-message-prefix nil isearch-nonincremental)
              isearch-message
              (apply #'propertize (format " [%s]" string)
@@ -2508,10 +2508,12 @@ is bound to outside of Isearch."
 
 (declare-function xterm--pasted-text "term/xterm" ())
 
-(defun isearch-xterm-paste ()
+(defun isearch-xterm-paste (event)
   "Pull terminal paste into search string."
-  (interactive)
-  (isearch-yank-string (xterm--pasted-text)))
+  (interactive "e")
+  (when (eq (car-safe event) 'xterm-paste)
+    (let ((pasted-text (nth 1 event)))
+      (isearch-yank-string pasted-text))))
 
 (defun isearch-yank-internal (jumpform)
   "Pull the text from point to the point reached by JUMPFORM.
@@ -3168,7 +3170,7 @@ If there is no completion possible, say so and continue searching."
 	     (isearch-message-prefix ellipsis isearch-nonincremental)
 	     m
 	     (isearch-message-suffix c-q-hack)))
-    (if c-q-hack m (let ((message-log-max nil)) (message-in-echo-area "%s" m)))))
+    (if c-q-hack m (let ((message-log-max nil)) (message "%s" m)))))
 
 (defun isearch--describe-regexp-mode (regexp-function &optional space-before)
   "Make a string for describing REGEXP-FUNCTION.

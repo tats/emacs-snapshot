@@ -781,10 +781,6 @@ the minibuffer.  If non-nil, point will move to the end of the prompt
 at the end of the active minibuffer.
 
 +++
-*** The function 'message' now displays the message at the end of the minibuffer
-when the minibuffer is active.
-
-+++
 *** 'y-or-n-p' now uses the minibuffer to read 'y' or 'n' answer.
 
 *** Some commands that previously used read-char-choice now read
@@ -1037,6 +1033,14 @@ is shown.)
 *** 'C-x v =' can now mimic Magit's diff format.
 Set the new user option 'diff-font-lock-prettify' to t for that, see
 below under "Diff mode".
+
+---
+*** The 'diff' function arguments OLD and NEW may each be a buffer
+rather than a file, in non-interactive calls.  This change was made in
+Emacs 24.1, but wasn't documented until now.
+
++++
+*** New command 'diff-buffers' interactively diffs two buffers.
 
 ** Diff mode
 +++
@@ -1550,6 +1554,12 @@ The maximum level is used by default; customize
 *** New user option 'python-pdbtrack-kill-buffers'.
 If non-nil, the default, buffers opened during pdbtracking session are
 killed when pdbtracking session is finished.
+
+---
+*** New function 'python-shell-send-region'.
+It send the statement delimited by 'python-nav-beginning-of-statement' and
+'python-nav-end-of-statement' to the inferior Python process.
+
 
 ** Help
 
@@ -2719,6 +2729,14 @@ overlays.  This is only done on 'display' properties that have the
 +++
 ** 'process-contact' now takes an optional NO-BLOCK argument to allow
 not waiting for a process to be set up.
+
+---
+** New variable 'read-process-output-max' controls sub-process throughput.
+This variable determines how many bytes can be read from a sub-process
+in one read operation.  The default, 4096 bytes, was previously a
+hard-coded constant.  Setting it to a larger value might enhance
+throughput of reading from sub-processes that produces vast
+(megabytes) amounts of data in one go.
 
 +++
 ** The new user option 'quit-window-hook' is now run first when

@@ -1019,7 +1019,7 @@ See also `tramp-file-name-regexp'.")
   (car tramp-file-name-structure))
 
 ;;;###autoload
-(defconst tramp-initial-file-name-regexp "\\`/.+:.*:"
+(defconst tramp-initial-file-name-regexp "\\`/[^/:]+:[^/:]*:"
   "Value for `tramp-file-name-regexp' for autoload.
 It must match the initial `tramp-syntax' settings.")
 
@@ -3259,10 +3259,16 @@ User is always nil."
 (defun tramp-handle-file-name-completion
   (filename directory &optional predicate)
   "Like `file-name-completion' for Tramp files."
-  (let (hits-ignored-extensions)
+  (let (hits-ignored-extensions fnac)
+    (setq fnac (file-name-all-completions filename directory))
+    ;; "." and ".." are never interesting as completions, and are
+    ;; actually in the way in a directory with only one file.  See
+    ;; file_name_completion() in dired.c.
+    (when (and (consp fnac) (= (length (delete "./" (delete "../" fnac))) 1))
+      (setq fnac (delete "./" (delete "../" fnac))))
     (or
      (try-completion
-      filename (file-name-all-completions filename directory)
+      filename fnac
       (lambda (x)
 	(when (funcall (or predicate #'identity) (expand-file-name x directory))
 	  (not
@@ -4295,14 +4301,16 @@ the remote host use line-endings as defined in the variable
   "Flush file caches and remove shell prompt."
   (unless (process-live-p proc)
     (let ((vec (process-get proc 'vector))
+	  (buf (process-buffer proc))
 	  (prompt (tramp-get-connection-property proc "prompt" nil)))
       (when vec
 	(tramp-message vec 5 "Sentinel called: `%S' `%s'" proc event)
         (tramp-flush-connection-properties proc)
         (tramp-flush-directory-properties vec ""))
-      (with-current-buffer (process-buffer proc)
-        (when (and prompt (tramp-search-regexp (regexp-quote prompt)))
-	  (delete-region (point) (point-max)))))))
+      (when (buffer-live-p buf)
+	(with-current-buffer buf
+          (when (and prompt (tramp-search-regexp (regexp-quote prompt)))
+	    (delete-region (point) (point-max))))))))
 
 (defun tramp-get-inode (vec)
   "Return the virtual inode number.
