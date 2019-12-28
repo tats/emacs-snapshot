@@ -311,15 +311,12 @@ is currently being used."
   "Insert contents of `ns-working-text' as UTF-8 string and mark with
 `ns-working-overlay'.  Any previously existing working text is cleared first.
 The overlay is assigned the face `ns-working-text-face'."
-  ;; FIXME: if buffer is read-only, don't try to insert anything, and
-  ;; if text is bound to a command, execute that instead (Bug#1453).
   (interactive)
   (ns-delete-working-text)
   (let ((start (point)))
-    (insert ns-working-text)
-    (overlay-put (setq ns-working-overlay (make-overlay start (point)
-							(current-buffer) nil t))
-		 'face 'ns-working-text-face)))
+    (overlay-put (setq ns-working-overlay (make-overlay start (point)))
+                 'after-string
+                 (propertize ns-working-text 'face 'ns-working-text-face))))
 
 (defun ns-echo-working-text ()
   "Echo contents of `ns-working-text' in message display area.
@@ -342,8 +339,7 @@ See `ns-insert-working-text'."
          ;; Still alive?
          (overlay-buffer ns-working-overlay))
     (with-current-buffer (overlay-buffer ns-working-overlay)
-      (delete-region (overlay-start ns-working-overlay)
-                     (overlay-end ns-working-overlay))
+      (overlay-put ns-working-overlay 'after-string nil)
       (delete-overlay ns-working-overlay)))
    ((integerp ns-working-overlay)
     (let ((msg (current-message))

@@ -234,15 +234,13 @@ completed.  If completing files, it means delete the file.  If
 completing buffers it means kill the buffer.  Both actions
 require user confirmation."
   (interactive)
-  (let ((beg (icomplete--field-beg)) (end (icomplete--field-end)))
+  (let ((end (icomplete--field-end)))
     (if (< (point) end)
         (call-interactively 'kill-line)
-      (let* ((md (completion--field-metadata beg))
-             (category (alist-get 'category (cdr md)))
-             (all (completion-all-sorted-completions))
+      (let* ((all (completion-all-sorted-completions))
              (thing (car all))
              (action
-              (pcase category
+              (pcase (icomplete--category)
                 (`buffer
                  (lambda ()
                    (when (yes-or-no-p (concat "Kill buffer " thing "? "))
@@ -267,11 +265,8 @@ require user confirmation."
 (defun icomplete-fido-delete-char ()
   "Delete char or maybe call `dired', like `ido-mode'."
   (interactive)
-  (let* ((beg (icomplete--field-beg))
-         (end (icomplete--field-end))
-         (md (completion--field-metadata beg))
-         (category (alist-get 'category (cdr md))))
-    (if (or (< (point) end) (not (eq category 'file)))
+  (let ((end (icomplete--field-end)))
+    (if (or (< (point) end) (not (eq (icomplete--category) 'file)))
         (call-interactively 'delete-char)
       (dired (file-name-directory (icomplete--field-string)))
       (exit-minibuffer))))
@@ -279,30 +274,23 @@ require user confirmation."
 (defun icomplete-fido-ret ()
   "Exit minibuffer or enter directory, like `ido-mode'."
   (interactive)
-  (let* ((beg (icomplete--field-beg))
-         (md (completion--field-metadata beg))
-         (category (alist-get 'category (cdr md)))
-         (dir (and (eq category 'file)
+  (let* ((dir (and (eq (icomplete--category) 'file)
                    (file-name-directory (icomplete--field-string))))
-         (current (car (completion-all-sorted-completions)))
+         (current (car completion-all-sorted-completions))
          (probe (and dir current
                      (expand-file-name (directory-file-name current) dir))))
     (cond ((and probe (file-directory-p probe) (not (string= current "./")))
            (icomplete-force-complete))
-          (current
-           (icomplete-force-complete-and-exit))
           (t
-           (exit-minibuffer)))))
+           (icomplete-force-complete-and-exit)))))
 
 (defun icomplete-fido-backward-updir ()
   "Delete char before or go up directory, like `ido-mode'."
   (interactive)
-  (let* ((beg (icomplete--field-beg))
-         (md (completion--field-metadata beg))
-         (category (alist-get 'category (cdr md))))
-    (if (and (eq (char-before) ?/) (eq category 'file))
-        (backward-kill-sexp 1)
-      (call-interactively 'backward-delete-char))))
+  (if (and (eq (char-before) ?/)
+           (eq (icomplete--category) 'file))
+      (backward-kill-sexp 1)
+    (call-interactively 'backward-delete-char)))
 
 (defvar icomplete-fido-mode-map
   (let ((map (make-sparse-keymap)))
@@ -392,6 +380,10 @@ completions:
 (defun icomplete--field-end ()
   (if (window-minibuffer-p) (point-max)
     (nth 1 completion-in-region--data)))
+(defun icomplete--category ()
+  (let* ((beg (icomplete--field-beg))
+         (md (completion--field-metadata beg)))
+    (alist-get 'category (cdr md))))
 
 ;;;_ > icomplete-simple-completing-p ()
 (defun icomplete-simple-completing-p ()
@@ -448,6 +440,40 @@ Usually run by inclusion in `minibuffer-setup-hook'."
 					  (cdr tem)))))
     (add-hook 'pre-command-hook  'icomplete-pre-command-hook  nil t)
     (add-hook 'post-command-hook 'icomplete-post-command-hook nil t)))
+
+(defun icomplete--sorted-completions ()
+  (or completion-all-sorted-completions
+      (cl-loop
+       with beg = (icomplete--field-beg)
+       with end = (icomplete--field-end)
+       with all = (completion-all-sorted-completions beg end)
+       for fn in (cond ((and minibuffer-default
+                             (= (icomplete--field-end) (icomplete--field-beg)))
+                        ;; When we have a non-nil default and no input
+                        ;; whatsoever: we want to make sure that default
+                        ;; is bubbled to the top so that
+                        ;; `icomplete-force-complete-and-exit' will
+                        ;; select it (do that even if the match doesn't
+                        ;; match the completion perfectly.
+                        `(,(lambda (comp)
+                             (equal minibuffer-default comp))
+                          ,(lambda (comp)
+                             (string-prefix-p minibuffer-default comp))))
+                       ((and fido-mode
+                             (not minibuffer-default)
+                             (eq (icomplete--category) 'file))
+                        `(,(lambda (comp)
+                             (string= "./" comp)))))
+       thereis (cl-loop
+                for l on all
+                while (consp (cdr l))
+                for comp = (cadr l)
+                when (funcall fn comp)
+                do (setf (cdr l) (cddr l))
+                and return
+                (completion--cache-all-sorted-completions beg end (cons comp all)))
+       finally return all)))
+
 
 
 
@@ -488,10 +514,7 @@ See `icomplete-mode' and `minibuffer-setup-hook'."
                     (sit-for icomplete-compute-delay)))
           (when (and
                  icomplete-tidy-shadowed-file-names
-                 (eq (alist-get 'category
-                                (cdr (completion--field-metadata
-                                      (icomplete--field-beg))))
-                     'file)
+                 (eq (icomplete--category) 'file)
                  rfn-eshadow-overlay (overlay-buffer rfn-eshadow-overlay)
                  (eq this-command 'self-insert-command)
                  (= saved-point (icomplete--field-end))
@@ -559,8 +582,7 @@ matches exist."
                          (funcall predicate cand))))
             predicate))
 	 (md (completion--field-metadata (icomplete--field-beg)))
-	 (comps (completion-all-sorted-completions
-                 (icomplete--field-beg) (icomplete--field-end)))
+	 (comps (icomplete--sorted-completions))
          (last (if (consp comps) (last comps)))
          (base-size (cdr last))
          (open-bracket (if require-match "(" "["))

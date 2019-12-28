@@ -134,10 +134,11 @@ This variable is relevant only if `backup-by-copying' is nil."
 (defcustom backup-by-copying-when-privileged-mismatch 200
   "Non-nil means create backups by copying to preserve a privileged owner.
 Renaming may still be used (subject to control of other variables)
-when it would not result in changing the owner of the file or if the owner
-has a user id greater than the value of this variable.  This is useful
-when low-numbered uid's are used for special system users (such as root)
-that must maintain ownership of certain files.
+when it would not result in changing the owner of the file or if the
+user id and group id of the file are both greater than the value of
+this variable.  This is useful when low-numbered uid's and gid's are
+used for special system users (such as root) that must maintain
+ownership of certain files.
 This variable is relevant only if `backup-by-copying' and
 `backup-by-copying-when-mismatch' are nil."
   :type '(choice (const nil) integer)
@@ -404,7 +405,7 @@ editing a remote file.
 On MS-DOS filesystems without long names this variable is always
 ignored."
   :group 'auto-save
-  :type '(repeat (list (string :tag "Regexp") (string :tag "Replacement")
+  :type '(repeat (list (regexp :tag "Regexp") (string :tag "Replacement")
 					   (boolean :tag "Uniquify")))
   :initialize 'custom-initialize-delay
   :version "21.1")
@@ -2165,9 +2166,9 @@ If that fails, try to open it with `find-file-literally'
                       (* total-free-memory 1024)))))))))
 
 (defun files--message (format &rest args)
-  "Like `message', except sometimes don't print to minibuffer.
-If the variable `save-silently' is non-nil, the message is not
-displayed on the minibuffer."
+  "Like `message', except sometimes don't show the message text.
+If the variable `save-silently' is non-nil, the message will not
+be visible in the echo area."
   (apply #'message format args)
   (when save-silently (message nil)))
 
@@ -4634,8 +4635,10 @@ BACKUPNAME is the backup file name, which is the old file renamed."
 				      (let ((attr (file-attributes
 						   real-file-name
 						   'integer)))
-					(<= (file-attribute-user-id attr)
-					    copy-when-priv-mismatch))))
+                                        (or (<= (file-attribute-user-id attr)
+                                                copy-when-priv-mismatch)
+                                            (<= (file-attribute-group-id attr)
+                                                copy-when-priv-mismatch)))))
 			     (not (file-ownership-preserved-p real-file-name
 							      t)))))
 		   setmodes)
@@ -7247,7 +7250,8 @@ if any returns nil.  If `confirm-kill-emacs' is non-nil, calls it."
            (or (not active)
                (with-displayed-buffer-window
                 (get-buffer-create "*Process List*")
-                '(display-buffer--maybe-at-bottom)
+                '(display-buffer--maybe-at-bottom
+                  (dedicated . t))
                 #'(lambda (window _value)
                     (with-selected-window window
                       (unwind-protect

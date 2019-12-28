@@ -860,7 +860,7 @@ The specified function will be called as:
   (wallet-func WALLET PRODUCT USER SERVER DATABASE PORT)
 
 It is expected to return either a string containing the password,
-a function returning the password, or nil, If you want to support
+a function returning the password, or nil.  If you want to support
 another format of password file, then implement a different
 search wallet function and identify the location of the password
 store with `sql-password-wallet'.")
@@ -905,7 +905,7 @@ it automatically."
 		 (const  :tag "Default Terminator" t)
 		 (string :tag "Terminator String")
 		 (cons   :tag "Terminator Pattern and String"
-			 (string :tag "Terminator Pattern")
+			 (regexp :tag "Terminator Pattern")
 			 (string :tag "Terminator String")))
   :version "22.2"
   :group 'SQL)
@@ -1033,7 +1033,7 @@ All products share this list; products should define a regexp to
 identify additional keywords in a variable defined by
 the :statement feature."
   :version "24.1"
-  :type 'string
+  :type 'regexp
   :group 'SQL)
 
 ;; Customization for Oracle

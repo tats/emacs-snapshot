@@ -814,7 +814,7 @@ GROUP is a string for decoration purposes and XREF is an
            for line-format = (and max-line-width
                                   (format "%%%dd: " max-line-width))
            do
-           (xref--insert-propertized '(face xref-file-header 'xref-group t)
+           (xref--insert-propertized '(face xref-file-header xref-group t)
                                      group "\n")
            (cl-loop for (xref . more2) on xrefs do
                     (with-slots (summary location) xref
@@ -1291,8 +1291,11 @@ Such as the current syntax table and the applied syntax properties."
 
 (defun xref--collect-matches (hit regexp tmp-buffer)
   (pcase-let* ((`(,line ,file ,text) hit)
-               (file (and file (concat (file-remote-p default-directory) file)))
-               (buf (xref--find-buffer-visiting file))
+               (remote-id (file-remote-p default-directory))
+               (file (and file (concat remote-id file)))
+               (buf (unless remote-id
+                      ;; find-buffer-visiting is slow on remote.
+                      (xref--find-buffer-visiting file)))
                (syntax-needed (xref--regexp-syntax-dependent-p regexp)))
     (if buf
         (with-current-buffer buf

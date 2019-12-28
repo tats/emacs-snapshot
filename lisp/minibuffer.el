@@ -746,6 +746,77 @@ If ARGS are provided, then pass MESSAGE through `format-message'."
             (sit-for (or minibuffer-message-timeout 1000000)))
         (delete-overlay ol)))))
 
+(defcustom minibuffer-message-clear-timeout nil
+  "How long to display an echo-area message when the minibuffer is active.
+If the value is a number, it is the time in seconds after which to
+remove the echo-area message from the active minibuffer.
+If the value is not a number, such messages are never removed,
+and their text is displayed until the next input event arrives.
+Unlike `minibuffer-message-timeout' used by `minibuffer-message',
+this option affects the pair of functions `set-minibuffer-message'
+and `clear-minibuffer-message' called automatically via
+`set-message-function' and `clear-message-function'."
+  :type '(choice (const :tag "Never time out" nil)
+                 (integer :tag "Wait for the number of seconds" 2))
+  :version "27.1")
+
+(defvar minibuffer-message-timer nil)
+(defvar minibuffer-message-overlay nil)
+
+(defun set-minibuffer-message (message)
+  "Temporarily display MESSAGE at the end of the minibuffer.
+The text is displayed for `minibuffer-message-clear-timeout' seconds
+(if the value is a number), or until the next input event arrives,
+whichever comes first.
+Unlike `minibuffer-message', this function is called automatically
+via `set-message-function'."
+  (when (and (not noninteractive)
+             (window-live-p (active-minibuffer-window)))
+    (with-current-buffer (window-buffer (active-minibuffer-window))
+      (setq message (if (string-match-p "\\` *\\[.+\\]\\'" message)
+                        ;; Make sure we can put-text-property.
+                        (copy-sequence message)
+                      (concat " [" message "]")))
+      (unless (or (null minibuffer-message-properties)
+                  ;; Don't overwrite the face properties the caller has set
+                  (text-properties-at 0 message))
+        (setq message (apply #'propertize message minibuffer-message-properties)))
+
+      (clear-minibuffer-message)
+
+      (setq minibuffer-message-overlay
+            (make-overlay (point-max) (point-max) nil t t))
+      (unless (zerop (length message))
+        ;; The current C cursor code doesn't know to use the overlay's
+        ;; marker's stickiness to figure out whether to place the cursor
+        ;; before or after the string, so let's spoon-feed it the pos.
+        (put-text-property 0 1 'cursor t message))
+      (overlay-put minibuffer-message-overlay 'after-string message)
+
+      (when (numberp minibuffer-message-clear-timeout)
+        (setq minibuffer-message-timer
+              (run-with-timer minibuffer-message-clear-timeout nil
+                              #'clear-minibuffer-message)))
+
+      ;; Return `t' telling the caller that the message
+      ;; was handled specially by this function.
+      t)))
+
+(setq set-message-function 'set-minibuffer-message)
+
+(defun clear-minibuffer-message ()
+  "Clear minibuffer message.
+Intended to be called via `clear-message-function'."
+  (when (not noninteractive)
+    (when (timerp minibuffer-message-timer)
+      (cancel-timer minibuffer-message-timer)
+      (setq minibuffer-message-timer nil))
+    (when (overlayp minibuffer-message-overlay)
+      (delete-overlay minibuffer-message-overlay)
+      (setq minibuffer-message-overlay nil))))
+
+(setq clear-message-function 'clear-minibuffer-message)
+
 (defun minibuffer-completion-contents ()
   "Return the user input in a minibuffer before point as a string.
 In Emacs 22, that was what completion commands operated on.
@@ -3512,20 +3583,31 @@ that is non-nil."
 (put 'flex 'completion--adjust-metadata 'completion--flex-adjust-metadata)
 
 (defun completion--flex-adjust-metadata (metadata)
-  (cl-flet ((compose-flex-sort-fn
-             (existing-sort-fn) ; wish `cl-flet' had proper indentation...
-             (lambda (completions)
-               (let ((res
-                      (if existing-sort-fn
-                          (funcall existing-sort-fn completions)
-                        completions)))
-                 (sort
-                  res
-                  (lambda (c1 c2)
-                    (or (equal c1 minibuffer-default)
-                        (let ((s1 (get-text-property 0 'completion-score c1))
-                              (s2 (get-text-property 0 'completion-score c2)))
-                          (> (or s1 0) (or s2 0))))))))))
+  (cl-flet
+      ((compose-flex-sort-fn
+        (existing-sort-fn) ; wish `cl-flet' had proper indentation...
+        (lambda (completions)
+          (let ((pre-sorted
+                 (if existing-sort-fn
+                     (funcall existing-sort-fn completions)
+                   completions)))
+            (cond
+             ((or (not (window-minibuffer-p))
+                  ;; JT@2019-12-23: FIXME: this is still wrong.  What
+                  ;; we need to test here is "some input that actually
+                  ;; leads to flex filtering", not "something after
+                  ;; the minibuffer prompt".  Among other
+                  ;; inconsistencies, the latter is always true for
+                  ;; file searches, meaning the next clauses will be
+                  ;; ignored.
+                  (> (point-max) (minibuffer-prompt-end)))
+              (sort
+               pre-sorted
+               (lambda (c1 c2)
+                 (let ((s1 (get-text-property 0 'completion-score c1))
+                       (s2 (get-text-property 0 'completion-score c2)))
+                   (> (or s1 0) (or s2 0))))))
+             (t pre-sorted))))))
     `(metadata
       (display-sort-function
        . ,(compose-flex-sort-fn

@@ -2303,8 +2303,10 @@ ns_color_index_to_rgba(int idx, struct frame *f)
       EmacsCGFloat r, g, b, a;
       [col getRed: &r green: &g blue: &b alpha: &a];
 
-      return ARGB_TO_ULONG((int)(a*255),
-                           (int)(r*255), (int)(g*255), (int)(b*255));
+      return ARGB_TO_ULONG((unsigned long) (a * 255),
+                           (unsigned long) (r * 255),
+                           (unsigned long) (g * 255),
+                           (unsigned long) (b * 255));
     }
   else
     return idx;
@@ -2327,8 +2329,10 @@ ns_query_color(void *col, Emacs_Color *color_def, bool setPixel)
 
   if (setPixel == YES)
     color_def->pixel
-      = ARGB_TO_ULONG((int)(a*255),
-		      (int)(r*255), (int)(g*255), (int)(b*255));
+      = ARGB_TO_ULONG((unsigned long) (a * 255),
+		      (unsigned long) (r * 255),
+                      (unsigned long) (g * 255),
+                      (unsigned long) (b * 255));
 }
 
 bool
@@ -6460,10 +6464,6 @@ not_in_argv (NSString *arg)
   if (!emacs_event)
     return;
 
-  /* First, clear any working text.  */
-  if (workingText != nil)
-    [self deleteWorkingText];
-
   /* It might be preferable to use getCharacters:range: below,
      cf. https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/StringDrawing.html#//apple_ref/doc/uid/TP40001445-112378.
      However, we probably can't use SAFE_NALLOCA here because it might
@@ -6492,6 +6492,10 @@ not_in_argv (NSString *arg)
       emacs_event->code = code;
       EV_TRAILER ((id)nil);
     }
+
+  /* Last, clear any working text.  */
+  if (workingText != nil)
+    [self deleteWorkingText];
 }
 
 
