@@ -11,7 +11,7 @@ appropriate, etc.
  1 file changed, 4 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index 6e0b039..965a3a1 100644
+index 5bd45d7..ea28029 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
 @@ -21,6 +21,10 @@ Temporary note:
@@ -23,5 +23,5 @@ index 6e0b039..965a3a1 100644
 +Please see /usr/share/doc/emacs-snapshot-common/README.Debian.gz.
 +
  
- * Installation Changes in Emacs 27.1
+ * Installation Changes in Emacs 28.1
  
