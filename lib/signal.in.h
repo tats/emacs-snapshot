@@ -1,6 +1,6 @@
 /* A GNU-like <signal.h>.
 
-   Copyright (C) 2006-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -322,6 +322,12 @@ _GL_FUNCDECL_RPL (signal, _gl_function_taking_int_returning_void_t,
 _GL_CXXALIAS_RPL (signal, _gl_function_taking_int_returning_void_t,
                   (int sig, _gl_function_taking_int_returning_void_t func));
 # else
+/* On OpenBSD, the declaration of 'signal' may not be present at this point,
+   because it occurs in <sys/signal.h>, not <signal.h> directly.  */
+#  if defined __OpenBSD__
+_GL_FUNCDECL_SYS (signal, _gl_function_taking_int_returning_void_t,
+                  (int sig, _gl_function_taking_int_returning_void_t func));
+#  endif
 _GL_CXXALIAS_SYS (signal, _gl_function_taking_int_returning_void_t,
                   (int sig, _gl_function_taking_int_returning_void_t func));
 # endif

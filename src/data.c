@@ -1,5 +1,5 @@
 /* Primitive operations on Lisp data types for GNU Emacs Lisp interpreter.
-   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2019 Free Software
+   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2020 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -2321,7 +2321,7 @@ bool-vector.  IDX starts at 0.  */)
 
 	      memcpy (str, SDATA (array), nbytes);
 	      allocate_string_data (XSTRING (array), nchars,
-				    nbytes + new_bytes - prev_bytes);
+				    nbytes + new_bytes - prev_bytes, false);
 	      memcpy (SDATA (array), str, idxval_byte);
 	      p1 = SDATA (array) + idxval_byte;
 	      memcpy (p1 + new_bytes, str + idxval_byte + prev_bytes,
@@ -3310,27 +3310,14 @@ bool_vector_spare_mask (EMACS_INT nr_bits)
   return (((bits_word) 1) << (nr_bits % BITS_PER_BITS_WORD)) - 1;
 }
 
-/* Info about unsigned long long, falling back on unsigned long
-   if unsigned long long is not available.  */
-
-#if HAVE_UNSIGNED_LONG_LONG_INT && defined ULLONG_WIDTH
-enum { ULL_WIDTH = ULLONG_WIDTH };
-# define ULL_MAX ULLONG_MAX
-#else
-enum { ULL_WIDTH = ULONG_WIDTH };
-# define ULL_MAX ULONG_MAX
-# define count_one_bits_ll count_one_bits_l
-# define count_trailing_zeros_ll count_trailing_zeros_l
-#endif
-
 /* Shift VAL right by the width of an unsigned long long.
-   ULL_WIDTH must be less than BITS_PER_BITS_WORD.  */
+   ULLONG_WIDTH must be less than BITS_PER_BITS_WORD.  */
 
 static bits_word
 shift_right_ull (bits_word w)
 {
   /* Pacify bogus GCC warning about shift count exceeding type width.  */
-  int shift = ULL_WIDTH - BITS_PER_BITS_WORD < 0 ? ULL_WIDTH : 0;
+  int shift = ULLONG_WIDTH - BITS_PER_BITS_WORD < 0 ? ULLONG_WIDTH : 0;
   return w >> shift;
 }
 
@@ -3347,7 +3334,7 @@ count_one_bits_word (bits_word w)
     {
       int i = 0, count = 0;
       while (count += count_one_bits_ll (w),
-	     (i += ULL_WIDTH) < BITS_PER_BITS_WORD)
+	     (i += ULLONG_WIDTH) < BITS_PER_BITS_WORD)
 	w = shift_right_ull (w);
       return count;
     }
@@ -3478,7 +3465,7 @@ count_trailing_zero_bits (bits_word val)
     return count_trailing_zeros (val);
   if (BITS_WORD_MAX == ULONG_MAX)
     return count_trailing_zeros_l (val);
-  if (BITS_WORD_MAX == ULL_MAX)
+  if (BITS_WORD_MAX == ULLONG_MAX)
     return count_trailing_zeros_ll (val);
 
   /* The rest of this code is for the unlikely platform where bits_word differs
@@ -3492,18 +3479,18 @@ count_trailing_zero_bits (bits_word val)
     {
       int count;
       for (count = 0;
-	   count < BITS_PER_BITS_WORD - ULL_WIDTH;
-	   count += ULL_WIDTH)
+	   count < BITS_PER_BITS_WORD - ULLONG_WIDTH;
+	   count += ULLONG_WIDTH)
 	{
-	  if (val & ULL_MAX)
+	  if (val & ULLONG_MAX)
 	    return count + count_trailing_zeros_ll (val);
 	  val = shift_right_ull (val);
 	}
 
-      if (BITS_PER_BITS_WORD % ULL_WIDTH != 0
+      if (BITS_PER_BITS_WORD % ULLONG_WIDTH != 0
 	  && BITS_WORD_MAX == (bits_word) -1)
 	val |= (bits_word) 1 << pre_value (ULONG_MAX < BITS_WORD_MAX,
-					   BITS_PER_BITS_WORD % ULL_WIDTH);
+					   BITS_PER_BITS_WORD % ULLONG_WIDTH);
       return count + count_trailing_zeros_ll (val);
     }
 }
@@ -3516,10 +3503,8 @@ bits_word_to_host_endian (bits_word val)
 #else
   if (BITS_WORD_MAX >> 31 == 1)
     return bswap_32 (val);
-# if HAVE_UNSIGNED_LONG_LONG
   if (BITS_WORD_MAX >> 31 >> 31 >> 1 == 1)
     return bswap_64 (val);
-# endif
   {
     int i;
     bits_word r = 0;

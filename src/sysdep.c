@@ -1,5 +1,5 @@
 /* Interfaces to system-dependent kernel and library entries.
-   Copyright (C) 1985-1988, 1993-1995, 1999-2019 Free Software
+   Copyright (C) 1985-1988, 1993-1995, 1999-2020 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -133,11 +133,6 @@ int _cdecl _spawnlp (int, const char *, const char *, ...);
 /* The following is needed for O_CLOEXEC, F_SETFD, FD_CLOEXEC, and
    several prototypes of functions called below.  */
 # include <sys/socket.h>
-#endif
-
-/* ULLONG_MAX is missing on Red Hat Linux 7.3; see Bug#11781.  */
-#ifndef ULLONG_MAX
-#define ULLONG_MAX TYPE_MAXIMUM (unsigned long long int)
 #endif
 
 /* Declare here, including term.h is problematic on some systems.  */
@@ -3141,7 +3136,7 @@ make_lisp_timeval (struct timeval t)
 
 #endif
 
-#if defined GNU_LINUX && defined HAVE_LONG_LONG_INT
+#ifdef GNU_LINUX
 static struct timespec
 time_from_jiffies (unsigned long long tval, long hz)
 {

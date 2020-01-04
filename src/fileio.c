@@ -1,6 +1,6 @@
 /* File IO for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-2019 Free Software Foundation, Inc.
+Copyright (C) 1985-1988, 1993-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -4975,6 +4975,7 @@ Optional fourth argument APPEND if non-nil means
 Optional fifth argument VISIT, if t or a string, means
   set the last-save-file-modtime of buffer to this file's modtime
   and mark buffer not modified.
+If VISIT is t, the buffer is marked as visiting FILENAME.
 If VISIT is a string, it is a second file name;
   the output goes to FILENAME, but the buffer is marked as visiting VISIT.
   VISIT is also the file name to lock and unlock for clash detection.

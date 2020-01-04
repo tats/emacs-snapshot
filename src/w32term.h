@@ -1,5 +1,5 @@
 /* Definitions and headers for communication on the Microsoft Windows API.
-   Copyright (C) 1995, 2001-2019 Free Software Foundation, Inc.
+   Copyright (C) 1995, 2001-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -371,6 +371,10 @@ struct w32_output
   /* Non-hourglass cursor that is currently active.  */
   HCURSOR current_cursor;
 
+  /* The window style for this frame.  Set up when the frame is
+     created and updated when adding/removing decorations in
+     w32_set_undecorated.  Used by w32_set_window_size to adjust the
+     frame's window rectangle.  */
   DWORD dwStyle;
 
   /* This is the Emacs structure for the display this frame is on.  */

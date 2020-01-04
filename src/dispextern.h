@@ -1,6 +1,6 @@
 /* Interface definitions for display code.
 
-Copyright (C) 1985, 1993-1994, 1997-2019 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1994, 1997-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -123,7 +123,9 @@ typedef HDC Emacs_Pix_Context;
 
 #ifdef HAVE_NS
 #include "nsgui.h"
-#define FACE_COLOR_TO_PIXEL(face_color, frame) ns_color_index_to_rgba(face_color, frame)
+#define FACE_COLOR_TO_PIXEL(face_color, frame) (FRAME_NS_P (frame) \
+                                                ? ns_color_index_to_rgba (face_color, frame) \
+                                                : face_color)
 /* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
 typedef struct ns_display_info Display_Info;
 typedef Emacs_Pixmap Emacs_Pix_Container;

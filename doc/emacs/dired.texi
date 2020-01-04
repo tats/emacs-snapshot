@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Dired
@@ -719,6 +719,11 @@ should create non-existent directories in @var{new}.
 
 Dired automatically changes the visited file name of buffers associated
 with renamed files so that they refer to the new names.
+
+@vindex dired-vc-rename
+If the value of the variable @code{dired-vc-rename} is non-@code{nil},
+files are renamed using the commands of the underlying VCS, via
+@code{vc-rename-file} (@pxref{VC Delete/Rename}).
 
 @findex dired-do-hardlink
 @kindex H @r{(Dired)}

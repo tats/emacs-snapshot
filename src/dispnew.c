@@ -1,6 +1,6 @@
 /* Updating of data structures for redisplay.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2019 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -534,6 +534,14 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
       eassert (left >= 0 && right >= 0);
       matrix->left_margin_glyphs = left;
       matrix->right_margin_glyphs = right;
+
+      /* If we are resizing a window, make sure the previous mode-line
+	 row of the window's current matrix is no longer marked as such.  */
+      if (w && matrix == w->current_matrix
+	  && matrix->nrows > 0
+	  && dim.height != matrix->nrows
+	  && matrix->nrows <= matrix->rows_allocated)
+	MATRIX_MODE_LINE_ROW (matrix)->mode_line_p = false;
     }
 
   /* Number of rows to be used by MATRIX.  */

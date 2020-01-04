@@ -1,6 +1,6 @@
 ;;; dired-aux.el --- less commonly used parts of dired -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
@@ -2958,7 +2958,6 @@ with the command \\[tags-loop-continue]."
 (declare-function xref--show-xrefs "xref")
 (declare-function xref-query-replace-in-results "xref")
 (declare-function project--files-in-directory "project")
-(declare-function project--find-regexp-in-files "project")
 
 ;;;###autoload
 (defun dired-do-find-regexp (regexp)
@@ -2994,7 +2993,7 @@ REGEXP should use constructs supported by your local `grep' command."
                    (push mark files)))
                (nreverse marks))
               (setq xrefs
-                    (project--find-regexp-in-files regexp files))
+                    (xref-matches-in-files regexp files))
               (unless xrefs
                 (user-error "No matches for: %s" regexp))
               xrefs))))

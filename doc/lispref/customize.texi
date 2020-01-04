@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1997-2019 Free Software Foundation, Inc.
+@c Copyright (C) 1997--2020 Free Software Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Customization
 @chapter Customization Settings
@@ -426,6 +426,12 @@ the build-time context.  This also has the side-effect that the
 (delayed) initialization is performed with the @code{:set} function.
 @xref{Building Emacs}.
 @end table
+
+@item :local @var{value}
+@kindex local@r{, @code{defcustom} keyword}
+If the @var{value} is @code{t}, mark @var{option} as automatically
+buffer-local; if the value is @code{permanent}, also set @var{option}s
+@code{permanent-local} property to @code{t}.  @xref{Creating Buffer-Local}.
 
 @item :risky @var{value}
 @kindex risky@r{, @code{defcustom} keyword}

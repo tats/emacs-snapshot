@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1993, 1998, 2001-2019 Free Software Foundation,
+@c Copyright (C) 1990--1993, 1998, 2001--2020 Free Software Foundation,
 @c Inc.
 @c See the file elisp.texi for copying conditions.
 @node Standard Hooks
@@ -109,6 +109,10 @@ Function to call to quit the current buffer.
 
 @item change-major-mode-hook
 @xref{Creating Buffer-Local}.
+
+@item comint-password-function
+This abnormal hook permits a derived mode to supply a password for the
+underlying command interpreter without prompting the user.
 
 @item command-line-functions
 @xref{Command-Line Arguments}.

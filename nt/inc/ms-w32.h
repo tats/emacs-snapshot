@@ -1,6 +1,6 @@
 /* System description file for Windows NT.
 
-Copyright (C) 1993-1995, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1993-1995, 2001-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -499,6 +499,8 @@ extern void *malloc_after_dump_9x(size_t);
 extern void *realloc_after_dump_9x(void *, size_t);
 extern void free_after_dump_9x(void *);
 
+extern void *sys_calloc(size_t, size_t);
+
 extern malloc_fn the_malloc_fn;
 extern realloc_fn the_realloc_fn;
 extern free_fn the_free_fn;
@@ -506,6 +508,7 @@ extern free_fn the_free_fn;
 #define malloc(size) (*the_malloc_fn)(size)
 #define free(ptr)   (*the_free_fn)(ptr)
 #define realloc(ptr, size) (*the_realloc_fn)(ptr, size)
+#define calloc(num, size) sys_calloc(num, size)
 
 #endif
 

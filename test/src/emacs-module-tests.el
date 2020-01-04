@@ -1,6 +1,6 @@
 ;;; emacs-module-tests --- Test GNU Emacs modules.  -*- lexical-binding: t; -*-
 
-;; Copyright 2015-2019 Free Software Foundation, Inc.
+;; Copyright 2015-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -401,5 +401,25 @@ See Bug#36226."
     (unwind-protect
         (load so nil nil :nosuffix :must-suffix)
       (delete-file so))))
+
+(ert-deftest module/function-finalizer ()
+  "Test that module function finalizers are properly called."
+  ;; We create and leak a couple of module functions with attached
+  ;; finalizer.  Creating only one function risks spilling it to the
+  ;; stack, where it wouldn't be garbage-collected.  However, with one
+  ;; hundred functions, there should be at least one that's
+  ;; unreachable.
+  (dotimes (_ 100)
+    (mod-test-make-function-with-finalizer))
+  (cl-destructuring-bind (valid-before invalid-before)
+      (mod-test-function-finalizer-calls)
+    (should (zerop invalid-before))
+    (garbage-collect)
+    (cl-destructuring-bind (valid-after invalid-after)
+        (mod-test-function-finalizer-calls)
+      (should (zerop invalid-after))
+      ;; We don't require exactly 100 invocations of the finalizer,
+      ;; but at least one.
+      (should (> valid-after valid-before)))))
 
 ;;; emacs-module-tests.el ends here

@@ -1,6 +1,6 @@
 /* Fundamental definitions for GNU Emacs Lisp interpreter. -*- coding: utf-8 -*-
 
-Copyright (C) 1985-1987, 1993-1995, 1997-2019 Free Software Foundation,
+Copyright (C) 1985-1987, 1993-1995, 1997-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -3812,7 +3812,8 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 /* Defined in alloc.c.  */
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
-extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT);
+extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT,
+				  bool);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);
@@ -3942,6 +3943,7 @@ extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
 extern void make_byte_code (struct Lisp_Vector *);
 extern struct Lisp_Vector *allocate_vector (ptrdiff_t);
+extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t);
 
 /* Make an uninitialized vector for SIZE objects.  NOTE: you must
    be sure that GC cannot happen until the vector is completely
@@ -3977,9 +3979,7 @@ make_uninit_sub_char_table (int depth, int min_char)
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
-  Lisp_Object vec = make_uninit_vector (size);
-  memclear (XVECTOR (vec)->contents, size * word_size);
-  return vec;
+  return make_lisp_ptr (allocate_nil_vector (size), Lisp_Vectorlike);
 }
 
 extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
@@ -4245,6 +4245,7 @@ extern Lisp_Object module_function_documentation
   (struct Lisp_Module_Function const *);
 extern module_funcptr module_function_address
   (struct Lisp_Module_Function const *);
+extern void module_finalize_function (const struct Lisp_Module_Function *);
 extern void mark_modules (void);
 extern void init_module_assertions (bool);
 extern void syms_of_module (void);

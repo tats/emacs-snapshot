@@ -1,5 +1,5 @@
 /* Heap management routines for GNU Emacs on the Microsoft Windows API.
-   Copyright (C) 1994, 2001-2019 Free Software Foundation, Inc.
+   Copyright (C) 1994, 2001-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Emacs.
 
@@ -595,6 +595,16 @@ free_after_dump_9x (void *ptr)
     {
       free_after_dump (*((void**)ptr-1));
     }
+}
+
+void *
+sys_calloc (size_t number, size_t size)
+{
+  size_t nbytes = number * size;
+  void *ptr = (*the_malloc_fn) (nbytes);
+  if (ptr)
+    memset (ptr, 0, nbytes);
+  return ptr;
 }
 
 #if defined HAVE_UNEXEC && defined ENABLE_CHECKING

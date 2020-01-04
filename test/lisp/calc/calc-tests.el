@@ -1,6 +1,6 @@
 ;;; calc-tests.el --- tests for calc                 -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Keywords: maint
@@ -29,6 +29,7 @@
 (require 'calc)
 (require 'calc-ext)
 (require 'calc-units)
+(require 'calc-forms)
 
 ;; XXX The order in which calc libraries (in particular calc-units)
 ;; are loaded influences whether a calc integer in an expression

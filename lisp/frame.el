@@ -1,6 +1,6 @@
 ;;; frame.el --- multi-frame management independent of window systems  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2000-2019 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -2725,6 +2725,9 @@ See also `toggle-frame-maximized'."
         line-prefix
         wrap-prefix
         truncate-lines
+        mode-line-format
+        header-line-format
+        tab-line-format
         display-line-numbers
         display-line-numbers-width
         display-line-numbers-current-absolute

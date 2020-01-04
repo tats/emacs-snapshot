@@ -1,6 +1,6 @@
 ;;; completion-tests.el --- Tests for completion functions  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2020 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords:
@@ -82,7 +82,8 @@
 
 (ert-deftest completion-table-test-quoting ()
   (let ((process-environment
-         `("CTTQ1=ed" "CTTQ2=et/" ,@process-environment)))
+         `("CTTQ1=ed" "CTTQ2=et/" ,@process-environment))
+        (default-directory (expand-file-name "test" source-directory)))
     (pcase-dolist (`(,input ,output)
                    '(
                      ;; Test that $ in files is properly $$ quoted.
