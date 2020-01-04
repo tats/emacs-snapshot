@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index aa11e6b..a1b6052 100644
+index 2c82c49..6a51b3d 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=
@@ -120,7 +120,7 @@ index aa11e6b..a1b6052 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index bb831a0..de0d9ee 100755
+index af339a9..4864d89 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -259,8 +259,7 @@ info_dir ()
@@ -134,7 +134,7 @@ index bb831a0..de0d9ee 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index f24597a..fbd60a7 100644
+index 24d21c7..f3eb727 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -5778,7 +5778,7 @@ AC_DEFUN
@@ -163,7 +163,7 @@ index f24597a..fbd60a7 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 5490580..8800638 100644
+index 0a26a26..a9d0e24 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -190,7 +190,7 @@ index 5490580..8800638 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 857064c..ba91278 100644
+index 45cbaad..d28e134 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -296,6 +296,14 @@ view-help-file
