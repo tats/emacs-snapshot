@@ -134,10 +134,10 @@ index af339a9..4864d89 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 24d21c7..f3eb727 100644
+index 08a4502..34410b9 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5778,7 +5778,7 @@ AC_DEFUN
+@@ -5795,7 +5795,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 24d21c7..f3eb727 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5830,15 +5830,6 @@ m4_define
+@@ -5847,15 +5847,6 @@ m4_define
  fi
  ])
  
