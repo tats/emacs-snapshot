@@ -1069,7 +1069,7 @@ DEFINE_GDB_SYMBOL_END (PSEUDOVECTOR_FLAG)
    with PVEC_TYPE_MASK to indicate the actual type.  */
 enum pvec_type
 {
-  PVEC_NORMAL_VECTOR,
+  PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
   PVEC_FREE,
   PVEC_BIGNUM,
   PVEC_MARKER,
@@ -1094,7 +1094,7 @@ enum pvec_type
   PVEC_CONDVAR,
   PVEC_MODULE_FUNCTION,
 
-  /* These should be last, check internal_equal to see why.  */
+  /* These should be last, for internal_equal and sxhash_obj.  */
   PVEC_COMPILED,
   PVEC_CHAR_TABLE,
   PVEC_SUB_CHAR_TABLE,
@@ -3652,7 +3652,7 @@ extern bool sweep_weak_table (struct Lisp_Hash_Table *, bool);
 extern void hexbuf_digest (char *, void const *, int);
 extern char *extract_data_from_object (Lisp_Object, ptrdiff_t *, ptrdiff_t *);
 EMACS_UINT hash_string (char const *, ptrdiff_t);
-EMACS_UINT sxhash (Lisp_Object, int);
+EMACS_UINT sxhash (Lisp_Object);
 Lisp_Object hashfn_eql (Lisp_Object, struct Lisp_Hash_Table *);
 Lisp_Object hashfn_equal (Lisp_Object, struct Lisp_Hash_Table *);
 Lisp_Object hashfn_user_defined (Lisp_Object, struct Lisp_Hash_Table *);
@@ -4245,6 +4245,7 @@ extern Lisp_Object module_function_documentation
   (struct Lisp_Module_Function const *);
 extern module_funcptr module_function_address
   (struct Lisp_Module_Function const *);
+extern void *module_function_data (const struct Lisp_Module_Function *);
 extern void module_finalize_function (const struct Lisp_Module_Function *);
 extern void mark_modules (void);
 extern void init_module_assertions (bool);

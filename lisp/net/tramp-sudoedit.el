@@ -265,10 +265,8 @@ absolute file names."
 	      v 0 (format "%s %s to %s" msg-operation filename newname)
 	    (unless (tramp-sudoedit-send-command
 		     v sudoedit-operation
-		     (tramp-compat-file-name-unquote
-		      (tramp-compat-file-local-name filename))
-		     (tramp-compat-file-name-unquote
-		      (tramp-compat-file-local-name newname)))
+		     (tramp-unquote-file-local-name filename)
+		     (tramp-unquote-file-local-name newname))
 	      (tramp-error
 	       v 'file-error
 	       "Error %s `%s' `%s'" msg-operation filename newname))))
@@ -508,21 +506,21 @@ the result will be a local, non-Tramp, file name."
       (tramp-message v 5 "file system info: %s" localname)
       (when (tramp-sudoedit-send-command
 	     v "df" "--block-size=1" "--output=size,used,avail"
-	     (tramp-compat-file-name-unquote localname)))
-      (with-current-buffer (tramp-get-connection-buffer v)
-	(goto-char (point-min))
-	(forward-line)
-	(when (looking-at
-	       (eval-when-compile
-		 (concat "[[:space:]]*\\([[:digit:]]+\\)"
-			 "[[:space:]]+\\([[:digit:]]+\\)"
-			 "[[:space:]]+\\([[:digit:]]+\\)")))
-	  (list (string-to-number (match-string 1))
-		;; The second value is the used size.  We need the
-		;; free size.
-		(- (string-to-number (match-string 1))
-		   (string-to-number (match-string 2)))
-		(string-to-number (match-string 3))))))))
+	     (tramp-compat-file-name-unquote localname))
+	(with-current-buffer (tramp-get-connection-buffer v)
+	  (goto-char (point-min))
+	  (forward-line)
+	  (when (looking-at
+		 (eval-when-compile
+		   (concat "[[:space:]]*\\([[:digit:]]+\\)"
+			   "[[:space:]]+\\([[:digit:]]+\\)"
+			   "[[:space:]]+\\([[:digit:]]+\\)")))
+	    (list (string-to-number (match-string 1))
+		  ;; The second value is the used size.  We need the
+		  ;; free size.
+		  (- (string-to-number (match-string 1))
+		     (string-to-number (match-string 2)))
+		  (string-to-number (match-string 3)))))))))
 
 (defun tramp-sudoedit-handle-set-file-times (filename &optional time)
   "Like `set-file-times' for Tramp files."
@@ -615,9 +613,7 @@ component is used as the target of the symlink."
       (let ((non-essential t))
 	(when (and (tramp-tramp-file-p target)
 		   (tramp-file-name-equal-p v (tramp-dissect-file-name target)))
-	  (setq target
-		(tramp-file-name-localname
-		 (tramp-dissect-file-name (expand-file-name target))))))
+	  (setq target (tramp-file-local-name (expand-file-name target)))))
 
       ;; If TARGET is still remote, quote it.
       (if (tramp-tramp-file-p target)
@@ -715,8 +711,7 @@ ID-FORMAT valid values are `string' and `integer'."
        (format "%d:%d"
 	       (or uid (tramp-sudoedit-get-remote-uid v 'integer))
 	       (or gid (tramp-sudoedit-get-remote-gid v 'integer)))
-       (tramp-compat-file-name-unquote
-	(tramp-compat-file-local-name filename)))))
+       (tramp-unquote-file-local-name filename))))
 
 (defun tramp-sudoedit-handle-write-region
   (start end filename &optional append visit lockname mustbenew)

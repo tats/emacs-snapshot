@@ -47,6 +47,7 @@ static void sort_vector_copy (Lisp_Object, ptrdiff_t,
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
 static bool internal_equal (Lisp_Object, Lisp_Object,
 			    enum equal_kind, int, Lisp_Object);
+static EMACS_UINT sxhash_obj (Lisp_Object, int);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
        doc: /* Return the ARGUMENT unchanged.  */
@@ -2433,6 +2434,9 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	   same size.  */
 	if (ASIZE (o2) != size)
 	  return false;
+
+	/* Compare bignums, overlays, markers, and boolvectors
+	   specially, by comparing their values.  */
 	if (BIGNUMP (o1))
 	  return mpz_cmp (*xbignum_val (o1), *xbignum_val (o2)) == 0;
 	if (OVERLAYP (o1))
@@ -2453,7 +2457,6 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 		    && (XMARKER (o1)->buffer == 0
 			|| XMARKER (o1)->bytepos == XMARKER (o2)->bytepos));
 	  }
-	/* Boolvectors are compared much like strings.  */
 	if (BOOL_VECTOR_P (o1))
 	  {
 	    EMACS_INT size = bool_vector_size (o1);
@@ -2463,11 +2466,6 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 			bool_vector_bytes (size)))
 	      return false;
 	    return true;
-	  }
-	if (WINDOW_CONFIGURATIONP (o1))
-	  {
-	    eassert (equal_kind != EQUAL_NO_QUIT);
-	    return compare_window_configurations (o1, o2, false);
 	  }
 
 	/* Aside from them, only true vectors, char-tables, compiled
@@ -4022,7 +4020,7 @@ hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 Lisp_Object
 hashfn_equal (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return make_ufixnum (sxhash (key, 0));
+  return make_ufixnum (sxhash (key));
 }
 
 /* Ignore HT and return a hash code for KEY which uses 'eql' to compare keys.
@@ -4042,7 +4040,7 @@ hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
   Lisp_Object args[] = { h->test.user_hash_function, key };
   Lisp_Object hash = hash_table_user_defined_call (ARRAYELTS (args), args, h);
-  return FIXNUMP (hash) ? hash : make_ufixnum (sxhash (hash, 0));
+  return FIXNUMP (hash) ? hash : make_ufixnum (sxhash (hash));
 }
 
 struct hash_table_test const
@@ -4606,13 +4604,13 @@ sxhash_list (Lisp_Object list, int depth)
 	 CONSP (list) && i < SXHASH_MAX_LEN;
 	 list = XCDR (list), ++i)
       {
-	EMACS_UINT hash2 = sxhash (XCAR (list), depth + 1);
+	EMACS_UINT hash2 = sxhash_obj (XCAR (list), depth + 1);
 	hash = sxhash_combine (hash, hash2);
       }
 
   if (!NILP (list))
     {
-      EMACS_UINT hash2 = sxhash (list, depth + 1);
+      EMACS_UINT hash2 = sxhash_obj (list, depth + 1);
       hash = sxhash_combine (hash, hash2);
     }
 
@@ -4632,7 +4630,7 @@ sxhash_vector (Lisp_Object vec, int depth)
   n = min (SXHASH_MAX_LEN, hash & PSEUDOVECTOR_FLAG ? PVSIZE (vec) : hash);
   for (i = 0; i < n; ++i)
     {
-      EMACS_UINT hash2 = sxhash (AREF (vec, i), depth + 1);
+      EMACS_UINT hash2 = sxhash_obj (AREF (vec, i), depth + 1);
       hash = sxhash_combine (hash, hash2);
     }
 
@@ -4675,7 +4673,13 @@ sxhash_bignum (Lisp_Object bignum)
    structure.  Value is an unsigned integer clipped to INTMASK.  */
 
 EMACS_UINT
-sxhash (Lisp_Object obj, int depth)
+sxhash (Lisp_Object obj)
+{
+  return sxhash_obj (obj, 0);
+}
+
+static EMACS_UINT
+sxhash_obj (Lisp_Object obj, int depth)
 {
   EMACS_UINT hash;
 
@@ -4696,22 +4700,35 @@ sxhash (Lisp_Object obj, int depth)
       hash = sxhash_string (SSDATA (obj), SBYTES (obj));
       break;
 
-      /* This can be everything from a vector to an overlay.  */
     case Lisp_Vectorlike:
-      if (BIGNUMP (obj))
-	hash = sxhash_bignum (obj);
-      else if (VECTORP (obj) || RECORDP (obj))
-	/* According to the CL HyperSpec, two arrays are equal only if
-	   they are `eq', except for strings and bit-vectors.  In
-	   Emacs, this works differently.  We have to compare element
-	   by element.  Same for records.  */
-	hash = sxhash_vector (obj, depth);
-      else if (BOOL_VECTOR_P (obj))
-	hash = sxhash_bool_vector (obj);
-      else
-	/* Others are `equal' if they are `eq', so let's take their
-	   address as hash.  */
-	hash = XHASH (obj);
+      {
+	enum pvec_type pvec_type = PSEUDOVECTOR_TYPE (XVECTOR (obj));
+	if (! (PVEC_NORMAL_VECTOR < pvec_type && pvec_type < PVEC_COMPILED))
+	  {
+	    /* According to the CL HyperSpec, two arrays are equal only if
+	       they are 'eq', except for strings and bit-vectors.  In
+	       Emacs, this works differently.  We have to compare element
+	       by element.  Same for pseudovectors that internal_equal
+	       examines the Lisp contents of.  */
+	    hash = sxhash_vector (obj, depth);
+	    break;
+	  }
+	else if (pvec_type == PVEC_BIGNUM)
+	  hash = sxhash_bignum (obj);
+	else if (pvec_type == PVEC_MARKER)
+	  {
+	    ptrdiff_t bytepos
+	      = XMARKER (obj)->buffer ? XMARKER (obj)->bytepos : 0;
+	    hash = sxhash_combine ((intptr_t) XMARKER (obj)->buffer, bytepos);
+	    hash = SXHASH_REDUCE (hash);
+	  }
+	else if (pvec_type == PVEC_BOOL_VECTOR)
+	  hash = sxhash_bool_vector (obj);
+	else
+	  /* Others are 'equal' if they are 'eq', so take their
+	     address as hash.  */
+	  hash = XHASH (obj);
+      }
       break;
 
     case Lisp_Cons:
