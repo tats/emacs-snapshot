@@ -24,6 +24,14 @@ applies, and please also update docstrings as needed.
 
 * Installation Changes in Emacs 28.1
 
+** Cairo is now used by default if found.
+'--with-cairo' is now the default, if the appropriate development files
+are found by 'configure'
+
+---
+** The ftx font backend driver has been removed.
+It was declared obsolete in Emacs 27.1.
+
 
 * Startup Changes in Emacs 28.1
 
@@ -35,6 +43,17 @@ applies, and please also update docstrings as needed.
 
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
+
+---
+** The sb-image.el library is now marked obsolete.
+This file was a compatibility kludge which is no longer needed.
+
+** Edebug
+
++++
+*** Edebug specification lists can use the new keyword '&error', which
+unconditionally aborts the current edebug instrumentation with the
+supplied error message.
 
 
 * New Modes and Packages in Emacs 28.1
@@ -50,6 +69,11 @@ incorrect hashes for window configurations and some other objects.
 
 ** The obsolete function 'thread-alive-p' has been removed.
 
+** dns-query now consistently uses Lisp integers to represent integers.
+Formerly it made an exception for integer components of SOA records,
+because SOA serial numbers can exceed fixnum ranges on 32-bit platforms.
+Emacs now supports bignums so this old glitch is no longer needed.
+
 
 * Lisp Changes in Emacs 28.1
 
@@ -61,6 +85,9 @@ finalizers, respectively.
 called when the function object is garbage-collected.  Use
 'set_function_finalizer' to set the finalizer and
 'get_function_finalizer' to retrieve it.
+
+** 'parse-time-string' can now parse ISO 8601 format strings,
+such as "2020-01-15T16:12:21-08:00".
 
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
