@@ -703,7 +703,9 @@ system, including many technical ones.  Examples:
  ("\\ldq" ?\“)
  ("\\rdq" ?\”)
  ("\\defs" ?≙)				; per fuzz/zed
- ;; ("\\sqrt[3]" ?∛)
+ ("\\sqrt" ?√)
+ ("\\sqrt[3]" ?∛)
+ ("\\sqrt[4]" ?∜)
  ("\\llbracket" ?\〚) 			; stmaryrd
  ("\\rrbracket" ?\〛)
  ;; ("\\lbag" ?\〚) 			; fuzz

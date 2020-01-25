@@ -851,7 +851,6 @@ If a directory or nothing is found at point, return nil."
     (if (and file-name
 	     (not (file-directory-p file-name)))
 	file-name)))
-(put 'dired-mode 'grep-read-files 'dired-grep-read-files)
 
 ;;;###autoload (define-key ctl-x-map "d" 'dired)
 ;;;###autoload
@@ -2244,6 +2243,7 @@ Keybindings:
   (setq-local font-lock-defaults
               '(dired-font-lock-keywords t nil nil beginning-of-line))
   (setq-local desktop-save-buffer 'dired-desktop-buffer-misc-data)
+  (setq-local grep-read-files-function #'dired-grep-read-files)
   (setq dired-switches-alist nil)
   (hack-dir-local-variables-non-file-buffer) ; before sorting
   (dired-sort-other dired-actual-switches t)
@@ -3858,28 +3858,31 @@ With prefix argument, unmark or unflag these files."
 	    (if fn (backup-file-name-p fn))))
      "backup file")))
 
-(defun dired-change-marks (&optional old new)
+(defun dired-change-marks (old new)
   "Change all OLD marks to NEW marks.
 OLD and NEW are both characters used to mark files."
+  (declare (advertised-calling-convention '(old new) "28.1"))
   (interactive
    (let* ((cursor-in-echo-area t)
 	  (old (progn (message "Change (old mark): ") (read-char)))
 	  (new (progn (message  "Change %c marks to (new mark): " old)
 		      (read-char))))
      (list old new)))
-  (if (or (eq old ?\r) (eq new ?\r))
-      (ding)
-    (let ((string (format "\n%c" old))
-	  (inhibit-read-only t))
-      (save-excursion
-	(goto-char (point-min))
-	(while (search-forward string nil t)
-	  (if (if (= old ?\s)
-		  (save-match-data
-		    (dired-get-filename 'no-dir t))
-		t)
-	      (subst-char-in-region (match-beginning 0)
-				    (match-end 0) old new)))))))
+  (dolist (c (list new old))
+    (if (or (not (char-displayable-p c))
+            (eq c ?\r))
+        (user-error "Invalid mark character: `%c'" c)))
+  (let ((string (format "\n%c" old))
+        (inhibit-read-only t))
+    (save-excursion
+      (goto-char (point-min))
+      (while (search-forward string nil t)
+        (if (if (= old ?\s)
+                (save-match-data
+                  (dired-get-filename 'no-dir t))
+              t)
+            (subst-char-in-region (match-beginning 0)
+                                  (match-end 0) old new))))))
 
 (defun dired-unmark-all-marks ()
   "Remove all marks from all files in the Dired buffer."
