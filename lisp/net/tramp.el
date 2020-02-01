@@ -1999,9 +1999,9 @@ without a visible progress reporter."
            (tm
             ;; We start a pulsing progress reporter after 3
             ;; seconds. Display only when there is a minimum level.
-            (when (<= ,level (min tramp-verbose 3))
-	      (when-let ((pr (make-progress-reporter ,message nil nil)))
-		(run-at-time 3 0.1 #'tramp-progress-reporter-update pr)))))
+	    (when-let ((pr (and (<= ,level (min tramp-verbose 3))
+				(make-progress-reporter ,message nil nil))))
+	      (run-at-time 3 0.1 #'tramp-progress-reporter-update pr))))
        (unwind-protect
            ;; Execute the body.
            (prog1 (progn ,@body) (setq cookie "done"))
@@ -2412,10 +2412,11 @@ Fall back to normal file name handler if no Tramp file name handler exists."
 (defun tramp-completion-file-name-handler (operation &rest args)
   "Invoke Tramp file name completion handler for OPERATION and ARGS.
 Falls back to normal file name handler if no Tramp file name handler exists."
-  (when tramp-mode
-    (if-let ((fn (assoc operation tramp-completion-file-name-handler-alist)))
-	(save-match-data (apply (cdr fn) args))
-      (tramp-run-real-handler operation args))))
+  (if-let
+      ((fn (and tramp-mode
+		(assoc operation tramp-completion-file-name-handler-alist))))
+      (save-match-data (apply (cdr fn) args))
+    (tramp-run-real-handler operation args)))
 
 ;;;###autoload
 (progn (defun tramp-autoload-file-name-handler (operation &rest args)
@@ -2843,7 +2844,7 @@ User is always nil."
   (let ((default-directory (tramp-compat-temporary-file-directory)))
     (when (file-readable-p filename)
       (with-temp-buffer
-	(insert-file-contents filename)
+	(insert-file-contents-literally filename)
 	(goto-char (point-min))
         (cl-loop while (not (eobp)) collect (funcall function))))))
 
@@ -3617,6 +3618,7 @@ support symbolic links."
   (let* ((asynchronous (string-match-p "[ \t]*&[ \t]*\\'" command))
 	 (command (substring command 0 asynchronous))
 	 current-buffer-p
+	 (output-buffer-p output-buffer)
 	 (output-buffer
 	  (cond
 	   ((bufferp output-buffer) output-buffer)
@@ -3634,6 +3636,7 @@ support symbolic links."
 	   ((stringp error-buffer) (get-buffer-create error-buffer))))
 	 (bname (buffer-name output-buffer))
 	 (p (get-buffer-process output-buffer))
+	 (dir default-directory)
 	 buffer)
 
     ;; The following code is taken from `shell-command', slightly
@@ -3670,6 +3673,10 @@ support symbolic links."
 	  (rename-uniquely))
         (setq output-buffer (get-buffer-create bname)))))
 
+    (unless output-buffer-p
+      (with-current-buffer output-buffer
+	(setq default-directory dir)))
+
     (setq buffer (if error-buffer
 		     (with-parsed-tramp-file-name default-directory nil
 		       (list output-buffer
@@ -3698,32 +3705,37 @@ support symbolic links."
 	      ;; Run the process.
 	      (setq p (start-file-process-shell-command
 		       (buffer-name output-buffer) buffer command))
-	    (if (process-live-p p)
-		;; Display output.
-		(with-current-buffer output-buffer
-		  (display-buffer output-buffer '(nil (allow-no-window . t)))
-		  (setq mode-line-process '(":%s"))
-		  (shell-mode)
-		  (set-process-filter p #'comint-output-filter)
-		  (set-process-sentinel
-		   p (if (listp buffer)
-			 (lambda (_proc _string)
-			   (with-current-buffer error-buffer
-			     (insert-file-contents (cadr buffer)))
-			   (delete-file (cadr buffer)))
-		       #'shell-command-sentinel)))
-	      ;; Show stderr.
+	    ;; Insert error messages if they were separated.
+	    (when (consp buffer)
 	      (with-current-buffer error-buffer
-		(insert-file-contents (cadr buffer)))
-	      (delete-file (cadr buffer)))))
+		(insert-file-contents-literally (cadr buffer))))
+	    (if (process-live-p p)
+	      ;; Display output.
+	      (with-current-buffer output-buffer
+		(display-buffer output-buffer '(nil (allow-no-window . t)))
+		(setq mode-line-process '(":%s"))
+		(shell-mode)
+		(set-process-filter p #'comint-output-filter)
+		(set-process-sentinel p #'shell-command-sentinel)
+		(when (consp buffer)
+		  (add-function
+		   :after (process-sentinel p)
+		   (lambda (_proc _string)
+		     (with-current-buffer error-buffer
+		       (insert-file-contents-literally
+			(cadr buffer) nil nil nil 'replace))
+		     (delete-file (cadr buffer))))))
+
+	      (when (consp buffer)
+		(delete-file (cadr buffer))))))
 
       (prog1
 	  ;; Run the process.
 	  (process-file-shell-command command nil buffer nil)
 	;; Insert error messages if they were separated.
-	(when (listp buffer)
+	(when (consp buffer)
 	  (with-current-buffer error-buffer
-	    (insert-file-contents (cadr buffer)))
+	    (insert-file-contents-literally (cadr buffer)))
 	  (delete-file (cadr buffer)))
 	(if current-buffer-p
 	    ;; This is like exchange-point-and-mark, but doesn't
@@ -3744,10 +3756,10 @@ BUFFER might be a list, in this case STDERR is separated."
   (tramp-file-name-handler
    'make-process
    :name name
-   :buffer (if (listp buffer) (car buffer) buffer)
+   :buffer (if (consp buffer) (car buffer) buffer)
    :command (and program (cons program args))
    ;; `shell-command' adds an errfile to `buffer'.
-   :stderr (when (listp buffer) (cadr buffer))
+   :stderr (when (consp buffer) (cadr buffer))
    :noquery nil
    :file-handler t))
 
@@ -4803,6 +4815,19 @@ verbosity of 6."
 	     (tramp-error vec (car err) (cdr err)))))
     (tramp-message vec 6 "%s" result)
     result))
+
+(defun tramp-process-running-p (process-name)
+  "Return t if system process PROCESS-NAME is running for `user-login-name'."
+  (when (stringp process-name)
+    (catch 'result
+      (dolist (pid (tramp-compat-funcall 'list-system-processes))
+	(let ((attributes (process-attributes pid)))
+	  (and (string-equal (cdr (assoc 'user attributes)) (user-login-name))
+               (when-let ((comm (cdr (assoc 'comm attributes))))
+                 ;; The returned command name could be truncated to 15
+                 ;; characters.  Therefore, we cannot check for `string-equal'.
+		 (string-prefix-p comm process-name))
+	       (throw 'result t)))))))
 
 (defun tramp-read-passwd (proc &optional prompt)
   "Read a password from user (compat function).
