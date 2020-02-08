@@ -105,13 +105,24 @@
 (defvar speedbar-initial-expansion-list-name)
 (defvar speedbar-frame)
 
-(defvar	gdb-memory-address "main")
-(defvar	gdb-memory-last-address nil
+(defvar-local gdb-memory-address-expression "main"
+  "This expression is passed to gdb.
+Possible value: main, $rsp, x+3.")
+(defvar-local gdb-memory-address nil
+  "Address of memory display.")
+(defvar-local gdb-memory-last-address nil
   "Last successfully accessed memory address.")
 (defvar	gdb-memory-next-page nil
   "Address of next memory page for program memory buffer.")
 (defvar	gdb-memory-prev-page nil
   "Address of previous memory page for program memory buffer.")
+(defvar-local gdb--memory-display-warning nil
+  "Display warning on memory header if t.
+
+When error occurs when retrieving memory, gdb-mi displays the
+last successful page.  In that case the expression might not
+match the memory displayed.  We want to let the user be aware of
+that, so display a warning exclamation mark in the header line.")
 
 (defvar gdb-thread-number nil
   "Main current thread.
@@ -324,7 +335,10 @@ in `gdb-handler-list' and clears all pending handlers invalidated
 by the reception of this reply."
   (let ((handler-function (gdb-get-handler-function token-number)))
     (when handler-function
-      (funcall handler-function)
+      ;; Protect against errors in handler-function.
+      (condition-case err
+          (funcall handler-function)
+        (error (message (error-message-string err))))
       (gdb-delete-handler token-number))))
 
 (defun gdb-remove-all-pending-triggers ()
@@ -1001,8 +1015,10 @@ no input, and GDB is waiting for input."
 	;; Sending an EOF does not work with GDB-MI; submit an
 	;; explicit quit command.
 	(progn
-	  (insert "quit")
-	  (comint-send-input t t))
+          (if (> gdb-control-level 0)
+              (process-send-eof proc)
+            (insert "quit")
+            (comint-send-input t t)))
       (delete-char arg))))
 
 (defvar gdb-define-alist nil "Alist of #define directives for GUD tooltips.")
@@ -3445,7 +3461,7 @@ line."
 (def-gdb-trigger-and-handler
   gdb-invalidate-memory
   (format "-data-read-memory %s %s %d %d %d"
-          gdb-memory-address
+          (gdb-mi-quote gdb-memory-address-expression)
           gdb-memory-format
           gdb-memory-unit
           gdb-memory-rows
@@ -3485,6 +3501,9 @@ in `gdb-memory-format'."
          (err-msg (bindat-get-field res 'msg)))
     (if (not err-msg)
         (let ((memory (bindat-get-field res 'memory)))
+          (when gdb-memory-last-address
+            ;; Nil means last retrieve emits error or just started the session.
+            (setq gdb--memory-display-warning nil))
           (setq gdb-memory-address (bindat-get-field res 'addr))
           (setq gdb-memory-next-page (bindat-get-field res 'next-page))
           (setq gdb-memory-prev-page (bindat-get-field res 'prev-page))
@@ -3498,10 +3517,15 @@ in `gdb-memory-format'."
                                             gdb-memory-format)))))
             (newline)))
       ;; Show last page instead of empty buffer when out of bounds
-      (progn
-        (let ((gdb-memory-address gdb-memory-last-address))
+      (when gdb-memory-last-address
+        (let ((gdb-memory-address-expression gdb-memory-last-address))
+          ;; If we don't set `gdb-memory-last-address' to nil,
+          ;; `gdb-invalidate-memory' eventually calls
+          ;; `gdb-read-memory-custom', making an infinite loop.
+          (setq gdb-memory-last-address nil
+                gdb--memory-display-warning t)
           (gdb-invalidate-memory 'update)
-          (error err-msg))))))
+          (user-error "Error when retrieving memory: %s Displaying last successful page" err-msg))))))
 
 (defvar gdb-memory-mode-map
   (let ((map (make-sparse-keymap)))
@@ -3535,7 +3559,7 @@ in `gdb-memory-format'."
   "Set the start memory address."
   (interactive)
   (let ((arg (read-from-minibuffer "Memory address: ")))
-    (setq gdb-memory-address arg))
+    (setq gdb-memory-address-expression arg))
   (gdb-invalidate-memory 'update))
 
 (defmacro def-gdb-set-positive-number (name variable echo-string &optional doc)
@@ -3718,7 +3742,19 @@ DOC is an optional documentation string."
 (defvar gdb-memory-header
   '(:eval
     (concat
-     "Start address["
+     "Start address "
+     ;; If `gdb-memory-address-expression' is nil, `propertize' would error.
+     (propertize (or gdb-memory-address-expression "N/A")
+                 'face font-lock-warning-face
+                 'help-echo "mouse-1: set start address"
+                 'mouse-face 'mode-line-highlight
+                 'local-map (gdb-make-header-line-mouse-map
+                             'mouse-1
+                             #'gdb-memory-set-address-event))
+     (if gdb--memory-display-warning
+         (propertize " !" 'face '(:inherit error :weight bold))
+       "")
+     " ["
      (propertize "-"
                  'face font-lock-warning-face
                  'help-echo "mouse-1: decrement address"
@@ -3735,13 +3771,9 @@ DOC is an optional documentation string."
                              'mouse-1
                              #'gdb-memory-show-next-page))
      "]: "
-     (propertize gdb-memory-address
-                 'face font-lock-warning-face
-                 'help-echo "mouse-1: set start address"
-                 'mouse-face 'mode-line-highlight
-                 'local-map (gdb-make-header-line-mouse-map
-                             'mouse-1
-                             #'gdb-memory-set-address-event))
+     ;; If `gdb-memory-address' is nil, `propertize' would error.
+     (propertize (or gdb-memory-address "N/A")
+                 'face font-lock-warning-face)
      "  Rows: "
      (propertize (number-to-string gdb-memory-rows)
                  'face font-lock-warning-face
