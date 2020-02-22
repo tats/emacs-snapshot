@@ -96,6 +96,11 @@ shows equivalent key bindings for all commands that have them.
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
+** Dired
+
+*** State changing VC operations are supported in dired-mode on files
+(but still not on directories).
+
 ** Help
 
 +++
@@ -125,6 +130,14 @@ supplied error message.
 +++
 *** New connection method "media", which allows accessing media devices
 like cell phones, tablets or cameras.
+
+** Tempo
+
+---
+*** 'tempo-define-template' can now re-assign templates to tags.
+Previously, assigning a new template to an already defined tag had no
+effect.
+
 
 ** map.el
 
