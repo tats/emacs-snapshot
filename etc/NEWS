@@ -96,6 +96,9 @@ shows equivalent key bindings for all commands that have them.
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
+** Emacs-Lisp mode
+*** The mode-line now indicates whether we're using lexical or dynamic scoping.
+
 ** Dired
 
 *** State changing VC operations are supported in dired-mode on files
@@ -124,6 +127,18 @@ To revert to the previous behaviour,
 *** Edebug specification lists can use the new keyword '&error', which
 unconditionally aborts the current edebug instrumentation with the
 supplied error message.
+
++++
+** ElDoc
+
+*** New hook 'eldoc-documentation-functions' to be used for registering
+doc string functions.  This makes the results of all doc string
+functions accessible to the user through the existing single function hook
+'eldoc-documentation-function'.
+
+*** 'eldoc-documentation-function' is now a custom variable.
+Modes should use the new hook instead of this variable to register
+their backends.
 
 ** Tramp
 
@@ -163,6 +178,16 @@ key             binding
 * New Modes and Packages in Emacs 28.1
 
 
+* Incompatible Editing Changes in Emacs 28.1
+
+** In nroff mode, 'center-line' is now bound to 'M-o M-s'.
+The original key binding was 'M-s', which interfered with I-search,
+since the latter uses 'M-s' as a prefix key of the search prefix map.
+
+** vc-print-branch-log shows the change log for BRANCH from its root
+directory instead of the default directory.
+
+
 * Incompatible Lisp Changes in Emacs 28.1
 
 ** 'equal' no longer examines some contents of window configurations.
@@ -183,8 +208,15 @@ Emacs now supports bignums so this old glitch is no longer needed.
 'previous-system-time-locale' have been removed, as they were created
 by mistake and were not useful to Lisp code.
 
+** The 'load-dangerous-libraries' variable is now obsolete.
+It was used to allow loading Lisp libraries compiled by XEmacs, a
+modified version of Emacs which is no longer actively maintained.
+This is no longer supported, and setting this variable has no effect.
+
 
 * Lisp Changes in Emacs 28.1
+
+** New macro 'dlet' to dynamically bind variables
 
 ** The variable 'force-new-style-backquotes' has been removed.
 This removes the final remaining trace of old-style backquotes.
@@ -197,6 +229,9 @@ finalizers, respectively.
 called when the function object is garbage-collected.  Use
 'set_function_finalizer' to set the finalizer and
 'get_function_finalizer' to retrieve it.
+
+** 'file-modes', 'set-file-modes', and 'set-file-times' now have an
+optional argument specifying whether to follow symbolic links.
 
 ** 'parse-time-string' can now parse ISO 8601 format strings,
 such as "2020-01-15T16:12:21-08:00".
