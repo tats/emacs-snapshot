@@ -93,8 +93,19 @@ line numbers that were previously jumped to.
 ** When 'suggest-key-bindings' is non-nil, the completion list of 'M-x'
 shows equivalent key bindings for all commands that have them.
 
+---
+** Movement commands in 'gomoku-mode' are fixed.
+'gomoku-move-sw' and 'gomoku-move-ne' now work correctly, and
+horizontal movements now stop at the edge of the board.
+
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
+
+** archive-mode
+*** Can now modify members of 'ar' archives.
+*** Display of summaries unified between backends
+*** New var 'archive-hidden-columns' and cmd 'archive-hideshow-column'
+These let you control which columns are displayed and which are kept hidden
 
 ** Emacs-Lisp mode
 
@@ -108,12 +119,15 @@ Mark mode, then Dired commands operate only on files in the active
 region.  The values 'file' and 'line' of this user option define the
 details of marking the file at the end of the region.
 
-*** State changing VC operations are supported in 'dired-mode' on files
-(but still not on directories).
+*** State changing VC operations are supported in Dired on files and
+directories with the help of new command 'dired-vc-next-action'.
 
 ** Change Logs and VC
 
 *** New command 'vc-dir-root' uses the root directory without asking.
+
+*** New commands 'vc-dir-mark-registered-files' (bound to '* r') and
+'vc-dir-mark-unregistered-files'.
 
 ** Gnus
 
@@ -160,6 +174,12 @@ functions accessible to the user through the existing single function hook
 *** 'eldoc-documentation-function' is now a user option.
 Modes should use the new hook instead of this user option to register
 their backends.
+
+** Eshell
+
+---
+*** Environment variable INSIDE_EMACS is now copied to subprocesses.
+Its value equals the result of evaluating '(format "%s,eshell" emacs-version)'.
 
 ** Tramp
 
@@ -227,6 +247,12 @@ case-insensitive matching of messages when the old behaviour is
 required, but the recommended solution is to use a correctly matching
 regexp instead.
 
+** Texinfo
+
+---
+*** New customizable option 'texinfo-texi2dvi-options'.
+This is used when invoking 'texi2dvi' from 'texinfo-tex-buffer'.
+
 
 * New Modes and Packages in Emacs 28.1
 
@@ -266,6 +292,10 @@ It was used to allow loading Lisp libraries compiled by XEmacs, a
 modified version of Emacs which is no longer actively maintained.
 This is no longer supported, and setting this variable has no effect.
 
++++
+** The macro 'with-displayed-buffer-window' is now obsolete.
+Use macro 'with-current-buffer-window' with action alist entry 'body-function'.
+
 
 * Lisp Changes in Emacs 28.1
 
@@ -292,6 +322,16 @@ optional argument specifying whether to follow symbolic links.
 
 ** 'parse-time-string' can now parse ISO 8601 format strings,
 such as "2020-01-15T16:12:21-08:00".
+
+---
+** 'make-network-process', 'make-serial-process' :coding behavior change.
+Previously, passing ":coding nil" to either of these functions would
+override any non-nil binding for 'coding-system-for-read' and
+'coding-system-for-write'.  For consistency with 'make-process' and
+'make-pipe-process', passing ":coding nil" is now ignored.  No code in
+Emacs depended on the previous behavior; if you really want the
+process' coding-system to be nil, use 'set-process-coding-system'
+after the process has been created, or pass in ":coding '(nil nil)".
 
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
