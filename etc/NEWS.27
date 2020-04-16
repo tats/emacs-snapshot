@@ -1647,6 +1647,16 @@ adjacent to an apostrophe, like "nick's".
 *** Set 'erc-button-url-regexp' to 'browse-url-button-regexp'
 which better handles surrounding pair of parentheses.
 
+---
+*** New function 'erc-switch-to-buffer-other-window'
+which is like 'erc-switch-to-buffer', but opens the buffer in another
+window.
+
+---
+*** New function 'erc-track-switch-buffer-other-window'
+which is like 'erc-track-switch-buffer', but opens the buffer in
+another window.
+
 ** EUDC
 
 ---
@@ -2238,6 +2248,10 @@ The option is useful for two reasons when verifying the signature:
     directory) method for finding the signer's key.  You need GnuPG
     2.2.17 to fully benefit from this feature.  See gpg(1) man page for
     "--auto-key-retrieve".
+
++++
+*** The 'mail-from-style' variable is now obsolete.
+According to RFC 5322, only the 'angles' value is valid.
 
 ---
 ** EasyPG
