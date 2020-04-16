@@ -134,10 +134,10 @@ index af339a9..4864d89 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 9907160..a6a42f0 100644
+index 8cd754b..717bc16 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5793,7 +5793,7 @@ AC_DEFUN
+@@ -5803,7 +5803,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 9907160..a6a42f0 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5845,15 +5845,6 @@ m4_define
+@@ -5855,15 +5855,6 @@ m4_define
  fi
  ])
  
@@ -190,7 +190,7 @@ index 7f536ad..aab4801 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index e40ed47..46ba687 100644
+index b7d867e..9940a3c 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -296,6 +296,14 @@ view-help-file
