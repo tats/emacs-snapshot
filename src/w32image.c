@@ -214,30 +214,37 @@ enum PropertyItem_type {
   PI_LONG_PAIR = 10
 };
 
-static unsigned long
+static double
 decode_delay (PropertyItem *propertyItem, int frame)
 {
   enum PropertyItem_type type = propertyItem[0].type;
-  unsigned long delay;
+  unsigned long udelay;
+  double retval;
 
   switch (type)
     {
     case PI_BYTE:
     case PI_BYTE_ANY:
-      delay = ((unsigned char *)propertyItem[0].value)[frame];
+      udelay = ((unsigned char *)propertyItem[0].value)[frame];
+      retval = udelay;
       break;
     case PI_USHORT:
-      delay = ((unsigned short *)propertyItem[0].value)[frame];
+      udelay = ((unsigned short *)propertyItem[0].value)[frame];
+      retval = udelay;
       break;
     case PI_ULONG:
     case PI_LONG:	/* delay should always be positive */
-      delay = ((unsigned long *)propertyItem[0].value)[frame];
+      udelay = ((unsigned long *)propertyItem[0].value)[frame];
+      retval = udelay;
       break;
     default:
-      emacs_abort ();
+      /* This negative value will cause the caller to disregard the
+	 delay if we cannot determine it reliably.  */
+      add_to_log ("Invalid or unknown propertyItem type in w32image.c");
+      retval = -1.0;
     }
 
-  return delay;
+  return retval;
 }
 
 static double
@@ -245,27 +252,33 @@ w32_frame_delay (GpBitmap *pBitmap, int frame)
 {
   UINT size;
   PropertyItem *propertyItem;
-  double delay = 0.0;
+  double delay = -1.0;
 
   /* Assume that the image has a property item of type PropertyItemEquipMake.
-     Get the size of that property item.  */
-  GdipGetPropertyItemSize (pBitmap, PropertyTagFrameDelay, &size);
+     Get the size of that property item.  This can fail for multi-frame TIFF
+     images.  */
+  GpStatus status = GdipGetPropertyItemSize (pBitmap, PropertyTagFrameDelay,
+					     &size);
 
-  /* Allocate a buffer to receive the property item.  */
-  propertyItem = malloc (size);
-  if (propertyItem != NULL)
+  if (status == Ok)
     {
-      /* Get the property item.  */
-      GdipGetPropertyItem (pBitmap, PropertyTagFrameDelay, size, propertyItem);
-      delay = decode_delay (propertyItem, frame);
-      if (delay <= 0)
-        {
-          /* In GIF files, unfortunately, delay is only specified for the first
-             frame.  */
-          delay = decode_delay (propertyItem, 0);
-        }
-      delay /= 100.0;
-      free (propertyItem);
+      /* Allocate a buffer to receive the property item.  */
+      propertyItem = malloc (size);
+      if (propertyItem != NULL)
+	{
+	  /* Get the property item.  */
+	  GdipGetPropertyItem (pBitmap, PropertyTagFrameDelay, size,
+			       propertyItem);
+	  delay = decode_delay (propertyItem, frame);
+	  if (delay <= 0)
+	    {
+	      /* In GIF files, unfortunately, delay is only specified
+		 for the first frame.  */
+	      delay = decode_delay (propertyItem, 0);
+	    }
+	  delay /= 100.0;
+	  free (propertyItem);
+	}
     }
   return delay;
 }
@@ -372,7 +385,7 @@ w32_load_image (struct frame *f, struct image *img,
         {
           if (nframes > 1)
             metadata = Fcons (Qcount, Fcons (make_fixnum (nframes), metadata));
-          if (delay)
+          if (delay >= 0)
             metadata = Fcons (Qdelay, Fcons (make_float (delay), metadata));
         }
       else if (status == Win32Error) /* FIXME! */
