@@ -524,9 +524,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  cp -a $(install_dir_x)/usr/bin $(pkgdir_bin_common)/usr
 	  cp -a $(install_dir_x)/usr/lib $(pkgdir_bin_common)/usr
 
-	  # The .pdmp is flavor-specific, so I don't install it here
-	  rm $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(target)/emacs.pdmp
-
 	  # I do NOT want the systemd service
 	  rm -rf $(pkgdir_bin_common)/usr/lib/systemd
 
@@ -558,14 +555,11 @@ override_dh_auto_install: $(autogen_install_files)
         ifneq (,$(findstring $(flavor), $(shell dh_listpackages)))
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_x),$(pkgdir_x),$(flavor),x)
-	  install -d $(pkgdir_x)/usr/lib/emacs/$(runtime_ver)/$(target)
-	  cp -a $(install_dir_x)/usr/lib/emacs/$(runtime_ver)/$(target)/emacs.pdmp $(pkgdir_x)/usr/lib/emacs/$(runtime_ver)/$(target)
 
           # install desktop entry
 	  install -d $(pkgdir_x)/usr/share/applications
 	  install -m 0644 \
 	    debian/$(flavor).desktop $(pkgdir_x)/usr/share/applications/
-
         endif
 
         ##################################################
@@ -574,10 +568,7 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call emacs_inst,build-nox,$(install_dir_nox))
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
-	  install -d $(pkgdir_nox)/usr/lib/emacs/$(runtime_ver)/$(target)
-	  cp -a $(install_dir_nox)/usr/lib/emacs/$(runtime_ver)/$(target)/emacs.pdmp $(pkgdir_nox)/usr/lib/emacs/$(runtime_ver)/$(target)
 	  rm -rf $(install_dir_nox)
-
         endif
 
         ##################################################
@@ -586,8 +577,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  $(call emacs_inst,build-lucid,$(install_dir_lucid))
 	  $(call install_common_binpkg_bits,\
 	    $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
-	  install -d $(pkgdir_lucid)/usr/lib/emacs/$(runtime_ver)/$(target)
-	  cp -a $(install_dir_lucid)/usr/lib/emacs/$(runtime_ver)/$(target)/emacs.pdmp $(pkgdir_lucid)/usr/lib/emacs/$(runtime_ver)/$(target)
 
           # install desktop entry
 	  install -d $(pkgdir_lucid)/usr/share/applications
@@ -595,7 +584,6 @@ override_dh_auto_install: $(autogen_install_files)
 	    debian/$(flavor)-lucid.desktop \
 	    $(pkgdir_lucid)/usr/share/applications/
 	  rm -rf $(install_dir_lucid)
-
         endif
 
         ##################################################
