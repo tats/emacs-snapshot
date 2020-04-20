@@ -20,7 +20,7 @@ Architecture: any
 Depends: emacs27-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs27, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs27-common-non-dfsg
-Conflicts: emacs27, emacs27-nox, emacs27-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: emacs27, emacs27-nox
 Replaces: emacs27, emacs27-nox
 Description: GNU Emacs editor (with Lucid GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
@@ -38,7 +38,7 @@ Architecture: any
 Depends: emacs27-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs27, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs27-common-non-dfsg
-Conflicts: emacs27, emacs27-lucid, emacs27-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: emacs27, emacs27-lucid
 Replaces: emacs27, emacs27-lucid
 Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
@@ -50,7 +50,7 @@ Architecture: any
 Depends: emacs27-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs27-common-non-dfsg
-Conflicts: emacs27-lucid, emacs27-nox, emacs27-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: emacs27-lucid, emacs27-nox
 Replaces: emacs27-lucid, emacs27-nox
 Description: GNU Emacs editor (with GTK+ GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
