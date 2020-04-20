@@ -1,3 +1,16 @@
+emacs27 (27.0.91+0.1-0.1) UNRELEASED; urgency=medium
+
+  * Merge debian/* from emacs-snapshot, commit 94fd8b6 on 2020-04-16
+  * Rename emacs-snapshot to emacs27 in debian/control
+  * Remove -common from Conflicts
+  * Rename emacs-snapshot to emacs27 in debian/patches/0002*.patch
+  * Disable debian/patches/000{4,5}*.patch
+  * Rename emacs-snapshot to emacs27 in debian/copyright
+  * Mention the Savannah site instead of the FTP sites in debian/copyright
+  * Use ${flavor} for emacs.ico
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 20 Apr 2020 21:26:44 +0900
+
 emacs-snapshot (2:20200416+emacs-27.0.90-744-g0127118c259-1) unstable; urgency=medium
 
   * New snapshot
