@@ -1,3 +1,18 @@
+emacs26 (26.3.50+0.1-0.1) UNRELEASED; urgency=medium
+
+  * Merge debian/* from emacs-snapshot, commit 94fd8b6 on 2020-04-16
+  * Rename emacs-snapshot to emacs26 in debian/control
+  * Remove -common from Conflicts
+  * Rename emacs-snapshot to emacs26 in debian/patches/0002*.patch
+  * Disable debian/patches/{0004,0005}*.patch
+  * Adjust debian/patches/0002*.patch
+  * Adjust debian/patches/0003*.patch, taken from Debian 1:26.3+1-1
+  * Revert "shipping their .pdmp files", commit a007fff on 2019-05-13
+  * Rename emacs-snapshot to emacs26 in debian/copyright
+  * Mention the Savannah site instead of the FTP sites in debian/copyright
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 20 Apr 2020 19:45:17 +0900
+
 emacs-snapshot (2:20200416+emacs-27.0.90-744-g0127118c259-1) unstable; urgency=medium
 
   * New snapshot
