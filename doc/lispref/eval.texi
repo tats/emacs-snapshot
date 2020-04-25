@@ -158,9 +158,9 @@ contents unchanged.
 @end group
 @end example
 
-  A self-evaluating form yields a constant, and you should not attempt
-to modify the constant's contents via @code{setcar}, @code{aset} or
-similar primitives.  The Lisp interpreter might unify the constants
+  A self-evaluating form yields constant conses, vectors and strings, and you
+should not attempt to modify their contents via @code{setcar}, @code{aset} or
+similar operations.  The Lisp interpreter might unify the constants
 yielded by your program's self-evaluating forms, so that these
 constants might share structure.  @xref{Constants and Mutability}.
 
@@ -606,6 +606,12 @@ Here are some examples of expressions that use @code{quote}:
 @end group
 @end example
 
+  Although the expressions @code{(list '+ 1 2)} and @code{'(+ 1 2)}
+both yield lists equal to @code{(+ 1 2)}, the former yields a
+freshly-minted mutable list whereas the latter yields a constant list
+built from conses that may be shared with other constants.
+@xref{Constants and Mutability}.
+
   Other quoting constructs include @code{function} (@pxref{Anonymous
 Functions}), which causes an anonymous lambda expression written in Lisp
 to be compiled, and @samp{`} (@pxref{Backquote}), which is used to quote
@@ -704,8 +710,8 @@ Here are some examples:
 @end example
 
 If a subexpression of a backquote construct has no substitutions or
-splices, it acts like @code{quote} in that it yields a constant that
-should not be modified.
+splices, it acts like @code{quote} in that it yields constant conses,
+vectors and strings that should not be modified.
 
 @node Eval
 @section Eval
