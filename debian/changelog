@@ -1,3 +1,14 @@
+emacs27 (27.0.91+0.2-0.1) UNRELEASED; urgency=medium
+
+  [ Tatsuya Kinoshita ]
+  * Update to 27.0.91+0.2, commit a76af88 on 2020-04-24
+
+  [ Alberto Donato ]
+  * Build-depend on libjansson-dev to get faster json
+    Origin: https://code.launchpad.net/~ack/emacs/+git/emacs/+merge/381441
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Sat, 25 Apr 2020 20:54:10 +0900
+
 emacs27 (27.0.91+0.1-0.1) UNRELEASED; urgency=medium
 
   * Merge debian/* from emacs-snapshot, commit 94fd8b6 on 2020-04-16
