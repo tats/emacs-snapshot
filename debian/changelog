@@ -1,16 +1,6 @@
-emacs27 (27.0.91+0.2-0.1) UNRELEASED; urgency=medium
+emacs27 (27.0.91+0.3-0.1) UNRELEASED; urgency=medium
 
   [ Tatsuya Kinoshita ]
-  * Update to 27.0.91+0.2, commit a76af88 on 2020-04-24
-
-  [ Alberto Donato ]
-  * Build-depend on libjansson-dev to get faster json
-    Origin: https://code.launchpad.net/~ack/emacs/+git/emacs/+merge/381441
-
- -- Tatsuya Kinoshita <tats@debian.org>  Sat, 25 Apr 2020 20:54:10 +0900
-
-emacs27 (27.0.91+0.1-0.1) UNRELEASED; urgency=medium
-
   * Merge debian/* from emacs-snapshot, commit 94fd8b6 on 2020-04-16
   * Rename emacs-snapshot to emacs27 in debian/control
   * Remove -common from Conflicts
@@ -20,7 +10,15 @@ emacs27 (27.0.91+0.1-0.1) UNRELEASED; urgency=medium
   * Mention the Savannah site instead of the FTP sites in debian/copyright
   * Use ${flavor} for emacs.ico
 
- -- Tatsuya Kinoshita <tats@debian.org>  Mon, 20 Apr 2020 21:26:44 +0900
+  [ Alberto Donato ]
+  * Build-depend on libjansson-dev to get faster json
+    Origin: https://code.launchpad.net/~ack/emacs/+git/emacs/+merge/381441
+
+  [ Tatsuya Kinoshita ]
+  * New upstream version 27.0.91+0.3
+    - emacs-27 branch, emacs-27.0.91-44-g9f5ae717fba
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 27 Apr 2020 23:13:59 +0900
 
 emacs-snapshot (2:20200416+emacs-27.0.90-744-g0127118c259-1) unstable; urgency=medium
 
