@@ -1,3 +1,11 @@
+emacs (1:26.3+1-2~1.gbp863010) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @8630108cc64605624263347e2e6b79880a3783a0 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 16 May 2020 19:04:46 -0500
+
 emacs (1:26.3+1-1) unstable; urgency=medium
 
   * Merge upstream version 26.3. (Closes: 939737)
