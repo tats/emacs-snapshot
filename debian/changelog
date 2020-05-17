@@ -1,10 +1,12 @@
-emacs (1:26.3+1-2~1.gbp863010) UNRELEASED; urgency=medium
+emacs (1:26.3+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @8630108cc64605624263347e2e6b79880a3783a0 **
+  * Fix intermittent test failures in process-tests.  Add
+    0012-The-Emacs-process-tests-should-no-longer-fail-interm.patch to
+    address the issue.  Thanks to Ivo De Decker for reporting the problem,
+    J. Smith for tracking down the upstream bug, and Nick Gasson for
+    locating the upstream patch. (Closes: 944616)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Sat, 16 May 2020 19:04:46 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 16 May 2020 19:25:51 -0500
 
 emacs (1:26.3+1-1) unstable; urgency=medium
 
