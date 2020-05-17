@@ -9,3 +9,4 @@
 0009-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
 0010-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
 0011-Fix-an-eshell-ls-dired-test-for-non-recent-files.patch
+0012-The-Emacs-process-tests-should-no-longer-fail-interm.patch
