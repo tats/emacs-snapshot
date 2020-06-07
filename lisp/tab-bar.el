@@ -1554,9 +1554,10 @@ indirectly called by the latter."
 Like \\[switch-to-buffer-other-frame] (which see), but creates a new tab."
   (interactive
    (list (read-buffer-to-switch "Switch to buffer in other tab: ")))
-  (display-buffer buffer-or-name '((display-buffer-in-tab)
-                                   (inhibit-same-window . nil)
-                                   (reusable-frames . t))
+  (display-buffer (window-normalize-buffer-to-switch-to buffer-or-name)
+                  '((display-buffer-in-tab)
+                    (inhibit-same-window . nil)
+                    (reusable-frames . t))
                   norecord))
 
 (defun find-file-other-tab (filename &optional wildcards)
@@ -1574,6 +1575,25 @@ Like \\[find-file-other-frame] (which see), but creates a new tab."
           value)
       (switch-to-buffer-other-tab value))))
 
+(defun other-tab-prefix ()
+  "Display the buffer of the next command in a new tab.
+The next buffer is the buffer displayed by the next command invoked
+immediately after this command (ignoring reading from the minibuffer).
+Creates a new tab before displaying the buffer, or switches to the tab
+that already contains that buffer.
+When `switch-to-buffer-obey-display-actions' is non-nil,
+`switch-to-buffer' commands are also supported."
+  (interactive)
+  (display-buffer-override-next-command
+   (lambda (buffer alist)
+     (cons (progn
+             (display-buffer-in-tab
+              buffer (append alist '((inhibit-same-window . nil)
+                                     (reusable-frames . t))))
+             (selected-window))
+           'tab)))
+  (message "Display next command buffer in a new tab..."))
+
 (define-key tab-prefix-map "2" 'tab-new)
 (define-key tab-prefix-map "1" 'tab-close-other)
 (define-key tab-prefix-map "0" 'tab-close)
@@ -1584,6 +1604,7 @@ Like \\[find-file-other-frame] (which see), but creates a new tab."
 (define-key tab-prefix-map "b" 'switch-to-buffer-other-tab)
 (define-key tab-prefix-map "f" 'find-file-other-tab)
 (define-key tab-prefix-map "\C-f" 'find-file-other-tab)
+(define-key tab-prefix-map "t" 'other-tab-prefix)
 
 
 (provide 'tab-bar)

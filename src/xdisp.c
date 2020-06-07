@@ -1415,6 +1415,7 @@ Value is the height in pixels of the line at point.  */)
       set_buffer_internal_1 (XBUFFER (w->contents));
     }
   SET_TEXT_POS (pt, PT, PT_BYTE);
+  void *itdata = bidi_shelve_cache ();
   start_display (&it, w, pt);
   /* Start from the beginning of the screen line, to make sure we
      traverse all of its display elements, and thus capture the
@@ -1426,6 +1427,7 @@ Value is the height in pixels of the line at point.  */)
   if (old_buffer)
     set_buffer_internal_1 (old_buffer);
 
+  bidi_unshelve_cache (itdata, false);
   return result;
 }
 
@@ -8690,6 +8692,7 @@ handle_stop_backwards (struct it *it, ptrdiff_t charpos)
   ptrdiff_t where_we_are = (bufp ? IT_CHARPOS (*it) : IT_STRING_CHARPOS (*it));
   struct display_pos save_current = it->current;
   struct text_pos save_position = it->position;
+  struct composition_it save_cmp_it = it->cmp_it;
   struct text_pos pos1;
   ptrdiff_t next_stop;
 
@@ -8717,6 +8720,7 @@ handle_stop_backwards (struct it *it, ptrdiff_t charpos)
   it->bidi_p = true;
   it->current = save_current;
   it->position = save_position;
+  it->cmp_it = save_cmp_it;
   next_stop = it->stop_charpos;
   it->stop_charpos = it->prev_stop;
   handle_stop (it);
@@ -11573,7 +11577,9 @@ display_echo_area_1 (ptrdiff_t a1, Lisp_Object a2)
   /* Display.  */
   clear_glyph_matrix (w->desired_matrix);
   XSETWINDOW (window, w);
+  void *itdata = bidi_shelve_cache ();
   try_window (window, start, 0);
+  bidi_unshelve_cache (itdata, false);
 
   return window_height_changed_p;
 }
@@ -19746,7 +19752,7 @@ find_last_row_displaying_text (struct glyph_matrix *matrix, struct it *it,
    by changes at the start of current_buffer that occurred since W's
    current matrix was built.  Value is null if no such row exists.
 
-   BEG_UNCHANGED us the number of characters unchanged at the start of
+   BEG_UNCHANGED is the number of characters unchanged at the start of
    current_buffer.  BEG + BEG_UNCHANGED is the buffer position of the
    first changed character in current_buffer.  Characters at positions <
    BEG + BEG_UNCHANGED are at the same buffer positions as they were
@@ -24442,6 +24448,7 @@ Value is the new character position of point.  */)
       bool at_eol_p;
       bool overshoot_expected = false;
       bool target_is_eol_p = false;
+      void *itdata = bidi_shelve_cache ();
 
       /* Setup the arena.  */
       SET_TEXT_POS (pt, PT, PT_BYTE);
@@ -24670,6 +24677,7 @@ Value is the new character position of point.  */)
 
       /* Move point to that position.  */
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
+      bidi_unshelve_cache (itdata, false);
     }
 
   return make_fixnum (PT);
@@ -27681,10 +27689,12 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
   struct glyph *glyph, *last;
   Lisp_Object lgstring;
   int i;
+  bool glyph_not_available_p;
 
   s->for_overlaps = overlaps;
   glyph = s->row->glyphs[s->area] + start;
   last = s->row->glyphs[s->area] + end;
+  glyph_not_available_p = glyph->glyph_not_available_p;
   s->cmp_id = glyph->u.cmp.id;
   s->cmp_from = glyph->slice.cmp.from;
   s->cmp_to = glyph->slice.cmp.to + 1;
@@ -27698,7 +27708,9 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
   while (glyph < last
 	 && glyph->u.cmp.automatic
 	 && glyph->u.cmp.id == s->cmp_id
-	 && s->cmp_to == glyph->slice.cmp.from)
+	 && glyph->face_id == face_id
+	 && s->cmp_to == glyph->slice.cmp.from
+	 && glyph->glyph_not_available_p == glyph_not_available_p)
     {
       s->width += glyph->pixel_width;
       s->cmp_to = (glyph++)->slice.cmp.to + 1;
@@ -27712,6 +27724,12 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
       /* Ensure that the code is only 2 bytes wide.  */
       s->char2b[i] = code & 0xFFFF;
     }
+
+  /* If the specified font could not be loaded, record that fact in
+     S->font_not_found_p so that we can draw rectangles for the
+     characters of the glyph string.  */
+  if (glyph_not_available_p)
+    s->font_not_found_p = true;
 
   return glyph - s->row->glyphs[s->area];
 }
@@ -28909,7 +28927,7 @@ append_composite_glyph (struct it *it)
       glyph->overlaps_vertically_p = (it->phys_ascent > it->ascent
 				      || it->phys_descent > it->descent);
       glyph->padding_p = false;
-      glyph->glyph_not_available_p = false;
+      glyph->glyph_not_available_p = it->glyph_not_available_p;
       glyph->face_id = it->face_id;
       glyph->font_type = FONT_TYPE_UNKNOWN;
       if (it->bidi_p)
@@ -30617,11 +30635,21 @@ gui_produce_glyphs (struct it *it)
       it->pixel_width
 	= composition_gstring_width (gstring, it->cmp_it.from, it->cmp_it.to,
 				     &metrics);
-      if (it->glyph_row
-	  && (metrics.lbearing < 0 || metrics.rbearing > metrics.width))
-	it->glyph_row->contains_overlapping_glyphs_p = true;
-      it->ascent = it->phys_ascent = metrics.ascent;
-      it->descent = it->phys_descent = metrics.descent;
+      if (it->pixel_width == 0)
+	{
+	  it->glyph_not_available_p = true;
+	  it->phys_ascent = it->ascent;
+	  it->phys_descent = it->descent;
+	  it->pixel_width = face->font->space_width;
+	}
+      else
+	{
+	  if (it->glyph_row
+	      && (metrics.lbearing < 0 || metrics.rbearing > metrics.width))
+	    it->glyph_row->contains_overlapping_glyphs_p = true;
+	  it->ascent = it->phys_ascent = metrics.ascent;
+	  it->descent = it->phys_descent = metrics.descent;
+	}
       IT_APPLY_FACE_BOX(it, face);
 
       /* If face has an overline, add the height of the overline

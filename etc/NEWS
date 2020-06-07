@@ -109,7 +109,19 @@ setting the variable 'auto-save-visited-mode' buffer-locally to nil.
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
-** EIEIO: 'oset' and 'oset-default' are declared obsolete.
+** Tab Bars
+
+*** The key prefix 'C-x t t' displays next command buffer in a new tab.
+
+** New bindings in occur-mode, 'next-error-no-select' bound to 'n' and
+'previous-error-no-select' bound to 'p'.
+
+** EIEIO
+
++++
+*** The macro 'oref-default' can now be used with 'setf'.
+It is now defined as a generalized variable that can be used with
+'setf' to modify the value stored in a given class slot.
 
 ** New minor mode 'cl-font-lock-built-in-mode' for `lisp-mode'.
 The mode provides refined highlighting of built-in functions, types,
@@ -408,14 +420,18 @@ information, see the related entry about 'shr-browse-url' above.
 all commands that prompt for a project directory.
 
 +++
-*** New commands 'project-dired' and 'project-eshell'.
-These commands run Dired and Eshell in a project's root directory,
+*** New commands 'project-dired', 'project-vc-dir', 'project-shell', 'project-eshell'.
+These commands run Dired/VC-Dir and Shell/Eshell in a project's root directory,
 respectively.
+
+*** New command 'project-compile', which runs compilation.
 
 +++
 *** New command 'project-switch-project'.
 This command lets you "switch" to another project and run a project
 command chosen from a dispatch menu.
+
+*** New user option 'project-list-file'.
 
 ** json.el
 
@@ -463,6 +479,11 @@ Instead, it considers window configurations to be equal only if they
 are 'eq'.  To compare contents, use 'compare-window-configurations'
 instead.  This change helps fix a bug in 'sxhash-equal', which returned
 incorrect hashes for window configurations and some other objects.
+
+** When its first argument is a string, 'make-text-button' no longer
+modifies the string's text properties; instead, it uses and returns
+a copy of the string.  This helps avoid trouble when strings are
+shared or constants.
 
 ---
 ** The obsolete function 'thread-alive-p' has been removed.
