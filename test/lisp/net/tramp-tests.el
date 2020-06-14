@@ -2294,16 +2294,25 @@ This checks also `file-name-as-directory', `file-name-directory',
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
-	    (insert-file-contents tmp-name)
-	    (should (string-equal (buffer-string) "foo"))
-	    (insert-file-contents tmp-name)
-	    (should (string-equal (buffer-string) "foofoo"))
+	    (let ((point (point)))
+	      (insert-file-contents tmp-name)
+	      (should (string-equal (buffer-string) "foo"))
+	      (should (= point (point))))
+	    (goto-char (1+ (point)))
+	    (let ((point (point)))
+	      (insert-file-contents tmp-name)
+	      (should (string-equal (buffer-string) "ffoooo"))
+	      (should (= point (point))))
 	    ;; Insert partly.
-	    (insert-file-contents tmp-name nil 1 3)
-	    (should (string-equal (buffer-string) "oofoofoo"))
+	    (let ((point (point)))
+	      (insert-file-contents tmp-name nil 1 3)
+	      (should (string-equal (buffer-string) "foofoooo"))
+	      (should (= point (point))))
 	    ;; Replace.
-	    (insert-file-contents tmp-name nil nil nil 'replace)
-	    (should (string-equal (buffer-string) "foo"))
+	    (let ((point (point)))
+	      (insert-file-contents tmp-name nil nil nil 'replace)
+	      (should (string-equal (buffer-string) "foo"))
+	      (should (= point (point))))
 	    ;; Error case.
 	    (delete-file tmp-name)
 	    (should-error
@@ -2916,6 +2925,9 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
   ;; (this is performed by `dired').  If FULL is nil, it shows just
   ;; one file.  So we refrain from testing.
   (skip-unless (not (tramp--test-ange-ftp-p)))
+  ;; `insert-directory' of crypted remote directories works only since
+  ;; Emacs 27.1.
+  (skip-unless (or (not (tramp--test-crypt-p)) (tramp--test-emacs27-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let* ((tmp-name1
@@ -3815,6 +3827,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check that `file-acl' and `set-file-acl' work proper."
   (skip-unless (tramp--test-enabled))
   (skip-unless (file-acl tramp-test-temporary-file-directory))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   ;; `filename-non-special' has been fixed in Emacs 27.1, see Bug#29579.
   (dolist (quoted (if (and (tramp--test-expensive-test) (tramp--test-emacs27-p))
@@ -3893,6 +3906,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (skip-unless
    (not (equal (file-selinux-context tramp-test-temporary-file-directory)
 	       '(nil nil nil nil))))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   ;; `filename-non-special' has been fixed in Emacs 27.1, see Bug#29579.
   (dolist (quoted (if (and (tramp--test-expensive-test) (tramp--test-emacs27-p))
@@ -4196,6 +4210,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let* ((tmp-name (tramp--test-make-temp-name nil quoted))
@@ -4274,6 +4289,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((default-directory tramp-test-temporary-file-directory)
@@ -4347,6 +4363,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; `make-process' supports file name handlers since Emacs 27.
   (skip-unless (tramp--test-emacs27-p))
 
@@ -4517,6 +4534,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 26.1.
   (skip-unless (boundp 'interrupt-process-functions))
 
@@ -4577,6 +4595,7 @@ INPUT, if non-nil, is a string sent to the process."
   ;; remote processes in Emacs.  That doesn't work for tramp-adb.el.
   (skip-unless (or (and (tramp--test-adb-p) (tramp--test-emacs27-p))
 		   (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted))
@@ -4668,6 +4687,7 @@ INPUT, if non-nil, is a string sent to the process."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Prior Emacs 27, `shell-command-dont-erase-buffer' wasn't working properly.
   (skip-unless (tramp--test-emacs27-p))
 
@@ -4880,6 +4900,7 @@ INPUT, if non-nil, is a string sent to the process."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (dolist (this-shell-command-to-string
 	   '(;; Synchronously.
@@ -4966,6 +4987,7 @@ INPUT, if non-nil, is a string sent to the process."
   ;; We test it only for the mock-up connection; otherwise there might
   ;; be problems with the used ports.
   (skip-unless (and (eq tramp-syntax 'default) (tramp--test-mock-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   ;; We force a reconnect, in order to have a clean environment.
   (dolist (dir `(,tramp-test-temporary-file-directory
@@ -5070,6 +5092,7 @@ INPUT, if non-nil, is a string sent to the process."
   ;; remote processes in Emacs.  That doesn't work for tramp-adb.el.
   (skip-unless (or (and (tramp--test-adb-p) (tramp--test-emacs27-p))
 		   (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 26.1.
   (skip-unless (and (fboundp 'connection-local-set-profile-variables)
 		    (fboundp 'connection-local-set-profiles)))
@@ -5126,6 +5149,7 @@ INPUT, if non-nil, is a string sent to the process."
   "Check `exec-path' and `executable-find'."
   (skip-unless (tramp--test-enabled))
   (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 27.1.
   (skip-unless (fboundp 'exec-path))
 
@@ -5169,6 +5193,7 @@ INPUT, if non-nil, is a string sent to the process."
   "Check loooong `tramp-remote-path'."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 27.1.
   (skip-unless (fboundp 'exec-path))
 
@@ -5233,6 +5258,7 @@ INPUT, if non-nil, is a string sent to the process."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     ;; We must use `file-truename' for the temporary directory, in
@@ -5581,6 +5607,10 @@ This does not support some special file names."
   (string-equal
    "docker" (file-remote-p tramp-test-temporary-file-directory 'method)))
 
+(defun tramp--test-crypt-p ()
+  "Check, whether the remote directory is crypted"
+  (tramp-crypt-file-name-p tramp-test-temporary-file-directory))
+
 (defun tramp--test-ftp-p ()
   "Check, whether an FTP-like method is used.
 This does not support globbing characters in file names (yet)."
@@ -5817,6 +5847,7 @@ This requires restrictions of file name syntax."
             ;; We do not run on macOS due to encoding problems.  See
             ;; Bug#36940.
 	    (when (and (tramp--test-expensive-test) (tramp--test-sh-p)
+		       (not (tramp--test-crypt-p))
 		       (not (eq system-type 'darwin)))
 	      (dolist (elt files)
 		(let ((envvar (concat "VAR_" (upcase (md5 elt))))
@@ -6149,6 +6180,7 @@ process sentinels.  They shall not disturb each other."
   ;; remote processes in Emacs.  That doesn't work for tramp-adb.el.
   (skip-unless (or (and (tramp--test-adb-p) (tramp--test-emacs27-p))
 		   (tramp--test-sh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (with-timeout
       (tramp--test-asynchronous-requests-timeout (tramp--test-timeout-handler))

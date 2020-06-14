@@ -745,7 +745,7 @@ to be set, depending on VALUE."
 	  tramp-postfix-host-format (tramp-build-postfix-host-format)
 	  tramp-postfix-host-regexp (tramp-build-postfix-host-regexp)
 	  tramp-remote-file-name-spec-regexp
-          (tramp-build-remote-file-name-spec-regexp)
+	  (tramp-build-remote-file-name-spec-regexp)
 	  tramp-file-name-structure (tramp-build-file-name-structure)
 	  tramp-file-name-regexp (tramp-build-file-name-regexp)
 	  tramp-completion-file-name-regexp
@@ -2182,6 +2182,7 @@ arguments to pass to the OPERATION."
 	    tramp-vc-file-name-handler
 	    tramp-completion-file-name-handler
 	    tramp-archive-file-name-handler
+	    tramp-crypt-file-name-handler
 	    cygwin-mount-name-hook-function
 	    cygwin-mount-map-drive-hook-function
 	    .
@@ -2484,12 +2485,15 @@ remote file names."
   (tramp-unload-file-name-handlers)
 
   ;; Add the handlers.  We do not add anything to the `operations'
-  ;; property of `tramp-file-name-handler' and
-  ;; `tramp-archive-file-name-handler', this shall be done by the
+  ;; property of `tramp-file-name-handler',
+  ;; `tramp-archive-file-name-handler' and
+  ;; `tramp-crypt-file-name-handler', this shall be done by the
   ;; respective foreign handlers.
   (add-to-list 'file-name-handler-alist
 	       (cons tramp-file-name-regexp #'tramp-file-name-handler))
   (put #'tramp-file-name-handler 'safe-magic t)
+
+  (tramp-register-crypt-file-name-handler)
 
   (add-to-list 'file-name-handler-alist
 	       (cons tramp-completion-file-name-regexp
@@ -3377,6 +3381,8 @@ User is always nil."
 	  ;; something is wrong; otherwise they might think that Emacs
 	  ;; is hung.  Of course, correctness has to come first.
 	  (numchase-limit 20)
+	  ;; Unquoting could enable encryption.
+	  tramp-crypt-enabled
 	  symlink-target)
       (with-parsed-tramp-file-name result v1
 	;; We cache only the localname.
@@ -3497,6 +3503,9 @@ User is always nil."
 		    ;; copy this part.  This works only for the shell file
 		    ;; name handlers.
 		    (when (and (or beg end)
+			       ;; Direct actions aren't possible for
+			       ;; crypted directories.
+			       (null tramp-crypt-enabled)
 			       (tramp-get-method-parameter
 				v 'tramp-login-program))
 		      (setq remote-copy (tramp-make-tramp-temp-file v))
@@ -3893,7 +3902,11 @@ of."
 
     (let ((tmpfile (tramp-compat-make-temp-file filename))
 	  (modes (tramp-default-file-modes
-		  filename (and (eq mustbenew 'excl) 'nofollow))))
+		  filename (and (eq mustbenew 'excl) 'nofollow)))
+	  (uid (tramp-compat-file-attribute-user-id
+		(file-attributes filename 'integer)))
+	  (gid (tramp-compat-file-attribute-group-id
+		(file-attributes filename 'integer))))
       (when (and append (file-exists-p filename))
 	(copy-file filename tmpfile 'ok))
       ;; The permissions of the temporary file should be set.  If
@@ -3912,15 +3925,18 @@ of."
 	(error
 	 (delete-file tmpfile)
 	 (tramp-error
-	  v 'file-error "Couldn't write region to `%s'" filename))))
+	  v 'file-error "Couldn't write region to `%s'" filename)))
 
-    (tramp-flush-file-properties v localname)
+      (tramp-flush-file-properties v localname)
 
-    ;; Set file modification time.
-    (when (or (eq visit t) (stringp visit))
-      (set-visited-file-modtime
-       (tramp-compat-file-attribute-modification-time
-	(file-attributes filename))))
+      ;; Set file modification time.
+      (when (or (eq visit t) (stringp visit))
+	(set-visited-file-modtime
+	 (tramp-compat-file-attribute-modification-time
+	  (file-attributes filename))))
+
+      ;; Set the ownership.
+      (tramp-set-file-uid-gid filename uid gid))
 
     ;; The end.
     (when (and (null noninteractive)
@@ -4649,6 +4665,8 @@ This handles also chrooted environments, which are not regarded as local."
      ;; handlers.  `tramp-local-host-p' is also called for "smb" and
      ;; alike, where it must fail.
      (tramp-get-method-parameter vec 'tramp-login-program)
+     ;; Direct actions aren't possible for crypted directories.
+     (null tramp-crypt-enabled)
      ;; The local temp directory must be writable for the other user.
      (file-writable-p
       (tramp-make-tramp-file-name
