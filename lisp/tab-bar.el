@@ -44,24 +44,11 @@
   :group 'convenience
   :version "27.1")
 
-(defgroup tab-bar-faces nil
+(defgroup tab-bar-faces '((tab-bar custom-face)) ; tab-bar is defined in faces.el
   "Faces used in the tab bar."
   :group 'tab-bar
   :group 'faces
   :version "27.1")
-
-(defface tab-bar
-  '((((class color) (min-colors 88))
-     :inherit variable-pitch
-     :background "grey85"
-     :foreground "black")
-    (((class mono))
-     :background "grey")
-    (t
-     :inverse-video t))
-  "Tab bar face."
-  :version "27.1"
-  :group 'tab-bar-faces)
 
 (defface tab-bar-tab
   '((default
@@ -1556,8 +1543,7 @@ Like \\[switch-to-buffer-other-frame] (which see), but creates a new tab."
    (list (read-buffer-to-switch "Switch to buffer in other tab: ")))
   (display-buffer (window-normalize-buffer-to-switch-to buffer-or-name)
                   '((display-buffer-in-tab)
-                    (inhibit-same-window . nil)
-                    (reusable-frames . t))
+                    (inhibit-same-window . nil))
                   norecord))
 
 (defun find-file-other-tab (filename &optional wildcards)
@@ -1588,8 +1574,7 @@ When `switch-to-buffer-obey-display-actions' is non-nil,
    (lambda (buffer alist)
      (cons (progn
              (display-buffer-in-tab
-              buffer (append alist '((inhibit-same-window . nil)
-                                     (reusable-frames . t))))
+              buffer (append alist '((inhibit-same-window . nil))))
              (selected-window))
            'tab)))
   (message "Display next command buffer in a new tab..."))

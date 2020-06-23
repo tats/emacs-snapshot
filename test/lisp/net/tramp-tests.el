@@ -2998,6 +2998,8 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
+  ;; Wildcards are not supported in tramp-crypt.el.
+  (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 26.1.
   (skip-unless (fboundp 'insert-directory-wildcard-in-dir-p))
 
@@ -6040,6 +6042,7 @@ Use the `ls' command."
   (skip-unless (not (tramp--test-windows-nt-and-batch)))
   (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (skip-unless (not (tramp--test-ksh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (tramp--test-utf8))
 
@@ -6054,6 +6057,7 @@ Use the `stat' command."
   (skip-unless (not (tramp--test-windows-nt-and-batch)))
   (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (skip-unless (not (tramp--test-ksh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
 
@@ -6075,6 +6079,7 @@ Use the `perl' command."
   (skip-unless (not (tramp--test-windows-nt-and-batch)))
   (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (skip-unless (not (tramp--test-ksh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
 
@@ -6099,6 +6104,7 @@ Use the `ls' command."
   (skip-unless (not (tramp--test-windows-nt-and-batch)))
   (skip-unless (not (tramp--test-windows-nt-and-pscp-psftp-p)))
   (skip-unless (not (tramp--test-ksh-p)))
+  (skip-unless (not (tramp--test-crypt-p)))
 
   (let ((tramp-connection-properties
 	 (append

@@ -220,6 +220,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <math.h>
 
 #include "lisp.h"
 #include "character.h"
@@ -818,6 +819,128 @@ load_pixmap (struct frame *f, Lisp_Object name)
 /***********************************************************************
                             Color Handling
  ***********************************************************************/
+
+/* Parse hex color component specification that starts at S and ends
+   right before E.  Set *DST to the parsed value normalized so that
+   the maximum value for the number of hex digits given becomes 65535,
+   and return true on success, false otherwise.  */
+static bool
+parse_hex_color_comp (const char *s, const char *e, unsigned short *dst)
+{
+  int n = e - s;
+  if (n <= 0 || n > 4)
+    return false;
+  int val = 0;
+  for (; s < e; s++)
+    {
+      int digit;
+      if (*s >= '0' && *s <= '9')
+        digit = *s - '0';
+      else if (*s >= 'A' && *s <= 'F')
+        digit = *s - 'A' + 10;
+      else if (*s >= 'a' && *s <= 'f')
+        digit = *s - 'a' + 10;
+      else
+        return false;
+      val = (val << 4) | digit;
+    }
+  int maxval = (1 << (n * 4)) - 1;
+  *dst = (unsigned)val * 65535 / maxval;
+  return true;
+}
+
+/* Parse floating-point color component specification that starts at S
+   and ends right before E.  Return the parsed number if in the range
+   [0,1]; otherwise return -1.  */
+static double
+parse_float_color_comp (const char *s, const char *e)
+{
+  char *end;
+  double x = strtod (s, &end);
+  return (end == e && x >= 0 && x <= 1) ? x : -1;
+}
+
+/* Parse SPEC as a numeric color specification and set *R, *G and *B.
+   Return true on success, false on failure.
+
+   Recognized formats of SPEC:
+
+    "#RGB", with R, G and B hex strings of equal length, 1-4 digits each.
+    "rgb:R/G/B", with R, G and B hex strings, 1-4 digits each.
+    "rgbi:R/G/B", with R, G and B numbers in [0,1].
+
+   If the function succeeds, it assigns to each of the components *R,
+   *G, and *B a value normalized to be in the [0, 65535] range.  If
+   the function fails, some or all of the components remain unassigned.  */
+bool
+parse_color_spec (const char *spec,
+                  unsigned short *r, unsigned short *g, unsigned short *b)
+{
+  int len = strlen (spec);
+  if (spec[0] == '#')
+    {
+      if ((len - 1) % 3 == 0)
+        {
+          int n = (len - 1) / 3;
+          return (   parse_hex_color_comp (spec + 1 + 0 * n,
+					   spec + 1 + 1 * n, r)
+                  && parse_hex_color_comp (spec + 1 + 1 * n,
+					   spec + 1 + 2 * n, g)
+                  && parse_hex_color_comp (spec + 1 + 2 * n,
+					   spec + 1 + 3 * n, b));
+        }
+    }
+  else if (strncmp (spec, "rgb:", 4) == 0)
+    {
+      char *sep1, *sep2;
+      return ((sep1 = strchr (spec + 4, '/')) != NULL
+              && (sep2 = strchr (sep1 + 1, '/')) != NULL
+              && parse_hex_color_comp (spec + 4, sep1, r)
+              && parse_hex_color_comp (sep1 + 1, sep2, g)
+              && parse_hex_color_comp (sep2 + 1, spec + len, b));
+    }
+  else if (strncmp (spec, "rgbi:", 5) == 0)
+    {
+      char *sep1, *sep2;
+      double red, green, blue;
+      if ((sep1 = strchr (spec + 5, '/')) != NULL
+          && (sep2 = strchr (sep1 + 1, '/')) != NULL
+          && (red = parse_float_color_comp (spec + 5, sep1)) >= 0
+          && (green = parse_float_color_comp (sep1 + 1, sep2)) >= 0
+          && (blue = parse_float_color_comp (sep2 + 1, spec + len)) >= 0)
+        {
+          *r = lrint (red * 65535);
+          *g = lrint (green * 65535);
+          *b = lrint (blue * 65535);
+          return true;
+        }
+    }
+  return false;
+}
+
+DEFUN ("color-values-from-color-spec",
+       Fcolor_values_from_color_spec,
+       Scolor_values_from_color_spec,
+       1, 1, 0,
+       doc: /* Parse color SPEC as a numeric color and return (RED GREEN BLUE).
+This function recognises the following formats for SPEC:
+
+ #RGB, where R, G and B are hex numbers of equal length, 1-4 digits each.
+ rgb:R/G/B, where R, G, and B are hex numbers, 1-4 digits each.
+ rgbi:R/G/B, where R, G and B are floating-point numbers in [0,1].
+
+If SPEC is not in one of the above forms, return nil.
+
+Each of the 3 integer members of the resulting list, RED, GREEN, and BLUE,
+is normalized to have its value in [0,65535].  */)
+  (Lisp_Object spec)
+{
+  CHECK_STRING (spec);
+  unsigned short r, g, b;
+  return (parse_color_spec (SSDATA (spec), &r, &g, &b)
+          ? list3i (r, g, b)
+          : Qnil);
+}
 
 /* Parse RGB_LIST, and fill in the RGB fields of COLOR.
    RGB_LIST should contain (at least) 3 lisp integers.
@@ -7018,4 +7141,5 @@ clear the face cache, see `clear-face-cache'.  */);
   defsubr (&Sinternal_face_x_get_resource);
   defsubr (&Sx_family_fonts);
 #endif
+  defsubr (&Scolor_values_from_color_spec);
 }
