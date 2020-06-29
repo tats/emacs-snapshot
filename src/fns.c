@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include <stdlib.h>
+#include <sys/random.h>
 #include <unistd.h>
 #include <filevercmp.h>
 #include <intprops.h>
@@ -37,10 +38,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "puresize.h"
 #include "gnutls.h"
-
-#if defined WINDOWSNT && defined HAVE_GNUTLS3
-# define gnutls_rnd w32_gnutls_rnd
-#endif
 
 static void sort_vector_copy (Lisp_Object, ptrdiff_t,
 			      Lisp_Object *restrict, Lisp_Object *restrict);
@@ -5267,7 +5264,6 @@ extract_data_from_object (Lisp_Object spec,
     }
   else if (EQ (object, Qiv_auto))
     {
-#ifdef HAVE_GNUTLS3
       /* Format: (iv-auto REQUIRED-LENGTH).  */
 
       if (! FIXNATP (start))
@@ -5276,14 +5272,19 @@ extract_data_from_object (Lisp_Object spec,
         {
 	  EMACS_INT start_hold = XFIXNAT (start);
           object = make_uninit_string (start_hold);
-          gnutls_rnd (GNUTLS_RND_NONCE, SSDATA (object), start_hold);
+	  char *lim = SSDATA (object) + start_hold;
+	  for (char *p = SSDATA (object); p < lim; p++)
+	    {
+	      ssize_t gotten = getrandom (p, lim - p, 0);
+	      if (0 <= gotten)
+		p += gotten;
+	      else if (errno != EINTR)
+		report_file_error ("Getting random data", Qnil);
+	    }
 
           *start_byte = 0;
           *end_byte = start_hold;
         }
-#else
-      error ("GnuTLS is not available, so `iv-auto' can't be used");
-#endif
     }
 
   if (!STRINGP (object))
