@@ -197,7 +197,7 @@ of the project instance object."
             pr (project--find-in-directory directory))))
     (when maybe-prompt
       (if pr
-          (project--add-to-project-list-front pr)
+          (project-remember-project pr)
         (project--remove-from-project-list directory)
         (setq pr (cons 'transient directory))))
     pr))
@@ -568,6 +568,13 @@ DIRS must contain directory names."
   ;; Sidestep the issue of expanded/abbreviated file names here.
   (cl-set-difference files dirs :test #'file-in-directory-p))
 
+(defun project--value-in-dir (var dir)
+  (with-temp-buffer
+    (setq default-directory dir)
+    (let ((enable-local-variables :all))
+      (hack-dir-local-variables-non-file-buffer))
+    (symbol-value var)))
+
 
 ;;; Project commands
 
@@ -592,12 +599,73 @@ DIRS must contain directory names."
 
 ;;;###autoload (define-key ctl-x-map "p" project-prefix-map)
 
-(defun project--value-in-dir (var dir)
-  (with-temp-buffer
-    (setq default-directory dir)
-    (let ((enable-local-variables :all))
-      (hack-dir-local-variables-non-file-buffer))
-    (symbol-value var)))
+;; We can't have these place-specific maps inherit from
+;; project-prefix-map because project--other-place-command needs to
+;; know which map the key binding came from, as if it came from one of
+;; these maps, we don't want to set display-buffer-overriding-action
+
+(defvar project-other-window-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\C-o" #'project-display-buffer)
+    map)
+  "Keymap for project commands that display buffers in other windows.")
+
+(defvar project-other-frame-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\C-o" #'project-display-buffer-other-frame)
+    map)
+  "Keymap for project commands that display buffers in other frames.")
+
+(defun project--other-place-command (action &optional map)
+  (let* ((key (read-key-sequence-vector nil t))
+         (place-cmd (lookup-key map key))
+         (generic-cmd (lookup-key project-prefix-map key))
+         (switch-to-buffer-obey-display-actions t)
+         (display-buffer-overriding-action (unless place-cmd action)))
+    (if-let ((cmd (or place-cmd generic-cmd)))
+        (call-interactively cmd)
+      (user-error "%s is undefined" (key-description key)))))
+
+;;;###autoload
+(defun project-other-window-command ()
+  "Run project command, displaying resultant buffer in another window.
+
+The following commands are available:
+
+\\{project-prefix-map}
+\\{project-other-window-map}"
+  (interactive)
+  (project--other-place-command '((display-buffer-pop-up-window)
+                                  (inhibit-same-window . t))
+                                project-other-window-map))
+
+;;;###autoload (define-key ctl-x-4-map "p" #'project-other-window-command)
+
+;;;###autoload
+(defun project-other-frame-command ()
+  "Run project command, displaying resultant buffer in another frame.
+
+The following commands are available:
+
+\\{project-prefix-map}
+\\{project-other-frame-map}"
+  (interactive)
+  (project--other-place-command '((display-buffer-pop-up-frame))
+                                project-other-frame-map))
+
+;;;###autoload (define-key ctl-x-5-map "p" #'project-other-frame-command)
+
+;;;###autoload
+(defun project-other-tab-command ()
+  "Run project command, displaying resultant buffer in a new tab.
+
+The following commands are available:
+
+\\{project-prefix-map}"
+  (interactive)
+  (project--other-place-command '((display-buffer-in-new-tab))))
+
+;;;###autoload (define-key tab-prefix-map "p" #'project-other-tab-command)
 
 (declare-function grep-read-files "grep")
 (declare-function xref--show-xrefs "xref")
@@ -877,14 +945,7 @@ Arguments the same as in `compile'."
          (default-directory (project-root pr)))
     (compile command comint)))
 
-;;;###autoload
-(defun project-switch-to-buffer ()
-  "Switch to another buffer belonging to the current project.
-This function prompts for another buffer, offering as candidates
-buffers that belong to the same project as the current buffer.
-Two buffers belong to the same project if their project instances,
-as reported by `project-current' in each buffer, are identical."
-  (interactive)
+(defun project--read-project-buffer ()
   (let* ((pr (project-current t))
          (current-buffer (current-buffer))
          (other-buffer (other-buffer current-buffer))
@@ -896,13 +957,49 @@ as reported by `project-current' in each buffer, are identical."
                  (equal pr
                         (with-current-buffer (cdr buffer)
                           (project-current)))))))
-    (switch-to-buffer
-     (read-buffer
-      "Switch to buffer: "
-      (when (funcall predicate (cons other-name other-buffer))
-        other-name)
-      nil
-      predicate))))
+    (read-buffer
+     "Switch to buffer: "
+     (when (funcall predicate (cons other-name other-buffer))
+       other-name)
+     nil
+     predicate)))
+
+;;;###autoload
+(defun project-switch-to-buffer (buffer-or-name)
+  "Display buffer BUFFER-OR-NAME in the selected window.
+When called interactively, prompts for a buffer belonging to the
+current project.  Two buffers belong to the same project if their
+project instances, as reported by `project-current' in each
+buffer, are identical."
+  (interactive (list (project--read-project-buffer)))
+  (switch-to-buffer buffer-or-name))
+
+;;;###autoload
+(defun project-display-buffer (buffer-or-name)
+  "Display BUFFER-OR-NAME in some window, without selecting it.
+When called interactively, prompts for a buffer belonging to the
+current project.  Two buffers belong to the same project if their
+project instances, as reported by `project-current' in each
+buffer, are identical.
+
+This function uses `display-buffer' as a subroutine, which see
+for how it is determined where the buffer will be displayed."
+  (interactive (list (project--read-project-buffer)))
+  (display-buffer buffer-or-name))
+
+;;;###autoload
+(defun project-display-buffer-other-frame (buffer-or-name)
+  "Display BUFFER-OR-NAME preferably in another frame.
+When called interactively, prompts for a buffer belonging to the
+current project.  Two buffers belong to the same project if their
+project instances, as reported by `project-current' in each
+buffer, are identical.
+
+This function uses `display-buffer-other-frame' as a subroutine,
+which see for how it is determined where the buffer will be
+displayed."
+  (interactive (list (project--read-project-buffer)))
+  (display-buffer-other-frame buffer-or-name))
 
 (defcustom project-kill-buffers-ignores
   '("\\*Help\\*")
@@ -987,7 +1084,8 @@ With some possible metadata (to be decided).")
       (pp project--list (current-buffer))
       (write-region nil nil filename nil 'silent))))
 
-(defun project--add-to-project-list-front (pr)
+;;;###autoload
+(defun project-remember-project (pr)
   "Add project PR to the front of the project list.
 Save the result in `project-list-file' if the list of projects has changed."
   (project--ensure-read-project-list)
