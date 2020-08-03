@@ -120,10 +120,10 @@ index 67e15cf..a032172 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index af339a9..4864d89 100755
+index d60984e..c57b0f5 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -259,8 +259,7 @@ info_dir ()
+@@ -260,8 +260,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,10 +134,10 @@ index af339a9..4864d89 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 148c50e..6eef759 100644
+index 93463e3..386afec 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5780,7 +5780,7 @@ AC_DEFUN
+@@ -5781,7 +5781,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 148c50e..6eef759 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5832,15 +5832,6 @@ m4_define
+@@ -5833,15 +5833,6 @@ m4_define
  fi
  ])
  
