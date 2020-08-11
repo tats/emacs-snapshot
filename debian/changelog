@@ -1,4 +1,4 @@
-emacs27 (27.0.91+0.3-0.1) UNRELEASED; urgency=medium
+emacs27 (27.1+0.1-0.1) UNRELEASED; urgency=medium
 
   [ Tatsuya Kinoshita ]
   * Merge debian/* from emacs-snapshot, commit 94fd8b6 on 2020-04-16
@@ -15,10 +15,10 @@ emacs27 (27.0.91+0.3-0.1) UNRELEASED; urgency=medium
     Origin: https://code.launchpad.net/~ack/emacs/+git/emacs/+merge/381441
 
   [ Tatsuya Kinoshita ]
-  * New upstream version 27.0.91+0.3
-    - emacs-27 branch, emacs-27.0.91-44-g9f5ae717fba
+  * New upstream version 27.1+0.1
+    - emacs-27.1, commit 86d8d76aa36 on 2020-08-04
 
- -- Tatsuya Kinoshita <tats@debian.org>  Mon, 27 Apr 2020 23:13:59 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Tue, 11 Aug 2020 19:36:07 +0900
 
 emacs-snapshot (2:20200416+emacs-27.0.90-744-g0127118c259-1) unstable; urgency=medium
 
