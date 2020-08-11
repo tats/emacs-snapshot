@@ -1850,10 +1850,14 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		  top_x = it3.current_x - it3.pixel_width;
 		  /* Account for line-number display, if IT3 still
 		     didn't.  This can happen if START - 1 is the
-		     first character on its display line.  */
-		  if (!it3.line_number_produced_p
-		      && it.line_number_produced_p)
-		    top_x += it.lnum_pixel_width;
+		     first or the last character on its display line.  */
+		  if (!it3.line_number_produced_p)
+		    {
+		      if (it3.lnum_pixel_width > 0)
+			top_x += it3.lnum_pixel_width;
+		      else if (it.line_number_produced_p)
+			top_x += it.lnum_pixel_width;
+		    }
 		  /* Normally, we would exit the above loop because we
 		     found the display element whose character
 		     position is CHARPOS.  For the contingency that we
@@ -5104,7 +5108,7 @@ handle_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
   if (CONSP (spec) && EQ (XCAR (spec), Qdisable_eval))
     {
       enable_eval = false;
-      spec = XCAR (XCDR (spec));
+      spec = CONSP (XCDR (spec)) ? XCAR (XCDR (spec)) : Qnil;
     }
 
   if (CONSP (spec)
@@ -8264,8 +8268,8 @@ get_visually_first_element (struct it *it)
     }
   else if (it->bidi_it.charpos == bob
 	   || (!string_p
-	       && (FETCH_CHAR (it->bidi_it.bytepos - 1) == '\n'
-		   || FETCH_CHAR (it->bidi_it.bytepos) == '\n')))
+	       && (FETCH_BYTE (it->bidi_it.bytepos - 1) == '\n'
+		   || FETCH_BYTE (it->bidi_it.bytepos) == '\n')))
     {
       /* If we are at the beginning of a line/string, we can produce
 	 the next element right away.  */
@@ -10401,33 +10405,43 @@ in_display_vector_p (struct it *it)
 DEFUN ("window-text-pixel-size", Fwindow_text_pixel_size, Swindow_text_pixel_size, 0, 6, 0,
        doc: /* Return the size of the text of WINDOW's buffer in pixels.
 WINDOW must be a live window and defaults to the selected one.  The
-return value is a cons of the maximum pixel-width of any text line and
-the maximum pixel-height of all text lines.
+return value is a cons of the maximum pixel-width of any text line
+and the pixel-height of all the text lines in the accessible portion
+of buffer text.
+
+This function exists to allow Lisp programs to adjust the dimensions
+of WINDOW to the buffer text it needs to display.
 
 The optional argument FROM, if non-nil, specifies the first text
-position and defaults to the minimum accessible position of the buffer.
-If FROM is t, use the minimum accessible position that starts a
-non-empty line.  TO, if non-nil, specifies the last text position and
-defaults to the maximum accessible position of the buffer.  If TO is t,
-use the maximum accessible position that ends a non-empty line.
+position to consider, and defaults to the minimum accessible position
+of the buffer.  If FROM is t, it stands for the minimum accessible
+position that starts a non-empty line.  TO, if non-nil, specifies the
+last text position and defaults to the maximum accessible position of
+the buffer.  If TO is t, it stands for the maximum accessible position
+that ends a non-empty line.
 
-The optional argument X-LIMIT, if non-nil, specifies the maximum text
-width that can be returned.  X-LIMIT nil or omitted, means to use the
-pixel-width of WINDOW's body; use this if you want to know how high
-WINDOW should be become in order to fit all of its buffer's text with
-the width of WINDOW unaltered.  Use the maximum width WINDOW may assume
-if you intend to change WINDOW's width.  In any case, text whose
-x-coordinate is beyond X-LIMIT is ignored.  Since calculating the width
-of long lines can take some time, it's always a good idea to make this
-argument as small as possible; in particular, if the buffer contains
-long lines that shall be truncated anyway.
+The optional argument X-LIMIT, if non-nil, specifies the maximum X
+coordinate beyond which the text should be ignored.  It is therefore
+also the maximum width that the function can return.  X-LIMIT nil or
+omitted means to use the pixel-width of WINDOW's body.  This default
+means text of truncated lines wider than the window will be ignored;
+specify a large value for X-LIMIT if lines are truncated and you need
+to account for the truncated text.  Use nil for X-LIMIT if you want to
+know how high WINDOW should become in order to fit all of its buffer's
+text with the width of WINDOW unaltered.  Use the maximum width WINDOW
+may assume if you intend to change WINDOW's width.  Since calculating
+the width of long lines can take some time, it's always a good idea to
+make this argument as small as possible; in particular, if the buffer
+contains long lines that shall be truncated anyway.
 
-The optional argument Y-LIMIT, if non-nil, specifies the maximum text
-height (excluding the height of the mode- or header-line, if any) that
-can be returned.  Text lines whose y-coordinate is beyond Y-LIMIT are
-ignored.  Since calculating the text height of a large buffer can take
-some time, it makes sense to specify this argument if the size of the
-buffer is large or unknown.
+The optional argument Y-LIMIT, if non-nil, specifies the maximum Y
+coordinate beyond which the text is to be ignored; it is therefore
+also the maxcomp height that the function can return (excluding the
+height of the mode- or header-line, if any).  Y-LIMIT nil or omitted
+means consider all of the accessible portion of buffer text up to the
+position specified by TO.  Since calculating the text height of a
+large buffer can take some time, it makes sense to specify this
+argument if the size of the buffer is large or unknown.
 
 Optional argument MODE-AND-HEADER-LINE nil or omitted means do not
 include the height of the mode- or header-line of WINDOW in the return
@@ -10442,7 +10456,7 @@ include the height of both, if present, in the return value.  */)
   struct buffer *b;
   struct it it;
   struct buffer *old_b = NULL;
-  ptrdiff_t start, end, pos;
+  ptrdiff_t start, end, bpos;
   struct text_pos startp;
   void *itdata = NULL;
   int c, max_x = 0, max_y = 0, x = 0, y = 0;
@@ -10457,32 +10471,56 @@ include the height of both, if present, in the return value.  */)
     }
 
   if (NILP (from))
-    start = BEGV;
+    {
+      start = BEGV;
+      bpos = BEGV_BYTE;
+    }
   else if (EQ (from, Qt))
     {
-      start = pos = BEGV;
-      while ((pos++ < ZV) && (c = FETCH_CHAR (pos))
-	     && (c == ' ' || c == '\t' || c == '\n' || c == '\r'))
-	start = pos;
-      while ((pos-- > BEGV) && (c = FETCH_CHAR (pos)) && (c == ' ' || c == '\t'))
-	start = pos;
+      start = BEGV;
+      bpos = BEGV_BYTE;
+      while (bpos < ZV_BYTE)
+	{
+	  FETCH_CHAR_ADVANCE (c, start, bpos);
+	  if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r'))
+	    break;
+	}
+      while (bpos > BEGV_BYTE)
+	{
+	  DEC_BOTH (start, bpos);
+	  c = FETCH_CHAR (bpos);
+	  if (!(c == ' ' || c == '\t'))
+	    break;
+	}
     }
   else
     {
       CHECK_FIXNUM_COERCE_MARKER (from);
       start = min (max (XFIXNUM (from), BEGV), ZV);
+      bpos = CHAR_TO_BYTE (start);
     }
+
+  SET_TEXT_POS (startp, start, bpos);
 
   if (NILP (to))
     end = ZV;
   else if (EQ (to, Qt))
     {
-      end = pos = ZV;
-      while ((pos-- > BEGV) && (c = FETCH_CHAR (pos))
-	     && (c == ' ' || c == '\t' || c == '\n' || c == '\r'))
-	end = pos;
-      while ((pos++ < ZV) && (c = FETCH_CHAR (pos)) && (c == ' ' || c == '\t'))
-	end = pos;
+      end = ZV;
+      bpos = ZV_BYTE;
+      while (bpos > BEGV_BYTE)
+	{
+	  DEC_BOTH (end, bpos);
+	  c = FETCH_CHAR (bpos);
+	  if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r'))
+	    break;
+	}
+      while (bpos < ZV_BYTE)
+	{
+	  FETCH_CHAR_ADVANCE (c, end, bpos);
+	  if (!(c == ' ' || c == '\t'))
+	    break;
+	}
     }
   else
     {
@@ -10499,7 +10537,6 @@ include the height of both, if present, in the return value.  */)
     max_y = XFIXNUM (y_limit);
 
   itdata = bidi_shelve_cache ();
-  SET_TEXT_POS (startp, start, CHAR_TO_BYTE (start));
   start_display (&it, w, startp);
   /* It makes no sense to measure dimensions of region of text that
      crosses the point where bidi reordering changes scan direction.
@@ -11516,7 +11553,9 @@ display_echo_area_1 (ptrdiff_t a1, Lisp_Object a2)
   /* Display.  */
   clear_glyph_matrix (w->desired_matrix);
   XSETWINDOW (window, w);
+  void *itdata = bidi_shelve_cache ();
   try_window (window, start, 0);
+  bidi_unshelve_cache (itdata, false);
 
   return window_height_changed_p;
 }
@@ -19698,7 +19737,7 @@ find_last_row_displaying_text (struct glyph_matrix *matrix, struct it *it,
    by changes at the start of current_buffer that occurred since W's
    current matrix was built.  Value is null if no such row exists.
 
-   BEG_UNCHANGED us the number of characters unchanged at the start of
+   BEG_UNCHANGED is the number of characters unchanged at the start of
    current_buffer.  BEG + BEG_UNCHANGED is the buffer position of the
    first changed character in current_buffer.  Characters at positions <
    BEG + BEG_UNCHANGED are at the same buffer positions as they were
@@ -24134,7 +24173,7 @@ the `bidi-class' property of a character.  */)
 	  itb.charpos = BEGV;
 	  itb.bytepos = BEGV_BYTE;
 	}
-      else if (FETCH_CHAR (from_bpos - 1) == '\n')
+      else if (FETCH_BYTE (from_bpos - 1) == '\n')
 	{
 	  itb.charpos = from_pos;
 	  itb.bytepos = from_bpos;
@@ -26303,6 +26342,22 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	startpos = marker_position (w->start);
 	startpos_byte = marker_byte_position (w->start);
 	height = WINDOW_TOTAL_LINES (w);
+	/* We cannot cope with w->start being outside of the
+	   accessible portion of the buffer; in particular,
+	   display_count_lines call below might infloop if called with
+	   startpos_byte outside of the [BEGV_BYTE..ZV_BYTE] region.
+	   Such w->start means we were called in some "creative" way
+	   when the buffer's restriction was changed, but the window
+	   wasn't yet redisplayed after that.  If that happens, we
+	   need to determine a new base line.  */
+	if (!(BUF_BEGV_BYTE (b) <= startpos_byte
+	      && startpos_byte <= BUF_ZV_BYTE (b)))
+	  {
+	    startpos = BUF_BEGV (b);
+	    startpos_byte = BUF_BEGV_BYTE (b);
+	    w->base_line_pos = 0;
+	    w->base_line_number = 0;
+	  }
 
 	/* If we decided that this buffer isn't suitable for line numbers,
 	   don't forget that too fast.  */
@@ -34953,7 +35008,8 @@ It has no effect when set to 0, or when line numbers are not absolute.  */);
   Fmake_variable_buffer_local (Qdisplay_line_numbers_offset);
 
   DEFVAR_BOOL ("display-fill-column-indicator", Vdisplay_fill_column_indicator,
-    doc: /* Non-nil means display the fill column indicator.  */);
+    doc: /* Non-nil means display the fill column indicator.
+See Info node `Displaying Boundaries' for details.  */);
   Vdisplay_fill_column_indicator = false;
   DEFSYM (Qdisplay_fill_column_indicator, "display-fill-column-indicator");
   Fmake_variable_buffer_local (Qdisplay_fill_column_indicator);
@@ -34962,7 +35018,8 @@ It has no effect when set to 0, or when line numbers are not absolute.  */);
     doc: /* Column for indicator when `display-fill-column-indicator' is non-nil.
 The default value is t which means that the indicator
 will use the `fill-column' variable.  If it is set to an integer the
-indicator will be drawn in that column.  */);
+indicator will be drawn in that column.
+See Info node `Displaying Boundaries' for details.  */);
   Vdisplay_fill_column_indicator_column = Qt;
   DEFSYM (Qdisplay_fill_column_indicator_column, "display-fill-column-indicator-column");
   Fmake_variable_buffer_local (Qdisplay_fill_column_indicator_column);
@@ -34970,7 +35027,8 @@ indicator will be drawn in that column.  */);
   DEFVAR_LISP ("display-fill-column-indicator-character", Vdisplay_fill_column_indicator_character,
     doc: /* Character to draw the indicator when `display-fill-column-indicator' is non-nil.
 The default is U+2502 but a good alternative is (ascii 124)
-if the font in fill-column-indicator face does not support Unicode characters.  */);
+if the font in fill-column-indicator face does not support Unicode characters.
+See Info node `Displaying Boundaries' for details.  */);
   Vdisplay_fill_column_indicator_character = Qnil;
   DEFSYM (Qdisplay_fill_column_indicator_character, "display-fill-column-indicator-character");
   Fmake_variable_buffer_local (Qdisplay_fill_column_indicator_character);

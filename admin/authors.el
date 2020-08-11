@@ -212,6 +212,7 @@ files.")
     ("Carlos Pita" "memeplex")
     ("Vinicius Jose Latorre" "viniciusjl")
     ("Gaby Launay" "galaunay")
+    ("Dick R. Chiang" "dickmao")
     )
   "Alist of author aliases.
 

@@ -44,24 +44,11 @@
   :group 'convenience
   :version "27.1")
 
-(defgroup tab-bar-faces nil
+(defgroup tab-bar-faces '((tab-bar custom-face)) ; tab-bar is defined in faces.el
   "Faces used in the tab bar."
   :group 'tab-bar
   :group 'faces
   :version "27.1")
-
-(defface tab-bar
-  '((((class color) (min-colors 88))
-     :inherit variable-pitch
-     :background "grey85"
-     :foreground "black")
-    (((class mono))
-     :background "grey")
-    (t
-     :inverse-video t))
-  "Tab bar face."
-  :version "27.1"
-  :group 'tab-bar-faces)
 
 (defface tab-bar-tab
   '((default
@@ -376,19 +363,22 @@ to `tab-bar-tab-name-truncated'."
   :group 'tab-bar
   :version "27.1")
 
-(defvar tab-bar-tab-name-ellipsis
-  (if (char-displayable-p ?…) "…" "..."))
+(defvar tab-bar-tab-name-ellipsis nil)
 
 (defun tab-bar-tab-name-truncated ()
   "Generate tab name from the buffer of the selected window.
 Truncate it to the length specified by `tab-bar-tab-name-truncated-max'.
 Append ellipsis `tab-bar-tab-name-ellipsis' in this case."
-  (let ((tab-name (buffer-name (window-buffer (minibuffer-selected-window)))))
+  (let ((tab-name (buffer-name (window-buffer (minibuffer-selected-window))))
+        (ellipsis (cond
+                   (tab-bar-tab-name-ellipsis)
+                   ((char-displayable-p ?…) "…")
+                   ("..."))))
     (if (< (length tab-name) tab-bar-tab-name-truncated-max)
         tab-name
       (propertize (truncate-string-to-width
                    tab-name tab-bar-tab-name-truncated-max nil nil
-                   tab-bar-tab-name-ellipsis)
+                   ellipsis)
                   'help-echo tab-name))))
 
 
@@ -1523,9 +1513,10 @@ indirectly called by the latter."
 Like \\[switch-to-buffer-other-frame] (which see), but creates a new tab."
   (interactive
    (list (read-buffer-to-switch "Switch to buffer in other tab: ")))
-  (display-buffer buffer-or-name '((display-buffer-in-tab
-                                    display-buffer-same-window)
-                                   (inhibit-same-window . nil))
+  (display-buffer (window-normalize-buffer-to-switch-to buffer-or-name)
+                  '((display-buffer-in-tab
+                     display-buffer-same-window)
+                    (inhibit-same-window . nil))
                   norecord))
 
 (defun find-file-other-tab (filename &optional wildcards)
