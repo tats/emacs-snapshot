@@ -35,7 +35,7 @@ Vcs-Git: https://salsa.debian.org/rlb/deb-emacs.git
 Package: emacs
 Architecture: all
 Depends:
-  emacs-gtk (>= 1:26.3) | emacs-lucid (>= 1:26.3) | emacs-nox (>= 1:26.3),
+  emacs-gtk (>= 1:27.1) | emacs-lucid (>= 1:27.1) | emacs-nox (>= 1:27.1),
   ${misc:Depends}
 Description: GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
