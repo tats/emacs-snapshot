@@ -1,4 +1,4 @@
-From 1626a4d516125deca5eb8d0f7a63b6d48d6ab63d Mon Sep 17 00:00:00 2001
+From f52e6bd94fab618e69d38332756e5321ed131f4e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor
@@ -12,14 +12,14 @@ Emacs runs debian-startup and sets debian-emacs-flavor.
 
 Author: Rob Browning <rlb@defaultvalue.org>
 ---
- lisp/startup.el | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ lisp/startup.el | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index 32051c232ca..6ee20ccf597 100644
+index bff10003f84..78cd8dd0e3a 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -434,6 +434,10 @@ tutorial-directory
+@@ -436,6 +436,10 @@ tutorial-directory
    :type 'directory
    :initialize #'custom-initialize-delay)
  
@@ -30,27 +30,19 @@ index 32051c232ca..6ee20ccf597 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Recursively add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -1129,8 +1133,21 @@ command-line
-     ;; be loaded from site-run-file and wants to test if -q was given
-     ;; should check init-file-user instead, since that is already set.
-     ;; See cus-edit.el for an example.
--    (if site-run-file
--	(load site-run-file t t))
-+
-+    ;; Original upstream startup
-+    ;; (if site-run-file
-+    ;;     (load site-run-file t t))
-+    ;;
-+
-+    ;; Debian startup
-+     (if site-run-file
-+        (progn
-+          ;; Load all the debian package snippets.
-+          ;; It's in here because we want -q to kill it too.
-+          (if (load "debian-startup" t t nil)
-+              (debian-startup debian-emacs-flavor))
-+          ;; Now the normal site file...
-+          (load site-run-file t t)))
+@@ -1361,7 +1365,14 @@ command-line
+         ;; Sites should not disable the startup screen.
+         ;; Only individuals should disable the startup screen.
+         (let ((inhibit-startup-screen inhibit-startup-screen))
+-	  (load site-run-file t t)))
++          (progn
++            ;; This form has been added by Debian to load all the
++            ;; debian package snippets (dh-elpa, etc.).  It's in here
++            ;; because we want -q to kill it too.
++            (if (load "debian-startup" t t nil)
++                (debian-startup debian-emacs-flavor))
++            ;; This is the normal upstream behavior
++            (load site-run-file t t))))
  
-     ;; Sites should not disable this.  Only individuals should disable
-     ;; the startup screen.
+     ;; Load that user's init file, or the default one, or none.
+     (startup--load-user-init-file

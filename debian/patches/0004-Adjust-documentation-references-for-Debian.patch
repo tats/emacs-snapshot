@@ -1,4 +1,4 @@
-From 8aa3059b73a8704207dc6d75a186c3bbb96005a6 Mon Sep 17 00:00:00 2001
+From 1d1ddc9136ece2df262fbd004d186ee55db6e22e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:25 -0500
 Subject: Adjust documentation references for Debian
@@ -12,18 +12,18 @@ appropriate, etc.
  1 file changed, 5 insertions(+)
 
 diff --git a/etc/NEWS b/etc/NEWS
-index d672d057bb3..fc63a563d28 100644
+index d0a24c23f3a..8a2cb6d7bce 100644
 --- a/etc/NEWS
 +++ b/etc/NEWS
-@@ -192,6 +192,11 @@ build-time.  See nextstep/INSTALL for details.
- (This change was actually made in Emacs 26.1, but was undocumented and
- not called out in its NEWS.)
+@@ -21,6 +21,11 @@ Temporary note:
+ When you add a new item, use the appropriate mark if you are sure it
+ applies, and please also update docstrings as needed.
  
-+ 
++
 +* Debian specific changes to Emacs
 +
 +Please see /usr/share/doc/emacs-common/README.Debian.gz.
 +
  
- * Installation Changes in Emacs 26.1
+ * Installation Changes in Emacs 27.1
  

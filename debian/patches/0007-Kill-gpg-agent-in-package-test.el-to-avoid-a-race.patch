@@ -1,4 +1,4 @@
-From cf13a10435f407dc71e2d82558794a0e1a6748ae Mon Sep 17 00:00:00 2001
+From c76c4d5aa5ee8b344fefa1076de880ea96247e0e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 10 Oct 2016 17:35:56 -0500
 Subject: Kill gpg agent in package-test.el to avoid a race
@@ -20,10 +20,10 @@ package-test.el should no longer fail during clean up.
  1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/test/lisp/emacs-lisp/package-tests.el b/test/lisp/emacs-lisp/package-tests.el
-index 212e73f4726..c28c8077ac7 100644
+index 4fcaf0e84c2..4cf49752605 100644
 --- a/test/lisp/emacs-lisp/package-tests.el
 +++ b/test/lisp/emacs-lisp/package-tests.el
-@@ -150,7 +150,14 @@ package-test-fake-contents-file
+@@ -155,7 +155,14 @@ package-test-fake-contents-file
                 ,@body)))
  
         (when (file-directory-p package-test-user-dir)

@@ -1,4 +1,4 @@
-From ab940f42b7ca0208b7c734fe3a9bce4209add168 Mon Sep 17 00:00:00 2001
+From 8ba31a5b9c413f0efca428f979fbff7a03cf156f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG
@@ -30,10 +30,10 @@ Status: new
  5 files changed, 37 insertions(+), 76 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 364deeae226..0e0931bd626 100644
+index 67e15cfecd2..05bfedcd17c 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -162,7 +162,9 @@ man1dir=$(mandir)/man1
+@@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -44,7 +44,7 @@ index 364deeae226..0e0931bd626 100644
  
  # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
  HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -820,8 +822,7 @@ endef
+@@ -830,8 +832,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -54,7 +54,7 @@ index 364deeae226..0e0931bd626 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -953,11 +954,11 @@ check check-maybe check-expensive check-all: have-tests all
+@@ -965,11 +966,11 @@ endif
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -71,7 +71,7 @@ index 364deeae226..0e0931bd626 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -978,9 +979,6 @@ info-dir: ${srcdir}/info/dir
+@@ -990,9 +991,6 @@ info-dir: ${srcdir}/info/dir
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index 364deeae226..0e0931bd626 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1002,14 +1000,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+@@ -1014,14 +1012,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index 364deeae226..0e0931bd626 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1027,14 +1021,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1039,14 +1033,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -120,7 +120,7 @@ index 364deeae226..0e0931bd626 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 651d35beafb..a767b541fc7 100755
+index af339a9e7ec..4864d89011b 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -259,8 +259,7 @@ info_dir ()
@@ -134,10 +134,10 @@ index 651d35beafb..a767b541fc7 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index ebf24c8657e..4561ef7f868 100644
+index 40bc610f9bf..3b10c855afc 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5487,7 +5487,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
+@@ -5798,7 +5798,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index ebf24c8657e..4561ef7f868 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5540,14 +5540,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -5850,14 +5850,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -167,7 +167,7 @@ index ebf24c8657e..4561ef7f868 100644
  dnl If we give this the more natural name, etc/refcards/emacsver.texi,
  dnl then a directory etc/refcards is created in the build directory,
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index d02f42bbeb9..b5447f6ba10 100644
+index 7f536ad9529..6b56f47aab8 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA = @INSTALL_DATA@
@@ -181,7 +181,7 @@ index d02f42bbeb9..b5447f6ba10 100644
  DOCMISC_W32 = @DOCMISC_W32@
  
  ## Info files to build and install on all platforms.
--INFO_COMMON = ada-mode auth autotype bovine calc ccmode cl \
+-INFO_COMMON = auth autotype bovine calc ccmode cl \
 -	dbus dired-x ebrowse ede ediff edt eieio \
 -	emacs-mime epa erc ert eshell eudc efaq eww \
 -	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
@@ -250,10 +250,10 @@ index d02f42bbeb9..b5447f6ba10 100644
  .PHONY: mostlyclean clean distclean bootstrap-clean maintainer-clean
  
 diff --git a/lisp/help.el b/lisp/help.el
-index c23d4d8fe54..a081d13f5d0 100644
+index 0f1991e3185..775dd35cbb1 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -292,6 +292,14 @@ view-help-file
+@@ -296,6 +296,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  

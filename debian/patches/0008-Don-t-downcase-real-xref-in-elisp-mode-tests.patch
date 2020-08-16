@@ -1,4 +1,4 @@
-From 411e4cc35d58d3b02dffa6fa83a350666d17f6d9 Mon Sep 17 00:00:00 2001
+From 53edda63b17b1f468d957ca67506b2b2c2ddef1e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 29 Jul 2017 11:50:27 -0500
 Subject: Don't downcase real xref in elisp-mode-tests
@@ -13,7 +13,7 @@ lookups.
  1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/test/lisp/progmodes/elisp-mode-tests.el b/test/lisp/progmodes/elisp-mode-tests.el
-index bc2d14b9498..26db1cbc102 100644
+index 2ba00656862..f4076574a72 100644
 --- a/test/lisp/progmodes/elisp-mode-tests.el
 +++ b/test/lisp/progmodes/elisp-mode-tests.el
 @@ -311,11 +311,15 @@ xref--case-insensitive

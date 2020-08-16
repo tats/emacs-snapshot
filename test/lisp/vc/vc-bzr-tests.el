@@ -1,6 +1,6 @@
 ;;; vc-bzr.el --- tests for vc/vc-bzr.el
 
-;; Copyright (C) 2011-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2020 Free Software Foundation, Inc.
 
 ;; Author: Glenn Morris <rgm@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -113,9 +113,6 @@
   "Test we can generate autoloads in a bzr directory when bzr is faulty."
   :tags '(:unstable)
   (skip-unless (executable-find vc-bzr-program))
-  ;; Avoid vc-mode-line bug;
-  ;; http://lists.gnu.org/r/emacs-devel/2018-12/msg00368.html
-  (skip-unless (not (eq 0 (user-real-uid))))
   (let* ((homedir (make-temp-file "vc-bzr-test" t))
          (bzrdir (expand-file-name "bzr" homedir))
          (file (progn

@@ -1,4 +1,4 @@
-From dea7c2e140df4e0aa87f7e557cca7057885632ff Mon Sep 17 00:00:00 2001
+From 4670db77e9a8c8c0fce8094b716af531e45f6a8f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 16 Dec 2018 17:13:36 -0600
 Subject: Mark vc-bzr-test-fauilt-bzr-autoloads as unstable for now
@@ -61,7 +61,7 @@ Currently the test fails like this:
  1 file changed, 1 insertion(+)
 
 diff --git a/test/lisp/vc/vc-bzr-tests.el b/test/lisp/vc/vc-bzr-tests.el
-index af65cd1c205..96282e0f7ad 100644
+index f738da7f41f..161a415f715 100644
 --- a/test/lisp/vc/vc-bzr-tests.el
 +++ b/test/lisp/vc/vc-bzr-tests.el
 @@ -111,6 +111,7 @@
@@ -70,5 +70,5 @@ index af65cd1c205..96282e0f7ad 100644
    "Test we can generate autoloads in a bzr directory when bzr is faulty."
 +  :tags '(:unstable)
    (skip-unless (executable-find vc-bzr-program))
-   ;; Avoid vc-mode-line bug;
-   ;; http://lists.gnu.org/r/emacs-devel/2018-12/msg00368.html
+   (let* ((homedir (make-temp-file "vc-bzr-test" t))
+          (bzrdir (expand-file-name "bzr" homedir))

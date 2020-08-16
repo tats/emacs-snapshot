@@ -1,4 +1,4 @@
-From 2ad9737023c999e593dba4a98b6b8e394317d960 Mon Sep 17 00:00:00 2001
+From dab3621bbfd8ef6361f4b0ef904c0f5256556a53 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 17 Dec 2018 15:27:30 -0600
 Subject: Mark echo-server-with-dns test as :unstable for now
@@ -9,10 +9,10 @@ It fails inside a Debian sbuild chroot.
  1 file changed, 1 insertion(+)
 
 diff --git a/test/lisp/net/network-stream-tests.el b/test/lisp/net/network-stream-tests.el
-index 29b92da3de0..478b1bb823f 100644
+index 28686547a44..a0df0a26672 100644
 --- a/test/lisp/net/network-stream-tests.el
 +++ b/test/lisp/net/network-stream-tests.el
-@@ -100,6 +100,7 @@ server-process-filter
+@@ -137,6 +137,7 @@ server-process-filter
        ))))
  
  (ert-deftest echo-server-with-dns ()
