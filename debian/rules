@@ -276,6 +276,7 @@ confflags += --with-mailutils
 
 # x configure flags
 confflags_gtk := $(confflags)
+confflags_gtk += --with-cairo
 confflags_gtk += --with-x=yes
 confflags_gtk += --with-x-toolkit=gtk3
 # For those who prefer the old-style non-toolkit scrollbars, just
