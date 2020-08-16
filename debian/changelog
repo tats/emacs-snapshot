@@ -1,3 +1,11 @@
+emacs (1:27.1+1-1~1.gbp3df17b) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @3df17bc05ad786f58516d60c69dbf94852ac6843 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 16 Aug 2020 12:05:19 -0500
+
 emacs (1:26.3+1-2) unstable; urgency=medium
 
   * Fix intermittent test failures in process-tests.  Add
