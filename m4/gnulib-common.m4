@@ -1,4 +1,4 @@
-# gnulib-common.m4 serial 53
+# gnulib-common.m4 serial 57
 dnl Copyright (C) 2007-2020 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
@@ -45,7 +45,7 @@ AC_DEFUN([gl_COMMON_BODY], [
                 ? 6000000 <= __apple_build_version__ \
                 : 3 < __clang_major__ + (5 <= __clang_minor__))))
    /* _Noreturn works as-is.  */
-# elif _GL_GNUC_PREREQ (2, 8) || 0x5110 <= __SUNPRO_C
+# elif _GL_GNUC_PREREQ (2, 8) || defined __clang__ || 0x5110 <= __SUNPRO_C
 #  define _Noreturn __attribute__ ((__noreturn__))
 # elif 1200 <= (defined _MSC_VER ? _MSC_VER : 0)
 #  define _Noreturn __declspec (noreturn)
@@ -76,6 +76,7 @@ AC_DEFUN([gl_COMMON_BODY], [
 # define _GL_ATTR_cold _GL_GNUC_PREREQ (4, 3)
 # define _GL_ATTR_const _GL_GNUC_PREREQ (2, 95)
 # define _GL_ATTR_deprecated _GL_GNUC_PREREQ (3, 1)
+# define _GL_ATTR_diagnose_if 0
 # define _GL_ATTR_error _GL_GNUC_PREREQ (4, 3)
 # define _GL_ATTR_externally_visible _GL_GNUC_PREREQ (4, 1)
 # define _GL_ATTR_fallthrough _GL_GNUC_PREREQ (7, 0)
@@ -149,6 +150,9 @@ AC_DEFUN([gl_COMMON_BODY], [
 #if _GL_HAS_ATTRIBUTE (error)
 # define _GL_ATTRIBUTE_ERROR(msg) __attribute__ ((__error__ (msg)))
 # define _GL_ATTRIBUTE_WARNING(msg) __attribute__ ((__warning__ (msg)))
+#elif _GL_HAS_ATTRIBUTE (diagnose_if)
+# define _GL_ATTRIBUTE_ERROR(msg) __attribute__ ((__diagnose_if__ (1, msg, "error")))
+# define _GL_ATTRIBUTE_WARNING(msg) __attribute__ ((__diagnose_if__ (1, msg, "warning")))
 #else
 # define _GL_ATTRIBUTE_ERROR(msg)
 # define _GL_ATTRIBUTE_WARNING(msg)
@@ -476,14 +480,6 @@ AC_DEFUN([gl_FEATURES_H],
   AC_SUBST([HAVE_FEATURES_H])
 ])
 
-# AS_VAR_IF(VAR, VALUE, [IF-MATCH], [IF-NOT-MATCH])
-# ----------------------------------------------------
-# Backport of autoconf-2.63b's macro.
-# Remove this macro when we can assume autoconf >= 2.64.
-m4_ifndef([AS_VAR_IF],
-[m4_define([AS_VAR_IF],
-[AS_IF([test x"AS_VAR_GET([$1])" = x""$2], [$3], [$4])])])
-
 # gl_PROG_CC_C99
 # Modifies the value of the shell variable CC in an attempt to make $CC
 # understand ISO C99 source code.
@@ -656,6 +652,72 @@ AC_DEFUN([gl_CACHE_VAL_SILENT],
   as_echo_n="$saved_as_echo_n"
 ])
 
-# AS_VAR_COPY was added in autoconf 2.63b
-m4_define_default([AS_VAR_COPY],
-[AS_LITERAL_IF([$1[]$2], [$1=$$2], [eval $1=\$$2])])
+dnl Expands to some code for use in .c programs that, on native Windows, defines
+dnl the Microsoft deprecated alias function names to the underscore-prefixed
+dnl actual function names. With this macro, these function names are available
+dnl without linking with '-loldnames' and without generating warnings.
+dnl Usage: Use it after all system header files are included.
+dnl          #include <...>
+dnl          #include <...>
+dnl          ]GL_MDA_DEFINES[
+dnl          ...
+AC_DEFUN([GL_MDA_DEFINES],[
+AC_REQUIRE([_GL_MDA_DEFINES])
+[$gl_mda_defines]
+])
+AC_DEFUN([_GL_MDA_DEFINES],
+[gl_mda_defines='
+#if defined _WIN32 && !defined __CYGWIN__
+#define access    _access
+#define chdir     _chdir
+#define chmod     _chmod
+#define close     _close
+#define creat     _creat
+#define dup       _dup
+#define dup2      _dup2
+#define ecvt      _ecvt
+#define execl     _execl
+#define execle    _execle
+#define execlp    _execlp
+#define execv     _execv
+#define execve    _execve
+#define execvp    _execvp
+#define execvpe   _execvpe
+#define fcloseall _fcloseall
+#define fcvt      _fcvt
+#define fdopen    _fdopen
+#define fileno    _fileno
+#define gcvt      _gcvt
+#define getcwd    _getcwd
+#define getpid    _getpid
+#define getw      _getw
+#define isatty    _isatty
+#define j0        _j0
+#define j1        _j1
+#define jn        _jn
+#define lfind     _lfind
+#define lsearch   _lsearch
+#define lseek     _lseek
+#define memccpy   _memccpy
+#define mkdir     _mkdir
+#define mktemp    _mktemp
+#define open      _open
+#define putenv    _putenv
+#define putw      _putw
+#define read      _read
+#define rmdir     _rmdir
+#define strdup    _strdup
+#define swab      _swab
+#define tempnam   _tempnam
+#define tzset     _tzset
+#define umask     _umask
+#define unlink    _unlink
+#define utime     _utime
+#define wcsdup    _wcsdup
+#define write     _write
+#define y0        _y0
+#define y1        _y1
+#define yn        _yn
+#endif
+'
+])

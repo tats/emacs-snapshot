@@ -1809,7 +1809,8 @@ bool_vector_uchar_data (Lisp_Object a)
 INLINE bool
 bool_vector_bitref (Lisp_Object a, EMACS_INT i)
 {
-  eassume (0 <= i && i < bool_vector_size (a));
+  eassume (0 <= i);
+  eassert (i < bool_vector_size (a));
   return !! (bool_vector_uchar_data (a)[i / BOOL_VECTOR_BITS_PER_CHAR]
 	     & (1 << (i % BOOL_VECTOR_BITS_PER_CHAR)));
 }
@@ -1825,11 +1826,11 @@ bool_vector_ref (Lisp_Object a, EMACS_INT i)
 INLINE void
 bool_vector_set (Lisp_Object a, EMACS_INT i, bool b)
 {
-  unsigned char *addr;
+  eassume (0 <= i);
+  eassert (i < bool_vector_size (a));
 
-  eassume (0 <= i && i < bool_vector_size (a));
-  addr = &bool_vector_uchar_data (a)[i / BOOL_VECTOR_BITS_PER_CHAR];
-
+  unsigned char *addr
+    = &bool_vector_uchar_data (a)[i / BOOL_VECTOR_BITS_PER_CHAR];
   if (b)
     *addr |= 1 << (i % BOOL_VECTOR_BITS_PER_CHAR);
   else
@@ -2275,11 +2276,7 @@ struct hash_table_test
 
 struct Lisp_Hash_Table
 {
-  /* Change pdumper.c if you change the fields here.
-
-     IMPORTANT!!!!!!!
-
-     Call hash_rehash_if_needed() before accessing.  */
+  /* Change pdumper.c if you change the fields here.  */
 
   /* This is for Lisp; the hash table code does not refer to it.  */
   union vectorlike_header header;
@@ -2398,20 +2395,7 @@ HASH_TABLE_SIZE (const struct Lisp_Hash_Table *h)
   return size;
 }
 
-void hash_table_rehash (struct Lisp_Hash_Table *h);
-
-INLINE bool
-hash_rehash_needed_p (const struct Lisp_Hash_Table *h)
-{
-  return NILP (h->hash);
-}
-
-INLINE void
-hash_rehash_if_needed (struct Lisp_Hash_Table *h)
-{
-  if (hash_rehash_needed_p (h))
-    hash_table_rehash (h);
-}
+void hash_table_rehash (Lisp_Object);
 
 /* Default size for hash tables if not specified.  */
 
@@ -3932,7 +3916,6 @@ build_string (const char *str)
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
-extern struct Lisp_Vector *allocate_vector (ptrdiff_t);
 extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t);
 
 /* Make an uninitialized vector for SIZE objects.  NOTE: you must
@@ -3942,7 +3925,11 @@ extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t);
    v = make_uninit_vector (3);
    ASET (v, 0, obj0);
    ASET (v, 1, Ffunction_can_gc ());
-   ASET (v, 2, obj1);  */
+   ASET (v, 2, obj1);
+
+   allocate_vector has a similar problem.  */
+
+extern struct Lisp_Vector *allocate_vector (ptrdiff_t);
 
 INLINE Lisp_Object
 make_uninit_vector (ptrdiff_t size)
@@ -3964,7 +3951,8 @@ make_uninit_sub_char_table (int depth, int min_char)
   return v;
 }
 
-/* Make a vector of SIZE nils.  */
+/* Make a vector of SIZE nils - faster than make_vector (size, Qnil)
+   if the OS already cleared the new memory.  */
 
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)

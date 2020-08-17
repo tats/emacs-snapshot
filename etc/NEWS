@@ -98,8 +98,19 @@ dimension.
 Added a new Mozhi scheme.  The inapplicable ITRANS scheme is now
 deprecated.  Errors in the Inscript method were corrected.
 
+---
+** Rudimentary support for the 'st' terminal emulator.
+Emacs now supports 256 color display on the 'st' terminal emulator.
+
 
 * Editing Changes in Emacs 28.1
+
+---
+** 'eval-expression' now no longer signals an error on incomplete expressions.
+Previously, typing 'M-: ( RET' would result in Emacs saying "End of
+file during parsing" and dropping out of the minibuffer.  The user
+would have to type 'M-: M-p' to edit and redo the expression.  Now
+Emacs will echo the message and allow the user to continue editing.
 
 +++
 ** New command 'undo-redo'.
@@ -204,12 +215,17 @@ as a data list rather than as a piece of code.
 ** Calendar
 
 +++
-*** New variable 'calendar-use-numeric-time-zones' to use numeric time zones.
-If non-nil, functions that display time zones (like the 'S' command in
-calendar mode that displays the sunrise time) will display time zones
-like "+0100" instead of "CET".
+*** New user option 'calendar-time-zone-style'.
+If 'numeric, calendar functions (eg calendar-sunrise-sunset) that display
+time zones will use a form like "+0100" instead of "CET".
 
 ** Dired
+
++++
+*** New user option 'dired-copy-dereference'.
+If set, Dired will dereferences symbolic links when copying.  This can
+be switched off on a per-usage basis by providing 'dired-do-copy' with
+a 'C-u' prefix.
 
 *** New user option 'dired-mark-region' affects all Dired commands
 that mark files.  When non-nil and the region is active in Transient
@@ -245,6 +261,13 @@ invoke 'C-u C-x v s' ('vc-create-tag').
 
 
 ** Gnus
+
++++
+*** The key binding of 'gnus-summary-search-article-forward' has changed.
+This command was previously on 'M-s' and shadowed the global 'M-s'
+search prefix.  The command has now been moved to 'M-s M-s'.  (For
+consistency, the 'M-s M-r' key binding has been added for the
+'gnus-summary-search-article-backward' command.)
 
 ---
 *** The value of "all" in the 'large-newsgroup-initial' group parameter changes.
@@ -505,6 +528,14 @@ with a newline.
 *** New user option 'texinfo-texi2dvi-options'.
 This is used when invoking 'texi2dvi' from 'texinfo-tex-buffer'.
 
+---
+*** New commands for moving in and between environments.
+An "environment" is something that ends with @end.  The commands are
+'C-c C-c C-f' (next end), 'C-c C-c C-b' (previous end),
+'C-c C-c C-n' (next start) and 'C-c C-c C-p' (previous start), as well
+as 'C-c .', which will alternate between the start end the end of the
+current environment.
+
 ** Rmail
 
 ---
@@ -517,6 +548,9 @@ prefix on the Subject line in various languages.
 *** New commands 'apropos-next-symbol' and 'apropos-previous-symbol'.
 These new navigation commands are bound to 'n' and 'p' in
 'apropos-mode'.
+
+*** New command 'apropos-function'.
+This works like 'C-u M-x apropos-command' but is more discoverable.
 
 ** CC Mode
 
@@ -690,6 +724,22 @@ https://www.w3.org/TR/xml/#charsets).  Now it rejects such strings.
 *** The /ignore command will now ask for a timeout to stop ignoring the user.
 Allowed inputs are seconds or ISO8601-like periods like "1h" or "4h30m".
 
+---
+*** ERC now recognizes C-] for italic text.
+Italic text is displayed in the new 'erc-italic-face'.
+
+---
+*** The erc-compat.el library is now marked obsolete.
+This file contained ERC compatibility code for Emacs 21 and XEmacs
+which is no longer needed.
+
+---
+*** erc-match.el now supports 'message' highlight type (not including the nick).
+The 'erc-current-nick-highlight-type', 'erc-pal-highlight-type',
+'erc-fool-highlight-type', 'erc-keyword-highlight-type', and
+'erc-dangerous-host-highlight-type' variables now support a 'message'
+type for highlighting the entire message but not the sender's nick.
+
 ** Battery
 
 ---
@@ -737,8 +787,56 @@ name.
 ** Recentf
 The recentf files are no longer backed up.
 
+** Calc
+
+---
+*** The behaviour when doing forward-delete has been changed.
+Previously, using the 'C-d' command would delete the final number in
+the input field, no matter where point was.  This has been changed to
+work more traditionally, with 'C-d' deleting the next character.
+Likewise, point isn't moved to the end of the string before inserting
+digits.
+
+** term-mode
+
+---
+*** New user option 'term-scroll-snap-to-bottom'.
+By default, 'term' and 'ansi-term' will now recenter the buffer so
+that the prompt is on the final line in the window.  Setting this new
+user option to nil inhibits this behavior.
+
+---
+*** New user option 'term-set-terminal-size'
+If non-nil, the LINES and COLUMNS environment variables will be set
+based on the current window size.  In previous versions of Emacs, this
+was always done (and that could lead to odd displays when resizing the
+window after starting).  This variable defaults to nil.
+
 
 ** Miscellaneous
+
+---
+*** Killing virtual ido buffers interactively will make them go away.
+Previously, killing a virtual ido buffer with 'ido-kill-buffer' didn't
+do anything.  This has now been changed, and killing virtual buffers
+with that command will remove the buffer from recentf.
+
+---
+*** New variable 'ffap-file-name-with-spaces'.
+If non-nil, 'find-file-at-point' and friends will try to guess more
+expansively to identify a file name with spaces.
+
+---
+*** Two new commands for centering in 'doc-view-mode'.
+The new commands 'doc-view-center-page-horizontally' (bound to 'c h')
+and 'doc-view-center-page-vertically' (bound to 'c v') center the page
+horizontally and vertically, respectively.
+
+---
+*** Change in meaning of 'icomplete-show-matches-on-no-input'.
+Previously, choosing a different completion with commands like 'C-.'
+and then hitting RET would choose the default completion.  Doing this
+will now choose the completion under point instead.
 
 *** The new library hierarchy.el has been added.
 It's a library to create, query, navigate and display hierarchy
@@ -753,6 +851,39 @@ never be narrower than 19 characters.
 *** Bookmarks can now be targets for new tabs.
 When the 'bookmark.el' library is loaded, a customize choice is added
 to 'tab-bar-new-tab-choice' for new tabs to show the bookmark list.
+
+
+** xwidget-webkit mode
+
+*** New xwidget functions
+'xwidget-webkit-uri' (return the current URL), 'xwidget-webkit-title'
+(return the current title), and 'xwidget-webkit-goto-history' (goto a
+point in history).
+
+*** Pixel-based scrolling
+The 'xwidget-webkit-scroll-up', 'xwidget-webkit-scroll-down' commands
+now supports scrolling arbitrary pixel values.  It now treats the
+optional 2nd argument as the pixel values to scroll.
+
+*** New commands for scrolling
+The new commands 'xwidget-webkit-scroll-up-line',
+'xwidget-webkit-scroll-down-line', 'xwidget-webkit-scroll-forward',
+'xwidget-webkit-scroll-backward' can be used to scroll webkit by the
+height of lines or width of chars.
+
+*** New user option 'xwidget-webkit-bookmark-jump-new-session'.
+When non-nil, use a new xwidget webkit session after bookmark jump.
+Otherwise, it will use 'xwidget-webkit-last-session'.
+
+** Flyspell mode
+
++++
+*** Corrections and actions menu can be optionally bound to mouse-3.
+When Flyspell mode highlights a word as misspelled, you can click on
+it to display a menu of possible corrections and actions.  You can now
+easily bind this menu to mouse-3 (usually the right mouse button)
+instead of mouse-2 (the default) by customizing the new option
+'flyspell-correct-on-mouse-3'.
 
 
 * New Modes and Packages in Emacs 28.1
@@ -828,8 +959,46 @@ have now been removed.
 ** Some libraries obsolete since Emacs 23 have been removed:
 'ledit.el', 'lmenu.el', 'lucid.el and 'old-whitespace.el'.
 
+---
+** Some functions and variables obsolete since Emacs 23 have been removed:
+
+'GOLD-map', 'bookmark-jump-noselect',
+'bookmark-read-annotation-text-func', 'buffer-menu-mode-hook',
+'char-coding-system-table', 'char-valid-p', 'charset-bytes',
+'charset-id', 'charset-list' (function), 'complete-in-turn',
+'completion-common-substring', 'crm-minibuffer-complete',
+'crm-minibuffer-complete-and-exit', 'crm-minibuffer-completion-help',
+'custom-mode', 'custom-mode-hook', 'detect-coding-with-priority',
+'dirtrack-debug' (function), 'dirtrack-debug-toggle',
+'dynamic-completion-table',
+'easy-menu-precalculate-equivalent-keybindings',
+'epa-display-verify-result', 'epg-passphrase-callback-function',
+'eshell-report-bug', 'ffap-bug', 'ffap-submit-bug', 'forward-point',
+'generic-char-p', 'global-highlight-changes', 'hi-lock-face-history',
+'hi-lock-regexp-history', 'highlight-changes-active-string',
+'highlight-changes-initial-state', 'highlight-changes-passive-string',
+'ispell-aspell-supports-utf8', 'lisp-mode-auto-fill',
+'locate-file-completion', 'make-coding-system',
+'minibuffer-local-must-match-filename-map', 'mouse-major-mode-menu',
+'mouse-popup-menubar', 'mouse-popup-menubar-stuff',
+'newsticker-groups-filename', 'non-iso-charset-alist',
+'nonascii-insert-offset', 'nonascii-translation-table',
+'password-read-and-add', 'pre-abbrev-expand-hook',
+'process-filter-multibyte-p', 'remember-buffer' (function),
+'rmail-message-filter', 'set-coding-priority',
+'set-process-filter-multibyte', 'shell-dirtrack-toggle',
+'t-mouse-mode', 'tooltip-hook', 'tpu-have-ispell',
+'url-generate-unique-filename', 'url-temporary-directory',
+'vc-arch-command', 'vc-default-working-revision' (variable),
+'vc-mtn-command', 'vc-revert-buffer', 'vc-workfile-version',
+'vcursor-toggle-vcursor-map', 'w32-focus-frame', 'w32-select-font'.
+
 
 * Lisp Changes in Emacs 28.1
+
++++
+** The 'count-lines' function now takes an optional parameter to
+ignore invisible lines.
 
 ---
 ** New function 'custom-add-choice'.
@@ -917,6 +1086,21 @@ convert them to a list '(R G B)' of primary color values.
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
 
+---
+** On macOS, Xwidget is now supported.
+If Emacs was built with xwidget support, you can access the embedded
+webkit browser with 'M-x xwidget-webkit-browse-url'.  Viewing two
+instances of xwidget webkit is not supported.
+
+*** Downloading files from xwidget-webkit is now supported.
+The new variable 'xwidget-webkit-download-dir' says where to download to.
+
+*** New functions for xwidget-webkit mode
+'xwidget-webkit-clone-and-split-below',
+'xwidget-webkit-clone-and-split-right'.
+
+*** New variable 'xwidget-webkit-enable-plugins'.
+
 +++
 ** On macOS, Emacs can now load dynamic modules with a ".dylib" suffix.
 'module-file-suffix' now has the value ".dylib" on macOS, but the
@@ -956,6 +1140,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+
 
 
 Local variables:

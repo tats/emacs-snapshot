@@ -57,12 +57,12 @@
 
 (load "erc-loaddefs" nil t)
 
-(eval-when-compile (require 'cl-lib))
+(require 'cl-lib)
 (require 'font-lock)
+(require 'format-spec)
 (require 'pp)
 (require 'thingatpt)
 (require 'auth-source)
-(require 'erc-compat)
 (require 'time-date)
 (require 'iso8601)
 (eval-when-compile (require 'subr-x))
@@ -877,8 +877,8 @@ See `erc-server-flood-margin' for other flood-related parameters.")
 ;; Script parameters
 
 (defcustom erc-startup-file-list
-  (list (concat erc-user-emacs-directory ".ercrc.el")
-        (concat erc-user-emacs-directory ".ercrc")
+  (list (concat user-emacs-directory ".ercrc.el")
+        (concat user-emacs-directory ".ercrc")
         "~/.ercrc.el" "~/.ercrc" ".ercrc.el" ".ercrc")
   "List of files to try for a startup script.
 The first existent and readable one will get executed.
@@ -1306,7 +1306,7 @@ Example:
          (enable (intern (format "erc-%s-enable" (downcase sn))))
          (disable (intern (format "erc-%s-disable" (downcase sn)))))
     `(progn
-       (erc-define-minor-mode
+       (define-minor-mode
         ,mode
         ,(format "Toggle ERC %S mode.
 With a prefix argument ARG, enable %s if ARG is positive,
@@ -1608,36 +1608,47 @@ symbol, it may have these values:
 (defun erc-generate-new-buffer-name (server port target)
   "Create a new buffer name based on the arguments."
   (when (numberp port) (setq port (number-to-string port)))
-  (let ((buf-name (or target
-                      (or (let ((name (concat server ":" port)))
-                            (when (> (length name) 1)
-                              name))
-                          ;; This fallback should in fact never happen
-                          "*erc-server-buffer*")))
-        buffer-name)
+  (let* ((buf-name (or target
+                       (let ((name (concat server ":" port)))
+                         (when (> (length name) 1)
+                           name))
+                       ;; This fallback should in fact never happen.
+                       "*erc-server-buffer*"))
+         (full-buf-name (concat buf-name "/" server))
+         (dup-buf-name (buffer-name (car (erc-channel-list nil))))
+         buffer-name)
     ;; Reuse existing buffers, but not if the buffer is a connected server
     ;; buffer and not if its associated with a different server than the
     ;; current ERC buffer.
-    ;; if buf-name is taken by a different connection (or by something !erc)
-    ;; then see if "buf-name/server" meets the same criteria
-    (dolist (candidate (list buf-name (concat buf-name "/" server)))
-      (if (and (not buffer-name)
-               erc-reuse-buffers
-               (or (not (get-buffer candidate))
-                   ;; Looking for a server buffer, so there's no target.
-                   (and (not target)
-                        (with-current-buffer (get-buffer candidate)
-                          (and (erc-server-buffer-p)
-                               (not (erc-server-process-alive)))))
-                   ;; Channel buffer; check that it's from the right server.
-                   (and target
-                        (with-current-buffer (get-buffer candidate)
-                          (and (string= erc-session-server server)
-                               (erc-port-equal erc-session-port port))))))
-          (setq buffer-name candidate)))
-    ;; if buffer-name is unset, neither candidate worked out for us,
+    ;; If buf-name is taken by a different connection (or by something !erc)
+    ;; then see if "buf-name/server" meets the same criteria.
+    (if (and dup-buf-name (string-match-p (concat buf-name "/") dup-buf-name))
+        (setq buffer-name full-buf-name) ; ERC buffer with full name already exists.
+      (dolist (candidate (list buf-name full-buf-name))
+        (if (and (not buffer-name)
+                 erc-reuse-buffers
+                 (or (not (get-buffer candidate))
+                     ;; Looking for a server buffer, so there's no target.
+                     (and (not target)
+                          (with-current-buffer (get-buffer candidate)
+                            (and (erc-server-buffer-p)
+                                 (not (erc-server-process-alive)))))
+                     ;; Channel buffer; check that it's from the right server.
+                     (and target
+                          (with-current-buffer (get-buffer candidate)
+                            (and (string= erc-session-server server)
+                                 (erc-port-equal erc-session-port port))))))
+            (setq buffer-name candidate)
+          (when (and (not buffer-name) (get-buffer buf-name) erc-reuse-buffers)
+            ;; A new buffer will be created with the name buf-name/server, rename
+            ;; the existing name-duplicated buffer with the same format as well.
+            (with-current-buffer (get-buffer buf-name)
+              (when (derived-mode-p 'erc-mode) ; ensure it's an erc buffer
+                (rename-buffer
+                 (concat buf-name "/" (or erc-session-server erc-server-announced-name)))))))))
+    ;; If buffer-name is unset, neither candidate worked out for us,
     ;; fallback to the old <N> uniquification method:
-    (or buffer-name (generate-new-buffer-name (concat buf-name "/" server)))))
+    (or buffer-name (generate-new-buffer-name full-buf-name))))
 
 (defun erc-get-buffer-create (server port target)
   "Create a new buffer based on the arguments."
@@ -2677,7 +2688,7 @@ displayed hostnames."
 otherwise `erc-server-announced-name'.  SERVER is matched against
 `erc-common-server-suffixes'."
   (when server
-    (or (cdar (erc-remove-if-not
+    (or (cdar (cl-remove-if-not
                (lambda (net) (string-match (car net) server))
                erc-common-server-suffixes))
         erc-server-announced-name)))
@@ -3153,16 +3164,18 @@ were most recently invited.  See also `invitation'."
       (setq chnl (erc-ensure-channel-name channel)))
     (when chnl
       ;; Prevent double joining of same channel on same server.
-      (let ((joined-channels
-             (mapcar #'(lambda (chanbuf)
-                         (with-current-buffer chanbuf (erc-default-target)))
-                     (erc-channel-list erc-server-process))))
-        (if (erc-member-ignore-case chnl joined-channels)
-            (switch-to-buffer (car (erc-member-ignore-case chnl
-                                                           joined-channels)))
-	  (let ((server (with-current-buffer (process-buffer erc-server-process)
-			  (or erc-session-server erc-server-announced-name))))
-	    (erc-server-join-channel server chnl key))))))
+      (let* ((joined-channels
+              (mapcar #'(lambda (chanbuf)
+                          (with-current-buffer chanbuf (erc-default-target)))
+                      (erc-channel-list erc-server-process)))
+             (server (with-current-buffer (process-buffer erc-server-process)
+		       (or erc-session-server erc-server-announced-name)))
+             (chnl-name (car (erc-member-ignore-case chnl joined-channels))))
+        (if chnl-name
+            (switch-to-buffer (if (get-buffer chnl-name)
+                                  chnl-name
+                                (concat chnl-name "/" server)))
+	  (erc-server-join-channel server chnl key)))))
   t)
 
 (defalias 'erc-cmd-CHANNEL 'erc-cmd-JOIN)
@@ -3712,8 +3725,9 @@ the message given by REASON."
                                                       x-toolkit-scroll-bars)))
                                "")
                              (if (featurep 'multi-tty) ", multi-tty" ""))
-                            (if erc-emacs-build-time
-                                (concat " of " erc-emacs-build-time)
+                            (if emacs-build-time
+                                (concat " of " (format-time-string
+                                                "%Y-%m-%d" emacs-build-time))
                               "")))
   t)
 
@@ -4560,7 +4574,7 @@ See also: `erc-echo-notice-in-user-buffers',
                 ((string-match "^-" mode)
                  ;; Remove the unbanned masks from the ban list
                  (setq erc-channel-banlist
-                       (erc-delete-if
+                       (cl-delete-if
                         #'(lambda (y)
                             (member (upcase (cdr y))
                                     (mapcar #'upcase
@@ -4581,7 +4595,7 @@ See also: `erc-echo-notice-in-user-buffers',
   "Group LIST into sublists of length N."
   (cond ((null list) nil)
         ((null (nthcdr n list)) (list list))
-        (t (cons (erc-subseq list 0 n) (erc-group-list (nthcdr n list) n)))))
+        (t (cons (cl-subseq list 0 n) (erc-group-list (nthcdr n list) n)))))
 
 
 ;;; MOTD numreplies
@@ -6170,8 +6184,7 @@ non-nil value is found.
           output        (apply #'format format-args))
     ;; Change all "1 units" to "1 unit".
     (while (string-match "\\([^0-9]\\|^\\)1 \\S-+\\(s\\)" output)
-      (setq output (erc-replace-match-subexpression-in-string
-                    "" output (match-string 2 output) 2 (match-beginning 2))))
+      (setq output (replace-match "" nil nil output 2)))
     output))
 
 

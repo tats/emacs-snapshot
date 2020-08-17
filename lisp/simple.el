@@ -1323,7 +1323,9 @@ If called from Lisp, return the number of words between START and
 END, without printing any message."
   (interactive (list nil nil))
   (cond ((not (called-interactively-p 'any))
-	 (let ((words 0))
+	 (let ((words 0)
+               ;; Count across field boundaries. (Bug#41761)
+               (inhibit-field-text-motion t))
 	   (save-excursion
 	     (save-restriction
 	       (narrow-to-region start end)
@@ -1366,28 +1368,47 @@ END, without printing any message."
 	  (message "line %d (narrowed line %d)"
 		   (+ n (line-number-at-pos start) -1) n))))))
 
-(defun count-lines (start end)
+(defun count-lines (start end &optional ignore-invisible-lines)
   "Return number of lines between START and END.
-This is usually the number of newlines between them,
-but can be one more if START is not equal to END
-and the greater of them is not at the start of a line."
+This is usually the number of newlines between them, but can be
+one more if START is not equal to END and the greater of them is
+not at the start of a line.
+
+When IGNORE-INVISIBLE-LINES is non-nil, invisible lines are not
+included in the count."
   (save-excursion
     (save-restriction
       (narrow-to-region start end)
       (goto-char (point-min))
-      (if (eq selective-display t)
-	  (save-match-data
-	    (let ((done 0))
-                     (while (re-search-forward "[\n\C-m]" nil t 40)
-                       (setq done (+ 40 done)))
-                     (while (re-search-forward "[\n\C-m]" nil t 1)
-                       (setq done (+ 1 done)))
-                     (goto-char (point-max))
-                     (if (and (/= start end)
-		       (not (bolp)))
-		  (1+ done)
-		done)))
-	(- (buffer-size) (forward-line (buffer-size)))))))
+      (cond ((and (not ignore-invisible-lines)
+                  (eq selective-display t))
+	     (save-match-data
+	       (let ((done 0))
+		 (while (re-search-forward "\n\\|\r[^\n]" nil t 40)
+		   (setq done (+ 40 done)))
+		 (while (re-search-forward "\n\\|\r[^\n]" nil t 1)
+		   (setq done (+ 1 done)))
+		 (goto-char (point-max))
+		 (if (and (/= start end)
+			  (not (bolp)))
+		     (1+ done)
+		   done))))
+	    (ignore-invisible-lines
+	     (save-match-data
+	       (- (buffer-size)
+                  (forward-line (buffer-size))
+		  (let ((invisible-count 0)
+		        prop)
+		    (goto-char (point-min))
+		    (while (re-search-forward "\n\\|\r[^\n]" nil t)
+		      (setq prop (get-char-property (1- (point)) 'invisible))
+		      (if (if (eq buffer-invisibility-spec t)
+			      prop
+			    (or (memq prop buffer-invisibility-spec)
+			        (assq prop buffer-invisibility-spec)))
+			  (setq invisible-count (1+ invisible-count))))
+		    invisible-count))))
+	    (t (- (buffer-size) (forward-line (buffer-size))))))))
 
 (defun line-number-at-pos (&optional pos absolute)
   "Return buffer line number at position POS.
@@ -1537,6 +1558,8 @@ in *Help* buffer.  See also the command `describe-char'."
     ;; Might as well bind TAB to completion, since inserting a TAB char is
     ;; much too rarely useful.
     (define-key m "\t" 'completion-at-point)
+    (define-key m "\r" 'read--expression-try-read)
+    (define-key m "\n" 'read--expression-try-read)
     (set-keymap-parent m minibuffer-local-map)
     m))
 
@@ -1619,6 +1642,10 @@ display the result of expression evaluation."
   "Hook run by `eval-expression' when entering the minibuffer.")
 
 (defun read--expression (prompt &optional initial-contents)
+  "Read an Emacs Lisp expression from the minibuffer.
+
+PROMPT and optional argument INITIAL-CONTENTS do the same as in
+function `read-from-minibuffer'."
   (let ((minibuffer-completing-symbol t))
     (minibuffer-with-setup-hook
         (lambda ()
@@ -1633,6 +1660,45 @@ display the result of expression evaluation."
       (read-from-minibuffer prompt initial-contents
                             read-expression-map t
                             'read-expression-history))))
+
+(defun read--expression-try-read ()
+  "Try to read an Emacs Lisp expression in the minibuffer.
+
+Exit the minibuffer if successful, else report the error to the
+user and move point to the location of the error.  If point is
+not already at the location of the error, push a mark before
+moving point."
+  (interactive)
+  (unless (> (minibuffer-depth) 0)
+    (error "Minibuffer must be active"))
+  (if (let* ((contents (minibuffer-contents))
+             (error-point nil))
+        (with-temp-buffer
+          (condition-case err
+              (progn
+                (insert contents)
+                (goto-char (point-min))
+                ;; `read' will signal errors like "End of file during
+                ;; parsing" and "Invalid read syntax".
+                (read (current-buffer))
+                ;; Since `read' does not signal the "Trailing garbage
+                ;; following expression" error, we check for trailing
+                ;; garbage ourselves.
+                (or (progn
+                      ;; This check is similar to what `string_to_object'
+                      ;; does in minibuf.c.
+                      (skip-chars-forward " \t\n")
+                      (= (point) (point-max)))
+                    (error "Trailing garbage following expression")))
+            (error
+             (setq error-point (+ (length (minibuffer-prompt)) (point)))
+             (with-current-buffer (window-buffer (minibuffer-window))
+               (unless (= (point) error-point)
+                 (push-mark))
+               (goto-char error-point)
+               (minibuffer-message (error-message-string err)))
+             nil))))
+      (exit-minibuffer)))
 
 (defun eval-expression-get-print-arguments (prefix-argument)
   "Get arguments for commands that print an expression result.
