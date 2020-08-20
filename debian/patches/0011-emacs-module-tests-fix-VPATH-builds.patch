@@ -1,0 +1,54 @@
+From eeeed459bbcad847b83a9687156f24cb4d370880 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Wed, 19 Aug 2020 19:14:35 -0500
+Subject: emacs-module-tests: fix VPATH builds
+
+Add the actual srcdir to the MODULE_CFLAGS include path, and adjust
+the module/describe-function-1 test to ignore the shared library path
+prefix, which varies when building outside the source tree.
+
+Bug: https://debbugs.gnu.org/37797
+Status: new
+---
+ test/Makefile.in               |  2 +-
+ test/src/emacs-module-tests.el | 11 ++++++-----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/test/Makefile.in b/test/Makefile.in
+index f03c194a7cb..6c433f1d682 100644
+--- a/test/Makefile.in
++++ b/test/Makefile.in
+@@ -260,7 +260,7 @@ GMP_OBJ = $(if @GMP_OBJ@, ../src/@GMP_OBJ@)
+ 
+ # Note: emacs-module.h is generated from emacs-module.h.in, hence we
+ # look in ../src, not $(srcdir)/../src.
+-MODULE_CFLAGS = -I../src -I$(srcdir)/../lib \
++MODULE_CFLAGS = -I../src -I$(srcdir)/../src -I$(srcdir)/../lib \
+   $(FPIC_CFLAGS) $(PROFILING_CFLAGS) \
+   $(WARN_CFLAGS) $(WERROR_CFLAGS) $(CFLAGS)
+ 
+diff --git a/test/src/emacs-module-tests.el b/test/src/emacs-module-tests.el
+index 91206156f85..1b512aff566 100644
+--- a/test/src/emacs-module-tests.el
++++ b/test/src/emacs-module-tests.el
+@@ -318,14 +318,15 @@ module--test-assertion
+   (with-temp-buffer
+     (let ((standard-output (current-buffer)))
+       (describe-function-1 #'mod-test-sum)
+-      (should (equal
+-               (buffer-substring-no-properties 1 (point-max))
+-               (format "a module function in `data/emacs-module/mod-test%s'.
++      (let ((result (buffer-substring-no-properties 1 (point-max))))
++        (should (string-match-p
++                 (format "a module function in `.*data/emacs-module/mod-test%s'.
+ 
+ (mod-test-sum a b)
+ 
+-Return A + B"
+-                       module-file-suffix))))))
++Return A \\+ B"
++                         module-file-suffix)
++                 (buffer-substring-no-properties 1 (point-max))))))))
+ 
+ (ert-deftest module/load-history ()
+   "Check that Bug#30164 is fixed."

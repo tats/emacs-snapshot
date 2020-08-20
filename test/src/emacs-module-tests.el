@@ -318,14 +318,15 @@ local reference."
   (with-temp-buffer
     (let ((standard-output (current-buffer)))
       (describe-function-1 #'mod-test-sum)
-      (should (equal
-               (buffer-substring-no-properties 1 (point-max))
-               (format "a module function in `data/emacs-module/mod-test%s'.
+      (let ((result (buffer-substring-no-properties 1 (point-max))))
+        (should (string-match-p
+                 (format "a module function in `.*data/emacs-module/mod-test%s'.
 
 (mod-test-sum a b)
 
-Return A + B"
-                       module-file-suffix))))))
+Return A \\+ B"
+                         module-file-suffix)
+                 (buffer-substring-no-properties 1 (point-max))))))))
 
 (ert-deftest module/load-history ()
   "Check that Bug#30164 is fixed."
