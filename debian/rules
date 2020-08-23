@@ -350,6 +350,11 @@ define install_common_binpkg_bits
   test -f $(1)/usr/bin/emacs-*
   cp -a $(1)/usr/bin/emacs-* $(2)/usr/bin/emacs-$(4)
 
+  test -f $(1)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
+  install -d $(2)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
+  cp -a $(1)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp \
+        $(2)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/
+
   install -d $(2)/usr/share/emacs/$(runtime_ver)/etc
   cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC \
 	$(2)/usr/share/emacs/$(runtime_ver)/etc/
@@ -450,6 +455,10 @@ override_dh_auto_install: $(autogen_install_files)
 	  # Make sure there's just one.
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
 	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
+
+	  # The pdmp files are flavor-specific
+	  test -f $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
+	  rm $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
 
 	  # Set up alternatives.
 	  alternatives=$$(ls $(pkgdir_bin_common)/usr/bin) \
