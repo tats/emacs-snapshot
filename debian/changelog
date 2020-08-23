@@ -1,10 +1,19 @@
-emacs (1:27.1+1-1~1.gbp3df17b) UNRELEASED; urgency=medium
+emacs (1:27.1+1-1) experimental; urgency=medium
 
-  ** SNAPSHOT build @3df17bc05ad786f58516d60c69dbf94852ac6843 **
+  * Merge upstream version 27.1.
 
-  * UNRELEASED
+  * Update debian/control for 27.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 16 Aug 2020 12:05:19 -0500
+  * Update debian/copyright for 27.1.
+
+  * Update debian/control build-deps for 27.1.
+
+  * Fix emacs-module-tests to work with VPATH builds.  Add
+    0011-emacs-module-tests-fix-VPATH-builds.patch to address the issue.
+
+  * debian/rules: put new pdmp files in flavor-specific packages.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 23 Aug 2020 16:09:09 -0500
 
 emacs (1:26.3+1-2) unstable; urgency=medium
 
