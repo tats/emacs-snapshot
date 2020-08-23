@@ -1,4 +1,4 @@
-From ba2f4bc9bc2c2e7aeab74dd19e719d8d2bb57036 Mon Sep 17 00:00:00 2001
+From 9b8021296d0fe152a6ee87169bf21c006d8d84ad Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -14,12 +14,12 @@ Status: new
  1 file changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index d02f42bbeb9..4dbe885b173 100644
+index 7f536ad9529..a2e0666076c 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -67,7 +67,7 @@ DOCMISC_W32 = @DOCMISC_W32@
  ## Info files to build and install on all platforms.
- INFO_COMMON = ada-mode auth autotype bovine calc ccmode cl \
+ INFO_COMMON = auth autotype bovine calc ccmode cl \
  	dbus dired-x ebrowse ede ediff edt eieio \
 -	emacs-mime epa erc ert eshell eudc efaq eww \
 +	emacs-mime epa erc ert eshell eudc eww \
