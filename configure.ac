@@ -1026,7 +1026,10 @@ AS_IF([test $gl_gcc_warnings = no],
     [# Use -fanalyzer and related options only if --enable-gcc-warnings,
      # as they slow GCC considerably.
      nw="$nw -fanalyzer -Wno-analyzer-double-free -Wno-analyzer-malloc-leak"
-     nw="$nw -Wno-analyzer-null-dereference -Wno-analyzer-use-after-free"])
+     nw="$nw -Wno-analyzer-null-dereference -Wno-analyzer-use-after-free"
+     # Use -Wsuggest-attribute=malloc only if --enable-gcc-warnings,
+     # as it doesn't flag code that is wrong in any way.
+     nw="$nw -Wsuggest-attribute=malloc"])
 
   nw="$nw -Wcast-align=strict"      # Emacs is tricky with pointers.
   nw="$nw -Wduplicated-branches"    # Too many false alarms
@@ -1769,13 +1772,6 @@ dnl On Solaris 8 there's a compilation warning for term.h because
 dnl it doesn't define 'bool'.
 AC_CHECK_HEADERS(term.h, , , -)
 AC_HEADER_TIME
-AC_CHECK_DECLS([sys_siglist], [], [], [[#include <signal.h>
-			              ]])
-if test $ac_cv_have_decl_sys_siglist != yes; then
-  # For Tru64, at least:
-  AC_CHECK_DECLS([__sys_siglist], [], [], [[#include <signal.h>
-			                  ]])
-fi
 AC_HEADER_SYS_WAIT
 
 AC_CHECK_HEADERS_ONCE(sys/socket.h)

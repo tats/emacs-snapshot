@@ -5566,10 +5566,28 @@ change the additional actions you can take on files."
                             t
                           (setq queried t)
                           (if (buffer-file-name buffer)
-                              (format "Save file %s? "
-                                      (buffer-file-name buffer))
-                            (format "Save buffer %s? "
-                                    (buffer-name buffer))))))
+                              (if (or
+                                   (equal (buffer-name buffer)
+                                          (file-name-nondirectory
+                                           (buffer-file-name buffer)))
+                                   (string-match
+                                    (concat "\\<"
+                                            (regexp-quote
+                                             (file-name-nondirectory
+                                              buffer-file-name))
+                                            "<[^>]*>\\'")
+                                    (buffer-name buffer)))
+                                  ;; The buffer name is similar to the
+                                  ;; file name.
+                                  (format "Save file %s? "
+                                          (buffer-file-name buffer))
+                                ;; The buffer and file names are
+                                ;; dissimilar; display both.
+                                (format "Save file %s (buffer %s)? "
+                                        (buffer-file-name buffer)
+                                        (buffer-name buffer)))
+                            ;; No file name
+                            (format "Save buffer %s? " (buffer-name buffer))))))
                  (lambda (buffer)
                    (with-current-buffer buffer
                      (save-buffer)))
@@ -5655,25 +5673,28 @@ like `write-region' does."
 
 (defun file-newest-backup (filename)
   "Return most recent backup file for FILENAME or nil if no backups exist."
+  (car (file-backup-file-names filename)))
+
+(defun file-backup-file-names (filename)
+  "Return a list of backup files for FILENAME.
+The list will be sorted by modification time so that the most
+recent files are first."
   ;; `make-backup-file-name' will get us the right directory for
   ;; ordinary or numeric backups.  It might create a directory for
   ;; backups as a side-effect, according to `backup-directory-alist'.
   (let* ((filename (file-name-sans-versions
 		    (make-backup-file-name (expand-file-name filename))))
-	 (file (file-name-nondirectory filename))
-	 (dir  (file-name-directory    filename))
-	 (comp (file-name-all-completions file dir))
-         (newest nil)
-         tem)
-    (while comp
-      (setq tem (pop comp))
-      (cond ((and (backup-file-name-p tem)
-                  (string= (file-name-sans-versions tem) file))
-             (setq tem (concat dir tem))
-             (if (or (null newest)
-                     (file-newer-than-file-p tem newest))
-                 (setq newest tem)))))
-    newest))
+         (dir (file-name-directory filename)))
+    (sort
+     (seq-filter
+      (lambda (candidate)
+        (and (backup-file-name-p candidate)
+             (string= (file-name-sans-versions candidate) filename)))
+      (mapcar
+       (lambda (file)
+         (concat dir file))
+       (file-name-all-completions (file-name-nondirectory filename) dir)))
+     #'file-newer-than-file-p)))
 
 (defun rename-uniquely ()
   "Rename current buffer to a similar name not already taken.
@@ -5894,9 +5915,9 @@ last-modified time as the old ones.  (This works on only some systems.)
 
 A prefix arg makes KEEP-TIME non-nil.
 
-Noninteractively, the last argument PARENTS says whether to
-create parent directories if they don't exist.  Interactively,
-this happens by default.
+Noninteractively, the PARENTS argument says whether to create
+parent directories if they don't exist.  Interactively, this
+happens by default.
 
 If NEWNAME is a directory name, copy DIRECTORY as a subdirectory
 there.  However, if called from Lisp with a non-nil optional

@@ -673,9 +673,7 @@ Otherwise returns the library directory name, if that is defined."
   ;; all versions, since versions earlier than 3.0.09 didn't identify
   ;; themselves on startup.
   (interactive "p")
-  (let ((default-directory (or (and (boundp 'temporary-file-directory)
-				    temporary-file-directory)
-			       default-directory))
+  (let ((default-directory (or temporary-file-directory default-directory))
 	(get-config-var
 	 (lambda (var)
 	   (when (re-search-forward
@@ -3725,8 +3723,7 @@ looking for a dictionary, please see the distribution of the GNU ispell
 program, or do an Internet search; there are various dictionaries
 available on the net."
   (interactive)
-  (if (and (boundp 'transient-mark-mode) transient-mark-mode
-	   (boundp 'mark-active) mark-active)
+  (if (and transient-mark-mode mark-active)
       (ispell-region (region-beginning) (region-end))
     (ispell-buffer)))
 
@@ -4191,7 +4188,7 @@ Both should not be used to define a buffer-local dictionary."
     (let (line-okay search done found)
       (while (not done)
         (let ((case-fold-search nil))
-          (setq search (search-forward ispell-words-keyword nil 'move)
+          (setq search (search-forward ispell-words-keyword nil t)
 	      found (or found search)
 	      line-okay (< (+ (length word) 1 ; 1 for space after word..
 			      (progn (end-of-line) (current-column)))
@@ -4202,8 +4199,10 @@ Both should not be used to define a buffer-local dictionary."
 	      (setq done t)
 	      (if (null search)
 		  (progn
-		    (open-line 1)
-		    (unless found (newline))
+		    (if found (insert "\n")  ;; after an existing LocalWords
+                      (goto-char (point-max)) ;; no LocalWords, go to end of file
+                      (open-line 1)
+                      (newline))
 		    (insert (if comment-start
                                 (concat
                                   (progn
