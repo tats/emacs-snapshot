@@ -2024,8 +2024,12 @@ is greater than 10.
   "Check `substitute-in-file-name'."
   (skip-unless (eq tramp-syntax 'default))
 
-  ;; Suppress method name check.
-  (let ((tramp-methods (cons '("method") tramp-methods)))
+  ;; Suppress method name check.  We cannot use the string "foo" as
+  ;; user name, because (substitute-in-string "/~foo") returns
+  ;; different values depending on the existence of user "foo" (see
+  ;; Bug#43052).
+  (let ((tramp-methods (cons '("method") tramp-methods))
+        (foo (downcase (md5 (current-time-string)))))
     (should
      (string-equal (substitute-in-file-name "/method:host:///foo") "/foo"))
     (should
@@ -2057,36 +2061,40 @@ is greater than 10.
     ;; Emacs 25, occasionally. No idea what's up.
     (when (tramp--test-emacs26-p)
       (should
-       (string-equal (substitute-in-file-name "/method:host://~foo") "/~foo"))
+       (string-equal
+	(substitute-in-file-name (concat "/method:host://~" foo))
+	(concat "/~" foo)))
       (should
        (string-equal
-	(substitute-in-file-name "/method:host:/~foo") "/method:host:/~foo"))
+	(substitute-in-file-name (concat "/method:host:/~" foo))
+	(concat "/method:host:/~" foo)))
       (should
        (string-equal
-	(substitute-in-file-name "/method:host:/path//~foo") "/~foo"))
+	(substitute-in-file-name (concat "/method:host:/path//~" foo))
+	(concat "/~" foo)))
       ;; (substitute-in-file-name "/path/~foo") expands only for a local
       ;; user "foo" to "/~foo"".  Otherwise, it doesn't expand.
       (should
        (string-equal
-	(substitute-in-file-name
-	 "/method:host:/path/~foo") "/method:host:/path/~foo"))
+	(substitute-in-file-name (concat "/method:host:/path/~" foo))
+	(concat "/method:host:/path/~" foo)))
       ;; Quoting local part.
       (should
        (string-equal
-	(substitute-in-file-name "/method:host:/://~foo")
-	"/method:host:/://~foo"))
+	(substitute-in-file-name (concat "/method:host:/://~" foo))
+	(concat "/method:host:/://~" foo)))
       (should
        (string-equal
-	(substitute-in-file-name
-	 "/method:host:/:/~foo") "/method:host:/:/~foo"))
+	(substitute-in-file-name (concat "/method:host:/:/~" foo))
+	(concat "/method:host:/:/~" foo)))
       (should
        (string-equal
-	(substitute-in-file-name
-	 "/method:host:/:/path//~foo") "/method:host:/:/path//~foo"))
+	(substitute-in-file-name (concat "/method:host:/:/path//~" foo))
+	(concat "/method:host:/:/path//~" foo)))
       (should
        (string-equal
-	(substitute-in-file-name
-	 "/method:host:/:/path/~foo") "/method:host:/:/path/~foo")))
+	(substitute-in-file-name (concat "/method:host:/:/path/~" foo))
+	(concat "/method:host:/:/path/~" foo))))
 
     (let (process-environment)
       (should
@@ -2131,16 +2139,19 @@ is greater than 10.
       (expand-file-name "/method:host:/path/../file") "/method:host:/file"))
     (should
      (string-equal
-      (expand-file-name "/method:host:/path/.") "/method:host:/path"))
+      (expand-file-name "/method:host:/path/.")
+      (if (tramp--test-emacs28-p) "/method:host:/path/" "/method:host:/path")))
     (should
      (string-equal
       (expand-file-name "/method:host:/path/..") "/method:host:/"))
     (should
      (string-equal
-      (expand-file-name "." "/method:host:/path/") "/method:host:/path"))
+      (expand-file-name "." "/method:host:/path/")
+      (if (tramp--test-emacs28-p) "/method:host:/path/" "/method:host:/path")))
     (should
      (string-equal
-      (expand-file-name "" "/method:host:/path/") "/method:host:/path"))
+      (expand-file-name "" "/method:host:/path/")
+      (if (tramp--test-emacs28-p) "/method:host:/path/" "/method:host:/path")))
     ;; Quoting local part.
     (should
      (string-equal
@@ -2155,21 +2166,12 @@ is greater than 10.
       "/method:host:/:/~/path/file"))))
 
 ;; The following test is inspired by Bug#26911 and Bug#34834.  They
-;; are rather bugs in `expand-file-name', and it fails for all Emacs
-;; versions.  Test added for later, when they are fixed.
+;; were bugs in `expand-file-name'.
 (ert-deftest tramp-test05-expand-file-name-relative ()
   "Check `expand-file-name'."
-  ;; Mark as failed until bug has been fixed.
-  :expected-result :failed
   (skip-unless (tramp--test-enabled))
-
-  ;; These are the methods the test doesn't fail.
-  (when (or (tramp--test-adb-p) (tramp--test-ange-ftp-p) (tramp--test-gvfs-p)
-	    (tramp--test-rclone-p)
-	    (tramp--test-smb-p))
-    (setf (ert-test-expected-result-type
-	   (ert-get-test 'tramp-test05-expand-file-name-relative))
-	  :passed))
+  ;; The bugs are fixed in Emacs 28.1.
+  (skip-unless (tramp--test-emacs28-p))
 
   (should
    (string-equal

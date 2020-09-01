@@ -42,6 +42,11 @@ default.  We strongly recommend building with HarBuzz support.  'x' is
 still a valid backend.
 
 ---
+** Building without double buffering support.
+configure --with-xdbe=no can now be used to disable double buffering
+at build time.
+
+---
 ** 'configure' now warns about building with libXft support.
 libXft is unmaintained, and causes a number of problems with modern
 fonts including but not limited to crashes; support for it may be
@@ -235,6 +240,9 @@ time zones will use a form like "+0100" instead of "CET".
 
 ** Dired
 
+---
+*** Broken and circular links are shown with the 'dired-broken-symlink' face.
+
 *** '=' ('dired-diff') will now put all backup files into the 'M-n' history.
 When using '=' on a file with backup files, the default file to use
 for diffing is the newest backup file.  You can now use 'M-n' to quickly
@@ -380,6 +388,15 @@ take the actual screenshot, and defaults to "ImageMagick import".
 *** The command 'view-lossage' can now be invoked from the menu bar.
 The menu-bar Help menu now has a "Show Recent Inputs" item under the
 "Describe" sub-menu.
+
+** Ispell
+
++++
+*** 'ispell-comments-and-strings' now accepts START and END arguments,
+defaulting to active region when used interactively.
+
++++
+*** New command 'ispell-comment-or-string-at-point' is provided.
 
 ---
 ** The old non-SMIE indentation of 'sh-mode' has been removed.
@@ -539,6 +556,9 @@ The variable 'compilation-error-case-fold-search' can be set for
 case-insensitive matching of messages when the old behavior is
 required, but the recommended solution is to use a correctly matching
 regexp instead.
+
+---
+*** Messages from Visual Studio that mention column numbers are now recognized.
 
 ** Hi Lock mode
 
@@ -762,6 +782,11 @@ This command lets you "switch" to another project and run a project
 command chosen from a dispatch menu.
 
 +++
+*** New commands 'project-shell-command' and 'project-async-shell-command'.
+These commands run 'shell-command' and 'async-shell-command' in a
+project's root directory, respectively.
+
++++
 *** New user option 'project-list-file'.
 
 ** json.el
@@ -876,6 +901,16 @@ window after starting).  This variable defaults to nil.
 
 
 ** Miscellaneous
+
++++
+*** The user can now customize how \"default\" values are prompted for.
+The new utility function 'format-prompt' has been added which uses the
+new 'minibuffer-default-prompt-format' variable to format \"default\"
+prompts.  This means that prompts that look like "Enter a number
+(default 10)" can be customized to look like, for instance, "Enter a
+number [10]", or not have the default displayed at all, like "Enter a
+number".  (This requires that all callers are altered to user
+'format-prompt', though.)
 
 ---
 *** New 'diff-mode' font locking face 'diff-error'.
@@ -1004,6 +1039,11 @@ mode, as are other data files produced by Emacs.
 ** hierarchy.el
 
 It's a library to create, query, navigate and display hierarchy structures.
+
+** New themes 'modus-vivendi' and 'modus-operandi'.
+These themes are designed for colour-contrast accessibility.  You can
+load the new themes using 'M-x customize-themes' or 'load-theme' from
+your init file.
 
 
 * Incompatible Editing Changes in Emacs 28.1
@@ -1134,6 +1174,12 @@ This function can be used by modes to add elements to the
 'choice' customization type of a variable.
 
 +++
+** 'expand-file-name' no longer omits a trailing slash if the omission
+changes the filename's meaning.  E.g., (expand-file-name "/a/b/.") now
+returns "/a/b/" not "/a/b", which might be misinterpreted as the name
+of a symbolic link rather than of the directory it points to.
+
++++
 ** New function 'file-modes-number-to-symbolic' to convert a numeric
 file mode specification into symbolic form.
 
@@ -1168,6 +1214,9 @@ equivalent period in seconds.
 
 +++
 ** The new function 'dom-remove-attribute' has been added.
+
++++
+** The new function 'dom-print' has been added.
 
 ---
 ** 'make-network-process', 'make-serial-process' ':coding' behavior change.
