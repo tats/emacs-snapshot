@@ -1148,12 +1148,13 @@ POS and RES.")
 	    (setcdr l1 (cons (list ,key) l2)))))))
 
 (defun compilation-auto-jump (buffer pos)
-  (with-current-buffer buffer
-    (goto-char pos)
-    (let ((win (get-buffer-window buffer 0)))
-      (if win (set-window-point win pos)))
-    (if compilation-auto-jump-to-first-error
-	(compile-goto-error))))
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (goto-char pos)
+      (let ((win (get-buffer-window buffer 0)))
+        (if win (set-window-point win pos)))
+      (if compilation-auto-jump-to-first-error
+	  (compile-goto-error)))))
 
 ;; This function is the central driver, called when font-locking to gather
 ;; all information needed to later jump to corresponding source code.
@@ -2912,11 +2913,8 @@ attempts to find a file whose name is produced by (format FMT FILENAME)."
 	    (and w (progn (compilation-set-window w marker)
                           (compilation-set-overlay-arrow w))))
           (let* ((name (read-file-name
-                        (format "Find this %s in%s: "
-                                compilation-error
-                                (if filename
-                                    (format " (default %s)" filename)
-                                  ""))
+                        (format-prompt "Find this %s in"
+                                       filename compilation-error)
                         spec-dir filename t nil
                         ;; The predicate below is fine when called from
                         ;; minibuffer-complete-and-exit, but it's too
