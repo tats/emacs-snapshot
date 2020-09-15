@@ -25,6 +25,8 @@
 (defvar dbus-debug nil)
 (declare-function dbus-get-unique-name "dbusbind.c" (bus))
 
+(setq dbus-show-dbus-errors nil)
+
 (defconst dbus--test-enabled-session-bus
   (and (featurep 'dbusbind)
        (dbus-ignore-errors (dbus-get-unique-name :session)))
@@ -41,7 +43,7 @@
 (defconst dbus--test-path "/org/gnu/Emacs/TestDBus"
   "Test object path.")
 
-(defconst dbus--test-interface "org.gnu.Emacs.TestDBus"
+(defconst dbus--test-interface "org.gnu.Emacs.TestDBus.Interface"
   "Test interface.")
 
 (defun dbus--test-availability (bus)
@@ -109,8 +111,16 @@
   (should-not (member dbus--test-service (dbus-list-known-names bus)))
 
   ;; `dbus-service-dbus' is reserved for the BUS itself.
-  (should-error (dbus-register-service bus dbus-service-dbus))
-  (should-error (dbus-unregister-service bus dbus-service-dbus)))
+  (should
+   (equal
+    (butlast
+     (should-error (dbus-register-service bus dbus-service-dbus)))
+    `(dbus-error ,dbus-error-invalid-args)))
+  (should
+   (equal
+    (butlast
+     (should-error (dbus-unregister-service bus dbus-service-dbus)))
+    `(dbus-error ,dbus-error-invalid-args))))
 
 (ert-deftest dbus-test02-register-service-session ()
   "Check service registration at `:session' bus."
@@ -204,28 +214,39 @@ This includes initialization and closing the bus."
   (dbus-ignore-errors (dbus-unregister-service :session dbus--test-service))
 
   (unwind-protect
-      (let ((method "Method")
-            (handler #'dbus--test-method-handler))
+      (let ((method1 "Method1")
+            (method2 "Method2")
+            (handler #'dbus--test-method-handler)
+            registered)
 
+        (should
+         (equal
+          (setq
+           registered
+           (dbus-register-method
+            :session dbus--test-service dbus--test-path
+            dbus--test-interface method1 handler))
+          `((:method :session ,dbus--test-interface ,method1)
+            (,dbus--test-service ,dbus--test-path ,handler))))
         (should
          (equal
           (dbus-register-method
            :session dbus--test-service dbus--test-path
-           dbus--test-interface method handler)
-          `((:method :session ,dbus--test-interface ,method)
+           dbus--test-interface method2 handler)
+          `((:method :session ,dbus--test-interface ,method2)
             (,dbus--test-service ,dbus--test-path ,handler))))
 
         ;; No argument, returns nil.
         (should-not
          (dbus-call-method
           :session dbus--test-service dbus--test-path
-          dbus--test-interface method))
+          dbus--test-interface method1))
         ;; One argument, returns the argument.
         (should
          (string-equal
           (dbus-call-method
            :session dbus--test-service dbus--test-path
-           dbus--test-interface method "foo")
+           dbus--test-interface method1 "foo")
           "foo"))
         ;; Two arguments, D-Bus error activated as `(:error ...)' list.
         (should
@@ -233,7 +254,7 @@ This includes initialization and closing the bus."
           (should-error
            (dbus-call-method
             :session dbus--test-service dbus--test-path
-            dbus--test-interface method "foo" "bar"))
+            dbus--test-interface method1 "foo" "bar"))
           `(dbus-error ,dbus-error-invalid-args "Wrong arguments (foo bar)")))
         ;; Three arguments, D-Bus error activated by `dbus-error' signal.
         (should
@@ -241,14 +262,28 @@ This includes initialization and closing the bus."
           (should-error
            (dbus-call-method
             :session dbus--test-service dbus--test-path
-            dbus--test-interface method "foo" "bar" "baz"))
+            dbus--test-interface method1 "foo" "bar" "baz"))
           `(dbus-error
             ,dbus-error-failed
-            "D-Bus error: \"D-Bus signal\", \"foo\", \"bar\", \"baz\""))))
+            "D-Bus error: \"D-Bus signal\", \"foo\", \"bar\", \"baz\"")))
+
+        ;; Unregister method.
+        (should (dbus-unregister-object registered))
+        (should-not (dbus-unregister-object registered))
+        (should
+         (equal
+          ;; We don't care the error message text.
+          (butlast
+           (should-error
+            (dbus-call-method
+             :session dbus--test-service dbus--test-path
+             dbus--test-interface method1 :timeout 10 "foo")))
+          `(dbus-error ,dbus-error-no-reply))))
 
     ;; Cleanup.
     (dbus-unregister-service :session dbus--test-service)))
 
+;; TODO: Test emits-signal.
 (ert-deftest dbus-test05-register-property ()
   "Check property registration for an own service."
   (skip-unless dbus--test-enabled-session-bus)
@@ -257,15 +292,19 @@ This includes initialization and closing the bus."
   (unwind-protect
       (let ((property1 "Property1")
             (property2 "Property2")
-            (property3 "Property3"))
+            (property3 "Property3")
+            (property4 "Property4")
+            registered)
 
         ;; `:read' property.
         (should
          (equal
-          (dbus-register-property
-           :session dbus--test-service dbus--test-path
-           dbus--test-interface property1 :read "foo")
-          `((:property :session "org.gnu.Emacs.TestDBus" ,property1)
+          (setq
+           registered
+           (dbus-register-property
+            :session dbus--test-service dbus--test-path
+            dbus--test-interface property1 :read "foo"))
+          `((:property :session ,dbus--test-interface ,property1)
             (,dbus--test-service ,dbus--test-path))))
         (should
          (string-equal
@@ -273,10 +312,22 @@ This includes initialization and closing the bus."
            :session dbus--test-service dbus--test-path
            dbus--test-interface property1)
           "foo"))
-        (should-not ;; Due to `:read' access type.
+        ;; Due to `:read' access type, we don't get a proper reply
+        ;; from `dbus-set-property'.
+        (should-not
          (dbus-set-property
           :session dbus--test-service dbus--test-path
           dbus--test-interface property1 "foofoo"))
+        (let ((dbus-show-dbus-errors t))
+          (should
+           (equal
+            ;; We don't care the error message text.
+            (butlast
+             (should-error
+              (dbus-set-property
+               :session dbus--test-service dbus--test-path
+               dbus--test-interface property1 "foofoo")))
+            `(dbus-error ,dbus-error-property-read-only))))
         (should
          (string-equal
           (dbus-get-property
@@ -290,12 +341,24 @@ This includes initialization and closing the bus."
           (dbus-register-property
            :session dbus--test-service dbus--test-path
            dbus--test-interface property2 :write "bar")
-          `((:property :session "org.gnu.Emacs.TestDBus" ,property2)
+          `((:property :session ,dbus--test-interface ,property2)
             (,dbus--test-service ,dbus--test-path))))
-        (should-not ;; Due to `:write' access type.
+        ;; Due to `:write' access type, we don't get a proper reply
+        ;; from `dbus-get-property'.
+        (should-not
          (dbus-get-property
           :session dbus--test-service dbus--test-path
           dbus--test-interface property2))
+        (let ((dbus-show-dbus-errors t))
+          (should
+           (equal
+            ;; We don't care the error message text.
+            (butlast
+             (should-error
+              (dbus-get-property
+               :session dbus--test-service dbus--test-path
+               dbus--test-interface property2)))
+            `(dbus-error ,dbus-error-access-denied))))
         (should
          (string-equal
           (dbus-set-property
@@ -307,32 +370,62 @@ This includes initialization and closing the bus."
           :session dbus--test-service dbus--test-path
           dbus--test-interface property2))
 
-        ;; `:readwrite' property.
+        ;; `:readwrite' property, typed value (Bug#43252).
         (should
          (equal
           (dbus-register-property
            :session dbus--test-service dbus--test-path
-           dbus--test-interface property3 :readwrite "baz")
-          `((:property :session "org.gnu.Emacs.TestDBus" ,property3)
+           dbus--test-interface property3 :readwrite :object-path "/baz")
+          `((:property :session ,dbus--test-interface ,property3)
             (,dbus--test-service ,dbus--test-path))))
         (should
          (string-equal
           (dbus-get-property
            :session dbus--test-service dbus--test-path
            dbus--test-interface property3)
-          "baz"))
+          "/baz"))
         (should
          (string-equal
           (dbus-set-property
            :session dbus--test-service dbus--test-path
-           dbus--test-interface property3 "bazbaz")
-          "bazbaz"))
+           dbus--test-interface property3 :object-path "/baz/baz")
+          "/baz/baz"))
         (should
          (string-equal
           (dbus-get-property
            :session dbus--test-service dbus--test-path
            dbus--test-interface property3)
-          "bazbaz"))
+          "/baz/baz"))
+
+        ;; Not registered property.
+        (should-not
+         (dbus-get-property
+          :session dbus--test-service dbus--test-path
+          dbus--test-interface property4))
+        (let ((dbus-show-dbus-errors t))
+          (should
+           (equal
+            ;; We don't care the error message text.
+            (butlast
+             (should-error
+              (dbus-get-property
+               :session dbus--test-service dbus--test-path
+               dbus--test-interface property4)))
+            `(dbus-error ,dbus-error-unknown-property))))
+        (should-not
+         (dbus-set-property
+          :session dbus--test-service dbus--test-path
+          dbus--test-interface property4 "foobarbaz"))
+        (let ((dbus-show-dbus-errors t))
+          (should
+           (equal
+            ;; We don't care the error message text.
+            (butlast
+             (should-error
+              (dbus-set-property
+               :session dbus--test-service dbus--test-path
+               dbus--test-interface property4 "foobarbaz")))
+            `(dbus-error ,dbus-error-unknown-property))))
 
         ;; `dbus-get-all-properties'.  We cannot retrieve a value for
         ;; the property with `:write' access type.
@@ -341,18 +434,193 @@ This includes initialization and closing the bus."
                 :session dbus--test-service dbus--test-path
                 dbus--test-interface)))
           (should (string-equal (cdr (assoc property1 result)) "foo"))
-          (should (string-equal (cdr (assoc property3 result)) "bazbaz"))
-          (should-not (assoc property2 result))))
+          (should (string-equal (cdr (assoc property3 result)) "/baz/baz"))
+          (should-not (assoc property2 result)))
 
-        ;; FIXME: This is wrong! The properties are missing.
-        ;; (should
-        ;;  (equal
-        ;;   (dbus-get-all-managed-objects
-        ;;    :session dbus--test-service dbus--test-path)
-        ;;   `((,dbus--test-path
-        ;;      ((,dbus-interface-peer)
-        ;;       (,dbus-interface-objectmanager)
-        ;;       (,dbus-interface-properties)))))))
+        ;; `dbus-get-all-managed-objects'.  We cannot retrieve a value for
+        ;; the property with `:write' access type.
+        (let ((result
+               (dbus-get-all-managed-objects
+                :session dbus--test-service dbus--test-path)))
+          (should (setq result (cadr (assoc dbus--test-path result))))
+          (should (setq result (cadr (assoc dbus--test-interface result))))
+          (should (string-equal (cdr (assoc property1 result)) "foo"))
+          (should (string-equal (cdr (assoc property3 result)) "/baz/baz"))
+          (should-not (assoc property2 result)))
+
+        ;; Unregister property.
+        (should (dbus-unregister-object registered))
+        (should-not (dbus-unregister-object registered))
+        (should-not
+         (dbus-get-property
+          :session dbus--test-service dbus--test-path
+          dbus--test-interface property1))
+        (let ((dbus-show-dbus-errors t))
+          (should
+           (equal
+            ;; We don't care the error message text.
+            (butlast
+             (should-error
+              (dbus-get-property
+               :session dbus--test-service dbus--test-path
+               dbus--test-interface property1)))
+            `(dbus-error ,dbus-error-unknown-property)))))
+
+    ;; Cleanup.
+    (dbus-unregister-service :session dbus--test-service)))
+
+;; The following test is inspired by Bug#43146.
+(ert-deftest dbus-test05-register-property-several-paths ()
+  "Check property registration for an own service at several paths."
+  (skip-unless dbus--test-enabled-session-bus)
+  (dbus-ignore-errors (dbus-unregister-service :session dbus--test-service))
+
+  (unwind-protect
+      (let ((property1 "Property1")
+            (property2 "Property2")
+            (property3 "Property3"))
+
+        ;; First path.
+        (should
+         (equal
+          (dbus-register-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property1 :readwrite "foo")
+          `((:property :session ,dbus--test-interface ,property1)
+            (,dbus--test-service ,dbus--test-path))))
+        (should
+         (equal
+          (dbus-register-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property2 :readwrite "bar")
+          `((:property :session ,dbus--test-interface ,property2)
+            (,dbus--test-service ,dbus--test-path))))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property1)
+          "foo"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property2)
+          "bar"))
+
+        (should
+         (string-equal
+          (dbus-set-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property1 "foofoo")
+          "foofoo"))
+        (should
+         (string-equal
+          (dbus-set-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property2 "barbar")
+          "barbar"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property1)
+          "foofoo"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service dbus--test-path
+           dbus--test-interface property2)
+          "barbar"))
+
+        ;; Second path.
+        (should
+         (equal
+          (dbus-register-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property2 :readwrite "foo")
+          `((:property :session ,dbus--test-interface ,property2)
+            (,dbus--test-service ,(concat dbus--test-path dbus--test-path)))))
+        (should
+         (equal
+          (dbus-register-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property3 :readwrite "bar")
+          `((:property :session ,dbus--test-interface ,property3)
+            (,dbus--test-service ,(concat dbus--test-path dbus--test-path)))))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property2)
+          "foo"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property3)
+          "bar"))
+
+        (should
+         (string-equal
+          (dbus-set-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property2 "foofoo")
+          "foofoo"))
+        (should
+         (string-equal
+          (dbus-set-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property3 "barbar")
+          "barbar"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property2)
+          "foofoo"))
+        (should
+         (string-equal
+          (dbus-get-property
+           :session dbus--test-service (concat dbus--test-path dbus--test-path)
+           dbus--test-interface property3)
+          "barbar"))
+
+        ;; Everything is still fine, tested with `dbus-get-all-properties'.
+        (let ((result
+               (dbus-get-all-properties
+                :session dbus--test-service dbus--test-path
+                dbus--test-interface)))
+          (should (string-equal (cdr (assoc property1 result)) "foofoo"))
+          (should (string-equal (cdr (assoc property2 result)) "barbar"))
+          (should-not (assoc property3 result)))
+
+        (let ((result
+               (dbus-get-all-properties
+                :session dbus--test-service
+                (concat dbus--test-path dbus--test-path) dbus--test-interface)))
+          (should (string-equal (cdr (assoc property2 result)) "foofoo"))
+          (should (string-equal (cdr (assoc property3 result)) "barbar"))
+          (should-not (assoc property1 result)))
+
+        ;; Final check with `dbus-get-all-managed-objects'.
+        (let ((result
+               (dbus-get-all-managed-objects :session dbus--test-service "/"))
+              result1)
+          (should (setq result1 (cadr (assoc dbus--test-path result))))
+          (should (setq result1 (cadr (assoc dbus--test-interface result1))))
+          (should (string-equal (cdr (assoc property1 result1)) "foofoo"))
+          (should (string-equal (cdr (assoc property2 result1)) "barbar"))
+          (should-not (assoc property3 result1))
+
+          (should
+           (setq
+            result1
+            (cadr (assoc (concat dbus--test-path dbus--test-path) result))))
+          (should (setq result1 (cadr (assoc dbus--test-interface result1))))
+          (should (string-equal (cdr (assoc property2 result1)) "foofoo"))
+          (should (string-equal (cdr (assoc property3 result1)) "barbar"))
+          (should-not (assoc property1 result1))))
 
     ;; Cleanup.
     (dbus-unregister-service :session dbus--test-service)))

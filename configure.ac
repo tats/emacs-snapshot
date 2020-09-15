@@ -724,7 +724,7 @@ case "${canonical}" in
   *-apple-darwin* )
     case "${canonical}" in
       *-apple-darwin[0-9].*) unported=yes ;;
-      i[3456]86-* | x86_64-* | arm-* )  ;;
+      i[3456]86-* | x86_64-* | arm-* | aarch64-* )  ;;
       * )            unported=yes ;;
     esac
     opsys=darwin
@@ -785,10 +785,7 @@ case "${canonical}" in
   *-nto-qnx* )
     opsys=qnxnto
     test -z "$CC" && CC=qcc
-    CFLAGS="$CFLAGS -D__NO_EXT_QNX"
-    if test "$with_unexec" = yes; then
-      LDFLAGS="-N2MB $LDFLAGS"
-    fi
+    LDFLAGS="-N2M $LDFLAGS"
   ;;
 
   ## Intel 386 machines where we don't care about the manufacturer.

@@ -1881,22 +1881,20 @@ to get different commands to edit and resubmit."
 	   '(metadata
 	     (annotation-function . read-extended-command--annotation)
 	     (category . command))
-         (let ((pred
-                (if (memq action '(nil t))
-                    ;; Exclude obsolete commands from completions.
-                    (lambda (sym)
-                      (and (funcall pred sym)
-                           (or (equal string (symbol-name sym))
-                               (not (get sym 'byte-obsolete-info)))))
-                  pred)))
-           (complete-with-action action obarray string pred))))
+         (complete-with-action action obarray string pred)))
      #'commandp t nil 'extended-command-history)))
 
 (defun read-extended-command--annotation (command-name)
-  (let* ((function (and (stringp command-name) (intern-soft command-name)))
-         (binding (where-is-internal function overriding-local-map t)))
-    (when (and binding (not (stringp binding)))
-      (format " (%s)" (key-description binding)))))
+  (let* ((fun (and (stringp command-name) (intern-soft command-name)))
+         (binding (where-is-internal fun overriding-local-map t))
+         (obsolete (get fun 'byte-obsolete-info))
+         (alias (symbol-function fun)))
+    (cond ((symbolp alias)
+           (format " (%s)" alias))
+          (obsolete
+           (format " (%s)" (car obsolete)))
+          ((and binding (not (stringp binding)))
+           (format " (%s)" (key-description binding))))))
 
 (defcustom suggest-key-bindings t
   "Non-nil means show the equivalent key-binding when M-x command has one.
@@ -2200,12 +2198,12 @@ Normally, history elements are matched case-insensitively if
 makes the search case-sensitive."
   (interactive
    (let* ((enable-recursive-minibuffers t)
-	  (regexp (read-from-minibuffer
-                   (format-prompt "Next element matching (regexp)"
-                                  (car minibuffer-history-search-history))
-		   nil minibuffer-local-map nil
-		   'minibuffer-history-search-history
-                   (car minibuffer-history-search-history))))
+	  (regexp (read-from-minibuffer "Next element matching (regexp): "
+					nil
+					minibuffer-local-map
+					nil
+					'minibuffer-history-search-history
+ 					(car minibuffer-history-search-history))))
      ;; Use the last regexp specified, by default, if input is empty.
      (list (if (string= regexp "")
 	       (if minibuffer-history-search-history
@@ -2752,11 +2750,12 @@ Contrary to `undo', this will not redo a previous undo."
   (let ((undo-no-redo t)) (undo arg)))
 
 (defun undo-redo (&optional arg)
-  "Undo the last ARG undos."
+  "Undo the last ARG undos, i.e., redo the last ARG changes.
+Interactively, ARG is the prefix numeric argument and defaults to 1."
   (interactive "*p")
   (cond
    ((not (undo--last-change-was-undo-p buffer-undo-list))
-    (user-error "No undo to undo"))
+    (user-error "No undone changes to redo"))
    (t
     (let* ((ul buffer-undo-list)
            (new-ul
