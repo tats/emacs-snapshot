@@ -190,7 +190,7 @@ index 7f536ad..aab4801 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 729684a..1270c56 100644
+index edef78d..3f85f98 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -295,6 +295,14 @@ view-help-file
