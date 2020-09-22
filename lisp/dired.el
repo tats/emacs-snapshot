@@ -2610,7 +2610,9 @@ it occurs in the buffer, and a value of t means construct name relative to
 Optional arg NO-ERROR-IF-NOT-FILEP means treat `.' and `..' as
 regular filenames and return nil if no filename on this line.
 Otherwise, an error occurs in these cases."
-  (let ((hidden (dired-subdir-hidden-p (dired-current-directory)))
+  (let ((hidden (and dired-subdir-alist
+                     (dired-subdir-hidden-p
+                      (dired-current-directory))))
 	case-fold-search file p1 p2 already-absolute)
     (when hidden
       (dired-unhide-subdir))
@@ -4060,10 +4062,10 @@ only in the active region if `dired-mark-region' is non-nil."
 	    (if fn (backup-file-name-p fn))))
      "backup file")))
 
-(defun dired-change-marks (old new)
+(defun dired-change-marks (&optional old new)
   "Change all OLD marks to NEW marks.
 OLD and NEW are both characters used to mark files."
-  (declare (advertised-calling-convention '(old new) "28.1"))
+  (declare (advertised-calling-convention (old new) "28.1"))
   (interactive
    (let* ((cursor-in-echo-area t)
 	  (old (progn (message "Change (old mark): ") (read-char)))
