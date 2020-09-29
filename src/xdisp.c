@@ -10619,7 +10619,7 @@ include the height of both, if present, in the return value.  */)
       while (bpos > BEGV_BYTE)
 	{
 	  dec_both (&start, &bpos);
-	  c = FETCH_CHAR (bpos);
+	  c = FETCH_BYTE (bpos);
 	  if (!(c == ' ' || c == '\t'))
 	    break;
 	}
@@ -10641,7 +10641,7 @@ include the height of both, if present, in the return value.  */)
       while (bpos > BEGV_BYTE)
 	{
 	  dec_both (&end, &bpos);
-	  c = FETCH_CHAR (bpos);
+	  c = FETCH_BYTE (bpos);
 	  if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r'))
 	    break;
 	}
@@ -11809,7 +11809,20 @@ resize_mini_window (struct window *w, bool exact_p)
 	  height = (max_height / unit) * unit;
 	  init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
 	  move_it_vertically_backward (&it, height - unit);
+	  /* The following move is usually a no-op when the stuff
+	     displayed in the mini-window comes entirely from buffer
+	     text, but it is needed when some of it comes from overlay
+	     strings, especially when there's an after-string at ZV.
+	     This happens with some completion packages, like
+	     icomplete, ido-vertical, etc.  With those packages, if we
+	     don't force w->start to be at the beginning of a screen
+	     line, important parts of the stuff in the mini-window,
+	     such as user prompt, will be hidden from view.  */
+	  move_it_by_lines (&it, 0);
 	  start = it.current.pos;
+	  /* Prevent redisplay_window from recentering, and thus from
+	     overriding the window-start point we computed here.  */
+	  w->start_at_line_beg = false;
 	}
       else
 	SET_TEXT_POS (start, BEGV, BEGV_BYTE);
@@ -22264,7 +22277,7 @@ trailing_whitespace_p (ptrdiff_t charpos)
   int c = 0;
 
   while (bytepos < ZV_BYTE
-	 && (c = FETCH_CHAR (bytepos),
+	 && (c = FETCH_BYTE (bytepos),
 	     c == ' ' || c == '\t'))
     ++bytepos;
 
@@ -22811,10 +22824,11 @@ display_count_lines_visually (struct it *it)
 	  SET_TEXT_POS (from, PT, PT_BYTE);
 	  to = IT_CHARPOS (*it);
 	}
-      start_display (&tem_it, it->w, from);
       /* Need to disable visual mode temporarily, since otherwise the
-	 call to move_it_to will cause infinite recursion.  */
+	 call to move_it_to below and inside start_display will cause
+	 infinite recursion.  */
       specbind (Qdisplay_line_numbers, Qrelative);
+      start_display (&tem_it, it->w, from);
       /* Some redisplay optimizations could invoke us very far from
 	 PT, which will make the caller painfully slow.  There should
 	 be no need to go too far beyond the window's bottom, as any
