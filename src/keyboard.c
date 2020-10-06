@@ -6234,7 +6234,7 @@ parse_modifiers_uncached (Lisp_Object symbol, ptrdiff_t *modifier_end)
 static Lisp_Object
 apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_byte)
 {
-  /* Since BASE could contain NULs, we can't use intern here; we have
+  /* Since BASE could contain nulls, we can't use intern here; we have
      to use Fintern, which expects a genuine Lisp_String, and keeps a
      reference to it.  */
   char new_mods[sizeof "A-C-H-M-S-s-up-down-drag-double-triple-"];
@@ -12106,7 +12106,8 @@ See also `pre-command-hook'.  */);
 
   DEFVAR_LISP ("menu-bar-final-items", Vmenu_bar_final_items,
 	       doc: /* List of menu bar items to move to the end of the menu bar.
-The elements of the list are event types that may have menu bar bindings.  */);
+The elements of the list are event types that may have menu bar
+bindings.  The order of this list controls the order of the items.  */);
   Vmenu_bar_final_items = Qnil;
 
   DEFVAR_LISP ("tab-bar-separator-image-expression", Vtab_bar_separator_image_expression,

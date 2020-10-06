@@ -209,9 +209,12 @@ xd_dbus_type_to_symbol (int type)
     : Qnil;
 }
 
+#define XD_KEYWORDP(object) !NILP (Fkeywordp (object))
+
 /* Check whether a Lisp symbol is a predefined D-Bus type symbol.  */
 #define XD_DBUS_TYPE_P(object)						\
-  (SYMBOLP (object) && ((xd_symbol_to_dbus_type (object) != DBUS_TYPE_INVALID)))
+  XD_KEYWORDP (object) &&						\
+    ((xd_symbol_to_dbus_type (object) != DBUS_TYPE_INVALID))
 
 /* Determine the DBusType of a given Lisp OBJECT.  It is used to
    convert Lisp objects, being arguments of `dbus-call-method' or
@@ -380,8 +383,9 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
       break;
 
     case DBUS_TYPE_BOOLEAN:
-      /* Any non-nil object will be regarded as `t', so we don't apply
-	 further type check.  */
+      /* There must be an argument.  */
+      if (EQ (QCboolean, object))
+	wrong_type_argument (intern ("booleanp"), object);
       sprintf (signature, "%c", dtype);
       break;
 
@@ -405,6 +409,8 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
     case DBUS_TYPE_STRING:
     case DBUS_TYPE_OBJECT_PATH:
     case DBUS_TYPE_SIGNATURE:
+      /* We dont check the syntax of object path and signature.  This
+	 will be done by libdbus.  */
       CHECK_STRING (object);
       sprintf (signature, "%c", dtype);
       break;
@@ -440,12 +446,18 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
 	{
 	  Lisp_Object elt1 = XD_NEXT_VALUE (elt);
 	  if (CONSP (elt1) && STRINGP (XCAR (elt1)) && NILP (XCDR (elt1)))
-	    subsig = SSDATA (XCAR (elt1));
+	    {
+	      subsig = SSDATA (XCAR (elt1));
+	      elt = Qnil;
+	    }
 	}
 
       while (!NILP (elt))
 	{
-	  if (subtype != XD_OBJECT_TO_DBUS_TYPE (CAR_SAFE (elt)))
+	  char x[DBUS_MAXIMUM_SIGNATURE_LENGTH];
+	  subtype = XD_OBJECT_TO_DBUS_TYPE (CAR_SAFE (elt));
+	  xd_signature (x, subtype, dtype, CAR_SAFE (XD_NEXT_VALUE (elt)));
+	  if (strcmp (subsig, x) != 0)
 	    wrong_type_argument (intern ("D-Bus"), CAR_SAFE (elt));
 	  elt = CDR_SAFE (XD_NEXT_VALUE (elt));
 	}
@@ -460,6 +472,7 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
       CHECK_CONS (object);
 
       elt = XD_NEXT_VALUE (elt);
+      CHECK_CONS (elt);
       subtype = XD_OBJECT_TO_DBUS_TYPE (CAR_SAFE (elt));
       xd_signature (x, subtype, dtype, CAR_SAFE (XD_NEXT_VALUE (elt)));
 
@@ -471,11 +484,12 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
       break;
 
     case DBUS_TYPE_STRUCT:
-      /* A struct list might contain any number of elements with
-	 different types.  No further check needed.  */
+      /* A struct list might contain any (but zero) number of elements
+	 with different types.  No further check needed.  */
       CHECK_CONS (object);
 
       elt = XD_NEXT_VALUE (elt);
+      CHECK_CONS (elt);
 
       /* Compose the signature from the elements.  It is enclosed by
 	 parentheses.  */
@@ -506,6 +520,7 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
 
       /* First element.  */
       elt = XD_NEXT_VALUE (elt);
+      CHECK_CONS (elt);
       subtype = XD_OBJECT_TO_DBUS_TYPE (CAR_SAFE (elt));
       xd_signature (x, subtype, dtype, CAR_SAFE (XD_NEXT_VALUE (elt)));
       xd_signature_cat (signature, x);
@@ -515,6 +530,7 @@ xd_signature (char *signature, int dtype, int parent_type, Lisp_Object object)
 
       /* Second element.  */
       elt = CDR_SAFE (XD_NEXT_VALUE (elt));
+      CHECK_CONS (elt);
       subtype = XD_OBJECT_TO_DBUS_TYPE (CAR_SAFE (elt));
       xd_signature (x, subtype, dtype, CAR_SAFE (XD_NEXT_VALUE (elt)));
       xd_signature_cat (signature, x);
@@ -615,6 +631,9 @@ xd_append_arg (int dtype, Lisp_Object object, DBusMessageIter *iter)
 	}
 
       case DBUS_TYPE_BOOLEAN:
+	/* There must be an argument.  */
+	if (EQ (QCboolean, object))
+	  wrong_type_argument (intern ("booleanp"), object);
 	{
 	  dbus_bool_t val = (NILP (object)) ? FALSE : TRUE;
 	  XD_DEBUG_MESSAGE ("%c %s", dtype, (val == FALSE) ? "false" : "true");
@@ -713,6 +732,8 @@ xd_append_arg (int dtype, Lisp_Object object, DBusMessageIter *iter)
       case DBUS_TYPE_STRING:
       case DBUS_TYPE_OBJECT_PATH:
       case DBUS_TYPE_SIGNATURE:
+	/* We dont check the syntax of object path and signature.
+	   This will be done by libdbus.  */
 	CHECK_STRING (object);
 	{
 	  /* We need to send a valid UTF-8 string.  We could encode `object'
@@ -1219,7 +1240,7 @@ this connection to those buses.  */)
 						xd_add_watch,
 						xd_remove_watch,
 						xd_toggle_watch,
-						SYMBOLP (bus)
+						XD_KEYWORDP (bus)
 						? (void *) XSYMBOL (bus)
 						: (void *) XSTRING (bus),
 						NULL))
@@ -1785,7 +1806,7 @@ xd_read_queued_messages (int fd, void *data)
     while (!NILP (busp))
       {
 	key = CAR_SAFE (CAR_SAFE (busp));
-	if ((SYMBOLP (key) && XSYMBOL (key) == data)
+	if ((XD_KEYWORDP (key) && XSYMBOL (key) == data)
 	    || (STRINGP (key) && XSTRING (key) == data))
 	  bus = key;
 	busp = CDR_SAFE (busp);
@@ -1922,31 +1943,33 @@ syms_of_dbusbind (void)
     doc: /* Hash table of registered functions for D-Bus.
 
 There are two different uses of the hash table: for accessing
-registered interfaces properties, targeted by signals or method calls,
-and for calling handlers in case of non-blocking method call returns.
+registered interfaces properties, targeted by signals, method calls or
+monitors, and for calling handlers in case of non-blocking method call
+returns.
 
 In the first case, the key in the hash table is the list (TYPE BUS
-INTERFACE MEMBER).  TYPE is one of the Lisp symbols `:method',
-`:signal' or `:property'.  BUS is either a Lisp symbol, `:system' or
-`:session', or a string denoting the bus address.  INTERFACE is a
-string which denotes a D-Bus interface, and MEMBER, also a string, is
-either a method, a signal or a property INTERFACE is offering.  All
-arguments but BUS must not be nil.
+[INTERFACE MEMBER]).  TYPE is one of the Lisp symbols `:method',
+`:signal', `:property' or `:monitor'.  BUS is either a Lisp symbol,
+`:system', `:session', `:system-private' or `:session-private', or a
+string denoting the bus address.  INTERFACE is a string which denotes
+a D-Bus interface, and MEMBER, also a string, is either a method, a
+signal or a property INTERFACE is offering.  All arguments can be nil.
 
 The value in the hash table is a list of quadruple lists ((UNAME
 SERVICE PATH OBJECT [RULE]) ...).  SERVICE is the service name as
 registered, UNAME is the corresponding unique name.  In case of
-registered methods and properties, UNAME is nil.  PATH is the object
-path of the sending object.  All of them can be nil, which means a
-wildcard then.
+registered methods, properties and monitors, UNAME is nil.  PATH is
+the object path of the sending object.  All of them can be nil, which
+means a wildcard then.
 
 OBJECT is either the handler to be called when a D-Bus message, which
 matches the key criteria, arrives (TYPE `:method', `:signal' and
 `:monitor'), or a list (ACCESS EMITS-SIGNAL VALUE) for TYPE
 `:property'.
 
-For entries of type `:signal', there is also a fifth element RULE,
-which keeps the match string the signal is registered with.
+For entries of type `:signal' or `:monitor', there is also a fifth
+element RULE, which keeps the match string the signal or monitor is
+registered with.
 
 In the second case, the key in the hash table is the list (:serial BUS
 SERIAL).  BUS is either a Lisp symbol, `:system' or `:session', or a

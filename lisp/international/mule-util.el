@@ -44,9 +44,24 @@
 	(setq i (1+ i)))))
   string)
 
-(defvar truncate-string-ellipsis "..."  ;"…"
+(defvar truncate-string-ellipsis nil
   "String to use to indicate truncation.
-Serves as default value of ELLIPSIS argument to `truncate-string-to-width'.")
+Serves as default value of ELLIPSIS argument to `truncate-string-to-width'
+returned by the function `truncate-string-ellipsis'.")
+
+(defun truncate-string-ellipsis ()
+  "Return the string used to indicate truncation.
+Use the value of the variable `truncate-string-ellipsis' when it's non-nil.
+Otherwise, return the Unicode character U+2026 \"HORIZONTAL ELLIPSIS\"
+when it's displayable on the selected frame, or `...'.  This function
+needs to be called on every use of `truncate-string-to-width' to
+decide whether the selected frame can display that Unicode character."
+  (cond
+   (truncate-string-ellipsis)
+   ;; This uses the character's name instead of the character itself
+   ;; to avoid decoding problems when loading this file.  FIXME.
+   ((char-displayable-p ?\N{HORIZONTAL ELLIPSIS}) "\N{HORIZONTAL ELLIPSIS}")
+   ("...")))
 
 ;;;###autoload
 (defun truncate-string-to-width (str end-column
@@ -73,7 +88,7 @@ If ELLIPSIS is non-nil, it should be a string which will replace the
 end of STR (including any padding) if it extends beyond END-COLUMN,
 unless the display width of STR is equal to or less than the display
 width of ELLIPSIS.  If it is non-nil and not a string, then ELLIPSIS
-defaults to `truncate-string-ellipsis'.
+defaults to `truncate-string-ellipsis', or to three dots when it's nil.
 
 If ELLIPSIS-TEXT-PROPERTY is non-nil, a too-long string will not
 be truncated, but instead the elided parts will be covered by a
@@ -81,7 +96,7 @@ be truncated, but instead the elided parts will be covered by a
   (or start-column
       (setq start-column 0))
   (when (and ellipsis (not (stringp ellipsis)))
-    (setq ellipsis truncate-string-ellipsis))
+    (setq ellipsis (truncate-string-ellipsis)))
   (let ((str-len (length str))
 	(str-width (string-width str))
 	(ellipsis-width (if ellipsis (string-width ellipsis) 0))

@@ -85,6 +85,10 @@ useful on systems such as FreeBSD which ships only with "etc/termcap".
 
 * Changes in Emacs 28.1
 
+*** New var 'redisplay-skip-initial-frame' to enable batch redisplay tests.
+Setting it to nil forces the redisplay to do its job even in the
+initial frame used in batch mode.
+
 ---
 ** Support for the 'strike-through' face attribute on TTY frames.
 If your terminal's termcap or terminfo database entry has the 'smxx'
@@ -151,6 +155,13 @@ your init file:
 
     (setq frame-title-format '(multiple-frames "%b"
                               ("" invocation-name "@" system-name)))
+
+** recentf
+
+---
+*** 'recentf-auto-cleanup' time string now repeats.
+When 'recentf-auto-cleanup' is set to a time string, it now repeats
+every day, rather than only running once after the mode is turned on.
 
 
 * Editing Changes in Emacs 28.1
@@ -317,6 +328,13 @@ If 'numeric', calendar functions (eg 'calendar-sunrise-sunset') that display
 time zones will use a form like "+0100" instead of "CET".
 
 ** Dired
+
++++
+*** New user option 'dired-switches-in-mode-line'.
+This variable controls how 'ls' switches are displayed in the mode
+line, and allows truncating them (to preserve space on the mode line)
+or showing them literally, either instead of, or in addition to,
+displaying "by name" or "by date" sort order.
 
 ---
 *** Broken and circular links are shown with the 'dired-broken-symlink' face.
@@ -1072,6 +1090,11 @@ based on the current window size.  In previous versions of Emacs, this
 was always done (and that could lead to odd displays when resizing the
 window after starting).  This variable defaults to nil.
 
+** Widget
+
++++
+*** 'widget-choose' now supports menus in extended format.
+
 ** Miscellaneous
 
 ---
@@ -1083,9 +1106,12 @@ keystrokes.
 
 +++
 *** Interactive regular expression search now uses faces for sub-groups.
-E.g., 'C-M-s foo-\([0-9]+\)' will now use the 'isearch-group-1' face
+E.g., 'C-M-s foo-\([0-9]+\)' will now use the 'isearch-group-odd' face
 on the part of the regexp that matches the sub-expression "[0-9]+".
+The even group matches are highlighted with the 'isearch-group-even' face.
 This is controlled by the 'search-highlight-submatches' user option.
+This feature is available only on terminals that have enough colors to
+distinguish between sub-expression highlighting.
 
 ---
 *** New user option 'reveal-auto-hide'.
@@ -1453,6 +1479,19 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 * Lisp Changes in Emacs 28.1
 
 +++
+** 'truncate-string-ellipsis' now uses '…' by default.
+Modes that use 'truncate-string-to-width' with non-nil, non-string
+argument 'ellipsis', will now indicate truncation using '…' when
+the selected frame can display it, and using "..." otherwise.
+
++++
+*** New command 'make-directory-autoloads'.
+This does the same as the old command 'update-directory-autoloads',
+but has different semantics: Instead of passing in the output file via
+the dynamically bound 'generated-autoload-file' variable, the output
+file is now a explicit parameter.
+
++++
 *** New function 'string-search'.
 This function takes two string parameters and returns the position of
 the first instance of the former string in the latter.
@@ -1582,6 +1621,8 @@ convert them to a list '(R G B)' of primary color values.
 This user option can be one of the predefined styles or a function to
 personalize the uniquified buffer name.
 
++++
+** 'inhibit-nul-byte-detection' is renamed to 'inhibit-null-byte-detection'.
 
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
