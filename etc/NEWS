@@ -85,6 +85,13 @@ useful on systems such as FreeBSD which ships only with "etc/termcap".
 
 * Changes in Emacs 28.1
 
++++
+*** A new system for displaying documentation for groups of function is added.
+This can either be used by saying 'M-x shortdoc-display-group' and
+choosing a group, or clicking a button in the *Help* buffers when
+looking at the doc string of a function that belongs to one of these
+groups.
+
 *** New var 'redisplay-skip-initial-frame' to enable batch redisplay tests.
 Setting it to nil forces the redisplay to do its job even in the
 initial frame used in batch mode.
@@ -225,6 +232,15 @@ preserving markers, properties and overlays.  The new variable
 'revert-buffer-with-fine-grain-max-seconds' specifies the maximum
 number of seconds that 'revert-buffer-with-fine-grain' should spend
 trying to be non-destructive.
+
+** Outline
+
++++
+*** New commands to cycle heading visibility.
+Typing 'TAB' on a heading cycles the current section between "hide
+all", "subheadings", and "show all" state. Typing 'S-TAB' anywhere in
+the buffer cycles the whole buffer between "only top-level headings",
+"all headings and subheadings", and "show all" states.
 
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
@@ -545,10 +561,20 @@ grep emits SGR ANSI escape sequences to color its output.  The new variable
 markers in order to provide highlighting in the source buffer.  The variable
 can be customized to accommodate other grep-like tools.
 
+---
+*** The 'lgrep' command now ignores directories.
+On systems where the grep command supports it, directories will be
+skipped.
+
 ** Help
 
 +++
 *** New command 'describe-keymap' describes keybindings in a keymap.
+
+---
+*** New keybinding in 'help-for-help' to display a manual.
+The 'R' keybinding after 'C-h C-h' will prompt for a manual name and
+then display it.
 
 +++
 ** New command 'lossage-size'.
@@ -1075,6 +1101,13 @@ work more traditionally, with 'C-d' deleting the next character.
 Likewise, point isn't moved to the end of the string before inserting
 digits.
 
++++
+*** Setting the word size to zero disables word clipping.
+The word size normally clips the results of certain bit-oriented
+operations such as shifts and bitwise XOR.  A word size of zero, set
+by 'b w', makes the operation have effect on the whole argument values
+and the result is not truncated in any way.
+
 ** term-mode
 
 ---
@@ -1106,9 +1139,12 @@ keystrokes.
 
 +++
 *** Interactive regular expression search now uses faces for sub-groups.
-E.g., 'C-M-s foo-\([0-9]+\)' will now use the 'isearch-group-odd' face
+E.g., 'C-M-s foo-\([0-9]+\)' will now use the 'isearch-group-1' face
 on the part of the regexp that matches the sub-expression "[0-9]+".
-The even group matches are highlighted with the 'isearch-group-even' face.
+By default, there are two faces for sub-group highlighting, but you
+can define more faces whose names are of the form 'isearch-group-N',
+where N are successive numbers above 2.
+
 This is controlled by the 'search-highlight-submatches' user option.
 This feature is available only on terminals that have enough colors to
 distinguish between sub-expression highlighting.

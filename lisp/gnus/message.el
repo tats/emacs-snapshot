@@ -1106,7 +1106,8 @@ point and mark around the citation text as modified."
 If nil, don't insert a signature.
 If t, insert `message-signature-file'.
 If a function or form, insert its result.
-See `mail-signature' for the recommended format of a signature."
+See `mail-signature' for the recommended format of a signature.
+Also see `message-signature-insert-empty-line'."
   :version "23.2"
   :type '(choice string
                  (const :tag "None" nil)
@@ -3614,7 +3615,14 @@ Message buffers and is not meant to be called directly."
       (do-auto-fill))))
 
 (defun message-insert-signature (&optional force)
-  "Insert a signature.  See documentation for variable `message-signature'."
+  "Insert a signature at the end of the buffer.
+
+See the documentation for the `message-signature' variable for
+more information.
+
+If FORCE is 0 (or when called interactively), the global values
+of the signature variables will be consulted if the local ones
+are null."
   (interactive (list 0))
   (let ((message-signature message-signature)
 	(message-signature-file message-signature-file))
