@@ -19489,6 +19489,11 @@ Variable to control whether use the locally stored @acronym{NOV} and
 articles when plugged, e.g., essentially using the Agent as a cache.
 The default is non-@code{nil}, which means to use the Agent as a cache.
 
+@item gnus-agent-eagerly-store-articles
+@vindex gnus-agent-eagerly-store-articles
+If non-@code{nil} (which is the default), store all articles read in
+agentized groups in the Agent cache.
+
 @item gnus-agent-go-online
 @vindex gnus-agent-go-online
 If @code{gnus-agent-go-online} is @code{nil}, the Agent will never
@@ -23914,10 +23919,10 @@ The following variables customize the appearance of the smileys:
 @item smiley-style
 @vindex smiley-style
 Specifies the smiley style.  Predefined smiley styles include
-@code{low-color} (small 13x14 pixel, three-color images), @code{medium}
-(more colorful images, 16x16 pixel), and @code{grayscale} (grayscale
-images, 14x14 pixel).  The default depends on the height of the default
-face.
+@code{emoji} (use emoji characters), @code{low-color} (small 13x14
+pixel, three-color images), @code{medium} (more colorful images, 16x16
+pixel), and @code{grayscale} (grayscale images, 14x14 pixel).  The
+default depends on the height of the default face.
 
 @item smiley-data-directory
 @vindex smiley-data-directory

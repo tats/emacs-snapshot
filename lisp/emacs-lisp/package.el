@@ -2152,6 +2152,7 @@ Downloads and installs required packages as needed."
     (unless (package--user-selected-p name)
       (package--save-selected-packages
        (cons name package-selected-packages)))
+    (package--quickstart-maybe-refresh)
     pkg-desc))
 
 ;;;###autoload
@@ -2630,8 +2631,7 @@ Used for the `action' property of buttons in the buffer created by
     (when (y-or-n-p (format-message "Install package `%s'? "
                                     (package-desc-full-name pkg-desc)))
       (package-install pkg-desc nil)
-      (revert-buffer nil t)
-      (goto-char (point-min)))))
+      (describe-package (package-desc-name pkg-desc)))))
 
 (defun package-delete-button-action (button)
   "Run `package-delete' on the package BUTTON points to.
@@ -2641,8 +2641,7 @@ Used for the `action' property of buttons in the buffer created by
     (when (y-or-n-p (format-message "Delete package `%s'? "
                                     (package-desc-full-name pkg-desc)))
       (package-delete pkg-desc)
-      (revert-buffer nil t)
-      (goto-char (point-min)))))
+      (describe-package (package-desc-name pkg-desc)))))
 
 (defun package-keyword-button-action (button)
   "Show filtered \"*Packages*\" buffer for BUTTON.
@@ -2709,6 +2708,7 @@ either a full name or nil, and EMAIL is a valid email address."
     (define-key map (kbd "/ s") 'package-menu-filter-by-status)
     (define-key map (kbd "/ v") 'package-menu-filter-by-version)
     (define-key map (kbd "/ m") 'package-menu-filter-marked)
+    (define-key map (kbd "/ u") 'package-menu-filter-upgradable)
     map)
   "Local keymap for `package-menu-mode' buffers.")
 
@@ -3904,6 +3904,15 @@ Unlike other filters, this leaves the marks intact."
 	      (setq mark (cdr (assq (tabulated-list-get-id) marks)))
 	      (tabulated-list-put-tag (char-to-string mark) t)))
 	(user-error "No packages found")))))
+
+(defun package-menu-filter-upgradable ()
+  "Filter \"*Packages*\" buffer to show only upgradable packages."
+  (interactive)
+  (let ((pkgs (mapcar #'car (package-menu--find-upgrades))))
+    (package-menu--filter-by
+     (lambda (pkg)
+       (memql (package-desc-name pkg) pkgs))
+     "upgradable")))
 
 (defun package-menu-clear-filter ()
   "Clear any filter currently applied to the \"*Packages*\" buffer."
