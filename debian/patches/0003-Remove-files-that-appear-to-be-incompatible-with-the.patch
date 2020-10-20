@@ -163,7 +163,7 @@ index f0c8e52..8573290 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 7f536ad..aab4801 100644
+index f4fb7d2..aab4801 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -181,7 +181,7 @@ index 7f536ad..aab4801 100644
 -	dbus dired-x ebrowse ede ediff edt eieio \
 -	emacs-mime epa erc ert eshell eudc efaq eww \
 -	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
--	mairix-el message mh-e newsticker nxml-mode octave-mode \
+-	mairix-el message mh-e modus-themes newsticker nxml-mode octave-mode \
 -	org pcl-cvs pgg rcirc remember reftex sasl \
 -	sc semantic ses sieve smtpmail speedbar srecode todo-mode tramp \
 -	url vhdl-mode vip viper widget wisent woman
