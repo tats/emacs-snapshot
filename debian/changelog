@@ -1,3 +1,9 @@
+emacs (1:27.1+1-2) unstable; urgency=medium
+
+  * Upload to unstable.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 24 Oct 2020 11:31:42 -0500
+
 emacs (1:27.1+1-1) experimental; urgency=medium
 
   * Merge upstream version 27.1.
