@@ -308,6 +308,9 @@ and variables.
 
 ** Archive mode
 
+---
+*** Archive Mode can now parse .squashfs files.
+
 *** Can now modify members of 'ar' archives.
 
 *** Display of summaries unified between backends.
@@ -399,6 +402,14 @@ The non-file buffers which can use VC commands are those that have
 their 'default-directory' under VC.
 
 *** New command 'vc-dir-root' uses the root directory without asking.
+
+---
+*** The responsible VC backend is now the most specific one.
+'vc-responsible-backend' loops over the backends in
+'vc-handled-backends' to determine which backend is responsible for a
+specific (unregistered) file.  Previously the first matching backend
+was chosen, but now the one with the most specific path is chosen (in
+case there's a directory handled by one backend inside another).
 
 *** New commands 'vc-dir-mark-registered-files' (bound to '* r') and
 'vc-dir-mark-unregistered-files'.
@@ -572,6 +583,9 @@ skipped.
 
 ** Help
 
+---
+*** 'g' ('revert-buffer') in 'help-mode' no longer requires confirmation.
+
 +++
 *** New command 'describe-keymap' describes keybindings in a keymap.
 
@@ -633,7 +647,7 @@ definition.
 ** ElDoc
 
 +++
-*** New user option 'eldoc-display-truncation-message'.
+*** New user option 'eldoc-echo-area-display-truncation-message'.
 If non-nil (the default), eldoc will display a message saying
 something like "(Documentation truncated. Use `M-x eldoc-doc-buffer'
 to see rest)" when a message has been truncated.  If nil, truncated
@@ -646,6 +660,13 @@ These functions don't need to produce the doc string right away, they
 may arrange for it to be produced asynchronously.  The results of all
 doc string functions are accessible to the user through the user
 option 'eldoc-documentation-strategy'.
+
+*** New hook 'eldoc-display-functions'.
+This hook is intended to be used for displaying doc string.  The
+functions receive the docstrings composed according to
+`eldoc-documentation-strategy' and are tasked with displaying it to
+the user.  Examples of such functions would use the echo area, a
+separate buffer or a tooltip.
 
 +++
 *** New user option 'eldoc-documentation-strategy'.
@@ -1166,7 +1187,21 @@ window after starting).  This variable defaults to nil.
 +++
 *** 'widget-choose' now supports menus in extended format.
 
+---
+*** The 'editable-list' widget now supports moving items up and down.
+You can now move items up and down by deleting and then reinserting
+them, using the DEL and INS buttons respectively.  This is useful in
+Custom buffers, for example, to change the order of the elements in a
+list.
+
 ** Miscellaneous
+
+---
+*** 'global-display-fill-column-indicator-mode' skips some buffers.
+By default, turning on 'global-display-fill-column-indicator-mode'
+doesn't turn on 'display-fill-column-indicator-mode' in special-mode
+buffers.  This can be controlled by customizing the variable
+'global-display-fill-column-indicator-modes'.
 
 ---
 *** New user option 'compilation-search-all-directories'.
@@ -1314,6 +1349,16 @@ to 'tab-bar-new-tab-choice' for new tabs to show the bookmark list.
 *** Movement commands in 'gomoku-mode' are fixed.
 'gomoku-move-sw' and 'gomoku-move-ne' now work correctly, and
 horizontal movements now stop at the edge of the board.
+
+** xterm-mouse mode
+
+---
+*** TTY menu navigation is now supported in 'xterm-mouse-mode'.
+TTY menus support mouse navigation and selection when xterm-mouse-mode
+is active.  When run on a terminal, clicking on the menu bar with the
+mouse now pops up a TTY menu by default instead of running the command
+'tmm-menubar'.  To restore the old behavior, set the variable
+'tty-menu-open-use-tmm' to non-nil.
 
 ** xwidget-webkit mode
 
@@ -1500,6 +1545,11 @@ This is no longer supported, and setting this variable has no effect.
 ** The macro 'with-displayed-buffer-window' is now obsolete.
 Use macro 'with-current-buffer-window' with action alist entry 'body-function'.
 
++++
+** `byte-compile-file' optional argument LOAD is now obsolete.
+To load the file after byte-compiling, add a call to 'load' from Lisp
+or use 'M-x emacs-lisp-byte-compile-and-load' interactively.
+
 ** The metamail.el library is now marked obsolete.
 
 ---
@@ -1583,6 +1633,11 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 
 
 * Lisp Changes in Emacs 28.1
+
++++
+** 'define-globalized-minor-mode' now takes a :predicate parameter.
+This can be used to control which major modes the minor mode should be
+used in.
 
 +++
 ** 'truncate-string-ellipsis' now uses '…' by default.
@@ -1734,6 +1789,14 @@ This user option can be one of the predefined styles or a function to
 personalize the uniquified buffer name.
 
 +++
+** New variable 'tty-menu-calls-mouse-position-function'.
+This controls whether 'mouse-position-function' is called by functions
+that retrieve the mouse position when that happens during TTY menu
+handling.  Lisp programs that set 'mouse-position-function' should
+also set this variable non-nil if they are compatible with the tty
+menu handling.
+
++++
 ** 'inhibit-nul-byte-detection' is renamed to 'inhibit-null-byte-detection'.
 
 +++
@@ -1742,6 +1805,9 @@ It is meant as an (experimental) aid for converting Emacs Lisp code
 to lexical binding, where dynamic (special) variables bound in one
 file can affect code in another.  For details, see the manual section
 '(Elisp) Converting to Lexical Binding'.
+
+---
+** 'unload-feature' now also tries to undo additions to buffer-local hooks.
 
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems

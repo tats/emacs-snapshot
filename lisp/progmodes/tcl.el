@@ -386,32 +386,36 @@ Call `tcl-set-font-lock-keywords' after changing this list.")
 Default list includes some TclX keywords.
 Call `tcl-set-font-lock-keywords' after changing this list.")
 
-(defvar tcl-builtin-list
-  '("after" "append" "array" "bgerror" "binary" "catch" "cd" "clock"
-    "close" "concat" "console" "dde" "encoding" "eof" "exec" "expr"
-    "fblocked" "fconfigure" "fcopy" "file" "fileevent" "flush"
-    "format" "gets" "glob" "history" "incr" "info" "interp" "join"
-    "lappend" "lindex" "linsert" "list" "llength" "load" "lrange"
-    "lreplace" "lsort" "namespace" "open" "package" "pid" "puts" "pwd"
-    "read" "regexp" "registry" "regsub" "rename" "scan" "seek" "set"
-    "socket" "source" "split" "string" "subst" "tell" "time" "trace"
-    "unknown" "unset" "vwait")
-  "List of Tcl commands.  Used only for highlighting.
-Call `tcl-set-font-lock-keywords' after changing this list.
-This list excludes those commands already found in `tcl-proc-list' and
-`tcl-keyword-list'.")
-
 (defvar tcl-font-lock-keywords nil
   "Keywords to highlight for Tcl.  See variable `font-lock-keywords'.
 This variable is generally set from `tcl-proc-regexp',
 `tcl-typeword-list', and `tcl-keyword-list' by the function
 `tcl-set-font-lock-keywords'.")
 
-(defconst tcl-syntax-propertize-function
-  (syntax-propertize-rules
-   ;; Mark the few `#' that are not comment-markers.
-   ("[^;[{ \t\n][ \t]*\\(#\\)" (1 ".")))
-  "Syntactic keywords for `tcl-mode'.")
+(eval-and-compile
+  (defvar tcl-builtin-list
+    '("after" "append" "array" "bgerror" "binary" "catch" "cd" "clock"
+      "close" "concat" "console" "dde" "encoding" "eof" "exec" "expr"
+      "fblocked" "fconfigure" "fcopy" "file" "fileevent" "flush"
+      "format" "gets" "glob" "history" "incr" "info" "interp" "join"
+      "lappend" "lindex" "linsert" "list" "llength" "load" "lrange"
+      "lreplace" "lsort" "namespace" "open" "package" "pid" "puts" "pwd"
+      "read" "regexp" "registry" "regsub" "rename" "scan" "seek" "set"
+      "socket" "source" "split" "string" "subst" "tell" "time" "trace"
+      "unknown" "unset" "vwait")
+    "List of Tcl commands.  Used only for highlighting.
+Call `tcl-set-font-lock-keywords' after changing this list.
+This list excludes those commands already found in `tcl-proc-list' and
+`tcl-keyword-list'.")
+
+  (defconst tcl-syntax-propertize-function
+    (syntax-propertize-rules
+     ;; Mark the few `#' that are not comment-markers.
+     ("[^;[{ \t\n][ \t]*\\(#\\)" (1 "."))
+     ((concat "\\_<" (regexp-opt tcl-builtin-list t)
+              "\\_>" "\s*{\\([^}].*\\)}")
+      (2 "_")))
+    "Syntactic keywords for `tcl-mode'."))
 
 ;; FIXME need some way to recognize variables because array refs look
 ;; like 2 sexps.
@@ -506,6 +510,7 @@ Uses variables `tcl-proc-regexp' and `tcl-keyword-list'."
          ;; number of "namespace::" qualifiers.  A leading "::" refers
          ;; to the global namespace.
          '("\\${\\([^}]+\\)}" 1 font-lock-variable-name-face)
+         '("{\\([^}]+\\)}" 1 font-lock-string-face)
          '("\\$\\(\\(?:::\\)?\\(?:[[:alnum:]_]+::\\)*[[:alnum:]_]+\\)"
            1 font-lock-variable-name-face)
          '("\\(?:\\s-\\|^\\|\\[\\)set\\s-+{\\([^}]+\\)}"
@@ -1555,21 +1560,21 @@ The first line is assumed to look like \"#!.../program ...\"."
 		 (char-to-string char)))
 	     string ""))
 
-;;
-;; Bug reporting.
-;;
 
 
-;; These are relics kept "just in case".
-(defalias 'tcl-uncomment-region 'uncomment-region)
-(defalias 'tcl-indent-for-comment 'comment-indent)
-(defalias 'add-log-tcl-defun 'tcl-add-log-defun)
-(defalias 'indent-tcl-exp 'tcl-indent-exp)
-(defalias 'calculate-tcl-indent 'tcl-calculate-indent)
-(defalias 'tcl-beginning-of-defun 'beginning-of-defun)
-(defalias 'tcl-end-of-defun 'end-of-defun)
-(defalias 'tcl-mark-defun 'mark-defun)
-(defun tcl-mark () (mark t))
+;;
+;; Obsolete.
+;;
+
+(define-obsolete-function-alias 'tcl-uncomment-region #'uncomment-region "28.1")
+(define-obsolete-function-alias 'tcl-indent-for-comment #'comment-indent "28.1")
+(define-obsolete-function-alias 'add-log-tcl-defun #'tcl-add-log-defun "28.1")
+(define-obsolete-function-alias 'indent-tcl-exp #'tcl-indent-exp "28.1")
+(define-obsolete-function-alias 'calculate-tcl-indent #'tcl-calculate-indent "28.1")
+(define-obsolete-function-alias 'tcl-beginning-of-defun #'beginning-of-defun "28.1")
+(define-obsolete-function-alias 'tcl-end-of-defun #'end-of-defun "28.1")
+(define-obsolete-function-alias 'tcl-mark-defun #'mark-defun "28.1")
+(defun tcl-mark () (declare (obsolete nil "28.1")) (mark t))
 
 (provide 'tcl)
 

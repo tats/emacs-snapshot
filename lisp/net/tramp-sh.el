@@ -2809,7 +2809,7 @@ implementation will be used."
 	    (signal 'wrong-type-argument (list #'stringp name)))
 	  (unless (or (null buffer) (bufferp buffer) (stringp buffer))
 	    (signal 'wrong-type-argument (list #'stringp buffer)))
-	  (unless (consp command)
+	  (unless (or (null command) (consp command))
 	    (signal 'wrong-type-argument (list #'consp command)))
 	  (unless (or (null coding)
 		      (and (symbolp coding) (memq coding coding-system-list))
@@ -2850,8 +2850,10 @@ implementation will be used."
 		 ;; command.
 		 (heredoc (and (stringp program)
 			       (string-match-p "sh$" program)
+			       (= (length args) 2)
 			       (string-equal "-c" (car args))
-			       (= (length args) 2)))
+			       ;; Don't if there is a string.
+			       (not (string-match-p "'\\|\"" (cadr args)))))
 		 ;; When PROGRAM is nil, we just provide a tty.
 		 (args (if (not heredoc) args
 			 (let ((i 250))
