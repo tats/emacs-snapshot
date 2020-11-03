@@ -480,7 +480,7 @@ The string is used in `tramp-methods'.")
 ;; HP-UX: /usr/bin:/usr/ccs/bin:/opt/ansic/bin:/opt/langtools/bin:/opt/fortran/bin
 ;; Solaris: /usr/xpg4/bin:/usr/ccs/bin:/usr/bin:/opt/SUNWspro/bin
 ;; GNU/Linux (Debian, Suse, RHEL): /bin:/usr/bin
-;; FreeBSD: /usr/bin:/bin:/usr/sbin:/sbin: - beware trailing ":"!
+;; FreeBSD, DragonFly: /usr/bin:/bin:/usr/sbin:/sbin: - beware trailing ":"!
 ;; Darwin: /usr/bin:/bin:/usr/sbin:/sbin
 ;; IRIX64: /usr/bin
 ;; QNAP QTS: ---
@@ -1703,7 +1703,7 @@ ID-FORMAT valid values are `string' and `integer'."
 ;; Directory listings.
 
 (defun tramp-sh-handle-directory-files-and-attributes
-  (directory &optional full match nosort id-format)
+  (directory &optional full match nosort id-format count)
   "Like `directory-files-and-attributes' for Tramp files."
   (unless id-format (setq id-format 'integer))
   (unless (file-exists-p directory)
@@ -1743,8 +1743,9 @@ ID-FORMAT valid values are `string' and `integer'."
 	    (sort result (lambda (x y) (string< (car x) (car y)))))
 	  ;; The scripts could fail, for example with huge file size.
 	  (tramp-handle-directory-files-and-attributes
-	   directory full match nosort id-format)))))
+	   directory full match nosort id-format count)))))
 
+;; FIXME: Fix function to work with count parameter.
 (defun tramp-do-directory-files-and-attributes-with-perl
   (vec localname &optional id-format)
   "Implement `directory-files-and-attributes' for Tramp files using a Perl script."
@@ -1760,6 +1761,7 @@ ID-FORMAT valid values are `string' and `integer'."
     (when (stringp object) (tramp-error vec 'file-error object))
     object))
 
+;; FIXME: Fix function to work with count parameter.
 (defun tramp-do-directory-files-and-attributes-with-stat
   (vec localname &optional id-format)
   "Implement `directory-files-and-attributes' for Tramp files using stat(1) command."
@@ -2523,13 +2525,10 @@ The method used must be an out-of-band method."
 
 (defun tramp-sh-handle-delete-directory (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
-  (setq directory (expand-file-name directory))
-  (with-parsed-tramp-file-name directory nil
-    (tramp-flush-directory-properties v localname)
+  (tramp-skeleton-delete-directory directory recursive trash
     (tramp-barf-unless-okay
      v (format "cd / && %s %s"
-	       (or (and trash (tramp-get-remote-trash v))
-		   (if recursive "rm -rf" "rmdir"))
+               (if recursive "rm -rf" "rmdir")
 	       (tramp-shell-quote-argument localname))
      "Couldn't delete %s" directory)))
 
@@ -2538,11 +2537,11 @@ The method used must be an out-of-band method."
   (setq filename (expand-file-name filename))
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
-    (tramp-barf-unless-okay
-     v (format "%s %s"
-	       (or (and trash (tramp-get-remote-trash v)) "rm -f")
-	       (tramp-shell-quote-argument localname))
-     "Couldn't delete %s" filename)))
+    (if (and delete-by-moving-to-trash trash)
+	(move-file-to-trash filename)
+      (tramp-barf-unless-okay
+       v (format "rm -f %s" (tramp-shell-quote-argument localname))
+       "Couldn't delete %s" filename))))
 
 ;; Dired.
 
@@ -4388,7 +4387,7 @@ process to set up.  VEC specifies the connection."
        (t
 	(tramp-message
 	 vec 5 "Checking remote host type for `send-process-string' bug")
-	(if (string-match-p "^FreeBSD" uname) 500 0))))
+	(if (string-match-p "FreeBSD\\|DragonFly" uname) 500 0))))
 
     ;; Set remote PATH variable.
     (tramp-set-remote-path vec)
@@ -4415,7 +4414,7 @@ process to set up.  VEC specifies the connection."
       (tramp-send-command vec "set +H" t))
 
     ;; Disable tab expansion.
-    (if (string-match-p "BSD\\|Darwin" uname)
+    (if (string-match-p "BSD\\|DragonFly\\|Darwin" uname)
 	(tramp-send-command vec "stty tabs" t)
       (tramp-send-command vec "stty tab0" t))
 

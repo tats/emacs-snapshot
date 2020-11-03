@@ -386,6 +386,21 @@ Call `tcl-set-font-lock-keywords' after changing this list.")
 Default list includes some TclX keywords.
 Call `tcl-set-font-lock-keywords' after changing this list.")
 
+(defvar tcl-builtin-list
+  '("after" "append" "array" "bgerror" "binary" "catch" "cd" "clock"
+    "close" "concat" "console" "dde" "encoding" "eof" "exec" "expr"
+    "fblocked" "fconfigure" "fcopy" "file" "fileevent" "flush"
+    "format" "gets" "glob" "history" "incr" "info" "interp" "join"
+    "lappend" "lindex" "linsert" "list" "llength" "load" "lrange"
+    "lreplace" "lsort" "namespace" "open" "package" "pid" "puts" "pwd"
+    "read" "regexp" "registry" "regsub" "rename" "scan" "seek" "set"
+    "socket" "source" "split" "string" "subst" "tell" "time" "trace"
+    "unknown" "unset" "vwait")
+  "List of Tcl commands.  Used only for highlighting.
+Call `tcl-set-font-lock-keywords' after changing this list.
+This list excludes those commands already found in `tcl-proc-list' and
+`tcl-keyword-list'.")
+
 (defvar tcl-font-lock-keywords nil
   "Keywords to highlight for Tcl.  See variable `font-lock-keywords'.
 This variable is generally set from `tcl-proc-regexp',
@@ -393,29 +408,64 @@ This variable is generally set from `tcl-proc-regexp',
 `tcl-set-font-lock-keywords'.")
 
 (eval-and-compile
-  (defvar tcl-builtin-list
-    '("after" "append" "array" "bgerror" "binary" "catch" "cd" "clock"
-      "close" "concat" "console" "dde" "encoding" "eof" "exec" "expr"
-      "fblocked" "fconfigure" "fcopy" "file" "fileevent" "flush"
-      "format" "gets" "glob" "history" "incr" "info" "interp" "join"
-      "lappend" "lindex" "linsert" "list" "llength" "load" "lrange"
-      "lreplace" "lsort" "namespace" "open" "package" "pid" "puts" "pwd"
-      "read" "regexp" "registry" "regsub" "rename" "scan" "seek" "set"
-      "socket" "source" "split" "string" "subst" "tell" "time" "trace"
-      "unknown" "unset" "vwait")
-    "List of Tcl commands.  Used only for highlighting.
-Call `tcl-set-font-lock-keywords' after changing this list.
-This list excludes those commands already found in `tcl-proc-list' and
-`tcl-keyword-list'.")
+  (defconst tcl--word-delimiters "[;{ \t\n"))
 
-  (defconst tcl-syntax-propertize-function
-    (syntax-propertize-rules
-     ;; Mark the few `#' that are not comment-markers.
-     ("[^;[{ \t\n][ \t]*\\(#\\)" (1 "."))
-     ((concat "\\_<" (regexp-opt tcl-builtin-list t)
-              "\\_>" "\s*{\\([^}].*\\)}")
-      (2 "_")))
-    "Syntactic keywords for `tcl-mode'."))
+(defun tcl--syntax-of-quote (pos)
+  "Decide whether a double quote opens a string or not."
+  ;; This is pretty tricky, because strings can be written as "..."
+  ;; or as {...} or without any quoting at all for some simple and not so
+  ;; simple cases (e.g. `abc' but also `a"b').  To make things more
+  ;; interesting, code is represented as strings, so the content of
+  ;; strings can be later re-lexed to find nested strings.
+  (save-excursion
+    (let ((ppss (syntax-ppss pos)))
+      (cond
+       ((nth 8 ppss) nil) ;; Within a string or a comment.
+       ((not (memq (char-before pos)
+                   (cons nil
+                         (eval-when-compile
+                           (mapcar #'identity tcl--word-delimiters)))))
+        ;; The double quote appears within some other lexical entity.
+        ;; FIXME: Similar treatment should be used for `{' which can appear
+        ;; within non-delimited strings (but only at top-level, so
+        ;; maybe it's not worth worrying about).
+        (string-to-syntax "."))
+       ((zerop (nth 0 ppss))
+        ;; Not within a { ... }, so can't be truncated by a }.
+        ;; FIXME: The syntax-table also considers () and [] as paren
+        ;; delimiters just like {}, even though Tcl treats them differently.
+        ;; Tho I'm not sure it's worth worrying about, either.
+        nil)
+       (t
+        ;; A double quote within a {...}: leave it as a normal string
+        ;; delimiter only if we don't find a closing } before we
+        ;; find a closing ".
+        (let ((type nil)
+              (depth 0))
+          (forward-char 1)
+          (while (and (not type)
+                      (re-search-forward "[\"{}\\]" nil t))
+            (pcase (char-after (match-beginning 0))
+              (?\\ (forward-char 1))
+              (?\" (setq type 'matched))
+              (?\{ (cl-incf depth))
+              (?\} (if (zerop depth) (setq type 'unmatched)
+                     (cl-incf depth)))))
+          (when (> (line-beginning-position) pos)
+            ;; The quote is not on the same line as the deciding
+            ;; factor, so make sure we revisit this choice later.
+            (put-text-property pos (point) 'syntax-multiline t))
+          (when (eq type 'unmatched)
+            ;; The quote has no matching close because a } closes the
+            ;; surrounding string before, so it doesn't really "open a string".
+            (string-to-syntax "."))))))))
+
+(defconst tcl-syntax-propertize-function
+  (syntax-propertize-rules
+   ;; Mark the few `#' that are not comment-markers.
+   ((concat "[^" tcl--word-delimiters "][ \t]*\\(#\\)") (1 "."))
+   ("\"" (0 (tcl--syntax-of-quote (match-beginning 0)))))
+  "Syntactic keywords for `tcl-mode'.")
 
 ;; FIXME need some way to recognize variables because array refs look
 ;; like 2 sexps.
@@ -510,7 +560,6 @@ Uses variables `tcl-proc-regexp' and `tcl-keyword-list'."
          ;; number of "namespace::" qualifiers.  A leading "::" refers
          ;; to the global namespace.
          '("\\${\\([^}]+\\)}" 1 font-lock-variable-name-face)
-         '("{\\([^}]+\\)}" 1 font-lock-string-face)
          '("\\$\\(\\(?:::\\)?\\(?:[[:alnum:]_]+::\\)*[[:alnum:]_]+\\)"
            1 font-lock-variable-name-face)
          '("\\(?:\\s-\\|^\\|\\[\\)set\\s-+{\\([^}]+\\)}"
@@ -598,6 +647,8 @@ already exist."
        '(tcl-font-lock-keywords nil nil nil beginning-of-defun))
   (set (make-local-variable 'syntax-propertize-function)
        tcl-syntax-propertize-function)
+  (add-hook 'syntax-propertize-extend-region-functions
+            #'syntax-propertize-multiline 'append 'local)
 
   (set (make-local-variable 'imenu-generic-expression)
        tcl-imenu-generic-expression)

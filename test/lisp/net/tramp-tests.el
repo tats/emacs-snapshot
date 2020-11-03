@@ -4,18 +4,20 @@
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
-;; This program is free software: you can redistribute it and/or
+;; This file is part of GNU Emacs.
+;;
+;; GNU Emacs is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
 ;; published by the Free Software Foundation, either version 3 of the
 ;; License, or (at your option) any later version.
 ;;
-;; This program is distributed in the hope that it will be useful, but
+;; GNU Emacs is distributed in the hope that it will be useful, but
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;; General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `https://www.gnu.org/licenses/'.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -2264,7 +2266,24 @@ This checks also `file-name-as-directory', `file-name-directory',
       (write-region "foo" nil tmp-name)
       (should (file-exists-p tmp-name))
       (delete-file tmp-name)
-      (should-not (file-exists-p tmp-name)))))
+      (should-not (file-exists-p tmp-name))
+
+      ;; Trashing files doesn't work for crypted remote files.
+      (unless (tramp--test-crypt-p)
+	(let ((trash-directory (tramp--test-make-temp-name 'local quoted))
+	      (delete-by-moving-to-trash t))
+	  (make-directory trash-directory)
+	  (should-not (file-exists-p tmp-name))
+	  (write-region "foo" nil tmp-name)
+	  (should (file-exists-p tmp-name))
+	  (delete-file tmp-name 'trash)
+	  (should-not (file-exists-p tmp-name))
+	  (should
+	   (file-exists-p
+	    (expand-file-name
+	     (file-name-nondirectory tmp-name) trash-directory)))
+	  (delete-directory trash-directory 'recursive)
+	  (should-not (file-exists-p trash-directory)))))))
 
 (ert-deftest tramp-test08-file-local-copy ()
   "Check `file-local-copy'."
@@ -2429,7 +2448,7 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (should-error
 	       (cl-letf (((symbol-function #'y-or-n-p) #'ignore)
 			 ;; Ange-FTP.
-			 ((symbol-function 'yes-or-no-p) 'ignore))
+			 ((symbol-function #'yes-or-no-p) #'ignore))
 		 (write-region "foo" nil tmp-name nil nil nil 'mustbenew))
                :type 'file-already-exists)
 	      (should-error
@@ -2761,7 +2780,52 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
        (delete-directory tmp-name1)
        :type 'file-error)
       (delete-directory tmp-name1 'recursive)
-      (should-not (file-directory-p tmp-name1)))))
+      (should-not (file-directory-p tmp-name1))
+
+      ;; Trashing directories works only since Emacs 27.1.  It doesn't
+      ;; work for crypted remote directories.
+      (when (and (not (tramp--test-crypt-p)) (tramp--test-emacs27-p))
+	(let ((trash-directory (tramp--test-make-temp-name 'local quoted))
+	      (delete-by-moving-to-trash t))
+	  (make-directory trash-directory)
+	  ;; Delete empty directory.
+	  (make-directory tmp-name1)
+	  (should (file-directory-p tmp-name1))
+	  (delete-directory tmp-name1 nil 'trash)
+	  (should-not (file-directory-p tmp-name1))
+	  (should
+	   (file-exists-p
+	    (expand-file-name
+	     (file-name-nondirectory tmp-name1) trash-directory)))
+	  (delete-directory trash-directory 'recursive)
+	  (should-not (file-exists-p trash-directory))
+	  ;; Delete non-empty directory.
+	  (make-directory tmp-name1)
+	  (should (file-directory-p tmp-name1))
+	  (write-region "foo" nil (expand-file-name "bla" tmp-name1))
+	  (should (file-exists-p (expand-file-name "bla" tmp-name1)))
+	  (make-directory tmp-name2)
+	  (should (file-directory-p tmp-name2))
+	  (write-region "foo" nil (expand-file-name "bla" tmp-name2))
+	  (should (file-exists-p (expand-file-name "bla" tmp-name2)))
+	  (should-error
+	   (delete-directory tmp-name1 nil 'trash)
+	   ;; tramp-rclone.el calls the local `delete-directory'.
+	   ;; This raises another error.
+	   :type (if (tramp--test-rclone-p) 'error 'file-error))
+	  (delete-directory tmp-name1 'recursive 'trash)
+	  (should-not (file-directory-p tmp-name1))
+	  (should
+	   (file-exists-p
+	    (format
+	     "%s/%s/bla" trash-directory (file-name-nondirectory tmp-name1))))
+	  (should
+	   (file-exists-p
+	    (format
+	     "%s/%s/%s/bla" trash-directory (file-name-nondirectory tmp-name1)
+	     (file-name-nondirectory tmp-name2))))
+	  (delete-directory trash-directory 'recursive)
+	  (should-not (file-exists-p trash-directory)))))))
 
 (ert-deftest tramp-test15-copy-directory ()
   "Check `copy-directory'."

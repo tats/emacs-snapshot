@@ -25,6 +25,7 @@
 ;;; Code:
 
 (require 'seq)
+(require 'text-property-search)
 (eval-when-compile (require 'cl-lib))
 
 (defgroup shortdoc nil
@@ -625,15 +626,6 @@ There can be any number of :example/:result elements."
    :eval (replace-regexp-in-string "[a-z]+" "_" "*foo*"))
   (string-match-p
    :eval (string-match-p "^[fo]+" "foobar"))
-  (match-string
-   :eval (and (string-match "^\\([fo]+\\)b" "foobar")
-              (match-string 0 "foobar")))
-  (match-beginning
-   :no-eval (match-beginning 1)
-   :eg-result 0)
-  (match-end
-   :no-eval (match-end 1)
-   :eg-result 3)
   "Looking in Buffers"
   (re-search-forward
    :no-eval (re-search-forward "^foo$" nil t)
@@ -644,6 +636,18 @@ There can be any number of :example/:result elements."
   (looking-at-p
    :no-eval (looking-at "f[0-9]")
    :eg-result t)
+  "Match Data"
+  (match-string
+   :eval (and (string-match "^\\([fo]+\\)b" "foobar")
+              (match-string 0 "foobar")))
+  (match-beginning
+   :no-eval (match-beginning 1)
+   :eg-result 0)
+  (match-end
+   :no-eval (match-end 1)
+   :eg-result 3)
+  (save-match-data
+    :no-eval (save-match-data ...))
   "Replacing Match"
   (replace-match
    :no-eval (replace-match "new")
@@ -659,7 +663,28 @@ There can be any number of :example/:result elements."
   (regexp-opt-depth
    :eval (regexp-opt-depth "\\(a\\(b\\)\\)"))
   (regexp-opt-charset
-   :eval (regexp-opt-charset '(?a ?b ?c ?d ?e))))
+   :eval (regexp-opt-charset '(?a ?b ?c ?d ?e)))
+  "The `rx' Structured Regexp Notation"
+  (rx
+   :eval (rx "IP=" (+ digit) (= 3 "." (+ digit))))
+  (rx-to-string
+   :eval (rx-to-string '(| "foo" "bar")))
+  (rx-define
+   :no-eval "(and (rx-define haskell-comment (seq \"--\" (zero-or-more nonl)))
+       (rx haskell-comment))"
+   :result "--.*")
+  (rx-let
+   :eval "(rx-let ((comma-separated (item) (seq item (0+ \",\" item)))
+           (number (1+ digit))
+           (numbers (comma-separated number)))
+    (rx \"(\" numbers \")\"))"
+   :result "([[:digit:]]+\\(?:,[[:digit:]]+\\)*)")
+  (rx-let-eval
+   :eval "(rx-let-eval
+      '((ponder (x) (seq \"Where have all the \" x \" gone?\")))
+    (rx-to-string
+     '(ponder (or \"flowers\" \"cars\" \"socks\"))))"
+   :result "\\(?:Where have all the \\(?:\\(?:car\\|flower\\|sock\\)s\\) gone\\?\\)"))
 
 (define-short-documentation-group sequence
   "Sequence Predicates"
@@ -1041,7 +1066,7 @@ There can be any number of :example/:result elements."
   (let ((inhibit-read-only t)
         (prev nil))
     (erase-buffer)
-    (special-mode)
+    (shortdoc-mode)
     (button-mode)
     (mapc
      (lambda (data)
@@ -1051,8 +1076,9 @@ There can be any number of :example/:result elements."
          (unless (bobp)
            (insert "\n"))
          (insert (propertize
-                  (concat data "\n\n")
-                  'face '(variable-pitch (:height 1.3 :weight bold)))))
+                  (concat (substitute-command-keys data) "\n\n")
+                  'face '(variable-pitch (:height 1.3 :weight bold))
+                  'shortdoc-section t)))
         ;; There may be functions not yet defined in the data.
         ((fboundp (car data))
          (when prev
@@ -1067,7 +1093,8 @@ There can be any number of :example/:result elements."
         (start-section (point))
         arglist-start)
     ;; Function calling convention.
-    (insert "(")
+    (insert (propertize "("
+                        'shortdoc-function t))
     (if (plist-get data :no-manual)
         (insert (symbol-name function))
       (insert-text-button
@@ -1176,6 +1203,51 @@ Example:
                   (not (stringp (cadr slist))))
         (setq slist (cdr slist)))
       (setcdr slist (cons elem (cdr slist))))))
+
+(defvar shortdoc-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "n") 'shortdoc-next)
+    (define-key map (kbd "p") 'shortdoc-previous)
+    (define-key map (kbd "C-c C-n") 'shortdoc-next-section)
+    (define-key map (kbd "C-c C-p") 'shortdoc-previous-section)
+    map)
+  "Keymap for `shortdoc-mode'")
+
+(define-derived-mode shortdoc-mode special-mode "shortdoc"
+  "Mode for shortdoc.")
+
+(defmacro shortdoc--goto-section (arg sym &optional reverse)
+  `(progn
+     (unless (natnump ,arg)
+       (setq ,arg 1))
+     (while (< 0 ,arg)
+       (,(if reverse
+             'text-property-search-backward
+           'text-property-search-forward)
+        ,sym t)
+       (setq ,arg (1- ,arg)))))
+
+(defun shortdoc-next (&optional arg)
+  "Move cursor to next function."
+  (interactive "p")
+  (shortdoc--goto-section arg 'shortdoc-function))
+
+(defun shortdoc-previous (&optional arg)
+  "Move cursor to previous function."
+  (interactive "p")
+  (shortdoc--goto-section arg 'shortdoc-function t)
+  (backward-char 1))
+
+(defun shortdoc-next-section (&optional arg)
+  "Move cursor to next section."
+  (interactive "p")
+  (shortdoc--goto-section arg 'shortdoc-section))
+
+(defun shortdoc-previous-section (&optional arg)
+  "Move cursor to previous section."
+  (interactive "p")
+  (shortdoc--goto-section arg 'shortdoc-section t)
+  (forward-line -2))
 
 (provide 'shortdoc)
 
