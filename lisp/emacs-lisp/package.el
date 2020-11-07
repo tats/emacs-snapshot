@@ -963,7 +963,11 @@ untar into a directory named DIR; otherwise, signal an error."
       (write-region
        (concat
         ";;; Generated package description from "
-        (replace-regexp-in-string "-pkg\\.el\\'" ".el" pkg-file)
+        (replace-regexp-in-string ;; just the final y.el or x/y.el
+         "^.*?\\([^/]+/\\)?\\([^/]+\\)$" "\\1\\2"
+         (replace-regexp-in-string
+          "/+" "/"
+          (replace-regexp-in-string "-pkg\\.el\\'" ".el" pkg-file)))
         "  -*- no-byte-compile: t -*-\n"
         (prin1-to-string
          (nconc
