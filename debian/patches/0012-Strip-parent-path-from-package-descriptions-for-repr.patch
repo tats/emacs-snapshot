@@ -1,0 +1,34 @@
+From a64353ba297f114e47c5e22d4a522d95bd400b58 Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sat, 7 Nov 2020 15:05:52 -0600
+Subject: Strip parent path from package descriptions for reproducibility
+
+Previously, the package description would include the full build tree
+path which varies.  Instead, remove any duplicate slashes and any
+components other than the immediate parent.
+
+Thanks to Chris Lamb for reporting the problem and tracking down the
+cause.
+
+Bug-Debian: https://bugs.debian.org/972861
+---
+ lisp/emacs-lisp/package.el | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/lisp/emacs-lisp/package.el b/lisp/emacs-lisp/package.el
+index 7d6be3cf4e2..60561fdb678 100644
+--- a/lisp/emacs-lisp/package.el
++++ b/lisp/emacs-lisp/package.el
+@@ -963,7 +963,11 @@ package-generate-description-file
+       (write-region
+        (concat
+         ";;; Generated package description from "
+-        (replace-regexp-in-string "-pkg\\.el\\'" ".el" pkg-file)
++        (replace-regexp-in-string ;; just the final y.el or x/y.el
++         "^.*?\\([^/]+/\\)?\\([^/]+\\)$" "\\1\\2"
++         (replace-regexp-in-string
++          "/+" "/"
++          (replace-regexp-in-string "-pkg\\.el\\'" ".el" pkg-file)))
+         "  -*- no-byte-compile: t -*-\n"
+         (prin1-to-string
+          (nconc
