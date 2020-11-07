@@ -10,3 +10,4 @@
 0010-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
 0011-emacs-module-tests-fix-VPATH-builds.patch
 0012-Strip-parent-path-from-package-descriptions-for-repr.patch
+0013-Recover-the-contents-of-the-schemas.xml-file.patch

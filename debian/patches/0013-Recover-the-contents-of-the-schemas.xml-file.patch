@@ -1,0 +1,85 @@
+From d1c7856ed466f639a9496c05a64d1b9f3af88c80 Mon Sep 17 00:00:00 2001
+From: Yasuhiro KIMURA <yasu@utahime.org>
+Date: Sun, 1 Nov 2020 14:01:31 +0100
+Subject: Recover the contents of the schemas.xml file
+
+* etc/schema/schemas.xml: Recover the file, which was apparently
+(mostly) removed by mistake by commit 165f738382 (bug#42851).
+
+Copyright-paperwork-exempt: yes
+Bug: https://debbugs.gnu.org/42851
+Bug-Debian: https://bugs.debian.org/973633
+---
+ etc/schema/schemas.xml | 58 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+
+diff --git a/etc/schema/schemas.xml b/etc/schema/schemas.xml
+index f1e0ed7856f..40175b056b1 100644
+--- a/etc/schema/schemas.xml
++++ b/etc/schema/schemas.xml
+@@ -1,7 +1,65 @@
+ <?xml version="1.0"?>
++<!-- Copyright (C) 2003-2004, 2007-2020 Free Software Foundation, Inc.
++
++This file is part of GNU Emacs.
++
++GNU Emacs is free software: you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++GNU Emacs is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>. -->
++
+ <locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
++  <transformURI fromPattern="*.xml" toPattern="*.rnc"/>
++
++  <uri pattern="*.xsl" typeId="XSLT"/>
++  <uri pattern="*.html" typeId="XHTML"/>
++  <uri pattern="*.rng" typeId="RELAX NG"/>
++  <uri pattern="*.rdf" typeId="RDF"/>
++  <uri pattern="*.dbk" typeId="DocBook"/>
++
++  <namespace ns="http://www.w3.org/1999/XSL/Transform" typeId="XSLT"/>
++  <namespace ns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" typeId="RDF"/>
++  <namespace ns="http://www.w3.org/1999/xhtml" typeId="XHTML"/>
++  <namespace ns="http://relaxng.org/ns/structure/1.0" typeId="RELAX NG"/>
++  <namespace ns="http://thaiopensource.com/ns/locating-rules/1.0"
++	     uri="locate.rnc"/>
++
++  <documentElement localName="stylesheet" typeId="XSLT"/>
++  <documentElement prefix="xsl" localName="transform" typeId="XSLT"/>
++
++  <documentElement localName="html" typeId="XHTML"/>
++
++  <documentElement localName="grammar" typeId="RELAX NG"/>
++
++  <documentElement prefix="" localName="article" typeId="DocBook"/>
++  <documentElement prefix="" localName="book" typeId="DocBook"/>
++  <documentElement prefix="" localName="chapter" typeId="DocBook"/>
++  <documentElement prefix="" localName="part" typeId="DocBook"/>
++  <documentElement prefix="" localName="refentry" typeId="DocBook"/>
++  <documentElement prefix="" localName="section" typeId="DocBook"/>
++
++  <documentElement localName="RDF" typeId="RDF"/>
++  <documentElement prefix="rdf" typeId="RDF"/>
++
++  <documentElement localName="locatingRules" uri="locate.rnc"/>
++
++  <typeId id="XSLT" uri="xslt.rnc"/>
++  <typeId id="RELAX NG" uri="relaxng.rnc"/>
++  <typeId id="XHTML" uri="xhtml.rnc"/>
++  <typeId id="DocBook" uri="docbook.rnc"/>
++  <typeId id="RDF" uri="rdfxml.rnc"/>
++
+   <documentElement prefix="office" typeId="OpenDocument"/>
+   <documentElement prefix="manifest" localName="manifest" typeId="OpenDocument Manifest"/>
+   <typeId id="OpenDocument" uri="od-schema-v1.2-os.rnc"/>
+   <typeId id="OpenDocument Manifest" uri="od-manifest-schema-v1.2-os.rnc"/>
++
+ </locatingRules>
