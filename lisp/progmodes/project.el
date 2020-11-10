@@ -301,8 +301,8 @@ to find the list of ignores for each directory."
                                        (split-string files)
                                        (concat " -o " find-name-arg " "))
                                       " "
-                                      (shell-quote-argument ")"))"")
-                          )))
+                                      (shell-quote-argument ")"))
+                            ""))))
     (project--remote-file-names
      (sort (split-string (shell-command-to-string command) "\0" t)
            #'string<))))
@@ -1160,7 +1160,9 @@ With some possible metadata (to be decided).")
   (let ((filename project-list-file))
     (with-temp-buffer
       (insert ";;; -*- lisp-data -*-\n")
-      (pp project--list (current-buffer))
+      (let ((print-length nil)
+            (print-level nil))
+        (pp project--list (current-buffer)))
       (write-region nil nil filename nil 'silent))))
 
 ;;;###autoload

@@ -89,6 +89,18 @@ useful on systems such as FreeBSD which ships only with "etc/termcap".
 This is controlled by the new variable 'scroll-minibuffer-conservatively'.
 
 +++
+** Improved handling of minibuffers on switching frames.
+By default, when you switch to another frame, an active minibuffer now
+moves to the newly selected frame.  Nevertheless, the effect of what
+you type in the minibuffer happens in the frame where the minibuffer
+was first activated, even if it moved to another frame.  An
+alternative behavior is available by customizing
+'minibuffer-follows-selected-frame' to nil.  Here, the minibuffer
+stays in the frame where you first opened it, and you must switch back
+to this frame to continue or abort its command.  The old, somewhat
+unsystematic behavior, which mixed these two is no longer available.
+
++++
 ** New system for displaying documentation for groups of functions.
 This can either be used by saying 'M-x shortdoc-display-group' and
 choosing a group, or clicking a button in the *Help* buffers when
@@ -148,7 +160,9 @@ displays.)
 
 +++
 ** Mouse wheel scrolling with Shift modifier now scrolls horizontally.
-This works in text buffers and over images.
+This works in text buffers and over images.  Typing a numeric prefix arg
+(e.g. 'M-5') before starting horizontal scrolling changes its step value.
+The value is saved in the user option 'mouse-wheel-scroll-amount-horizontal'.
 
 ---
 ** The default value of 'frame-title-format' and 'icon-title-format' has changed.
@@ -422,6 +436,11 @@ their 'default-directory' under VC.
 *** New command 'vc-dir-root' uses the root directory without asking.
 
 ---
+*** New face 'log-view-commit-body'.
+This is used when expanding commit messages from 'vc-print-root-log'
+and similar commands.
+
+---
 *** The responsible VC backend is now the most specific one.
 'vc-responsible-backend' loops over the backends in
 'vc-handled-backends' to determine which backend is responsible for a
@@ -452,7 +471,13 @@ tags to be considered as well.
 ** Gnus
 
 +++
-*** New value for user option 'smiley-style'.
+*** New gnus-search library
+A new unified search syntax which can be used across multiple
+supported search engines.  Set 'gnus-search-use-parsed-queries' to
+non-nil to enable.
+
++++
+*** New value for user option 'smiley-style'
 Smileys can now be rendered with emojis instead of small images when
 using the new 'emoji' value in 'smiley-style'.
 
@@ -632,6 +657,8 @@ transient input method (which can be different from the input method
 enabled by 'C-\').  For example, 'C-u C-x \ compose RET' selects the
 'compose' input method; then typing 'C-x \ 1 2' will insert the
 character '½', and disable the 'compose' input method afterwards.
+You can use 'C-x \' in incremental search to insert a single character
+to the search string.
 
 ---
 *** New input method 'compose' based on X Multi_key sequences.
@@ -832,6 +859,11 @@ GDB-Windows'.
 Now GDB only uses one source window to display source file by default.
 Customize 'gdb-max-source-window-count' to use more than one window.
 Control source file display by 'gdb-display-source-buffer-action'.
+
++++
+*** The default value of gdb-mi-decode-strings is now t.
+This means that the default coding-system is now used to decode strings
+and source file names from GDB.
 
 ** Gravatar
 
@@ -1689,12 +1721,6 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 
 * Lisp Changes in Emacs 28.1
 
-** New variable 'integer-output-format' determines how to print integer values.
-When this variable is bound to the value 't', integers are printed by
-printing functions as characters when an integer represents a character.
-When bound to the number 16, non-negative integers are printed in the
-hexadecimal format.
-
 +++
 ** 'define-globalized-minor-mode' now takes a ':predicate' parameter.
 This can be used to control which major modes the minor mode should be
@@ -1887,6 +1913,11 @@ file can affect code in another.  For details, see the manual section
 'replace-regexp-in-string', 'catch', 'throw', 'error', 'signal'
 and 'play-sound-file'.
 
++++
+** New variable 'print-integers-as-characters' modifies integer printing.
+If this variable is non-nil, character syntax is used for printing
+numbers when this makes sense, such as '?A' for 65.
+
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
 
@@ -1930,6 +1961,11 @@ image API via 'M-x report-emacs-bug'.
 
 ---
 ** The user option 'make-pointer-invisible' is now honored on macOS.
+
+--
+** On macOS, 's-<left>' and 's-<right>' are now bound to
+'move-beginning-of-line' and 'move-end-of-line' respectively. The commands
+to select previous/next frame are still bound to 's-~' and 's-`'.
 
 
 ----------------------------------------------------------------------

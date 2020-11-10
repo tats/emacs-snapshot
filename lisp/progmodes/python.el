@@ -2921,7 +2921,7 @@ process buffer for a list of commands.)"
          (python-shell-make-comint
           (or cmd (python-shell-calculate-command))
           (python-shell-get-process-name dedicated) show)))
-    (pop-to-buffer buffer)
+    (set-buffer buffer)
     (get-buffer-process buffer)))
 
 (defun run-python-internal ()
@@ -4011,8 +4011,8 @@ Argument OUTPUT is a string with the output from the comint process."
   "Setup pdb tracking in current buffer."
   (make-local-variable 'python-pdbtrack-buffers-to-kill)
   (make-local-variable 'python-pdbtrack-tracked-buffer)
-  (add-to-list (make-local-variable 'comint-input-filter-functions)
-               #'python-pdbtrack-comint-input-filter-function)
+  (add-hook 'comint-input-filter-functions
+            #'python-pdbtrack-comint-input-filter-function nil t)
   (add-to-list (make-local-variable 'comint-output-filter-functions)
                #'python-pdbtrack-comint-output-filter-function)
   (add-function :before (process-sentinel (get-buffer-process (current-buffer)))

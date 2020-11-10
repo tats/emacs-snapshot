@@ -1606,6 +1606,9 @@ or as help on variables `cperl-tips', `cperl-problems',
   (if (cperl-val 'cperl-electric-keywords)
       (abbrev-mode 1))
   (set-syntax-table cperl-mode-syntax-table)
+  ;; Workaround for Bug#30393, needed for Emacs 26.
+  (when (< emacs-major-version 27)
+    (setq-local open-paren-in-column-0-is-defun-start nil))
   ;; Until Emacs is multi-threaded, we do not actually need it local:
   (make-local-variable 'cperl-font-lock-multiline-start)
   (make-local-variable 'cperl-font-locking)
@@ -5980,6 +5983,7 @@ else
      (cperl-continued-brace-offset     .  0)
      (cperl-label-offset               . -2)
      (cperl-continued-statement-offset .  4)
+     (cperl-close-paren-offset         . -4)
      (cperl-extra-newline-before-brace .  nil)
      (cperl-extra-newline-before-brace-multiline .  nil)
      (cperl-merge-trailing-else        .  nil)

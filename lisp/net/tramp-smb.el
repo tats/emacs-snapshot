@@ -704,6 +704,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		    (mapcar (lambda (x) (when (string-match-p match x) x))
 			    result))))
 
+    ;; Sort them if necessary.
+    (unless nosort
+      (setq result (sort result #'string-lessp)))
+
     ;; Return count number of results.
     (when (and (natnump count) (> count 0))
       (setq result (nbutlast result (- (length result) count))))
@@ -714,8 +718,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (mapcar
 	     (lambda (x) (format "%s/%s" (directory-file-name directory) x))
 	     result)))
-    ;; Sort them if necessary.
-    (unless nosort (setq result (sort result #'string-lessp)))
+
     result))
 
 (defun tramp-smb-handle-expand-file-name (name &optional dir)
@@ -2143,8 +2146,7 @@ Removes smb prompt.  Returns nil if an error message has appeared."
     "%s %s"
     tramp-smb-winexe-shell-command tramp-smb-winexe-shell-command-switch))
 
-  (set (make-local-variable 'kill-buffer-hook)
-       '(tramp-smb-kill-winexe-function))
+  (add-hook 'kill-buffer-hook #'tramp-smb-kill-winexe-function nil t)
 
   ;; Suppress "^M".  Shouldn't we specify utf8?
   (set-process-coding-system (tramp-get-connection-process vec) 'raw-text-dos)
