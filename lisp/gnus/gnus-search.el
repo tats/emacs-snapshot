@@ -90,14 +90,18 @@
 
 ;;; Internal Variables:
 
-(defvar gnus-search-memo-query nil
-  "Internal: stores current query.")
-
-(defvar gnus-search-memo-server nil
-  "Internal: stores current server.")
+;; When Gnus servers are implemented as objects or structs, give them
+;; a `search-engine' slot and get rid of this variable.
+(defvar gnus-search-engine-instance-alist nil
+  "Mapping between servers and instantiated search engines.")
 
 (defvar gnus-search-history ()
   "Internal history of Gnus searches.")
+
+(defun gnus-search-shutdown ()
+  (setq gnus-search-engine-instance-alist nil))
+
+(gnus-add-shutdown #'gnus-search-shutdown 'gnus)
 
 (define-error 'gnus-search-parse-error "Gnus search parsing error")
 
@@ -1315,7 +1319,7 @@ filenames, sometimes with additional information.  Returns a list
 of viable results, in the form of a list of [group article score]
 vectors.")
 
-(cl-defgeneric gnus-search-index-extract (engine)
+(cl-defgeneric gnus-search-indexed-extract (engine)
   "Extract a single article result from the current buffer.
 Returns a list of two values: a file name, and a relevancy score.
 Advances point to the beginning of the next result.")
@@ -1970,7 +1974,9 @@ remaining string, then adds all that to the top-level spec."
 (defun gnus-search-server-to-engine (srv)
   (let* ((method (gnus-server-to-method srv))
 	 (engine-config (assoc 'gnus-search-engine (cddr method)))
-	 (server (or (nth 1 engine-config)
+	 (server (or (cdr-safe
+		      (assoc-string srv gnus-search-engine-instance-alist t))
+		     (nth 1 engine-config)
 		     (cdr-safe (assoc (car method) gnus-search-default-engines))
 		     (when-let ((old (assoc 'nnir-search-engine
 					    (cddr method))))
@@ -1994,17 +2000,19 @@ remaining string, then adds all that to the top-level spec."
 	    (make-instance server))
 	   (t nil)))
     (if inst
-	(when (cddr engine-config)
-	  ;; We're not being completely backward-compatible here,
-	  ;; because we're not checking for nnir-specific config
-	  ;; options in the server definition.
-	  (pcase-dolist (`(,key ,value) (cddr engine-config))
-	    (condition-case nil
-		(setf (slot-value inst key) value)
-	      ((invalid-slot-name invalid-slot-type)
-	       (nnheader-message
-		5 "Invalid search engine parameter: (%s %s)"
-		key value)))))
+	(unless (assoc-string srv gnus-search-engine-instance-alist t)
+	  (when (cddr engine-config)
+	    ;; We're not being completely backward-compatible here,
+	    ;; because we're not checking for nnir-specific config
+	    ;; options in the server definition.
+	    (pcase-dolist (`(,key ,value) (cddr engine-config))
+	      (condition-case nil
+		  (setf (slot-value inst key) value)
+		((invalid-slot-name invalid-slot-type)
+		 (nnheader-message
+		  5 "Invalid search engine parameter: (%s %s)"
+		  key value)))))
+	  (push (cons srv inst) gnus-search-engine-instance-alist))
       (error "No search engine defined for %s" srv))
     inst))
 
@@ -2093,9 +2101,10 @@ article came from is also searched."
 (defun gnus-search--complete-key-data ()
   "Potentially return completion data for a search key or value."
   (let* ((key-start (save-excursion
-		      (if (re-search-backward " " (minibuffer-prompt-end) t)
-			  (1+ (point))
-			(minibuffer-prompt-end))))
+		      (or (re-search-backward " " (minibuffer-prompt-end) t)
+			  (goto-char (minibuffer-prompt-end)))
+		      (skip-chars-forward " -")
+		      (point)))
 	 (after-colon (save-excursion
 			(when (re-search-backward ":" key-start t)
 			  (1+ (point)))))
@@ -2105,7 +2114,7 @@ article came from is also searched."
 	;; only handle in a contact-completion context.
 	(when (and gnus-search-contact-tables
 		   (save-excursion
-		     (re-search-backward "\\<\\(\\w+\\):" key-start t)
+		     (re-search-backward "\\<-?\\(\\w+\\):" key-start t)
 		     (member (match-string 1)
 			     '("from" "to" "cc"
 			       "bcc" "recipient" "address"))))
@@ -2118,7 +2127,8 @@ article came from is also searched."
 		  ;; If the value contains spaces, make sure it's
 		  ;; quoted.
 		  (when (and (memql status '(exact finished))
-			     (string-match-p " " str))
+			     (or (string-match-p " " str)
+				 in-string))
 		    (unless (looking-at-p "\\s\"")
 		      (insert "\""))
 		    ;; Unless we already have an opening quote...
