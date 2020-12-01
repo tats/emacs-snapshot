@@ -203,8 +203,8 @@ key is supported."
 (defun filesets-select-command (cmd-list)
   "Select one command from CMD-LIST -- a string with space separated names."
   (let ((this (shell-command-to-string
-	       (format "which --skip-alias %s 2> /dev/null | head -n 1"
-		       cmd-list))))
+	       (format "which --skip-alias %s 2> %s | head -n 1"
+		       cmd-list null-device))))
     (if (equal this "")
 	nil
       (file-name-nondirectory (substring this 0 (- (length this) 1))))))
@@ -1909,7 +1909,7 @@ User will be queried, if no fileset name is provided."
 		       (substring (elt submenu 0) 2))))
     (if (listp submenu)
 	(cons name (cdr submenu))
-      (apply 'vector (list name (cdr (append submenu nil)))))))
+      (apply 'vector (list name (cadr (append submenu nil)))))))
 ;      (vconcat `[,name] (subseq submenu 1)))))
 
 (defun filesets-wrap-submenu (submenu-body)
