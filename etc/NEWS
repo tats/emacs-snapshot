@@ -192,6 +192,11 @@ have been replaced with "chat.freenode.net" throughout Emacs.
 These functions return the connection local value of the respective
 variables.  This can be used for remote hosts.
 
+** Emacs now prints a backtrace when signaling an error in batch mode.  This
+makes debugging Emacs Lisp scripts run in batch mode easier.  If you
+want to disable this behavior, set 'backtrace-on-error-noninteractive'
+to nil.
+
 
 * Editing Changes in Emacs 28.1
 
@@ -281,6 +286,14 @@ the buffer cycles the whole buffer between "only top-level headings",
 
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
+
+** Emacs Server
+
++++
+*** New user option 'server-client-instructions'.
+When emacsclient connects, Emacs will (by default) output a message
+about how to exit the client frame.  If 'server-client-instructions'
+is set to nil, this message is inhibited.
 
 ** Python mode
 
@@ -490,7 +503,7 @@ tags to be considered as well.
 
 +++
 *** New user option 'gnus-paging-select-next'.
-This controls what happens when using commands like `SPC' and `DEL' to
+This controls what happens when using commands like 'SPC' and 'DEL' to
 page the current article.  If non-nil (the default), go to the
 next/prev article, but if nil, do nothing at the end/start of the article.
 
@@ -842,6 +855,12 @@ performance of asynchronous remote processes" node of the Tramp manual
 for details, and also for a discussion or restrictions.  This feature
 is experimental.
 
++++
+*** New user option 'tramp-debug-to-file'.
+When non-nil, this user option instructs Tramp to mirror the debug
+buffer to a file under the "/tmp/" directory.  This is useful, if (in
+rare cases) Tramp blocks Emacs, and we need further debug information.
+
 ** Tempo
 
 ---
@@ -1181,6 +1200,16 @@ project's root directory, respectively.
 So typing 'C-u RET' in the "*xref*" buffer quits its window
 before navigating to the selected location.
 
+*** New options xref-search-program and xref-search-program-alist.
+So far Grep and ripgrep are supported.  ripgrep seems to offer better
+performance in certain cases, in particular for case-insensitive
+searches.
+
++++
+*** New commands 'xref-prev-group' and 'xref-next-group'.
+These commands are bound respectively to 'P' and 'N', and navigate to
+the first item of the previous or next group in the "*xref*" buffer.
+
 ** json.el
 
 ---
@@ -1341,6 +1370,18 @@ This new command (bound to 'C-c C-l') regenerates the current hunk.
 
 ** Miscellaneous
 
+---
+*** Errors in 'kill-emacs-hook' no longer prevent Emacs from shutting down.
+If a function in that hook signals an error in an interactive Emacs,
+the user will be prompted on whether to continue.  If the user doesn't
+answer within five seconds, Emacs will continue shutting down anyway.
+
+---
+*** iso-transl is now preloaded.
+This means that keystrokes like 'Alt-[' are defined by default,
+instead of only becoming available after doing (for instance)
+'C-x 8 <letter>'.
+
 *** New user option 'completions-detailed'.
 When non-nil, some commands like 'describe-symbol' show more detailed
 completions with more information in completion prefix and suffix.
@@ -1349,7 +1390,7 @@ completions with more information in completion prefix and suffix.
 *** User option 'completions-format' supports a new value 'one-column'.
 
 ---
-*** New user option 'bibtex-unify-case-convert'.
+*** New user option 'bibtex-unify-case-function'.
 This new option allows the user to customize how case is converted
 when unifying entries.
 
@@ -1526,7 +1567,7 @@ mouse now pops up a TTY menu by default instead of running the command
 ** text-scale-mode
 
 ---
-*** text-scale-mode can now adjust font size of the header line.
+*** 'text-scale-mode' can now adjust font size of the header line.
 When the new buffer local variable 'text-scale-remap-header-line'
 is non-nil, 'text-scale-adjust' will also scale the text in the header
 line when displaying that buffer.
@@ -1811,8 +1852,10 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 
 * Lisp Changes in Emacs 28.1
 
+** New function `garbage-collect-maybe` to trigger GC early
+
 ---
-** `defvar` detects the error of defining a variable currently lexically bound.
+** 'defvar' detects the error of defining a variable currently lexically bound.
 Such mixes are always signs that the outer lexical binding was an
 error and should have used dynamic binding instead.
 
@@ -1825,7 +1868,7 @@ a prefix string, and a suffix string.
 +++
 ** 'read-char-from-minibuffer' and 'y-or-n-p' support 'help-form'.
 If you bind 'help-form' to a non-nil value while calling these functions,
-then pressing 'C-h' (help-char) causes the function to evaluate 'help-form'
+then pressing 'C-h' ('help-char') causes the function to evaluate 'help-form'
 and display the result.
 
 +++
@@ -2018,7 +2061,7 @@ file can affect code in another.  For details, see the manual section
 "(Elisp) Converting to Lexical Binding".
 
 +++
-** 'byte-recompile-directory' can now compile symlinked .el files.
+** 'byte-recompile-directory' can now compile symlinked ".el" files.
 This is achieved by giving a non-nil FOLLOW-SYMLINKS parameter.
 
 ---

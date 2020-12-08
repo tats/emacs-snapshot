@@ -1155,7 +1155,7 @@ Note: Many newsgroups frown upon nontraditional reply styles.
 You probably want to set this variable only for specific groups,
 e.g. using `gnus-posting-styles':
 
-  (eval (set (make-local-variable \\='message-cite-reply-position) \\='above))"
+  (eval (setq-local message-cite-reply-position \\='above))"
   :version "24.1"
   :type '(choice (const :tag "Reply inline" traditional)
 		 (const :tag "Reply above" above)
@@ -1172,7 +1172,7 @@ Presets to impersonate popular mail agents are found in the
 message-cite-style-* variables.  This variable is intended for
 use in `gnus-posting-styles', such as:
 
-  ((posting-from-work-p) (eval (set (make-local-variable \\='message-cite-style) message-cite-style-outlook)))"
+  ((posting-from-work-p) (eval (setq-local message-cite-style message-cite-style-outlook)))"
   :version "24.1"
   :group 'message-insertion
   :type '(choice (const :tag "Do not override variables" :value nil)
@@ -2090,14 +2090,21 @@ is used by default."
       (goto-char (point-min))
       (looking-at message-unix-mail-delimiter))))
 
-(defun message-fetch-field (header &optional not-all)
-  "The same as `mail-fetch-field', only remove all newlines.
+(defun message-fetch-field (header &optional first)
+  "Return the value of the header field named HEADER.
+Continuation lines are folded (i.e., newlines are removed).
 Surrounding whitespace is also removed.
+
+By default, if there's more than one header field named HEADER,
+all the values are returned as one concatenated string, and
+values are comma-separated.
+
+If FIRST is non-nil, only the first value is returned.
 
 The buffer is expected to be narrowed to just the header of the message;
 see `message-narrow-to-headers-or-head'."
   (let* ((inhibit-point-motion-hooks t)
-	 (value (mail-fetch-field header nil (not not-all))))
+	 (value (mail-fetch-field header nil (not first))))
     (when value
       (while (string-match "\n[\t ]+" value)
 	(setq value (replace-match " " t t value)))
@@ -2105,12 +2112,12 @@ see `message-narrow-to-headers-or-head'."
       ;; we have initial or trailing white space; remove it.
       (string-trim value))))
 
-(defun message-field-value (header &optional not-all)
+(defun message-field-value (header &optional first)
   "The same as `message-fetch-field', only narrow to the headers first."
   (save-excursion
     (save-restriction
       (message-narrow-to-headers-or-head)
-      (message-fetch-field header not-all))))
+      (message-fetch-field header first))))
 
 (defun message-narrow-to-field ()
   "Narrow the buffer to the header on the current line."
@@ -3071,44 +3078,43 @@ See also `message-forbidden-properties'."
 Like `text-mode', but with these additional commands:
 
 \\{message-mode-map}"
-  (set (make-local-variable 'message-reply-buffer) nil)
-  (set (make-local-variable 'message-inserted-headers) nil)
-  (set (make-local-variable 'message-send-actions) nil)
-  (set (make-local-variable 'message-return-action) nil)
-  (set (make-local-variable 'message-exit-actions) nil)
-  (set (make-local-variable 'message-kill-actions) nil)
-  (set (make-local-variable 'message-postpone-actions) nil)
-  (set (make-local-variable 'message-draft-article) nil)
+  (setq-local message-reply-buffer nil)
+  (setq-local message-inserted-headers nil)
+  (setq-local message-send-actions nil)
+  (setq-local message-return-action nil)
+  (setq-local message-exit-actions nil)
+  (setq-local message-kill-actions nil)
+  (setq-local message-postpone-actions nil)
+  (setq-local message-draft-article nil)
   (setq buffer-offer-save t)
-  (set (make-local-variable 'facemenu-add-face-function)
+  (setq-local facemenu-add-face-function
        (lambda (face end)
 	 (let ((face-fun (cdr (assq face message-face-alist))))
 	   (if face-fun
 	       (funcall face-fun (point) end)
 	     (error "Face %s not configured for %s mode" face mode-name)))
 	 ""))
-  (set (make-local-variable 'facemenu-remove-face-function) t)
-  (set (make-local-variable 'message-reply-headers) nil)
+  (setq-local facemenu-remove-face-function t)
+  (setq-local message-reply-headers nil)
   (make-local-variable 'message-newsreader)
   (make-local-variable 'message-mailer)
   (make-local-variable 'message-post-method)
-  (set (make-local-variable 'message-sent-message-via) nil)
-  (set (make-local-variable 'message-checksum) nil)
-  (set (make-local-variable 'message-mime-part) 0)
+  (setq-local message-sent-message-via nil)
+  (setq-local message-checksum nil)
+  (setq-local message-mime-part 0)
   (message-setup-fill-variables)
   (when message-fill-column
     (setq fill-column message-fill-column)
     (turn-on-auto-fill))
   ;; Allow using comment commands to add/remove quoting.
-  ;; (set (make-local-variable 'comment-start) message-yank-prefix)
+  ;; (setq-local comment-start message-yank-prefix)
   (when message-yank-prefix
-    (set (make-local-variable 'comment-start) message-yank-prefix)
-    (set (make-local-variable 'comment-start-skip)
-	 (concat "^" (regexp-quote message-yank-prefix) "[ \t]*")))
-  (set (make-local-variable 'font-lock-defaults)
-       '(message-font-lock-keywords t))
+    (setq-local comment-start message-yank-prefix)
+    (setq-local comment-start-skip
+                (concat "^" (regexp-quote message-yank-prefix) "[ \t]*")))
+  (setq-local font-lock-defaults '(message-font-lock-keywords t))
   (if (boundp 'tool-bar-map)
-      (set (make-local-variable 'tool-bar-map) (message-make-tool-bar)))
+      (setq-local tool-bar-map (message-make-tool-bar)))
   ;; Mmmm... Forbidden properties...
   (add-hook 'after-change-functions #'message-strip-forbidden-properties
 	    nil 'local)
@@ -3127,45 +3133,41 @@ Like `text-mode', but with these additional commands:
     ;; Don't enable multibyte on an indirect buffer.  Maybe enabling
     ;; multibyte is not necessary at all. -- zsh
     (mm-enable-multibyte))
-  (set (make-local-variable 'indent-tabs-mode) nil) ;No tabs for indentation.
+  (setq-local indent-tabs-mode nil) ; No tabs for indentation.
   (mml-mode)
   ;; Syntactic fontification. Helps `show-paren-mode',
   ;; `electric-pair-mode', and C-M-* navigation by syntactically
   ;; excluding citations and other artifacts.
   ;;
-  (set (make-local-variable 'syntax-propertize-function) 'message--syntax-propertize)
-  (set (make-local-variable 'parse-sexp-ignore-comments) t)
+  (setq-local syntax-propertize-function 'message--syntax-propertize)
+  (setq-local parse-sexp-ignore-comments t)
   (setq-local message-encoded-mail-cache nil))
 
 (defun message-setup-fill-variables ()
   "Setup message fill variables."
-  (set (make-local-variable 'fill-paragraph-function)
-       'message-fill-paragraph)
-  (make-local-variable 'paragraph-separate)
-  (make-local-variable 'paragraph-start)
-  (make-local-variable 'adaptive-fill-regexp)
+  (setq-local fill-paragraph-function 'message-fill-paragraph)
   (make-local-variable 'adaptive-fill-first-line-regexp)
   (let ((quote-prefix-regexp
 	 ;; User should change message-cite-prefix-regexp if
 	 ;; message-yank-prefix is set to an abnormal value.
 	 (concat "\\(" message-cite-prefix-regexp "\\)[ \t]*")))
-    (setq paragraph-start
-	  (concat
-	   (regexp-quote mail-header-separator) "$\\|"
-	   "[ \t]*$\\|"			; blank lines
-	   "-- $\\|"			; signature delimiter
-	   "---+$\\|"		   ; delimiters for forwarded messages
-	   page-delimiter "$\\|"	; spoiler warnings
-	   ".*wrote:$\\|"		; attribution lines
-	   quote-prefix-regexp "$\\|"	; empty lines in quoted text
-					; mml tags
-	   "<#!*/?\\(multipart\\|part\\|external\\|mml\\|secure\\)"))
-    (setq paragraph-separate paragraph-start)
-    (setq adaptive-fill-regexp
-	  (concat quote-prefix-regexp "\\|" adaptive-fill-regexp))
-    (setq adaptive-fill-first-line-regexp
-	  (concat quote-prefix-regexp "\\|"
-		  adaptive-fill-first-line-regexp)))
+    (setq-local paragraph-start
+                (concat
+                 (regexp-quote mail-header-separator) "$\\|"
+                 "[ \t]*$\\|"			; blank lines
+                 "-- $\\|"			; signature delimiter
+                 "---+$\\|"		   ; delimiters for forwarded messages
+                 page-delimiter "$\\|"	; spoiler warnings
+                 ".*wrote:$\\|"		; attribution lines
+                 quote-prefix-regexp "$\\|"	; empty lines in quoted text
+                                        ; mml tags
+                 "<#!*/?\\(multipart\\|part\\|external\\|mml\\|secure\\)"))
+    (setq-local paragraph-separate paragraph-start)
+    (setq-local adaptive-fill-regexp
+                (concat quote-prefix-regexp "\\|" adaptive-fill-regexp))
+    (setq-local adaptive-fill-first-line-regexp
+                (concat quote-prefix-regexp "\\|"
+                        adaptive-fill-first-line-regexp)))
   (setq-local auto-fill-inhibit-regexp nil)
   (setq-local normal-auto-fill-function 'message-do-auto-fill))
 

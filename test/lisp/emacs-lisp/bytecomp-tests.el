@@ -490,6 +490,9 @@ Subtests signal errors if something goes wrong."
       (defun def () (m))))
   (should (equal (funcall 'def) 4)))
 
+
+;;;; Warnings.
+
 (ert-deftest bytecomp-tests--warnings ()
   (with-current-buffer (get-buffer-create "*Compile-Log*")
     (let ((inhibit-read-only t)) (erase-buffer)))
@@ -537,18 +540,8 @@ Subtests signal errors if something goes wrong."
   (bytecomp--with-warning-test "foo.*lacks a prefix"
     '(defvar foo nil)))
 
-(ert-deftest test-eager-load-macro-expansion ()
-  (test-byte-comp-compile-and-load nil
-    '(progn (defmacro abc (arg) 1) (defun def () (abc 2))))
-  (should (equal (funcall 'def) 1)))
-
-(ert-deftest test-eager-load-macro-expansion-eval-and-compile ()
-  (test-byte-comp-compile-and-load nil
-    '(eval-and-compile (defmacro abc (arg) -1) (defun def () (abc 2))))
-  (should (equal (funcall 'def) -1)))
-
 (defmacro bytecomp--define-warning-file-test (file re-warning &optional reverse)
-  `(ert-deftest ,(intern (format "bytecomp-warn/%s" file)) ()
+  `(ert-deftest ,(intern (format "bytecomp/%s" file)) ()
      :expected-result ,(if reverse :failed :passed)
      (with-current-buffer (get-buffer-create "*Compile-Log*")
        (let ((inhibit-read-only t)) (erase-buffer))
@@ -556,9 +549,56 @@ Subtests signal errors if something goes wrong."
        (ert-info ((buffer-string) :prefix "buffer: ")
          (should (re-search-forward ,re-warning))))))
 
-(bytecomp--define-warning-file-test "warn-free-setq.el" "free.*foo")
+(bytecomp--define-warning-file-test "error-lexical-var-with-add-hook.el"
+                            "add-hook.*lexical var")
 
-(bytecomp--define-warning-file-test "warn-free-variable-reference.el" "free.*bar")
+(bytecomp--define-warning-file-test "error-lexical-var-with-remove-hook.el"
+                            "remove-hook.*lexical var")
+
+(bytecomp--define-warning-file-test "error-lexical-var-with-run-hook-with-args-until-failure.el"
+                            "args-until-failure.*lexical var")
+
+(bytecomp--define-warning-file-test "error-lexical-var-with-run-hook-with-args-until-success.el"
+                            "args-until-success.*lexical var")
+
+(bytecomp--define-warning-file-test "error-lexical-var-with-run-hook-with-args.el"
+                            "args.*lexical var")
+
+(bytecomp--define-warning-file-test "error-lexical-var-with-symbol-value.el"
+                            "symbol-value.*lexical var")
+
+(bytecomp--define-warning-file-test "warn-autoload-not-on-top-level.el"
+                            "compiler ignores.*autoload.*")
+
+(bytecomp--define-warning-file-test "warn-callargs.el"
+                            "with 2 arguments, but accepts only 1")
+
+(bytecomp--define-warning-file-test "warn-defcustom-nogroup.el"
+                            "fails to specify containing group")
+
+(bytecomp--define-warning-file-test "warn-defcustom-notype.el"
+                            "fails to specify type")
+
+(bytecomp--define-warning-file-test "warn-defvar-lacks-prefix.el"
+                            "var.*foo.*lacks a prefix")
+
+(bytecomp--define-warning-file-test "warn-format.el"
+                            "called with 2 args to fill 1 format field")
+
+(bytecomp--define-warning-file-test "warn-free-setq.el"
+                            "free.*foo")
+
+(bytecomp--define-warning-file-test "warn-free-variable-reference.el"
+                            "free.*bar")
+
+(bytecomp--define-warning-file-test "warn-make-variable-buffer-local.el"
+                            "make-variable-buffer-local.*not called at toplevel")
+
+(bytecomp--define-warning-file-test "warn-interactive-only.el"
+                            "next-line.*interactive use only.*forward-line")
+
+(bytecomp--define-warning-file-test "warn-lambda-malformed-interactive-spec.el"
+                            "malformed interactive spec")
 
 (bytecomp--define-warning-file-test "warn-obsolete-defun.el"
                             "foo-obsolete.*obsolete function.*99.99")
@@ -575,8 +615,42 @@ Subtests signal errors if something goes wrong."
 (bytecomp--define-warning-file-test "warn-obsolete-variable.el"
                             "bytecomp--tests-obs.*obsolete.*99.99")
 
-(bytecomp--define-warning-file-test "warn-interactive-only.el"
-                            "next-line.*interactive use only.*forward-line")
+(bytecomp--define-warning-file-test "warn-redefine-defun-as-macro.el"
+                            "as both function and macro")
+
+(bytecomp--define-warning-file-test "warn-redefine-macro-as-defun.el"
+                            "as both function and macro")
+
+(bytecomp--define-warning-file-test "warn-redefine-defun.el"
+                            "defined multiple")
+
+(bytecomp--define-warning-file-test "warn-save-excursion.el"
+                            "with-current.*rather than save-excursion")
+
+(bytecomp--define-warning-file-test "warn-variable-let-bind-constant.el"
+                            "let-bind constant")
+
+(bytecomp--define-warning-file-test "warn-variable-let-bind-nonvariable.el"
+                            "let-bind nonvariable")
+
+(bytecomp--define-warning-file-test "warn-variable-set-constant.el"
+                            "variable reference to constant")
+
+(bytecomp--define-warning-file-test "warn-variable-set-nonvariable.el"
+                            "variable reference to nonvariable")
+
+
+;;;; Macro expansion.
+
+(ert-deftest test-eager-load-macro-expansion ()
+  (test-byte-comp-compile-and-load nil
+    '(progn (defmacro abc (arg) 1) (defun def () (abc 2))))
+  (should (equal (funcall 'def) 1)))
+
+(ert-deftest test-eager-load-macro-expansion-eval-and-compile ()
+  (test-byte-comp-compile-and-load nil
+    '(eval-and-compile (defmacro abc (arg) -1) (defun def () (abc 2))))
+  (should (equal (funcall 'def) -1)))
 
 (ert-deftest test-eager-load-macro-expansion-eval-when-compile ()
   ;; Make sure we interpret eval-when-compile forms properly.  CLISP

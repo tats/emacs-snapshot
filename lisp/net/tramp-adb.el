@@ -217,7 +217,7 @@ ARGUMENTS to pass to the OPERATION."
 	 (lambda (line)
 	   (when (string-match "^\\(\\S-+\\)[[:space:]]+device$" line)
 	     ;; Replace ":" by "#".
-	     `(nil ,(replace-regexp-in-string
+	     `(nil ,(tramp-compat-string-replace
 		     ":" tramp-prefix-port-format (match-string 1 line)))))
 	 (tramp-process-lines nil tramp-adb-program "devices"))))
 
@@ -1074,7 +1074,7 @@ E.g. a host name \"192.168.1.1#5555\" returns \"192.168.1.1:5555\"
     (let* ((host (tramp-file-name-host vec))
 	   (port (tramp-file-name-port-or-default vec))
 	   (devices (mapcar #'cadr (tramp-adb-parse-device-names nil))))
-      (replace-regexp-in-string
+      (tramp-compat-string-replace
        tramp-prefix-port-format ":"
        (cond ((member host devices) host)
 	     ;; This is the case when the host is connected to the default port.
@@ -1090,7 +1090,7 @@ E.g. a host name \"192.168.1.1#5555\" returns \"192.168.1.1:5555\"
 		   (not (zerop (length host)))
 		   (tramp-adb-execute-adb-command
                     vec "connect"
-                    (replace-regexp-in-string
+                    (tramp-compat-string-replace
 		     tramp-prefix-port-format ":" host)))
 	      ;; When new device connected, running other adb command (e.g.
 	      ;; adb shell) immediately will fail.  To get around this
@@ -1260,6 +1260,9 @@ connection if a previous connection has died for some reason."
 	    (process-put p 'adjust-window-size-function #'ignore)
 	    (set-process-query-on-exit-flag p nil)
 
+	    ;; Set connection-local variables.
+	    (tramp-set-connection-local-variables vec)
+
 	    ;; Change prompt.
 	    (tramp-set-connection-property
 	     p "prompt" (regexp-quote (format "///%s#$" prompt)))
@@ -1311,9 +1314,6 @@ connection if a previous connection has died for some reason."
 		(tramp-set-file-property vec "" "su-command-p" nil)
 		(tramp-error
 		 vec 'file-error "Cannot switch to user `%s'" user)))
-
-	    ;; Set connection-local variables.
-	    (tramp-set-connection-local-variables vec)
 
 	    ;; Mark it as connected.
 	    (tramp-set-connection-property p "connected" t)))))))

@@ -265,10 +265,11 @@ see the function `dirtrack-mode'."
   :group 'shell-directories)
 
 (defcustom explicit-shell-file-name nil
-  "If non-nil, is file name to use for explicitly requested inferior shell.
-When nil, such interactive shell sessions fallback to using either
-the shell specified in $ESHELL or in `shell-file-name'."
-  :type '(choice (const :tag "None" nil) file)
+  "If non-nil, the file name to use for explicitly requested inferior shells.
+When nil, such interactive shell sessions fall back to using the
+shell specified in either the environment variable \"ESHELL\" or
+`shell-file-name'."
+  :type '(choice (const :tag "Default" nil) file)
   :group 'shell)
 
 ;; Note: There are no explicit references to the variable `explicit-csh-args'.
@@ -470,32 +471,32 @@ Shell buffers.  It implements `shell-completion-execonly' for
 
 (defun shell-completion-vars ()
   "Setup completion vars for `shell-mode' and `read-shell-command'."
-  (set (make-local-variable 'comint-completion-fignore)
-       shell-completion-fignore)
-  (set (make-local-variable 'comint-delimiter-argument-list)
-       shell-delimiter-argument-list)
-  (set (make-local-variable 'comint-file-name-chars) shell-file-name-chars)
-  (set (make-local-variable 'comint-file-name-quote-list)
-       shell-file-name-quote-list)
-  (set (make-local-variable 'comint-file-name-prefix)
-       (or (file-remote-p default-directory) ""))
-  (set (make-local-variable 'comint-dynamic-complete-functions)
-       shell-dynamic-complete-functions)
+  (setq-local comint-completion-fignore
+              shell-completion-fignore)
+  (setq-local comint-delimiter-argument-list
+              shell-delimiter-argument-list)
+  (setq-local comint-file-name-chars shell-file-name-chars)
+  (setq-local comint-file-name-quote-list
+              shell-file-name-quote-list)
+  (setq-local comint-file-name-prefix
+              (or (file-remote-p default-directory) ""))
+  (setq-local comint-dynamic-complete-functions
+              shell-dynamic-complete-functions)
   (setq-local comint-unquote-function #'shell--unquote-argument)
   (setq-local comint-requote-function #'shell--requote-argument)
-  (set (make-local-variable 'pcomplete-parse-arguments-function)
-       #'shell--parse-pcomplete-arguments)
-  (set (make-local-variable 'pcomplete-termination-string)
-       (cond ((not comint-completion-addsuffix) "")
-             ((stringp comint-completion-addsuffix)
-              comint-completion-addsuffix)
-             ((not (consp comint-completion-addsuffix)) " ")
-             (t (cdr comint-completion-addsuffix))))
-  (set (make-local-variable 'pcomplete-command-completion-function)
-       #'shell-command-completion-function)
+  (setq-local pcomplete-parse-arguments-function
+              #'shell--parse-pcomplete-arguments)
+  (setq-local pcomplete-termination-string
+              (cond ((not comint-completion-addsuffix) "")
+                    ((stringp comint-completion-addsuffix)
+                     comint-completion-addsuffix)
+                    ((not (consp comint-completion-addsuffix)) " ")
+                    (t (cdr comint-completion-addsuffix))))
+  (setq-local pcomplete-command-completion-function
+              #'shell-command-completion-function)
   ;; Don't use pcomplete's defaulting mechanism, rely on
   ;; shell-dynamic-complete-functions instead.
-  (set (make-local-variable 'pcomplete-default-completion-function) #'ignore)
+  (setq-local pcomplete-default-completion-function #'ignore)
   (setq-local comint-input-autoexpand shell-input-autoexpand)
   ;; Not needed in shell-mode because it's inherited from comint-mode, but
   ;; placed here for read-shell-command.
@@ -595,7 +596,7 @@ buffer."
       (and (stringp hsize)
 	   (integerp (setq hsize (string-to-number hsize)))
 	   (> hsize 0)
-	   (set (make-local-variable 'comint-input-ring-size) hsize))
+           (setq-local comint-input-ring-size hsize))
       (setq comint-input-ring-file-name
             (concat
              remote
@@ -748,16 +749,15 @@ Make the shell buffer the current buffer, and return it.
 
   (with-connection-local-variables
    ;; On remote hosts, the local `shell-file-name' might be useless.
-   (when (file-remote-p default-directory)
-     (if (and (called-interactively-p 'any)
+   (when (and (file-remote-p default-directory)
+              (called-interactively-p 'any)
               (null explicit-shell-file-name)
               (null (getenv "ESHELL")))
-         (set (make-local-variable 'explicit-shell-file-name)
-              (file-local-name
-	       (expand-file-name
-                (read-file-name
-                 "Remote shell path: " default-directory shell-file-name
-                 t shell-file-name))))))
+     (setq-local explicit-shell-file-name
+                 (file-local-name
+                  (expand-file-name
+                   (read-file-name "Remote shell path: " default-directory
+                                   shell-file-name t shell-file-name)))))
 
    ;; Rain or shine, BUFFER must be current by now.
    (unless (comint-check-proc buffer)
