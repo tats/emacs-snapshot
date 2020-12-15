@@ -2944,7 +2944,8 @@ implementation will be used."
 				 (mapconcat
 				  #'tramp-shell-quote-argument uenv " "))
 			      "")
-			    (if heredoc (format "<<'%s'" tramp-end-of-heredoc) "")
+			    (if heredoc
+				(format "<<'%s'" tramp-end-of-heredoc) "")
 			    (if tmpstderr (format "2>'%s'" tmpstderr) "")
 			    (mapconcat #'tramp-shell-quote-argument env " ")
 			    (if heredoc
@@ -3562,7 +3563,7 @@ implementation will be used."
 
 	  ;; Make `last-coding-system-used' have the right value.
 	  (when coding-system-used
-	    (set 'last-coding-system-used coding-system-used))))
+            (setq last-coding-system-used coding-system-used))))
 
       (tramp-flush-file-properties v localname)
 
@@ -3834,6 +3835,10 @@ Fall back to normal file name handler if no Tramp handler exists."
 	(unless (process-live-p p)
 	  (tramp-error
 	   p 'file-notify-error "Monitoring not supported for `%s'" file-name))
+	;; Set "gio-file-monitor" property if needed.
+	(when (string-equal (file-name-nondirectory command) "gio")
+	  (tramp-set-connection-property
+	   p "gio-file-monitor" (tramp-get-remote-gio-file-monitor v)))
 	p))))
 
 (defun tramp-sh-gio-monitor-process-filter (proc string)
@@ -4910,7 +4915,8 @@ Goes through the list `tramp-inline-compress-commands'."
 (defun tramp-timeout-session (vec)
   "Close the connection VEC after a session timeout.
 If there is just some editing, retry it after 5 seconds."
-  (if (and tramp-locked tramp-locker
+  (if (and (tramp-get-connection-property
+	    (tramp-get-connection-process vec) "locked" nil)
 	   (tramp-file-name-equal-p vec (car tramp-current-connection)))
       (progn
 	(tramp-message
@@ -4954,10 +4960,9 @@ connection if a previous connection has died for some reason."
 	(when (and (time-less-p
 		    60 (time-since
 			(tramp-get-connection-property p "last-cmd-time" 0)))
-		   (process-live-p p))
-	  (tramp-send-command vec "echo are you awake" t t)
-	  (unless (and (process-live-p p)
-		       (tramp-wait-for-output p 10))
+		   (process-live-p p)
+		   (tramp-get-connection-property p "connected" nil))
+	  (unless (tramp-send-command-and-check vec "echo are you awake")
 	    ;; The error will be caught locally.
 	    (tramp-error vec 'file-error "Awake did fail")))
       (file-error
@@ -5752,6 +5757,30 @@ This command is returned only if `delete-by-moving-to-trash' is non-nil."
   (with-tramp-connection-property vec "gio-monitor"
     (tramp-message vec 5 "Finding a suitable `gio-monitor' command")
     (tramp-find-executable vec "gio" (tramp-get-remote-path vec) t t)))
+
+(defun tramp-get-remote-gio-file-monitor (vec)
+  "Determine remote GFileMonitor."
+  (with-tramp-connection-property vec "gio-file-monitor"
+    (with-current-buffer (tramp-get-connection-buffer vec)
+      (tramp-message vec 5 "Finding the used GFileMonitor")
+      (when-let ((gio (tramp-get-remote-gio-monitor vec)))
+	;; Search for the used FileMonitor.  There is no known way to
+	;; get this information directly from gio, so we check for
+	;; linked libraries of libgio.
+	(when (tramp-send-command-and-check vec (concat "ldd " gio))
+	  (goto-char (point-min))
+	  (when (re-search-forward "\\S-+/libgio\\S-+")
+	    (when (tramp-send-command-and-check
+		   vec (concat "strings " (match-string 0)))
+	      (goto-char (point-min))
+	      (re-search-forward
+	       (format
+		"^%s$"
+		(regexp-opt
+		 '("GFamFileMonitor" "GFenFileMonitor"
+		   "GInotifyFileMonitor" "GKqueueFileMonitor")))
+	       nil 'noerror)
+	      (intern (match-string 0)))))))))
 
 (defun tramp-get-remote-gvfs-monitor-dir (vec)
   "Determine remote `gvfs-monitor-dir' command."
