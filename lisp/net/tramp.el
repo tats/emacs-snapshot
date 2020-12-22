@@ -7,10 +7,6 @@
 ;; Maintainer: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
 ;; Package: tramp
-;; Version: 2.5.0-pre
-;; Package-Requires: ((emacs "25.1"))
-;; Package-Type: multi
-;; URL: https://savannah.gnu.org/projects/tramp
 
 ;; This file is part of GNU Emacs.
 
@@ -1022,8 +1018,8 @@ See `tramp-file-name-structure'."
    5 6 7 8 1))
 
 (defvar tramp-file-name-structure nil ;Initialized when defining `tramp-syntax'!
-  "List of six elements (REGEXP METHOD USER HOST FILE HOP), detailing \
-the Tramp file name structure.
+  "List detailing the Tramp file name structure.
+This is a list of six elements (REGEXP METHOD USER HOST FILE HOP).
 
 The first element REGEXP is a regular expression matching a Tramp file
 name.  The regex should contain parentheses around the method name,
@@ -3788,16 +3784,33 @@ It does not support `:stderr'."
 	(unless (or (null sentinel) (functionp sentinel))
 	  (signal 'wrong-type-argument (list #'functionp sentinel)))
 	(unless (or (null stderr) (bufferp stderr))
-	  (signal 'wrong-type-argument (list #'stringp stderr)))
+	  (signal 'wrong-type-argument (list #'bufferp stderr)))
 
 	(let* ((buffer
 		(if buffer
 		    (get-buffer-create buffer)
 		  ;; BUFFER can be nil.  We use a temporary buffer.
 		  (generate-new-buffer tramp-temp-buffer-name)))
+	       ;; We use as environment the difference to toplevel
+	       ;; `process-environment'.
+	       (env (mapcar
+		     (lambda (elt)
+		       (unless
+			   (member
+			    elt (default-toplevel-value 'process-environment))
+			 (when (string-match-p "=" elt) elt)))
+		     process-environment))
+	       (env (setenv-internal
+		     env "INSIDE_EMACS"
+		     (concat (or (getenv "INSIDE_EMACS") emacs-version)
+			     ",tramp:" tramp-version)
+		     'keep))
+	       (env (mapcar #'tramp-shell-quote-argument (delq nil env)))
+	       ;; Quote command.
+	       (command (mapconcat #'tramp-shell-quote-argument command " "))
+	       ;; Set cwd and environment variables.
 	       (command
-		(mapconcat
-		 #'identity (append `("cd" ,localname "&&") command) " ")))
+	        (append `("cd" ,localname "&&" "(" "env") env `(,command ")"))))
 
 	  ;; Check for `tramp-sh-file-name-handler', because something
 	  ;; is different between tramp-adb.el and tramp-sh.el.
@@ -3852,7 +3865,7 @@ It does not support `:stderr'."
 	      (mapcar (lambda (x) (split-string x " ")) login-args))
 	     p (make-process
 		:name name :buffer buffer
-		:command (append `(,login-program) login-args `(,command))
+		:command (append `(,login-program) login-args command)
 		:coding coding :noquery noquery :connection-type connection-type
 		:filter filter :sentinel sentinel :stderr stderr))
 

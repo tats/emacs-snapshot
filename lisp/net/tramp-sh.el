@@ -58,8 +58,7 @@ If it is nil, no compression at all will be applied."
 
 ;;;###tramp-autoload
 (defcustom tramp-copy-size-limit 10240
-  "The maximum file size where inline copying is preferred over an \
-out-of-the-band copy.
+  "Maximum file size where inline copying is preferred to an out-of-the-band copy.
 If it is nil, out-of-the-band copy will be used without a check."
   :group 'tramp
   :type '(choice (const nil) integer))
@@ -2235,7 +2234,7 @@ the uid and gid from FILENAME."
 		     (file-writable-p (concat prefix localname2))))
 	    (tramp-do-copy-or-rename-file-directly
 	     op (concat prefix localname1) (concat prefix localname2)
-	     ok-if-already-exists keep-date t)
+	     ok-if-already-exists keep-date preserve-uid-gid)
 	    ;; We must change the ownership to the local user.
 	    (tramp-set-file-uid-gid
 	     (concat prefix localname2)
@@ -2871,7 +2870,7 @@ implementation will be used."
 	  (unless (or (null sentinel) (functionp sentinel))
 	    (signal 'wrong-type-argument (list #'functionp sentinel)))
 	  (unless (or (null stderr) (bufferp stderr) (stringp stderr))
-	    (signal 'wrong-type-argument (list #'stringp stderr)))
+	    (signal 'wrong-type-argument (list #'bufferp stderr)))
 	  (when (and (stringp stderr) (tramp-tramp-file-p stderr)
 		     (not (tramp-equal-remote default-directory stderr)))
 	    (signal 'file-error (list "Wrong stderr" stderr)))
@@ -2985,7 +2984,11 @@ implementation will be used."
 		      ;; `verify-visited-file-modtime'.
 		      (let ((buffer-undo-list t)
 			    (inhibit-read-only t)
-			    (mark (point-max)))
+			    (mark (point-max))
+			    (coding-system-for-write
+			     (if (symbolp coding) coding (car coding)))
+			    (coding-system-for-read
+			     (if (symbolp coding) coding (cdr coding))))
 			(clear-visited-file-modtime)
 			(narrow-to-region (point-max) (point-max))
 			;; We call `tramp-maybe-open-connection', in
@@ -4960,9 +4963,10 @@ connection if a previous connection has died for some reason."
 	(when (and (time-less-p
 		    60 (time-since
 			(tramp-get-connection-property p "last-cmd-time" 0)))
-		   (process-live-p p)
-		   (tramp-get-connection-property p "connected" nil))
-	  (unless (tramp-send-command-and-check vec "echo are you awake")
+		   (process-live-p p))
+	  (tramp-send-command vec "echo are you awake" t t)
+	  (unless (and (process-live-p p)
+		       (tramp-wait-for-output p 10))
 	    ;; The error will be caught locally.
 	    (tramp-error vec 'file-error "Awake did fail")))
       (file-error
@@ -6137,5 +6141,10 @@ function cell is returned to be applied on a buffer."
 ;;   screen, or tmux, or mosh.
 ;;
 ;; * Implement `:stderr' of `make-process' as pipe process.
+
+;; * One interesting solution (with other applications as well) would
+;;   be to stipulate, as a directory or connection-local variable, an
+;;   additional rc file on the remote machine that is sourced every
+;;   time Tramp connects.  <https://emacs.stackexchange.com/questions/62306>
 
 ;;; tramp-sh.el ends here

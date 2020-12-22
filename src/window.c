@@ -617,11 +617,12 @@ equals the special symbol `mark-for-redisplay'.
 Run `buffer-list-update-hook' unless NORECORD is non-nil.  Note that
 applications and internal routines often select a window temporarily for
 various purposes; mostly, to simplify coding.  As a rule, such
-selections should be not recorded and therefore will not pollute
+selections should not be recorded and therefore will not pollute
 `buffer-list-update-hook'.  Selections that "really count" are those
 causing a visible change in the next redisplay of WINDOW's frame and
-should be always recorded.  So if you think of running a function each
-time a window gets selected put it on `buffer-list-update-hook'.
+should always be recorded.  So if you think of running a function each
+time a window gets selected, put it on `buffer-list-update-hook' or
+`window-selection-change-functions'.
 
 Also note that the main editor command loop sets the current buffer to
 the buffer of the selected window before each command.  */)
@@ -7822,7 +7823,7 @@ set_window_scroll_bars (struct window *w, Lisp_Object width,
 	 if more than a single window needs to be considered, see
 	 redisplay_internal.  */
       if (changed)
-	windows_or_buffers_changed = 31;
+	wset_redisplay (w);
 
       return changed ? w : NULL;
     }

@@ -1441,6 +1441,11 @@ that makes it a valid button.
 ** Miscellaneous
 
 +++
+*** A number of new string manipulation functions have been added.
+'string-clean-whitespace', 'string-fill', 'string-limit',
+'string-lines', 'string-pad', 'string-chop-newline' and 'string-slice'.
+
++++
 *** New variable 'current-minibuffer-command'.
 This is like 'this-command', but it is bound recursively when entering
 the minibuffer.
@@ -1480,6 +1485,10 @@ completions with more information in completion prefix and suffix.
 *** New user option 'bibtex-unify-case-function'.
 This new option allows the user to customize how case is converted
 when unifying entries.
+
+---
+*** The user option 'bibtex-maintain-sorted-entries' now permits
+user-defined sorting schemes.
 
 +++
 *** 'format-seconds' can now be used for sub-second times.
@@ -1816,6 +1825,13 @@ incorrect hashes for window configurations and some other objects.
 modifies the string's text properties; instead, it uses and returns
 a copy of the string.  This helps avoid trouble when strings are
 shared or constants.
+
++++
+** Temporary buffers no longer run certain buffer hooks.
+The macros 'with-temp-buffer' and 'with-temp-file' no longer run the
+hooks 'kill-buffer-hook', 'kill-buffer-query-functions', and
+'buffer-list-update-hook' for the temporary buffers they create.  This
+avoids slowing them down when a lot of these hooks are defined.
 
 ---
 ** The obsolete function 'thread-alive-p' has been removed.
@@ -2159,6 +2175,7 @@ and 'play-sound-file'.
 If this variable is non-nil, character syntax is used for printing
 numbers when this makes sense, such as '?A' for 65.
 
++++
 ** New error 'remote-file-error', a subcategory of 'file-error'.
 It is signaled if a remote file operation fails due to internal
 reasons, and could block Emacs.  It does not replace 'file-error'
@@ -2171,7 +2188,21 @@ Until it is solved you could ignore such errors by performing
 
     (setq debug-ignored-errors (cons 'remote-file-error debug-ignored-errors))
 
++++
 ** The error 'ftp-error' belongs also to category 'remote-file-error'.
+
++++
+** Buffers can now be created with certain hooks disabled.
+The functions 'get-buffer-create' and 'generate-new-buffer' accept a
+new optional argument 'inhibit-buffer-hooks'.  If non-nil, the new
+buffer does not run the hooks 'kill-buffer-hook',
+'kill-buffer-query-functions', and 'buffer-list-update-hook'.  This
+avoids slowing down internal or temporary buffers that are never
+presented to users or passed on to other applications.
+
+---
+** 'start-process-shell-command' and 'start-file-process-shell-command'
+do not support the old calling conventions any longer.
 
 
 * Changes in Emacs 28.1 on Non-Free Operating Systems
