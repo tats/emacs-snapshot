@@ -1,6 +1,6 @@
-;;; format.el --- read and save files in multiple formats
+;;; format.el --- read and save files in multiple formats  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1994-1995, 1997, 1999, 2001-2020 Free Software
+;; Copyright (C) 1994-1995, 1997, 1999, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Boris Goldowsky <boris@gnu.org>
@@ -419,7 +419,8 @@ If FORMAT is nil then do not do any format conversion."
                                             (file-name-nondirectory file)))))
      (list file fmt)))
   (let ((format-alist nil))
-     (find-file filename))
+    (with-suppressed-warnings ((interactive-only find-file))
+      (find-file filename)))
   (if format
       (format-decode-buffer format)))
 

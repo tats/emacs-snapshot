@@ -1,6 +1,6 @@
 ### @configure_input@
 
-# Copyright (C) 1992-2020 Free Software Foundation, Inc.
+# Copyright (C) 1992-2021 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -968,6 +968,10 @@ else
 	@echo "You do not seem to have the test/ directory."
 	@echo "Maybe you used a release tarfile that lacks tests."
 endif
+
+test/%:
+	$(MAKE) -C test $*
+
 
 dist:
 	cd ${srcdir}; ./make-dist

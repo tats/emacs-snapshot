@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with NeXT/Open/GNUstep API.
-   Copyright (C) 1989, 1993, 2005, 2008-2020 Free Software Foundation,
+   Copyright (C) 1989, 1993, 2005, 2008-2021 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -414,6 +414,7 @@ typedef id instancetype;
    ========================================================================== */
 
 @class EmacsToolbar;
+@class EmacsSurface;
 
 #ifdef NS_IMPL_COCOA
 @interface EmacsView : NSView <NSTextInput, NSWindowDelegate>
@@ -435,7 +436,7 @@ typedef id instancetype;
    BOOL fs_is_native;
    BOOL in_fullscreen_transition;
 #ifdef NS_DRAW_TO_BUFFER
-   CGContextRef drawingBuffer;
+   EmacsSurface *surface;
 #endif
 @public
    struct frame *emacsframe;
@@ -478,7 +479,7 @@ typedef id instancetype;
 
 #ifdef NS_DRAW_TO_BUFFER
 - (void)focusOnDrawingBuffer;
-- (void)createDrawingBuffer;
+- (void)unfocusDrawingBuffer;
 #endif
 - (void)copyRect:(NSRect)srcRect to:(NSRect)dstRect;
 
@@ -497,6 +498,7 @@ typedef id instancetype;
   NSPoint grabOffset;
 }
 
+- (BOOL)restackWindow:(NSWindow *)win above:(BOOL)above;
 - (void)setAppearance;
 @end
 
@@ -515,13 +517,12 @@ typedef id instancetype;
 
 @interface EmacsMenu : NSMenu  <NSMenuDelegate>
 {
-  unsigned long keyEquivModMask;
   BOOL needsUpdate;
 }
 
 - (void)menuNeedsUpdate: (NSMenu *)menu; /* (delegate method) */
-- (NSString *)parseKeyEquiv: (const char *)key;
-- (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr;
+- (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+                            attributes: (NSDictionary *)attributes;
 - (void)fillWithWidgetValue: (void *)wvptr;
 - (EmacsMenu *)addSubmenuWithTitle: (const char *)title;
 - (void) removeAllItems;
@@ -704,6 +705,25 @@ typedef id instancetype;
 - (bool)judge;
 + (CGFloat)scrollerWidth;
 @end
+
+#ifdef NS_DRAW_TO_BUFFER
+@interface EmacsSurface : NSObject
+{
+  NSMutableArray *cache;
+  NSSize size;
+  CGColorSpaceRef colorSpace;
+  IOSurfaceRef currentSurface;
+  IOSurfaceRef lastSurface;
+  CGContextRef context;
+}
+- (id) initWithSize: (NSSize)s ColorSpace: (CGColorSpaceRef)cs;
+- (void) dealloc;
+- (NSSize) getSize;
+- (CGContextRef) getContext;
+- (void) releaseContext;
+- (IOSurfaceRef) getSurface;
+@end
+#endif
 
 
 /* ==========================================================================

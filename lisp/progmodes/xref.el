@@ -1,6 +1,6 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
-;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
 ;; Version: 1.0.4
 ;; Package-Requires: ((emacs "26.3"))
 
@@ -109,12 +109,20 @@ This is typically the filename.")
 
 (defcustom xref-file-name-display 'abs
   "Style of file name display in *xref* buffers.
+
 If the value is the symbol `abs', the default, show the file names
 in their full absolute form.
+
 If `nondirectory', show only the nondirectory (a.k.a. \"base name\")
-part of the file name."
+part of the file name.
+
+If `project-relative', show only the file name relative to the
+current project root.  If there is no current project, or if the
+file resides outside of its root, show that particular file name
+in its full absolute form."
   :type '(choice (const :tag "absolute file name" abs)
-                 (const :tag "nondirectory file name" nondirectory))
+                 (const :tag "nondirectory file name" nondirectory)
+                 (const :tag "relative to project root" project-relative))
   :version "27.1")
 
 ;; FIXME: might be useful to have an optional "hint" i.e. a string to
@@ -149,10 +157,31 @@ Line numbers start from 1 and columns from 0.")
             (forward-char column))
           (point-marker))))))
 
+(defvar xref--project-root-memo nil
+  "Cons mapping `default-directory' value to the search root.")
+
 (cl-defmethod xref-location-group ((l xref-file-location))
   (cl-ecase xref-file-name-display
-    (abs (oref l file))
-    (nondirectory (file-name-nondirectory (oref l file)))))
+    (abs
+     (oref l file))
+    (nondirectory
+     (file-name-nondirectory (oref l file)))
+    (project-relative
+     (unless (and xref--project-root-memo
+                  (equal (car xref--project-root-memo)
+                         default-directory))
+       (setq xref--project-root-memo
+             (cons default-directory
+                   (let ((root
+                          (let ((pr (project-current)))
+                            (and pr (xref--project-root pr)))))
+                     (and root (expand-file-name root))))))
+     (let ((file (oref l file))
+           (search-root (cdr xref--project-root-memo)))
+       (if (and search-root
+                (string-prefix-p search-root file))
+           (substring file (length search-root))
+         file)))))
 
 (defclass xref-buffer-location (xref-location)
   ((buffer :type buffer :initarg :buffer)
@@ -273,10 +302,7 @@ current project's main and external roots."
      (xref-references-in-directory identifier dir))
    (let ((pr (project-current t)))
      (cons
-      (if (fboundp 'project-root)
-          (project-root pr)
-        (with-no-warnings
-          (project-roots pr)))
+      (xref--project-root pr)
       (project-external-roots pr)))))
 
 (cl-defgeneric xref-backend-apropos (backend pattern)
@@ -521,8 +547,7 @@ If SELECT is non-nil, select the target window."
   "Goto and display position POS of buffer BUF in a window.
 Honor `xref--original-window-intent', run `xref-after-jump-hook'
 and finally return the window."
-  (let* ((xref-buf (current-buffer))
-         (pop-up-frames
+  (let* ((pop-up-frames
           (or (eq xref--original-window-intent 'frame)
               pop-up-frames))
          (action
@@ -540,9 +565,6 @@ and finally return the window."
     (with-selected-window (display-buffer buf action)
       (xref--goto-char pos)
       (run-hooks 'xref-after-jump-hook)
-      (let ((buf (current-buffer)))
-        (with-current-buffer xref-buf
-          (setq-local other-window-scroll-buffer buf)))
       (selected-window))))
 
 (defun xref--display-buffer-in-other-window (buffer alist)
@@ -913,6 +935,12 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
       (pop-to-buffer (current-buffer))
       (current-buffer))))
 
+(defun xref--project-root (project)
+  (if (fboundp 'project-root)
+      (project-root project)
+    (with-no-warnings
+      (car (project-roots project)))))
+
 (defun xref--show-common-initialize (xref-alist fetcher alist)
   (setq buffer-undo-list nil)
   (let ((inhibit-read-only t)
@@ -977,8 +1005,8 @@ local keymap that binds `RET' to `xref-quit-and-goto-xref'."
                        '(display-buffer-in-direction . ((direction . below))))
         (current-buffer))))))
 
-(define-obsolete-function-alias
-  'xref--show-defs-buffer-at-bottom #'xref-show-definitions-buffer-at-bottom)
+(define-obsolete-function-alias 'xref--show-defs-buffer-at-bottom
+  #'xref-show-definitions-buffer-at-bottom "28.1")
 
 (defun xref-show-definitions-completing-read (fetcher alist)
   "Let the user choose the target definition with completion.
@@ -1018,9 +1046,20 @@ between them by typing in the minibuffer with completion."
 
     (setq xref (if (not (cdr xrefs))
                    (car xrefs)
-                 (cdr (assoc (completing-read "Jump to definition: "
-                                              (reverse xref-alist-with-line-info))
-                             xref-alist-with-line-info))))
+                 (let* ((collection (reverse xref-alist-with-line-info))
+                        (ctable
+                         (lambda (string pred action)
+                           (cond
+                            ((eq action 'metadata)
+                             '(metadata . ((category . xref-location))))
+                            (t
+                             (complete-with-action action collection string pred)))))
+                        (def (caar collection)))
+                   (cdr (assoc (completing-read "Choose definition: "
+                                                ctable nil t
+                                                nil nil
+                                                def)
+                               collection)))))
 
     (xref-pop-to-location xref (assoc-default 'display-action alist))))
 

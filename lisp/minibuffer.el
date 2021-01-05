@@ -1,6 +1,6 @@
 ;;; minibuffer.el --- Minibuffer completion functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Package: emacs
@@ -956,6 +956,7 @@ styles for specific categories, such as files, buffers, etc."
     ;; A new style that combines substring and pcm might be better,
     ;; e.g. one that does not anchor to bos.
     (project-file (styles . (substring)))
+    (xref-location (styles . (substring)))
     (info-menu (styles . (basic substring))))
   "Default settings for specific completion categories.
 Each entry has the shape (CATEGORY . ALIST) where ALIST is

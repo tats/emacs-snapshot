@@ -1,6 +1,6 @@
 GNU Emacs NEWS -- history of user-visible changes.
 
-Copyright (C) 2017-2020 Free Software Foundation, Inc.
+Copyright (C) 2017-2021 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 Please send Emacs bug reports to 'bug-gnu-emacs@gnu.org'.
@@ -212,6 +212,12 @@ This makes debugging Emacs Lisp scripts run in batch mode easier.  To
 get back the old behavior, set the new variable
 'backtrace-on-error-noninteractive' to a nil value.
 
+** 'redisplay-skip-fontification-on-input' helps Emacs keep up with fast input.
+This is another attempt to solve the problem of handling high key repeat rate
+and other "slow scrolling" situations.  It is hoped it behaves better
+than 'fast-but-imprecise-scrolling' and 'jit-lock-defer-time'.
+It is not enabled by default.
+
 
 * Editing Changes in Emacs 28.1
 
@@ -232,8 +238,9 @@ forms, but this command has now been changed to work more like
 ** Standalone 'M-y' uses the minibuffer to complete previous kills.
 When 'M-y' is typed not after a yank command, it activates the minibuffer
 where you can browse previous kills using the minibuffer history or
-completion.  In Isearch 'C-s M-y' uses the minibuffer with completion
-on previous kills to read a string and append it to the search string.
+completion.  In Isearch, you can bind 'C-s M-y' to the command
+`isearch-yank-pop' that uses the minibuffer with completion on
+previous kills to read a string and append it to the search string.
 
 ---
 ** New user options 'copy-region-blink-delay' and 'delete-pair-blink-delay'.
@@ -1301,6 +1308,11 @@ have been renamed to have "proper" public names and documented
 ('xref-show-definitions-buffer' and
 'xref-show-definitions-buffer-at-bottom').
 
+---
+*** New value 'project-relative' for 'xref-file-name-display'
+If chosen, file names in *xref* buffers will be displayed relative
+to the 'project-root' of the current project, when available.
+
 ** json.el
 
 ---
@@ -1475,6 +1487,9 @@ that makes it a valid button.
 
 
 ** Miscellaneous
+
++++
+*** 'add-to-ordered-list' can now take a test predicate.
 
 +++
 *** New predicate functions 'length<', 'length>' and 'length='.
@@ -1741,7 +1756,15 @@ Otherwise, it will use 'xwidget-webkit-last-session'.
 ** Flymake mode
 
 +++
-*** New user option 'flymake-mode-line-indicator-format'.
+*** New user options to customize Flymake's mode-line.
+
+The new customization variable 'flymake-mode-line-format' is a mix of
+strings and symbols like 'flymake-mode-line-title' ,
+'flymake-mode-line-exception' and 'flymake-mode-line-counters'.  The
+new customization variable 'flymake-mode-line-counter-format' is a mix
+of strings and symbols like 'flymake-mode-line-error-counter',
+'flymake-mode-line-warning-counter' and
+'flymake-mode-line-note-counter'.
 
 ** Flyspell mode
 
@@ -1920,11 +1943,6 @@ This is no longer supported, and setting this variable has no effect.
 ** The macro 'with-displayed-buffer-window' is now obsolete.
 Use macro 'with-current-buffer-window' with action alist entry 'body-function'.
 
-+++
-** 'byte-compile-file' optional argument LOAD is now obsolete.
-To load the file after byte-compiling, add a call to 'load' from Lisp
-or use 'M-x emacs-lisp-byte-compile-and-load' interactively.
-
 ---
 ** The metamail.el library is now marked obsolete.
 
@@ -2007,6 +2025,12 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 'vcursor-toggle-vcursor-map', 'w32-focus-frame', 'w32-select-font',
 'wisent-lex-make-token-table'.
 
+** The 'when' argument of `make-obsolete` and related functions is mandatory.
+The use of those functions without a 'when' argument was marked
+obsolete back in Emacs-23.1.  The affected functions are:
+make-obsolete, define-obsolete-function-alias, make-obsolete-variable,
+define-obsolete-variable-alias.
+
 
 * Lisp Changes in Emacs 28.1
 
@@ -2028,6 +2052,11 @@ a prefix string, and a suffix string.
 If you bind 'help-form' to a non-nil value while calling these functions,
 then pressing 'C-h' ('help-char') causes the function to evaluate 'help-form'
 and display the result.
+
+---
+** New variables 'read-char-choice-use-read-key' and 'y-or-n-p-use-read-key'.
+When non-nil, then functions 'read-char-choice' and 'y-or-n-p' (respectively)
+use the function 'read-key' to read a character instead of using the minibuffer.
 
 +++
 ** 'set-window-configuration' now takes an optional 'dont-set-frame'
@@ -2233,6 +2262,11 @@ This is achieved by giving a non-nil FOLLOW-SYMLINKS parameter.
 By default, it will warn if a documentation string is wider than the
 largest of 80 characters or 'fill-column'.  This is controlled by the
 new user option 'byte-compile-docstring-max-column'.
+
++++
+*** 'byte-compile-file' optional argument LOAD is now obsolete.
+To load the file after byte-compiling, add a call to 'load' from Lisp
+or use 'M-x emacs-lisp-byte-compile-and-load' interactively.
 
 ---
 ** 'unload-feature' now also tries to undo additions to buffer-local hooks.

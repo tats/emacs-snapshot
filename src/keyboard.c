@@ -1,6 +1,6 @@
 /* Keyboard and mouse input; editor command loop.
 
-Copyright (C) 1985-1989, 1993-1997, 1999-2020 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1997, 1999-2021 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -285,7 +285,7 @@ bool input_pending;
    with the input rate, but if it can keep up just enough that there's no
    input_pending when we begin the command, then redisplay is not skipped
    which results in better feedback to the user.  */
-static bool input_was_pending;
+bool input_was_pending;
 
 /* Circular buffer for pre-read keyboard input.  */
 
@@ -3647,7 +3647,8 @@ kbd_buffer_unget_event (struct selection_input_event *event)
 #define INPUT_EVENT_POS_MAX \
   ((ptrdiff_t) min (PTRDIFF_MAX, min (TYPE_MAXIMUM (Time) / 2, \
 				      MOST_POSITIVE_FIXNUM)))
-#define INPUT_EVENT_POS_MIN (-1 - INPUT_EVENT_POS_MAX)
+#define INPUT_EVENT_POS_MIN (PTRDIFF_MIN < -INPUT_EVENT_POS_MAX \
+			     ? -1 - INPUT_EVENT_POS_MAX : PTRDIFF_MIN)
 
 /* Return a Time that encodes position POS.  POS must be in range.  */
 
@@ -12387,12 +12388,6 @@ syms_of_keyboard_for_pdumper (void)
 void
 keys_of_keyboard (void)
 {
-  initial_define_key (global_map, Ctl ('Z'), "suspend-emacs");
-  initial_define_key (control_x_map, Ctl ('Z'), "suspend-emacs");
-  initial_define_key (meta_map, Ctl ('C'), "exit-recursive-edit");
-  initial_define_key (global_map, Ctl (']'), "abort-recursive-edit");
-  initial_define_key (meta_map, 'x', "execute-extended-command");
-
   initial_define_lispy_key (Vspecial_event_map, "delete-frame",
 			    "handle-delete-frame");
 #ifdef HAVE_NTGUI

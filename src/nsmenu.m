@@ -1,5 +1,5 @@
 /* NeXT/Open/GNUstep and macOS Cocoa menu and toolbar module.
-   Copyright (C) 2007-2020 Free Software Foundation, Inc.
+   Copyright (C) 2007-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -104,6 +104,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
   NSAutoreleasePool *pool;
   BOOL needsSet = NO;
   id menu = [NSApp mainMenu];
+  bool owfi;
 
   Lisp_Object items;
   widget_value *wv, *first_wv, *prev_wv = 0;
@@ -171,6 +172,13 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       set_buffer_internal_1 (XBUFFER (buffer));
 
+      /* TODO: for some reason this is not needed in other terms, but
+	 some menu updates call Info-extract-pointer which causes
+	 abort-on-error if waiting-for-input.  Needs further
+	 investigation.  */
+      owfi = waiting_for_input;
+      waiting_for_input = 0;
+
       /* Run the Lucid hook.  */
       safe_run_hooks (Qactivate_menubar_hook);
 
@@ -223,6 +231,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       submenu_start[i] = -1;
       finish_menu_items ();
+      waiting_for_input = owfi;
 
       /* Convert menu_items into widget_value trees
 	 to display the menu.  This cannot evaluate Lisp code.  */
@@ -356,6 +365,9 @@ ns_update_menubar (struct frame *f, bool deep_p)
       else
         submenu = [menu addSubmenuWithTitle: wv->name];
 
+      if ([[submenu title] isEqualToString:@"Help"])
+        [NSApp setHelpMenu:submenu];
+
       if (deep_p)
         [submenu fillWithWidgetValue: wv->contents];
 
@@ -448,33 +460,8 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
 }
 
 
-/* Parse a widget_value's key rep (examples: 's-p', 's-S', '(C-x C-s)', '<f13>')
-   into an accelerator string.  We are only able to display a single character
-   for an accelerator, together with an optional modifier combination.  (Under
-   Carbon more control was possible, but in Cocoa multi-char strings passed to
-   NSMenuItem get ignored.  For now we try to display a super-single letter
-   combo, and return the others as strings to be appended to the item title.
-   (This is signaled by setting keyEquivModMask to 0 for now.) */
--(NSString *)parseKeyEquiv: (const char *)key
-{
-  const char *tpos = key;
-  keyEquivModMask = NSEventModifierFlagCommand;
-
-  if (!key || !*key)
-    return @"";
-
-  while (*tpos == ' ' || *tpos == '(')
-    tpos++;
-  if ((*tpos == 's') && (*(tpos+1) == '-'))
-    {
-      return [NSString stringWithFormat: @"%c", tpos[2]];
-    }
-  keyEquivModMask = 0; /* signal */
-  return [NSString stringWithUTF8String: tpos];
-}
-
-
 - (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+                            attributes: (NSDictionary *)attributes
 {
   NSMenuItem *item;
   widget_value *wv = (widget_value *)wvptr;
@@ -482,36 +469,33 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
   if (menu_separator_name_p (wv->name))
     {
       item = [NSMenuItem separatorItem];
-      [self addItem: item];
     }
   else
     {
-      NSString *title, *keyEq;
-      title = [NSString stringWithUTF8String: wv->name];
+      NSString *title = [NSString stringWithUTF8String: wv->name];
       if (title == nil)
         title = @"< ? >";  /* (get out in the open so we know about it) */
 
-      keyEq = [self parseKeyEquiv: wv->key];
-#ifdef NS_IMPL_COCOA
-      /* macOS mangles modifier strings longer than one character.  */
-      if (keyEquivModMask == 0)
+      item = [[[NSMenuItem alloc] init] autorelease];
+      if (wv->key)
         {
-          title = [title stringByAppendingFormat: @" (%@)", keyEq];
-          item = [self addItemWithTitle: (NSString *)title
-                                 action: @selector (menuDown:)
-                          keyEquivalent: @""];
-        }
-      else
-        {
-#endif
-          item = [self addItemWithTitle: (NSString *)title
-                                 action: @selector (menuDown:)
-                          keyEquivalent: keyEq];
+          NSString *key = [NSString stringWithUTF8String: wv->key];
 #ifdef NS_IMPL_COCOA
-        }
+          /* Cocoa only permits a single key (with modifiers) as
+             keyEquivalent, so we put them in the title string
+             in a tab-separated column. */
+          title = [title stringByAppendingFormat: @"\t%@", key];
+#else
+          [item setKeyEquivalent: key];
 #endif
-      [item setKeyEquivalentModifierMask: keyEquivModMask];
+        }
 
+      NSAttributedString *atitle = [[[NSAttributedString alloc]
+                                         initWithString: title
+                                             attributes: attributes]
+                                     autorelease];
+      [item setAction: @selector (menuDown:)];
+      [item setAttributedTitle: atitle];
       [item setEnabled: wv->enabled];
 
       /* Draw radio buttons and tickboxes.  */
@@ -524,6 +508,7 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
       [item setTag: (NSInteger)wv->call_data];
     }
 
+  [self addItem: item];
   return item;
 }
 
@@ -546,17 +531,116 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
 }
 
 
+typedef struct {
+  const char *from, *to;
+} subst_t;
+
+/* Standard keyboard symbols used in menus. */
+static const subst_t key_symbols[] = {
+  {"<backspace>",  "⌫"},
+  {"DEL",          "⌫"},
+  {"<deletechar>", "⌦"},
+  {"<return>",     "↩"},
+  {"RET",          "↩"},
+  {"<left>",       "←"},
+  {"<right>",      "→"},
+  {"<up>",         "↑"},
+  {"<down>",       "↓"},
+  {"<prior>",      "⇞"},
+  {"<next>",       "⇟"},
+  {"<home>",       "↖"},
+  {"<end>",        "↘"},
+  {"<tab>",        "⇥"},
+  {"TAB",          "⇥"},
+  {"<backtab>",    "⇤"},
+};
+
+/* Transform the key sequence KEY into something prettier by
+   substituting keyboard symbols. */
+static char *
+prettify_key (const char *key)
+{
+  while (*key == ' ') key++;
+
+  int len = strlen (key);
+  char *buf = xmalloc (len + 1);
+  memcpy (buf, key, len + 1);
+  for (int i = 0; i < ARRAYELTS (key_symbols); i++)
+    {
+      ptrdiff_t fromlen = strlen (key_symbols[i].from);
+      char *p = buf;
+      while (p < buf + len)
+        {
+          char *match = memmem (buf, len, key_symbols[i].from, fromlen);
+          if (!match)
+            break;
+          ptrdiff_t tolen = strlen (key_symbols[i].to);
+          eassert (tolen <= fromlen);
+          memcpy (match, key_symbols[i].to, tolen);
+          memmove (match + tolen, match + fromlen,
+                   len - (match + fromlen - buf) + 1);
+          len -= fromlen - tolen;
+          p = match + tolen;
+        }
+    }
+  Lisp_Object result = build_string (buf);
+  xfree (buf);
+  return SSDATA (result);
+}
+
 - (void)fillWithWidgetValue: (void *)wvptr
 {
-  widget_value *wv = (widget_value *)wvptr;
+  widget_value *first_wv = (widget_value *)wvptr;
+  NSFont *menuFont = [NSFont menuFontOfSize:0];
+  NSDictionary *attributes = nil;
+
+#ifdef NS_IMPL_COCOA
+  /* Cocoa doesn't allow multi-key sequences in its menu display, so
+     work around it by using tabs to split the title into two
+     columns.  */
+  NSDictionary *font_attribs = @{NSFontAttributeName: menuFont};
+  CGFloat maxNameWidth = 0;
+  CGFloat maxKeyWidth = 0;
+
+  /* Determine the maximum width of all menu items. */
+  for (widget_value *wv = first_wv; wv != NULL; wv = wv->next)
+    if (!menu_separator_name_p (wv->name))
+      {
+        NSString *name = [NSString stringWithUTF8String: wv->name];
+        NSSize nameSize = [name sizeWithAttributes: font_attribs];
+        maxNameWidth = MAX(maxNameWidth, nameSize.width);
+        if (wv->key)
+          {
+            wv->key = prettify_key (wv->key);
+            NSString *key = [NSString stringWithUTF8String: wv->key];
+            NSSize keySize = [key sizeWithAttributes: font_attribs];
+            maxKeyWidth = MAX(maxKeyWidth, keySize.width);
+          }
+      }
+
+  /* Put some space between the names and keys. */
+  CGFloat maxWidth = maxNameWidth + maxKeyWidth + 40;
+
+  /* Set a right-aligned tab stop at the maximum width, so that the
+     key will appear immediately to the left of it. */
+  NSTextTab *tab =
+    [[[NSTextTab alloc] initWithTextAlignment: NSTextAlignmentRight
+                                     location: maxWidth
+                                      options: @{}] autorelease];
+  NSMutableParagraphStyle *pstyle = [[[NSMutableParagraphStyle alloc] init]
+                                      autorelease];
+  [pstyle setTabStops: @[tab]];
+  attributes = @{NSParagraphStyleAttributeName: pstyle};
+#endif
 
   /* clear existing contents */
   [self removeAllItems];
 
   /* add new contents */
-  for (; wv != NULL; wv = wv->next)
+  for (widget_value *wv = first_wv; wv != NULL; wv = wv->next)
     {
-      NSMenuItem *item = [self addItemWithWidgetValue: wv];
+      NSMenuItem *item = [self addItemWithWidgetValue: wv
+                                           attributes: attributes];
 
       if (wv->contents)
         {
@@ -872,14 +956,11 @@ update_frame_tool_bar (struct frame *f)
   int i, k = 0;
   EmacsView *view = FRAME_NS_VIEW (f);
   EmacsToolbar *toolbar = [view toolbar];
-  int oldh;
 
   NSTRACE ("update_frame_tool_bar");
 
   if (view == nil || toolbar == nil) return;
   block_input ();
-
-  oldh = FRAME_TOOLBAR_HEIGHT (f);
 
 #ifdef NS_IMPL_COCOA
   [toolbar clearActive];
