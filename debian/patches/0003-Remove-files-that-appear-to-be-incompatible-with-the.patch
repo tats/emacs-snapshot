@@ -29,7 +29,7 @@ Status: new
  5 files changed, 32 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index fbb1891..4d989af 100644
+index 2068362..8a8791c 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -164,7 +164,9 @@ man1dir=
@@ -53,7 +53,7 @@ index fbb1891..4d989af 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -972,11 +973,11 @@ $(CHECK_TARGETS):
+@@ -976,11 +977,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index fbb1891..4d989af 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -997,9 +998,7 @@ info-dir:
+@@ -1001,9 +1002,7 @@ info-dir:
  
  ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
@@ -81,7 +81,7 @@ index fbb1891..4d989af 100644
    $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1021,14 +1020,10 @@ ${srcdir}/info/dir:
+@@ -1025,14 +1024,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index fbb1891..4d989af 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1046,14 +1041,10 @@ install-pdf:
+@@ -1050,14 +1045,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -120,7 +120,7 @@ index fbb1891..4d989af 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index d60984e..c57b0f5 100755
+index 35c391d..ab87ce1 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -260,8 +260,7 @@ info_dir ()
@@ -134,10 +134,10 @@ index d60984e..c57b0f5 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index bf76844..c9f6388 100644
+index 66c6606..de6800b 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5802,7 +5802,7 @@ AC_DEFUN
+@@ -5819,7 +5819,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index bf76844..c9f6388 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5854,15 +5854,6 @@ m4_define
+@@ -5871,15 +5871,6 @@ m4_define
  fi
  ])
  
@@ -163,7 +163,7 @@ index bf76844..c9f6388 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index f4fb7d2..aab4801 100644
+index d627055..d410ff5 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -61,18 +61,14 @@ INSTALL_DATA =
@@ -190,7 +190,7 @@ index f4fb7d2..aab4801 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index ac5c2f1..825bab5 100644
+index 084e941..b23d860 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -297,6 +297,14 @@ view-help-file
