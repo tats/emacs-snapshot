@@ -320,6 +320,7 @@ confflags += --enable-locallisppath=$(local_lpath)
 # x configure flags
 confflags_x := $(confflags) 
 confflags_x += --with-x=yes
+confflags_x += --with-imagemagick
 confflags_x += --with-x-toolkit=gtk3
 # For those who prefer the old-style non-toolkit scrollbars, just
 # change the assignment below to --without-toolkit-scroll-bars.  The
