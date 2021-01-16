@@ -1646,39 +1646,6 @@ specified buffer position instead of point are used.
 
 /* GC is possible in this function if it autoloads a keymap.  */
 
-DEFUN ("local-key-binding", Flocal_key_binding, Slocal_key_binding, 1, 2, 0,
-       doc: /* Return the binding for command KEYS in current local keymap only.
-KEYS is a string or vector, a sequence of keystrokes.
-The binding is probably a symbol with a function definition.
-
-If optional argument ACCEPT-DEFAULT is non-nil, recognize default
-bindings; see the description of `lookup-key' for more details about this.  */)
-  (Lisp_Object keys, Lisp_Object accept_default)
-{
-  register Lisp_Object map = BVAR (current_buffer, keymap);
-  if (NILP (map))
-    return Qnil;
-  return Flookup_key (map, keys, accept_default);
-}
-
-/* GC is possible in this function if it autoloads a keymap.  */
-
-DEFUN ("global-key-binding", Fglobal_key_binding, Sglobal_key_binding, 1, 2, 0,
-       doc: /* Return the binding for command KEYS in current global keymap only.
-KEYS is a string or vector, a sequence of keystrokes.
-The binding is probably a symbol with a function definition.
-This function's return values are the same as those of `lookup-key'
-\(which see).
-
-If optional argument ACCEPT-DEFAULT is non-nil, recognize default
-bindings; see the description of `lookup-key' for more details about this.  */)
-  (Lisp_Object keys, Lisp_Object accept_default)
-{
-  return Flookup_key (current_global_map, keys, accept_default);
-}
-
-/* GC is possible in this function if it autoloads a keymap.  */
-
 DEFUN ("minor-mode-key-binding", Fminor_mode_key_binding, Sminor_mode_key_binding, 1, 2, 0,
        doc: /* Find the visible minor mode bindings of KEY.
 Return an alist of pairs (MODENAME . BINDING), where MODENAME is
@@ -1710,28 +1677,6 @@ bindings; see the description of `lookup-key' for more details about this.  */)
       }
 
   return Flist (j, maps);
-}
-
-DEFUN ("define-prefix-command", Fdefine_prefix_command, Sdefine_prefix_command, 1, 3, 0,
-       doc: /* Define COMMAND as a prefix command.  COMMAND should be a symbol.
-A new sparse keymap is stored as COMMAND's function definition and its
-value.
-This prepares COMMAND for use as a prefix key's binding.
-If a second optional argument MAPVAR is given, it should be a symbol.
-The map is then stored as MAPVAR's value instead of as COMMAND's
-value; but COMMAND is still defined as a function.
-The third optional argument NAME, if given, supplies a menu name
-string for the map.  This is required to use the keymap as a menu.
-This function returns COMMAND.  */)
-  (Lisp_Object command, Lisp_Object mapvar, Lisp_Object name)
-{
-  Lisp_Object map = Fmake_sparse_keymap (name);
-  Ffset (command, map);
-  if (!NILP (mapvar))
-    Fset (mapvar, map);
-  else
-    Fset (command, map);
-  return command;
 }
 
 DEFUN ("use-global-map", Fuse_global_map, Suse_global_map, 1, 1, 0,
@@ -3275,12 +3220,9 @@ be preferred.  */);
   defsubr (&Scopy_keymap);
   defsubr (&Scommand_remapping);
   defsubr (&Skey_binding);
-  defsubr (&Slocal_key_binding);
-  defsubr (&Sglobal_key_binding);
   defsubr (&Sminor_mode_key_binding);
   defsubr (&Sdefine_key);
   defsubr (&Slookup_key);
-  defsubr (&Sdefine_prefix_command);
   defsubr (&Suse_global_map);
   defsubr (&Suse_local_map);
   defsubr (&Scurrent_local_map);

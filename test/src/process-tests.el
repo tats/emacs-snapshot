@@ -28,6 +28,7 @@
 (require 'puny)
 (require 'rx)
 (require 'subr-x)
+(require 'dns)
 
 ;; Timeout in seconds; the test fails if the timeout is reached.
 (defvar process-test-sentinel-wait-timeout 2.0)
@@ -350,14 +351,23 @@ See Bug#30460."
 ;; All the following tests require working DNS, which appears not to
 ;; be the case for hydra.nixos.org, so disable them there for now.
 
+;; This will need updating when IANA assign more IPv6 global ranges.
+(defun ipv6-is-available ()
+  (and (featurep 'make-network-process '(:family ipv6))
+       (cl-rassoc-if
+        (lambda (elt)
+          (and (eq 9 (length elt))
+               (= (logand (aref elt 0) #xe000) #x2000)))
+        (network-interface-list))))
+
 (ert-deftest lookup-family-specification ()
   "`network-lookup-address-info' should only accept valid family symbols."
   (skip-unless (not (getenv "EMACS_HYDRA_CI")))
   (with-timeout (60 (ert-fail "Test timed out"))
-  (should-error (network-lookup-address-info "google.com" 'both))
-  (should (network-lookup-address-info "google.com" 'ipv4))
-  (when (featurep 'make-network-process '(:family ipv6))
-    (should (network-lookup-address-info "google.com" 'ipv6)))))
+  (should-error (network-lookup-address-info "localhost" 'both))
+  (should (network-lookup-address-info "localhost" 'ipv4))
+  (when (ipv6-is-available)
+    (should (network-lookup-address-info "localhost" 'ipv6)))))
 
 (ert-deftest lookup-unicode-domains ()
   "Unicode domains should fail."
@@ -380,7 +390,8 @@ See Bug#30460."
         (addresses-v4 (network-lookup-address-info "google.com" 'ipv4)))
     (should addresses-both)
     (should addresses-v4))
-  (when (featurep 'make-network-process '(:family ipv6))
+  (when (and (ipv6-is-available)
+             (dns-query "google.com" 'AAAA))
     (should (network-lookup-address-info "google.com" 'ipv6)))))
 
 (ert-deftest non-existent-lookup-failure ()
@@ -565,6 +576,11 @@ FD_SETSIZE file descriptors (Bug#24325)."
                 (should (memq (process-status process) '(run exit)))
                 (when (process-live-p process)
                   (process-send-eof process))
+                ;; FIXME: This `sleep-for' shouldn't be needed.  It
+                ;; indicates a bug in Emacs; perhaps SIGCHLD is
+                ;; received in parallel with `accept-process-output',
+                ;; causing the latter to hang.
+                (sleep-for 0.1)
                 (while (accept-process-output process))
                 (should (eq (process-status process) 'exit))
                 ;; If there's an error between fork and exec, Emacs
@@ -646,6 +662,8 @@ FD_SETSIZE file descriptors (Bug#24325)."
 (ert-deftest process-tests/fd-setsize-no-crash/make-serial-process ()
   "Check that Emacs doesn't crash when trying to use more than
 FD_SETSIZE file descriptors (Bug#24325)."
+  ;; This test cannot be run if PTYs aren't supported.
+  (skip-unless (not (eq system-type 'windows-nt)))
   (with-timeout (60 (ert-fail "Test timed out"))
     (process-tests--with-processes processes
       ;; In order to use `make-serial-process', we need to create some
@@ -667,6 +685,15 @@ FD_SETSIZE file descriptors (Bug#24325)."
                  (tty-name (process-tty-name host)))
             (should (processp host))
             (push host processes)
+            ;; FIXME: The assumption below that using :connection 'pty
+            ;; in make-process necessarily produces a process with PTY
+            ;; connection is unreliable and non-portable.
+            ;; make-process can legitimately and silently fall back on
+            ;; pipes if allocating a PTY fails (and on MS-Windows it
+            ;; always fails).  The following code also assumes that
+            ;; process-tty-name produces a file name that can be
+            ;; passed to 'stat' and to make-serial-process, which is
+            ;; also non-portable.
             (should tty-name)
             (should (file-exists-p tty-name))
             (should-not (member tty-name tty-names))

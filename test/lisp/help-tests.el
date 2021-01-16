@@ -95,14 +95,14 @@
 key             binding
 ---             -------
 
-C-g		abort-recursive-edit
+C-g		abort-minibuffers
 TAB		minibuffer-complete
 C-j		minibuffer-complete-and-exit
 RET		minibuffer-complete-and-exit
 ESC		Prefix Command
 SPC		minibuffer-complete-word
 ?		minibuffer-completion-help
-<C-tab>		file-cache-minibuffer-complete
+C-<tab>		file-cache-minibuffer-complete
 <XF86Back>	previous-history-element
 <XF86Forward>	next-history-element
 <down>		next-line-or-history-element
@@ -122,7 +122,7 @@ M-s		next-matching-history-element
 
 (ert-deftest help-tests-substitute-command-keys/keymap-change ()
   (with-substitute-command-keys-test
-   (test "\\<minibuffer-local-must-match-map>\\[abort-recursive-edit]" "C-g")
+   (test "\\<minibuffer-local-must-match-map>\\[abort-recursive-edit]" "C-]")
    (test "\\<emacs-lisp-mode-map>\\[eval-defun]" "C-M-x")))
 
 (defvar help-tests-remap-map
