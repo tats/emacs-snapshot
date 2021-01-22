@@ -11,10 +11,10 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index fcfc2f8..8454f72 100644
+index 3a3093f..898efd6 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
-@@ -62,7 +62,7 @@ emacs-version
+@@ -60,7 +60,7 @@ emacs-version
  to the system configuration; look at `system-configuration' instead."
    (interactive "P")
    (let ((version-string
