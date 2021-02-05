@@ -226,6 +226,16 @@ C-M-<return> instead of <C-M-return>.  Either variant can be used as
 input; functions such as 'kbd' and 'read-kbd-macro' accept both styles
 as equivalent (they have done so for a long time).
 
++++
+** New user option 'lazy-highlight-no-delay-length'.
+Lazy highlighting of matches in Isearch now starts immediately if the
+search string is at least this long.  'lazy-highlight-initial-delay'
+still applies for shorter search strings, which avoids flicker in the
+search buffer due to too many matches being highlighted.
+
++++
+** 'revert-buffer' is now bound to 'C-x g' globally.
+
 
 * Editing Changes in Emacs 28.1
 
@@ -503,6 +513,12 @@ If 'numeric', calendar functions (eg 'calendar-sunrise-sunset') that display
 time zones will use a form like "+0100" instead of "CET".
 
 ** Dired
+
+---
+*** Behavior change on 'dired-clean-confirm-killing-deleted-buffers'.
+Previously, if 'dired-clean-up-buffers-too' was non-nil, and
+'dired-clean-confirm-killing-deleted-buffers' was nil, the buffers
+wouldn't be killed.  This combination will now kill the buffers.
 
 +++
 *** New user option 'dired-switches-in-mode-line'.
@@ -943,6 +959,9 @@ command line under point (and any following output).
 ** Eshell
 
 ---
+*** 'eshell-hist-ignoredups' can now also be used to mimic "erasedups" in bash.
+
+---
 *** Environment variable 'INSIDE_EMACS' is now copied to subprocesses.
 Its value equals the result of evaluating '(format "%s,eshell" emacs-version)'.
 
@@ -1131,6 +1150,11 @@ requires to enlarge 'max-specpdl-size', the number of Lisp variable
 bindings, will be aborted, and Emacs will not ask you whether to
 enlarge 'max-specpdl-size' to complete the rendering.  The default is
 t, which preserves the original behavior.
+
+---
+*** New user option 'rmail-show-message-set-modified'.
+If set non-nil, showing an unseen message will set the Rmail buffer's
+modified flag.
 
 ** Apropos
 
@@ -1989,6 +2013,13 @@ first).
 
 * Incompatible Editing Changes in Emacs 28.1
 
+** In 'f90-mode', the backslash character ('\') no longer escapes.
+For about a decade, the backslash character has no longer had a
+special escape syntax in Fortran F90.  To get the old behaviour back,
+say something like:
+
+    (modify-syntax-entry ?\\ "\\" f90-mode-syntax-table)
+
 ** In 'nroff-mode', 'center-line' is now bound to 'M-o M-s'.
 The original key binding was 'M-s', which interfered with I-search,
 since the latter uses 'M-s' as a prefix key of the search prefix map.
@@ -1998,6 +2029,9 @@ directory instead of the default directory.
 
 
 * Incompatible Lisp Changes in Emacs 28.1
+
+** 'completions-annotations' face is not used when the caller puts own face.
+This affects the suffix specified by completion 'annotation-function'.
 
 ** 'set-process-buffer' now updates the process mark.
 The mark will be set to point to the end of the new buffer.
@@ -2087,8 +2121,9 @@ ledit.el, lmenu.el, lucid.el and old-whitespace.el.
 'completion-base-size', 'completion-common-substring',
 'crm-minibuffer-complete', 'crm-minibuffer-complete-and-exit',
 'crm-minibuffer-completion-help', 'custom-mode', 'custom-mode-hook',
-'define-mode-overload-implementation', 'detect-coding-with-priority',
-'dirtrack-debug', 'dirtrack-debug-toggle', 'dynamic-completion-table',
+'define-key-rebound-commands', 'define-mode-overload-implementation',
+'detect-coding-with-priority', 'dirtrack-debug',
+'dirtrack-debug-toggle', 'dynamic-completion-table',
 'easy-menu-precalculate-equivalent-keybindings',
 'epa-display-verify-result', 'epg-passphrase-callback-function',
 'eshell-report-bug', 'eval-next-after-load', 'exchange-dot-and-mark',

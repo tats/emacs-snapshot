@@ -1637,7 +1637,7 @@ w32_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 	  if (!old)
 	    /* Make menu bar when there was none.  Emacs 25 waited until
 	       the next redisplay for this to take effect.  */
-	    set_frame_menubar (f, false, true);
+	    set_frame_menubar (f, true);
 	  else
 	    {
 	      /* Remove menu bar.  */
@@ -9479,6 +9479,18 @@ cache_system_info (void)
 
   w32_num_mouse_buttons = GetSystemMetrics (SM_CMOUSEBUTTONS);
 }
+
+#ifdef WINDOWSNT
+char *
+w32_version_string (void)
+{
+  /* NNN.NNN.NNNNNNNNNN */
+  static char version_string[3 + 1 + 3 + 1 + 10 + 1];
+  _snprintf (version_string, sizeof version_string, "%d.%d.%d",
+	     w32_major_version, w32_minor_version, w32_build_number);
+  return version_string;
+}
+#endif
 
 #ifdef EMACSDEBUG
 void
