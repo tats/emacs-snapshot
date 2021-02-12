@@ -10706,6 +10706,7 @@ include the height of both, if present, in the return value.  */)
 
   itdata = bidi_shelve_cache ();
   start_display (&it, w, startp);
+  int start_y = it.current_y;
   /* It makes no sense to measure dimensions of region of text that
      crosses the point where bidi reordering changes scan direction.
      By using unidirectional movement here we at least support the use
@@ -10726,7 +10727,7 @@ include the height of both, if present, in the return value.  */)
   int start_x = it.current_x;
   int move_op = MOVE_TO_POS | MOVE_TO_Y;
   int to_x = -1;
-  it.current_y = 0;
+  it.current_y = start_y;
   /* If FROM is on a newline, pretend that we start at the beginning
      of the next line, because the newline takes no place on display.  */
   if (FETCH_BYTE (start) == '\n')
@@ -10776,11 +10777,11 @@ include the height of both, if present, in the return value.  */)
   /* If text spans more than one screen line, we don't need to adjust
      the x-span for start_x, since the second and subsequent lines
      will begin at zero X coordinate.  */
-  if (it.current_y > 0)
+  if (it.current_y > start_y)
     start_x = 0;
 
-  /* Subtract height of header-line which was counted automatically by
-     start_display.  */
+  /* Subtract height of header-line and tab-line which was counted
+     automatically by start_display.  */
   y = it.current_y + it.max_ascent + it.max_descent
     - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
   /* Don't return more than Y-LIMIT.  */
@@ -19451,8 +19452,11 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
      'start_display' again.  */
   ptrdiff_t it_charpos = IT_CHARPOS (it);
 
-  /* Don't let the cursor end in the scroll margins.  */
+  /* Don't let the cursor end in the scroll margins.  However, when
+     the window is vscrolled, we leave it to vscroll to handle the
+     margins, see window_scroll_pixel_based.  */
   if ((flags & TRY_WINDOW_CHECK_MARGINS)
+      && w->vscroll == 0
       && !MINI_WINDOW_P (w))
     {
       int top_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
@@ -19461,7 +19465,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
 	top_scroll_margin += CURRENT_HEADER_LINE_HEIGHT (w);
       start_display (&it, w, pos);
 
-      if ((w->cursor.y >= 0	/* not vscrolled */
+      if ((w->cursor.y >= 0
 	   && w->cursor.y < top_scroll_margin
 	   && CHARPOS (pos) > BEGV)
 	  /* rms: considering make_cursor_line_fully_visible_p here
