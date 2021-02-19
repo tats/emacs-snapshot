@@ -138,6 +138,10 @@ messages are highlighted; this helps to see what messages were visited."
   nil
   "Overlay highlighting the current error message in the `next-error' buffer.")
 
+(defvar global-minor-modes nil
+  "A list of the currently enabled global minor modes.
+This is a list of symbols.")
+
 (defcustom next-error-hook nil
   "List of hook functions run by `next-error' after visiting source file."
   :type 'hook
@@ -545,7 +549,7 @@ It must be called via `run-hook-with-args-until-success' with no arguments.
 If any function on this hook returns a non-nil value, `delete-selection-mode'
 will act on that value (see `delete-selection-helper') and will
 usually delete the region.  If all the functions on this hook return
-nil, it is an indiction that `self-insert-command' needs the region
+nil, it is an indication that `self-insert-command' needs the region
 untouched by `delete-selection-mode' and will itself do whatever is
 appropriate with the region.
 Any function on `post-self-insert-hook' that acts on the region should
@@ -1274,7 +1278,19 @@ that uses or sets the mark."
 
 ;; Counting lines, one way or another.
 
-(defvar-local goto-line-history nil
+(defcustom goto-line-history-local nil
+  "If this option is nil, `goto-line-history' is shared between all buffers.
+If it is non-nil, each buffer has its own value of this history list.
+
+Note that on changing from non-nil to nil, the former contents of
+`goto-line-history' for each buffer are discarded on use of
+`goto-line' in that buffer."
+  :group 'editing
+  :type 'boolean
+  :safe #'booleanp
+  :version "28.1")
+
+(defvar goto-line-history nil
   "History of values entered with `goto-line'.")
 
 (defun goto-line-read-args (&optional relative)
@@ -1292,6 +1308,11 @@ that uses or sets the mark."
             (if buffer
                 (concat " in " (buffer-name buffer))
               "")))
+      ;; Has the buffer locality of `goto-line-history' changed?
+      (cond ((and goto-line-history-local (not (local-variable-p 'goto-line-history)))
+             (make-local-variable 'goto-line-history))
+            ((and (not goto-line-history-local) (local-variable-p 'goto-line-history))
+             (kill-local-variable 'goto-line-history)))
       ;; Read the argument, offering that number (if any) as default.
       (list (read-number (format "Goto%s line%s: "
                                  (if (buffer-narrowed-p)
@@ -1900,55 +1921,126 @@ to get different commands to edit and resubmit."
 (defvar extended-command-history nil)
 (defvar execute-extended-command--last-typed nil)
 
+(defcustom read-extended-command-predicate nil
+  "Predicate to use to determine which commands to include when completing.
+If it's nil, include all the commands.
+If it's a function, it will be called with two parameters: the
+symbol of the command and a buffer.  The predicate should return
+non-nil if the command should be present when doing `M-x TAB'
+in that buffer."
+  :version "28.1"
+  :group 'completion
+  :type '(choice (const :tag "Don't exclude any commands" nil)
+                 (const :tag "Exclude commands irrelevant to current buffer's mode"
+                        command-completion-default-include-p)
+                 (function :tag "Other function")))
+
 (defun read-extended-command ()
-  "Read command name to invoke in `execute-extended-command'."
-  (minibuffer-with-setup-hook
-      (lambda ()
-        (add-hook 'post-self-insert-hook
-                  (lambda ()
-                    (setq execute-extended-command--last-typed
-                              (minibuffer-contents)))
-                  nil 'local)
-        (setq-local minibuffer-default-add-function
-	     (lambda ()
-	       ;; Get a command name at point in the original buffer
-	       ;; to propose it after M-n.
-	       (let ((def (with-current-buffer
-			      (window-buffer (minibuffer-selected-window))
-			    (and (commandp (function-called-at-point))
-				 (format "%S" (function-called-at-point)))))
-		     (all (sort (minibuffer-default-add-completions)
-                                #'string<)))
-		 (if def
-		     (cons def (delete def all))
-		   all)))))
-    ;; Read a string, completing from and restricting to the set of
-    ;; all defined commands.  Don't provide any initial input.
-    ;; Save the command read on the extended-command history list.
-    (completing-read
-     (concat (cond
-	      ((eq current-prefix-arg '-) "- ")
-	      ((and (consp current-prefix-arg)
-		    (eq (car current-prefix-arg) 4)) "C-u ")
-	      ((and (consp current-prefix-arg)
-		    (integerp (car current-prefix-arg)))
-	       (format "%d " (car current-prefix-arg)))
-	      ((integerp current-prefix-arg)
-	       (format "%d " current-prefix-arg)))
-	     ;; This isn't strictly correct if `execute-extended-command'
-	     ;; is bound to anything else (e.g. [menu]).
-	     ;; It could use (key-description (this-single-command-keys)),
-	     ;; but actually a prompt other than "M-x" would be confusing,
-	     ;; because "M-x" is a well-known prompt to read a command
-	     ;; and it serves as a shorthand for "Extended command: ".
-	     "M-x ")
-     (lambda (string pred action)
-       (if (and suggest-key-bindings (eq action 'metadata))
-	   '(metadata
-	     (affixation-function . read-extended-command--affixation)
-	     (category . command))
-         (complete-with-action action obarray string pred)))
-     #'commandp t nil 'extended-command-history)))
+  "Read command name to invoke in `execute-extended-command'.
+This function uses the `read-extended-command-predicate' user option."
+  (let ((buffer (current-buffer)))
+    (minibuffer-with-setup-hook
+        (lambda ()
+          (add-hook 'post-self-insert-hook
+                    (lambda ()
+                      (setq execute-extended-command--last-typed
+                            (minibuffer-contents)))
+                    nil 'local)
+          (setq-local minibuffer-default-add-function
+	              (lambda ()
+	                ;; Get a command name at point in the original buffer
+	                ;; to propose it after M-n.
+	                (let ((def
+                               (with-current-buffer
+			           (window-buffer (minibuffer-selected-window))
+			         (and (commandp (function-called-at-point))
+				      (format
+                                       "%S" (function-called-at-point)))))
+		              (all (sort (minibuffer-default-add-completions)
+                                         #'string<)))
+		          (if def
+		              (cons def (delete def all))
+		            all)))))
+      ;; Read a string, completing from and restricting to the set of
+      ;; all defined commands.  Don't provide any initial input.
+      ;; Save the command read on the extended-command history list.
+      (completing-read
+       (concat (cond
+	        ((eq current-prefix-arg '-) "- ")
+	        ((and (consp current-prefix-arg)
+		      (eq (car current-prefix-arg) 4)) "C-u ")
+	        ((and (consp current-prefix-arg)
+		      (integerp (car current-prefix-arg)))
+	         (format "%d " (car current-prefix-arg)))
+	        ((integerp current-prefix-arg)
+	         (format "%d " current-prefix-arg)))
+	       ;; This isn't strictly correct if `execute-extended-command'
+	       ;; is bound to anything else (e.g. [menu]).
+	       ;; It could use (key-description (this-single-command-keys)),
+	       ;; but actually a prompt other than "M-x" would be confusing,
+	       ;; because "M-x" is a well-known prompt to read a command
+	       ;; and it serves as a shorthand for "Extended command: ".
+	       "M-x ")
+       (lambda (string pred action)
+         (if (and suggest-key-bindings (eq action 'metadata))
+	     '(metadata
+	       (affixation-function . read-extended-command--affixation)
+	       (category . command))
+           (complete-with-action action obarray string pred)))
+       (lambda (sym)
+         (and (commandp sym)
+              (or (null read-extended-command-predicate)
+                  (and (functionp read-extended-command-predicate)
+                       (funcall read-extended-command-predicate sym buffer)))))
+       t nil 'extended-command-history))))
+
+(defun command-completion-default-include-p (symbol buffer)
+  "Say whether SYMBOL should be offered as a completion.
+If there's a `completion-predicate' for SYMBOL, the result from
+calling that predicate is called.  If there isn't one, this
+predicate is true if the command SYMBOL is applicable to the
+major mode in BUFFER, or any of the active minor modes in
+BUFFER."
+  (if (get symbol 'completion-predicate)
+      ;; An explicit completion predicate takes precedence.
+      (funcall (get symbol 'completion-predicate) symbol buffer)
+    ;; Check the modes.
+    (let ((modes (command-modes symbol)))
+      (or (null modes)
+          ;; Common case: Just a single mode.
+          (if (null (cdr modes))
+              (or (provided-mode-derived-p
+                   (buffer-local-value 'major-mode buffer) (car modes))
+                  (memq (car modes)
+                        (buffer-local-value 'local-minor-modes buffer))
+                  (memq (car modes) global-minor-modes))
+            ;; Uncommon case: Multiple modes.
+            (apply #'provided-mode-derived-p
+                   (buffer-local-value 'major-mode buffer)
+                   modes)
+            (seq-intersection modes
+                              (buffer-local-value 'local-minor-modes buffer)
+                              #'eq)
+            (seq-intersection modes global-minor-modes #'eq))))))
+
+(defun command-completion-with-modes-p (modes buffer)
+  "Say whether MODES are in action in BUFFER.
+This is the case if either the major mode is derived from one of MODES,
+or (if one of MODES is a minor mode), if it is switched on in BUFFER."
+  (or (apply #'provided-mode-derived-p
+             (buffer-local-value 'major-mode buffer)
+             modes)
+      ;; It's a minor mode.
+      (seq-intersection modes
+                        (buffer-local-value 'local-minor-modes buffer)
+                        #'eq)
+      (seq-intersection modes global-minor-modes #'eq)))
+
+(defun command-completion-button-p (category buffer)
+  "Return non-nil if there's a button of CATEGORY at point in BUFFER."
+  (with-current-buffer buffer
+    (and (get-text-property (point) 'button)
+         (eq (get-text-property (point) 'category) category))))
 
 (defun read-extended-command--affixation (command-names)
   (with-selected-window (or (minibuffer-selected-window) (selected-window))
