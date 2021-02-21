@@ -1,10 +1,10 @@
-emacs-non-dfsg (1:27.1+1-2~1.gbp1703ae) UNRELEASED; urgency=medium
+emacs-non-dfsg (1:27.1+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @1703ae00c1f5506e69eadb80f686fc4d3219675b **
+  * Upload to unstable for bullseye with no changes from the 1:27.1+1-1
+    experimental version.  Thanks to Francesco Potortì for
+    the report/reminder. (Closes: 917004)
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 21 Feb 2021 14:25:54 -0600
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 21 Feb 2021 14:28:07 -0600
 
 emacs-non-dfsg (1:27.1+1-1) experimental; urgency=medium
 
