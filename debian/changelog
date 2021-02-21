@@ -1,3 +1,11 @@
+emacs-non-dfsg (1:27.1+1-2~1.gbp1703ae) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @1703ae00c1f5506e69eadb80f686fc4d3219675b **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 21 Feb 2021 14:25:54 -0600
+
 emacs-non-dfsg (1:27.1+1-1) experimental; urgency=medium
 
   * Merge upstream version 27.1.
