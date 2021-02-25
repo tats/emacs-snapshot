@@ -119,6 +119,20 @@ applies to newsticker only."
   :type 'boolean
   :group 'newsticker-treeview)
 
+(defcustom newsticker-treeview-use-feed-name-from-url-list-in-treeview
+  t
+  "Use the feed names from 'newsticker-url-list' for display in treeview."
+  :version "28.1"
+  :type 'boolean
+  :group 'newsticker-treeview)
+
+(defcustom newsticker-treeview-use-feed-name-from-url-list-in-itemview
+  t
+  "Use feed names from 'newsticker-url-list' in itemview."
+  :version "28.1"
+  :type 'boolean
+  :group 'newsticker-treeview)
+
 (defvar newsticker-groups
   '("Feeds")
   "List of feed groups, used in the treeview frontend.
@@ -738,11 +752,14 @@ for the button."
                (img (newsticker--image-read feed-name-symbol nil 40)))
           (if (and (display-images-p) img)
               (newsticker--insert-image img (car item))
-            (insert (newsticker--real-feed-name feed-name-symbol))))
+            (insert (if newsticker-treeview-use-feed-name-from-url-list-in-itemview
+                        (symbol-name feed-name-symbol)
+                      (newsticker--real-feed-name feed-name-symbol)))))
         (add-text-properties (point-min) (point)
                              (list 'face 'newsticker-feed-face
                                    'mouse-face 'highlight
-                                   'help-echo "Visit in web browser."
+                                   'help-echo (concat (newsticker--real-feed-name feed-name-symbol)
+                                                      "\nClick to visit in web browser.")
                                    :nt-link (newsticker--link item)
                                    'keymap newsticker--treeview-url-keymap))
         (setq pos (point))
@@ -933,10 +950,10 @@ Optional arguments CHANGED-WIDGET and EVENT are ignored."
     (newsticker-treeview-mode)))
 
 (defun newsticker--treeview-propertize-tag (tag &optional num-new nt-id feed
-                                                vfeed)
+                                                vfeed tooltip)
   "Return propertized copy of string TAG.
 Optional argument NUM-NEW is used for choosing face, other
-arguments NT-ID, FEED, and VFEED are added as properties."
+arguments NT-ID, FEED, VFEED and TOOLTIP are added as properties."
   ;;(message "newsticker--treeview-propertize-tag `%s' %s" feed nt-id)
   (let ((face 'newsticker-treeview-face)
         (map (make-sparse-keymap)))
@@ -950,14 +967,14 @@ arguments NT-ID, FEED, and VFEED are added as properties."
                 :nt-id nt-id
                 :nt-feed feed
                 :nt-vfeed vfeed
-                'help-echo tag
+                'help-echo tooltip
                 'mouse-face 'highlight)))
 
 (defun newsticker--treeview-tree-get-tag (feed-name vfeed-name
                                                     &optional nt-id)
   "Return a tag string for either FEED-NAME or, if it is nil, for VFEED-NAME.
 Optional argument NT-ID is added to the tag's properties."
-  (let (tag (num-new 0))
+  (let (tag tooltip (num-new 0))
     (cond (vfeed-name
            (cond ((string= vfeed-name "new")
                   (setq num-new (newsticker--stat-num-items-total 'new))
@@ -970,18 +987,29 @@ Optional argument NT-ID is added to the tag's properties."
                   (setq tag (format "Obsolete items (%d)" num-new)))
                  ((string= vfeed-name "all")
                   (setq num-new (newsticker--stat-num-items-total))
-                  (setq tag (format "All items (%d)" num-new)))))
+                  (setq tag (format "All items (%d)" num-new))))
+           (setq tooltip tag))
           (feed-name
            (setq num-new (newsticker--stat-num-items-for-group
                           (intern feed-name) 'new 'immortal))
            (setq tag
                  (format "%s (%d)"
-                         (newsticker--real-feed-name (intern feed-name))
-                         num-new))))
+                         (if newsticker-treeview-use-feed-name-from-url-list-in-itemview
+                             feed-name
+                           (newsticker--real-feed-name (intern feed-name)))
+                         num-new))
+           (setq tooltip
+                 (if (newsticker--group-get-group feed-name)
+                     tag
+                   (format "%s (%d)\n%s"
+                           feed-name
+                           num-new
+                           (newsticker--real-feed-name (intern feed-name)))))))
     (if tag
         (newsticker--treeview-propertize-tag tag num-new
                                              nt-id
-                                             feed-name vfeed-name))))
+                                             feed-name vfeed-name
+                                             tooltip))))
 
 (defun newsticker--stat-num-items-for-group (feed-name-symbol &rest ages)
   "Count number of items in feed FEED-NAME-SYMBOL that have an age matching AGES."
@@ -1434,6 +1462,15 @@ Move to next item unless DONT-PROCEED is non-nil."
                                   newsticker--treeview-current-vfeed)
                               (newsticker--treeview-get-selected-item)))
 
+(defun newsticker-treeview-customize-current-feed ()
+  "Open customization buffer for `newsticker-url-list' and move to current feed."
+  (interactive)
+  (let ((cur-feed (or newsticker--treeview-current-feed
+                      newsticker--treeview-current-vfeed)))
+    (if (newsticker--group-get-group cur-feed)
+        (message "Cannot customize groups.  Please select a feed.")
+      (newsticker-customize-feed cur-feed))))
+
 (defun newsticker--treeview-set-current-node (node)
   "Make NODE the current node."
   (with-current-buffer (newsticker--treeview-tree-buffer)
@@ -1626,7 +1663,7 @@ Return t if a new feed was activated, nil otherwise."
   (interactive
    (list (let ((completion-ignore-case t))
            (completing-read
-            "Jump to feed: "
+            "Jump to feed/group: "
             (append '("new" "obsolete" "immortal" "all")
                     (mapcar #'car (append newsticker-url-list
                                           newsticker-url-list-defaults)))
@@ -1852,28 +1889,34 @@ of the shift.  If MOVE-GROUP is nil the currently selected feed
 `newsticker--treeview-current-feed' is shifted, if it is t then
 the current feed's parent group is shifted.."
   (let* ((cur-feed newsticker--treeview-current-feed)
-         (thing (if move-group
-                    (newsticker--group-find-parent-group cur-feed)
+         (thing (if (and move-group
+                         (not (newsticker--group-get-group cur-feed)))
+                    (car (newsticker--group-find-parent-group cur-feed))
                   cur-feed))
          (parent-group (newsticker--group-find-parent-group
-                        (if move-group (car thing) thing))))
+                        ;;(if move-group (car thing) thing)
+                        thing)))
     (unless parent-group
       (error "Group not found!"))
     (let* ((siblings (cdr parent-group))
-           (pos (cl-position thing siblings :test 'equal))
+           (pos (cl-position thing siblings :test
+                             (lambda (o1 o2)
+                               (equal (if (listp o1) (car o1) o1)
+                                      (if (listp o2) (car o2) o2)))))
            (tpos (+ pos delta ))
            (new-pos (max 0 (min (length siblings) tpos)))
            (beg (cl-subseq siblings 0 (min pos new-pos)))
            (end (cl-subseq siblings (+ 1 (max pos new-pos))))
            (p (elt siblings new-pos)))
       (when (not (= pos new-pos))
-        (setcdr parent-group
-                (cl-concatenate 'list
-                                beg
-                                (if (> delta 0)
-                                    (list p thing)
-                                  (list thing p))
-                                end))
+        (let ((th (or (newsticker--group-get-group thing) thing)))
+          (setcdr parent-group
+                  (cl-concatenate 'list
+                                  beg
+                                  (if (> delta 0)
+                                      (list p th)
+                                    (list th p))
+                                  end)))
         (newsticker--treeview-tree-update)
         (newsticker-treeview-update)
         (newsticker-treeview-jump cur-feed)))))
@@ -1989,6 +2032,7 @@ Return t if groups have changed, nil otherwise."
     (define-key map " " 'newsticker-treeview-next-page)
     (define-key map "a" 'newsticker-add-url)
     (define-key map "b" 'newsticker-treeview-browse-url-item)
+    (define-key map "c" 'newsticker-treeview-customize-current-feed)
     (define-key map "F" 'newsticker-treeview-prev-feed)
     (define-key map "f" 'newsticker-treeview-next-feed)
     (define-key map "g" 'newsticker-treeview-get-news)
