@@ -425,6 +425,16 @@ the specializer used will be the one returned by BODY."
 (defun cl-generic--method-qualifier-p (x)
   (not (listp x)))
 
+(defun cl--defmethod-doc-pos ()
+  "Return the index of the docstring for a `cl-defmethod'.
+Presumes point is at the end of the `cl-defmethod' symbol."
+  (save-excursion
+    (let ((n 2))
+      (while (and (ignore-errors (forward-sexp 1) t)
+                  (not (eq (char-before) ?\))))
+        (cl-incf n))
+      n)))
+
 ;;;###autoload
 (defmacro cl-defmethod (name args &rest body)
   "Define a new method for generic function NAME.
@@ -464,7 +474,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
 \(and can be extended) by the various methods of `cl-generic-generalizers'.
 
 \(fn NAME [QUALIFIER] ARGS &rest [DOCSTRING] BODY)"
-  (declare (doc-string 3) (indent defun)
+  (declare (doc-string cl--defmethod-doc-pos) (indent defun)
            (debug
             (&define                    ; this means we are defining something
              [&name [sexp   ;Allow (setf ...) additionally to symbols.
@@ -487,7 +497,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                (or (not (fboundp 'byte-compile-warning-enabled-p))
                    (byte-compile-warning-enabled-p 'obsolete name))
                (let* ((obsolete (get name 'byte-obsolete-info)))
-                 (macroexp--warn-and-return
+                 (macroexp-warn-and-return
                   (macroexp--obsolete-warning name obsolete "generic function")
                   nil)))
          ;; You could argue that `defmethod' modifies rather than defines the

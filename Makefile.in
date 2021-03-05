@@ -997,14 +997,24 @@ info-real: $(INFOS)
 pdf: $(PDFS)
 ps: $(PSS)
 
+# This dependency is due to those doc/misc/ manuals that use .org sources.
+# Depending on src is sufficient, but ends up being slow, since the
+# uncompiled lisp/org/*.el files are used to build the .texi files
+# (which can be slow even with the elc files).
+misc-info: lisp
+# Using src rather than lisp because one is less likely to get unnecessary
+# rebuilds of stuff that is not strictly necessary for generating manuals.
+misc-dvi misc-html misc-pdf misc-ps: src
+
 info-dir: ${srcdir}/info/dir
 
-## Hopefully doc/misc/*.texi is not too long for some systems?
+texi_misc = $(shell ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
+
 srcdir_doc_info_dir_inputs = \
   ${srcdir}/doc/emacs/emacs.texi \
   ${srcdir}/doc/lispintro/emacs-lisp-intro.texi \
   ${srcdir}/doc/lispref/elisp.texi \
-  $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
+  $(addprefix ${srcdir}/doc/misc/,${texi_misc})
 info_dir_inputs = \
   ../build-aux/dir_top \
   $(subst ${srcdir}/doc/,,${srcdir_doc_info_dir_inputs})
@@ -1084,10 +1094,11 @@ uninstall-ps: $(UNINSTALL_PS)
 # would require changing every rule in doc/ that builds an info file,
 # and it's not worth it.  This case is only relevant if you download a
 # release, then change the .texi files.
+ifneq ($(HAVE_MAKEINFO),no)
+info: info-real info-dir
+else
 info:
-  ifneq ($(HAVE_MAKEINFO),no)
-	$(MAKE) info-real info-dir
-  endif
+endif
 
 ## build-aux/make-info-dir expects only certain dircategories.
 check-info: info
