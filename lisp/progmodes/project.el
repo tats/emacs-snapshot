@@ -732,13 +732,14 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
   (interactive (list (project--read-regexp)))
   (require 'xref)
   (require 'grep)
-  (let* ((pr (project-current t))
+  (let* ((caller-dir default-directory)
+         (pr (project-current t))
          (default-directory (project-root pr))
          (files
           (if (not current-prefix-arg)
               (project-files pr)
             (let ((dir (read-directory-name "Base directory: "
-                                            nil default-directory t)))
+                                            caller-dir nil t)))
               (project--files-in-directory dir
                                            nil
                                            (grep-read-files regexp))))))
@@ -782,9 +783,12 @@ pattern to search for."
       (user-error "No matches for: %s" regexp))
     xrefs))
 
+(defvar project-regexp-history-variable 'grep-regexp-history)
+
 (defun project--read-regexp ()
   (let ((sym (thing-at-point 'symbol t)))
-    (read-regexp "Find regexp" (and sym (regexp-quote sym)))))
+    (read-regexp "Find regexp" (and sym (regexp-quote sym))
+                 project-regexp-history-variable)))
 
 ;;;###autoload
 (defun project-find-file ()
