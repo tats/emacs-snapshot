@@ -530,9 +530,6 @@ override_dh_auto_install: $(autogen_install_files)
 	  # The .pdmp is flavor-specific, so I don't install it here
 	  rm $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(target)/emacs.pdmp
 
-	  # I do NOT want the systemd service
-	  rm -rf $(pkgdir_bin_common)/usr/lib/systemd
-
 	  # Make sure there's just one.
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
 	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
