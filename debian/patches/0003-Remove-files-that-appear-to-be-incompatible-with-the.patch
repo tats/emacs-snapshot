@@ -21,18 +21,18 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- Makefile.in          | 45 ++++++++++++++++++---------------------------
+ Makefile.in          | 44 +++++++++++++++++---------------------------
  admin/update_autogen |  3 +--
  configure.ac         | 11 +----------
  doc/misc/Makefile.in | 12 ++++--------
  lisp/help.el         |  8 ++++++++
- 5 files changed, 32 insertions(+), 47 deletions(-)
+ 5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2068362..8a8791c 100644
+index 6385483..bf46af5 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -164,7 +164,9 @@ man1dir=
+@@ -152,7 +152,9 @@ man1dir=
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -41,9 +41,9 @@ index 2068362..8a8791c 100644
 +# package (see /usr/share/doc/emacs*-common/copyright).
 +INFO_NONMISC=
  
- # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
- HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -837,8 +839,7 @@ $(1)_$(2):
+ # Directory for local state files for all programs.
+ localstatedir=@localstatedir@
+@@ -818,8 +820,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 2068362..8a8791c 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -976,11 +977,11 @@ test/%:
+@@ -961,11 +962,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,18 +70,17 @@ index 2068362..8a8791c 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1001,9 +1002,7 @@ info-dir:
+@@ -996,9 +997,6 @@ info-dir:
+ texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
- ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
 -  ${srcdir}/doc/emacs/emacs.texi \
 -  ${srcdir}/doc/lispintro/emacs-lisp-intro.texi \
 -  ${srcdir}/doc/lispref/elisp.texi \
-+  ${srcdir}/doc/misc/*.texi \
-   $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
+   $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1025,14 +1024,10 @@ ${srcdir}/info/dir:
+@@ -1020,14 +1018,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +99,7 @@ index 2068362..8a8791c 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1050,14 +1045,10 @@ install-pdf:
+@@ -1045,14 +1039,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -134,10 +133,10 @@ index 35c391d..ab87ce1 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 11a06a3..9e7ff12 100644
+index 2c62a9f..8b3f840 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5821,7 +5821,7 @@ AC_DEFUN
+@@ -5812,7 +5812,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +145,7 @@ index 11a06a3..9e7ff12 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5873,15 +5873,6 @@ m4_define
+@@ -5864,15 +5864,6 @@ m4_define
  fi
  ])
  
@@ -163,10 +162,10 @@ index 11a06a3..9e7ff12 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index d627055..d410ff5 100644
+index 7982c0d..a9b1395 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -61,18 +61,14 @@ INSTALL_DATA =
+@@ -63,18 +63,14 @@ INSTALL_DATA =
  MAKEINFO = @MAKEINFO@
  MAKEINFO_OPTS = --force -I$(emacsdir)
  
@@ -190,10 +189,10 @@ index d627055..d410ff5 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 084e941..b23d860 100644
+index d4be9aa..776985d 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -297,6 +297,14 @@ view-help-file
+@@ -291,6 +291,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
