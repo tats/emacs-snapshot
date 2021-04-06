@@ -314,6 +314,7 @@ confflags += --libexecdir=/usr/lib
 confflags += --localstatedir=/var/lib
 confflags += --infodir=/usr/share/info
 confflags += --mandir=/usr/share/man
+confflags += --enable-libsystemd
 confflags += --with-pop=yes
 confflags += --enable-locallisppath=$(local_lpath)
 
