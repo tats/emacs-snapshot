@@ -367,6 +367,12 @@ trying to be non-destructive.
 This command opens a new buffer called "*Memory Report*" and gives a
 summary of where Emacs is using memory currently.
 
++++
+** New user option 'isearch-repeat-on-direction-change'.
+When this option is set, direction changes in Isearch move to another
+search match, if there is one, instead of moving point to the other
+end of the current match.
+
 ** Outline
 
 +++
@@ -928,6 +934,14 @@ take the actual screenshot, and defaults to "ImageMagick import".
 *** Allow direct selection of smtp authentication mechanism.
 A server entry retrieved by auth-source can request a desired smtp
 authentication mechanism by setting a value for the key 'smtp-auth'.
+
+** Search and Replace
+
+*** New user option 'isearch-wrap-pause' defines how to wrap the search.
+There are choices to disable wrapping completely and to wrap immediately.
+When wrapping immediately, it consistently handles the numeric arguments
+of 'C-s' ('isearch-repeat-forward') and 'C-r' ('isearch-repeat-backward'),
+continuing with the remaining count after wrapping.
 
 ** Grep
 
@@ -2393,11 +2407,6 @@ parameter.
 ** The Lisp variables 'previous-system-messages-locale' and
 'previous-system-time-locale' have been removed, as they were created
 by mistake and were not useful to Lisp code.
-
----
-** Loading 'generic-x' unconditionally loads all modes.
-The user option 'generic-extras-enable-list' is now obsolete, and
-setting it has no effect.
 
 ---
 ** The 'load-dangerous-libraries' variable is now obsolete.
