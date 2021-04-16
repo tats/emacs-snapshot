@@ -119,7 +119,7 @@ index 6385483..bf46af5 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 35c391d..ab87ce1 100755
+index 11c4313..b6dfadd 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -260,8 +260,7 @@ info_dir ()
@@ -133,10 +133,10 @@ index 35c391d..ab87ce1 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 2c62a9f..8b3f840 100644
+index d3647bd..8abb2b6 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5812,7 +5812,7 @@ AC_DEFUN
+@@ -5835,7 +5835,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index 2c62a9f..8b3f840 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5864,15 +5864,6 @@ m4_define
+@@ -5887,15 +5887,6 @@ m4_define
  fi
  ])
  
