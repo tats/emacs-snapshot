@@ -2923,15 +2923,19 @@ alternative implementation will be used."
 			;; until the process is deleted.
 			(when (bufferp stderr)
 			  (with-current-buffer stderr
-			    (insert-file-contents-literally remote-tmpstderr))
+			    ;; There's a mysterious error, see
+			    ;; <https://github.com/joaotavora/eglot/issues/662>.
+			    (ignore-errors
+			      (insert-file-contents-literally remote-tmpstderr)))
 			  ;; Delete tmpstderr file.
 			  (add-function
 			   :after (process-sentinel p)
 			   (lambda (_proc _msg)
 			     (when (file-exists-p remote-tmpstderr)
 			       (with-current-buffer stderr
-				 (insert-file-contents-literally
-				  remote-tmpstderr nil nil nil 'replace))
+				 (ignore-errors
+				   (insert-file-contents-literally
+				    remote-tmpstderr nil nil nil 'replace)))
 			       (delete-file remote-tmpstderr)))))
 			;; Return process.
 			p)))
@@ -5484,15 +5488,15 @@ Nonexistent directories are removed from spec."
 	;; Check whether stat(1) returns usable syntax.  "%s" does not
 	;; work on older AIX systems.  Recent GNU stat versions
 	;; (8.24?)  use shell quoted format for "%N", we check the
-	;; boundaries "`" and "'", therefore.  See Bug#23422 in
-	;; coreutils.  Since GNU stat 8.26, environment variable
-	;; QUOTING_STYLE is supported.
+	;; boundaries "`" and "'" and their localized variants,
+	;; therefore.  See Bug#23422 in coreutils.  Since GNU stat
+	;; 8.26, environment variable QUOTING_STYLE is supported.
 	(when result
 	  (setq result (concat "env QUOTING_STYLE=locale " result)
 		tmp (tramp-send-command-and-read
 		     vec (format "%s -c '(\"%%N\" %%s)' /" result) 'noerror))
 	  (unless (and (listp tmp) (stringp (car tmp))
-		       (string-match-p "^\\(`/'\\|‘/’\\)$" (car tmp))
+		       (string-match-p "^[\"`‘„”«「]/[\"'’“”»」]$" (car tmp))
 		       (integerp (cadr tmp)))
 	    (setq result nil)))
 	result))))

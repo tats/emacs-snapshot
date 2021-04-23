@@ -116,9 +116,9 @@ it is disabled.")
                                   doc nil nil 1)))))
 
 ;;;###autoload
-(defalias 'easy-mmode-define-minor-mode 'define-minor-mode)
+(defalias 'easy-mmode-define-minor-mode #'define-minor-mode)
 ;;;###autoload
-(defmacro define-minor-mode (mode doc &optional init-value lighter keymap &rest body)
+(defmacro define-minor-mode (mode doc &rest body)
   "Define a new minor mode MODE.
 This defines the toggle command MODE and (by default) a control variable
 MODE (you can override this with the :variable keyword, see below).
@@ -143,9 +143,9 @@ BODY contains code to execute each time the mode is enabled or disabled.
   It is executed after toggling the mode, and before running MODE-hook.
   Before the actual body code, you can write keyword arguments, i.e.
   alternating keywords and values.  If you provide BODY, then you must
-  provide at least one keyword argument.  The following special
-  keywords are supported (other keywords are passed to `defcustom' if
-  the minor mode is global):
+  provide at least one keyword argument (e.g. `:lighter nil`).
+  The following special keywords are supported (other keywords are passed
+  to `defcustom' if the minor mode is global):
 
 :global GLOBAL	If non-nil specifies that the minor mode is not meant to be
 		buffer-local, so don't make the variable MODE buffer-local.
@@ -186,9 +186,11 @@ For example, you could write
     ...BODY CODE...)
 
 For backward compatibility with the Emacs<21 calling convention,
-BODY can also start with the triplet INIT-VALUE LIGHTER KEYMAP."
+the keywords can also be preceded by the obsolete triplet
+INIT-VALUE LIGHTER KEYMAP.
+
+\(fn MODE DOC [KEYWORD VAL ... &rest BODY])"
   (declare (doc-string 2)
-           (advertised-calling-convention (mode doc &rest body) "28.1")
            (debug (&define name string-or-null-p
 			   [&optional [&not keywordp] sexp
 			    &optional [&not keywordp] sexp
@@ -198,6 +200,9 @@ BODY can also start with the triplet INIT-VALUE LIGHTER KEYMAP."
 
   (let* ((last-message (make-symbol "last-message"))
          (mode-name (symbol-name mode))
+         (init-value nil)
+         (keymap nil)
+         (lighter nil)
 	 (pretty-name nil)
 	 (globalp nil)
 	 (set nil)
@@ -214,22 +219,20 @@ BODY can also start with the triplet INIT-VALUE LIGHTER KEYMAP."
 	 (hook-on (intern (concat mode-name "-on-hook")))
 	 (hook-off (intern (concat mode-name "-off-hook")))
          (interactive t)
-         (warnwrap (if (keywordp init-value) #'identity
+         (warnwrap (if (or (null body) (keywordp (car body))) #'identity
                      (lambda (exp)
                        (macroexp-warn-and-return
                         "Use keywords rather than deprecated positional arguments to `define-minor-mode'"
                         exp))))
 	 keyw keymap-sym tmp)
 
-    ;; Allow skipping the first three args.
-    (cond
-     ((keywordp init-value)
-      (setq body (if keymap `(,init-value ,lighter ,keymap ,@body)
-		   `(,init-value ,lighter))
-	    init-value nil lighter nil keymap nil))
-     ((keywordp lighter)
-      (setq body `(,lighter ,keymap ,@body) lighter nil keymap nil))
-     ((keywordp keymap) (push keymap body) (setq keymap nil)))
+    ;; Allow BODY to start with the old INIT-VALUE LIGHTER KEYMAP triplet.
+    (unless (keywordp (car body))
+      (setq init-value (pop body))
+      (unless (keywordp (car body))
+        (setq lighter (pop body))
+        (unless (keywordp (car body))
+          (setq keymap (pop body)))))
 
     ;; Check keys.
     (while (keywordp (setq keyw (car body)))
@@ -267,7 +270,7 @@ BODY can also start with the triplet INIT-VALUE LIGHTER KEYMAP."
     (unless set (setq set '(:set #'custom-set-minor-mode)))
 
     (unless initialize
-      (setq initialize '(:initialize 'custom-initialize-default)))
+      (setq initialize '(:initialize #'custom-initialize-default)))
 
     ;; TODO? Mark booleans as safe if booleanp?  Eg abbrev-mode.
     (unless type (setq type '(:type 'boolean)))
@@ -405,9 +408,9 @@ No problems result if this variable is not bound.
 ;;;
 
 ;;;###autoload
-(defalias 'easy-mmode-define-global-mode 'define-globalized-minor-mode)
+(defalias 'easy-mmode-define-global-mode #'define-globalized-minor-mode)
 ;;;###autoload
-(defalias 'define-global-minor-mode 'define-globalized-minor-mode)
+(defalias 'define-global-minor-mode #'define-globalized-minor-mode)
 ;;;###autoload
 (defmacro define-globalized-minor-mode (global-mode mode turn-on &rest body)
   "Make a global mode GLOBAL-MODE corresponding to buffer-local minor MODE.
@@ -509,12 +512,12 @@ disable it.  If called from Lisp, enable the mode if ARG is omitted or nil.\n\n"
 	 (if ,global-mode
 	     (progn
 	       (add-hook 'after-change-major-mode-hook
-			 ',MODE-enable-in-buffers)
-	       (add-hook 'find-file-hook ',MODE-check-buffers)
-	       (add-hook 'change-major-mode-hook ',MODE-cmhh))
-	   (remove-hook 'after-change-major-mode-hook ',MODE-enable-in-buffers)
-	   (remove-hook 'find-file-hook ',MODE-check-buffers)
-	   (remove-hook 'change-major-mode-hook ',MODE-cmhh))
+			 #',MODE-enable-in-buffers)
+	       (add-hook 'find-file-hook #',MODE-check-buffers)
+	       (add-hook 'change-major-mode-hook #',MODE-cmhh))
+	   (remove-hook 'after-change-major-mode-hook #',MODE-enable-in-buffers)
+	   (remove-hook 'find-file-hook #',MODE-check-buffers)
+	   (remove-hook 'change-major-mode-hook #',MODE-cmhh))
 
 	 ;; Go through existing buffers.
 	 (dolist (buf (buffer-list))
@@ -554,7 +557,7 @@ list."
 
        ;; A function which checks whether MODE has been disabled in the major
        ;; mode hook which has just been run.
-       (add-hook ',minor-MODE-hook ',MODE-set-explicitly)
+       (add-hook ',minor-MODE-hook #',MODE-set-explicitly)
 
        ;; List of buffers left to process.
        (defvar ,MODE-buffers nil)
@@ -581,13 +584,13 @@ list."
 
        (defun ,MODE-check-buffers ()
 	 (,MODE-enable-in-buffers)
-	 (remove-hook 'post-command-hook ',MODE-check-buffers))
+	 (remove-hook 'post-command-hook #',MODE-check-buffers))
        (put ',MODE-check-buffers 'definition-name ',global-mode)
 
        ;; The function that catches kill-all-local-variables.
        (defun ,MODE-cmhh ()
 	 (add-to-list ',MODE-buffers (current-buffer))
-	 (add-hook 'post-command-hook ',MODE-check-buffers))
+	 (add-hook 'post-command-hook #',MODE-check-buffers))
        (put ',MODE-cmhh 'definition-name ',global-mode))))
 
 (defun easy-mmode--globalized-predicate-p (predicate)
