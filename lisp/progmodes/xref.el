@@ -1,7 +1,7 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
 ;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
-;; Version: 1.0.4
+;; Version: 1.1.0
 ;; Package-Requires: ((emacs "26.1"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -652,8 +652,8 @@ SELECT is `quit', also quit the *xref* window."
 
 (defun xref-goto-xref (&optional quit)
   "Jump to the xref on the current line and select its window.
-Non-interactively, non-nil QUIT, or interactively, with prefix argument
-means to first quit the *xref* buffer."
+If QUIT is non-nil (interactively, with prefix argument), also
+quit the *xref* buffer."
   (interactive "P")
   (let* ((buffer (current-buffer))
          (xref (or (xref--item-at-point)

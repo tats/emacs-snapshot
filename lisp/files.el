@@ -908,6 +908,8 @@ See `file-symlink-p' to distinguish symlinks."
 		       (read-file-name "Load file: " nil nil 'lambda))))
   (load (expand-file-name file) nil nil t))
 
+(defvar comp-eln-to-el-h)
+
 (defun locate-file (filename path &optional suffixes predicate)
   "Search for FILENAME through PATH.
 If found, return the absolute file name of FILENAME; otherwise
@@ -934,7 +936,10 @@ one or more of those symbols."
 	  (logior (if (memq 'executable predicate) 1 0)
 		  (if (memq 'writable predicate) 2 0)
 		  (if (memq 'readable predicate) 4 0))))
-  (locate-file-internal filename path suffixes predicate))
+  (let ((file (locate-file-internal filename path suffixes predicate)))
+    (if (and file (string-match "\\.eln\\'" file))
+        (gethash (file-name-nondirectory file) comp-eln-to-el-h)
+      file)))
 
 (defun locate-file-completion-table (dirs suffixes string pred action)
   "Do completion for file names passed to `locate-file'."
@@ -1648,13 +1653,14 @@ rather than FUN itself, to `minibuffer-setup-hook'."
     (when (eq (car-safe fun) :append)
       (setq append '(t) fun (cadr fun)))
     `(let ((,funsym ,fun)
-           ,hook)
-       (setq ,hook
-             (lambda ()
-               ;; Clear out this hook so it does not interfere
-               ;; with any recursive minibuffer usage.
-               (remove-hook 'minibuffer-setup-hook ,hook)
-               (funcall ,funsym)))
+           ;; Use a symbol to make sure `add-hook' doesn't waste time
+           ;; in `equal'ity testing (bug#46326).
+           (,hook (make-symbol "minibuffer-setup")))
+       (fset ,hook (lambda ()
+                     ;; Clear out this hook so it does not interfere
+                     ;; with any recursive minibuffer usage.
+                     (remove-hook 'minibuffer-setup-hook ,hook)
+                     (funcall ,funsym)))
        (unwind-protect
            (progn
              (add-hook 'minibuffer-setup-hook ,hook ,@append)
