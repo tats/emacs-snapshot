@@ -401,16 +401,34 @@ The string is used in `tramp-methods'.")
 
 ;;;###tramp-autoload
 (defconst tramp-completion-function-alist-ssh
-  '((tramp-parse-rhosts      "/etc/hosts.equiv")
+  `((tramp-parse-rhosts      "/etc/hosts.equiv")
     (tramp-parse-rhosts      "/etc/shosts.equiv")
-    (tramp-parse-shosts      "/etc/ssh_known_hosts")
-    (tramp-parse-sconfig     "/etc/ssh_config")
+    ;; On W32 systems, the ssh directory is located somewhere else.
+    (tramp-parse-shosts      ,(expand-file-name
+			       "ssh/ssh_known_hosts"
+			       (or (and (eq system-type 'windows-nt)
+					(getenv "ProgramData"))
+				   "/etc/")))
+    (tramp-parse-sconfig     ,(expand-file-name
+			       "ssh/ssh_config"
+			       (or (and (eq system-type 'windows-nt)
+					(getenv "ProgramData"))
+				   "/etc/")))
     (tramp-parse-shostkeys   "/etc/ssh2/hostkeys")
     (tramp-parse-sknownhosts "/etc/ssh2/knownhosts")
     (tramp-parse-rhosts      "~/.rhosts")
     (tramp-parse-rhosts      "~/.shosts")
-    (tramp-parse-shosts      "~/.ssh/known_hosts")
-    (tramp-parse-sconfig     "~/.ssh/config")
+    ;; On W32 systems, the .ssh directory is located somewhere else.
+    (tramp-parse-shosts      ,(expand-file-name
+			       ".ssh/known_hosts"
+			       (or (and (eq system-type 'windows-nt)
+					(getenv "USERPROFILE"))
+				   "~/")))
+    (tramp-parse-sconfig     ,(expand-file-name
+			       ".ssh/config"
+			       (or (and (eq system-type 'windows-nt)
+					(getenv "USERPROFILE"))
+				   "~/")))
     (tramp-parse-shostkeys   "~/.ssh2/hostkeys")
     (tramp-parse-sknownhosts "~/.ssh2/knownhosts"))
   "Default list of (FUNCTION FILE) pairs to be examined for ssh methods.")
@@ -433,7 +451,7 @@ The string is used in `tramp-methods'.")
 ;;;###tramp-autoload
 (defconst tramp-completion-function-alist-putty
   `((tramp-parse-putty
-     ,(if (memq system-type '(windows-nt))
+     ,(if (eq system-type 'windows-nt)
 	  "HKEY_CURRENT_USER\\Software\\SimonTatham\\PuTTY\\Sessions"
 	"~/.putty/sessions")))
  "Default list of (FUNCTION REGISTRY) pairs to be examined for putty sessions.")
@@ -2200,7 +2218,7 @@ The method used must be an out-of-band method."
 	 (t2 (tramp-tramp-file-p newname))
 	 (orig-vec (tramp-dissect-file-name (if t1 filename newname)))
 	 copy-program copy-args copy-env copy-keep-date listener spec
-	 options source target remote-copy-program remote-copy-args)
+	 options source target remote-copy-program remote-copy-args p)
 
     (with-parsed-tramp-file-name (if t1 filename newname) nil
       (if (and t1 t2)
@@ -2235,10 +2253,10 @@ The method used must be an out-of-band method."
 			#'identity)
 		      (if t1
 			  (tramp-make-copy-program-file-name v)
-			(tramp-unquote-shell-quote-argument filename)))
+			(tramp-compat-file-name-unquote filename)))
 	      target (if t2
 			 (tramp-make-copy-program-file-name v)
-		       (tramp-unquote-shell-quote-argument newname)))
+		       (tramp-compat-file-name-unquote newname)))
 
 	;; Check for user.  There might be an interactive setting.
 	(setq user (or (tramp-file-name-user v)
@@ -2270,6 +2288,13 @@ The method used must be an out-of-band method."
 	      ;; keep-date argument is non-nil), or a replacement for
 	      ;; the whole keep-date sublist.
 	      (delete " " (apply #'tramp-expand-args v 'tramp-copy-args spec))
+	      ;; `tramp-ssh-controlmaster-options' is a string instead
+	      ;; of a list.  Unflatten it.
+	      copy-args
+	      (tramp-compat-flatten-tree
+	       (mapcar
+		(lambda (x) (if (string-match-p " " x) (split-string x) x))
+		copy-args))
 	      copy-env (apply #'tramp-expand-args v 'tramp-copy-env spec)
 	      remote-copy-program
 	      (tramp-get-method-parameter v 'tramp-remote-copy-program)
@@ -2331,31 +2356,26 @@ The method used must be an out-of-band method."
 		  copy-args
 		  (if remote-copy-program
 		      (list (if t1 (concat ">" target) (concat "<" source)))
-		    (list source target))))
+		    (list source target)))
+		 ;; Use an asynchronous process.  By this, password
+		 ;; can be handled.  We don't set a timeout, because
+		 ;; the copying of large files can last longer than 60
+		 ;; secs.
+		 p (apply
+		    #'start-process
+		    (tramp-get-connection-name v)
+		    (tramp-get-connection-buffer v)
+		    copy-program copy-args))
+		(tramp-message orig-vec 6 "%s" (string-join (process-command p) " "))
+		(process-put p 'vector orig-vec)
+		(process-put p 'adjust-window-size-function #'ignore)
+		(set-process-query-on-exit-flag p nil)
 
-		;; Use an asynchronous process.  By this, password can
-		;; be handled.  We don't set a timeout, because the
-		;; copying of large files can last longer than 60 secs.
-		(let* ((command
-			(mapconcat
-			 #'identity (append (list copy-program) copy-args)
-			 " "))
-		       (p (let ((default-directory
-				  (tramp-compat-temporary-file-directory)))
-			    (start-process-shell-command
-			     (tramp-get-connection-name v)
-			     (tramp-get-connection-buffer v)
-			     command))))
-		  (tramp-message orig-vec 6 "%s" command)
-		  (process-put p 'vector orig-vec)
-		  (process-put p 'adjust-window-size-function #'ignore)
-		  (set-process-query-on-exit-flag p nil)
-
-		  ;; We must adapt `tramp-local-end-of-line' for
-		  ;; sending the password.
-		  (let ((tramp-local-end-of-line tramp-rsh-end-of-line))
-		    (tramp-process-actions
-		     p v nil tramp-actions-copy-out-of-band))))
+		;; We must adapt `tramp-local-end-of-line' for
+		;; sending the password.
+		(let ((tramp-local-end-of-line tramp-rsh-end-of-line))
+		  (tramp-process-actions
+		   p v nil tramp-actions-copy-out-of-band)))
 
 	    ;; Reset the transfer process properties.
 	    (tramp-flush-connection-property v "process-name")
@@ -2903,15 +2923,19 @@ alternative implementation will be used."
 			;; until the process is deleted.
 			(when (bufferp stderr)
 			  (with-current-buffer stderr
-			    (insert-file-contents-literally remote-tmpstderr))
+			    ;; There's a mysterious error, see
+			    ;; <https://github.com/joaotavora/eglot/issues/662>.
+			    (ignore-errors
+			      (insert-file-contents-literally remote-tmpstderr)))
 			  ;; Delete tmpstderr file.
 			  (add-function
 			   :after (process-sentinel p)
 			   (lambda (_proc _msg)
 			     (when (file-exists-p remote-tmpstderr)
 			       (with-current-buffer stderr
-				 (insert-file-contents-literally
-				  remote-tmpstderr nil nil nil 'replace))
+				 (ignore-errors
+				   (insert-file-contents-literally
+				    remote-tmpstderr nil nil nil 'replace)))
 			       (delete-file remote-tmpstderr)))))
 			;; Return process.
 			p)))
@@ -3684,7 +3708,8 @@ Fall back to normal file name handler if no Tramp handler exists."
 	(remote-prefix
 	 (with-current-buffer (process-buffer proc)
 	   (file-remote-p default-directory)))
-	(rest-string (process-get proc 'rest-string)))
+	(rest-string (process-get proc 'rest-string))
+	pos)
     (when rest-string
       (tramp-message proc 10 "Previous string:\n%s" rest-string))
     (tramp-message proc 6 "%S\n%s" proc string)
@@ -3706,28 +3731,27 @@ Fall back to normal file name handler if no Tramp handler exists."
 
       ;; Determine monitor name.
       (unless (tramp-connection-property-p proc "gio-file-monitor")
-        (cond
-         ;; We have seen this on cygwin gio and on emba.  Let's make some assumptions.
-         ((string-match
-           "Can't find module 'help' specified in GIO_USE_FILE_MONITOR" string)
-          (cond
-           ((getenv "EMACS_EMBA_CI")
-            (tramp-set-connection-property
-             proc "gio-file-monitor" 'GInotifyFileMonitor))
-           ((eq system-type 'cygwin)
-            (tramp-set-connection-property
-             proc "gio-file-monitor" 'GPollFileMonitor))
-           (t (tramp-error proc 'file-error "Cannot determine gio monitor"))))
-         ;; TODO: What happens, if several monitor names are reported?
-         ((string-match "\
+        (tramp-set-connection-property
+         proc "gio-file-monitor"
+         (cond
+          ;; We have seen this on cygwin gio and on emba.  Let's make
+          ;; some assumptions.
+          ((string-match
+            "Can't find module 'help' specified in GIO_USE_FILE_MONITOR" string)
+	   (setq pos (match-end 0))
+           (cond
+            ((getenv "EMACS_EMBA_CI") 'GInotifyFileMonitor)
+            ((eq system-type 'cygwin) 'GPollFileMonitor)
+            (t nil)))
+          ;; TODO: What happens, if several monitor names are reported?
+          ((string-match "\
 Supported arguments for GIO_USE_FILE_MONITOR environment variable:
 \\s-*\\([[:alpha:]]+\\) - 20" string)
-          (tramp-set-connection-property
-           proc "gio-file-monitor"
+	   (setq pos (match-end 0))
            (intern
-            (format "G%sFileMonitor" (capitalize (match-string 1 string))))))
-         (t (throw 'doesnt-work nil)))
-        (setq string (replace-match "" nil nil string)))
+	    (format "G%sFileMonitor" (capitalize (match-string 1 string)))))
+          (t (setq pos (length string)) nil)))
+	(setq string (substring string pos)))
 
       ;; Delete empty lines.
       (setq string (tramp-compat-string-replace "\n\n" "\n" string))
@@ -3761,6 +3785,8 @@ Supported arguments for GIO_USE_FILE_MONITOR environment variable:
 	     `(file-notify ,object file-notify-callback))))))
 
     ;; Save rest of the string.
+    (while (string-match "^\n" string)
+      (setq string (replace-match "" nil nil string)))
     (when (zerop (length string)) (setq string nil))
     (when string (tramp-message proc 10 "Rest string:\n%s" string))
     (process-put proc 'rest-string string)))
@@ -5203,15 +5229,17 @@ Return ATTR."
 	 (directory-file-name (tramp-file-name-unquote-localname vec))))
     (when (string-match-p tramp-ipv6-regexp host)
       (setq host (format "[%s]" host)))
+    ;; This does not work yet for MS Windows scp, if there are
+    ;; characters to be quoted.  Win32 OpenSSH 7.9 is said to support
+    ;; this, see
+    ;; <https://github.com/PowerShell/Win32-OpenSSH/releases/tag/v7.9.0.0p1-Beta>
     (unless (string-match-p "ftp$" method)
       (setq localname (tramp-shell-quote-argument localname)))
     (cond
      ((tramp-get-method-parameter vec 'tramp-remote-copy-program)
       localname)
-     ((not (zerop (length user)))
-      (format
-       "%s@%s:%s" user host (tramp-unquote-shell-quote-argument localname)))
-     (t (format "%s:%s" host (tramp-unquote-shell-quote-argument localname))))))
+     ((zerop (length user)) (format "%s:%s" host localname))
+     (t (format "%s@%s:%s" user host localname)))))
 
 (defun tramp-method-out-of-band-p (vec size)
   "Return t if this is an out-of-band method, nil otherwise."
@@ -5462,15 +5490,15 @@ Nonexistent directories are removed from spec."
 	;; Check whether stat(1) returns usable syntax.  "%s" does not
 	;; work on older AIX systems.  Recent GNU stat versions
 	;; (8.24?)  use shell quoted format for "%N", we check the
-	;; boundaries "`" and "'", therefore.  See Bug#23422 in
-	;; coreutils.  Since GNU stat 8.26, environment variable
-	;; QUOTING_STYLE is supported.
+	;; boundaries "`" and "'" and their localized variants,
+	;; therefore.  See Bug#23422 in coreutils.  Since GNU stat
+	;; 8.26, environment variable QUOTING_STYLE is supported.
 	(when result
 	  (setq result (concat "env QUOTING_STYLE=locale " result)
 		tmp (tramp-send-command-and-read
 		     vec (format "%s -c '(\"%%N\" %%s)' /" result) 'noerror))
 	  (unless (and (listp tmp) (stringp (car tmp))
-		       (string-match-p "^\\(`/'\\|‘/’\\)$" (car tmp))
+		       (string-match-p "^[\"`‘„”«「]/[\"'’“”»」]$" (car tmp))
 		       (integerp (cadr tmp)))
 	    (setq result nil)))
 	result))))
@@ -5764,7 +5792,7 @@ function cell is returned to be applied on a buffer."
 	   ;; slashes as directory separators.
 	   (cond
 	    ((and (string-match-p "local" prop)
-		  (memq system-type '(windows-nt)))
+		  (eq system-type 'windows-nt))
 	       "(%s | \"%s\")")
 	    ((string-match-p "local" prop) "(%s | %s)")
 	    (t "(%s | %s >%%s)"))
@@ -5775,7 +5803,7 @@ function cell is returned to be applied on a buffer."
 	   ;; the pipe symbol be quoted if they use forward
 	   ;; slashes as directory separators.
 	   (if (and (string-match-p "local" prop)
-		    (memq system-type '(windows-nt)))
+		    (eq system-type 'windows-nt))
 	       "(%s <%%s | \"%s\")"
 	     "(%s <%%s | %s)")
 	   compress coding))

@@ -327,6 +327,11 @@ string is passed through `substitute-command-keys'.  */)
     xsignal1 (Qvoid_function, function);
   if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
     fun = XCDR (fun);
+#ifdef HAVE_NATIVE_COMP
+  if (!NILP (Fsubr_native_elisp_p (fun)))
+    doc = native_function_doc (fun);
+  else
+#endif
   if (SUBRP (fun))
     doc = make_fixnum (XSUBR (fun)->doc);
 #ifdef HAVE_MODULES
@@ -495,10 +500,11 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 	    XSETCAR (tem, make_fixnum (offset));
 	}
     }
-
   /* Lisp_Subrs have a slot for it.  */
-  else if (SUBRP (fun))
-    XSUBR (fun)->doc = offset;
+  else if (SUBRP (fun) && !SUBR_NATIVE_COMPILEDP (fun))
+    {
+      XSUBR (fun)->doc = offset;
+    }
 
   /* Bytecode objects sometimes have slots for it.  */
   else if (COMPILEDP (fun))
@@ -544,7 +550,7 @@ the same file name is found in the `doc-directory'.  */)
   Lisp_Object delayed_init =
     find_symbol_value (intern ("custom-delayed-init-variables"));
 
-  if (EQ (delayed_init, Qunbound)) delayed_init = Qnil;
+  if (!CONSP (delayed_init)) delayed_init = Qnil;
 
   CHECK_STRING (filename);
 
