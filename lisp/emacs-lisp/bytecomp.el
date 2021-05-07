@@ -2238,12 +2238,12 @@ With argument ARG, insert value in current buffer after the form."
         (setq byte-compile-noruntime-functions nil)
         (setq byte-compile-new-defuns nil)
         (when byte-native-compiling
-          (defvar comp-speed)
-          (push `(comp-speed . ,comp-speed) byte-native-qualities)
-          (defvar comp-debug)
-          (push `(comp-debug . ,comp-debug) byte-native-qualities)
-          (defvar comp-native-driver-options)
-          (push `(comp-native-driver-options . ,comp-native-driver-options)
+          (defvar native-comp-speed)
+          (push `(native-comp-speed . ,native-comp-speed) byte-native-qualities)
+          (defvar native-comp-debug)
+          (push `(native-comp-debug . ,native-comp-debug) byte-native-qualities)
+          (defvar native-comp-driver-options)
+          (push `(native-comp-driver-options . ,native-comp-driver-options)
                 byte-native-qualities)
           (defvar no-native-compile)
           (push `(no-native-compile . ,no-native-compile)
@@ -5311,7 +5311,8 @@ already up-to-date."
   "Reload any Lisp file that was changed since Emacs was dumped.
 Use with caution."
   (let* ((argv0 (car command-line-args))
-         (emacs-file (or (cdr (nth 2 (pdumper-stats)))
+         (emacs-file (or (and (fboundp 'pdumper-stats)
+                              (cdr (nth 2 (pdumper-stats))))
                          (executable-find argv0))))
     (if (not (and emacs-file (file-exists-p emacs-file)))
         (message "Can't find %s to refresh preloaded Lisp files" argv0)

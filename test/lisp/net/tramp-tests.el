@@ -195,9 +195,6 @@ is greater than 10.
 	      "^error with add-name-to-file")
 	    debug-ignored-errors))
 	  inhibit-message)
-     (when trace-buffer
-       (dolist (elt (all-completions "tramp-" obarray 'functionp))
-	 (trace-function-background (intern elt))))
      (unwind-protect
 	 (let ((tramp--test-instrument-test-case-p t)) ,@body)
        ;; Unwind forms.
@@ -205,13 +202,12 @@ is greater than 10.
 	 (untrace-all))
        (when (and (null tramp--test-instrument-test-case-p) (> tramp-verbose 3))
 	 (dolist
-	     (buf (if trace-buffer
-		      (cons (get-buffer trace-buffer) (tramp-list-tramp-buffers))
-		    (tramp-list-tramp-buffers)))
+	     (buf (append
+		   (tramp-list-tramp-buffers)
+		   (and trace-buffer (list (get-buffer trace-buffer)))))
 	   (with-current-buffer buf
-	     (message ";; %s\n%s" buf (buffer-string)))))
-       (when trace-buffer
-	 (kill-buffer trace-buffer)))))
+	     (message ";; %s\n%s" buf (buffer-string)))
+	   (kill-buffer buf))))))
 
 (defsubst tramp--test-message (fmt-string &rest arguments)
   "Emit a message into ERT *Messages*."
@@ -5886,6 +5882,7 @@ This requires restrictions of file name syntax."
 	    (make-directory tmp-name2)
 
 	    (dolist (elt files)
+	      ;(tramp--test-message "%s" elt)
 	      (let* ((file1 (expand-file-name elt tmp-name1))
 		     (file2 (expand-file-name elt tmp-name2))
 		     (file3 (expand-file-name (concat elt "foo") tmp-name1)))
@@ -6075,7 +6072,8 @@ This requires restrictions of file name syntax."
 		 "\tfoo bar baz\t")
 		(t " foo\tbar baz\t"))
 	  "@foo@bar@baz@"
-	  "$foo$bar$$baz$"
+	  (unless (tramp--test-windows-nt-and-scp-p)
+	    "$foo$bar$$baz$")
 	  "-foo-bar-baz-"
 	  "%foo%bar%baz%"
 	  "&foo&bar&baz&"
@@ -6091,9 +6089,10 @@ This requires restrictions of file name syntax."
 	      "'foo'bar'baz'"
 	    "'foo\"bar'baz\"")
 	  "#foo~bar#baz~"
-	  (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
-	      "!foo!bar!baz!"
-	    "!foo|bar!baz|")
+	  (unless (tramp--test-windows-nt-and-scp-p)
+	    (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
+		"!foo!bar!baz!"
+	      "!foo|bar!baz|"))
 	  (if (or (tramp--test-gvfs-p)
 		  (tramp--test-rclone-p)
 		  (tramp--test-windows-nt-or-smb-p))
@@ -6114,7 +6113,6 @@ This requires restrictions of file name syntax."
   "Check special characters in file names."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-rsync-p)))
-  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   (skip-unless (or (tramp--test-emacs26-p) (not (tramp--test-rclone-p))))
 
   (tramp--test-special-characters))
@@ -6126,7 +6124,6 @@ Use the `stat' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
@@ -6145,7 +6142,6 @@ Use the `perl' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
@@ -6167,7 +6163,6 @@ Use the `ls' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
 
   (let ((tramp-connection-properties
 	 (append

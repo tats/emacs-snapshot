@@ -106,6 +106,7 @@
     (define-key map "t" 'help-with-tutorial)
     (define-key map "v" 'describe-variable)
     (define-key map "w" 'where-is)
+    (define-key map "x" 'describe-command)
     (define-key map "q" 'help-quit)
     map)
   "Keymap for characters following the Help key.")
@@ -232,7 +233,7 @@ Do not call this in the scope of `with-help-window'."
 (make-help-screen help-for-help
   (purecopy "Type a help option: [abcCdefFgiIkKlLmnprstvw.] C-[cdefmnoptw] or ?")
   (concat
-   "\(Type "
+   "(Type "
    (help--key-description-fontified (kbd "<PageDown>"))
    " or "
    (help--key-description-fontified (kbd "<PageUp>"))
@@ -252,6 +253,7 @@ Do not call this in the scope of `with-help-window'."
         "Search for commands (see also \\[apropos])")
        ("apropos-documentation"
         "Search documentation of functions, variables, and other items")
+       ("describe-command" "Show help for command")
        ("describe-function" "Show help for function")
        ("describe-variable" "Show help for variable")
        ("describe-symbol" "Show help for function or variable"))
@@ -1888,7 +1890,7 @@ the same names as used in the original source code, when possible."
    ((and (byte-code-function-p def) (listp (aref def 0))) (aref def 0))
    ((eq (car-safe def) 'lambda) (nth 1 def))
    ((eq (car-safe def) 'closure) (nth 2 def))
-   ((and (featurep 'nativecomp)
+   ((and (featurep 'native-compile)
          (subrp def)
          (listp (subr-native-lambda-list def)))
     (subr-native-lambda-list def))
