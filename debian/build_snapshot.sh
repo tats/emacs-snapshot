@@ -56,6 +56,7 @@ perl -p -i -e 's/emacs-snapshot/emacs-snapshot-no-native-comp/g' debian/patches/
 perl -p -i -e 's/emacs-snapshot/emacs-snapshot-no-native-comp/' debian/changelog
 make -f ./debian/rules debian/control
 make -f ./debian/rules debian/copyright
+gbp buildpackage --git-builder=true --git-cleaner=true --git-ignore-new
 sbuild --nolog -s --force-orig-source -A -d unstable
 
 dput -u digitalocean_emacs  ../emacs-snapshot*.changes(om[1])
