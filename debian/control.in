@@ -19,6 +19,7 @@ Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
 Package: @DEB_FLAVOR@-lucid
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-lucid
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
@@ -37,6 +38,7 @@ Description: GNU Emacs editor (with Lucid GUI support)
  information.
 
 Package: @DEB_FLAVOR@-nox
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-nox
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
@@ -49,6 +51,7 @@ Description: GNU Emacs editor (without GUI support)
  and provides only a text terminal interface.
 
 Package: @DEB_FLAVOR@
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader
@@ -62,6 +65,7 @@ Description: GNU Emacs editor (with GTK+ GUI support)
  @DEB_FLAVOR@-lucid package).
 
 Package: @DEB_FLAVOR@-bin-common
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-bin-common
 Architecture: any
 Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: GNU Emacs editor's shared, architecture dependent files
@@ -70,6 +74,7 @@ Description: GNU Emacs editor's shared, architecture dependent files
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
 
 Package: @DEB_FLAVOR@-common
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-common
 Architecture: all
 Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
@@ -80,6 +85,7 @@ Description: GNU Emacs editor's shared, architecture independent infrastructure
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
 
 Package: @DEB_FLAVOR@-el
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-el
 Architecture: all
 Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${misc:Depends}
 Description: GNU Emacs LISP (.el) files

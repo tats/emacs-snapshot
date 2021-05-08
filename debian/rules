@@ -74,6 +74,7 @@ debsrc_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
 
 # The flavor (i.e. emacs21) currently matches the source package name.
 flavor := $(src_name)
+flavor_other_native_comp := $(if $(filter emacs-snapshot,$(flavor)),emacs-snapshot-no-native-comp,emacs-snapshot)
 
 info_subdir := emacs-$(major_ver)
 
@@ -226,6 +227,7 @@ define deb_sub
     -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
     -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
     -e "s|\@DEB_FLAVOR\@|$(flavor)|go;" \
+    -e "s|\@DEB_FLAVOR_OTHER_NATIVE_COMP\@|$(flavor_other_native_comp)|go;" \
     -e "s|\@MENU_VERSION\@|$(menu_ver)|go;" \
     -e "s|\@INFO_FILES\@|$(main_dir_info_files)|go;" \
     -e "s|\@INFO_SUBDIR\@|$(info_subdir)|go;" \
