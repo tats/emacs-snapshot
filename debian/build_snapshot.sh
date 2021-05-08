@@ -59,4 +59,4 @@ make -f ./debian/rules debian/copyright
 gbp buildpackage --git-builder=true --git-cleaner=true --git-ignore-new
 sbuild --nolog -s --force-orig-source -A -d unstable
 
-dput -u digitalocean_emacs  ../emacs-snapshot*.changes(om[1])
+dput -u digitalocean_emacs  ../emacs-snapshot*.changes(om[1,2])
