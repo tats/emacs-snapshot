@@ -47,4 +47,15 @@ gbp buildpackage --git-builder=true --git-cleaner=true --git-ignore-new
 # note that on my box the "unstable" chroot is actually "jessie"
 sbuild --nolog -s --force-orig-source -A -d unstable
 
+
+##### Done. Do it again without native compilation
+git clean -ffdx; git reset --hard
+(echo -e '#!/usr/bin/make -f\nNO_NATIVE_COMP:=1\n'; cat debian/rules) > debian/rules.new && mv debian/rules.new debian/rules
+chmod ug+x debian/rules
+perl -p -i -e 's/emacs-snapshot/emacs-snapshot-no-native-comp/g' debian/patches/0002-Run-debian-startup-and-set-debian-emacs-flavor.patch
+perl -p -i -e 's/emacs-snapshot/emacs-snapshot-no-native-comp/' debian/changelog
+make -f ./debian/rules debian/control
+make -f ./debian/rules debian/copyright
+sbuild --nolog -s --force-orig-source -A -d unstable
+
 dput -u digitalocean_emacs  ../emacs-snapshot*.changes(om[1])
