@@ -11,7 +11,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index 3a3093f..898efd6 100644
+index 3a3093fdd4a..8ada3e7011b 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
 @@ -60,7 +60,7 @@ emacs-version
@@ -19,7 +19,17 @@ index 3a3093f..898efd6 100644
    (interactive "P")
    (let ((version-string
 -         (format "GNU Emacs %s (build %s, %s%s%s%s)%s"
-+         (format "GNU Emacs %s (build %s, %s%s%s%s)%s, unofficial emacs-snapshot build: http://emacs.secretsauce.net"
++         (format "GNU Emacs %s (build %s, %s%s%s%s)%s, unofficial %s build: http://emacs.secretsauce.net"
                   emacs-version
                   emacs-build-number
  		 system-configuration
+@@ -87,7 +87,8 @@ emacs-version
+ 					      "" "\n")
+ 					  " of %Y-%m-%d")
+ 					 emacs-build-time)
+-		   ""))))
++		   "")
++                 debian-emacs-flavor)))
+     (if here
+         (insert version-string)
+       (if (called-interactively-p 'interactive)
