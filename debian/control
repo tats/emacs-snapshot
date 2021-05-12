@@ -69,10 +69,14 @@ Description: GNU Emacs editor's shared, architecture dependent files
  This package contains the architecture dependent infrastructure
  that's shared by emacs28, emacs28-lucid, and emacs28-nox.
 
+# This depends on the emacs-el package. It is needed only for the native-comp
+# packages so tha they have something to compile. I leave the Depends even for
+# the no-native-comp packages because doing that is not worth the required
+# typing. See: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48342
 Package: emacs28-common
 Architecture: all
-Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
-Suggests: emacs28-el, emacs28-common-non-dfsg
+Depends: emacs28-el (= ${source:Version}), emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
+Suggests: emacs28-common-non-dfsg
 Conflicts: emacs28-el (<< ${source:Version}), cedet, eieio, speedbar
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.

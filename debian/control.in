@@ -69,10 +69,14 @@ Description: GNU Emacs editor's shared, architecture dependent files
  This package contains the architecture dependent infrastructure
  that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
 
+# This depends on the emacs-el package. It is needed only for the native-comp
+# packages so tha they have something to compile. I leave the Depends even for
+# the no-native-comp packages because doing that is not worth the required
+# typing. See: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48342
 Package: @DEB_FLAVOR@-common
 Architecture: all
-Depends: emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
-Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
+Depends: @DEB_FLAVOR@-el (= ${source:Version}), emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
+Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@-el (<< ${source:Version}), cedet, eieio, speedbar
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
