@@ -29,10 +29,10 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 8d52cb5..fcedf32 100644
+index 65eceb2..960e01f 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -154,7 +154,9 @@ man1dir=
+@@ -156,7 +156,9 @@ man1dir=
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,17 +43,17 @@ index 8d52cb5..fcedf32 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -842,8 +844,7 @@ $(1)_$(2):
+@@ -844,8 +846,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
 -mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/emacs doc/misc \
--  doc/lispref doc/lispintro
-+mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc
+-  doc/lispref doc/lispintro test
++mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc test
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -975,11 +976,11 @@ test/%:
+@@ -959,11 +960,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 8d52cb5..fcedf32 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1010,9 +1011,6 @@ info-dir:
+@@ -994,9 +995,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -80,7 +80,7 @@ index 8d52cb5..fcedf32 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1034,14 +1032,10 @@ ${srcdir}/info/dir:
+@@ -1018,14 +1016,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -99,7 +99,7 @@ index 8d52cb5..fcedf32 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1059,14 +1053,10 @@ install-pdf:
+@@ -1043,14 +1037,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
