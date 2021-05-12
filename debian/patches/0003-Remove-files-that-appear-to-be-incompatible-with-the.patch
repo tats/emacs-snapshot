@@ -29,10 +29,10 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 6385483..bf46af5 100644
+index 65eceb2..960e01f 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -152,7 +152,9 @@ man1dir=
+@@ -156,7 +156,9 @@ man1dir=
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,17 +43,17 @@ index 6385483..bf46af5 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -818,8 +820,7 @@ $(1)_$(2):
+@@ -844,8 +846,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
 -mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/emacs doc/misc \
--  doc/lispref doc/lispintro
-+mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc
+-  doc/lispref doc/lispintro test
++mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc test
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -961,11 +962,11 @@ test/%:
+@@ -959,11 +960,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 6385483..bf46af5 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -996,9 +997,6 @@ info-dir:
+@@ -994,9 +995,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -80,7 +80,7 @@ index 6385483..bf46af5 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1020,14 +1018,10 @@ ${srcdir}/info/dir:
+@@ -1018,14 +1016,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -99,7 +99,7 @@ index 6385483..bf46af5 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1045,14 +1039,10 @@ install-pdf:
+@@ -1043,14 +1037,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -119,7 +119,7 @@ index 6385483..bf46af5 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 35c391d..ab87ce1 100755
+index 11c4313..b6dfadd 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -260,8 +260,7 @@ info_dir ()
@@ -133,10 +133,10 @@ index 35c391d..ab87ce1 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 2c62a9f..8b3f840 100644
+index 3df4359..79ce4ad 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5812,7 +5812,7 @@ AC_DEFUN
+@@ -5967,7 +5967,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index 2c62a9f..8b3f840 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5864,15 +5864,6 @@ m4_define
+@@ -6019,15 +6019,6 @@ m4_define
  fi
  ])
  
@@ -189,10 +189,10 @@ index 7982c0d..a9b1395 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index d4be9aa..776985d 100644
+index babaf4a..5932e59 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -291,6 +291,14 @@ view-help-file
+@@ -357,6 +357,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
