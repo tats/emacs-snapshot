@@ -19,12 +19,12 @@ Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
 Package: @DEB_FLAVOR@-lucid
-Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-lucid
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-lucid,
+  @DEB_FLAVOR@, @DEB_FLAVOR@-nox, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox
 Description: GNU Emacs editor (with Lucid GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
@@ -38,12 +38,12 @@ Description: GNU Emacs editor (with Lucid GUI support)
  information.
 
 Package: @DEB_FLAVOR@-nox
-Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-nox
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-nox,
+  @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid
 Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
@@ -51,12 +51,12 @@ Description: GNU Emacs editor (without GUI support)
  and provides only a text terminal interface.
 
 Package: @DEB_FLAVOR@
-Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@,
+  @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, @DEB_FLAVOR@-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
 Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox
 Description: GNU Emacs editor (with GTK+ GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
@@ -78,11 +78,11 @@ Description: GNU Emacs editor's shared, architecture dependent files
 # the no-native-comp packages because doing that is not worth the required
 # typing. See: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=48342
 Package: @DEB_FLAVOR@-common
-Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-common
 Architecture: all
 Depends: @DEB_FLAVOR@-el (= ${source:Version}), emacsen-common (>= 2.0.8), dpkg (>= 1.15.4) | install-info, ${misc:Depends}
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-el (<< ${source:Version}), cedet, eieio, speedbar
+Conflicts: @DEB_FLAVOR_OTHER_NATIVE_COMP@-common,
+  @DEB_FLAVOR@-el (<< ${source:Version}), cedet, eieio, speedbar
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
