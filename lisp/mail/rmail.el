@@ -3357,7 +3357,7 @@ removing prefixes such as Re:, Fwd: and so on and mailing list
 tags such as [tag]."
   (let ((subject (or (rmail-get-header "Subject" msgnum) ""))
 	(regexp "\\`[ \t\n]*\\(\\(\\w\\{1,4\\}\u00a0*[:：]\\|\\[[^]]+]\\)[ \t\n]+\\)*"))
-    ;; Debbugs sometimes adds `[External] :'; if that happened,
+    ;; Corporate mailing systems sometimes add `[External] :'; if that happened,
     ;; delete everything up thru there.  Empirically, that deletion makes
     ;; the Subject match the other messages in the thread.
     (if (string-match "[[]external][ \t\n]*:" subject)
@@ -3767,7 +3767,7 @@ use \\[mail-yank-original] to yank the original message into it."
     (rmail-apply-in-message
      rmail-current-message
      (lambda ()
-       (let ((beg (point-min)) (end (point-max))
+       (let ((end (point-max))
              subheader)
          ;; Find the message's real header.
          (search-forward "\n\n" nil 'move)
