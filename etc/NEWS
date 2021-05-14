@@ -999,7 +999,6 @@ the entire list as before.  An integer value limits the list length
 
 *** 'vc-git-stash' is now bound to 'C' in the stash headers.
 
---
 *** Some stash keybindings are now available in the stash button.
 'vc-git-stash' and 'vc-git-stash-snapshot' can now be run using 'C'
 and 'S' respectively, including when there are no stashes.
@@ -2735,7 +2734,7 @@ days there are in a month in a specific year), 'date-ordinal-to-time'
 (that computes the date of an ordinal day), 'decoded-time-add' (for
 doing computations on a decoded time structure), 'make-decoded-time'
 (for making a decoded time structure with only the given keywords
-filled out), and 'encoded-time-set-defaults' (which fills in nil
+filled out), and 'decoded-time-set-defaults' (which fills in nil
 elements as if it's midnight January 1st, 1970) have been added.
 
 *** In the DST slot, 'encode-time' and 'parse-time-string' now return -1

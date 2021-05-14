@@ -2696,7 +2696,7 @@ If `default-directory' is remote, full file names are adapted accordingly."
     (let ((remote (file-remote-p default-directory)))
       (when remote
         (goto-char (point-min))
-        (while (re-search-forward "[\\[,]fullname=\"\\(.+\\)\"" nil t)
+        (while (re-search-forward "[\\[,]fullname=\"\\(.+?\\)\"" nil t)
           (replace-match (concat remote "\\1") nil nil nil 1))))
     (goto-char (point-min))
     (when fix-key
@@ -4376,7 +4376,7 @@ overlay arrow in source buffer."
   (let ((frame (bindat-get-field (gdb-json-partial-output) 'frame)))
     (when frame
       (setq gdb-selected-frame (bindat-get-field frame 'func))
-      (setq gdb-selected-file (bindat-get-field frame 'fullname))
+      (setq gdb-selected-file (file-local-name (bindat-get-field frame 'fullname)))
       (setq gdb-frame-number (bindat-get-field frame 'level))
       (setq gdb-frame-address (bindat-get-field frame 'addr))
       (let ((line (bindat-get-field frame 'line)))
