@@ -456,9 +456,6 @@
 (defvar menu-bar-edit-menu
   (let ((menu (make-sparse-keymap "Edit")))
 
-    (bindings--define-key menu [props]
-      '(menu-item "Text Properties" facemenu-menu))
-
     ;; ns-win.el said: Add spell for platform consistency.
     (if (featurep 'ns)
         (bindings--define-key menu [spell]
@@ -492,7 +489,7 @@
       '(menu-item "Select All" mark-whole-buffer
                   :help "Mark the whole buffer for a subsequent cut/copy"))
     (bindings--define-key menu [clear]
-      '(menu-item "Clear" delete-region
+      '(menu-item "Clear" delete-active-region
                   :enable (and mark-active
                                (not buffer-read-only))
                   :help

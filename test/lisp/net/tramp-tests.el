@@ -179,6 +179,11 @@ The temporary file is not created."
   "Whether `tramp--test-instrument-test-case' run.
 This shall used dynamically bound only.")
 
+;; When `tramp-verbose' is greater than 10, and you want to trace
+;; other functions as well, do something like
+;; (let ((tramp-trace-functions '(file-name-non-special)))
+;;   (tramp--test-instrument-test-case 11
+;;     ...))
 (defmacro tramp--test-instrument-test-case (verbose &rest body)
   "Run BODY with `tramp-verbose' equal VERBOSE.
 Print the content of the Tramp connection and debug buffers, if
@@ -187,8 +192,7 @@ is greater than 10.
 `should-error' is not handled properly.  BODY shall not contain a timeout."
   (declare (indent 1) (debug (natnump body)))
   `(let* ((tramp-verbose (max (or ,verbose 0) (or tramp-verbose 0)))
-	  (trace-buffer
-	   (when (> tramp-verbose 10) (generate-new-buffer " *temp*")))
+	  (trace-buffer (tramp-trace-buffer-name tramp-test-vec))
 	  (debug-ignored-errors
 	   (append
 	    '("^make-symbolic-link not supported$"
@@ -198,13 +202,9 @@ is greater than 10.
      (unwind-protect
 	 (let ((tramp--test-instrument-test-case-p t)) ,@body)
        ;; Unwind forms.
-       (when trace-buffer
-	 (untrace-all))
        (when (and (null tramp--test-instrument-test-case-p) (> tramp-verbose 3))
-	 (dolist
-	     (buf (append
-		   (tramp-list-tramp-buffers)
-		   (and trace-buffer (list (get-buffer trace-buffer)))))
+	 (untrace-all)
+	 (dolist (buf (tramp-list-tramp-buffers))
 	   (with-current-buffer buf
 	     (message ";; %s\n%s" buf (buffer-string)))
 	   (kill-buffer buf))))))
@@ -3094,7 +3094,6 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   ;; Wildcards are not supported in tramp-crypt.el.
   (skip-unless (not (tramp--test-crypt-p)))
   ;; Since Emacs 26.1.
@@ -5842,13 +5841,6 @@ This does not support utf8 based file transfer."
   (and (eq system-type 'windows-nt)
        (tramp-method-out-of-band-p tramp-test-vec 1)))
 
-(defun tramp--test-windows-nt-and-scp-p ()
-  "Check, whether the locale host runs MS Windows, and scpx? is used.
-This does not support utf8 based file transfer."
-  (and (eq system-type 'windows-nt)
-       (string-match-p
-	"^scpx?" (file-remote-p tramp-test-temporary-file-directory 'method))))
-
 (defun tramp--test-windows-nt-or-smb-p ()
   "Check, whether the locale or remote host runs MS Windows.
 This requires restrictions of file name syntax."
@@ -5882,6 +5874,7 @@ This requires restrictions of file name syntax."
 	    (make-directory tmp-name2)
 
 	    (dolist (elt files)
+	      ;(tramp--test-message "%s" elt)
 	      (let* ((file1 (expand-file-name elt tmp-name1))
 		     (file2 (expand-file-name elt tmp-name2))
 		     (file3 (expand-file-name (concat elt "foo") tmp-name1)))
@@ -6071,9 +6064,9 @@ This requires restrictions of file name syntax."
 		 "\tfoo bar baz\t")
 		(t " foo\tbar baz\t"))
 	  "@foo@bar@baz@"
-	  "$foo$bar$$baz$"
+	  (unless (tramp--test-windows-nt-and-out-of-band-p) "$foo$bar$$baz$")
 	  "-foo-bar-baz-"
-	  "%foo%bar%baz%"
+	  (unless (tramp--test-windows-nt-and-out-of-band-p) "%foo%bar%baz%")
 	  "&foo&bar&baz&"
 	  (unless (or (tramp--test-ftp-p)
 		      (tramp--test-gvfs-p)
@@ -6087,9 +6080,10 @@ This requires restrictions of file name syntax."
 	      "'foo'bar'baz'"
 	    "'foo\"bar'baz\"")
 	  "#foo~bar#baz~"
-	  (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
-	      "!foo!bar!baz!"
-	    "!foo|bar!baz|")
+	  (unless (tramp--test-windows-nt-and-out-of-band-p)
+	    (if (or (tramp--test-gvfs-p) (tramp--test-windows-nt-or-smb-p))
+		"!foo!bar!baz!"
+	      "!foo|bar!baz|"))
 	  (if (or (tramp--test-gvfs-p)
 		  (tramp--test-rclone-p)
 		  (tramp--test-windows-nt-or-smb-p))
@@ -6110,7 +6104,6 @@ This requires restrictions of file name syntax."
   "Check special characters in file names."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (tramp--test-rsync-p)))
-;  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   (skip-unless (or (tramp--test-emacs26-p) (not (tramp--test-rclone-p))))
 
   (tramp--test-special-characters))
@@ -6122,7 +6115,6 @@ Use the `stat' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-;  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-stat v)))
@@ -6141,7 +6133,6 @@ Use the `perl' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-;  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
   ;; We cannot use `tramp-test-vec', because this fails during compilation.
   (with-parsed-tramp-file-name tramp-test-temporary-file-directory nil
     (skip-unless (tramp-get-remote-perl v)))
@@ -6163,7 +6154,6 @@ Use the `ls' command."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   (skip-unless (not (tramp--test-rsync-p)))
-;  (skip-unless (not (tramp--test-windows-nt-and-scp-p)))
 
   (let ((tramp-connection-properties
 	 (append
