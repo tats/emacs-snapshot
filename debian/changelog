@@ -1,4 +1,4 @@
-emacs28 (28.0.50+0.20210515-0.1) UNRELEASED; urgency=medium
+emacs28 (28.0.50+0.20210515-0.2) UNRELEASED; urgency=medium
 
   [ Tatsuya Kinoshita ]
   * Sync debian/control.in with the latest change
@@ -18,8 +18,9 @@ emacs28 (28.0.50+0.20210515-0.1) UNRELEASED; urgency=medium
   [ Tatsuya Kinoshita ]
   * New upstream version 28.0.50+0.20210515
     - Emacs master branch, emacs-27.1-7808-g0a681590268 on 2021-05-15
+  * Set NATIVE_FULL_AOT to native compile ahead-of-time
 
- -- Tatsuya Kinoshita <tats@debian.org>  Sat, 15 May 2021 18:25:20 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Sun, 16 May 2021 08:14:17 +0900
 
 emacs-snapshot (2:20210405+emacs-27.1-5691-ge0c3925961c-1) unstable; urgency=medium
 
