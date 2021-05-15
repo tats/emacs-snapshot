@@ -1,5 +1,6 @@
-emacs28 (28.0.50+0.20210507-0.1) UNRELEASED; urgency=medium
+emacs28 (28.0.50+0.20210515-0.1) UNRELEASED; urgency=medium
 
+  [ Tatsuya Kinoshita ]
   * Sync debian/control.in with the latest change
   * Use flavor for emacs.service
   * Remove -common from Conflicts
@@ -9,10 +10,16 @@ emacs28 (28.0.50+0.20210507-0.1) UNRELEASED; urgency=medium
   * Disable debian/patches/000{4,5}*.patch
   * Enable native compilation with libgccjit-10-dev
   * Install emacs-module.h as $(flavor)-module.h
-  * New upstream version 28.0.50+0.20210507
-    - Emacs master branch, emacs-27.1-7700-gf50577ea07f on 2021-05-07
 
- -- Tatsuya Kinoshita <tats@debian.org>  Fri, 07 May 2021 23:04:57 +0900
+  [ Dima Kogan ]
+  * emacs builds now require the -el packages
+  * patch update
+
+  [ Tatsuya Kinoshita ]
+  * New upstream version 28.0.50+0.20210515
+    - Emacs master branch, emacs-27.1-7808-g0a681590268 on 2021-05-15
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Sat, 15 May 2021 18:25:20 +0900
 
 emacs-snapshot (2:20210405+emacs-27.1-5691-ge0c3925961c-1) unstable; urgency=medium
 
