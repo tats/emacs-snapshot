@@ -2538,7 +2538,7 @@ If search string is empty, just beep."
   "Read a string from the `kill-ring' and append it to the search string."
   (interactive)
   (with-isearch-suspended
-   (let ((string (read-from-kill-ring)))
+   (let ((string (read-from-kill-ring "Yank from kill-ring: ")))
      (if (and isearch-case-fold-search
               (eq 'not-yanks search-upper-case))
          (setq string (downcase string)))
@@ -3461,6 +3461,10 @@ Can be changed via `isearch-search-fun-function' for special needs."
       (funcall
        (if isearch-forward #'re-search-forward #'re-search-backward)
        regexp bound noerror count))))
+
+;; This is for when we compile this file during bootstrap, with
+;; loaddefs.el still not loaded.
+(declare-function multi-isearch-switch-buffer "misearch" ())
 
 (defun isearch-search-string (string bound noerror)
   "Search for the first occurrence of STRING or its translation.

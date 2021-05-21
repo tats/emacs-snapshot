@@ -1169,7 +1169,7 @@ ARGS are command switches passed to PROGRAM.")
 (defcustom dired-compress-file-default-suffix nil
   "Default suffix for compressing a single file.
 If nil, \".gz\" will be used."
-  :type 'string
+  :type '(choice (const :tag ".gz" nil) string)
   :group 'dired
   :version "28.1")
 
@@ -1190,7 +1190,7 @@ output file.  %i path(s) are relative, while %o is absolute.")
 (defcustom dired-compress-directory-default-suffix nil
   "Default suffix for compressing a directory.
 If nil, \".tar.gz\" will be used."
-  :type 'string
+  :type '(choice (const :tag ".tar.gz" nil) string)
   :group 'dired
   :version "28.1")
 
@@ -1334,7 +1334,8 @@ Return nil if no change in files."
                        (user-error "No compression rule found for suffix %s, \
 see `dired-compress-file-alist' for the supported suffixes list."
                                    dired-compress-file-default-suffix)
-                     (and (or (not (file-exists-p out-name))
+                     (and (file-exists-p file)
+                          (or (not (file-exists-p out-name))
                               (y-or-n-p
                                (format
                                 "File %s already exists.  Really compress? "
@@ -1343,8 +1344,7 @@ see `dired-compress-file-alist' for the supported suffixes list."
                            (replace-regexp-in-string
                             "%o" (shell-quote-argument out-name)
                             (replace-regexp-in-string
-                             "%i" (shell-quote-argument
-                                   (file-name-nondirectory file))
+                             "%i" (shell-quote-argument file)
                              (cdr rule)
                              nil t)
                             nil t))
