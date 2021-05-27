@@ -442,6 +442,11 @@ major mode.
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
+** Completion List Mode
+New key bindings have been added: 'n' and 'p' to navigate completions,
+and 'M-g M-c' to switch to the minibuffer, and you can also switch back
+to the completion list buffer with 'M-g M-c'.
+
 ** Benchmark
 *** New function 'benchmark-call' to measure the execution time of a function.
 Additionally, the number of repetitions can be expressed as a minimal duration
@@ -747,6 +752,11 @@ enabled, and how to enable it.
 If set to non-nil, Dired will dereference symbolic links when copying.
 This can be switched off on a per-usage basis by providing
 'dired-do-copy' with a 'C-u' prefix.
+
+*** New user option 'dired-do-revert-buffer'.
+Non-nil reverts the destination Dired buffer after performing one
+of these operations: 'dired-do-copy', 'dired-do-rename',
+'dired-do-symlink', 'dired-do-hardlink'.
 
 *** New user option 'dired-mark-region' affects all Dired commands
 that mark files.  When non-nil and the region is active in Transient
@@ -2694,6 +2704,15 @@ the Emacs Lisp reference manual for background.
 
 
 * Lisp Changes in Emacs 28.1
+
+---
+** Emacs now attempts to test for high-rate subprocess output more fairly.
+When several subprocesses produce output simultaneously at high rate,
+Emacs will now by default attempt to service them all in a round-robin
+fashion.  Set the new variable 'process-prioritize-lower-fds' to a
+non-nil value to get back the old behavior, whereby after reading
+from a subprocess, Emacs would check for output of other subprocesses
+in a way that is likely to read from the same process again.
 
 +++
 ** New function 'sxhash-equal-including-properties'.
