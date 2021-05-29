@@ -29,7 +29,7 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 65eceb2..960e01f 100644
+index 3facfa5..eac02e0 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -156,7 +156,9 @@ man1dir=
