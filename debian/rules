@@ -427,7 +427,7 @@ override_dh_auto_install: $(autogen_install_files)
 	  cd $(pkgdir_common)/usr/include \
 	    && mv emacs-module.h $(flavor)-module.h
 	  cd $(pkgdir_common)/usr/share/metainfo \
-	    && mv emacs.appdata.xml $(flavor).appdata.xml
+	    && mv emacs.metainfo.xml $(flavor).metainfo.xml
 
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
 	  && test -f DOC
