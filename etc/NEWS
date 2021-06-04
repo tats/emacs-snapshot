@@ -510,6 +510,13 @@ When emacsclient connects, Emacs will (by default) output a message
 about how to exit the client frame.  If 'server-client-instructions'
 is set to nil, this message is inhibited.
 
++++
+*** New command 'server-edit-abort'.
+This command (not bound to any key by default) can be used to abort
+an edit instead of marking it as "Done" (which the 'C-x #' command
+does).  The 'emacsclient' program exits with an abnormal status as
+result of this command.
+
 ** Perl mode
 
 ---
@@ -534,9 +541,13 @@ indentation is done using SMIE or with the old ad-hoc code.
 ** Icomplete
 
 +++
-*** New minor mode 'icomplete-vertical-mode'.
-This mode is intended to be used with Icomplete or Fido, to display the
-list of completions candidates vertically instead of horizontally.
+*** New minor mode 'icomplete-vertical-mode', alias 'fido-vertical-mode'.
+This mode is intended to be used with Icomplete ('M-x icomplete-mode')
+or Fido ('M-x fido-mode'), to display the list of completions
+candidates vertically instead of horizontally.  When used with
+Icomplete, completions are rotated and selection kept at the top.
+When used with Fido, completions scroll like a typical dropdown
+widget.
 
 ---
 ** Specific warnings can now be disabled from the warning buffer.
@@ -550,6 +561,14 @@ disabled entirely.
 
 ---
 *** Autoload the main entry point 'mspool-show'.
+
+** Windmove
+
+*** New user options to customize windmove keybindings.
+These options include 'windmove-default-keybindings',
+'windmove-display-default-keybindings',
+'windmove-delete-default-keybindings',
+'windmove-swap-states-default-keybindings'.
 
 ** Windows
 
@@ -830,6 +849,11 @@ completion over Git branch names.  The default is nil, which causes
 tags to be considered as well.
 
 ** Gnus
+
++++
+*** New user option 'gnus-process-mark-toggle'.
+If non-nil, the `#' command in the Group and Summary buffers will
+toggle instead of setting the process mark.
 
 +++
 *** New user option 'gnus-registry-register-all'.
@@ -1991,6 +2015,15 @@ Shift while typing 'C-a', i.e. 'C-S-a', will now highlight the text.
 
 ** Miscellaneous
 
+---
+*** New variable 'hl-line-overlay-priority'.
+This can be used to change the priority of the hl-line overlays.
+
++++
+*** New command 'mailcap-view-file'.
+This command will open a viewer based on the file type, as determined
+by ~/.mailcap and related files and variables.
+
 +++
 *** New command 'C-x C-k Q' to force redisplay in keyboard macros.
 
@@ -2725,6 +2758,10 @@ customize them.
 
 
 * Lisp Changes in Emacs 28.1
+
++++
+** New function 'buffer-local-boundp'.
+This predicate says whether a symbol is bound in a specific buffer.
 
 ---
 ** Emacs now attempts to test for high-rate subprocess output more fairly.
