@@ -91,6 +91,12 @@ proper pty support that Emacs needs.
 
 * Startup Changes in Emacs 28.1
 
+---
+** In GTK builds, Emacs now supports startup notification.
+This means that Emacs won't steal keyboard focus upon startup
+(when started via the Desktop) if the user is typing into another
+application.
+
 ** Emacs can support 24-bit color TTY without terminfo database.
 If your text-mode terminal supports 24-bit true color, but your system
 lacks the terminfo database, you can instruct Emacs to support 24-bit
@@ -898,6 +904,12 @@ String or list of strings specifying switches for Git log under VC.
 ** Gnus
 
 +++
+*** New Summary buffer sort options for extra headers.
+The extra header sort option ('C-c C-s C-x') prompts for a header
+and fails if no sort function has been defined. Sorting by
+Newsgroups ('C-c C-s C-u') has been pre-defined.
+
++++
 *** The '#' command in the Group and Summary buffer now toggles,
 instead of sets, the process mark.
 
@@ -1125,13 +1137,12 @@ This change is for better compatibility with old versions of non-GNU
 ** Help
 
 +++
-*** New command 'help-view-source' ('s')
-This command will view the source file (if any) of the current help
-topic.
-
-+++
-*** New command 'help-goto-info' ('i')
-This command will look up the current symbol (if any) in Info.
+*** New convenience commands with short keys in the Help buffer.
+New command 'help-view-source' ('s') will view the source file (if
+any) of the current help topic.  New command 'help-goto-info' ('i')
+will look up the current symbol (if any) in Info.  New command
+'help-customize' ('c') will customize the variable or the face
+(if any) whose doc string is being shown in the Help buffer.
 
 ---
 *** The 'help-for-help' ('C-h C-h') screen has been redesigned.
@@ -1163,6 +1174,11 @@ can provide a better overview in a long list of available bindings.
 
 ---
 *** New keybinding 'C-h R' prompts for a manual to display and displays it.
+
+---
+*** Closing the *Help* buffer from the toolbar now buries the buffer.
+In previous Emacs versions, the *Help* buffer was killed instead when
+clicking the "X" icon in the tool bar.
 
 +++
 ** New command 'lossage-size'.
@@ -1213,6 +1229,13 @@ deprecated.  Errors in the Inscript method were corrected.
 ---
 *** New input method 'cham'.
 There's also a Cham greeting in "etc/HELLO".
+
+---
+*** New input methods for Lakota language orthographies.
+Two orthographies are represented here, the Suggested Lakota Orthography
+and what is known as the White Hat Orthography.  Input methods lakota-slo-prefix,
+lakota-slo-postfix, and lakota-white-hat-postfix have been added.
+There is also a Lakota greeting in "etc/HELLO".
 
 ** Ispell
 
@@ -1588,6 +1611,9 @@ These new navigation commands are bound to 'n' and 'p' in
 
 *** New command 'apropos-function'.
 This works like 'C-u M-x apropos-command' but is more discoverable.
+
+*** New face 'apropos-button'.
+Applies to buttons that indicate a face.
 
 ** CC Mode
 
@@ -2107,6 +2133,12 @@ If the EMACS_TEST_VERBOSE environment variable is set, failure
 summaries will include the failing condition.
 
 ** Miscellaneous
+
+---
+*** `C-u M-x dig' will now prompt for a query type to use.
+
++++
+*** rcirc now supports SASL authentication.
 
 +++
 *** 'save-interprogram-paste-before-kill' can now be a number.
