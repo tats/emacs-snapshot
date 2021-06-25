@@ -29,10 +29,10 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 3facfa5..eac02e0 100644
+index b750288..43608c5 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -156,7 +156,9 @@ man1dir=
+@@ -158,7 +158,9 @@ man1dir=
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,7 +43,7 @@ index 3facfa5..eac02e0 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -844,8 +846,7 @@ $(1)_$(2):
+@@ -851,8 +853,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 3facfa5..eac02e0 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -959,11 +960,11 @@ test/%:
+@@ -966,11 +967,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 3facfa5..eac02e0 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -994,9 +995,6 @@ info-dir:
+@@ -1001,9 +1002,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -80,7 +80,7 @@ index 3facfa5..eac02e0 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1018,14 +1016,10 @@ ${srcdir}/info/dir:
+@@ -1025,14 +1023,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -99,7 +99,7 @@ index 3facfa5..eac02e0 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1043,14 +1037,10 @@ install-pdf:
+@@ -1050,14 +1044,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -133,10 +133,10 @@ index 11c4313..b6dfadd 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index c828f8d..2bf49c3 100644
+index 830f338..10b1b57 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5971,7 +5971,7 @@ AC_DEFUN
+@@ -5976,7 +5976,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index c828f8d..2bf49c3 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6023,15 +6023,6 @@ m4_define
+@@ -6028,15 +6028,6 @@ m4_define
  fi
  ])
  
