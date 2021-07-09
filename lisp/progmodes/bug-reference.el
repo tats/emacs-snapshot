@@ -25,10 +25,13 @@
 
 ;; This file provides minor modes for putting clickable overlays on
 ;; references to bugs.  A bug reference is text like "PR foo/29292";
-;; this is mapped to a URL using a user-supplied format.
+;; this is mapped to a URL using a user-supplied format; see
+;; `bug-reference-url-format' and `bug-reference-bug-regexp'. More
+;; extensive documentation is in (info "(emacs) Bug Reference").
 
 ;; Two minor modes are provided.  One works on any text in the buffer;
-;; the other operates only on comments and strings.
+;; the other operates only on comments and strings. By default, the
+;; URL link is followed by invoking C-c RET or mouse-2.
 
 ;;; Code:
 
@@ -126,6 +129,9 @@ The second subexpression should match the bug reference (usually a number)."
   "Open URL corresponding to the bug reference at POS."
   (interactive
    (list (if (integerp last-command-event) (point) last-command-event)))
+  (when (null bug-reference-url-format)
+    (user-error
+     "You must customize some bug-reference variables; see Emacs info node Bug Reference"))
   (if (and (not (integerp pos)) (eventp pos))
       ;; POS is a mouse event; switch to the proper window/buffer
       (let ((posn (event-start pos)))
@@ -362,7 +368,7 @@ From, and Cc against HEADER-REGEXP in
 (defvar bug-reference-setup-from-irc-alist
   `((,(concat "#" (regexp-opt '("emacs" "gnus" "org-mode" "rcirc"
                                 "erc") 'words))
-     "freenode"
+     "Libera.Chat"
      "\\([Bb]ug ?#?\\)\\([0-9]+\\(?:#[0-9]+\\)?\\)"
      "https://debbugs.gnu.org/%s"))
   "An alist for setting up `bug-reference-mode' in IRC modes.
@@ -377,8 +383,8 @@ Each element has the form
 
 CHANNEL-REGEXP is a regexp matched against the current IRC
 channel name (e.g. #emacs).  NETWORK-REGEXP is matched against
-the IRC network name (e.g. freenode).  Both entries are optional.
-If all given entries match, BUG-REGEXP is set as
+the IRC network name (e.g. Libera.Chat).  Both entries are
+optional.  If all given entries match, BUG-REGEXP is set as
 `bug-reference-bug-regexp' and URL-FORMAT is set as
 `bug-reference-url-format'.")
 
