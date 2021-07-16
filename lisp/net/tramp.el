@@ -3630,7 +3630,7 @@ User is always nil."
 	     (file-writable-p (file-name-directory filename)))))))
 
 (defcustom tramp-allow-unsafe-temporary-files nil
-  "Whether root-owned auto-save or backup files can be written to \"/tmp\"."
+  "Whether root-owned auto-save, backup or lock files can be written to \"/tmp\"."
   :version "28.1"
   :type 'boolean)
 
@@ -3819,9 +3819,9 @@ User is always nil."
       (cons (expand-file-name filename) (cdr result)))))
 
 (defun tramp-get-lock-file (file)
-  "Read lockfile of FILE.
-Return nil when there is no lockfile"
-  (let ((lockname (tramp-compat-make-lock-file-name file)))
+  "Read lockfile info of FILE.
+Return nil when there is no lockfile."
+  (when-let ((lockname (tramp-compat-make-lock-file-name file)))
     (or (file-symlink-p lockname)
 	(and (file-readable-p lockname)
 	     (with-temp-buffer
@@ -3839,51 +3839,78 @@ Return nil when there is no lockfile"
      (or (process-id p)
 	 (tramp-get-connection-property p "lock-pid" (emacs-pid))))))
 
-(defconst tramp-lock-file-contents-regexp
+(defconst tramp-lock-file-info-regexp
   ;; USER@HOST.PID[:BOOT_TIME]
   "\\`\\(.+\\)@\\(.+\\)\\.\\([[:digit:]]+\\)\\(?::\\([[:digit:]]+\\)\\)?\\'"
   "The format of a lock file.")
 
 (defun tramp-handle-file-locked-p (file)
   "Like `file-locked-p' for Tramp files."
-  (when-let ((contents (tramp-get-lock-file file))
-	     (match (string-match tramp-lock-file-contents-regexp contents)))
-    (or (and (string-equal (match-string 1 contents) (user-login-name))
-	     (string-equal (match-string 2 contents) (system-name))
-	     (string-equal (match-string 3 contents) (tramp-get-lock-pid file)))
-	(match-string 1 contents))))
+  (when-let ((info (tramp-get-lock-file file))
+	     (match (string-match tramp-lock-file-info-regexp info)))
+    (or (and (string-equal (match-string 1 info) (user-login-name))
+	     (string-equal (match-string 2 info) (system-name))
+	     (string-equal (match-string 3 info) (tramp-get-lock-pid file)))
+	(match-string 1 info))))
 
 (defun tramp-handle-lock-file (file)
   "Like `lock-file' for Tramp files."
   ;; See if this file is visited and has changed on disk since it
   ;; was visited.
   (catch 'dont-lock
-    (unless (or (null create-lockfiles)
-		(eq (file-locked-p file) t)) ;; Locked by me.
-      (when-let ((contents (tramp-get-lock-file file))
-		 (match (string-match tramp-lock-file-contents-regexp contents)))
+    (unless (eq (file-locked-p file) t) ;; Locked by me.
+      (when-let ((info (tramp-get-lock-file file))
+		 (match (string-match tramp-lock-file-info-regexp info)))
 	(unless (ask-user-about-lock
 		 file (format
-		       "%s@%s (pid %s)" (match-string 1 contents)
-		       (match-string 2 contents) (match-string 3 contents)))
+		       "%s@%s (pid %s)" (match-string 1 info)
+		       (match-string 2 info) (match-string 3 info)))
 	  (throw 'dont-lock nil)))
 
-      (let ((lockname (tramp-compat-make-lock-file-name file))
-	    ;; USER@HOST.PID[:BOOT_TIME]
-	    (contents
-	     (format
-	      "%s@%s.%s" (user-login-name) (system-name)
-	      (tramp-get-lock-pid file)))
-	    create-lockfiles signal-hook-function)
-	(condition-case nil
-	    (make-symbolic-link contents lockname 'ok-if-already-exists)
-	  (error (write-region contents nil lockname)))))))
+      (when-let ((lockname (tramp-compat-make-lock-file-name file))
+	         ;; USER@HOST.PID[:BOOT_TIME]
+	         (info
+	          (format
+	           "%s@%s.%s" (user-login-name) (system-name)
+	           (tramp-get-lock-pid file))))
+
+	;; Protect against security hole.
+	(with-parsed-tramp-file-name file nil
+	  (when (and (not tramp-allow-unsafe-temporary-files)
+		     (file-in-directory-p lockname temporary-file-directory)
+		     (zerop (or (tramp-compat-file-attribute-user-id
+				 (file-attributes file 'integer))
+				tramp-unknown-id-integer))
+		     (not (with-tramp-connection-property
+			      (tramp-get-process v) "unsafe-temporary-file"
+			    (yes-or-no-p
+			     (concat
+			      "Lock file on local temporary directory, "
+			      "do you want to continue? ")))))
+	    (tramp-error v 'file-error "Unsafe lock file name")))
+
+	;; Do the lock.
+        (let (create-lockfiles signal-hook-function)
+	  (condition-case nil
+	      (make-symbolic-link info lockname 'ok-if-already-exists)
+	    (error
+	     (with-file-modes #o0644
+               (write-region info nil lockname)))))))))
+
+(defun tramp-handle-make-lock-file-name (file)
+  "Like `make-lock-file-name' for Tramp files."
+  (and create-lockfiles
+       ;; This variable has been introduced with Emacs 28.1.
+       (not (bound-and-true-p remote-file-name-inhibit-locks))
+       (tramp-run-real-handler 'make-lock-file-name (list file))))
 
 (defun tramp-handle-unlock-file (file)
   "Like `unlock-file' for Tramp files."
-  (condition-case err
-      (delete-file (tramp-compat-make-lock-file-name file))
-    (error (userlock--handle-unlock-error err))))
+  (when-let ((lockname (tramp-compat-make-lock-file-name file)))
+    (condition-case err
+        (delete-file lockname)
+      ;; `userlock--handle-unlock-error' exists since Emacs 28.1.
+      (error (tramp-compat-funcall 'userlock--handle-unlock-error err)))))
 
 (defun tramp-handle-load (file &optional noerror nomessage nosuffix must-suffix)
   "Like `load' for Tramp files."
@@ -4436,9 +4463,7 @@ of."
 		     (format "File %s exists; overwrite anyway? " filename)))))
       (tramp-error v 'file-already-exists filename))
 
-    (let ((auto-saving
-	   (string-match-p "^#.+#$" (file-name-nondirectory filename)))
-	  file-locked
+    (let (file-locked
 	  (tmpfile (tramp-compat-make-temp-file filename))
 	  (modes (tramp-default-file-modes
 		  filename (and (eq mustbenew 'excl) 'nofollow)))
@@ -4450,7 +4475,8 @@ of."
 		   (tramp-get-remote-gid v 'integer))))
 
       ;; Lock file.
-      (when (and (not auto-saving) (file-remote-p lockname)
+      (when (and (not (auto-save-file-name-p (file-name-nondirectory filename)))
+		 (file-remote-p lockname)
 		 (not (eq (file-locked-p lockname) t)))
 	(setq file-locked t)
 	;; `lock-file' exists since Emacs 28.1.

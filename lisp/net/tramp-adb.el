@@ -164,7 +164,7 @@ It is used for TCP/IP devices."
     (make-auto-save-file-name . tramp-handle-make-auto-save-file-name)
     (make-directory . tramp-adb-handle-make-directory)
     (make-directory-internal . ignore)
-    ;; `make-lock-file-name' performed by default handler.
+    (make-lock-file-name . tramp-handle-make-lock-file-name)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
     (make-process . tramp-adb-handle-make-process)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
@@ -549,14 +549,13 @@ But handle the case, if the \"test\" command is not available."
 		     (format "File %s exists; overwrite anyway? " filename)))))
       (tramp-error v 'file-already-exists filename))
 
-    (let* ((auto-saving
-	    (string-match-p "^#.+#$" (file-name-nondirectory filename)))
-	   file-locked
-	   (curbuf (current-buffer))
-	   (tmpfile (tramp-compat-make-temp-file filename)))
+    (let (file-locked
+	  (curbuf (current-buffer))
+	  (tmpfile (tramp-compat-make-temp-file filename)))
 
       ;; Lock file.
-      (when (and (not auto-saving) (file-remote-p lockname)
+      (when (and (not (auto-save-file-name-p (file-name-nondirectory filename)))
+		 (file-remote-p lockname)
 		 (not (eq (file-locked-p lockname) t)))
 	(setq file-locked t)
 	;; `lock-file' exists since Emacs 28.1.
@@ -804,7 +803,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
   (when (and (numberp destination) (zerop destination))
     (error "Implementation does not handle immediate return"))
 
-  (with-parsed-tramp-file-name default-directory nil
+  (with-parsed-tramp-file-name (expand-file-name default-directory) nil
     (let (command input tmpinput stderr tmpstderr outbuf ret)
       ;; Compute command.
       (setq command (mapconcat #'tramp-shell-quote-argument
