@@ -477,7 +477,6 @@ file it's locking, and it has the same name, but with \".#\" prepended."
   :type '(repeat (list (regexp :tag "Regexp")
                        (string :tag "Replacement")
 		       (boolean :tag "Uniquify")))
-  :initialize 'custom-initialize-delay
   :version "28.1")
 
 (defcustom remote-file-name-inhibit-locks nil
@@ -1702,6 +1701,10 @@ rather than FUN itself, to `minibuffer-setup-hook'."
 (defun find-file-read-args (prompt mustmatch)
   (list (read-file-name prompt nil default-directory mustmatch)
 	t))
+
+(defun file-name-history--add (file)
+  "Add FILE to `file-name-history'."
+  (add-to-history 'file-name-history (abbreviate-file-name file)))
 
 (defun find-file (filename &optional wildcards)
   "Edit file FILENAME.
@@ -3436,12 +3439,26 @@ Major modes can use this to examine user-specified local variables
 in order to initialize other data structure based on them.")
 
 (defcustom safe-local-variable-values nil
-  "List variable-value pairs that are considered safe.
+  "List of variable-value pairs that are considered safe.
 Each element is a cons cell (VAR . VAL), where VAR is a variable
-symbol and VAL is a value that is considered safe."
+symbol and VAL is a value that is considered safe.
+
+Also see `ignored-local-variable-values'."
   :risky t
   :group 'find-file
   :type 'alist)
+
+(defcustom ignored-local-variable-values nil
+  "List of variable-value pairs that should always be ignored.
+Each element is a cons cell (VAR . VAL), where VAR is a variable
+symbol and VAL is its value; if VAR is set to VAL by a file-local
+variables section, that setting should be ignored.
+
+Also see `safe-local-variable-values'."
+  :risky t
+  :group 'find-file
+  :type 'alist
+  :version "28.1")
 
 (defcustom safe-local-eval-forms
   ;; This should be here at least as long as Emacs supports write-file-hooks.
@@ -3593,7 +3610,9 @@ n  -- to ignore the local variables list.")
 	(if offer-save
 	    (insert "
 !  -- to apply the local variables list, and permanently mark these
-      values (*) as safe (in the future, they will be set automatically.)\n\n")
+      values (*) as safe (in the future, they will be set automatically.)
+i  -- to ignore the local variables list, and permanently mark these
+      values (*) as ignored\n\n")
 	  (insert "\n\n"))
 	(dolist (elt all-vars)
 	  (cond ((member elt unsafe-vars)
@@ -3617,16 +3636,24 @@ n  -- to ignore the local variables list.")
 	(pop-to-buffer buf '(display-buffer--maybe-at-bottom))
 	(let* ((exit-chars '(?y ?n ?\s))
 	       (prompt (format "Please type %s%s: "
-			       (if offer-save "y, n, or !" "y or n")
+			       (if offer-save "y, n, ! or i" "y or n")
 			       (if (< (line-number-at-pos (point-max))
 				      (window-body-height))
 				   ""
 				 ", or C-v/M-v to scroll")))
 	       char)
-	  (if offer-save (push ?! exit-chars))
+	  (when offer-save
+            (push ?i exit-chars)
+            (push ?! exit-chars))
 	  (setq char (read-char-choice prompt exit-chars))
-	  (when (and offer-save (= char ?!) unsafe-vars)
-	    (customize-push-and-save 'safe-local-variable-values unsafe-vars))
+	  (when (and offer-save
+                     (or (= char ?!) (= char ?i))
+                     unsafe-vars)
+	    (customize-push-and-save
+             (if (= char ?!)
+                 'safe-local-variable-values
+               'ignored-local-variable-values)
+             unsafe-vars))
 	  (prog1 (memq char '(?! ?\s ?y))
 	    (quit-window t)))))))
 
@@ -3719,13 +3746,18 @@ If these settings come from directory-local variables, then
 DIR-NAME is the name of the associated directory.  Otherwise it is nil."
   ;; Find those variables that we may want to save to
   ;; `safe-local-variable-values'.
-  (let (all-vars risky-vars unsafe-vars)
+  (let (all-vars risky-vars unsafe-vars ignored)
     (dolist (elt variables)
       (let ((var (car elt))
 	    (val (cdr elt)))
 	(cond ((memq var ignored-local-variables)
 	       ;; Ignore any variable in `ignored-local-variables'.
 	       nil)
+              ((seq-some (lambda (elem)
+                           (and (eq (car elem) var)
+                                (eq (cdr elem) val)))
+                         ignored-local-variable-values)
+               nil)
 	      ;; Obey `enable-local-eval'.
 	      ((eq var 'eval)
 	       (when enable-local-eval
@@ -6246,9 +6278,6 @@ This undoes all changes since the file was visited or saved.
 With a prefix argument, offer to revert from latest auto-save file, if
 that is more recent than the visited file.
 
-Reverting a buffer will try to preserve markers in the buffer;
-see the Info node `(elisp)Reverting' for details.
-
 This command also implements an interface for special buffers
 that contain text that doesn't come from a file, but reflects
 some other data instead (e.g. Dired buffers, `buffer-list'
@@ -6274,7 +6303,12 @@ This function binds `revert-buffer-in-progress-p' non-nil while it operates.
 This function calls the function that `revert-buffer-function' specifies
 to do the work, with arguments IGNORE-AUTO and NOCONFIRM.
 The default function runs the hooks `before-revert-hook' and
-`after-revert-hook'."
+`after-revert-hook'
+
+Reverting a buffer will try to preserve markers in the buffer,
+but it cannot always preserve all of them.  For better results,
+use `revert-buffer-with-fine-grain', which tries harder to
+preserve markers and overlays, at the price of being slower."
   ;; I admit it's odd to reverse the sense of the prefix argument, but
   ;; there is a lot of code out there that assumes that the first
   ;; argument should be t to avoid consulting the auto-save file, and
@@ -6283,7 +6317,9 @@ The default function runs the hooks `before-revert-hook' and
   ;; interface, but leaving the programmatic interface the same.
   (interactive (list (not current-prefix-arg)))
   (let ((revert-buffer-in-progress-p t)
-        (revert-buffer-preserve-modes preserve-modes))
+        (revert-buffer-preserve-modes preserve-modes)
+        ;; Preserve buffer-readedness.
+        (buffer-read-only buffer-read-only))
     (funcall (or revert-buffer-function #'revert-buffer--default)
              ignore-auto noconfirm)))
 

@@ -92,6 +92,10 @@ proper pty support that Emacs needs.
 * Startup Changes in Emacs 28.1
 
 ---
+** File names given on the command line will now be pushed onto
+'file-name-history'.
+
+---
 ** In GTK builds, Emacs now supports startup notification.
 This means that Emacs won't steal keyboard focus upon startup
 (when started via the Desktop) if the user is typing into another
@@ -335,6 +339,10 @@ by dragging the tab lines of their topmost windows with the mouse.
 
 * Editing Changes in Emacs 28.1
 
+---
+** Dragging a file to Emacs will now also push the name of the file
+onto 'file-name-history'.
+
 +++
 ** A prefix arg now causes 'delete-other-frames' to only iconify frames.
 
@@ -476,6 +484,11 @@ highlighting on heading lines using standard outline faces.  This
 works well only when there are no conflicts with faces used by the
 major mode.
 
+** New commands 'copy-matching-lines' and 'kill-matching-lines'.
+These commands are similar to the command 'flush-lines',
+but add the matching lines to the kill ring as a single string,
+including the newlines that separate the lines.
+
 
 * Changes in Specialized Modes and Packages in Emacs 28.1
 
@@ -580,6 +593,11 @@ SMIE is now always enabled and 'ruby-use-smie' only controls whether
 indentation is done using SMIE or with the old ad-hoc code.
 
 ** Icomplete
+
+---
+*** New user option 'icomplete-matches-format'.
+This allows controlling the current/total number of matches for the
+prompt prefix.
 
 +++
 *** New minor mode 'icomplete-vertical-mode', alias 'fido-vertical-mode'.
@@ -868,6 +886,12 @@ keys, add the following to your init file:
 
 ** Change Logs and VC
 
+*** vc-git now sets the GIT_LITERAL_PATHSPECS environment variable.
+This ensures that Git operations on files containing wildcard
+characters work as they're supposed to.  However, this also affects
+scripts running from Git hooks, and these have to "unset
+GIT_LITERAL_PATHSPECS" to work as before.
+
 *** More VC commands can be used from non-file buffers.
 The relevant commands are those that don't change the VC state.
 The non-file buffers which can use VC commands are those that have
@@ -1153,6 +1177,11 @@ any directory names on the 'find' command lines end in a slash.
 This change is for better compatibility with old versions of non-GNU
 'find', such as the one used on macOS.
 
+---
+*** New utility function 'grep-file-at-point'.
+This returns the name of the file at point (if any) in 'grep-mode'
+buffers.
+
 ** Help
 
 +++
@@ -1416,6 +1445,10 @@ If non-nil, 'shell-mode' handles implicit "cd" commands, changing the
 directory if the command is a directory.  Useful for shells like "zsh"
 that has this feature.
 
++++
+*** 'comint-delete-output' can now save deleted text in the kill-ring.
+Interactively, 'C-u C-c C-o' triggers this new optional behavior.
+
 ** Eshell
 
 ---
@@ -1587,11 +1620,27 @@ Defaults to 'libravatar', with 'unicornify' and 'gravatar' as options.
 
 ** Compilation mode
 
+---
+*** New function 'ansi-color-compilation-filter'.
+This function is meant to be used in 'compilation-filter-hook'.
+
+---
+*** New user option 'ansi-color-for-compilation-mode'.
+This controls what 'ansi-color-compilation-filter' does.
+
 *** Regexp matching of messages is now case-sensitive by default.
 The variable 'compilation-error-case-fold-search' can be set for
 case-insensitive matching of messages when the old behavior is
 required, but the recommended solution is to use a correctly matching
 regexp instead.
+
+---
+*** New user option 'compilation-search-all-directories'.
+When doing parallel builds, directories and compilation errors may
+arrive in the "*compilation*" buffer out-of-order.  If this variable is
+non-nil (the default), Emacs will now search backwards in the buffer
+for any directory the file with errors may be in.  If nil, this won't
+be done (and this restores how this previously worked).
 
 ---
 *** Messages from ShellCheck are now recognized.
@@ -1981,6 +2030,27 @@ used instead.  Uses of 'json-encode-list' should be changed to call
 one of 'json-encode', 'json-encode-alist', 'json-encode-plist', or
 'json-encode-array' instead.
 
+** json.c
+
++++
+*** New function 'json-available-p'.
+This predicate returns non-nil if Emacs is built with libjansson
+support, and it is available on the current system.
+
++++
+*** Native JSON functions now signal an error if libjansson is unavailable.
+This affects 'json-serialize', 'json-insert', 'json-parse-srtring',
+and 'json-parse-buffer'.  This can happen if Emacs was compiled with
+libjansson, but the DLL cannot be found and/or loaded by Emacs at run
+time.  Previously, Emacs would display a message and return nil in
+these cases.
+
+*** The JSON functions 'json-serialize', 'json-insert',
+'json-parse-string', and 'json-parse-buffer' now implement some of the
+semantics of RFC 8259 instead of the earlier RFC 4627.  In particular,
+these functions now accept top-level JSON values that are neither
+arrays nor objects.
+
 ** xml.el
 
 *** XML serialization functions now reject invalid characters.
@@ -2210,6 +2280,22 @@ This command, called interactively, toggles the local value of
 ** Miscellaneous
 
 ---
+*** New utility function 'make-separator-line'.
+
+---
+*** New face 'separator-line'.
+This is used by 'make-separator-line'.
+
++++
+*** New user option 'ignored-local-variable-values'.
+This is the opposite of 'safe-local-variable-values' -- it's an alist
+of variable-value pairs that are to be ignored when reading a
+local-variables section of a file.
+
+---
+*** 'indent-tabs-mode' is now a global minor mode instead of just a variable.
+
+---
 *** New user option 'save-place-abbreviate-file-names'.
 
 ---
@@ -2351,14 +2437,6 @@ By default, turning on 'global-display-fill-column-indicator-mode'
 doesn't turn on 'display-fill-column-indicator-mode' in special-mode
 buffers.  This can be controlled by customizing the variable
 'global-display-fill-column-indicator-modes'.
-
----
-*** New user option 'compilation-search-all-directories'.
-When doing parallel builds, directories and compilation errors may
-arrive in the "*compilation*" buffer out-of-order.  If this variable is
-non-nil (the default), Emacs will now search backwards in the buffer
-for any directory the file with errors may be in.  If nil, this won't
-be done (and this restores how this previously worked).
 
 +++
 *** New user option 'next-error-message-highlight'.
@@ -2631,6 +2709,15 @@ also keep the type information of their arguments.  Use the
 ---
 *** New face 'perl-heredoc', used for heredoc elements.
 
++++
+** A function can now be thrown to the 'exit' label in addition to t or nil.
+The command loop will call it with zero arguments before returning.
+
++++
+** New error symbol 'minibuffer-quit'.
+Signaling it has almost the same effect as 'quit' except that it
+doesn't cause keyboard macro termination.
+
 ---
 *** The command 'cperl-set-style' offers the new value "PBP".
 This value customizes Emacs to use the style recommended in Damian
@@ -2717,6 +2804,9 @@ similar to prefix arguments, but are more flexible and discoverable.
 
 * Incompatible Editing Changes in Emacs 28.1
 
+** 'revert-buffer' will now preserve buffer-readedness.
+It previously switched the read-only flag off.
+
 ** 'electric-indent-mode' now also indents inside strings and comments,
 (unless the indentation function doesn't, of course).
 To recover the previous behavior you can use:
@@ -2768,6 +2858,14 @@ This is to keep the same behavior as Eshell.
 
 
 * Incompatible Lisp Changes in Emacs 28.1
+
+---
+** 'kill-all-local-variables' has changed how it handles non-symbol hooks.
+The function is documented to eliminated all buffer-local bindings
+except variables with a 'permanent-local' property, or hooks that
+have elements with a 'permanent-local-hook' property.  In addition, it
+would also keep lambda expressions in hooks sometimes.  The latter has
+now been changed: The function will now also remove these.
 
 ---
 ** Some floating-point numbers are now handled differently by the Lisp reader.
@@ -3404,12 +3502,6 @@ locales.  They are also available as aliases 'ebcdic-cp-*' (e.g.,
 'ebcdic-cp-fi' for the Finnish variant 'ibm278'), and 'cp2xx' (e.g.,
 'cp278' for 'ibm278').  There are also new charsets 'ibm2xx' to
 support these coding-systems.
-
-** The JSON functions 'json-serialize', 'json-insert',
-'json-parse-string', and 'json-parse-buffer' now implement some of the
-semantics of RFC 8259 instead of the earlier RFC 4627.  In particular,
-these functions now accept top-level JSON values that are neither
-arrays nor objects.
 
 ---
 ** 'while-no-input-ignore-events' accepts more special events.
