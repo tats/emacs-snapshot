@@ -119,9 +119,8 @@ page for 'seccomp' system call, for details about Secure Computing
 filters.
 
 ** Setting 'fill-column' to nil is obsolete.
-This undocumented use of 'fill-column' is now obsolete.  If you have
-set this value to nil disable auto filling, instead disable
-'auto-fill-mode' in the relevant mode instead.
+This undocumented use of 'fill-column' is now obsolete.  To disable
+auto filling, turn off 'auto-fill-mode' instead.
 
 For instance, you could add something like the following to your init
 file:
@@ -767,6 +766,15 @@ faces in other ways.
 *** The new command 'recenter-current-error', bound to 'l' in Occur or
 compilation buffers, recenters the current displayed occurrence/error.
 
+---
+*** Occur mode may use a different type for 'occur-target' property values.
+The value was previously always a marker set to the start of the first
+match on the line but can now also be a list of '(BEGIN . END)' pairs
+of markers delimiting each match on the line.
+This is a fully compatible change to the internal occur-mode
+implementation, and code creating their own occur-mode buffers will
+work as before.
+
 ** EIEIO
 
 +++
@@ -896,7 +904,7 @@ keys, add the following to your init file:
 
 ** Change Logs and VC
 
-*** vc-git now sets the GIT_LITERAL_PATHSPECS environment variable.
+*** vc-git now sets the 'GIT_LITERAL_PATHSPECS' environment variable.
 This ensures that Git operations on files containing wildcard
 characters work as they're supposed to.  However, this also affects
 scripts running from Git hooks, and these have to "unset
@@ -1142,6 +1150,12 @@ command has been added.  It depends on using an external program to
 take the actual screenshot, and defaults to "ImageMagick import".
 
 ** Smtpmail
+
++++
+*** New user option 'smtpmail-store-queue-variables'.
+If non-nil, SMTP variables will be stored together with the queued
+messages, and will then be used when sending with
+'M-x smtpmail-send-queued-mail'.
 
 +++
 *** Allow direct selection of smtp authentication mechanism.
@@ -1492,6 +1506,9 @@ like cell phones, tablets or cameras.
 *** New connection method "sshfs", which allows accessing remote files
 via a file system mounted with 'sshfs'.
 
+---
+*** Tramp supports authentication via yubikey now.
+
 +++
 *** Trashed remote files are moved to the local trash directory.
 All remote files, which are trashed, are moved to the local trash
@@ -1595,6 +1612,10 @@ See the new user options 'package-name-column-width',
 'package-archive-column-width'.
 
 ** gdb-mi
+
+*** New user option 'gdb-registers-enable-filter'.
+If non-nil, apply a register filter based on
+'gdb-registers-filter-pattern-list'.
 
 +++
 *** gdb-mi can now store and restore window configurations.
@@ -1720,6 +1741,36 @@ modified flag.
 ---
 *** New faces for heading elements.
 Those are 'shr-h1', 'shr-h2', 'shr-h3', 'shr-h4', 'shr-h5', 'shr-h6'.
+
+** MH-E mail handler for Emacs
+
+Functions and variables related to handling junk mail have been
+renamed to not associate color with sender quality.
+
++++
+*** New names for mh-junk interactive functions.
+Function 'mh-junk-whitelist' is renamed 'mh-junk-allowlist'.
+Function 'mh-junk-blacklist' is renamed 'mh-junk-blocklist'.
+
++++
+*** New binding for 'mh-junk-allowlist'.
+The key binding for 'mh-junk-allowlist' is changed from 'J w' to 'J a'.
+The old binding is supported but warns that it is obsolete.
+
++++
+*** New names for some hooks.
+'mh-whitelist-msg-hook' is renamed 'mh-allowlist-msg-hook'.
+'mh-blacklist-msg-hook' is renamed 'mh-blocklist-msg-hook'.
+
++++
+*** New names for some variables.
+Variable 'mh-whitelist-preserves-sequences-flag' is renamed
+'mh-allowlist-preserves-sequences-flag'.
+
++++
+*** New names for some faces.
+Face 'mh-folder-blacklisted' is renamed 'mh-folder-blocklisted'.
+Face 'mh-folder-whitelisted' is renamed 'mh-folder-allowlisted'.
 
 ** Apropos
 
@@ -2049,7 +2100,7 @@ support, and it is available on the current system.
 
 +++
 *** Native JSON functions now signal an error if libjansson is unavailable.
-This affects 'json-serialize', 'json-insert', 'json-parse-srtring',
+This affects 'json-serialize', 'json-insert', 'json-parse-string',
 and 'json-parse-buffer'.  This can happen if Emacs was compiled with
 libjansson, but the DLL cannot be found and/or loaded by Emacs at run
 time.  Previously, Emacs would display a message and return nil in
@@ -2289,10 +2340,13 @@ This command, called interactively, toggles the local value of
 
 ** Miscellaneous
 
+---
+*** fileloop will now skip missing files instead of signalling an error.
+
 +++
-*** .dir-locals.el now supports setting 'auto-mode-alist'.
-The new 'auto-mode-alist' specification in .dir-local.el files can now
-be used to override the global 'auto-mode-alist' in the current
+*** ".dir-locals.el" now supports setting 'auto-mode-alist'.
+The new 'auto-mode-alist' specification in ".dir-locals.el" files can
+now be used to override the global 'auto-mode-alist' in the current
 directory tree.
 
 ---
@@ -2317,10 +2371,13 @@ local-variables section of a file.
 ---
 *** 'tabulated-list-mode' can now restore original display order.
 Many commands (like 'C-x C-b') are derived from 'tabulated-list-mode',
-and that mode allow the user to sort on any column.  There was
+and that mode allows the user to sort on any column.  There was
 previously no easy way to get back to the original displayed order
 after sorting, but giving a -1 numerical prefix to the sorting command
 will now restore the original order.
+
+---
+*** 'M-left' and 'M-right' now move between columns in 'tabulated-list-mode'.
 
 +++
 *** New utility function 'insert-into-buffer'.
@@ -2506,25 +2563,6 @@ Like 'search-highlight-submatches', this is controlled by the new user option
 If non-nil (the default), revealed text is automatically hidden when
 point leaves the text.  If nil, the text is not hidden again.  Instead
 'M-x reveal-hide-revealed' can be used to hide all the revealed text.
-
-+++
-*** New user options to control the look of line/column numbers in the mode line.
-'mode-line-position-line-format' is the line number format (when
-'line-number-mode' is on), 'mode-line-position-column-format' is
-the column number format (when 'column-number-mode' is on), and
-'mode-line-position-column-line-format' is the combined format (when
-both modes are on).
-
-+++
-*** New user option 'mode-line-compact'.
-If non-nil, repeating spaces are compressed into a single space.  If
-'long', this is only done when the mode line is longer than the
-current window width (in characters).
-
-+++
-*** 'global-mode-string' constructs should end with a space.
-This was previously not formalized, which led to combinations of modes
-displaying data "smushed together" on the mode line.
 
 +++
 *** New command 'submit-emacs-patch'.
@@ -2825,9 +2863,6 @@ similar to prefix arguments, but are more flexible and discoverable.
 
 * Incompatible Editing Changes in Emacs 28.1
 
-** 'revert-buffer' will now preserve buffer-readedness.
-It previously switched the read-only flag off.
-
 ** 'electric-indent-mode' now also indents inside strings and comments,
 (unless the indentation function doesn't, of course).
 To recover the previous behavior you can use:
@@ -2882,7 +2917,7 @@ This is to keep the same behavior as Eshell.
 
 ---
 ** 'kill-all-local-variables' has changed how it handles non-symbol hooks.
-The function is documented to eliminated all buffer-local bindings
+The function is documented to eliminate all buffer-local bindings
 except variables with a 'permanent-local' property, or hooks that
 have elements with a 'permanent-local-hook' property.  In addition, it
 would also keep lambda expressions in hooks sometimes.  The latter has
@@ -3114,6 +3149,11 @@ The former is now declared obsolete.
 
 
 * Lisp Changes in Emacs 28.1
+
++++
+*** New function 'file-name-concat'.
+This appends file name components to a directory name and returns the
+result.
 
 +++
 *** New function 'split-string-shell-command'.

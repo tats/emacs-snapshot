@@ -3200,9 +3200,10 @@ Also applies to `magic-fallback-mode-alist'.")
 This function takes an alist of the same form as
 `auto-mode-alist'.  It then tries to find the appropriate match
 in the alist for the current buffer; setting the mode if
-possible.  Returns non-`nil' if the mode was set, `nil'
-otherwise.  DIR-LOCAL is a boolean which, if true, says that this
-call is via directory-locals and extra checks should be done."
+possible.
+Return non-nil if the mode was set, nil otherwise.
+DIR-LOCAL non-nil means this call is via directory-locals, and
+extra checks should be done."
   (if buffer-file-name
       (let (mode
             (name buffer-file-name)
@@ -3221,7 +3222,7 @@ call is via directory-locals and extra checks should be done."
                 (if case-insensitive-p
                     ;; Filesystem is case-insensitive.
                     (let ((case-fold-search t))
-                      (assoc-default alist 'string-match))
+                      (assoc-default name alist 'string-match))
                   ;; Filesystem is case-sensitive.
                   (or
                    ;; First match case-sensitively.
@@ -3237,13 +3238,20 @@ call is via directory-locals and extra checks should be done."
               (setq mode (car mode)
                     name (substring name 0 (match-beginning 0)))
             (setq name nil)))
-        (when (and dir-local mode)
-          (unless (string-suffix-p "-mode" (symbol-name mode))
-            (message "Ignoring invalid mode `%s'" (symbol-name mode))
-            (setq mode nil)))
+        (when (and dir-local mode
+                   (not (set-auto-mode--dir-local-valid-p mode)))
+          (message "Ignoring invalid mode `%s'" mode)
+          (setq mode nil))
         (when mode
           (set-auto-mode-0 mode keep-mode-if-same)
           t))))
+
+(defun set-auto-mode--dir-local-valid-p (mode)
+  "Say whether MODE can be used in a .dir-local.el `auto-mode-alist'."
+  (and (symbolp mode)
+       (string-suffix-p "-mode" (symbol-name mode))
+       (commandp mode)
+       (not (provided-mode-derived-p mode 'special-mode))))
 
 (defun set-auto-mode (&optional keep-mode-if-same)
   "Select major mode appropriate for current buffer.
@@ -6356,9 +6364,7 @@ preserve markers and overlays, at the price of being slower."
   ;; interface, but leaving the programmatic interface the same.
   (interactive (list (not current-prefix-arg)))
   (let ((revert-buffer-in-progress-p t)
-        (revert-buffer-preserve-modes preserve-modes)
-        ;; Preserve buffer-readedness.
-        (buffer-read-only buffer-read-only))
+        (revert-buffer-preserve-modes preserve-modes))
     (funcall (or revert-buffer-function #'revert-buffer--default)
              ignore-auto noconfirm)))
 
@@ -6609,7 +6615,8 @@ details on the arguments, see `revert-buffer'."
 		 (coding-system-for-read 'auto-save-coding))
 	     (erase-buffer)
 	     (insert-file-contents file-name nil)
-	     (set-buffer-file-coding-system coding-system))
+	     (set-buffer-file-coding-system coding-system)
+             (set-buffer-auto-saved))
 	   (after-find-file nil nil t))
 	  (t (user-error "Recover-file canceled")))))
 
@@ -8119,16 +8126,16 @@ Otherwise, trash FILENAME using the freedesktop.org conventions,
                  ;; exists, but the file name may exist in the trash
                  ;; directory even if there is no info file for it.
                  (when (file-exists-p
-                        (expand-file-name files-base trash-files-dir))
+                        (file-name-concat trash-files-dir files-base))
                    (setq overwrite t
                          files-base (file-name-nondirectory
                                      (make-temp-file
-                                      (expand-file-name
-                                       files-base trash-files-dir)
+                                      (file-name-concat
+                                       trash-files-dir files-base)
                                       is-directory))))
-		 (setq info-fn (expand-file-name
-				(concat files-base ".trashinfo")
-				trash-info-dir))
+		 (setq info-fn (file-name-concat
+				trash-info-dir
+                                (concat files-base ".trashinfo")))
                  ;; Re-check the existence (sort of).
 		 (condition-case nil
 		     (write-region nil nil info-fn nil 'quiet info-fn 'excl)
@@ -8137,14 +8144,14 @@ Otherwise, trash FILENAME using the freedesktop.org conventions,
 		    ;; like Emacs-style backup file names.  E.g.:
 		    ;; https://bugs.kde.org/170956
 		    (setq info-fn (make-temp-file
-				   (expand-file-name files-base trash-info-dir)
+				   (file-name-concat trash-info-dir files-base)
 				   nil ".trashinfo"))
 		    (setq files-base (substring (file-name-nondirectory info-fn)
                                                 0 (- (length ".trashinfo"))))
 		    (write-region nil nil info-fn nil 'quiet info-fn)))
 		 ;; Finally, try to move the file to the trashcan.
 		 (let ((delete-by-moving-to-trash nil)
-		       (new-fn (expand-file-name files-base trash-files-dir)))
+		       (new-fn (file-name-concat trash-files-dir files-base)))
 		   (rename-file fn new-fn overwrite)))))))))
 
 (defsubst file-attribute-type (attributes)

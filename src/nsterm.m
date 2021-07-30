@@ -1732,52 +1732,35 @@ ns_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 
   block_input ();
 
-  if (FRAME_PARENT_FRAME (f))
-    {
-      /* Convert the parent frame's view rectangle into screen
-         coords.  */
-      EmacsView *parentView = FRAME_NS_VIEW (FRAME_PARENT_FRAME (f));
-      NSRect parentRect = [parentView convertRect:[parentView frame]
-                                           toView:nil];
-      parentRect = [[parentView window] convertRectToScreen:parentRect];
+  /* If there is no parent frame then just convert to screen
+     coordinates, UNLESS we have negative values, in which case I
+     think it's best to position from the bottom and right of the
+     current screen rather than the main screen or whole display.  */
 
-      if (f->size_hint_flags & XNegative)
-        topLeft.x = NSMaxX (parentRect) - NSWidth (windowFrame) + xoff;
-      else
-        topLeft.x = NSMinX (parentRect) + xoff;
+  NSRect parentRect = ns_parent_window_rect (f);
 
-      if (f->size_hint_flags & YNegative)
-        topLeft.y = NSMinY (parentRect) + NSHeight (windowFrame) - yoff;
-      else
-        topLeft.y = NSMaxY (parentRect) - yoff;
-    }
+  if (f->size_hint_flags & XNegative)
+    topLeft.x = NSMaxX (parentRect) - NSWidth (windowFrame) + xoff;
+  else if (FRAME_PARENT_FRAME (f))
+    topLeft.x = NSMinX (parentRect) + xoff;
   else
-    {
-      /* If there is no parent frame then just convert to screen
-         coordinates, UNLESS we have negative values, in which case I
-         think it's best to position from the bottom and right of the
-         current screen rather than the main screen or whole
-         display.  */
-      NSRect screenFrame = [[[view window] screen] frame];
+    topLeft.x = xoff;
 
-      if (f->size_hint_flags & XNegative)
-        topLeft.x = NSMaxX (screenFrame) - NSWidth (windowFrame) + xoff;
-      else
-        topLeft.x = xoff;
-
-      if (f->size_hint_flags & YNegative)
-        topLeft.y = NSMinY (screenFrame) + NSHeight (windowFrame) - yoff;
-      else
-        topLeft.y = NSMaxY ([[[NSScreen screens] objectAtIndex:0] frame]) - yoff;
+  if (f->size_hint_flags & YNegative)
+    topLeft.y = NSMinY (parentRect) + NSHeight (windowFrame) - yoff;
+  else if (FRAME_PARENT_FRAME (f))
+    topLeft.y = NSMaxY (parentRect) - yoff;
+  else
+    topLeft.y = NSMaxY ([[[NSScreen screens] objectAtIndex:0] frame]) - yoff;
 
 #ifdef NS_IMPL_GNUSTEP
-      /* Don't overlap the menu.
+  /* Don't overlap the menu.
 
-         FIXME: Surely there's a better way than just hardcoding 100
-         in here?  */
-      topLeft.x = 100;
+     FIXME: Surely there's a better way than just hardcoding 100 in
+     here?  */
+  if (topLeft.x < 100)
+    topLeft.x = 100;
 #endif
-    }
 
   NSTRACE_POINT ("setFrameTopLeftPoint", topLeft);
   [[view window] setFrameTopLeftPoint:topLeft];
@@ -1800,40 +1783,34 @@ ns_set_window_size (struct frame *f,
 {
   EmacsView *view = FRAME_NS_VIEW (f);
   NSWindow *window = [view window];
-  NSRect wr = [window frame];
-  int orig_height = wr.size.height;
+  NSRect frameRect;
 
   NSTRACE ("ns_set_window_size");
 
   if (view == nil)
     return;
 
-  NSTRACE_RECT ("current", wr);
+  NSTRACE_RECT ("current", [window frame]);
   NSTRACE_MSG ("Width:%d Height:%d", width, height);
   NSTRACE_MSG ("Font %d x %d", FRAME_COLUMN_WIDTH (f), FRAME_LINE_HEIGHT (f));
 
   block_input ();
 
-  wr.size.width = width + f->border_width;
-  wr.size.height = height;
-  if (! [view isFullscreen])
-    wr.size.height += FRAME_NS_TITLEBAR_HEIGHT (f)
-      + FRAME_TOOLBAR_HEIGHT (f);
+  frameRect = [window frameRectForContentRect:NSMakeRect (0, 0, width, height)];
 
-  /* Do not try to constrain to this screen.  We may have multiple
-     screens, and want Emacs to span those.  Constraining to screen
-     prevents that, and that is not nice to the user.  */
- if (f->output_data.ns->zooming)
-   f->output_data.ns->zooming = 0;
- else
-   wr.origin.y += orig_height - wr.size.height;
+  /* Set the origin so the top left of the frame doesn't move.  */
+  frameRect.origin = [window frame].origin;
+  frameRect.origin.y += NSHeight ([view frame]) - height;
 
- /* Usually it seems safe to delay changing the frame size, but when a
-    series of actions are taken with no redisplay between them then we
-    can end up using old values so don't delay here.  */
- change_frame_size (f, width, height, false, NO, false);
+  if (f->output_data.ns->zooming)
+    f->output_data.ns->zooming = 0;
 
-  [window setFrame:wr display:NO];
+  /* Usually it seems safe to delay changing the frame size, but when a
+     series of actions are taken with no redisplay between them then we
+     can end up using old values so don't delay here.  */
+  change_frame_size (f, width, height, false, NO, false);
+
+  [window setFrame:frameRect display:NO];
 
   unblock_input ();
 }
@@ -2433,12 +2410,10 @@ ns_set_frame_alpha (struct frame *f)
   else if (0.0 <= alpha && alpha < alpha_min && alpha_min <= 1.0)
     alpha = alpha_min;
 
-#ifdef NS_IMPL_COCOA
   {
     EmacsView *view = FRAME_NS_VIEW (f);
-  [[view window] setAlphaValue: alpha];
+    [[view window] setAlphaValue: alpha];
   }
-#endif
 }
 
 
@@ -3092,6 +3067,39 @@ ns_compute_glyph_string_overhangs (struct glyph_string *s)
 
    ========================================================================== */
 
+static NSMutableDictionary *fringe_bmp;
+
+static void
+ns_define_fringe_bitmap (int which, unsigned short *bits, int h, int w)
+{
+  NSBezierPath *p = [NSBezierPath bezierPath];
+
+  if (!fringe_bmp)
+    fringe_bmp = [[NSMutableDictionary alloc] initWithCapacity:25];
+
+  [p moveToPoint:NSMakePoint (0, 0)];
+
+  for (int y = 0 ; y < h ; y++)
+    for (int x = 0 ; x < w ; x++)
+      {
+        /* XBM rows are always round numbers of bytes, with any unused
+           bits ignored.  */
+        int byte = y * (w/8 + (w%8 ? 1 : 0)) + x/8;
+        bool bit = bits[byte] & (0x80 >> x%8);
+        if (bit)
+          [p appendBezierPathWithRect:NSMakeRect (x, y, 1, 1)];
+      }
+
+  [fringe_bmp setObject:p forKey:[NSNumber numberWithInt:which]];
+}
+
+
+static void
+ns_destroy_fringe_bitmap (int which)
+{
+  [fringe_bmp removeObjectForKey:[NSNumber numberWithInt:which]];
+}
+
 
 extern int max_used_fringe_bitmap;
 static void
@@ -3119,41 +3127,18 @@ ns_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct face *face = p->face;
-  static EmacsImage **bimgs = NULL;
-  static int nBimgs = 0;
   NSRect clearRect = NSZeroRect;
-  NSRect imageRect = NSZeroRect;
   NSRect rowRect = ns_row_rect (w, row, ANY_AREA);
 
   NSTRACE_WHEN (NSTRACE_GROUP_FRINGE, "ns_draw_fringe_bitmap");
   NSTRACE_MSG ("which:%d cursor:%d overlay:%d width:%d height:%d period:%d",
                p->which, p->cursor_p, p->overlay_p, p->wd, p->h, p->dh);
 
-  /* grow bimgs if needed */
-  if (nBimgs < max_used_fringe_bitmap)
-    {
-      bimgs = xrealloc (bimgs, max_used_fringe_bitmap * sizeof *bimgs);
-      memset (bimgs + nBimgs, 0,
-	      (max_used_fringe_bitmap - nBimgs) * sizeof *bimgs);
-      nBimgs = max_used_fringe_bitmap;
-    }
+  /* Work out the rectangle we will need to clear.  */
+  clearRect = NSMakeRect (p->x, p->y, p->wd, p->h);
 
-  /* Work out the rectangle we will composite into.  */
-  if (p->which)
-    imageRect = NSMakeRect (p->x, p->y, p->wd, p->h);
-
-  /* Work out the rectangle we will need to clear.  Because we're
-     compositing rather than blitting, we need to clear the area under
-     the image regardless of anything else.  */
   if (p->bx >= 0 && !p->overlay_p)
-    {
-      clearRect = NSMakeRect (p->bx, p->by, p->nx, p->ny);
-      clearRect = NSUnionRect (clearRect, imageRect);
-    }
-  else
-    {
-      clearRect = imageRect;
-    }
+    clearRect = NSUnionRect (clearRect, NSMakeRect (p->bx, p->by, p->nx, p->ny));
 
   /* Handle partially visible rows.  */
   clearRect = NSIntersectionRect (clearRect, rowRect);
@@ -3169,53 +3154,29 @@ ns_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
       NSRectFill (clearRect);
     }
 
-  if (p->which)
+  NSBezierPath *bmp = [fringe_bmp objectForKey:[NSNumber numberWithInt:p->which]];
+  if (bmp)
     {
-      EmacsImage *img = bimgs[p->which - 1];
+      NSAffineTransform *transform = [NSAffineTransform transform];
+      NSColor *bm_color;
 
-      if (!img)
-        {
-          // Note: For "periodic" images, allocate one EmacsImage for
-          // the base image, and use it for all dh:s.
-          unsigned short *bits = p->bits;
-          int full_height = p->h + p->dh;
-          int i;
-          unsigned char *cbits = xmalloc (full_height);
+      /* Because the image is defined at (0, 0) we need to take a copy
+         and then transform that copy to the new origin.  */
+      bmp = [bmp copy];
+      [transform translateXBy:p->x yBy:p->y - p->dh];
+      [bmp transformUsingAffineTransform:transform];
 
-          for (i = 0; i < full_height; i++)
-            cbits[i] = bits[i];
-          img = [[EmacsImage alloc] initFromXBM: cbits width: 8
-                                         height: full_height
-                                             fg: 0 bg: 0
-                                   reverseBytes: NO];
-          bimgs[p->which - 1] = img;
-          xfree (cbits);
-        }
+      if (!p->cursor_p)
+        bm_color = ns_lookup_indexed_color(face->foreground, f);
+      else if (p->overlay_p)
+        bm_color = ns_lookup_indexed_color(face->background, f);
+      else
+        bm_color = f->output_data.ns->cursor_color;
 
+      [bm_color set];
+      [bmp fill];
 
-      {
-        NSColor *bm_color;
-        if (!p->cursor_p)
-          bm_color = ns_lookup_indexed_color(face->foreground, f);
-        else if (p->overlay_p)
-          bm_color = ns_lookup_indexed_color(face->background, f);
-        else
-          bm_color = f->output_data.ns->cursor_color;
-        [img setXBMColor: bm_color];
-      }
-
-      // Note: For periodic images, the full image height is "h + hd".
-      // By using the height h, a suitable part of the image is used.
-      NSRect fromRect = NSMakeRect(0, 0, p->wd, p->h);
-
-      NSTRACE_RECT ("fromRect", fromRect);
-
-      [img drawInRect: imageRect
-             fromRect: fromRect
-            operation: NSCompositingOperationSourceOver
-             fraction: 1.0
-           respectFlipped: YES
-                hints: nil];
+      [bmp release];
     }
   ns_unfocus (f);
 }
@@ -3690,7 +3651,7 @@ ns_draw_box (NSRect r, CGFloat hthickness, CGFloat vthickness,
 
 
 static void
-ns_draw_relief (NSRect r, int hthickness, int vthickness, char raised_p,
+ns_draw_relief (NSRect outer, int hthickness, int vthickness, char raised_p,
                char top_p, char bottom_p, char left_p, char right_p,
                struct glyph_string *s)
 /* --------------------------------------------------------------------------
@@ -3701,7 +3662,7 @@ ns_draw_relief (NSRect r, int hthickness, int vthickness, char raised_p,
 {
   static NSColor *baseCol = nil, *lightCol = nil, *darkCol = nil;
   NSColor *newBaseCol = nil;
-  NSRect sr = r;
+  NSRect inner;
 
   NSTRACE ("ns_draw_relief");
 
@@ -3735,33 +3696,50 @@ ns_draw_relief (NSRect r, int hthickness, int vthickness, char raised_p,
       darkCol = [[baseCol shadowWithLevel: 0.3] retain];
     }
 
+  /* Calculate the inner rectangle.  */
+  inner = NSInsetRect (outer, hthickness, vthickness);
+
   [(raised_p ? lightCol : darkCol) set];
 
-  /* TODO: mitering. Using NSBezierPath doesn't work because of color switch.  */
-
-  /* top */
-  sr.size.height = hthickness;
-  if (top_p) NSRectFill (sr);
-
-  /* left */
-  sr.size.height = r.size.height;
-  sr.size.width = vthickness;
-  if (left_p) NSRectFill (sr);
+  if (top_p || left_p)
+    {
+      NSBezierPath *p = [NSBezierPath bezierPath];
+      [p moveToPoint:NSMakePoint (NSMinX (outer), NSMinY (outer))];
+      if (top_p)
+        {
+          [p lineToPoint:NSMakePoint (NSMaxX (outer), NSMinY (outer))];
+          [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMinY (inner))];
+        }
+      [p lineToPoint:NSMakePoint (NSMinX (inner), NSMinY (inner))];
+      if (left_p)
+        {
+          [p lineToPoint:NSMakePoint (NSMinX (inner), NSMaxY (inner))];
+          [p lineToPoint:NSMakePoint (NSMinX (outer), NSMaxY (outer))];
+        }
+      [p closePath];
+      [p fill];
+    }
 
   [(raised_p ? darkCol : lightCol) set];
 
-  /* bottom */
-  sr.size.width = r.size.width;
-  sr.size.height = hthickness;
-  sr.origin.y += r.size.height - hthickness;
-  if (bottom_p) NSRectFill (sr);
-
-  /* right */
-  sr.size.height = r.size.height;
-  sr.origin.y = r.origin.y;
-  sr.size.width = vthickness;
-  sr.origin.x += r.size.width - vthickness;
-  if (right_p) NSRectFill (sr);
+    if (bottom_p || right_p)
+    {
+      NSBezierPath *p = [NSBezierPath bezierPath];
+      [p moveToPoint:NSMakePoint (NSMaxX (outer), NSMaxY (outer))];
+      if (right_p)
+        {
+          [p lineToPoint:NSMakePoint (NSMaxX (outer), NSMinY (outer))];
+          [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMinY (inner))];
+        }
+      [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMaxY (inner))];
+      if (bottom_p)
+        {
+          [p lineToPoint:NSMakePoint (NSMinX (inner), NSMaxY (inner))];
+          [p lineToPoint:NSMakePoint (NSMinX (outer), NSMaxY (outer))];
+        }
+      [p closePath];
+      [p fill];
+    }
 }
 
 
@@ -5170,8 +5148,8 @@ static struct redisplay_interface ns_redisplay_interface =
   gui_get_glyph_overhangs,
   gui_fix_overlapping_area,
   ns_draw_fringe_bitmap,
-  0, /* define_fringe_bitmap */ /* FIXME: simplify ns_draw_fringe_bitmap */
-  0, /* destroy_fringe_bitmap */
+  ns_define_fringe_bitmap,
+  ns_destroy_fringe_bitmap,
   ns_compute_glyph_string_overhangs,
   ns_draw_glyph_string,
   ns_define_frame_cursor,
@@ -5356,6 +5334,8 @@ ns_term_init (Lisp_Object display_name)
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
 
   terminal->name = xlispstrdup (display_name);
+
+  gui_init_fringe (terminal->rif);
 
   unblock_input ();
 
