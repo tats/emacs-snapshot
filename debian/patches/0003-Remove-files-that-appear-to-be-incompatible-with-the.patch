@@ -29,7 +29,7 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 97d954b..ca0d586 100644
+index 235b707..f787577 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -161,7 +161,9 @@ man1dir=
@@ -43,7 +43,7 @@ index 97d954b..ca0d586 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -878,8 +880,7 @@ $(1)_$(2):
+@@ -879,8 +881,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 97d954b..ca0d586 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -993,11 +994,11 @@ test/%:
+@@ -994,11 +995,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 97d954b..ca0d586 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1028,9 +1029,6 @@ info-dir:
+@@ -1029,9 +1030,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -80,7 +80,7 @@ index 97d954b..ca0d586 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1052,14 +1050,10 @@ ${srcdir}/info/dir:
+@@ -1053,14 +1051,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -99,7 +99,7 @@ index 97d954b..ca0d586 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1077,14 +1071,10 @@ install-pdf:
+@@ -1078,14 +1072,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -133,10 +133,10 @@ index 11c4313..b6dfadd 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index c924634..bc0477d 100644
+index 79cc56f..74eb61b 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5983,7 +5983,7 @@ AC_DEFUN
+@@ -5984,7 +5984,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index c924634..bc0477d 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6038,15 +6038,6 @@ m4_define
+@@ -6039,15 +6039,6 @@ m4_define
  fi
  ])
  
