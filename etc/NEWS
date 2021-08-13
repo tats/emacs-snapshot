@@ -310,7 +310,7 @@ search buffer due to too many matches being highlighted.
 +++
 ** A new keymap for buffer actions has been added.
 The 'C-x x' keymap now holds keystrokes for various buffer-oriented
-commands.  The new keystrokes are 'C-x x g' ('revert-buffer'),
+commands.  The new keystrokes are 'C-x x g' ('revert-buffer-quick'),
 'C-x x r' ('rename-buffer'), 'C-x x u' ('rename-uniquely'), 'C-x x n'
 ('clone-buffer'), 'C-x x i' ('insert-buffer'), 'C-x x t'
 ('toggle-truncate-lines') and 'C-x x f' ('font-lock-update').
@@ -353,6 +353,11 @@ by dragging the tab lines of their topmost windows with the mouse.
 
 
 * Editing Changes in Emacs 28.1
+
+** New value 'save-some-buffers-root' of 'save-some-buffers-default-predicate'.
+It allows to ask about saving only files under the project root
+or in subdirectories of the directory that was default during
+command invocation.
 
 ---
 ** Dragging a file to Emacs will now also push the name of the file
@@ -558,6 +563,10 @@ in better code.
 The new 'cl-type' pattern compares types using 'cl-typep', which allows
 comparing simple types like '(cl-type integer)', as well as forms like
 '(cl-type (integer 0 10))'.
+
+*** New macro 'pcase-setq'
+This macro is the 'setq' equivalent of 'pcase-let', which allows for
+destructuring patterns in a 'setq' form.
 
 +++
 ** profiler.el
@@ -798,7 +807,7 @@ The method of highlighting is specified by the user options
 'next-error-highlight' and 'next-error-highlight-no-select'.
 
 ---
-*** A fringe arrow in the '*Occur*' buffer indicates the selected match.
+*** A fringe arrow in the "*Occur*" buffer indicates the selected match.
 
 ---
 *** Occur mode may use a different type for 'occur-target' property values.
@@ -818,7 +827,7 @@ It is now defined as a generalized variable that can be used with
 
 ---
 *** 'form' in '(eql form)' specializers in 'cl-defmethod' is now evaluated.
-This corresponds to the behaviour of defmethod in Common Lisp Object System.
+This corresponds to the behavior of defmethod in Common Lisp Object System.
 For compatibility, '(eql SYMBOL)' does not evaluate SYMBOL, for now.
 
 ** New minor mode 'cl-font-lock-built-in-mode' for 'lisp-mode'.
@@ -1001,6 +1010,10 @@ tags to be considered as well.
 String or list of strings specifying switches for Git log under VC.
 
 ** Gnus
+
++++
+*** New user option 'gnus-topic-display-predicate'.
+This can be used to inhibit the display of some topics completely.
 
 +++
 *** nnimap now supports the oauth2.el library.
@@ -1551,8 +1564,10 @@ like cell phones, tablets or cameras.
 *** New connection method "sshfs", which allows accessing remote files
 via a file system mounted with 'sshfs'.
 
----
-*** Tramp supports authentication via yubikey now.
++++
+*** Tramp supports SSH authentication via a hardware security key now.
+This requires at least OpenSSH 8.2, and a FIDO U2F compatible
+security key, like yubikey, solokey, or nitrokey.
 
 +++
 *** Trashed remote files are moved to the local trash directory.
@@ -1981,7 +1996,7 @@ to prevent aliasing and other unwanted effects.  The new image
 property ':transform-smoothing' can be set to t to force smoothing
 and nil to disable smoothing.
 
-The default behaviour of smoothing on down-scaling and not smoothing
+The default behavior of smoothing on down-scaling and not smoothing
 on up-scaling remains unchanged.
 
 +++
@@ -2325,6 +2340,10 @@ a list.
 ** Diff
 
 ---
+*** New face 'diff-changed-unspecified'.
+This is used when 'diff-use-changed-face' is non-nil.
+
+---
 *** New 'diff-mode' font locking face 'diff-error'.
 This face is used for error messages from 'diff'.
 
@@ -2390,7 +2409,35 @@ When non-nil, this option suppresses lock files for remote files.
 This command, called interactively, toggles the local value of
 'create-lockfiles' in the current buffer.
 
+** image-dired
+
+---
+*** 'image-dired-mouse-toggle-mark' now toggles files in the active region.
+
++++
+*** New user option 'image-dired-thumb-visible-marks'.
+If non-nil (the default), use 'image-dired-thumb-mark' to say what
+images are marked.
+
+*** New command 'image-dired-tag-marked-thumbnails'.
+
+*** New command 'image-dired-delete-marked'.
+
 ** Miscellaneous
+
+---
+*** 'shell-script-mode' now supports 'outline-minor-mode'.
+The outline headings have lines that start with "###".
+
++++
+*** New command 'revert-buffer-quick'.
+This is bound to 'C-x x g' and is like `revert-buffer', but prompts
+less.
+
++++
+*** New user option 'revert-buffer-quick-short-answers'.  This
+controls how the new 'revert-buffer-quick' (`C-x x g') command
+prompts.
 
 ---
 *** fileloop will now skip missing files instead of signalling an error.
@@ -2981,7 +3028,7 @@ command, which updates the syntax highlighting in the current buffer.
 
 ** In 'f90-mode', the backslash character ('\') no longer escapes.
 For about a decade, the backslash character has no longer had a
-special escape syntax in Fortran F90.  To get the old behaviour back,
+special escape syntax in Fortran F90.  To get the old behavior back,
 say something like:
 
     (modify-syntax-entry ?\\ "\\" f90-mode-syntax-table)

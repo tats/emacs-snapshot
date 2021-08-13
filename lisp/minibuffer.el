@@ -2706,7 +2706,15 @@ not active.")
   :abbrev-table nil          ;abbrev.el is not loaded yet during dump.
   ;; Note: this major mode is called from minibuf.c.
   "Major mode to use in the minibuffer when it is not active.
-This is only used when the minibuffer area has no active minibuffer.")
+This is only used when the minibuffer area has no active minibuffer.
+
+Note that the minibuffer may change to this mode more often than
+you might expect.  For instance, typing `M-x' may change the
+buffer to this mode, then to a different mode, and then back
+again to this mode upon exit.  Code running from
+`minibuffer-inactive-mode-hook' has to be prepared to run
+multiple times per minibuffer invocation.  Also see
+`minibuffer-exit-hook'.")
 
 (defvaralias 'minibuffer-mode-map 'minibuffer-local-map)
 
@@ -2741,7 +2749,7 @@ Useful to give the user default values that won't be substituted."
 
 (defun completion--make-envvar-table ()
   (mapcar (lambda (enventry)
-            (substring enventry 0 (string-match-p "=" enventry)))
+            (substring enventry 0 (string-search "=" enventry)))
           process-environment))
 
 (defconst completion--embedded-envvar-re
@@ -2810,7 +2818,7 @@ same as `substitute-in-file-name'."
                                        pred action))
        ((eq (car-safe action) 'boundaries)
         (let ((start (length (file-name-directory string)))
-              (end (string-match-p "/" (cdr action))))
+              (end (string-search "/" (cdr action))))
           `(boundaries
             ;; if `string' is "C:" in w32, (file-name-directory string)
             ;; returns "C:/", so `start' is 3 rather than 2.
@@ -3988,7 +3996,7 @@ which is at the core of flex logic.  The extra
 
 (defun completion-flex-try-completion (string table pred point)
   "Try to flex-complete STRING in TABLE given PRED and POINT."
-  (unless (and completion-flex-nospace (string-match-p " " string))
+  (unless (and completion-flex-nospace (string-search " " string))
     (pcase-let ((`(,all ,pattern ,prefix ,suffix ,_carbounds)
                  (completion-substring--all-completions
                   string table pred point
@@ -4005,7 +4013,7 @@ which is at the core of flex logic.  The extra
 
 (defun completion-flex-all-completions (string table pred point)
   "Get flex-completions of STRING in TABLE, given PRED and POINT."
-  (unless (and completion-flex-nospace (string-match-p " " string))
+  (unless (and completion-flex-nospace (string-search " " string))
     (pcase-let ((`(,all ,pattern ,prefix ,_suffix ,_carbounds)
                  (completion-substring--all-completions
                   string table pred point
