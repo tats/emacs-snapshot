@@ -3943,39 +3943,38 @@ that is non-nil."
 (put 'flex 'completion--adjust-metadata 'completion--flex-adjust-metadata)
 
 (defun completion--flex-adjust-metadata (metadata)
-  (cl-flet
-      ((compose-flex-sort-fn
-        (existing-sort-fn) ; wish `cl-flet' had proper indentation...
-        (lambda (completions)
-          (let ((pre-sorted
-                 (if existing-sort-fn
-                     (funcall existing-sort-fn completions)
-                   completions)))
-            (cond
-             ((or (not (window-minibuffer-p))
-                  ;; JT@2019-12-23: FIXME: this is still wrong.  What
-                  ;; we need to test here is "some input that actually
-                  ;; leads to flex filtering", not "something after
-                  ;; the minibuffer prompt".  Among other
-                  ;; inconsistencies, the latter is always true for
-                  ;; file searches, meaning the next clauses will be
-                  ;; ignored.
-                  (> (point-max) (minibuffer-prompt-end)))
-              (sort
-               pre-sorted
-               (lambda (c1 c2)
-                 (let ((s1 (get-text-property 0 'completion-score c1))
-                       (s2 (get-text-property 0 'completion-score c2)))
-                   (> (or s1 0) (or s2 0))))))
-             (t pre-sorted))))))
-    `(metadata
-      (display-sort-function
-       . ,(compose-flex-sort-fn
-           (completion-metadata-get metadata 'display-sort-function)))
-      (cycle-sort-function
-       . ,(compose-flex-sort-fn
-           (completion-metadata-get metadata 'cycle-sort-function)))
-      ,@(cdr metadata))))
+  "If `flex' is actually doing filtering, adjust sorting."
+  (let ((flex-is-filtering-p
+         ;; JT@2019-12-23: FIXME: this is kinda wrong.  What we need
+         ;; to test here is "some input that actually leads/led to
+         ;; flex filtering", not "something after the minibuffer
+         ;; prompt".  E.g. The latter is always true for file
+         ;; searches, meaning we'll be doing extra work when we
+         ;; needn't.
+         (or (not (window-minibuffer-p))
+             (> (point-max) (minibuffer-prompt-end))))
+        (existing-dsf
+         (completion-metadata-get metadata 'display-sort-function))
+        (existing-csf
+         (completion-metadata-get metadata 'cycle-sort-function)))
+    (cl-flet
+        ((compose-flex-sort-fn
+          (existing-sort-fn) ; wish `cl-flet' had proper indentation...
+          (lambda (completions)
+            (sort
+             (funcall existing-sort-fn completions)
+             (lambda (c1 c2)
+               (let ((s1 (get-text-property 0 'completion-score c1))
+                     (s2 (get-text-property 0 'completion-score c2)))
+                 (> (or s1 0) (or s2 0))))))))
+      `(metadata
+        ,@(and flex-is-filtering-p
+               `((display-sort-function
+                  . ,(compose-flex-sort-fn (or existing-dsf #'identity)))))
+        ,@(and flex-is-filtering-p
+               `((cycle-sort-function
+                  . ,(compose-flex-sort-fn (or existing-csf #'identity)))))
+        ,@(cdr metadata)))))
 
 (defun completion-flex--make-flex-pattern (pattern)
   "Convert PCM-style PATTERN into PCM-style flex pattern.

@@ -2194,6 +2194,8 @@ Also see `suggest-key-bindings'."
           (setq binding candidate))))
     binding))
 
+(defvar execute-extended-command--binding-timer nil)
+
 (defun execute-extended-command (prefixarg &optional command-name typed)
   ;; Based on Fexecute_extended_command in keyboard.c of Emacs.
   ;; Aaron S. Hawley <aaron.s.hawley(at)gmail.com> 2009-08-24
@@ -2217,7 +2219,9 @@ invoking, give a prefix argument to `execute-extended-command'."
   (let* ((function (and (stringp command-name) (intern-soft command-name)))
          (binding (and suggest-key-bindings
 		       (not executing-kbd-macro)
-		       (where-is-internal function overriding-local-map t))))
+		       (where-is-internal function overriding-local-map t)))
+         (delay-before-suggest 0)
+         (find-shorter nil))
     (unless (commandp function)
       (error "`%s' is not a valid command name" command-name))
     ;; Some features, such as novice.el, rely on this-command-keys
@@ -2232,41 +2236,52 @@ invoking, give a prefix argument to `execute-extended-command'."
     (setq real-this-command function)
     (let ((prefix-arg prefixarg))
       (command-execute function 'record))
-    ;; If enabled, show which key runs this command.
-    ;; But first wait, and skip the message if there is input.
-    (let* ((waited
-            ;; If this command displayed something in the echo area;
-            ;; wait a few seconds, then display our suggestion message.
-            ;; FIXME: Wait *after* running post-command-hook!
-            ;; FIXME: If execute-extended-command--shorter were
-            ;; faster, we could compute the result here first too.
-            (when (and suggest-key-bindings
-                       (or binding
-                           (and extended-command-suggest-shorter typed)))
-              (sit-for (cond
-                        ((zerop (length (current-message))) 0)
-                        ((numberp suggest-key-bindings) suggest-key-bindings)
-                        (t 2))))))
-      (when (and waited (not (consp unread-command-events)))
-        (unless (or (not extended-command-suggest-shorter)
-                    binding executing-kbd-macro (not (symbolp function))
-                    (<= (length (symbol-name function)) 2))
-          ;; There's no binding for CMD.  Let's try and find the shortest
-          ;; string to use in M-x.
-          ;; FIXME: Can be slow.  Cache it maybe?
-          (while-no-input
-            (setq binding (execute-extended-command--shorter
-                           (symbol-name function) typed))))
-        (when binding
-          (with-temp-message
-              (format-message "You can run the command `%s' with %s"
-                              function
-                              (if (stringp binding)
-                                  (concat "M-x " binding " RET")
-                                (key-description binding)))
-            (sit-for (if (numberp suggest-key-bindings)
-                         suggest-key-bindings
-                       2))))))))
+    ;; Ensure that we never have two of the suggest-binding timers in
+    ;; flight.
+    (when execute-extended-command--binding-timer
+      (cancel-timer execute-extended-command--binding-timer))
+    ;; If this command displayed something in the echo area; then
+    ;; postpone display our suggestion message a bit.
+    (when (and suggest-key-bindings
+               (or binding
+                   (and extended-command-suggest-shorter typed)))
+      (setq delay-before-suggest
+            (cond
+             ((zerop (length (current-message))) 0)
+             ((numberp suggest-key-bindings) suggest-key-bindings)
+             (t 2)))
+      (when (and extended-command-suggest-shorter
+                 (not binding)
+                 (not executing-kbd-macro)
+                 (symbolp function)
+                 (> (length (symbol-name function)) 2))
+        ;; There's no binding for CMD.  Let's try and find the shortest
+        ;; string to use in M-x.
+        (setq find-shorter t))
+      (when (or binding find-shorter)
+        (setq execute-extended-command--binding-timer
+              (run-at-time
+               delay-before-suggest nil
+               (lambda ()
+                 ;; If the user has typed any other commands in the
+                 ;; meantime, then don't display anything.
+                 (when (eq function real-last-command)
+                   ;; Find shorter string.
+                   (when find-shorter
+                     (while-no-input
+                       ;; FIXME: Can be slow.  Cache it maybe?
+                       (setq binding (execute-extended-command--shorter
+                                      (symbol-name function) typed))))
+                   (when binding
+                     (with-temp-message
+                         (format-message "You can run the command `%s' with %s"
+                                         function
+                                         (if (stringp binding)
+                                             (concat "M-x " binding " RET")
+                                           (key-description binding)))
+                       (sit-for (if (numberp suggest-key-bindings)
+                                    suggest-key-bindings
+                                  2))))))))))))
 
 (defun execute-extended-command-for-buffer (prefixarg &optional
                                                       command-name typed)
@@ -6649,9 +6664,16 @@ is temporarily turned on.  Furthermore, the mark will be deactivated
 by any subsequent point motion key that was not shift-translated, or
 by any action that normally deactivates the mark in Transient Mark mode.
 
+When the value is `permanent', the mark will be deactivated by any
+action which normally does that, but not by motion keys that were
+not shift-translated.
+
 See `this-command-keys-shift-translated' for the meaning of
 shift-translation."
-  :type 'boolean
+  :type '(choice (const :tag "Off" nil)
+                 (const :tag "Permanent" permanent)
+                 (other :tag "On" t))
+  :version "28.1"
   :group 'editing-basics)
 
 (defun handle-shift-selection ()
@@ -6669,7 +6691,12 @@ translation.
 Otherwise, if the region has been activated temporarily,
 deactivate it, and restore the variable `transient-mark-mode' to
 its earlier value."
-  (cond ((and shift-select-mode this-command-keys-shift-translated)
+  (cond ((and (eq shift-select-mode 'permanent)
+              this-command-keys-shift-translated)
+         (unless mark-active
+           (push-mark nil nil t)))
+        ((and shift-select-mode
+              this-command-keys-shift-translated)
          (unless (and mark-active
 		      (eq (car-safe transient-mark-mode) 'only))
 	   (setq-local transient-mark-mode

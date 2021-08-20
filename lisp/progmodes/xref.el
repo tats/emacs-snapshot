@@ -877,7 +877,8 @@ beginning of the line."
            ;; it gets reset to that window's point from time to time).
            (let ((win (get-buffer-window (current-buffer))))
              (and win (set-window-point win (point))))
-           (xref--show-location (xref-item-location xref) t))
+           (let ((xref--current-item xref))
+             (xref--show-location (xref-item-location xref) t)))
           (t
            (error "No %s xref" (if backward "previous" "next"))))))
 
@@ -1729,12 +1730,14 @@ Such as the current syntax table and the applied syntax properties."
     (if buf
         (with-current-buffer buf
           (save-excursion
-            (goto-char (point-min))
-            (forward-line (1- line))
-            (xref--collect-matches-1 regexp file line
-                                     (line-beginning-position)
-                                     (line-end-position)
-                                     syntax-needed)))
+            (save-restriction
+              (widen)
+              (goto-char (point-min))
+              (forward-line (1- line))
+              (xref--collect-matches-1 regexp file line
+                                       (line-beginning-position)
+                                       (line-end-position)
+                                       syntax-needed))))
       ;; Using the temporary buffer is both a performance and a buffer
       ;; management optimization.
       (with-current-buffer tmp-buffer
