@@ -1496,7 +1496,8 @@ Remove completion BASE prefix string from history elements."
                                            base-size md
                                            minibuffer-completion-table
                                            minibuffer-completion-predicate))
-             (sort-fun (completion-metadata-get all-md 'cycle-sort-function)))
+             (sort-fun (completion-metadata-get all-md 'cycle-sort-function))
+             (group-fun (completion-metadata-get all-md 'group-function)))
         (when last
           (setcdr last nil)
 
@@ -1506,17 +1507,25 @@ Remove completion BASE prefix string from history elements."
           (setq all (delete-dups all))
           (setq last (last all))
 
-          (if sort-fun
-              (setq all (funcall sort-fun all))
-            ;; Sort first by length and alphabetically.
+          (cond
+           (sort-fun (setq all (funcall sort-fun all)))
+           ((and completions-group group-fun)
+            ;; TODO: experiment with re-grouping here.  Might be slow
+            ;; if the group-fun (given by the table and out of our
+            ;; control) is slow and/or allocates too much.
+            )
+           (t
+            ;; If the table doesn't stipulate a sorting function or a
+            ;; group function, sort first by length and
+            ;; alphabetically.
             (setq all (minibuffer--sort-by-length-alpha all))
-            ;; Sort by history position, put the default, if it
+            ;; Then sort by history position, and put the default, if it
             ;; exists, on top.
             (when (minibufferp)
               (setq all (minibuffer--sort-by-position
                          (minibuffer--sort-preprocess-history
                           (substring string 0 base-size))
-                         all))))
+                         all)))))
 
           ;; Cache the result.  This is not just for speed, but also so that
           ;; repeated calls to minibuffer-force-complete can cycle through
@@ -3520,7 +3529,8 @@ string in COMPLETIONS.  Return a deep copy of COMPLETIONS where
 each string is propertized with `completion-score', a number
 between 0 and 1, and with faces `completions-common-part',
 `completions-first-difference' in the relevant segments."
-  (when completions
+  (cond
+   ((and completions (cl-loop for e in pattern thereis (stringp e)))
     (let* ((re (completion-pcm--pattern->regex pattern 'group))
            (point-idx (completion-pcm--pattern-point-idx pattern))
            (case-fold-search completion-ignore-case)
@@ -3611,7 +3621,8 @@ between 0 and 1, and with faces `completions-common-part',
               0 1 'completion-score
               (/ score-numerator (* end (1+ score-denominator)) 1.0) str)))
          str)
-       completions))))
+       completions)))
+   (t completions)))
 
 (defun completion-pcm--find-all-completions (string table pred point
                                                     &optional filter)

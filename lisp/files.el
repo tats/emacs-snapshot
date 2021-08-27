@@ -42,15 +42,6 @@
   "Finding files."
   :group 'files)
 
-
-(defcustom delete-auto-save-files t
-  "Non-nil means delete auto-save file when a buffer is saved or killed.
-
-Note that the auto-save file will not be deleted if the buffer is killed
-when it has unsaved changes."
-  :type 'boolean
-  :group 'auto-save)
-
 (defcustom directory-abbrev-alist
   nil
   "Alist of abbreviations for file directories.
@@ -257,7 +248,7 @@ This feature is advisory: for example, if the directory in which the
 file is being saved is not writable, Emacs may ignore a non-nil value
 of `file-precious-flag' and write directly into the file.
 
-See also: `break-hardlink-on-save'."
+See also: `break-hardlink-on-save' and `file-preserve-symlinks-on-save'."
   :type 'boolean
   :group 'backup)
 
@@ -5033,7 +5024,7 @@ FILENAME has the format of a directory.
 See also `file-name-sans-extension'."
   (let ((extn (string-trim-left extension "[.]")))
     (cond ((string-empty-p filename)
-           (error "Empty filename: %s" filename))
+           (error "Empty filename"))
           ((string-empty-p extn)
            (error "Malformed extension: %s" extension))
           ((directory-name-p filename)
@@ -7501,7 +7492,7 @@ normally equivalent short `-D' option is just passed on to
 			      (unless (equal switches "")
 				;; Split the switches at any spaces so we can
 				;; pass separate options as separate args.
-				(split-string-shell-command switches)))
+				(split-string-and-unquote switches)))
 			    ;; Avoid lossage if FILE starts with `-'.
 			    '("--")
 			    (list file))))))

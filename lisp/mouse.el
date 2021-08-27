@@ -289,9 +289,11 @@ the same menu with changes such as added new menu items."
   :type '(repeat
           (choice (function-item context-menu-undo)
                   (function-item context-menu-region)
+                  (function-item context-menu-toolbar)
                   (function-item context-menu-global)
                   (function-item context-menu-local)
                   (function-item context-menu-minor)
+                  (function-item context-menu-buffers)
                   (function-item context-menu-vc)
                   (function-item context-menu-ffap)
                   (function :tag "Custom function")))
@@ -304,14 +306,30 @@ the same menu with changes such as added new menu items."
 
 (defun context-menu-map ()
   "Return composite menu map."
-  (let ((menu (make-sparse-keymap)))
-    (run-hook-wrapped 'context-menu-functions
-                      (lambda (fun)
-                        (setq menu (funcall fun menu))
-                        nil))
+  (let ((menu (make-sparse-keymap (propertize "Context Menu" 'hide t))))
+    (let ((fun (mouse-posn-property (event-start last-input-event)
+                                    'context-menu-function)))
+      (if (functionp fun)
+          (setq menu (funcall fun menu))
+        (run-hook-wrapped 'context-menu-functions
+                          (lambda (fun)
+                            (setq menu (funcall fun menu))
+                            nil))))
+    ;; TODO: remove double separators
     (when (functionp context-menu-filter-function)
       (setq menu (funcall context-menu-filter-function menu)))
     menu))
+
+(defun context-menu-toolbar (menu)
+  "Tool bar menu items."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-toolbar] menu-bar-separator)
+  (map-keymap (lambda (key binding)
+                (when (consp binding)
+                  (define-key-after menu (vector key)
+                    (copy-sequence binding))))
+              (lookup-key global-map [tool-bar]))
+  menu)
 
 (defun context-menu-global (menu)
   "Global submenus."
@@ -348,6 +366,17 @@ the same menu with changes such as added new menu items."
                       (define-key-after menu (vector key)
                         (copy-sequence binding))))
                   (cdr mode))))
+  menu)
+
+(defun context-menu-buffers (menu)
+  "Submenus with buffers."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-buffers] menu-bar-separator)
+  (map-keymap (lambda (key binding)
+                (when (consp binding)
+                  (define-key-after menu (vector key)
+                    (copy-sequence binding))))
+              (mouse-buffer-menu-keymap))
   menu)
 
 (defun context-menu-vc (menu)
@@ -396,7 +425,7 @@ the same menu with changes such as added new menu items."
                            "\\[ns-copy-including-secondary]"
                          "\\[kill-ring-save]")))
   (define-key-after menu [paste]
-    `(menu-item "Paste" mouse-yank-primary
+    `(menu-item "Paste" mouse-yank-at-click
                 :visible (funcall
                           ',(lambda ()
                               (and (or
@@ -440,42 +469,34 @@ the same menu with changes such as added new menu items."
   `(menu-item ,(purecopy "Context Menu") ignore
               :filter (lambda (_) (context-menu-map))))
 
-(defvar context-menu--saved-bindings nil
-  "Alist of bindings to restore when `context-menu-mode' is disabled.")
-
-(defun context-menu--bind-mouse (click-sym down-sym)
-  "Enable `context-menu-mode' mouse bindings.
-CLICK-SYM and DOWN-SYM are the mouse click and down key symbols to use."
-  (let ((click (vector click-sym))
-        (down (vector down-sym)))
-    (push (cons click-sym (global-key-binding click))
-          context-menu--saved-bindings)
-    (global-unset-key click)
-    (push (cons down-sym (global-key-binding down))
-          context-menu--saved-bindings)
-    (global-set-key down context-menu-entry)))
-
-(defun context-menu--restore-bindings ()
-  "Restore saved `context-menu-mode' bindings."
-  (pcase-dolist (`(,sym . ,binding) context-menu--saved-bindings)
-    (let ((key (vector sym)))
-      (if binding
-          (global-set-key key binding)
-        (global-unset-key key)))))
+(defvar context-menu-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-3] nil)
+    (define-key map [down-mouse-3] context-menu-entry)
+    (define-key map [menu] #'context-menu-open)
+    (if (featurep 'w32)
+        (define-key map [apps] #'context-menu-open))
+    (when (featurep 'ns)
+      (define-key map [C-mouse-1] nil)
+      (define-key map [C-down-mouse-1] context-menu-entry))
+    map)
+  "Context Menu mode map.")
 
 (define-minor-mode context-menu-mode
   "Toggle Context Menu mode.
 
 When Context Menu mode is enabled, clicking the mouse button down-mouse-3
 activates the menu whose contents depends on its surrounding context."
-  :global t :group 'mouse
-  (if context-menu-mode
-      (progn
-        (setq context-menu--saved-bindings nil)
-        (context-menu--bind-mouse 'mouse-3 'down-mouse-3)
-        (when (featurep 'ns)
-          (context-menu--bind-mouse 'C-mouse-1 'C-down-mouse-1)))
-    (context-menu--restore-bindings)))
+  :global t :group 'mouse)
+
+(defun context-menu-open ()
+  "Start key navigation of the context menu.
+This is the keyboard interface to \\[context-menu-map]."
+  (interactive)
+  (let ((inhibit-mouse-event-check t))
+    (popup-menu (context-menu-map) (point))))
+
+(global-set-key [S-f10] 'context-menu-open)
 
 
 ;; Commands that operate on windows.
