@@ -2070,7 +2070,7 @@ This function uses the `read-extended-command-predicate' user option."
   "Say whether SYMBOL has been marked as a mode-specific command in BUFFER."
   ;; Check the modes.
   (let ((modes (command-modes symbol)))
-    ;; Common case: Just a single mode.
+    ;; Common fast case: Just a single mode.
     (if (null (cdr modes))
         (or (provided-mode-derived-p
              (buffer-local-value 'major-mode buffer) (car modes))
@@ -2078,13 +2078,7 @@ This function uses the `read-extended-command-predicate' user option."
                   (buffer-local-value 'local-minor-modes buffer))
             (memq (car modes) global-minor-modes))
       ;; Uncommon case: Multiple modes.
-      (apply #'provided-mode-derived-p
-             (buffer-local-value 'major-mode buffer)
-             modes)
-      (seq-intersection modes
-                        (buffer-local-value 'local-minor-modes buffer)
-                        #'eq)
-      (seq-intersection modes global-minor-modes #'eq))))
+      (command-completion-with-modes-p modes buffer))))
 
 (defun command-completion-default-include-p (symbol buffer)
   "Say whether SYMBOL should be offered as a completion.
@@ -8312,8 +8306,13 @@ non-nil."
 		      (if (eq buffer (window-buffer window))
 			  (set-window-hscroll window 0)))
 		    nil t)))
-  (message "Truncate long lines %s"
-	   (if truncate-lines "enabled" "disabled")))
+  (message "Truncate long lines %s%s"
+	   (if truncate-lines "enabled" "disabled")
+           (if (and truncate-lines visual-line-mode)
+               (progn
+                 (visual-line-mode -1)
+                 (format-message " and `visual-line-mode' disabled"))
+             "")))
 
 (defun toggle-word-wrap (&optional arg)
   "Toggle whether to use word-wrapping for continuation lines.
