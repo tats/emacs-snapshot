@@ -2571,10 +2571,12 @@ the `buffer-name'."
    (format
     (concat
      "import os.path;import sys;"
-     "sys.path.append(os.path.dirname(os.path.dirname('''%s''')));"
-     "__package__ = '''%s''';"
+     "sys.path.append(os.path.dirname(os.path.dirname(%s)));"
+     "__package__ = %s;"
      "import %s")
-    directory package package)
+    (python-shell--encode-string directory)
+    (python-shell--encode-string package)
+    package)
    (python-shell-get-process)))
 
 (defun python-shell-accept-process-output (process &optional timeout regexp)
@@ -2811,6 +2813,44 @@ eventually provide a shell."
   :type 'hook
   :group 'python)
 
+(defconst python-shell-eval-setup-code
+  "\
+def __PYTHON_EL_eval(source, filename):
+    import ast, sys
+    if sys.version_info[0] == 2:
+        from __builtin__ import compile, eval, globals
+    else:
+        from builtins import compile, eval, globals
+    sys.stdout.write('\\n')
+    try:
+        p, e = ast.parse(source, filename), None
+    except SyntaxError:
+        t, v, tb = sys.exc_info()
+        sys.excepthook(t, v, tb.tb_next)
+        return
+    if p.body and isinstance(p.body[-1], ast.Expr):
+        e = p.body.pop()
+    try:
+        g = globals()
+        exec(compile(p, filename, 'exec'), g, g)
+        if e:
+            return eval(compile(ast.Expression(e.value), filename, 'eval'), g, g)
+    except Exception:
+        t, v, tb = sys.exc_info()
+        sys.excepthook(t, v, tb.tb_next)"
+  "Code used to evaluate statements in inferior Python processes.")
+
+(defconst python-shell-eval-file-setup-code
+  "\
+def __PYTHON_EL_eval_file(filename, tempname, encoding, delete):
+    import codecs, os
+    with codecs.open(tempname or filename, encoding=encoding) as file:
+        source = file.read().encode(encoding)
+    if delete and tempname:
+        os.remove(tempname)
+    return __PYTHON_EL_eval(source, filename)"
+  "Code used to evaluate files in inferior Python processes.")
+
 (defun python-shell-comint-watch-for-first-prompt-output-filter (output)
   "Run `python-shell-first-prompt-hook' when first prompt is found in OUTPUT."
   (when (not python-shell--first-prompt-received)
@@ -2826,6 +2866,15 @@ eventually provide a shell."
           (setq python-shell--first-prompt-received-output-buffer nil)
         (setq-local python-shell--first-prompt-received t)
         (setq python-shell--first-prompt-received-output-buffer nil)
+        (cl-letf (((symbol-function 'python-shell-send-string)
+                   (lambda (string process)
+                     (comint-send-string
+                      process
+                      (format "exec(%s)\n" (python-shell--encode-string string))))))
+          ;; Bootstrap: the normal definition of `python-shell-send-string'
+          ;; depends on the Python code sent here.
+          (python-shell-send-string-no-output python-shell-eval-setup-code)
+          (python-shell-send-string-no-output python-shell-eval-file-setup-code))
         (with-current-buffer (current-buffer)
           (let ((inhibit-quit nil))
             (run-hooks 'python-shell-first-prompt-hook))))))
@@ -3081,33 +3130,6 @@ there for compatibility with CEDET.")
       (delete-trailing-whitespace))
     temp-file-name))
 
-(defconst python-shell-eval-setup-code
-  "\
-def __PYTHON_EL_eval(source, filename):
-    import ast, sys
-    if sys.version_info[0] == 2:
-        from __builtin__ import compile, eval, globals
-    else:
-        from builtins import compile, eval, globals
-    sys.stdout.write('\\n')
-    try:
-        p, e = ast.parse(source, filename), None
-    except SyntaxError:
-        t, v, tb = sys.exc_info()
-        sys.excepthook(t, v, tb.tb_next)
-        return
-    if p.body and isinstance(p.body[-1], ast.Expr):
-        e = p.body.pop()
-    try:
-        g = globals()
-        exec(compile(p, filename, 'exec'), g, g)
-        if e:
-            return eval(compile(ast.Expression(e.value), filename, 'eval'), g, g)
-    except Exception:
-        t, v, tb = sys.exc_info()
-        sys.excepthook(t, v, tb.tb_next)"
-  "Code used to evaluate statements in inferior Python processes.")
-
 (defalias 'python-shell--encode-string
   (let ((fun (if (and (fboundp 'json-serialize)
                       (>= emacs-major-version 28))
@@ -3127,12 +3149,18 @@ user-friendly message if there's no process running; defaults to
 t when called interactively."
   (interactive
    (list (read-string "Python command: ") nil t))
-  (comint-send-string
-   (or process (python-shell-get-process-or-error msg))
-   (format "exec(%s);__PYTHON_EL_eval(%s, %s)\n"
-           (python-shell--encode-string python-shell-eval-setup-code)
-           (python-shell--encode-string string)
-           (python-shell--encode-string (or (buffer-file-name) "<string>")))))
+  (let ((process (or process (python-shell-get-process-or-error msg)))
+        (code (format "__PYTHON_EL_eval(%s, %s)\n"
+                      (python-shell--encode-string string)
+                      (python-shell--encode-string (or (buffer-file-name)
+                                                       "<string>")))))
+    (if (or (null (process-tty-name process))
+            (<= (string-bytes code) comint-max-line-length))
+        (comint-send-string process code)
+      (let* ((temp-file-name (with-current-buffer (process-buffer process)
+                               (python-shell--save-temp-file string)))
+             (file-name (or (buffer-file-name) temp-file-name)))
+        (python-shell-send-file file-name process temp-file-name t)))))
 
 (defvar python-shell-output-filter-in-progress nil)
 (defvar python-shell-output-filter-buffer nil)
@@ -3174,8 +3202,7 @@ Return the output."
         (inhibit-quit t))
     (or
      (with-local-quit
-       (comint-send-string
-        process (format "exec(%s)\n" (python-shell--encode-string string)))
+       (python-shell-send-string string process)
        (while python-shell-output-filter-in-progress
          ;; `python-shell-output-filter' takes care of setting
          ;; `python-shell-output-filter-in-progress' to NIL after it
@@ -3401,15 +3428,11 @@ t when called interactively."
     (comint-send-string
      process
      (format
-      (concat
-       "import codecs, os;"
-       "__pyfile = codecs.open('''%s''', encoding='''%s''');"
-       "__code = __pyfile.read().encode('''%s''');"
-       "__pyfile.close();"
-       (when (and delete temp-file-name)
-         (format "os.remove('''%s''');" temp-file-name))
-       "exec(compile(__code, '''%s''', 'exec'));")
-      (or temp-file-name file-name) encoding encoding file-name))))
+      "__PYTHON_EL_eval_file(%s, %s, %s, %s)\n"
+      (python-shell--encode-string file-name)
+      (python-shell--encode-string (or temp-file-name ""))
+      (python-shell--encode-string (symbol-name encoding))
+      (if delete "True" "False")))))
 
 (defun python-shell-switch-to-shell (&optional msg)
   "Switch to inferior Python process buffer.
@@ -3511,23 +3534,14 @@ def __PYTHON_EL_get_completions(text):
   "25.1"
   "Completion string code must work for (i)pdb.")
 
-(defcustom python-shell-completion-string-code
-  "';'.join(__PYTHON_EL_get_completions('''%s'''))"
-  "Python code used to get a string of completions separated by semicolons.
-The string passed to the function is the current python name or
-the full statement in the case of imports."
-  :type 'string
-  :group 'python)
-
 (defcustom python-shell-completion-native-disabled-interpreters
   ;; PyPy's readline cannot handle some escape sequences yet.  Native
-  ;; completion was found to be non-functional for IPython (see
-  ;; Bug#25067).  Native completion doesn't work on w32 (Bug#28580).
+  ;; completion doesn't work on w32 (Bug#28580).
   (if (eq system-type 'windows-nt) '("")
-    '("pypy" "ipython"))
+    '("pypy"))
   "List of disabled interpreters.
 When a match is found, native completion is disabled."
-  :version "25.1"
+  :version "28.1"
   :type '(repeat string))
 
 (defcustom python-shell-completion-native-enable t
@@ -3814,9 +3828,10 @@ completion."
            (python-util-strip-string
             (python-shell-send-string-no-output
              (format
-              (concat python-shell-completion-setup-code
-                      "\nprint (" python-shell-completion-string-code ")")
-              input) process))))
+              "%s\nprint(';'.join(__PYTHON_EL_get_completions(%s)))"
+              python-shell-completion-setup-code
+              (python-shell--encode-string input))
+             process))))
       (when (> (length completions) 2)
         (split-string completions
                       "^'\\|^\"\\|;\\|'$\\|\"$" t)))))
@@ -4539,28 +4554,16 @@ def __FFAP_get_module_path(objstr):
   :type 'string
   :group 'python)
 
-(defcustom python-ffap-string-code
-  "__FFAP_get_module_path('''%s''')"
-  "Python code used to get a string with the path of a module."
-  :type 'string
-  :group 'python)
-
 (defun python-ffap-module-path (module)
   "Function for `ffap-alist' to return path for MODULE."
-  (let ((process (or
-                  (and (derived-mode-p 'inferior-python-mode)
-                       (get-buffer-process (current-buffer)))
-                  (python-shell-get-process))))
-    (if (not process)
-        nil
-      (let ((module-file
-             (python-shell-send-string-no-output
-              (concat
-               python-ffap-setup-code
-               "\nprint (" (format python-ffap-string-code module) ")")
-              process)))
-        (unless (zerop (length module-file))
-          (python-util-strip-string module-file))))))
+  (when-let ((process (python-shell-get-process))
+             (module-file
+              (python-shell-send-string-no-output
+               (format "%s\nprint(__FFAP_get_module_path(%s))"
+                       python-ffap-setup-code
+                       (python-shell--encode-string module)))))
+    (unless (string-empty-p module-file)
+      (python-util-strip-string module-file))))
 
 (defvar ffap-alist)
 
@@ -4651,12 +4654,6 @@ See `python-check-command' for the default."
   :type 'string
   :group 'python)
 
-(defcustom python-eldoc-string-code
-  "__PYDOC_get_help('''%s''')"
-  "Python code used to get a string with the documentation of an object."
-  :type 'string
-  :group 'python)
-
 (defun python-eldoc--get-symbol-at-point ()
   "Get the current symbol for eldoc.
 Returns the current symbol handling point within arguments."
@@ -4686,11 +4683,12 @@ returns will be used.  If not FORCE-PROCESS is passed what
                 ;; enabled.  Bug#18794.
                 (python-util-strip-string
                  (python-shell-send-string-no-output
-                  (concat
+                  (format
+                   "%s\nprint(__PYDOC_get_help(%s))"
                    python-eldoc-setup-code
-                   "\nprint(" (format python-eldoc-string-code input) ")")
+                   (python-shell--encode-string input))
                   process)))))
-        (unless (zerop (length docstring))
+        (unless (string-empty-p docstring)
           docstring)))))
 
 (defvar-local python-eldoc-get-doc t
@@ -4741,7 +4739,9 @@ Interactively, prompt for symbol."
   (interactive
    (let ((symbol (python-eldoc--get-symbol-at-point))
          (enable-recursive-minibuffers t))
-     (list (read-string (format-prompt "Describe symbol" symbol)
+     (list (read-string (if symbol
+                            (format "Describe symbol (default %s): " symbol)
+                          "Describe symbol: ")
                         nil nil symbol))))
   (message (python-eldoc--get-doc-at-point symbol)))
 

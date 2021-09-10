@@ -6622,7 +6622,6 @@ Does not set point.  Does nothing if mark ring is empty."
     (setq mark-ring (nconc mark-ring (list (copy-marker (mark-marker)))))
     (set-marker (mark-marker) (car mark-ring))
     (set-marker (car mark-ring) nil)
-    (unless (mark t) (ding))
     (pop mark-ring))
   (deactivate-mark))
 
@@ -7777,7 +7776,9 @@ other purposes."
 When Visual Line mode is enabled, `word-wrap' is turned on in
 this buffer, and simple editing commands are redefined to act on
 visual lines, not logical lines.  See Info node `Visual Line
-Mode' for details."
+Mode' for details.
+Turning on this mode disables line truncation set up by
+variables `truncate-lines' and `truncate-partial-width-windows'."
   :keymap visual-line-mode-map
   :group 'visual-line
   :lighter " Wrap"
@@ -8728,7 +8729,7 @@ See also `read-mail-command' concerning reading mail."
 		(function-item :tag "Message with full Gnus features"
 			       :format "%t\n"
 			       gnus-user-agent)
-		(function :tag "Other"))
+		(symbol :tag "Other"))
   :version "23.2"                       ; sendmail->message
   :group 'mail)
 

@@ -479,6 +479,15 @@ executed once, when the buffer is created."
   :group 'comint
   :version "26.1")
 
+(defconst comint-max-line-length
+  (pcase system-type
+    ('gnu/linux 4096)
+    ('windows-nt 8196)
+    (_ 1024))
+  "Maximum line length, in bytes, accepted by the inferior process.
+This setting is only meaningful when communicating with subprocesses
+via PTYs.")
+
 (defvar comint-mode-map
   (let ((map (make-sparse-keymap)))
     ;; Keys:
@@ -665,7 +674,8 @@ to continue it.
 \\{comint-mode-map}
 
 Entry to this mode runs the hooks on `comint-mode-hook'."
-  (setq mode-line-process '(":%s"))
+  (setq mode-line-process
+        (list (propertize ":%s" 'help-echo "Process status")))
   (setq-local window-point-insertion-type t)
   (setq-local comint-last-input-start (point-min-marker))
   (setq-local comint-last-input-end (point-min-marker))

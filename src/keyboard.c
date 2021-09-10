@@ -951,6 +951,10 @@ cmd_error (Lisp_Object data)
       Vexecuting_kbd_macro = Qnil;
       executing_kbd_macro = Qnil;
     }
+  else if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
+    /* An `M-x' command that signals a `minibuffer-quit' condition
+       that's part of a kbd macro.  */
+    finalize_kbd_macro_chars ();
 
   specbind (Qstandard_output, Qt);
   specbind (Qstandard_input, Qt);
@@ -5650,6 +5654,12 @@ make_lispy_event (struct input_event *event)
 
 	    position = make_lispy_position (f, event->x, event->y,
 					    event->timestamp);
+
+	    if (CONSP (event->arg) && EQ (XCAR (event->arg), Qtab_bar))
+	      {
+		XSETCAR (XCDR (position), Qtab_bar);
+		position = nconc2 (position, Fcons (XCDR (event->arg), Qnil));
+	      }
 	  }
 #ifndef USE_TOOLKIT_SCROLL_BARS
 	else
