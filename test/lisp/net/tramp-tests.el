@@ -2083,7 +2083,7 @@ Also see `ignore'."
       "/method:host:/:/path//foo"))
 
     ;; Forwhatever reasons, the following tests let Emacs crash for
-    ;; Emacs 25, occasionally. No idea what's up.
+    ;; Emacs 25, occasionally.  No idea what's up.
     (when (tramp--test-emacs26-p)
       (should
        (string-equal
@@ -2765,12 +2765,12 @@ This checks also `file-name-as-directory', `file-name-directory',
 	    (ignore-errors (delete-directory source 'recursive))
 	    (ignore-errors (delete-directory target 'recursive))))))))
 
-(defun tramp-test-make-directory-helper (test-default-file-modes-p)
-  "Helper test used by tramp-test13-make-directory* tests."
-  (dolist (quoted (if (and (tramp--test-expensive-test)
-                           (not test-default-file-modes-p))
-                      '(nil t)
-                    '(nil)))
+(ert-deftest tramp-test13-make-directory ()
+  "Check `make-directory'.
+This tests also `file-directory-p' and `file-accessible-directory-p'."
+  (skip-unless (tramp--test-enabled))
+
+  (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let* ((tmp-name1 (tramp--test-make-temp-name nil quoted))
 	   (tmp-name2 (expand-file-name "foo/bar" tmp-name1))
 	   (unusual-file-mode-1 #o740)
@@ -2784,9 +2784,9 @@ This checks also `file-name-as-directory', `file-name-directory',
 	     :type 'file-already-exists)
 	    (should (file-directory-p tmp-name1))
 	    (should (file-accessible-directory-p tmp-name1))
-	    (and test-default-file-modes-p
-		 (should (equal (format "%#o" unusual-file-mode-1)
-				(format "%#o" (file-modes tmp-name1)))))
+	    (when (tramp--test-supports-file-modes-p)
+	      (should (equal (format "%#o" unusual-file-mode-1)
+			     (format "%#o" (file-modes tmp-name1)))))
 	    (should-error
 	     (make-directory tmp-name2)
 	     :type 'file-error)
@@ -2794,29 +2794,15 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (make-directory tmp-name2 'parents))
 	    (should (file-directory-p tmp-name2))
 	    (should (file-accessible-directory-p tmp-name2))
-	    (and test-default-file-modes-p
-		 (should (equal (format "%#o" unusual-file-mode-2)
-				(format "%#o" (file-modes tmp-name2)))))
+	    (when (tramp--test-supports-file-modes-p)
+	      (should (equal (format "%#o" unusual-file-mode-2)
+			     (format "%#o" (file-modes tmp-name2)))))
 	    ;; If PARENTS is non-nil, `make-directory' shall not
 	    ;; signal an error when DIR exists already.
 	    (make-directory tmp-name2 'parents))
 
 	;; Cleanup.
 	(ignore-errors (delete-directory tmp-name1 'recursive))))))
-
-(ert-deftest tramp-test13-make-directory ()
-  "Check `make-directory'.
-This tests also `file-directory-p' and `file-accessible-directory-p'."
-  (skip-unless (tramp--test-enabled))
-  (tramp-test-make-directory-helper nil))
-
-(ert-deftest tramp-test13-make-directory-with-file-modes ()
-  "Check that `make-directory' honors `default-file-modes'.
-This is a separate test from `tramp-test13-make-directory' so
-it can be skipped for backends that do not support file modes."
-  (skip-unless (tramp--test-enabled))
-  (skip-unless (tramp--test-supports-file-modes-p))
-  (tramp-test-make-directory-helper t))
 
 (ert-deftest tramp-test14-delete-directory ()
   "Check `delete-directory'."
@@ -4478,7 +4464,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (should (string-equal (format "%s\n" fnnd) (buffer-string)))
 	      (should-not (get-buffer-window (current-buffer) t))
 
-	      ;; Second run. The output must be appended.
+	      ;; Second run.  The output must be appended.
 	      (goto-char (point-max))
 	      (should (zerop (process-file "ls" nil t t fnnd)))
 	      ;; `ls' could produce colorized output.
@@ -4602,8 +4588,10 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		(should
 		 (string-match-p
 		  (if (memq process-connection-type '(nil pipe))
-		      "66\n6F\n6F\n0D\n0A\n"
-		    "66\n6F\n6F\n0A\n0A\n")
+		      ;; `telnet' converts \r to <CR><NUL> if `crlf'
+		      ;; flag is FALSE.  See telnet(1) man page.
+		      "66\n6F\n6F\n0D\\(\n00\\)?\n0A\n"
+		    "66\n6F\n6F\n0A\\(\n00\\)?\n0A\n")
 		  (buffer-string))))
 
 	    ;; Cleanup.
@@ -4768,8 +4756,9 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 	;; Cleanup.
 	(ignore-errors (delete-process proc)))
 
-      ;; Process with stderr buffer.
-      (unless (tramp-direct-async-process-p)
+      ;; Process with stderr buffer.  `telnet' does not cooperate with
+      ;; three processes.
+      (unless (or (tramp--test-telnet-p) (tramp-direct-async-process-p))
 	(let ((stderr (generate-new-buffer "*stderr*")))
 	  (unwind-protect
 	      (with-temp-buffer
@@ -4865,8 +4854,10 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 		   (string-match-p
 		    (if (memq (or connection-type process-connection-type)
 			      '(nil pipe))
-			"66\n6F\n6F\n0D\n0A\n"
-		      "66\n6F\n6F\n0A\n0A\n")
+			;; `telnet' converts \r to <CR><NUL> if `crlf'
+			;; flag is FALSE.  See telnet(1) man page.
+			"66\n6F\n6F\n0D\\(\n00\\)?\n0A\n"
+		      "66\n6F\n6F\n0A\\(\n00\\)?\n0A\n")
 		    (buffer-string))))
 
 	      ;; Cleanup.
@@ -5512,9 +5503,9 @@ Use direct async.")
           ;; Ignore trailing newline.
 	  (setq path (substring (shell-command-to-string "echo $PATH") nil -1))
 	  ;; The shell doesn't handle such long strings.
-	  (unless (<= (length path)
-		      (tramp-get-connection-property
-		       tramp-test-vec "pipe-buf" 4096))
+	  (when (<= (length path)
+		    (tramp-get-connection-property
+		     tramp-test-vec "pipe-buf" 4096))
 	    ;; The last element of `exec-path' is `exec-directory'.
             (should
 	     (string-equal
@@ -6168,6 +6159,12 @@ This requires restrictions of file name syntax."
   "Check, whether the sudoedit method is used."
   (tramp-sudoedit-file-name-p tramp-test-temporary-file-directory))
 
+(defun tramp--test-telnet-p ()
+  "Check, whether the telnet method is used.
+This does not support special file names."
+  (string-equal
+   "telnet" (file-remote-p tramp-test-temporary-file-directory 'method)))
+
 (defun tramp--test-windows-nt-p ()
   "Check, whether the locale host runs MS Windows."
   (eq system-type 'windows-nt))
@@ -6726,6 +6723,7 @@ process sentinels.  They shall not disturb each other."
 		   (tramp--test-sh-p)))
   (skip-unless (not (tramp--test-crypt-p)))
   (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-telnet-p)))
   (skip-unless (not (tramp--test-windows-nt-p)))
 
   (with-timeout
@@ -6763,11 +6761,6 @@ process sentinels.  They shall not disturb each other."
             (cond
              ((getenv "EMACS_HYDRA_CI") 10)
              (t 1)))
-           ;; We must distinguish due to performance reasons.
-           (timer-operation
-            (cond
-             ((tramp--test-mock-p) #'vc-registered)
-             (t #'file-attributes)))
 	   ;; This is when all timers start.  We check inside the
 	   ;; timer function, that we don't exceed timeout.
 	   (timer-start (current-time))
@@ -6803,7 +6796,7 @@ process sentinels.  They shall not disturb each other."
 			   (cons 'remote-file-error debug-ignored-errors)))
                       (tramp--test-message
                        "Start timer %s %s" file (current-time-string))
-		      (funcall timer-operation file)
+		      (vc-registered file)
                       (tramp--test-message
                        "Stop timer %s %s" file (current-time-string))
                       ;; Adjust timer if it takes too much time.
