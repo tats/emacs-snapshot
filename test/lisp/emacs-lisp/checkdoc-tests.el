@@ -131,7 +131,10 @@ See the comments in Bug#24998."
     (checkdoc-in-abbreviation-p (point))))
 
 (ert-deftest checkdoc-tests-in-abbrevation-p/basic-case ()
-  (should (checkdoc-tests--abbrev-test "foo bar e.g. baz" "e.g")))
+  (should (checkdoc-tests--abbrev-test "foo bar e.g. baz" "e.g"))
+  (should (checkdoc-tests--abbrev-test "behavior/errors etc. that" "etc"))
+  (should (checkdoc-tests--abbrev-test "foo vs. bar" "vs"))
+  (should (checkdoc-tests--abbrev-test "spy a.k.a. spy" "a.k.a")))
 
 (ert-deftest checkdoc-tests-in-abbrevation-p/with-parens ()
   (should (checkdoc-tests--abbrev-test "foo bar (e.g. baz)" "e.g")))
@@ -147,6 +150,43 @@ See the comments in Bug#24998."
 
 (ert-deftest checkdoc-tests-in-abbrevation-p/incorrect-abbreviation ()
   (should-not (checkdoc-tests--abbrev-test "foo bar a.b.c." "a.b.c")))
+
+(defun checkdoc-test-error-format-is-good (msg &optional reverse literal)
+  (with-temp-buffer
+    (erase-buffer)
+    (emacs-lisp-mode)
+    (let ((standard-output (current-buffer)))
+      (if literal
+          (print (format "(error \"%s\")" msg))
+        (prin1 `(error ,msg))))
+    (goto-char (length "(error \""))
+    (if reverse
+         (should (checkdoc--error-bad-format-p))
+       (should-not (checkdoc--error-bad-format-p)))))
+
+(defun checkdoc-test-error-format-is-bad (msg &optional literal)
+  (checkdoc-test-error-format-is-good msg t literal))
+
+(ert-deftest checkdoc-tests-error-message-bad-format-p ()
+  (checkdoc-test-error-format-is-good "Foo")
+  (checkdoc-test-error-format-is-good "Foo: bar baz")
+  (checkdoc-test-error-format-is-good "some-symbol: Foo")
+  (checkdoc-test-error-format-is-good "`some-symbol' foo bar")
+  (checkdoc-test-error-format-is-good "%sfoo")
+  (checkdoc-test-error-format-is-good "avl-tree-enter:\\
+ Updated data does not match existing data" nil 'literal))
+
+(ert-deftest checkdoc-tests-error-message-bad-format-p/defined-symbols ()
+  (defvar checkdoc-tests--var-symbol nil)
+  (checkdoc-test-error-format-is-good "checkdoc-tests--var-symbol foo bar baz")
+  (defun checkdoc-tests--fun-symbol ())
+  (checkdoc-test-error-format-is-good "checkdoc-tests--fun-symbol foo bar baz"))
+
+(ert-deftest checkdoc-tests-error-message-bad-format-p/not-capitalized ()
+  (checkdoc-test-error-format-is-bad "foo")
+  (checkdoc-test-error-format-is-bad "some-symbol: foo")
+  (checkdoc-test-error-format-is-bad "avl-tree-enter:\
+ updated data does not match existing data"))
 
 (ert-deftest checkdoc-tests-fix-y-or-n-p ()
   (with-temp-buffer

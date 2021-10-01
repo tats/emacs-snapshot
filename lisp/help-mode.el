@@ -224,6 +224,11 @@ The format is (FUNCTION ARGS...).")
   'help-function #'info
   'help-echo (purecopy "mouse-2, RET: read this Info node"))
 
+(define-button-type 'help-man
+  :supertype 'help-xref
+  'help-function #'man
+  'help-echo (purecopy "mouse-2, RET: read this man page"))
+
 (define-button-type 'help-customization-group
   :supertype 'help-xref
   'help-function #'customize-group
@@ -268,6 +273,10 @@ The format is (FUNCTION ARGS...).")
             (when (or (< position (point-min))
                       (> position (point-max)))
               (widen))
+            ;; Save mark for the old location, unless the point is not
+            ;; actually going to move.
+            (unless (= (point) position)
+              (push-mark nil t))
             (goto-char position))
         (message "Unable to find location in file")))))
 
@@ -438,6 +447,11 @@ when help commands related to multilingual environment (e.g.,
    "\\<[Ii]nfo[ \t\n]+\\(node\\|anchor\\)[ \t\n]+['`‘]\\([^'’]+\\)['’]")
   "Regexp matching doc string references to an Info node.")
 
+(defconst help-xref-man-regexp
+  (purecopy
+   "\\<[Mm]an[ \t\n]+page[ \t\n]+\\(?:for[ \t\n]+\\)?['`‘\"]\\([^'’\"]+\\)['’\"]")
+  "Regexp matching doc string references to a man page.")
+
 (defconst help-xref-customization-group-regexp
   (purecopy "\\<[Cc]ustomization[ \t\n]+[Gg]roup[ \t\n]+['`‘]\\([^'’]+\\)['’]")
   "Regexp matching doc string references to a customization group.")
@@ -548,6 +562,10 @@ that."
 			(setq data ;; possible newlines if para filled
 			      (replace-regexp-in-string "[ \t\n]+" " " data t t)))
                       (help-xref-button 2 'help-info data))))
+                ;; Man references
+                (save-excursion
+                  (while (re-search-forward help-xref-man-regexp nil t)
+                    (help-xref-button 1 'help-man (match-string 1))))
                 ;; Customization groups.
                 (save-excursion
                   (while (re-search-forward

@@ -163,8 +163,8 @@ BODY contains code to execute each time the mode is enabled or disabled.
 		Not used if you also specify :variable.
 :lighter SPEC	Text displayed in the mode line when the mode is on.
 :keymap MAP	Keymap bound to the mode keymap.  Defaults to `MODE-map'.
-		If non-nil, it should be a variable name (whose value is
-		a keymap), or an expression that returns either a keymap or
+                If non-nil, it should be an unquoted variable name (whose value
+                is a keymap), or an expression that returns either a keymap or
 		a list of (KEY . BINDING) pairs where KEY and BINDING are
 		suitable for `define-key'.  If you supply a KEYMAP argument
 		that is not a symbol, this macro defines the variable MODE-map
@@ -496,15 +496,17 @@ on if the hook has explicitly disabled it.
        (define-minor-mode ,global-mode
          ,(concat (format "Toggle %s in all buffers.\n" pretty-name)
                   (internal--format-docstring-line
-                   "With prefix ARG, enable %s if ARG is positive; otherwise, \
-disable it.\n\n"
+                   (concat "With prefix ARG, enable %s if ARG is positive; "
+                           "otherwise, disable it.")
                    pretty-global-name)
+                  "\n\n"
                   "If called from Lisp, toggle the mode if ARG is `toggle'.
 Enable the mode if ARG is nil, omitted, or is a positive number.
 Disable the mode if ARG is a negative number.\n\n"
                   (internal--format-docstring-line
-                   "%s is enabled in all buffers where `%s' would do it.\n\n"
+                   "%s is enabled in all buffers where `%s' would do it."
                    pretty-name turn-on)
+                  "\n\n"
                   (internal--format-docstring-line
                    "See `%s' for more information on %s."
                    mode pretty-name)

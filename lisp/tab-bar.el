@@ -312,6 +312,11 @@ that closes only when clicked on the close button."
                                   (tab-bar-duplicate-tab
                                    nil ,tab-number))
                     :help "Duplicate the tab"))
+      (define-key-after menu [detach-tab]
+        `(menu-item "Detach" (lambda () (interactive)
+                               (tab-bar-detach-tab
+                                ,tab-number))
+                    :help "Detach the tab to new frame"))
       (define-key-after menu [close]
         `(menu-item "Close" (lambda () (interactive)
                               (tab-bar-close-tab ,tab-number))
@@ -1007,7 +1012,8 @@ on the tab bar instead."
 When this command is bound to a numeric key (with a prefix or modifier key
 using `tab-bar-select-tab-modifiers'), calling it without an argument
 will translate its bound numeric key to the numeric argument.
-TAB-NUMBER counts from 1.  Negative TAB-NUMBER counts tabs from the end of the tab bar."
+TAB-NUMBER counts from 1.  Negative TAB-NUMBER counts tabs from the end of
+the tab bar."
   (interactive "P")
   (unless (integerp tab-number)
     (let ((key (event-basic-type last-command-event)))
@@ -1195,10 +1201,22 @@ Interactively, ARG selects the ARGth different frame to move to."
                   (nthcdr to-index to-tabs))
       (with-selected-frame from-frame
         (let ((inhibit-message t) ; avoid message about deleted tab
+              (tab-bar-close-last-tab-choice 'delete-frame)
               tab-bar-closed-tabs)
           (tab-bar-close-tab from-number)))
       (tab-bar-tabs-set to-tabs to-frame)
       (force-mode-line-update t))))
+
+(defun tab-bar-detach-tab (&optional from-number)
+  "Detach tab number FROM-NUMBER to a new frame.
+Interactively or without argument, detach current tab."
+  (interactive (list (1+ (tab-bar--current-tab-index))))
+  (let* ((tab (nth (1- (or from-number 1)) (funcall tab-bar-tabs-function)))
+         (tab-name (alist-get 'name tab))
+         (new-frame (make-frame `((name . ,tab-name)))))
+    (tab-bar-move-tab-to-frame nil nil from-number new-frame nil)
+    (with-selected-frame new-frame
+      (tab-bar-close-tab))))
 
 
 (defcustom tab-bar-new-tab-to 'right
@@ -1244,7 +1262,8 @@ After the tab is created, the hooks in
       ;; Handle the case when it's called in the active minibuffer.
       (when (minibuffer-selected-window)
         (select-window (minibuffer-selected-window)))
-      (delete-other-windows)
+      (let ((ignore-window-parameters t))
+        (delete-other-windows))
       ;; Create a new window to get rid of old window parameters
       ;; (e.g. prev/next buffers) of old window.
       (split-window) (delete-window)
@@ -1907,7 +1926,7 @@ Letters do not insert themselves; instead, they are commands.
   (move-to-column tab-switcher-column))
 
 (defun tab-switcher-unmark (&optional backup)
-  "Cancel all requested operations on window configuration on this line and move down.
+  "Cancel requested operations on window configuration on this line and move down.
 Optional prefix arg means move up."
   (interactive "P")
   (beginning-of-line)
@@ -1919,7 +1938,7 @@ Optional prefix arg means move up."
   (move-to-column tab-switcher-column))
 
 (defun tab-switcher-backup-unmark ()
-  "Move up and cancel all requested operations on window configuration on line above."
+  "Move up one line and cancel requested operations on window configuration there."
   (interactive)
   (forward-line -1)
   (tab-switcher-unmark)

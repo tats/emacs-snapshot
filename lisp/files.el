@@ -2883,6 +2883,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\|SQUASHFS\\)\\'" .
      ("\\.[ds]?va?h?\\'" . verilog-mode)
      ("\\.by\\'" . bovine-grammar-mode)
      ("\\.wy\\'" . wisent-grammar-mode)
+     ("\\.erts\\'" . erts-mode)
      ;; .emacs or .gnus or .viper following a directory delimiter in
      ;; Unix or MS-DOS syntax.
      ("[:/\\]\\..*\\(emacs\\|gnus\\|viper\\)\\'" . emacs-lisp-mode)
@@ -5756,7 +5757,7 @@ be saved."
   :version "26.1")
 
 (defun save-some-buffers-root ()
-  "A predicate to check whether the buffer is under the root directory.
+  "A predicate to check whether the buffer is under the project root directory.
 Can be used as a value of `save-some-buffers-default-predicate'
 to save buffers only under the project root or in subdirectories
 of the directory that was default during command invocation."
