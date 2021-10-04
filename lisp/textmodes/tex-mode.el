@@ -599,11 +599,13 @@ An alternative value is \" . \", if you use a font with a narrow period."
 	;; Citation args.
 	(list (concat slash citations opt arg) 3 'font-lock-constant-face)
 	;;
-	;; Text between `` quotes ''.
-	(cons (concat (regexp-opt '("``" "\"<" "\"`" "<<" "«") t)
-		      "[^'\">{]+"	;a bit pessimistic
-		      (regexp-opt '("''" "\">" "\"'" ">>" "»") t))
-	      'font-lock-string-face)
+        ;; Text between `` quotes ''.
+        (list (concat (regexp-opt '("``" "\"<" "\"`" "<<" "«") t)
+                      "\\(\\(.\\|\n\\)+?\\)"
+                      (regexp-opt `("''" "\">" "\"'" ">>" "»") t))
+              '(1 font-lock-keyword-face)
+              '(2 font-lock-string-face)
+              '(4 font-lock-keyword-face))
 	;;
 	;; Command names, special and general.
 	(cons (concat slash specials-1) 'font-lock-warning-face)
@@ -1012,12 +1014,18 @@ says which mode to use."
   (tex-common-initialization))
 
 (advice-add 'tex-mode :around #'tex--redirect-to-submode)
+(defvar tex-mode--recursing nil)
 (defun tex--redirect-to-submode (orig-fun)
   "Redirect to one of the submodes when called directly."
-  (funcall (if delay-mode-hooks
-               ;; We're called from one of the children already.
-               orig-fun
-             (tex--guess-mode))))
+  ;; The file may have "mode: tex" in the local variable
+  ;; block, in which case we'll be called recursively
+  ;; infinitely.  Inhibit that.
+  (let ((tex-mode--recursing tex-mode--recursing))
+    (funcall (if (or delay-mode-hooks tex-mode--recursing)
+                 ;; We're called from one of the children already.
+                 orig-fun
+               (setq tex-mode--recursing t)
+               (tex--guess-mode)))))
 
 ;; The following three autoloaded aliases appear to conflict with
 ;; AUCTeX.  However, even though AUCTeX uses the mixed case variants
@@ -1424,20 +1432,25 @@ on the line for the invalidity you want to see."
 		    ;; Skip "Mismatches:" header line.
 		    (forward-line 1)
 		    (setq num-matches (1+ num-matches))
-		    (insert-buffer-substring buffer start end)
-		    (let (text-beg (text-end (point-marker)))
-		      (forward-char (- start end))
-		      (setq text-beg (point-marker))
-		      (insert (format "%3d: " linenum))
-		      (add-text-properties
-		       text-beg (- text-end 1)
-		       '(mouse-face highlight
-				    help-echo
-				    "mouse-2: go to this invalidity"))
-		      (put-text-property text-beg (- text-end 1)
-					 'occur-target tem))))))))
+                    (let ((inhibit-read-only t))
+		      (insert-buffer-substring buffer start end)
+		      (let ((text-end (point-marker))
+                            text-beg)
+		        (forward-char (- start end))
+		        (setq text-beg (point-marker))
+		        (insert (format "%3d: " linenum))
+		        (add-text-properties
+		         text-beg (- text-end 1)
+		         '(mouse-face highlight
+				      help-echo
+				      "mouse-2: go to this invalidity"))
+		        (put-text-property (point) (- text-end 1)
+					   'occur-match t)
+		        (put-text-property text-beg text-end
+					   'occur-target tem)))))))))
       (with-current-buffer standard-output
-	(let ((no-matches (zerop num-matches)))
+	(let ((no-matches (zerop num-matches))
+              (inhibit-read-only t))
 	  (if no-matches
 	      (insert "None!\n"))
 	  (if (called-interactively-p 'interactive)
@@ -2065,7 +2078,7 @@ Return the process in which TeX is running."
     (let* ((cmd (eval command t))
 	   (proc (tex-shell-proc))
 	   (buf (process-buffer proc))
-           (star (string-match "\\*" cmd))
+           (star (string-search "*" cmd))
 	   (string
 	    (concat
 	     (if (null file)
@@ -2130,6 +2143,7 @@ If NOT-ALL is non-nil, save the `.dvi' file."
 (defvar tex-compile-commands
   `(,@(mapcar (lambda (prefix)
                 `((concat ,prefix tex-command
+                          " " tex-start-options
                           " " (if (< 0 (length tex-start-commands))
                                   (shell-quote-argument tex-start-commands))
                           " %f")
@@ -2339,7 +2353,7 @@ FILE is typically the output DVI or PDF file."
            collect (cons char (shell-quote-argument file))))
 
 (defun tex-format-cmd (format fspec)
-  "Like `format-spec' but adds user-specified args to the command.
+  "Like `format-spec' but add user-specified args to the command.
 Only applies the FSPEC to the args part of FORMAT."
   (setq fspec (tex--quote-spec fspec))
   (if (not (string-match "\\([^ /\\]+\\) " format))
@@ -2466,7 +2480,7 @@ Only applies the FSPEC to the args part of FORMAT."
 
 (defun tex-start-tex (command file &optional dir)
   "Start a TeX run, using COMMAND on FILE."
-  (let* ((star (string-match "\\*" command))
+  (let* ((star (string-search "*" command))
          (compile-command
           (if star
 	      (concat (substring command 0 star)
@@ -2525,7 +2539,10 @@ The value of `tex-command' specifies the command to use to run TeX."
           (file-name-as-directory (expand-file-name tex-directory)))
          (tex-out-file (expand-file-name (concat tex-zap-file ".tex")
 					 zap-directory))
-	 (main-file (expand-file-name (tex-main-file)))
+         ;; We may be running from an unsaved buffer, in which case
+         ;; there's no point in guessing for a main file name.
+	 (main-file (and buffer-file-name
+                         (expand-file-name (tex-main-file))))
 	 (ismain (string-equal main-file (buffer-file-name)))
 	 already-output)
     ;; Don't delete temp files if we do the same buffer twice in a row.
@@ -2534,9 +2551,11 @@ The value of `tex-command' specifies the command to use to run TeX."
     (let ((default-directory zap-directory)) ; why?
       ;; We assume the header is fully contained in tex-main-file.
       ;; We use f-f-ns so we get prompted about any changes on disk.
-      (with-current-buffer (find-file-noselect main-file)
-	(setq already-output (tex-region-header tex-out-file
-						(and ismain beg))))
+      (if (not main-file)
+          (setq already-output 0)
+        (with-current-buffer (find-file-noselect main-file)
+	  (setq already-output (tex-region-header tex-out-file
+						  (and ismain beg)))))
       ;; Write out the specified region (but don't repeat anything
       ;; already written in the header).
       (write-region (if ismain
@@ -2765,7 +2784,7 @@ so normally SUFFIX starts with one."
 	  ;; Not found, so split on first period.
 	  (concat (file-name-directory file-name)
 		  (substring file 0
-			     (string-match "\\." file))
+			     (string-search "." file))
 		  suffix)))
     " "))
 
@@ -3329,7 +3348,6 @@ There might be text before point."
     ("\\oplus" . ?⊕)
     ("\\oslash" . ?⊘)
     ("\\otimes" . ?⊗)
-    ("\\par" . ? )
     ("\\parallel" . ?∥)
     ("\\partial" . ?∂)
     ("\\perp" . ?⊥)
@@ -3436,7 +3454,7 @@ There might be text before point."
     ("\\varprime" . ?′)
     ("\\varpropto" . ?∝)
     ("\\varrho" . ?ϱ)
-    ("\\varsigma" ?ς)
+    ("\\varsigma" . ?ς)
     ("\\vartriangleleft" . ?⊲)
     ("\\vartriangleright" . ?⊳)
     ("\\vdash" . ?⊢)
@@ -3451,7 +3469,97 @@ There might be text before point."
     ("\\Bbb{P}" . ?ℙ)			; Also sometimes \mathbb.
     ("\\Bbb{Q}" . ?ℚ)
     ("\\Bbb{R}" . ?ℝ)
+    ("\\Bbb{T}" . ?𝕋)
     ("\\Bbb{Z}" . ?ℤ)
+    ("\\mathbb{N}" . ?ℕ)			; AMS commands for blackboard bold
+    ("\\mathbb{P}" . ?ℙ)			; Also sometimes \mathbb.
+    ("\\mathbb{Q}" . ?ℚ)
+    ("\\mathbb{R}" . ?ℝ)
+    ("\\mathbb{T}" . ?𝕋)
+    ("\\mathbb{Z}" . ?ℤ)
+    ("\\pm" . ?±)
+    ("\\|" . ?‖)
+    ("\\varkappa" . ?ϰ)
+    ;; caligraphic
+    ("\\mathcal{A}" . ?𝒜)
+    ("\\mathcal{B}" . ?ℬ)
+    ("\\mathcal{C}" . ?𝒞)
+    ("\\mathcal{D}" . ?𝒟)
+    ("\\mathcal{E}" . ?ℰ)
+    ("\\mathcal{F}" . ?ℱ)
+    ("\\mathcal{G}" . ?𝒢)
+    ("\\mathcal{H}" . ?ℋ)
+    ("\\mathcal{I}" . ?ℐ)
+    ("\\mathcal{J}" . ?𝒥)
+    ("\\mathcal{K}" . ?𝒦)
+    ("\\mathcal{L}" . ?ℒ)
+    ("\\mathcal{M}" . ?ℳ)
+    ("\\mathcal{N}" . ?𝒩)
+    ("\\mathcal{O}" . ?𝒪)
+    ("\\mathcal{P}" . ?𝒫)
+    ("\\mathcal{Q}" . ?𝒬)
+    ("\\mathcal{R}" . ?ℛ)
+    ("\\mathcal{S}" . ?𝒮)
+    ("\\mathcal{T}" . ?𝒯)
+    ("\\mathcal{U}" . ?𝒰)
+    ("\\mathcal{V}" . ?𝒱)
+    ("\\mathcal{W}" . ?𝒲)
+    ("\\mathcal{X}" . ?𝒳)
+    ("\\mathcal{Y}" . ?𝒴)
+    ("\\mathcal{Z}" . ?𝒵)
+    ;; fractur
+    ("\\mathfrak{A}" . ?𝔄)
+    ("\\mathfrak{B}" . ?𝔅)
+    ("\\mathfrak{C}" . ?ℭ)
+    ("\\mathfrak{D}" . ?𝔇)
+    ("\\mathfrak{E}" . ?𝔈)
+    ("\\mathfrak{F}" . ?𝔉)
+    ("\\mathfrak{G}" . ?𝔊)
+    ("\\mathfrak{H}" . ?ℌ)
+    ("\\mathfrak{I}" . ?ℑ)
+    ("\\mathfrak{J}" . ?𝔍)
+    ("\\mathfrak{K}" . ?𝔎)
+    ("\\mathfrak{L}" . ?𝔏)
+    ("\\mathfrak{M}" . ?𝔐)
+    ("\\mathfrak{N}" . ?𝔑)
+    ("\\mathfrak{O}" . ?𝔒)
+    ("\\mathfrak{P}" . ?𝔓)
+    ("\\mathfrak{Q}" . ?𝔔)
+    ("\\mathfrak{R}" . ?ℜ)
+    ("\\mathfrak{S}" . ?𝔖)
+    ("\\mathfrak{T}" . ?𝔗)
+    ("\\mathfrak{U}" . ?𝔘)
+    ("\\mathfrak{V}" . ?𝔙)
+    ("\\mathfrak{W}" . ?𝔚)
+    ("\\mathfrak{X}" . ?𝔛)
+    ("\\mathfrak{Y}" . ?𝔜)
+    ("\\mathfrak{Z}" . ?ℨ)
+    ("\\mathfrak{a}" . ?𝔞)
+    ("\\mathfrak{b}" . ?𝔟)
+    ("\\mathfrak{c}" . ?𝔠)
+    ("\\mathfrak{d}" . ?𝔡)
+    ("\\mathfrak{e}" . ?𝔢)
+    ("\\mathfrak{f}" . ?𝔣)
+    ("\\mathfrak{g}" . ?𝔤)
+    ("\\mathfrak{h}" . ?𝔥)
+    ("\\mathfrak{i}" . ?𝔦)
+    ("\\mathfrak{j}" . ?𝔧)
+    ("\\mathfrak{k}" . ?𝔨)
+    ("\\mathfrak{l}" . ?𝔩)
+    ("\\mathfrak{m}" . ?𝔪)
+    ("\\mathfrak{n}" . ?𝔫)
+    ("\\mathfrak{o}" . ?𝔬)
+    ("\\mathfrak{p}" . ?𝔭)
+    ("\\mathfrak{q}" . ?𝔮)
+    ("\\mathfrak{r}" . ?𝔯)
+    ("\\mathfrak{s}" . ?𝔰)
+    ("\\mathfrak{t}" . ?𝔱)
+    ("\\mathfrak{u}" . ?𝔲)
+    ("\\mathfrak{v}" . ?𝔳)
+    ("\\mathfrak{w}" . ?𝔴)
+    ("\\mathfrak{x}" . ?𝔵)
+    ("\\mathfrak{y}" . ?𝔶)
+    ("\\mathfrak{z}" . ?𝔷)
     ("--" . ?–)
     ("---" . ?—)
     ("\\ordfeminine" . ?ª)

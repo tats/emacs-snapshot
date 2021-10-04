@@ -428,8 +428,9 @@ during splitting, which may be slow."
 		      (time-subtract
 		       now
 		       (nnimap-last-command-time nnimap-object))))
-            (ignore-errors              ;E.g. "buffer foo has no process".
-              (nnimap-send-command "NOOP"))))))))
+            (with-local-quit
+              (ignore-errors          ;E.g. "buffer foo has no process".
+                (nnimap-send-command "NOOP")))))))))
 
 (defun nnimap-open-connection (buffer)
   ;; Be backwards-compatible -- the earlier value of nnimap-stream was
@@ -598,6 +599,13 @@ during splitting, which may be slow."
              (eq nnimap-authenticator 'anonymous)
 	     (eq nnimap-authenticator 'login)))
     (nnimap-command "LOGIN %S %S" user password))
+   ((and (nnimap-capability "AUTH=XOAUTH2")
+         (eq nnimap-authenticator 'xoauth2))
+    (nnimap-command  "AUTHENTICATE XOAUTH2 %s"
+                     (base64-encode-string
+                      (format "user=%s\001auth=Bearer %s\001\001"
+                              (nnimap-quote-specials user)
+                              (nnimap-quote-specials password)))))
    ((and (nnimap-capability "AUTH=CRAM-MD5")
 	 (or (null nnimap-authenticator)
 	     (eq nnimap-authenticator 'cram-md5)))
@@ -1076,7 +1084,9 @@ during splitting, which may be slow."
                   "UID COPY %s %S")
                 (nnimap-article-ranges (gnus-compress-sequence articles))
                 (nnimap-group-to-imap (gnus-group-real-name nnmail-expiry-target)))
-               (set (if can-move 'deleted-articles 'articles-to-delete) articles))))
+               (if can-move
+                   (setq deleted-articles articles)
+                 (setq articles-to-delete articles)))))
       t)
      (t
       (dolist (article articles)
@@ -1289,7 +1299,7 @@ If LIMIT, first try to limit the search to the N last articles."
   (when (and (nnimap-greeting nnimap-object)
 	     (string-match greeting-match (nnimap-greeting nnimap-object))
 	     (eq type 'append)
-	     (string-match "\000" data))
+	     (string-search "\000" data))
     (let ((choice (gnus-multiple-choice
 		   "Message contains NUL characters.  Delete, continue, abort? "
 		   '((?d "Delete NUL characters")
@@ -1628,15 +1638,13 @@ If LIMIT, first try to limit the search to the N last articles."
 	      (setq start-article 1))
 	    (let* ((unread
 		    (gnus-compress-sequence
-                     (seq-difference
-                      (seq-difference
+		     (gnus-set-difference
+		      (gnus-set-difference
 		       existing
 		       (gnus-sorted-union
 			(cdr (assoc '%Seen flags))
-                        (cdr (assoc '%Deleted flags)))
-                       #'eq)
-                      (cdr (assoc '%Flagged flags))
-                      #'eq)))
+			(cdr (assoc '%Deleted flags))))
+		      (cdr (assoc '%Flagged flags)))))
 		   (read (gnus-range-difference
 			  (cons start-article high) unread)))
 	      (when (> start-article 1)
@@ -1751,7 +1759,7 @@ If LIMIT, first try to limit the search to the N last articles."
     (let ((result nil))
       (dolist (elem (split-string irange ","))
 	(push
-	 (if (string-match ":" elem)
+	 (if (string-search ":" elem)
 	     (let ((numbers (split-string elem ":")))
 	       (cons (string-to-number (car numbers))
 		     (string-to-number (cadr numbers))))

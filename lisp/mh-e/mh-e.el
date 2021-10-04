@@ -26,14 +26,11 @@
 
 ;; MH-E is an Emacs interface to the MH mail system.
 
-;; MH-E is supported in GNU Emacs 21 and higher, as well as XEmacs 21
-;; (except for versions 21.5.9-21.5.16). It is compatible with MH
-;; versions 6.8.4 and higher, all versions of nmh, and GNU mailutils
-;; 1.0 and higher. Gnus is also required; version 5.10 or higher is
-;; recommended.
+;; MH-E is compatible with MH versions 6.8.4 and higher, all versions
+;; of nmh, and GNU mailutils 1.0 and higher.
 
 ;; MH (Message Handler) is a powerful mail reader. See
-;; http://rand-mh.sourceforge.net/.
+;; https://rand-mh.sourceforge.io/.
 
 ;; N.B. MH must have been compiled with the MHE compiler flag or several
 ;; features necessary for MH-E will be missing from MH commands, specifically
@@ -48,12 +45,6 @@
 ;;   (global-set-key "\C-cr" 'mh-rmail)
 ;;   (global-set-key "\C-xm" 'mh-smail)
 ;;   (global-set-key "\C-x4m" 'mh-smail-other-window)
-
-;; If Emacs can't find mh-rmail or mh-smail, add the following to ~/.emacs:
-;;   (require 'mh-autoloads)
-
-;; If you want to customize MH-E before explicitly loading it, add this:
-;;   (require 'mh-cus-load)
 
 ;; Mailing Lists:
 ;;   mh-e-users@lists.sourceforge.net
@@ -82,7 +73,8 @@
 ;; Rewritten for GNU Emacs, James Larus, 1985.
 ;; Modified by Stephen Gildea, 1988.
 ;; Maintenance picked up by Bill Wohler and the
-;; SourceForge Crew <http://mh-e.sourceforge.net/>, 2001.
+;;   SourceForge Crew <https://mh-e.sourceforge.io/>, 2001.
+;; Since 2016, MH-E development occurs within the Emacs repository.
 
 ;;; Code:
 
@@ -229,7 +221,7 @@ User's mail folder directory.")
 (defvar mh-arrow-marker nil
   "Marker for arrow display in fringe.")
 
-(defvar mh-blacklist nil
+(defvar mh-blocklist nil
   "List of messages to use to train the junk filter.
 This variable can be used by
 `mh-before-commands-processed-hook'.")
@@ -295,7 +287,7 @@ Elements have the form (SEQUENCE . MESSAGES).")
   "Stack of operations that change the folder view.
 These operations include narrowing or threading.")
 
-(defvar mh-whitelist nil
+(defvar mh-allowlist nil
   "List of messages to use to train the junk filter.
 This variable can be used by
 `mh-before-commands-processed-hook'.")
@@ -738,8 +730,11 @@ is described by the variable `mh-variants'."
       ;; Make a unique list of directories, keeping the given order.
       ;; We don't want the same MH variant to be listed multiple times.
       (cl-loop for dir in (append mh-path mh-sys-path exec-path) do
-               (setq dir (file-chase-links (directory-file-name dir)))
-               (cl-pushnew dir list-unique :test #'equal))
+               ;; skip relative dirs, typically "."
+               (if (file-name-absolute-p dir)
+                   (progn
+                     (setq dir (file-chase-links (directory-file-name dir)))
+                     (cl-pushnew dir list-unique :test #'equal))))
       (cl-loop for dir in (nreverse list-unique) do
                (when (and dir (file-accessible-directory-p dir))
                  (let ((variant (mh-variant-info dir)))
@@ -790,14 +785,16 @@ is described by the variable `mh-variants'."
 (defun mh-variant-gnu-mh-info (dir)
   "Return info for GNU mailutils MH variant in DIR.
 This assumes that a temporary buffer is set up."
-  ;; 'mhparam -version' output:
+  ;; Sample '-version' outputs:
   ;; mhparam (GNU mailutils 0.3.2)
-  (let ((mhparam (expand-file-name "mhparam" dir)))
-    (when (mh-file-command-p mhparam)
+  ;; install-mh (GNU Mailutils 2.2)
+  ;; install-mh (GNU Mailutils 3.7)
+  (let ((install-mh (expand-file-name "install-mh" dir)))
+    (when (mh-file-command-p install-mh)
       (erase-buffer)
-      (call-process mhparam nil '(t nil) nil "-version")
+      (call-process install-mh nil '(t nil) nil "-version")
       (goto-char (point-min))
-      (when (search-forward-regexp "mhparam (\\(GNU [Mm]ailutils \\S +\\))"
+      (when (search-forward-regexp "install-mh (\\(GNU [Mm]ailutils \\S +\\))"
                                    nil t)
         (let ((version (match-string 1))
               (mh-progs dir))
@@ -811,14 +808,15 @@ This assumes that a temporary buffer is set up."
 
 (defun mh-variant-nmh-info (dir)
   "Return info for nmh variant in DIR assuming a temporary buffer is set up."
-  ;; `mhparam -version' outputs:
+  ;; Sample '-version' outputs:
   ;; mhparam -- nmh-1.1-RC1 [compiled on chaak at Fri Jun 20 11:03:28 PDT 2003]
-  (let ((mhparam (expand-file-name "mhparam" dir)))
-    (when (mh-file-command-p mhparam)
+  ;; install-mh -- nmh-1.7.1 built October 26, 2019 on build-server-000
+  (let ((install-mh (expand-file-name "install-mh" dir)))
+    (when (mh-file-command-p install-mh)
       (erase-buffer)
-      (call-process mhparam nil '(t nil) nil "-version")
+      (call-process install-mh nil '(t nil) nil "-version")
       (goto-char (point-min))
-      (when (search-forward-regexp "mhparam -- nmh-\\(\\S +\\)" nil t)
+      (when (search-forward-regexp "install-mh -- nmh-\\(\\S +\\)" nil t)
         (let ((version (format "nmh %s" (match-string 1)))
               (mh-progs dir))
           `(,version
@@ -1684,13 +1682,13 @@ fashion."
 
 ;; Available spam filter interfaces
 (defvar mh-junk-function-alist
-  '((spamassassin mh-spamassassin-blacklist mh-spamassassin-whitelist)
-    (bogofilter mh-bogofilter-blacklist mh-bogofilter-whitelist)
-    (spamprobe mh-spamprobe-blacklist mh-spamprobe-whitelist))
+  '((spamassassin mh-spamassassin-blocklist mh-spamassassin-allowlist)
+    (bogofilter mh-bogofilter-blocklist mh-bogofilter-allowlist)
+    (spamprobe mh-spamprobe-blocklist mh-spamprobe-allowlist))
   "Available choices of spam programs to use.
 
 This is an alist. For each element there are functions that
-blacklist a message as spam and whitelist a message incorrectly
+blocklist a message as spam and allowlist a message incorrectly
 classified as spam.")
 
 (defun mh-junk-choose (symbol value)
@@ -1715,8 +1713,8 @@ be slow when junking large numbers of messages. If you have
 enough memory or don't junk that many messages at the same time,
 you might try turning on this option.
 
-Note that this option is used as the \"display\" argument in the
-call to `call-process'. Therefore, turning on this option means
+Note that this option is used as the \"destination\" argument in
+the call to `call-process'. Therefore, turning on this option means
 setting its value to \"0\". You can also set its value to t to
 direct the programs' output to the \"*MH-E Log*\" buffer; this
 may be useful for debugging."
@@ -2233,11 +2231,11 @@ commands."
   :group 'mh-sequences
   :package-version '(MH-E . "7.0"))
 
-(defcustom-mh mh-whitelist-preserves-sequences-flag t
-  "Non-nil means that sequences are preserved when messages are whitelisted.
+(defcustom-mh mh-allowlist-preserves-sequences-flag t
+  "Non-nil means that sequences are preserved when messages are allowlisted.
 
 If a message is in any sequence (except \"Previous-Sequence:\"
-and \"cur\") when it is whitelisted, then it will still be in
+and \"cur\") when it is allowlisted, then it will still be in
 those sequences in the destination folder. If this behavior is
 not desired, then turn off this option."
   :type 'boolean
@@ -3192,7 +3190,7 @@ annotated messages with `mh-annotate-list'."
   "Hook run by \\<mh-folder-mode-map>\\[mh-execute-commands] before performing outstanding refile and delete requests.
 
 Variables that are useful in this hook include `mh-delete-list',
-`mh-refile-list', `mh-blacklist', and `mh-whitelist' which can be
+`mh-refile-list', `mh-blocklist', and `mh-allowlist' which can be
 used to see which changes will be made to the current folder,
 `mh-current-folder'."
   :type 'hook
@@ -3224,8 +3222,8 @@ before sending, add the `ispell-message' function."
   :group 'mh-letter
   :package-version '(MH-E . "6.0"))
 
-(defcustom-mh mh-blacklist-msg-hook nil
-  "Hook run by \\<mh-letter-mode-map>\\[mh-junk-blacklist] after marking each message for blacklisting."
+(defcustom-mh mh-blocklist-msg-hook nil
+  "Hook run by \\<mh-letter-mode-map>\\[mh-junk-blocklist] after marking each message for blocklisting."
   :type 'hook
   :group 'mh-hooks
   :group 'mh-show
@@ -3397,8 +3395,8 @@ sequence."
   :group 'mh-sequences
   :package-version '(MH-E . "6.0"))
 
-(defcustom-mh mh-whitelist-msg-hook nil
-  "Hook run by \\<mh-letter-mode-map>\\[mh-junk-whitelist] after marking each message for whitelisting."
+(defcustom-mh mh-allowlist-msg-hook nil
+  "Hook run by \\<mh-letter-mode-map>\\[mh-junk-allowlist] after marking each message for allowlisting."
   :type 'hook
   :group 'mh-hooks
   :group 'mh-show
@@ -3624,9 +3622,9 @@ specified colors."
   :group 'mh-folder
   :package-version '(MH-E . "8.0"))
 
-(defface-mh mh-folder-blacklisted
+(defface-mh mh-folder-blocklisted
   (mh-face-data 'mh-folder-msg-number '((t (:inherit mh-folder-msg-number))))
-  "Blacklisted message face."
+  "Blocklisted message face."
   :group 'mh-faces
   :group 'mh-folder
   :package-version '(MH-E . "8.4"))
@@ -3720,9 +3718,9 @@ format `mh-scan-format-nmh' and the regular expression
   :group 'mh-folder
   :package-version '(MH-E . "8.0"))
 
-(defface-mh mh-folder-whitelisted
+(defface-mh mh-folder-allowlisted
   (mh-face-data 'mh-folder-refiled '((t (:inherit mh-folder-refiled))))
-  "Whitelisted message face."
+  "Allowlisted message face."
   :group 'mh-faces
   :group 'mh-folder
   :package-version '(MH-E . "8.4"))

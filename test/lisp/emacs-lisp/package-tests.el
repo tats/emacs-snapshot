@@ -180,7 +180,7 @@
   (replace-regexp-in-string "-pkg\\.el\\'" "" (package--description-file dir)))
 
 (defun package-test-suffix-matches (base suffix-list)
-  "Return file names matching BASE concatenated with each item in SUFFIX-LIST"
+  "Return file names matching BASE concatenated with each item in SUFFIX-LIST."
   (mapcan (lambda (item) (file-expand-wildcards (concat base item)))
           suffix-list))
 
@@ -262,6 +262,74 @@ Must called from within a `tar-mode' buffer."
                    simple-single-desc))))
       (should (file-exists-p autoloads-file))
       (should-not (get-file-buffer autoloads-file)))))
+
+(ert-deftest package-test-install-file ()
+  "Install files with `package-install-file'."
+  (with-package-test (:basedir (ert-resource-directory))
+    (package-initialize)
+    (let* ((pkg-el "simple-single-1.3.el")
+           (source-file (expand-file-name pkg-el (ert-resource-directory))))
+      (should-not (package-installed-p 'simple-single))
+      (package-install-file source-file)
+      (should (package-installed-p 'simple-single))
+      (package-delete (cadr (assq 'simple-single package-alist)))
+      (should-not (package-installed-p 'simple-single)))
+
+    (let* ((pkg-el "multi-file-0.2.3.tar")
+           (source-file (expand-file-name pkg-el (ert-resource-directory))))
+      (package-initialize)
+      (should-not (package-installed-p 'multie-file))
+      (package-install-file source-file)
+      (should (package-installed-p 'multi-file))
+      (package-delete (cadr (assq 'multi-file package-alist))))
+    ))
+
+(ert-deftest package-test-install-file-EOLs ()
+  "Install same file multiple time with `package-install-file'
+but with a different end of line convention (bug#48137)."
+  (with-package-test (:basedir (ert-resource-directory))
+    (package-initialize)
+    (let* ((pkg-el "simple-single-1.3.el")
+           (source-file (expand-file-name pkg-el (ert-resource-directory))))
+
+      (with-temp-buffer
+        (insert-file-contents source-file)
+
+        (let (hashes)
+          (dolist (coding '(unix dos mac) hashes)
+            (let* ((eol-file (expand-file-name pkg-el package-test-user-dir)))
+              ;; save package with this EOL convention.
+              (set-buffer-file-coding-system coding)
+              (write-region (point-min) (point-max) eol-file)
+
+              (should-not (package-installed-p 'simple-single))
+              (package-install-file eol-file)
+              (should (package-installed-p 'simple-single))
+
+              ;; check the package file has been installed unmodified.
+              (let ((eol-hash (with-temp-buffer
+                                (insert-file-contents-literally eol-file)
+                                (buffer-hash))))
+                ;; also perform an additional check that the package
+                ;; file created with this EOL convention is different
+                ;; than all the others created so far.
+                (should-not (member eol-hash hashes))
+                (setq hashes (cons eol-hash hashes))
+
+                (let* ((descr (cadr (assq 'simple-single package-alist)))
+                       (pkg-dir (package-desc-dir descr))
+                       (dest-file (expand-file-name "simple-single.el" pkg-dir ))
+                       (dest-hash (with-temp-buffer
+                                    (insert-file-contents-literally dest-file)
+                                    (buffer-hash))))
+
+                  (should (string= dest-hash eol-hash))))
+
+              (package-delete (cadr (assq 'simple-single package-alist)))
+              (should-not (package-installed-p 'simple-single))
+              (delete-file eol-file)
+              (should-not (file-exists-p eol-file))
+              )))))))
 
 (ert-deftest package-test-install-dependency ()
   "Install a package which includes a dependency."
@@ -568,7 +636,7 @@ Must called from within a `tar-mode' buffer."
      (save-excursion (should (re-search-forward "Status: Installed in ['`‘]simple-single-1.3/['’] (unsigned)." nil t)))
      (save-excursion (should (search-forward "Version: 1.3" nil t)))
      (save-excursion (should (search-forward "Summary: A single-file package with no dependencies" nil t)))
-     (save-excursion (should (search-forward "Homepage: http://doodles.au" nil t)))
+     (save-excursion (should (search-forward "Website: http://doodles.au" nil t)))
      (save-excursion (should (re-search-forward "Keywords: \\[?frobnicate\\]?" nil t)))
      (save-excursion (should (search-forward "This package provides a minor mode to frobnicate"
                                              nil t)))
@@ -584,7 +652,7 @@ Must called from within a `tar-mode' buffer."
     (with-fake-help-buffer
      (describe-package 'multi-file)
      (goto-char (point-min))
-     (should (search-forward "Homepage: http://puddles.li" nil t))
+     (should (search-forward "Website: http://puddles.li" nil t))
      (should (search-forward "This is a bare-bones readme file for the multi-file"
                              nil t)))))
 
@@ -597,7 +665,7 @@ Must called from within a `tar-mode' buffer."
     (with-fake-help-buffer
      (describe-package 'simple-single)
      (goto-char (point-min))
-     (should (search-forward "Homepage: http://doodles.au" nil t))
+     (should (search-forward "Website: http://doodles.au" nil t))
      (should (search-forward "This package provides a minor mode to frobnicate"
                              nil t)))))
 
@@ -610,7 +678,7 @@ Must called from within a `tar-mode' buffer."
     (with-fake-help-buffer
      (describe-package 'multi-file)
      (goto-char (point-min))
-     (should (search-forward "Homepage: http://puddles.li" nil t))
+     (should (search-forward "Website: http://puddles.li" nil t))
      (should (search-forward "This is a bare-bones readme file for the multi-file"
                              nil t)))))
 

@@ -83,18 +83,19 @@ When this is `function', only ask when called non-interactively."
                  (const :tag "Ask if called non-interactively" function)
                  (other :tag "Ask" t)))
 
-(defcustom auto-insert-prompt "Perform %s auto-insertion? "
-  "Prompt to use when querying whether to auto-insert.
+(defcustom auto-insert-prompt "Perform %s auto-insertion?"
+  "Prompt to use when querying whether to `auto-insert'.
 If this contains a %s, that will be replaced by the matching rule."
-  :type 'string)
+  :type 'string
+  :version "28.1")
 
 
 (defcustom auto-insert-alist
   '((("\\.\\([Hh]\\|hh\\|hpp\\|hxx\\|h\\+\\+\\)\\'" . "C / C++ header")
      (replace-regexp-in-string
       "[^A-Z0-9]" "_"
-      (replace-regexp-in-string
-       "\\+" "P"
+      (string-replace
+       "+" "P"
        (upcase (file-name-nondirectory buffer-file-name))))
      "#ifndef " str \n
      "#define " str "\n\n"

@@ -39,8 +39,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "puresize.h"
 #include "gnutls.h"
 
-static void sort_vector_copy (Lisp_Object, ptrdiff_t,
-			      Lisp_Object *restrict, Lisp_Object *restrict);
+static void sort_vector_copy (Lisp_Object pred, ptrdiff_t len,
+			      Lisp_Object src[restrict VLA_ELEMS (len)],
+			      Lisp_Object dest[restrict VLA_ELEMS (len)]);
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
 static bool internal_equal (Lisp_Object, Lisp_Object,
 			    enum equal_kind, int, Lisp_Object);
@@ -321,7 +322,7 @@ Letter-case is significant, but text properties are ignored. */)
 
   USE_SAFE_ALLOCA;
   ptrdiff_t *column = SAFE_ALLOCA ((len1 + 1) * sizeof (ptrdiff_t));
-  for (y = 1; y <= len1; y++)
+  for (y = 0; y <= len1; y++)
     column[y] = y;
 
   if (use_byte_compare)
@@ -1173,7 +1174,7 @@ string_make_multibyte (Lisp_Object string)
 
 
 /* Convert STRING (if unibyte) to a multibyte string without changing
-   the number of characters.  Characters 0200 trough 0237 are
+   the number of characters.  Characters 0200 through 0237 are
    converted to eight-bit characters. */
 
 Lisp_Object
@@ -1754,7 +1755,8 @@ DEFUN ("assoc", Fassoc, Sassoc, 2, 3, 0,
        doc: /* Return non-nil if KEY is equal to the car of an element of ALIST.
 The value is actually the first element of ALIST whose car equals KEY.
 
-Equality is defined by TESTFN if non-nil or by `equal' if nil.  */)
+Equality is defined by the function TESTFN, defaulting to `equal'.
+TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
      (Lisp_Object key, Lisp_Object alist, Lisp_Object testfn)
 {
   if (eq_comparable_value (key) && NILP (testfn))
@@ -2948,8 +2950,10 @@ do_yes_or_no_p (Lisp_Object prompt)
 DEFUN ("yes-or-no-p", Fyes_or_no_p, Syes_or_no_p, 1, 1, 0,
        doc: /* Ask user a yes-or-no question.
 Return t if answer is yes, and nil if the answer is no.
-PROMPT is the string to display to ask the question.  It should end in
-a space; `yes-or-no-p' adds \"(yes or no) \" to it.
+
+PROMPT is the string to display to ask the question; `yes-or-no-p'
+adds \"(yes or no) \" to it.  It does not need to end in space, but if
+it does up to one space will be removed.
 
 The user must confirm the answer with RET, and can edit it until it
 has been confirmed.
@@ -3954,7 +3958,7 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
       if (c == '=')
 	continue;
 
-      if (v1 < 0)
+      if (v1 == 0)
 	return -1;
       value += v1 - 1;
 
@@ -5768,16 +5772,6 @@ characters.  */ )
   return list3 (make_int (lines), make_int (longest), make_float (mean));
 }
 
-static bool
-string_ascii_p (Lisp_Object string)
-{
-  ptrdiff_t nbytes = SBYTES (string);
-  for (ptrdiff_t i = 0; i < nbytes; i++)
-    if (SREF (string, i) > 127)
-      return false;
-  return true;
-}
-
 DEFUN ("string-search", Fstring_search, Sstring_search, 2, 3, 0,
        doc: /* Search for the string NEEDLE in the string HAYSTACK.
 The return value is the position of the first occurrence of NEEDLE in
@@ -5892,12 +5886,14 @@ in OBJECT.  */)
 
 DEFUN ("line-number-at-pos", Fline_number_at_pos,
        Sline_number_at_pos, 0, 2, 0,
-       doc: /* Return the line number at POSITION.
-If POSITION is nil, use the current buffer location.
+       doc: /* Return the line number at POSITION in the current buffer.
+If POSITION is nil or omitted, it defaults to point's position in the
+current buffer.
 
-If the buffer is narrowed, the position returned is the position in the
-visible part of the buffer.  If ABSOLUTE is non-nil, count the lines
-from the absolute start of the buffer.  */)
+If the buffer is narrowed, the return value by default counts the lines
+from the beginning of the accessible portion of the buffer.  But if the
+second optional argument ABSOLUTE is non-nil, the value counts the lines
+from the absolute start of the buffer, disregarding the narrowing.  */)
   (register Lisp_Object position, Lisp_Object absolute)
 {
   ptrdiff_t pos, start = BEGV_BYTE;
@@ -5915,9 +5911,9 @@ from the absolute start of the buffer.  */)
   if (!NILP (absolute))
     start = BEG_BYTE;
 
-  /* Check that POSITION is n the visible range of the buffer. */
+  /* Check that POSITION is in the accessible range of the buffer. */
   if (pos < BEGV || pos > ZV)
-    args_out_of_range (make_int (start), make_int (ZV));
+    args_out_of_range_3 (make_int (pos), make_int (BEGV), make_int (ZV));
 
   return make_int (count_lines (start, CHAR_TO_BYTE (pos)) + 1);
 }

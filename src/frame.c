@@ -729,7 +729,7 @@ adjust_frame_size (struct frame *f, int new_text_width, int new_text_height,
 	  && (f->new_width >= 0 || f->new_height >= 0))
 	/* For implied resizes with inhibit 2 (external menu and tool
 	   bar) pick up any new sizes the display engine has not
-	   processed yet.  Otherwsie, we would request the old sizes
+	   processed yet.  Otherwise, we would request the old sizes
 	   which will make this request appear as a request to set new
 	   sizes and have the WM react accordingly which is not TRT.
 
@@ -982,6 +982,7 @@ make_frame (bool mini_p)
   f->ns_transparent_titlebar = false;
 #endif
 #endif
+  f->select_mini_window_flag = false;
   /* This one should never be zero.  */
   f->change_stamp = 1;
   root_window = make_window ();
@@ -1016,6 +1017,10 @@ make_frame (bool mini_p)
 
   rw->total_lines = FRAME_LINES (f) - (mini_p ? 1 : 0);
   rw->pixel_height = rw->total_lines * FRAME_LINE_HEIGHT (f);
+
+  fset_face_hash_table
+    (f, make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, DEFAULT_REHASH_SIZE,
+                         DEFAULT_REHASH_THRESHOLD, Qnil, false));
 
   if (mini_p)
     {
@@ -1325,7 +1330,7 @@ affects all frames on the same terminal device.  */)
 {
   struct frame *f;
   struct terminal *t = NULL;
-  Lisp_Object frame, tem;
+  Lisp_Object frame;
   struct frame *sf = SELECTED_FRAME ();
 
 #ifdef MSDOS
@@ -1401,20 +1406,23 @@ affects all frames on the same terminal device.  */)
 		  (t->display_info.tty->name
 		   ? build_string (t->display_info.tty->name)
 		   : Qnil));
+
+  /* Make the frame face hash be frame-specific, so that each
+     frame could change its face definitions independently.  */
+  fset_face_hash_table (f, Fcopy_hash_table (sf->face_hash_table));
+  /* Simple copy_hash_table isn't enough, because we need the contents of
+     the vectors which are the values in face_hash_table to
+     be copied as well.  */
+  ptrdiff_t idx = 0;
+  struct Lisp_Hash_Table *table = XHASH_TABLE (f->face_hash_table);
+  for (idx = 0; idx < table->count; ++idx)
+    set_hash_value_slot (table, idx, Fcopy_sequence (HASH_VALUE (table, idx)));
+
   /* On terminal frames the `minibuffer' frame parameter is always
      virtually t.  Avoid that a different value in parms causes
      complaints, see Bug#24758.  */
   store_in_alist (&parms, Qminibuffer, Qt);
   Fmodify_frame_parameters (frame, parms);
-
-  /* Make the frame face alist be frame-specific, so that each
-     frame could change its face definitions independently.  */
-  fset_face_alist (f, Fcopy_alist (sf->face_alist));
-  /* Simple Fcopy_alist isn't enough, because we need the contents of
-     the vectors which are the CDRs of associations in face_alist to
-     be copied as well.  */
-  for (tem = f->face_alist; CONSP (tem); tem = XCDR (tem))
-    XSETCDR (XCAR (tem), Fcopy_sequence (XCDR (XCAR (tem))));
 
   f->can_set_window_size = true;
   f->after_make_frame = true;
@@ -1542,7 +1550,17 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
       tty->top_frame = frame;
     }
 
+  sf->select_mini_window_flag = MINI_WINDOW_P (XWINDOW (sf->selected_window));
+
   selected_frame = frame;
+
+  move_minibuffers_onto_frame (sf, for_deletion);
+
+  if (f->select_mini_window_flag
+      && !NILP (Fminibufferp (XWINDOW (f->minibuffer_window)->contents, Qt)))
+    f->selected_window = f->minibuffer_window;
+  f->select_mini_window_flag = false;
+
   if (! FRAME_MINIBUF_ONLY_P (XFRAME (selected_frame)))
     last_nonminibuf_frame = XFRAME (selected_frame);
 
@@ -1559,7 +1577,6 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
 #endif
     internal_last_event_frame = Qnil;
 
-  move_minibuffers_onto_frame (sf, for_deletion);
   return frame;
 }
 
@@ -1821,15 +1838,20 @@ prev_frame (Lisp_Object frame, Lisp_Object minibuf)
 
 DEFUN ("next-frame", Fnext_frame, Snext_frame, 0, 2, 0,
        doc: /* Return the next frame in the frame list after FRAME.
-It considers only frames on the same terminal as FRAME.
-By default, skip minibuffer-only frames.
-If omitted, FRAME defaults to the selected frame.
-If optional argument MINIFRAME is nil, exclude minibuffer-only frames.
-If MINIFRAME is a window, include only its own frame
-and any frame now using that window as the minibuffer.
-If MINIFRAME is `visible', include all visible frames.
-If MINIFRAME is 0, include all visible and iconified frames.
-Otherwise, include all frames.  */)
+Only frames on the same terminal as FRAME are included in the list
+of candidate frames.  If omitted, FRAME defaults to the selected frame.
+
+If MINIFRAME is nil (the default), include all frames except
+minibuffer-only frames.
+
+If MINIFRAME is a window, include only its own frame and any frame now
+using that window as the minibuffer.
+
+If MINIFRAME is `visible', include only visible frames.
+
+If MINIFRAME is 0, include only visible and iconified frames.
+
+If MINIFRAME is any other value, include all frames.  */)
   (Lisp_Object frame, Lisp_Object miniframe)
 {
   if (NILP (frame))

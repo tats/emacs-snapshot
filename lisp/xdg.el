@@ -109,7 +109,7 @@ file:///foo/bar.jpg"
         "_DIR=\""
         (group-n 2 (or "/" "$HOME/") (*? (or (not (any "\"")) "\\\"")))
         "\""))
-  "Regexp matching non-comment lines in xdg-user-dirs config files.")
+  "Regexp matching non-comment lines in `xdg-user-dirs' config files.")
 
 (defvar xdg-user-dirs nil
   "Alist of directory keys and values.")
@@ -131,7 +131,7 @@ This should be called at the beginning of a line."
       (when (and k v) (cons k (xdg--substitute-home-env v))))))
 
 (defun xdg--user-dirs-parse-file (filename)
-  "Return alist of xdg-user-dirs from FILENAME."
+  "Return alist of `xdg-user-dirs' from FILENAME."
   (let (elt res)
     (when (file-readable-p filename)
       (with-temp-buffer
@@ -208,8 +208,8 @@ Optional argument GROUP defaults to the string \"Desktop Entry\"."
   "Partition VALUE into elements delimited by unescaped semicolons."
   (let (res)
     (setq value (string-trim-left value))
-    (dolist (x (split-string (replace-regexp-in-string "\\\\;" "\0" value) ";"))
-      (push (replace-regexp-in-string "\0" ";" x) res))
+    (dolist (x (split-string (string-replace "\\;" "\0" value) ";"))
+      (push (string-replace "\0" ";" x) res))
     (when (null (string-match-p "[^[:blank:]]" (car res))) (pop res))
     (nreverse res)))
 
@@ -231,7 +231,7 @@ admin config, and finally system cached associations."
         (desktop (getenv "XDG_CURRENT_DESKTOP"))
         res)
     (when desktop
-      (setq desktop (format "%s-mimeapps.list" desktop)))
+      (setq desktop (list (format "%s-mimeapps.list" desktop))))
     (dolist (name (cons "mimeapps.list" desktop))
       (push (expand-file-name name (xdg-config-home)) res)
       (push (expand-file-name (format "applications/%s" name) (xdg-data-home))

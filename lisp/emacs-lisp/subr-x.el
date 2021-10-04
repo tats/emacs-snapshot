@@ -62,7 +62,7 @@ Is equivalent to:
     (+ (- (/ (+ 5 20) 25)) 40)
 Note how the single `-' got converted into a list before
 threading."
-  (declare (indent 1)
+  (declare (indent 0)
            (debug (form &rest [&or symbolp (sexp &rest form)])))
   `(internal--thread-argument t ,@forms))
 
@@ -79,7 +79,7 @@ Is equivalent to:
     (+ 40 (- (/ 25 (+ 20 5))))
 Note how the single `-' got converted into a list before
 threading."
-  (declare (indent 1) (debug thread-first))
+  (declare (indent 0) (debug thread-first))
   `(internal--thread-argument nil ,@forms))
 
 (defsubst internal--listify (elt)
@@ -107,7 +107,7 @@ If ELT is of the form ((EXPR)), listify (EXPR) with a dummy symbol."
 (defun internal--build-binding (binding prev-var)
   "Check and build a single BINDING with PREV-VAR."
   (thread-first
-      binding
+    binding
     internal--listify
     internal--check-binding
     (internal--build-binding-value-form prev-var)))
@@ -127,7 +127,7 @@ This is like `if-let' but doesn't handle a VARLIST of the form
 \(SYMBOL SOMETHING) specially."
   (declare (indent 2)
            (debug ((&rest [&or symbolp (symbolp form) (form)])
-                   form body)))
+                   body)))
   (if varlist
       `(let* ,(setq varlist (internal--build-bindings varlist))
          (if ,(caar (last varlist))
@@ -146,9 +146,7 @@ This is like `when-let' but doesn't handle a VARLIST of the form
   "Bind variables according to VARLIST and conditionally evaluate BODY.
 Like `when-let*', except if BODY is empty and all the bindings
 are non-nil, then the result is non-nil."
-  (declare (indent 1)
-           (debug ((&rest [&or symbolp (symbolp form) (form)])
-                   body)))
+  (declare (indent 1) (debug if-let*))
   (let (res)
     (if varlist
         `(let* ,(setq varlist (internal--build-bindings varlist))
@@ -174,9 +172,9 @@ As a special case, interprets a SPEC of the form \(SYMBOL SOMETHING)
 like \((SYMBOL SOMETHING)).  This exists for backward compatibility
 with an old syntax that accepted only one binding."
   (declare (indent 2)
-           (debug ([&or (&rest [&or symbolp (symbolp form) (form)])
-                        (symbolp form)]
-                   form body)))
+           (debug ([&or (symbolp form)  ; must be first, Bug#48489
+                        (&rest [&or symbolp (symbolp form) (form)])]
+                   body)))
   (when (and (<= (length spec) 2)
              (not (listp (car spec))))
     ;; Adjust the single binding case
@@ -242,6 +240,7 @@ carriage return."
       (substring string 0 (- (length string) (length suffix)))
     string))
 
+;;;###autoload
 (defun string-clean-whitespace (string)
   "Clean up whitespace in STRING.
 All sequences of whitespaces in STRING are collapsed into a
@@ -319,6 +318,7 @@ than this function."
      (end (substring string (- (length string) length)))
      (t (substring string 0 length)))))
 
+;;;###autoload
 (defun string-lines (string &optional omit-nulls)
   "Split STRING into a list of lines.
 If OMIT-NULLS, empty lines will be removed from the results."

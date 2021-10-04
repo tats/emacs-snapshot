@@ -46,7 +46,7 @@ the terminal-initialization file to be loaded."
     ("vt320" . "vt200")
     ("vt400" . "vt200")
     ("vt420" . "vt200")
-    )
+    ("alacritty" . "xterm"))
   "Alist of terminal type aliases.
 Entries are of the form (TYPE . ALIAS), where both elements are strings.
 This means to treat a terminal of type TYPE as if it were of type ALIAS."
@@ -176,10 +176,28 @@ REGISTRY, ALTERNATIVE1, ALTERNATIVE2, and etc."
 ;;; Creation, copying.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(make-obsolete-variable 'face-new-frame-defaults
+ "use `face--new-frame-defaults' or `face-alist' instead." "28.1")
+
+(defun frame-face-alist (&optional frame)
+  "Return an alist of frame-local faces defined on FRAME.
+This alist is a copy of the contents of `frame--face-hash-table'.
+For internal use only."
+  (declare (obsolete frame--face-hash-table "28.1"))
+  (let (faces)
+    (maphash (lambda (face spec)
+               (let ((face-id  (car (gethash face face--new-frame-defaults))))
+                 (push `(,face-id ,face . ,spec) faces)))
+             (frame--face-hash-table frame))
+    (mapcar #'cdr (sort faces (lambda (f1 f2) (< (car f1) (car f2)))))))
 
 (defun face-list ()
   "Return a list of all defined faces."
-  (mapcar #'car face-new-frame-defaults))
+  (let (faces)
+    (maphash (lambda (face spec)
+               (push `(,(car spec) . ,face) faces))
+             face--new-frame-defaults)
+    (mapcar #'cdr (sort faces (lambda (f1 f2) (< (car f1) (car f2)))))))
 
 (defun make-face (face)
   "Define a new face with name FACE, a symbol.
@@ -1777,18 +1795,21 @@ If FRAME is nil, that stands for the selected frame."
     (mapcar 'car (tty-color-alist frame))))
 (defalias 'x-defined-colors 'defined-colors)
 
-(defun defined-colors-with-face-attributes (&optional frame)
-  "Return a list of colors supported for a particular frame.
-See `defined-colors' for arguments and return value. In contrast
+(defun defined-colors-with-face-attributes (&optional frame foreground)
+  "Return a list of colors supported for a particular FRAME.
+See `defined-colors' for arguments and return value.  In contrast
 to `defined-colors' the elements of the returned list are color
 strings with text properties, that make the color names render
-with the color they represent as background color."
+with the color they represent as background color (if FOREGROUND
+is nil; otherwise use the foreground color)."
   (mapcar
    (lambda (color-name)
-     (let ((foreground (readable-foreground-color color-name))
-	   (color      (copy-sequence color-name)))
-       (propertize color 'face (list :foreground foreground
-				     :background color))))
+     (let ((color (copy-sequence color-name)))
+       (propertize color 'face
+		   (if foreground
+		       (list :foreground color)
+		     (list :foreground (readable-foreground-color color-name)
+                           :background color)))))
    (defined-colors frame)))
 
 (defun readable-foreground-color (color)
@@ -1897,7 +1918,8 @@ If omitted or nil, that stands for the selected frame's display."
       (x-display-grayscale-p display)
     (> (tty-color-gray-shades display) 2)))
 
-(defun read-color (&optional prompt convert-to-RGB allow-empty-name msg)
+(defun read-color (&optional prompt convert-to-RGB allow-empty-name msg
+			     foreground)
   "Read a color name or RGB triplet.
 Completion is available for color names, but not for RGB triplets.
 
@@ -1924,13 +1946,18 @@ If optional arg ALLOW-EMPTY-NAME is non-nil, the user is allowed
 to enter an empty color name (the empty string).
 
 Interactively, or with optional arg MSG non-nil, print the
-resulting color name in the echo area."
+resulting color name in the echo area.
+
+Interactively, displays a list of colored completions.  If optional
+argument FOREGROUND is non-nil, shows them as foregrounds, otherwise
+as backgrounds."
   (interactive "i\np\ni\np")    ; Always convert to RGB interactively.
   (let* ((completion-ignore-case t)
 	 (colors (append '("foreground at point" "background at point")
 			 (if allow-empty-name '(""))
                          (if (display-color-p)
-                             (defined-colors-with-face-attributes)
+                             (defined-colors-with-face-attributes
+                               nil foreground)
                            (defined-colors))))
 	 (color (completing-read
 		 (or prompt "Color (name or #RGB triplet): ")
@@ -2115,6 +2142,8 @@ the X resource \"reverseVideo\" is present, handle that."
     (unwind-protect
 	(progn
 	  (x-setup-function-keys frame)
+	  (dolist (face (nreverse (face-list)))
+	    (face-spec-recalc face frame))
 	  (x-handle-reverse-video frame parameters)
 	  (frame-set-background-mode frame t)
 	  (face-set-after-frame-default frame parameters)
@@ -2145,7 +2174,7 @@ the X resource \"reverseVideo\" is present, handle that."
 (defun face-set-after-frame-default (frame &optional parameters)
   "Initialize the frame-local faces of FRAME.
 Calculate the face definitions using the face specs, custom theme
-settings, X resources, and `face-new-frame-defaults'.
+settings, X resources, and `face--new-frame-defaults'.
 Finally, apply any relevant face attributes found amongst the
 frame parameters in PARAMETERS."
   ;; The `reverse' is so that `default' goes first.
@@ -2154,7 +2183,7 @@ frame parameters in PARAMETERS."
 	(progn
 	  ;; Initialize faces from face spec and custom theme.
 	  (face-spec-recalc face frame)
-	  ;; Apply attributes specified by face-new-frame-defaults
+	  ;; Apply attributes specified by face--new-frame-defaults
 	  (internal-merge-in-global-face face frame))
       ;; Don't let invalid specs prevent frame creation.
       (error nil)))
@@ -2913,23 +2942,30 @@ It is used for characters of no fonts too."
 
 ;; Faces for TTY menus.
 (defface tty-menu-enabled-face
-  '((t
-     :foreground "yellow" :background "blue" :weight bold))
+  '((((class color))
+     :foreground "yellow" :background "blue" :weight bold)
+    (t :weight bold))
   "Face for displaying enabled items in TTY menus."
-  :group 'basic-faces)
+  :group 'basic-faces
+  :version "28.1")
 
 (defface tty-menu-disabled-face
   '((((class color) (min-colors 16))
      :foreground "lightgray" :background "blue")
-    (t
-     :foreground "white" :background "blue"))
+    (((class color))
+     :foreground "white" :background "blue")
+    (t :inherit shadow))
   "Face for displaying disabled items in TTY menus."
-  :group 'basic-faces)
+  :group 'basic-faces
+  :version "28.1")
 
 (defface tty-menu-selected-face
-  '((t :background "red"))
+  '((((class color))
+      :background "red")
+    (t :inverse-video t))
   "Face for displaying the currently selected item in TTY menus."
-  :group 'basic-faces)
+  :group 'basic-faces
+  :version "28.1")
 
 (defgroup paren-showing-faces nil
   "Faces used to highlight paren matches."
@@ -3035,7 +3071,7 @@ also the same size as FACE on FRAME, or fail."
       (let ((fonts (x-list-fonts pattern face frame 1)))
 	(or fonts
 	    (if face
-		(if (string-match-p "\\*" pattern)
+		(if (string-search "*" pattern)
 		    (if (null (face-font face))
 			(error "No matching fonts are the same height as the frame default font")
 		      (error "No matching fonts are the same height as face `%s'" face))

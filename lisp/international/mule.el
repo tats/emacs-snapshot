@@ -294,7 +294,6 @@ attribute."
 
     (apply 'define-charset-internal name (mapcar 'cdr attrs))))
 
-
 (defun load-with-code-conversion (fullname file &optional noerror nomessage)
   "Execute a file of Lisp code named FILE whose absolute name is FULLNAME.
 The file contents are decoded before evaluation if necessary.
@@ -1148,7 +1147,7 @@ Value is a list of transformed arguments."
 	      (,(plist-get props 'decode) . ,(plist-get props 'encode))
 	      ,properties ,eol-type))
      (t
-      (error "unsupported XEmacs style make-coding-style arguments: %S"
+      (error "Unsupported XEmacs style make-coding-style arguments: %S"
 	     `(,name ,type ,doc-string ,props))))))
 
 (defun merge-coding-systems (first second)
@@ -1380,8 +1379,11 @@ If CODING-SYSTEM is nil or the coding-type of CODING-SYSTEM is
 `raw-text', the decoding of keyboard input is disabled.
 
 TERMINAL may be a terminal object, a frame, or nil for the
-selected frame's terminal.  The setting has no effect on
-graphical terminals."
+selected frame's terminal.
+
+The setting has no effect on graphical terminals.  It also
+has no effect on MS-Windows text-mode terminals, except on
+Windows 9X systems.  For Windows 9X, see also `w32-set-console-codepage'."
   (interactive
    (list (let* ((coding (keyboard-coding-system nil))
 		(default (if (eq (coding-system-type coding) 'raw-text)

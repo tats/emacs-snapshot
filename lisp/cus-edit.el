@@ -1205,7 +1205,7 @@ Show the buffer in another window, but don't select it."
     (unless (eq symbol basevar)
       (message "`%s' is an alias for `%s'" symbol basevar))))
 
-(defvar customize-changed-options-previous-release "26.3"
+(defvar customize-changed-options-previous-release "27.2"
   "Version for `customize-changed' to refer back to by default.")
 
 ;; Packages will update this variable, so make it available.
@@ -1665,8 +1665,11 @@ Otherwise use brackets."
 		   'custom-button-pressed
 		 'custom-button-pressed-unraised))))
 
+(defvar custom--invocation-options nil)
+
 (defun custom-buffer-create-internal (options &optional _description)
   (Custom-mode)
+  (setq custom--invocation-options options)
   (let ((init-file (or custom-file user-init-file)))
     ;; Insert verbose help at the top of the custom buffer.
     (when custom-buffer-verbose-help
@@ -1907,7 +1910,7 @@ item in another window.\n\n"))
 (widget-put (get 'editable-field 'widget-type)
 	    :custom-show (lambda (_widget value)
 			   (let ((pp (pp-to-string value)))
-			     (cond ((string-match-p "\n" pp)
+			     (cond ((string-search "\n" pp)
 				    nil)
 				   ((> (length pp) 40)
 				    nil)
@@ -2821,7 +2824,7 @@ the present value is saved to its :shown-value property instead."
 			  (list (widget-value
 				 (car-safe
 				  (widget-get widget :children)))))
-	    (error "There are unsaved changes")))
+	    (message "Note: There are unsaved changes")))
 	(widget-put widget :documentation-shown nil)
 	(widget-put widget :custom-state 'hidden))
       (custom-redraw widget)
@@ -5120,8 +5123,8 @@ If several parents are listed, go to the first of them."
 The following commands are available:
 
 \\<widget-keymap>\
-Move to next button, link or editable field.     \\[widget-forward]
-Move to previous button, link or editable field. \\[widget-backward]
+Move to next button, link or editable field.      \\[widget-forward]
+Move to previous button, link or editable field.  \\[widget-backward]
 \\<custom-field-keymap>\
 Complete content of editable text field.   \\[widget-complete]
 \\<custom-mode-map>\
@@ -5148,10 +5151,18 @@ if that value is non-nil."
 			:label (nth 5 arg)))
 		     custom-commands)
 		    (setq custom-tool-bar-map map))))
+  (setq-local custom--invocation-options nil)
+  (setq-local revert-buffer-function #'custom--revert-buffer)
   (make-local-variable 'custom-options)
   (make-local-variable 'custom-local-buffer)
   (custom--initialize-widget-variables)
   (add-hook 'widget-edit-functions 'custom-state-buffer-message nil t))
+
+(defun custom--revert-buffer (_ignore-auto _noconfirm)
+  (unless custom--invocation-options
+    (error "Insufficient data to revert"))
+  (custom-buffer-create custom--invocation-options
+                        (buffer-name)))
 
 (put 'Custom-mode 'mode-class 'special)
 

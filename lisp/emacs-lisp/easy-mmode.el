@@ -32,7 +32,7 @@
 ;; natural for the minor-mode end-users.
 
 ;; For each mode, easy-mmode defines the following:
-;; <mode>      : The minor mode predicate. A buffer-local variable.
+;; <mode>      : The minor mode predicate.  A buffer-local variable.
 ;; <mode>-map  : The keymap possibly associated to <mode>.
 ;;       see `define-minor-mode' documentation
 ;;
@@ -84,18 +84,22 @@ replacing its case-insensitive matches with the literal string in LIGHTER."
 (defconst easy-mmode--arg-docstring
   "
 
-If called interactively, toggle `%s'.  If the prefix argument is
-positive, enable the mode, and if it is zero or negative, disable
-the mode.
+This is a minor mode.  If called interactively, toggle the `%s'
+mode.  If the prefix argument is positive, enable the mode, and
+if it is zero or negative, disable the mode.
 
 If called from Lisp, toggle the mode if ARG is `toggle'.
 Enable the mode if ARG is nil, omitted, or is a positive number.
 Disable the mode if ARG is a negative number.
 
+To check whether the minor mode is enabled in the current buffer,
+evaluate `%s'.
+
 The mode's hook is called both when the mode is enabled and when
 it is disabled.")
 
-(defun easy-mmode--mode-docstring (doc mode-pretty-name keymap-sym)
+(defun easy-mmode--mode-docstring (doc mode-pretty-name keymap-sym
+                                       getter)
   (let ((doc (or doc (format "Toggle %s on or off.
 
 \\{%s}" mode-pretty-name keymap-sym))))
@@ -104,7 +108,10 @@ it is disabled.")
       (let* ((fill-prefix nil)
              (docs-fc (bound-and-true-p emacs-lisp-docstring-fill-column))
              (fill-column (if (integerp docs-fc) docs-fc 65))
-             (argdoc (format easy-mmode--arg-docstring mode-pretty-name))
+             (argdoc (format easy-mmode--arg-docstring mode-pretty-name
+                             ;; Avoid having quotes turn into pretty quotes.
+                             (string-replace "'" "\\\\='"
+                                             (format "%S" getter))))
              (filled (if (fboundp 'fill-region)
                          (with-temp-buffer
                            (insert argdoc)
@@ -158,8 +165,8 @@ BODY contains code to execute each time the mode is enabled or disabled.
 		Not used if you also specify :variable.
 :lighter SPEC	Text displayed in the mode line when the mode is on.
 :keymap MAP	Keymap bound to the mode keymap.  Defaults to `MODE-map'.
-		If non-nil, it should be a variable name (whose value is
-		a keymap), or an expression that returns either a keymap or
+                If non-nil, it should be an unquoted variable name (whose value
+                is a keymap), or an expression that returns either a keymap or
 		a list of (KEY . BINDING) pairs where KEY and BINDING are
 		suitable for `define-key'.  If you supply a KEYMAP argument
 		that is not a symbol, this macro defines the variable MODE-map
@@ -173,11 +180,11 @@ BODY contains code to execute each time the mode is enabled or disabled.
 		named variable, or a generalized variable.
 		PLACE can also be of the form (GET . SET), where GET is
 		an expression that returns the current state, and SET is
-		a function that takes one argument, the new state, and
-		sets it.  If you specify a :variable, this function does
-		not define a MODE variable (nor any of the terms used
+		a function that takes one argument, the new state, which should
+                be assigned to PLACE.  If you specify a :variable, this function
+                does not define a MODE variable (nor any of the terms used
 		in :variable).
-:after-hook     A single lisp form which is evaluated after the mode hooks
+:after-hook     A single Lisp form which is evaluated after the mode hooks
                 have been run.  It should not be quoted.
 
 For example, you could write
@@ -308,7 +315,8 @@ or call the function `%s'."))))
        ,(funcall
          warnwrap
          `(defun ,modefun (&optional arg ,@extra-args)
-            ,(easy-mmode--mode-docstring doc pretty-name keymap-sym)
+            ,(easy-mmode--mode-docstring doc pretty-name keymap-sym
+                                         getter)
             ,(when interactive
 	       ;; Use `toggle' rather than (if ,mode 0 1) so that using
 	       ;; repeat-command still does the toggling correctly.
@@ -490,12 +498,17 @@ on if the hook has explicitly disabled it.
        (define-minor-mode ,global-mode
          ,(concat (format "Toggle %s in all buffers.\n" pretty-name)
                   (internal--format-docstring-line
-                   "With prefix ARG, enable %s if ARG is positive; otherwise, \
-disable it.  If called from Lisp, enable the mode if ARG is omitted or nil.\n\n"
+                   (concat "With prefix ARG, enable %s if ARG is positive; "
+                           "otherwise, disable it.")
                    pretty-global-name)
+                  "\n\n"
+                  "If called from Lisp, toggle the mode if ARG is `toggle'.
+Enable the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.\n\n"
                   (internal--format-docstring-line
-                   "%s is enabled in all buffers where `%s' would do it.\n\n"
+                   "%s is enabled in all buffers where `%s' would do it."
                    pretty-name turn-on)
+                  "\n\n"
                   (internal--format-docstring-line
                    "See `%s' for more information on %s."
                    mode pretty-name)

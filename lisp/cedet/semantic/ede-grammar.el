@@ -38,13 +38,13 @@
    (keybindings :initform nil)
    (phony :initform t)
    (sourcetype :initform
-	       (semantic-ede-source-grammar-wisent
-		semantic-ede-source-grammar-bovine
-		))
+	       '(semantic-ede-source-grammar-wisent
+		 semantic-ede-source-grammar-bovine
+		 ))
    (availablecompilers :initform
-		       (semantic-ede-grammar-compiler-wisent
-			semantic-ede-grammar-compiler-bovine
-			))
+		       '(semantic-ede-grammar-compiler-wisent
+			 semantic-ede-grammar-compiler-bovine
+			 ))
    (aux-packages :initform '("semantic" "cedet-compat"))
    (pre-load-packages :initform '("cedet-compat" "semantic/grammar" "semantic/bovine/grammar" "semantic/wisent/grammar"))
    )
@@ -185,7 +185,7 @@ max-lisp-eval-depth 700)'\n"
 
 (cl-defmethod ede-proj-makefile-insert-dist-dependencies ((this semantic-ede-proj-target-grammar))
   "Insert dist dependencies, or intermediate targets.
-This makes sure that all grammar lisp files are created before the dist
+This makes sure that all grammar Lisp files are created before the dist
 runs, so they are always up to date.
 Argument THIS is the target that should insert stuff."
   (cl-call-next-method)

@@ -378,7 +378,7 @@ for more information."
          ;; expression is checked by the byte-compiler, and that
          ;; lexical-binding is obeyed, so quote the expression with
          ;; `lambda' rather than with `quote'.
-         ``(funcall #',(lambda () ,standard))
+         ``(funcall #',(lambda () "" ,standard))
        `',standard)
     ,doc
     ,@args))
@@ -926,7 +926,7 @@ See `custom-known-themes' for a list of known themes."
 	  ;; the value to a fake theme, `changed'.  If the theme is
 	  ;; later disabled, we use this to bring back the old value.
 	  ;;
-	  ;; For faces, we just use `face-new-frame-defaults' to
+	  ;; For faces, we just use `face--new-frame-defaults' to
 	  ;; recompute when the theme is disabled.
 	  (when (and (eq prop 'theme-value)
 		     (boundp symbol))
@@ -1528,7 +1528,7 @@ See `custom-enabled-themes' for a list of enabled themes."
 	(let* ((prop   (car s))
 	       (symbol (cadr s))
 	       (val (assq-delete-all theme (get symbol prop))))
-          (custom-push-theme prop symbol theme 'reset)
+          (put symbol prop val)
 	  (cond
 	   ((eq prop 'theme-value)
             (custom-theme-recalc-variable symbol)

@@ -1266,7 +1266,8 @@ Zero-width assertions: these all match the empty string in specific places.
 
 (literal EXPR) Match the literal string from evaluating EXPR at run time.
 (regexp EXPR)  Match the string regexp from evaluating EXPR at run time.
-(eval EXPR)    Match the rx sexp from evaluating EXPR at compile time.
+(eval EXPR)    Match the rx sexp from evaluating EXPR at macro-expansion
+                (compile) time.
 
 Additional constructs can be defined using `rx-define' and `rx-let',
 which see.
@@ -1442,15 +1443,25 @@ following constructs:
                    introduced by a previous (let REF ...)
                    construct."
   (let* ((rx--pcase-vars nil)
-         (regexp (rx--to-expr (rx--pcase-transform (cons 'seq regexps))))
-         (nvars (length rx--pcase-vars)))
+         (regexp (rx--to-expr (rx--pcase-transform (cons 'seq regexps)))))
     `(and (pred stringp)
-          ,(if (zerop nvars)
-               ;; No variables bound: a single predicate suffices.
-               `(pred (string-match ,regexp))
+          ,(pcase (length rx--pcase-vars)
+            (0
+             ;; No variables bound: a single predicate suffices.
+             `(pred (string-match ,regexp)))
+            (1
+             ;; Create a match value that on a successful regexp match
+             ;; is the submatch value, 0 on failure.  We can't use nil
+             ;; for failure because it is a valid submatch value.
+             `(app (lambda (s)
+                     (if (string-match ,regexp s)
+                         (match-string 1 s)
+                       0))
+                   (and ,(car rx--pcase-vars) (pred (not numberp)))))
+            (nvars
              ;; Pack the submatches into a dotted list which is then
              ;; immediately destructured into individual variables again.
-             ;; This is of course slightly inefficient when NVARS > 1.
+             ;; This is of course slightly inefficient.
              ;; A dotted list is used to reduce the number of conses
              ;; to create and take apart.
              `(app (lambda (s)
@@ -1463,7 +1474,7 @@ following constructs:
                           (rx--reduce-right
                            #'cons
                            (mapcar (lambda (name) (list '\, name))
-                                   (reverse rx--pcase-vars)))))))))
+                                   (reverse rx--pcase-vars))))))))))
 
 ;; Obsolete internal symbol, used in old versions of the `flycheck' package.
 (define-obsolete-function-alias 'rx-submatch-n 'rx-to-string "27.1")

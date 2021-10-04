@@ -43,7 +43,7 @@
 (require 'text-property-search)
 
 (defgroup shr nil
-  "Simple HTML Renderer"
+  "Simple HTML Renderer."
   :version "25.1"
   :group 'web)
 
@@ -182,6 +182,33 @@ temporarily blinks with this face."
   '((t :inherit underline :underline (:style wave)))
   "Face for <abbr> elements."
   :version "27.1")
+
+(defface shr-h1
+  '((t :height 1.3 :weight bold))
+  "Face for <h1> elements."
+  :version "28.1")
+
+(defface shr-h2
+  '((t :weight bold))
+  "Face for <h2> elements."
+  :version "28.1")
+
+(defface shr-h3
+  '((t :slant italic))
+  "Face for <h3> elements."
+  :version "28.1")
+
+(defface shr-h4 nil
+  "Face for <h4> elements."
+  :version "28.1")
+
+(defface shr-h5 nil
+  "Face for <h5> elements."
+  :version "28.1")
+
+(defface shr-h6 nil
+  "Face for <h6> elements."
+  :version "28.1")
 
 (defcustom shr-inhibit-images nil
   "If non-nil, inhibit loading images."
@@ -1257,20 +1284,20 @@ Return a string with image data."
 CONTENT-FUNCTION is a function to retrieve an image for a cid url that
 is an argument.  The function to be returned takes three arguments URL,
 START, and END.  Note that START and END should be markers."
-  `(lambda (url start end)
-     (when url
-       (if (string-match "\\`cid:" url)
-	   ,(when content-function
-	      `(let ((image (funcall ,content-function
-				     (substring url (match-end 0)))))
-		 (when image
-		   (goto-char start)
-		   (funcall shr-put-image-function
-			    image (buffer-substring start end))
-		   (delete-region (point) end))))
-         (url-retrieve url #'shr-image-fetched
-		       (list (current-buffer) start end)
-		       t t)))))
+  (lambda (url start end)
+    (when url
+      (if (string-match "\\`cid:" url)
+	  (when content-function
+	    (let ((image (funcall content-function
+				  (substring url (match-end 0)))))
+	      (when image
+		(goto-char start)
+		(funcall shr-put-image-function
+			 image (buffer-substring start end))
+		(delete-region (point) end))))
+        (url-retrieve url #'shr-image-fetched
+		      (list (current-buffer) start end)
+		      t t)))))
 
 (defun shr-heading (dom &rest types)
   (shr-ensure-paragraph)
@@ -1939,24 +1966,22 @@ BASE is the URL of the HTML being rendered."
   (shr-generic dom))
 
 (defun shr-tag-h1 (dom)
-  (shr-heading dom (if shr-use-fonts
-		       '(variable-pitch (:height 1.3 :weight bold))
-		     'bold)))
+  (shr-heading dom 'shr-h1))
 
 (defun shr-tag-h2 (dom)
-  (shr-heading dom 'bold))
+  (shr-heading dom 'shr-h2))
 
 (defun shr-tag-h3 (dom)
-  (shr-heading dom 'italic))
+  (shr-heading dom 'shr-h3))
 
 (defun shr-tag-h4 (dom)
-  (shr-heading dom))
+  (shr-heading dom 'shr-h4))
 
 (defun shr-tag-h5 (dom)
-  (shr-heading dom))
+  (shr-heading dom 'shr-h5))
 
 (defun shr-tag-h6 (dom)
-  (shr-heading dom))
+  (shr-heading dom 'shr-h6))
 
 (defun shr-tag-hr (_dom)
   (shr-ensure-newline)

@@ -817,7 +817,7 @@ in which case you might want to use `image-default-frame-delay'."
 	(cons images delay)))))
 
 (defun image-animated-p (image)
-  "Like `image-multi-frame-p', but returns nil if no delay is specified."
+  "Like `image-multi-frame-p', but return nil if no delay is specified."
   (let ((multi (image-multi-frame-p image)))
     (and (cdr multi) multi)))
 
@@ -1191,7 +1191,9 @@ rotations by only multiples of 90 degrees."
                       360)))))
 
 (defun image-save ()
-  "Save the image under point."
+  "Save the image under point.
+This writes the original image data to a file.  Rotating or
+changing the displayed image size does not affect the saved image."
   (interactive)
   (let ((image (image--get-image)))
     (with-temp-buffer

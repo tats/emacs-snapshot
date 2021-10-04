@@ -415,7 +415,7 @@ reftex-label.  Rescanning of the buffer can also be requested from the
 label selection menu.
 The function returns the selected label or nil.
 If NO-INSERT is non-nil, do not insert \\ref command, just return label.
-When called with 2 C-u prefix args, disable magic word recognition."
+When called with 2 \\[universal-argument] prefix args, disable magic word recognition."
 
   (interactive)
 
@@ -798,7 +798,7 @@ When called with 2 C-u prefix args, disable magic word recognition."
       (push (cons (current-buffer) buffer-invisibility-spec)
             reftex-buffers-with-changed-invisibility)
       (setq buffer-invisibility-spec nil))
-     ((string-match "\r" (buffer-substring beg end))
+     ((string-search "\r" (buffer-substring beg end))
       ;; Invisible with selective display.  We need to copy it.
       (let ((string (buffer-substring-no-properties beg end)))
         (switch-to-buffer "*RefTeX Context Copy*")

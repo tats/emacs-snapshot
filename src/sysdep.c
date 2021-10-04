@@ -657,7 +657,7 @@ sys_subshell (void)
 #endif
   pid_t pid;
   struct save_signal saved_handlers[5];
-  char *str = SSDATA (encode_current_directory ());
+  char *str = SSDATA (get_current_directory (true));
 
 #ifdef DOS_NT
   pid = 0;
@@ -2744,6 +2744,138 @@ cfsetspeed (struct termios *termios_p, speed_t vitesse)
 }
 #endif
 
+/* The following is based on the glibc implementation of cfsetspeed.  */
+
+struct speed_struct
+{
+  speed_t value;
+  speed_t internal;
+};
+
+static const struct speed_struct speeds[] =
+  {
+#ifdef B0
+    { 0, B0 },
+#endif
+#ifdef B50
+    { 50, B50 },
+#endif
+#ifdef B75
+    { 75, B75 },
+#endif
+#ifdef B110
+    { 110, B110 },
+#endif
+#ifdef B134
+    { 134, B134 },
+#endif
+#ifdef B150
+    { 150, B150 },
+#endif
+#ifdef B200
+    { 200, B200 },
+#endif
+#ifdef B300
+    { 300, B300 },
+#endif
+#ifdef B600
+    { 600, B600 },
+#endif
+#ifdef B1200
+    { 1200, B1200 },
+#endif
+#ifdef B1200
+    { 1200, B1200 },
+#endif
+#ifdef B1800
+    { 1800, B1800 },
+#endif
+#ifdef B2400
+    { 2400, B2400 },
+#endif
+#ifdef B4800
+    { 4800, B4800 },
+#endif
+#ifdef B9600
+    { 9600, B9600 },
+#endif
+#ifdef B19200
+    { 19200, B19200 },
+#endif
+#ifdef B38400
+    { 38400, B38400 },
+#endif
+#ifdef B57600
+    { 57600, B57600 },
+#endif
+#ifdef B76800
+    { 76800, B76800 },
+#endif
+#ifdef B115200
+    { 115200, B115200 },
+#endif
+#ifdef B153600
+    { 153600, B153600 },
+#endif
+#ifdef B230400
+    { 230400, B230400 },
+#endif
+#ifdef B307200
+    { 307200, B307200 },
+#endif
+#ifdef B460800
+    { 460800, B460800 },
+#endif
+#ifdef B500000
+    { 500000, B500000 },
+#endif
+#ifdef B576000
+    { 576000, B576000 },
+#endif
+#ifdef B921600
+    { 921600, B921600 },
+#endif
+#ifdef B1000000
+    { 1000000, B1000000 },
+#endif
+#ifdef B1152000
+    { 1152000, B1152000 },
+#endif
+#ifdef B1500000
+    { 1500000, B1500000 },
+#endif
+#ifdef B2000000
+    { 2000000, B2000000 },
+#endif
+#ifdef B2500000
+    { 2500000, B2500000 },
+#endif
+#ifdef B3000000
+    { 3000000, B3000000 },
+#endif
+#ifdef B3500000
+    { 3500000, B3500000 },
+#endif
+#ifdef B4000000
+    { 4000000, B4000000 },
+#endif
+  };
+
+/* Convert a numerical speed (e.g., 9600) to a Bnnn constant (e.g.,
+   B9600); see bug#49524.  */
+static speed_t
+convert_speed (speed_t speed)
+{
+  for (size_t i = 0; i < sizeof speeds / sizeof speeds[0]; i++)
+    {
+      if (speed == speeds[i].internal)
+	return speed;
+      else if (speed == speeds[i].value)
+	return speeds[i].internal;
+    }
+  return speed;
+}
+
 /* For serial-process-configure  */
 void
 serial_configure (struct Lisp_Process *p,
@@ -2775,7 +2907,7 @@ serial_configure (struct Lisp_Process *p,
   else
     tem = Fplist_get (p->childp, QCspeed);
   CHECK_FIXNUM (tem);
-  err = cfsetspeed (&attr, XFIXNUM (tem));
+  err = cfsetspeed (&attr, convert_speed (XFIXNUM (tem)));
   if (err != 0)
     report_file_error ("Failed cfsetspeed", tem);
   childp2 = Fplist_put (childp2, QCspeed, tem);
@@ -3626,7 +3758,7 @@ system_process_attributes (Lisp_Object pid)
   ttyname = proc.ki_tdev == NODEV ? NULL : devname (proc.ki_tdev, S_IFCHR);
   unblock_input ();
   if (ttyname)
-    attrs = Fcons (Fcons (Qtty, build_string (ttyname)), attrs);
+    attrs = Fcons (Fcons (Qttname, build_string (ttyname)), attrs);
 
   attrs = Fcons (Fcons (Qtpgid,   INT_TO_INTEGER (proc.ki_tpgid)), attrs);
   attrs = Fcons (Fcons (Qminflt,  INT_TO_INTEGER (proc.ki_rusage.ru_minflt)),
@@ -3898,20 +4030,19 @@ system_process_attributes (Lisp_Object pid)
 Lisp_Object
 system_process_attributes (Lisp_Object pid)
 {
-  int proc_id;
+  int proc_id, i;
   struct passwd *pw;
   struct group  *gr;
   char *ttyname;
   struct timeval starttime;
   struct timespec t, now;
-  struct rusage *rusage;
   dev_t tdev;
   uid_t uid;
   gid_t gid;
 
   int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID};
   struct kinfo_proc proc;
-  size_t proclen = sizeof proc;
+  size_t len = sizeof proc;
 
   Lisp_Object attrs = Qnil;
   Lisp_Object decoded_comm;
@@ -3920,7 +4051,7 @@ system_process_attributes (Lisp_Object pid)
   CONS_TO_INTEGER (pid, int, proc_id);
   mib[3] = proc_id;
 
-  if (sysctl (mib, 4, &proc, &proclen, NULL, 0) != 0 || proclen == 0)
+  if (sysctl (mib, 4, &proc, &len, NULL, 0) != 0 || len == 0)
     return attrs;
 
   uid = proc.kp_eproc.e_ucred.cr_uid;
@@ -3957,8 +4088,8 @@ system_process_attributes (Lisp_Object pid)
   decoded_comm = (code_convert_string_norecord
 		  (build_unibyte_string (comm),
 		   Vlocale_coding_system, 0));
-
   attrs = Fcons (Fcons (Qcomm, decoded_comm), attrs);
+
   {
     char state[2] = {'\0', '\0'};
     switch (proc.kp_proc.p_stat)
@@ -3994,27 +4125,24 @@ system_process_attributes (Lisp_Object pid)
   ttyname = tdev == NODEV ? NULL : devname (tdev, S_IFCHR);
   unblock_input ();
   if (ttyname)
-    attrs = Fcons (Fcons (Qtty, build_string (ttyname)), attrs);
+    attrs = Fcons (Fcons (Qttname, build_string (ttyname)), attrs);
 
   attrs = Fcons (Fcons (Qtpgid, INT_TO_INTEGER (proc.kp_eproc.e_tpgid)),
 		 attrs);
 
-  rusage = proc.kp_proc.p_ru;
-  if (rusage)
+  rusage_info_current ri;
+  if (proc_pid_rusage(proc_id, RUSAGE_INFO_CURRENT, (rusage_info_t *) &ri) == 0)
     {
-      attrs = Fcons (Fcons (Qminflt, INT_TO_INTEGER (rusage->ru_minflt)),
-		     attrs);
-      attrs = Fcons (Fcons (Qmajflt, INT_TO_INTEGER (rusage->ru_majflt)),
-		     attrs);
+      struct timespec utime = make_timespec (ri.ri_user_time / TIMESPEC_HZ,
+					     ri.ri_user_time % TIMESPEC_HZ);
+      struct timespec stime = make_timespec (ri.ri_system_time / TIMESPEC_HZ,
+					     ri.ri_system_time % TIMESPEC_HZ);
+      attrs = Fcons (Fcons (Qutime, make_lisp_time (utime)), attrs);
+      attrs = Fcons (Fcons (Qstime, make_lisp_time (stime)), attrs);
+      attrs = Fcons (Fcons (Qtime, make_lisp_time (timespec_add (utime, stime))), attrs);
 
-      attrs = Fcons (Fcons (Qutime, make_lisp_timeval (rusage->ru_utime)),
-		     attrs);
-      attrs = Fcons (Fcons (Qstime, make_lisp_timeval (rusage->ru_stime)),
-		     attrs);
-      t = timespec_add (timeval_to_timespec (rusage->ru_utime),
-			timeval_to_timespec (rusage->ru_stime));
-      attrs = Fcons (Fcons (Qtime, make_lisp_time (t)), attrs);
-    }
+      attrs = Fcons (Fcons (Qmajflt, INT_TO_INTEGER (ri.ri_pageins)), attrs);
+  }
 
   starttime = proc.kp_proc.p_starttime;
   attrs = Fcons (Fcons (Qnice,  make_fixnum (proc.kp_proc.p_nice)), attrs);
@@ -4023,6 +4151,50 @@ system_process_attributes (Lisp_Object pid)
   now = current_timespec ();
   t = timespec_sub (now, timeval_to_timespec (starttime));
   attrs = Fcons (Fcons (Qetime, make_lisp_time (t)), attrs);
+
+  struct proc_taskinfo taskinfo;
+  if (proc_pidinfo (proc_id, PROC_PIDTASKINFO, 0, &taskinfo, sizeof (taskinfo)) > 0)
+    {
+      attrs = Fcons (Fcons (Qvsize, make_fixnum (taskinfo.pti_virtual_size / 1024)), attrs);
+      attrs = Fcons (Fcons (Qrss, make_fixnum (taskinfo.pti_resident_size / 1024)), attrs);
+      attrs = Fcons (Fcons (Qthcount, make_fixnum (taskinfo.pti_threadnum)), attrs);
+    }
+
+#ifdef KERN_PROCARGS2
+  char args[ARG_MAX];
+  mib[1] = KERN_PROCARGS2;
+  mib[2] = proc_id;
+  len = sizeof args;
+
+  if (sysctl (mib, 3, &args, &len, NULL, 0) == 0 && len != 0)
+    {
+      char *start, *end;
+
+      int argc = *(int*)args; /* argc is the first int */
+      start = args + sizeof (int);
+
+      start += strlen (start) + 1; /* skip executable name and any '\0's */
+      while ((start - args < len) && ! *start) start++;
+
+      /* skip argv to find real end */
+      for (i = 0, end = start; i < argc && (end - args) < len; i++)
+	{
+	  end += strlen (end) + 1;
+	}
+
+      len = end - start;
+      for (int i = 0; i < len; i++)
+	{
+	  if (! start[i] && i < len - 1)
+	    start[i] = ' ';
+	}
+
+      AUTO_STRING (comm, start);
+      decoded_comm = code_convert_string_norecord (comm,
+						   Vlocale_coding_system, 0);
+      attrs = Fcons (Fcons (Qargs, decoded_comm), attrs);
+    }
+#endif	/* KERN_PROCARGS2 */
 
   return attrs;
 }

@@ -25,7 +25,7 @@
 
 ;; This code helps GNU Emacs maintainers keep the loaddefs.el file up to
 ;; date.  It interprets magic cookies of the form ";;;###autoload" in
-;; lisp source files in various useful ways.  To learn more, read the
+;; Lisp source files in various useful ways.  To learn more, read the
 ;; source; if you're going to use this, you'd better be able to.
 
 ;;; Code:
@@ -250,7 +250,10 @@ expression, in which case we want to handle forms differently."
 	   (custom-autoload ',varname ,file
                             ,(condition-case nil
                                  (null (plist-get props :set))
-                               (error nil))))))
+                               (error nil)))
+           ;; Propagate the :safe property to the loaddefs file.
+           ,@(when-let ((safe (plist-get props :safe)))
+               `((put ',varname 'safe-local-variable ,safe))))))
 
      ((eq car 'defgroup)
       ;; In Emacs this is normally handled separately by cus-dep.el, but for
@@ -429,8 +432,10 @@ FILE's name."
   file)
 
 (defun autoload-insert-section-header (outbuf autoloads load-name file time)
-  "Insert the section-header line,
-which lists the file name and which functions are in it, etc."
+  "Insert into buffer OUTBUF the section-header line for FILE.
+The header line lists the file name, its \"load name\", its autoloads,
+and the time the FILE was last updated (the time is inserted only
+if `autoload-timestamps' is non-nil, otherwise a fixed fake time is inserted)."
   ;; (cl-assert ;Make sure we don't insert it in the middle of another section.
   ;;  (save-excursion
   ;;    (or (not (re-search-backward
@@ -623,8 +628,8 @@ Don't try to split prefixes that are already longer than that.")
                       (radix-tree-iter-mappings
                        (cdr x) (lambda (s _)
                                  (push (concat prefix s) dropped)))
-                      (message "Not registering prefix \"%s\" from %s.  Affects: %S"
-                               prefix file dropped)
+                      (message "%s:0: Warning: Not registering prefix \"%s\".  Affects: %S"
+                               file prefix dropped)
                       nil))))
               prefixes)))
         `(register-definition-prefixes ,file ',(sort (delq nil strings)

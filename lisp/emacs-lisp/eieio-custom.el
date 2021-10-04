@@ -46,7 +46,7 @@
 	     :documentation "A string for testing custom.
 This is the next line of documentation.")
    (listostuff :initarg :listostuff
-	       :initform ("1" "2" "3")
+	       :initform '("1" "2" "3")
 	       :type list
 	       :custom (repeat (string :tag "Stuff"))
 	       :label "List of Strings"
@@ -333,7 +333,7 @@ Optional argument GROUP is the sub-group of slots to display."
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map widget-keymap)
     map)
-  "Keymap for EIEIO Custom mode")
+  "Keymap for EIEIO Custom mode.")
 
 (define-derived-mode eieio-custom-mode fundamental-mode "EIEIO Custom"
   "Major mode for customizing EIEIO objects.

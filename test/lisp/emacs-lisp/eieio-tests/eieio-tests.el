@@ -48,13 +48,13 @@
 	 :type (or null class-a)
 	 :documentation "Test self referencing types.")
    )
-  "Class A")
+  "Class A.")
 
 (defclass class-b ()
   ((land :initform "Sc"
 	 :type string
 	 :documentation "Detail about land."))
-  "Class B")
+  "Class B.")
 
 (defclass class-ab (class-a class-b)
   ((amphibian :initform "frog"
@@ -160,7 +160,7 @@
   ;; error
   (should-error (abstract-class)))
 
-(defgeneric generic1 () "First generic function")
+(defgeneric generic1 () "First generic function.")
 
 (ert-deftest eieio-test-03-generics ()
   (defun anormalfunction () "A plain function for error testing." nil)
@@ -574,7 +574,21 @@ METHOD is the method that was attempting to be called."
   (setf (get-slot-3 eitest-t1) 'setf-emu)
   (should (eq (get-slot-3 eitest-t1) 'setf-emu))
   ;; Roll back
-  (setf (get-slot-3 eitest-t1) 'emu))
+  (setf (get-slot-3 eitest-t1) 'emu)
+  (defvar eieio-tests-initform-was-evaluated)
+  (defclass eieio-tests-initform-not-evaluated-when-initarg-is-present ()
+    ((slot-with-initarg-and-initform
+      :initarg :slot-with-initarg-and-initform
+      :initform (setf eieio-tests-initform-was-evaluated t))))
+  (setq eieio-tests-initform-was-evaluated nil)
+  (make-instance
+   'eieio-tests-initform-not-evaluated-when-initarg-is-present)
+  (should eieio-tests-initform-was-evaluated)
+  (setq eieio-tests-initform-was-evaluated nil)
+  (make-instance
+   'eieio-tests-initform-not-evaluated-when-initarg-is-present
+   :slot-with-initarg-and-initform t)
+  (should-not eieio-tests-initform-was-evaluated))
 
 (defvar eitest-t2 nil)
 (ert-deftest eieio-test-26-default-inheritance ()
@@ -887,12 +901,12 @@ Subclasses to override slot attributes.")
 
 (defclass opt-test1 ()
   ()
-  "Abstract base class"
+  "Abstract base class."
   :abstract t)
 
 (defclass opt-test2 (opt-test1)
   ()
-  "Instantiable child")
+  "Instantiable child.")
 
 (ert-deftest eieio-test-36-build-class-alist ()
   (should (= (length (eieio-build-class-alist 'opt-test1 nil)) 2))

@@ -1,4 +1,4 @@
-;;; bytecomp-tests.el  -*- lexical-binding:t -*-
+;;; bytecomp-tests.el --- Tests for bytecomp.el  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 
@@ -40,6 +40,24 @@
 (defun bytecomp-test-identity (x)
   "Identity, but hidden from some optimisations."
   x)
+
+(defmacro bytecomp-test-loop (outer1 outer2 inner1 inner2)
+  "Exercise constant propagation inside `while' loops.
+OUTER1, OUTER2, INNER1 and INNER2 are forms placed in the outer and
+inner loops respectively."
+  `(let ((x 1) (i 3) (res nil))
+     (while (> i 0)
+       (let ((y 2) (j 2))
+         (setq res (cons (list 'outer x y) res))
+         (while (> j 0)
+           (setq res (cons (list 'inner x y) res))
+           ,inner1
+           ,inner2
+           (setq j (1- j)))
+         ,outer1
+         ,outer2)
+       (setq i (1- i)))
+     res))
 
 (defconst bytecomp-tests--test-cases
   '(
@@ -432,6 +450,15 @@
     (let ((x 2))
       (list (or (bytecomp-test-identity 'a) (setq x 3)) x))
 
+    (mapcar (lambda (b)
+              (let ((a nil))
+                (+ 0
+                   (progn
+                     (setq a b)
+                     (setq b 1)
+                     a))))
+            '(10))
+
     (let* ((x 1)
            (y (condition-case x
                   (/ 1 0)
@@ -444,6 +471,25 @@
        (arith-error (prog1 (lambda (y) (+ y x))
                       (setq x 10))))
      4)
+
+    ;; Loop constprop: set the inner and outer variables in the inner
+    ;; and outer loops, all combinations.
+    (bytecomp-test-loop nil        nil        nil        nil       )
+    (bytecomp-test-loop nil        nil        nil        (setq x 6))
+    (bytecomp-test-loop nil        nil        (setq x 5) nil       )
+    (bytecomp-test-loop nil        nil        (setq x 5) (setq x 6))
+    (bytecomp-test-loop nil        (setq x 4) nil        nil       )
+    (bytecomp-test-loop nil        (setq x 4) nil        (setq x 6))
+    (bytecomp-test-loop nil        (setq x 4) (setq x 5) nil       )
+    (bytecomp-test-loop nil        (setq x 4) (setq x 5) (setq x 6))
+    (bytecomp-test-loop (setq x 3) nil        nil        nil       )
+    (bytecomp-test-loop (setq x 3) nil        nil        (setq x 6))
+    (bytecomp-test-loop (setq x 3) nil        (setq x 5) nil       )
+    (bytecomp-test-loop (setq x 3) nil        (setq x 5) (setq x 6))
+    (bytecomp-test-loop (setq x 3) (setq x 4) nil        nil       )
+    (bytecomp-test-loop (setq x 3) (setq x 4) nil        (setq x 6))
+    (bytecomp-test-loop (setq x 3) (setq x 4) (setq x 5) nil       )
+    (bytecomp-test-loop (setq x 3) (setq x 4) (setq x 5) (setq x 6))
 
     ;; No error, no success handler.
     (condition-case x
@@ -503,6 +549,97 @@
                  (:success 'good))
                (1+ x))))
       (funcall f 3))
+
+    ;; Check `not' in cond switch (bug#49746).
+    (mapcar (lambda (x) (cond ((equal x "a") 1)
+                              ((member x '("b" "c")) 2)
+                              ((not x) 3)))
+            '("a" "b" "c" "d" nil))
+
+    ;; `let' and `let*' optimisations with body being constant or variable
+    (let* (a
+           (b (progn (setq a (cons 1 a)) 2))
+           (c (1+ b))
+           (d (list a c)))
+      d)
+    (let ((a nil))
+      (let ((b (progn (setq a (cons 1 a)) 2))
+            (c (progn (setq a (cons 3 a))))
+            (d (list a)))
+        d))
+    (let* ((_a 1)
+           (_b 2))
+      'z)
+    (let ((_a 1)
+          (_b 2))
+      'z)
+    (let (x y)
+      y)
+    (let* (x y)
+      y)
+    (let (x y)
+      'a)
+    (let* (x y)
+      'a)
+
+    ;; Check empty-list optimisations.
+    (mapcar (lambda (x) (member x nil)) '("a" 2 nil))
+    (mapcar (lambda (x) (memql x nil)) '(a 2 nil))
+    (mapcar (lambda (x) (memq x nil)) '(a nil))
+    (let ((n 0))
+      (list (mapcar (lambda (x) (member (setq n (1+ n)) nil)) '(a "nil"))
+            n))
+    (mapcar (lambda (x) (assoc x nil)) '("a" nil))
+    (mapcar (lambda (x) (assq x nil)) '(a nil))
+    (mapcar (lambda (x) (rassoc x nil)) '("a" nil))
+    (mapcar (lambda (x) (rassq x nil)) '(a nil))
+    (let ((n 0))
+      (list (mapcar (lambda (x) (assoc (setq n (1+ n)) nil)) '(a "nil"))
+            n))
+
+    ;; Exercise variable-aliasing optimisations.
+    (let ((a (list 1)))
+      (let ((b a))
+        (let ((a (list 2)))
+          (list a b))))
+
+    (let ((a (list 1)))
+      (let ((a (list 2))
+            (b a))
+        (list a b)))
+
+    (let* ((a (list 1))
+           (b a)
+           (a (list 2)))
+      (condition-case a
+          (list a b)
+        (error (list 'error a b))))
+
+    (let* ((a (list 1))
+           (b a)
+           (a (list 2)))
+      (condition-case a
+          (/ 0)
+        (error (list 'error a b))))
+
+    (let* ((a (list 1))
+           (b a)
+           (a (list 2))
+           (f (list (lambda (x) (list x a)))))
+      (funcall (car f) 3))
+
+    (let* ((a (list 1))
+           (b a)
+           (f (list (lambda (x) (setq a x)))))
+      (funcall (car f) 3)
+      (list a b))
+
+    (let* ((a (list 1))
+           (b a)
+           (a (list 2))
+           (f (list (lambda (x) (setq a x)))))
+      (funcall (car f) 3)
+      (list a b))
     )
   "List of expressions for cross-testing interpreted and compiled code.")
 
@@ -700,6 +837,9 @@ byte-compiled.  Run with dynamic binding."
 (bytecomp--define-warning-file-test "warn-callargs.el"
                             "with 2 arguments, but accepts only 1")
 
+(bytecomp--define-warning-file-test "warn-callargs-defsubst.el"
+                            "with 2 arguments, but accepts only 1")
+
 (bytecomp--define-warning-file-test "warn-defcustom-nogroup.el"
                             "fails to specify containing group")
 
@@ -797,10 +937,9 @@ byte-compiled.  Run with dynamic binding."
  "warn-wide-docstring-define-obsolete-variable-alias.el"
  "defvaralias .foo. docstring wider than .* characters")
 
-;; TODO: We don't yet issue warnings for defuns.
 (bytecomp--define-warning-file-test
  "warn-wide-docstring-defun.el"
- "wider than .* characters" 'reverse)
+ "wider than .* characters")
 
 (bytecomp--define-warning-file-test
  "warn-wide-docstring-defvar.el"
@@ -1312,9 +1451,51 @@ compiled correctly."
                    (funcall f 3))
                  4)))
 
+(declare-function bc-test-alpha-f (ert-resource-file "bc-test-alpha.el"))
+
+(ert-deftest bytecomp-defsubst ()
+  ;; Check that lexical variables don't leak into inlined code.  See
+  ;; https://lists.gnu.org/archive/html/emacs-devel/2021-05/msg01227.html
+
+  ;; First, remove any trace of the functions and package defined:
+  (fmakunbound 'bc-test-alpha-f)
+  (fmakunbound 'bc-test-beta-f)
+  (setq features (delq 'bc-test-beta features))
+  ;; Byte-compile one file that uses a function from another file that isn't
+  ;; compiled.
+  (let ((file (ert-resource-file "bc-test-alpha.el"))
+        (load-path (cons (ert-resource-directory) load-path)))
+    (byte-compile-file file)
+    (load-file (concat file "c"))
+    (should (equal (bc-test-alpha-f 'a) '(nil a)))))
+
+(ert-deftest bytecomp-tests-byte-compile--wide-docstring-p/func-arg-list ()
+  (should-not (byte-compile--wide-docstring-p "\
+\(dbus-register-property BUS SERVICE PATH INTERFACE PROPERTY ACCESS \
+[TYPE] VALUE &optional EMITS-SIGNAL DONT-REGISTER-SERVICE)" fill-column))
+  (should-not (byte-compile--wide-docstring-p "\
+(fn CMD FLAGS FIS &key (BUF (cvs-temp-buffer)) DONT-CHANGE-DISC CVSARGS \
+POSTPROC)" fill-column))
+  ;; Bug#49007
+  (should-not (byte-compile--wide-docstring-p "\
+(fn (THIS rudel-protocol-backend) TRANSPORT \
+INFO INFO-CALLBACK &optional PROGRESS-CALLBACK)" fill-column))
+  (should-not (byte-compile--wide-docstring-p "\
+\(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] \
+[:tags \\='(TAG...)] BODY...)" fill-column))
+  (should-not (byte-compile--wide-docstring-p "\
+(make-soap-xs-element &key NAME NAMESPACE-TAG ID TYPE^ OPTIONAL? MULTIPLE? \
+REFERENCE SUBSTITUTION-GROUP ALTERNATIVES IS-GROUP)" fill-column))
+  (should-not (byte-compile--wide-docstring-p "\
+(fn NAME FIXTURE INPUT &key SKIP-PAIR-STRING EXPECTED-STRING \
+EXPECTED-POINT BINDINGS (MODES \\='\\='(ruby-mode js-mode python-mode)) \
+(TEST-IN-COMMENTS t) (TEST-IN-STRINGS t) (TEST-IN-CODE t) \
+(FIXTURE-FN \\='#\\='electric-pair-mode))" fill-column)))
+
+
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; End:
 
 (provide 'bytecomp-tests)
-;; bytecomp-tests.el ends here.
+;;; bytecomp-tests.el ends here

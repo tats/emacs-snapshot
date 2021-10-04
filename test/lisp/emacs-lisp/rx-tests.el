@@ -17,6 +17,8 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
+;;; Code:
+
 (require 'ert)
 (require 'rx)
 
@@ -166,6 +168,20 @@
                         (backref 1))
                     (list u v)))
                  '("1" "3")))
+  (should (equal (pcase "bz"
+                   ((rx "a" (let x nonl)) (list 1 x))
+                   (_ 'no))
+                 'no))
+  (should (equal (pcase "az"
+                   ((rx "a" (let x nonl)) (list 1 x))
+                   ((rx "b" (let x nonl)) (list 2 x))
+                   (_ 'no))
+                 '(1 "z")))
+  (should (equal (pcase "bz"
+                   ((rx "a" (let x nonl)) (list 1 x))
+                   ((rx "b" (let x nonl)) (list 2 x))
+                   (_ 'no))
+                 '(2 "z")))
   (let ((k "blue"))
     (should (equal (pcase "<blue>"
                      ((rx "<" (literal k) ">") 'ok))
@@ -569,3 +585,5 @@
            "\\(?3:.+$\\)")))
 
 (provide 'rx-tests)
+
+;;; rx-tests.el ends here

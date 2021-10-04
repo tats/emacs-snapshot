@@ -1718,7 +1718,10 @@ to use a pty, or nil to use the default specified through
 :stderr STDERR -- STDERR is either a buffer or a pipe process attached
 to the standard error of subprocess.  Specifying this implies
 `:connection-type' is set to `pipe'.  If STDERR is nil, standard error
-is mixed with standard output and sent to BUFFER or FILTER.
+is mixed with standard output and sent to BUFFER or FILTER.  (Note
+that specifying :stderr will create a new, separate (but associated)
+process, with its own filter and sentinel.  See
+Info node `(elisp) Asynchronous Processes' for more details.)
 
 :file-handler FILE-HANDLER -- If FILE-HANDLER is non-nil, then look
 for a file name handler for the current buffer's `default-directory'
@@ -1755,7 +1758,7 @@ usage: (make-process &rest ARGS)  */)
      buffer's current directory, or its unhandled equivalent.  We
      can't just have the child check for an error when it does the
      chdir, since it's in a vfork.  */
-  current_dir = encode_current_directory ();
+  current_dir = get_current_directory (true);
 
   name = Fplist_get (contact, QCname);
   CHECK_STRING (name);
@@ -5134,6 +5137,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 			     Lisp_Object wait_for_cell,
 			     struct Lisp_Process *wait_proc, int just_wait_proc)
 {
+  static int last_read_channel = -1;
   int channel, nfds;
   fd_set Available;
   fd_set Writeok;
@@ -5188,6 +5192,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   while (1)
     {
       bool process_skipped = false;
+      bool wrapped;
+      int channel_start;
 
       /* If calling from keyboard input, do not quit
 	 since we want to return C-g as an input character.
@@ -5229,7 +5235,10 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #ifdef HAVE_GNUTLS
 		/* Continue TLS negotiation. */
 		if (p->gnutls_initstage == GNUTLS_STAGE_HANDSHAKE_TRIED
-		    && p->is_non_blocking_client)
+		    && p->is_non_blocking_client
+		    /* Don't proceed until we have established a connection. */
+		    && !(fd_callback_info[p->outfd].flags
+			 & NON_BLOCKING_CONNECT_FD))
 		  {
 		    gnutls_try_handshake (p);
 		    p->gnutls_handshakes_tried++;
@@ -5722,8 +5731,21 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
             d->func (channel, d->data);
 	}
 
-      for (channel = 0; channel <= max_desc; channel++)
+      /* Do round robin if `process-pritoritize-lower-fds' is nil. */
+      channel_start
+	= process_prioritize_lower_fds ? 0 : last_read_channel + 1;
+
+      for (channel = channel_start, wrapped = false;
+	   !wrapped || (channel < channel_start && channel <= max_desc);
+	   channel++)
 	{
+	  if (channel > max_desc)
+	    {
+	      wrapped = true;
+	      channel = -1;
+	      continue;
+	    }
+
 	  if (FD_ISSET (channel, &Available)
 	      && ((fd_callback_info[channel].flags & (KEYBOARD_FD | PROCESS_FD))
 		  == PROCESS_FD))
@@ -5761,6 +5783,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		     don't try to read from any other processes
 		     before doing the select again.  */
 		  FD_ZERO (&Available);
+		  last_read_channel = channel;
 
 		  if (do_display)
 		    redisplay_preserve_echo_area (12);
@@ -6864,7 +6887,7 @@ If CURRENT-GROUP is `lambda', and if the shell owns the terminal,
 don't send the signal.
 
 This function calls the functions of `interrupt-process-functions' in
-the order of the list, until one of them returns non-`nil'.  */)
+the order of the list, until one of them returns non-nil.  */)
   (Lisp_Object process, Lisp_Object current_group)
 {
   return CALLN (Frun_hook_with_args_until_success, Qinterrupt_process_functions,
@@ -8477,11 +8500,21 @@ non-nil value means that the delay is not reset on write.
 The variable takes effect when `start-process' is called.  */);
   Vprocess_adaptive_read_buffering = Qt;
 
+  DEFVAR_BOOL ("process-prioritize-lower-fds", process_prioritize_lower_fds,
+	       doc: /* Whether to start checking for subprocess output from first file descriptor.
+Emacs loops through file descriptors to check for output from subprocesses.
+If this variable is nil, the default, then after accepting output from a
+subprocess, Emacs will continue checking the rest of descriptors, starting
+from the one following the descriptor it just read.  If this variable is
+non-nil, Emacs will always restart the loop from the first file descriptor,
+thus favoring processes with lower descriptors.  */);
+  process_prioritize_lower_fds = 0;
+
   DEFVAR_LISP ("interrupt-process-functions", Vinterrupt_process_functions,
 	       doc: /* List of functions to be called for `interrupt-process'.
 The arguments of the functions are the same as for `interrupt-process'.
 These functions are called in the order of the list, until one of them
-returns non-`nil'.  */);
+returns non-nil.  */);
   Vinterrupt_process_functions = list1 (Qinternal_default_interrupt_process);
 
   DEFVAR_LISP ("internal--daemon-sockname", Vinternal__daemon_sockname,

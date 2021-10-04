@@ -725,6 +725,9 @@ recursive_edit_1 (void)
   if (STRINGP (val))
     xsignal1 (Qerror, val);
 
+  if (FUNCTIONP (val))
+    call0 (val);
+
   return unbind_to (count, Qnil);
 }
 
@@ -750,10 +753,21 @@ DEFUN ("recursive-edit", Frecursive_edit, Srecursive_edit, 0, 0, "",
        doc: /* Invoke the editor command loop recursively.
 To get out of the recursive edit, a command can throw to `exit' -- for
 instance (throw \\='exit nil).
-If you throw a value other than t, `recursive-edit' returns normally
-to the function that called it.  Throwing a t value causes
-`recursive-edit' to quit, so that control returns to the command loop
-one level up.
+
+The following values (last argument to `throw') can be used when
+throwing to \\='exit:
+
+- t causes `recursive-edit' to quit, so that control returns to the
+  command loop one level up.
+
+- A string causes `recursive-edit' to signal an error, printing that
+  string as the error message.
+
+- A function causes `recursive-edit' to call that function with no
+  arguments, and then return normally.
+
+- Any other value causes `recursive-edit' to return normally to the
+  function that called it.
 
 This function is called by the editor initialization to begin editing.  */)
   (void)
@@ -921,6 +935,8 @@ static Lisp_Object
 cmd_error (Lisp_Object data)
 {
   Lisp_Object old_level, old_length;
+  ptrdiff_t count = SPECPDL_INDEX ();
+  Lisp_Object conditions;
   char macroerror[sizeof "After..kbd macro iterations: "
 		  + INT_STRLEN_BOUND (EMACS_INT)];
 
@@ -940,10 +956,19 @@ cmd_error (Lisp_Object data)
   else
     *macroerror = 0;
 
-  Vstandard_output = Qt;
-  Vstandard_input = Qt;
-  Vexecuting_kbd_macro = Qnil;
-  executing_kbd_macro = Qnil;
+  conditions = Fget (XCAR (data), Qerror_conditions);
+  if (NILP (Fmemq (Qminibuffer_quit, conditions)))
+    {
+      Vexecuting_kbd_macro = Qnil;
+      executing_kbd_macro = Qnil;
+    }
+  else if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
+    /* An `M-x' command that signals a `minibuffer-quit' condition
+       that's part of a kbd macro.  */
+    finalize_kbd_macro_chars ();
+
+  specbind (Qstandard_output, Qt);
+  specbind (Qstandard_input, Qt);
   kset_prefix_arg (current_kboard, Qnil);
   kset_last_prefix_arg (current_kboard, Qnil);
   cancel_echoing ();
@@ -960,6 +985,7 @@ cmd_error (Lisp_Object data)
   Vquit_flag = Qnil;
   Vinhibit_quit = Qnil;
 
+  unbind_to (count, Qnil);
   return make_fixnum (0);
 }
 
@@ -976,7 +1002,7 @@ cmd_error_internal (Lisp_Object data, const char *context)
 {
   /* The immediate context is not interesting for Quits,
      since they are asynchronous.  */
-  if (EQ (XCAR (data), Qquit))
+  if (signal_quit_p (XCAR (data)))
     Vsignaling_function = Qnil;
 
   Vquit_flag = Qnil;
@@ -998,24 +1024,28 @@ Default value of `command-error-function'.  */)
   (Lisp_Object data, Lisp_Object context, Lisp_Object signal)
 {
   struct frame *sf = SELECTED_FRAME ();
+  Lisp_Object conditions = Fget (XCAR (data), Qerror_conditions);
+  int is_minibuffer_quit = !NILP (Fmemq (Qminibuffer_quit, conditions));
 
   CHECK_STRING (context);
 
   /* If the window system or terminal frame hasn't been initialized
-     yet, or we're not interactive, write the message to stderr and exit.  */
-  if (!sf->glyphs_initialized_p
-	   /* The initial frame is a special non-displaying frame. It
-	      will be current in daemon mode when there are no frames
-	      to display, and in non-daemon mode before the real frame
-	      has finished initializing.  If an error is thrown in the
-	      latter case while creating the frame, then the frame
-	      will never be displayed, so the safest thing to do is
-	      write to stderr and quit.  In daemon mode, there are
-	      many other potential errors that do not prevent frames
-	      from being created, so continuing as normal is better in
-	      that case.  */
-	   || (!IS_DAEMON && FRAME_INITIAL_P (sf))
-	   || noninteractive)
+     yet, or we're not interactive, write the message to stderr and exit.
+     Don't do this for the minibuffer-quit condition.  */
+  if (!is_minibuffer_quit
+      && (!sf->glyphs_initialized_p
+	  /* The initial frame is a special non-displaying frame. It
+	     will be current in daemon mode when there are no frames
+	     to display, and in non-daemon mode before the real frame
+	     has finished initializing.  If an error is thrown in the
+	     latter case while creating the frame, then the frame
+	     will never be displayed, so the safest thing to do is
+	     write to stderr and quit.  In daemon mode, there are
+	     many other potential errors that do not prevent frames
+	     from being created, so continuing as normal is better in
+	     that case.  */
+	  || (!IS_DAEMON && FRAME_INITIAL_P (sf))
+	  || noninteractive))
     {
       print_error_message (data, Qexternal_debugging_output,
 			   SSDATA (context), signal);
@@ -1025,16 +1055,24 @@ Default value of `command-error-function'.  */)
   else
     {
       clear_message (1, 0);
-      Fdiscard_input ();
       message_log_maybe_newline ();
-      bitch_at_user ();
+
+      if (is_minibuffer_quit)
+	{
+	  Fding (Qt);
+	}
+      else
+	{
+	  Fdiscard_input ();
+	  bitch_at_user ();
+	}
 
       print_error_message (data, Qt, SSDATA (context), signal);
     }
   return Qnil;
 }
 
-static Lisp_Object command_loop_2 (Lisp_Object);
+static Lisp_Object command_loop_1 (void);
 static Lisp_Object top_level_1 (Lisp_Object);
 
 /* Entry to editor-command-loop.
@@ -1062,7 +1100,7 @@ command_loop (void)
   if (command_loop_level > 0 || minibuf_level > 0)
     {
       Lisp_Object val;
-      val = internal_catch (Qexit, command_loop_2, Qnil);
+      val = internal_catch (Qexit, command_loop_2, Qerror);
       executing_kbd_macro = Qnil;
       return val;
     }
@@ -1070,7 +1108,7 @@ command_loop (void)
     while (1)
       {
 	internal_catch (Qtop_level, top_level_1, Qnil);
-	internal_catch (Qtop_level, command_loop_2, Qnil);
+	internal_catch (Qtop_level, command_loop_2, Qerror);
 	executing_kbd_macro = Qnil;
 
 	/* End of file in -batch run causes exit here.  */
@@ -1083,15 +1121,16 @@ command_loop (void)
    editing loop, and reenter the editing loop.
    When there is an error, cmd_error runs and returns a non-nil
    value to us.  A value of nil means that command_loop_1 itself
-   returned due to end of file (or end of kbd macro).  */
+   returned due to end of file (or end of kbd macro).  HANDLERS is a
+   list of condition names, passed to internal_condition_case.  */
 
-static Lisp_Object
-command_loop_2 (Lisp_Object ignore)
+Lisp_Object
+command_loop_2 (Lisp_Object handlers)
 {
   register Lisp_Object val;
 
   do
-    val = internal_condition_case (command_loop_1, Qerror, cmd_error);
+    val = internal_condition_case (command_loop_1, handlers, cmd_error);
   while (!NILP (val));
 
   return Qnil;
@@ -1234,7 +1273,7 @@ static int read_key_sequence (Lisp_Object *, Lisp_Object,
                               bool, bool, bool, bool);
 static void adjust_point_for_property (ptrdiff_t, bool);
 
-Lisp_Object
+static Lisp_Object
 command_loop_1 (void)
 {
   modiff_count prev_modiff = 0;
@@ -2254,8 +2293,17 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 		{
 		  int i;
 		  if (meta_key != 2)
-		    for (i = 0; i < n; i++)
-		      events[i] = make_fixnum (XFIXNUM (events[i]) & ~0x80);
+		    {
+		      for (i = 0; i < n; i++)
+			{
+			  int c = XFIXNUM (events[i]);
+			  int modifier =
+			    (meta_key == 3 && c < 0x100 && (c & 0x80))
+			    ? meta_modifier
+			    : 0;
+			  events[i] = make_fixnum ((c & ~0x80) | modifier);
+			}
+		    }
 		}
 	      else
 		{
@@ -2264,7 +2312,7 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 		  int i;
 		  for (i = 0; i < n; i++)
 		    src[i] = XFIXNUM (events[i]);
-		  if (meta_key != 2)
+		  if (meta_key < 2) /* input-meta-mode is t or nil */
 		    for (i = 0; i < n; i++)
 		      src[i] &= ~0x80;
 		  coding->destination = dest;
@@ -2282,7 +2330,18 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 		      eassert (coding->carryover_bytes == 0);
 		      n = 0;
 		      while (n < coding->produced_char)
-			events[n++] = make_fixnum (string_char_advance (&p));
+			{
+			  int c = string_char_advance (&p);
+			  if (meta_key == 3)
+			    {
+			      int modifier
+				= (c < 0x100 && (c & 0x80)
+				   ? meta_modifier
+				   : 0);
+			      c = (c & ~0x80) | modifier;
+			    }
+			  events[n++] = make_fixnum (c);
+			}
 		    }
 		}
 	    }
@@ -3233,10 +3292,6 @@ help_char_p (Lisp_Object c)
 static void
 record_char (Lisp_Object c)
 {
-  /* quail.el binds this to avoid recording keys twice.  */
-  if (inhibit_record_char)
-    return;
-
   int recorded = 0;
 
   if (CONSP (c) && (EQ (XCAR (c), Qhelp_echo) || EQ (XCAR (c), Qmouse_movement)))
@@ -4195,7 +4250,7 @@ decode_timer (Lisp_Object timer, struct timespec *result)
 {
   Lisp_Object *vec;
 
-  if (! (VECTORP (timer) && ASIZE (timer) == 9))
+  if (! (VECTORP (timer) && ASIZE (timer) == 10))
     return false;
   vec = XVECTOR (timer)->contents;
   if (! NILP (vec[0]))
@@ -5022,6 +5077,10 @@ static short const internal_border_parts[] = {
 
 static Lisp_Object button_down_location;
 
+/* A cons recording the original frame-relative x and y coordinates of
+   the down mouse event.  */
+static Lisp_Object frame_relative_event_pos;
+
 /* Information about the most recent up-going button event:  Which
    button, what location, and what time.  */
 
@@ -5044,12 +5103,41 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
   enum window_part part;
   Lisp_Object posn = Qnil;
   Lisp_Object extra_info = Qnil;
+  int mx = XFIXNUM (x), my = XFIXNUM (y);
   /* Coordinate pixel positions to return.  */
   int xret = 0, yret = 0;
   /* The window or frame under frame pixel coordinates (x,y)  */
   Lisp_Object window_or_frame = f
-    ? window_from_coordinates (f, XFIXNUM (x), XFIXNUM (y), &part, 0, 0)
+    ? window_from_coordinates (f, mx, my, &part, true, true)
     : Qnil;
+
+  /* Report mouse events on the tab bar and (on GUI frames) on the
+     tool bar.  */
+#ifdef HAVE_WINDOW_SYSTEM
+  if ((WINDOWP (f->tab_bar_window)
+       && EQ (window_or_frame, f->tab_bar_window))
+#ifndef HAVE_EXT_TOOL_BAR
+      || (WINDOWP (f->tool_bar_window)
+	  && EQ (window_or_frame, f->tool_bar_window))
+#endif
+      )
+    {
+      posn = EQ (window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
+      /* Kludge alert: for mouse events on the tab bar and tool bar,
+	 keyboard.c wants the frame, not the special-purpose window
+	 we use to display those, and it wants frame-relative
+	 coordinates.  FIXME!  */
+      window_or_frame = Qnil;
+    }
+#endif
+  if (!FRAME_WINDOW_P (f)
+      && FRAME_TAB_BAR_LINES (f) > 0
+      && my >= FRAME_MENU_BAR_LINES (f)
+      && my < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
+    {
+      posn = Qtab_bar;
+      window_or_frame = Qnil;	/* see above */
+    }
 
   if (WINDOWP (window_or_frame))
     {
@@ -5063,15 +5151,15 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       Lisp_Object object = Qnil;
 
       /* Pixel coordinates relative to the window corner.  */
-      int wx = XFIXNUM (x) - WINDOW_LEFT_EDGE_X (w);
-      int wy = XFIXNUM (y) - WINDOW_TOP_EDGE_Y (w);
+      int wx = mx - WINDOW_LEFT_EDGE_X (w);
+      int wy = my - WINDOW_TOP_EDGE_Y (w);
 
       /* For text area clicks, return X, Y relative to the corner of
 	 this text area.  Note that dX, dY etc are set below, by
 	 buffer_posn_from_coords.  */
       if (part == ON_TEXT)
 	{
-	  xret = XFIXNUM (x) - window_box_left (w, TEXT_AREA);
+	  xret = mx - window_box_left (w, TEXT_AREA);
 	  yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
 	}
       /* For mode line and header line clicks, return X, Y relative to
@@ -5195,7 +5283,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	    : (part == ON_RIGHT_FRINGE || part == ON_RIGHT_MARGIN
 	       || (part == ON_VERTICAL_SCROLL_BAR
 		   && WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (w)))
-	    ? (XFIXNUM (x) - window_box_left (w, TEXT_AREA))
+	    ? (mx - window_box_left (w, TEXT_AREA))
 	    : 0;
 	  int y2 = wy;
 
@@ -5247,17 +5335,17 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 					       make_fixnum (row)),
 					extra_info)));
     }
-
   else if (f)
     {
       /* Return mouse pixel coordinates here.  */
       XSETFRAME (window_or_frame, f);
-      xret = XFIXNUM (x);
-      yret = XFIXNUM (y);
+      xret = mx;
+      yret = my;
 
 #ifdef HAVE_WINDOW_SYSTEM
       if (FRAME_WINDOW_P (f)
 	  && FRAME_LIVE_P (f)
+	  && NILP (posn)
 	  && FRAME_INTERNAL_BORDER_WIDTH (f) > 0
 	  && !NILP (get_frame_param (f, Qdrag_internal_border)))
 	{
@@ -5606,6 +5694,11 @@ make_lispy_event (struct input_event *event)
 
 	    position = make_lispy_position (f, event->x, event->y,
 					    event->timestamp);
+
+	    /* For tab-bar clicks, add the propertized string with
+	       button information as OBJECT member of POSITION.  */
+	    if (CONSP (event->arg) && EQ (XCAR (event->arg), Qtab_bar))
+	      position = nconc2 (position, Fcons (XCDR (event->arg), Qnil));
 	  }
 #ifndef USE_TOOLKIT_SCROLL_BARS
 	else
@@ -5673,6 +5766,7 @@ make_lispy_event (struct input_event *event)
 	      double_click_count = 1;
 	    button_down_time = event->timestamp;
 	    *start_pos_ptr = Fcopy_alist (position);
+	    frame_relative_event_pos = Fcons (event->x, event->y);
 	    ignore_mouse_drag_p = false;
 	  }
 
@@ -5695,20 +5789,12 @@ make_lispy_event (struct input_event *event)
 	      ignore_mouse_drag_p = false;
 	    else
 	      {
-		Lisp_Object new_down, down;
 		intmax_t xdiff = double_click_fuzz, ydiff = double_click_fuzz;
 
-		/* The third element of every position
-		   should be the (x,y) pair.  */
-		down = Fcar (Fcdr (Fcdr (start_pos)));
-		new_down = Fcar (Fcdr (Fcdr (position)));
-
-		if (CONSP (down)
-		    && FIXNUMP (XCAR (down)) && FIXNUMP (XCDR (down)))
-		  {
-		    xdiff = XFIXNUM (XCAR (new_down)) - XFIXNUM (XCAR (down));
-		    ydiff = XFIXNUM (XCDR (new_down)) - XFIXNUM (XCDR (down));
-		  }
+		xdiff = XFIXNUM (event->x)
+		  - XFIXNUM (XCAR (frame_relative_event_pos));
+		ydiff = XFIXNUM (event->y)
+		  - XFIXNUM (XCDR (frame_relative_event_pos));
 
 		if (! (0 < double_click_fuzz
 		       && - double_click_fuzz < xdiff
@@ -5725,11 +5811,50 @@ make_lispy_event (struct input_event *event)
 			  a click.  But mouse-drag-region completely ignores
 			  this case and it hasn't caused any real problem, so
 			  it's probably OK to ignore it as well.  */
-		       && EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position)))))
+		       && (EQ (Fcar (Fcdr (start_pos)),
+			       Fcar (Fcdr (position))) /* Same buffer pos */
+			   || !EQ (Fcar (start_pos),
+				   Fcar (position))))) /* Different window */
 		  {
 		    /* Mouse has moved enough.  */
 		    button_down_time = 0;
 		    click_or_drag_modifier = drag_modifier;
+		  }
+		else if (((!EQ (Fcar (start_pos), Fcar (position)))
+			  || (!EQ (Fcar (Fcdr (start_pos)),
+				   Fcar (Fcdr (position)))))
+			 /* Was the down event in a window body? */
+			 && FIXNUMP (Fcar (Fcdr (start_pos)))
+			 && WINDOW_LIVE_P (Fcar (start_pos))
+			 && !NILP (Ffboundp (Qwindow_edges)))
+		  /* If the window (etc.) at the mouse position has
+		     changed between the down event and the up event,
+		     we assume there's been a redisplay between the
+		     two events, and we pretend the mouse is still in
+		     the old window to prevent a spurious drag event
+		     being generated.  */
+		  {
+		    Lisp_Object edges
+		      = call4 (Qwindow_edges, Fcar (start_pos), Qt, Qnil, Qt);
+		    int new_x = XFIXNUM (Fcar (frame_relative_event_pos));
+		    int new_y = XFIXNUM (Fcdr (frame_relative_event_pos));
+
+		    /* If the up-event is outside the down-event's
+		       window, use coordinates that are within it.  */
+		    if (new_x < XFIXNUM (Fcar (edges)))
+		      new_x = XFIXNUM (Fcar (edges));
+		    else if (new_x >= XFIXNUM (Fcar (Fcdr (Fcdr (edges)))))
+		      new_x = XFIXNUM (Fcar (Fcdr (Fcdr (edges)))) - 1;
+		    if (new_y < XFIXNUM (Fcar (Fcdr (edges))))
+		      new_y = XFIXNUM (Fcar (Fcdr (edges)));
+		    else if (new_y
+			     >= XFIXNUM (Fcar (Fcdr (Fcdr (Fcdr (edges))))))
+		      new_y = XFIXNUM (Fcar (Fcdr (Fcdr (Fcdr (edges))))) - 1;
+
+		    position = make_lispy_position
+		      (XFRAME (event->frame_or_window),
+		       make_fixnum (new_x), make_fixnum (new_y),
+		       event->timestamp);
 		  }
 	      }
 
@@ -6570,8 +6695,11 @@ DEFUN ("event-convert-list", Fevent_convert_list, Sevent_convert_list, 1, 1, 0,
 EVENT-DESC should contain one base event type (a character or symbol)
 and zero or more modifier names (control, meta, hyper, super, shift, alt,
 drag, down, double or triple).  The base must be last.
-The return value is an event type (a character or symbol) which
-has the same base event type and all the specified modifiers.  */)
+
+The return value is an event type (a character or symbol) which has
+essentially the same base event type and all the specified modifiers.
+(Some compatibility base types, like symbols that represent a
+character, are not returned verbatim.)  */)
   (Lisp_Object event_desc)
 {
   Lisp_Object base = Qnil;
@@ -7036,7 +7164,7 @@ tty_read_avail_input (struct terminal *terminal,
       buf.modifiers = 0;
       if (tty->meta_key == 1 && (cbuf[i] & 0x80))
         buf.modifiers = meta_modifier;
-      if (tty->meta_key != 2)
+      if (tty->meta_key < 2)
         cbuf[i] &= ~0x80;
 
       buf.code = cbuf[i];
@@ -7558,7 +7686,7 @@ menu_item_eval_property_1 (Lisp_Object arg)
 {
   /* If we got a quit from within the menu computation,
      quit all the way out of it.  This takes care of C-] in the debugger.  */
-  if (CONSP (arg) && EQ (XCAR (arg), Qquit))
+  if (CONSP (arg) && signal_quit_p (XCAR (arg)))
     quit ();
 
   return Qnil;
@@ -9109,8 +9237,7 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
       /* If the function returned something invalid,
 	 barf--don't ignore it.  */
       if (! (NILP (next) || VECTORP (next) || STRINGP (next)))
-	error ("Function %s returns invalid key sequence",
-	       SSDATA (SYMBOL_NAME (tem)));
+	signal_error ("Function returns invalid key sequence", tem);
     }
   return next;
 }
@@ -9543,17 +9670,23 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		      (interrupted_kboard,
 		       Fcons (make_lispy_switch_frame (frame),
 			      KVAR (interrupted_kboard, kbd_queue)));
+                   mock_input = 0;
+                 }
+               else
+                 {
+                   if (FIXNUMP (key) && XFIXNUM (key) != -2)
+                     {
+                       /* If interrupted while initializing terminal, we
+                          need to replay the interrupting key.  See
+                          Bug#5095 and Bug#37782.  */
+                       mock_input = 1;
+                       keybuf[0] = key;
+                     }
+                   else
+                     {
+                       mock_input = 0;
+                     }
 		  }
-                if (FIXNUMP (key) && XFIXNUM (key) != -2)
-                  {
-                    /* If interrupted while initializing terminal, we
-                       need to replay the interrupting key.  See
-                       Bug#5095 and Bug#37782.  */
-                    mock_input = 1;
-                    keybuf[0] = key;
-                  }
-                else
-                  mock_input = 0;
 		goto replay_entire_sequence;
 	      }
 	  }
@@ -11043,7 +11176,10 @@ See also `current-input-mode'.  */)
 DEFUN ("set-input-meta-mode", Fset_input_meta_mode, Sset_input_meta_mode, 1, 2, 0,
        doc: /* Enable or disable 8-bit input on TERMINAL.
 If META is t, Emacs will accept 8-bit input, and interpret the 8th
-bit as the Meta modifier.
+bit as the Meta modifier before it decodes the characters.
+
+If META is `encoded', Emacs will interpret the 8th bit of single-byte
+characters after decoding the characters.
 
 If META is nil, Emacs will ignore the top bit, on the assumption it is
 parity.
@@ -11072,6 +11208,8 @@ See also `current-input-mode'.  */)
     new_meta = 0;
   else if (EQ (meta, Qt))
     new_meta = 1;
+  else if (EQ (meta, Qencoded))
+    new_meta = 3;
   else
     new_meta = 2;
 
@@ -11134,6 +11272,8 @@ Second arg FLOW non-nil means use ^S/^Q flow control for output to terminal
  (no effect except in CBREAK mode).
 Third arg META t means accept 8-bit input (for a Meta key).
  META nil means ignore the top bit, on the assumption it is parity.
+ META `encoded' means accept 8-bit input and interpret Meta after
+   decoding the input characters.
  Otherwise, accept 8-bit input and don't use the top bit for Meta.
 Optional fourth arg QUIT if non-nil specifies character to use for quitting.
 See also `current-input-mode'.  */)
@@ -11154,9 +11294,12 @@ The value is a list of the form (INTERRUPT FLOW META QUIT), where
     nil, Emacs is using CBREAK mode.
   FLOW is non-nil if Emacs uses ^S/^Q flow control for output to the
     terminal; this does not apply if Emacs uses interrupt-driven input.
-  META is t if accepting 8-bit input with 8th bit as Meta flag.
-    META nil means ignoring the top bit, on the assumption it is parity.
-    META is neither t nor nil if accepting 8-bit input and using
+  META is t if accepting 8-bit unencoded input with 8th bit as Meta flag.
+  META is `encoded' if accepting 8-bit encoded input with 8th bit as
+    Meta flag which has to be interpreted after decoding the input.
+  META is nil if ignoring the top bit of input, on the assumption that
+    it is a parity bit.
+  META is neither t nor nil if accepting 8-bit input and using
     all 8 bits as the character code.
   QUIT is the character Emacs currently uses to quit.
 The elements of this list correspond to the arguments of
@@ -11172,7 +11315,9 @@ The elements of this list correspond to the arguments of
       flow = FRAME_TTY (sf)->flow_control ? Qt : Qnil;
       meta = (FRAME_TTY (sf)->meta_key == 2
 	      ? make_fixnum (0)
-	      : (CURTTY ()->meta_key == 1 ? Qt : Qnil));
+	      : (CURTTY ()->meta_key == 1
+		 ? Qt
+		 : (CURTTY ()->meta_key == 3 ? Qencoded : Qnil)));
     }
   else
     {
@@ -11649,6 +11794,7 @@ syms_of_keyboard (void)
   DEFSYM (Qmake_frame_visible, "make-frame-visible");
   DEFSYM (Qselect_window, "select-window");
   DEFSYM (Qselection_request, "selection-request");
+  DEFSYM (Qwindow_edges, "window-edges");
   {
     int i;
 
@@ -11662,9 +11808,11 @@ syms_of_keyboard (void)
       }
   }
   DEFSYM (Qno_record, "no-record");
+  DEFSYM (Qencoded, "encoded");
 
   button_down_location = make_nil_vector (5);
   staticpro (&button_down_location);
+  staticpro (&frame_relative_event_pos);
   mouse_syms = make_nil_vector (5);
   staticpro (&mouse_syms);
   wheel_syms = make_nil_vector (ARRAYELTS (lispy_wheel_names));
@@ -12074,10 +12222,11 @@ terminal device.  See Info node `(elisp)Multiple Terminals'.  */);
   DEFVAR_LISP ("overriding-local-map", Voverriding_local_map,
 	       doc: /* Keymap that replaces (overrides) local keymaps.
 If this variable is non-nil, Emacs looks up key bindings in this
-keymap INSTEAD OF the keymap char property, minor mode maps, and the
-buffer's local map.  Hence, the only active keymaps would be
-`overriding-terminal-local-map', this keymap, and `global-keymap', in
-order of precedence.  */);
+keymap INSTEAD OF `keymap' text properties, `local-map' and `keymap'
+overlay properties, minor mode maps, and the buffer's local map.
+
+Hence, the only active keymaps would be `overriding-terminal-local-map',
+this keymap, and `global-keymap', in order of precedence.  */);
   Voverriding_local_map = Qnil;
 
   DEFVAR_LISP ("overriding-local-map-menu-flag", Voverriding_local_map_menu_flag,
@@ -12269,7 +12418,10 @@ Called with three arguments:
 - the error data, a list of the form (SIGNALED-CONDITION . SIGNAL-DATA)
   such as what `condition-case' would bind its variable to,
 - the context (a string which normally goes at the start of the message),
-- the Lisp function within which the error was signaled.  */);
+- the Lisp function within which the error was signaled.
+
+Also see `set-message-function' (which controls how non-error messages
+are displayed).  */);
   Vcommand_error_function = intern ("command-error-default-function");
 
   DEFVAR_LISP ("enable-disabled-menus-and-buttons",
@@ -12343,13 +12495,6 @@ If nil, Emacs crashes immediately in response to fatal signals.  */);
                Vwhile_no_input_ignore_events,
                doc: /* Ignored events from while-no-input.  */);
 
-  DEFVAR_BOOL ("inhibit--record-char",
-	       inhibit_record_char,
-	       doc: /* If non-nil, don't record input events.
-This inhibits recording input events for the purposes of keyboard
-macros, dribble file, and `recent-keys'.
-Internal use only.  */);
-
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }
 
@@ -12383,8 +12528,6 @@ syms_of_keyboard_for_pdumper (void)
   /* Create the initial keyboard.  Qt means 'unset'.  */
   eassert (initial_kboard == NULL);
   initial_kboard = allocate_kboard (Qt);
-
-  inhibit_record_char = false;
 }
 
 void

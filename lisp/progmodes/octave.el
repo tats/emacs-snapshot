@@ -351,7 +351,7 @@ Non-nil means always go to the next Octave code line after sending."
 ;; corresponding continuation lines).
 
 (defun octave-smie--funcall-p ()
-  "Return non-nil if we're in an expression context.  Moves point."
+  "Return non-nil if we're in an expression context.  Move point."
   (looking-at "[ \t]*("))
 
 (defun octave-smie--end-index-p ()
@@ -460,7 +460,8 @@ Non-nil means always go to the next Octave code line after sending."
          (smie-rule-parent octave-block-offset)
        ;; For (invalid) code between switch and case.
        ;; (if (smie-rule-parent-p "switch") 4)
-       nil))))
+       nil))
+    ('(:after . "=") (smie-rule-parent octave-block-offset))))
 
 (defun octave-indent-comment ()
   "A function for `smie-indent-functions' (which see)."
@@ -894,7 +895,7 @@ startup file, `~/.emacs-octave'."
 (defun inferior-octave-completion-at-point ()
   "Return the data to complete the Octave symbol at point."
   ;; https://debbugs.gnu.org/14300
-  (unless (string-match-p "/" (or (comint--match-partial-filename) ""))
+  (unless (string-search "/" (or (comint--match-partial-filename) ""))
     (let ((beg (save-excursion
                  (skip-syntax-backward "w_" (comint-line-beginning-position))
                  (point)))
@@ -1033,7 +1034,7 @@ directory and makes this the current buffer's default directory."
   (nth 8 (syntax-ppss)))
 
 (defun octave-looking-at-kw (regexp)
-  "Like `looking-at', but sets `case-fold-search' nil."
+  "Like `looking-at', but set `case-fold-search' nil first."
   (let ((case-fold-search nil))
     (looking-at regexp)))
 

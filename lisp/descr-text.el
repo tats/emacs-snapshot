@@ -50,7 +50,7 @@
     (when (string-match-p "\n\\'" pp)
       (setq pp (substring pp 0 (1- (length pp)))))
 
-    (if (and (not (string-match-p "\n" pp))
+    (if (and (not (string-search "\n" pp))
     	     (<= (length pp) (- (window-width) (current-column))))
 	(insert pp)
       (insert-text-button
@@ -97,7 +97,7 @@ into help buttons that call `describe-text-category' or
 ;;; Describe-Text Commands.
 
 (defun describe-text-category (category)
-  "Describe a text property category."
+  "Describe a text property CATEGORY."
   (interactive "SCategory: ")
   (help-setup-xref (list #'describe-text-category category)
 		   (called-interactively-p 'interactive))
@@ -677,7 +677,7 @@ The character information includes:
                   (let ((display (describe-char-display pos char)))
                     (if (display-graphic-p (selected-frame))
                         (if display
-                            (concat "by this font (glyph code)\n    " display)
+                            (concat "by this font (glyph code):\n    " display)
                           "no font available")
                       (if display
                           (format "terminal code %s" display)

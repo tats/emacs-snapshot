@@ -941,7 +941,8 @@ For more details, see Info node `(cl)Loop Facility'.
                                "above" "below" "by" "in" "on" "=" "across"
                                "repeat" "while" "until" "always" "never"
                                "thereis" "collect" "append" "nconc" "sum"
-                               "count" "maximize" "minimize" "if" "unless"
+                               "count" "maximize" "minimize"
+                               "if" "when" "unless"
                                "return"]
                           form]
                          ["using" (symbolp symbolp)]
@@ -1761,7 +1762,7 @@ Once the END-TEST becomes true, the RESULT forms are evaluated (with
 the VARs still bound to their values) to produce the result
 returned by `cl-do'.
 
-Note that the entire loop is enclosed in an implicit `nil' block, so
+Note that the entire loop is enclosed in an implicit nil block, so
 that you can use `cl-return' to exit at any time.
 
 Also note that END-TEST is checked before evaluating BODY.  If END-TEST
@@ -1790,7 +1791,7 @@ Once the END-TEST becomes true, the RESULT forms are evaluated (with
 the VARs still bound to their values) to produce the result
 returned by `cl-do*'.
 
-Note that the entire loop is enclosed in an implicit `nil' block, so
+Note that the entire loop is enclosed in an implicit nil block, so
 that you can use `cl-return' to exit at any time.
 
 Also note that END-TEST is checked before evaluating BODY.  If END-TEST
@@ -1924,7 +1925,8 @@ from OBARRAY.
 
 \(fn (VAR [OBARRAY [RESULT]]) BODY...)"
   (declare (indent 1)
-           (debug ((symbolp &optional form form) cl-declarations body)))
+           (debug ((symbolp &optional form form) cl-declarations
+                   def-body)))
   ;; Apparently this doesn't have an implicit block.
   `(cl-block nil
      (let (,(car spec))
@@ -1964,7 +1966,7 @@ Each symbol in the first list is bound to the corresponding value in the
 second list (or to nil if VALUES is shorter than SYMBOLS); then the
 BODY forms are executed and their result is returned.  This is much like
 a `let' form, except that the list of symbols can be computed at run-time."
-  (declare (indent 2) (debug (form form body)))
+  (declare (indent 2) (debug (form form def-body)))
   (let ((bodyfun (make-symbol "body"))
         (binds (make-symbol "binds"))
         (syms (make-symbol "syms"))
@@ -2069,7 +2071,7 @@ Like `cl-flet' but the definitions can refer to previous ones.
   ;; even handle mutually recursive functions.
   (letrec
       ((done nil) ;; Non-nil if some TCO happened.
-       ;; This var always holds the value `nil' until (just before) we
+       ;; This var always holds the value nil until (just before) we
        ;; exit the loop.
        (retvar (make-symbol "retval"))
        (ofargs (mapcar (lambda (s) (if (memq s cl--lambda-list-keywords) s
@@ -2866,20 +2868,28 @@ in SLOTs.  It defines a `make-NAME' constructor, a `copy-NAME'
 copier, a `NAME-p' predicate, and slot accessors named `NAME-SLOT'.
 You can use the accessors to set the corresponding slots, via `setf'.
 
-NAME may instead take the form (NAME OPTIONS...), where each
-OPTION is either a single keyword or (KEYWORD VALUE) where
-KEYWORD can be one of `:conc-name', `:constructor', `:copier',
-`:predicate', `:type', `:named', `:initial-offset',
-`:print-function', `:noinline', or `:include'.  See Info
-node `(cl)Structures' for the description of the options.
+NAME is usually a symbol, but may instead take the form (NAME
+OPTIONS...), where each OPTION is either a single keyword
+or (KEYWORD VALUE) where KEYWORD can be one of `:conc-name',
+`:constructor', `:copier', `:predicate', `:type', `:named',
+`:initial-offset', `:print-function', `:noinline', or `:include'.
+See Info node `(cl)Structures' for the description of the
+options.
 
-Each SLOT may instead take the form (SNAME SDEFAULT SOPTIONS...), where
-SDEFAULT is the default value of that slot and SOPTIONS are keyword-value
-pairs for that slot.
+The first element in SLOTS can be a doc string.
+
+The rest of the elements in SLOTS is a list of SLOT elements,
+each of which should either be a symbol, or take the form (SNAME
+SDEFAULT SOPTIONS...), where SDEFAULT is the default value of
+that slot and SOPTIONS are keyword-value pairs for that slot.
+
 Supported keywords for slots are:
 - `:read-only': If this has a non-nil value, that slot cannot be set via `setf'.
 - `:documentation': this is a docstring describing the slot.
 - `:type': the type of the field; currently only used for documentation.
+
+To see the documentation for a defined struct type, use
+\\[describe-symbol] or \\[cl-describe-type].
 
 \(fn NAME &optional DOCSTRING &rest SLOTS)"
   (declare (doc-string 2) (indent 1)
@@ -3073,12 +3083,21 @@ Supported keywords for slots are:
                            `(nth ,pos cl-x))))))
 	      (push slot slots)
 	      (push default-value defaults)
-	      ;; The arg "cl-x" is referenced by name in eg pred-form
+              ;; The arg "cl-x" is referenced by name in e.g. pred-form
 	      ;; and pred-check, so changing it is not straightforward.
 	      (push `(,defsym ,accessor (cl-x)
-                       ,(format "Access slot \"%s\" of `%s' struct CL-X.%s"
-                                slot name
-                                (if doc (concat "\n" doc) ""))
+                       ,(concat
+                         ;; NB.  This will produce incorrect results
+                         ;; in some cases, as our coding conventions
+                         ;; says that the first line must be a full
+                         ;; sentence.  However, if we don't word wrap
+                         ;; we will have byte-compiler warnings about
+                         ;; overly long docstrings.  So we can't have
+                         ;; a perfect result here, and choose to avoid
+                         ;; the byte-compiler warnings.
+                         (internal--format-docstring-line
+                          "Access slot \"%s\" of `%s' struct CL-X." slot name)
+                         (if doc (concat "\n" doc) ""))
                        (declare (side-effect-free t))
                        ,access-body)
                     forms)
@@ -3270,10 +3289,18 @@ the form NAME which is a shorthand for (NAME NAME)."
 (defun cl-struct-sequence-type (struct-type)
   "Return the sequence used to build STRUCT-TYPE.
 STRUCT-TYPE is a symbol naming a struct type.  Return `record',
-`vector`, or `list' if STRUCT-TYPE is a struct type, nil otherwise."
+`vector', or `list' if STRUCT-TYPE is a struct type, nil otherwise."
   (declare (side-effect-free t) (pure t))
   (cl--struct-class-type (cl--struct-get-class struct-type)))
 
+(defun cl--alist-to-plist (alist)
+  (let ((res '()))
+    (dolist (x alist)
+      (push (car x) res)
+      (push (cdr x) res))
+    (nreverse res)))
+
+;;;###autoload
 (defun cl-struct-slot-info (struct-type)
   "Return a list of slot names of struct STRUCT-TYPE.
 Each entry is a list (SLOT-NAME . OPTS), where SLOT-NAME is a
@@ -3291,7 +3318,7 @@ slots skipped by :initial-offset may appear in the list."
                 ,(cl--slot-descriptor-initform slot)
                 ,@(if (not (eq (cl--slot-descriptor-type slot) t))
                       `(:type ,(cl--slot-descriptor-type slot)))
-                ,@(cl--slot-descriptor-props slot))
+                ,@(cl--alist-to-plist (cl--slot-descriptor-props slot)))
               descs)))
     (nreverse descs)))
 
@@ -3323,14 +3350,16 @@ Of course, we really can't know that for sure, so it's just a heuristic."
                '((array		. arrayp)
                  (atom		. atom)
                  (base-char	. characterp)
+                 (bignum	. bignump)
                  (boolean	. booleanp)
                  (bool-vector	. bool-vector-p)
                  (buffer	. bufferp)
                  (character	. natnump)
                  (char-table	. char-table-p)
+                 (command	. commandp)
                  (hash-table	. hash-table-p)
                  (cons		. consp)
-                 (fixnum	. integerp)
+                 (fixnum	. fixnump)
                  (float		. floatp)
                  (function	. functionp)
                  (integer	. integerp)
@@ -3588,8 +3617,6 @@ The type name can then be used in `cl-typecase', `cl-check-type', etc."
 (cl-deftype extended-char () '(and character (not base-char)))
 ;; Define fixnum so `cl-typep' recognize it and the type check emitted
 ;; by `cl-the' is effective.
-(cl-deftype fixnum () 'fixnump)
-(cl-deftype bignum () 'bignump)
 
 ;;; Additional functions that we can now define because we've defined
 ;;; `cl-defsubst' and `cl-typep'.
@@ -3613,6 +3640,14 @@ STRUCT and SLOT-NAME are symbols.  INST is a structure instance."
 (make-obsolete-variable 'cl-macs-load-hook
                         "use `with-eval-after-load' instead." "28.1")
 (run-hooks 'cl-macs-load-hook)
+
+;;; Pcase type pattern.
+
+;;;###autoload
+(pcase-defmacro cl-type (type)
+  "Pcase pattern that matches objects of TYPE.
+TYPE is a type descriptor as accepted by `cl-typep', which see."
+  `(pred (pcase--flip cl-typep ',type)))
 
 ;; Local variables:
 ;; generated-autoload-file: "cl-loaddefs.el"

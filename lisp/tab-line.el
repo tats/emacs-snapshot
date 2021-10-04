@@ -36,13 +36,15 @@
   :group 'convenience
   :version "27.1")
 
-(defcustom tab-line-tab-face-functions '(tab-line-tab-face-special)
+(defcustom tab-line-tab-face-functions
+  '(tab-line-tab-face-modified tab-line-tab-face-special)
   "Functions called to modify tab faces.
 Each function is called with five arguments: the tab, a list of
 all tabs, the face returned by the previously called modifier,
 whether the tab is a buffer, and whether the tab is selected."
   :type '(repeat
           (choice (function-item tab-line-tab-face-special)
+                  (function-item tab-line-tab-face-modified)
                   (function-item tab-line-tab-face-inactive-alternating)
                   (function-item tab-line-tab-face-group)
                   (function :tag "Custom function")))
@@ -92,6 +94,14 @@ function `tab-line-tab-face-special'."
   :version "28.1"
   :group 'tab-line-faces)
 
+(defface tab-line-tab-modified
+  '((t :inherit font-lock-doc-face))
+  "Face for modified tabs.
+Applied when option `tab-line-tab-face-functions' includes
+function `tab-line-tab-face-modified'."
+  :version "28.1"
+  :group 'tab-line-faces)
+
 (defface tab-line-tab-group
   '((t :inherit tab-line :box nil))
   "Face for group tabs.
@@ -123,16 +133,17 @@ function `tab-line-tab-face-group'."
 
 (defvar tab-line-tab-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [tab-line mouse-1] 'tab-line-select-tab)
+    (define-key map [tab-line down-mouse-1] 'tab-line-select-tab)
     (define-key map [tab-line mouse-2] 'tab-line-close-tab)
+    (define-key map [tab-line down-mouse-3] 'tab-line-tab-context-menu)
     (define-key map "\C-m" 'tab-line-select-tab)
     map)
   "Local keymap for `tab-line-mode' window tabs.")
 
 (defvar tab-line-add-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [tab-line mouse-1] 'tab-line-new-tab)
-    (define-key map [tab-line mouse-2] 'tab-line-new-tab)
+    (define-key map [tab-line down-mouse-1] 'tab-line-new-tab)
+    (define-key map [tab-line down-mouse-2] 'tab-line-new-tab)
     (define-key map "\C-m" 'tab-line-new-tab)
     map)
   "Local keymap to add `tab-line-mode' window tabs.")
@@ -146,16 +157,16 @@ function `tab-line-tab-face-group'."
 
 (defvar tab-line-left-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [tab-line mouse-1] 'tab-line-hscroll-left)
-    (define-key map [tab-line mouse-2] 'tab-line-hscroll-left)
+    (define-key map [tab-line down-mouse-1] 'tab-line-hscroll-left)
+    (define-key map [tab-line down-mouse-2] 'tab-line-hscroll-left)
     (define-key map "\C-m" 'tab-line-new-tab)
     map)
   "Local keymap to scroll `tab-line-mode' window tabs to the left.")
 
 (defvar tab-line-right-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [tab-line mouse-1] 'tab-line-hscroll-right)
-    (define-key map [tab-line mouse-2] 'tab-line-hscroll-right)
+    (define-key map [tab-line down-mouse-1] 'tab-line-hscroll-right)
+    (define-key map [tab-line down-mouse-2] 'tab-line-hscroll-right)
     (define-key map "\C-m" 'tab-line-new-tab)
     map)
   "Local keymap to scroll `tab-line-mode' window tabs to the right.")
@@ -471,7 +482,10 @@ should return the formatted tab name to display in the tab line."
     (dolist (fn tab-line-tab-face-functions)
       (setf face (funcall fn tab tabs face buffer-p selected-p)))
     (apply 'propertize
-           (concat (propertize name 'keymap tab-line-tab-map)
+           (concat (propertize name
+                               'keymap tab-line-tab-map
+                               ;; Don't turn mouse-1 into mouse-2 (bug#49247)
+                               'follow-link 'ignore)
                    (or (and (or buffer-p (assq 'buffer tab) (assq 'close tab))
                             tab-line-close-button-show
                             (not (eq tab-line-close-button-show
@@ -533,6 +547,15 @@ When TAB is a non-file-backed buffer, make FACE inherit from
     (setf face `(:inherit (tab-line-tab-special ,face))))
   face)
 
+(defun tab-line-tab-face-modified (tab _tabs face buffer-p _selected-p)
+  "Return FACE for TAB according to whether it's modified.
+When TAB is a modified, file-backed buffer, make FACE inherit
+from `tab-line-tab-modified'.  For use in
+`tab-line-tab-face-functions'."
+  (when (and buffer-p (buffer-file-name tab) (buffer-modified-p tab))
+    (setf face `(:inherit (tab-line-tab-modified ,face))))
+  face)
+
 (defun tab-line-tab-face-group (tab _tabs face _buffer-p _selected-p)
   "Return FACE for TAB according to whether it's a group tab.
 For use in `tab-line-tab-face-functions'."
@@ -551,7 +574,10 @@ For use in `tab-line-tab-face-functions'."
                           ;; handle tab-line scrolling
                           (window-parameter nil 'tab-line-hscroll)
                           ;; for setting face 'tab-line-tab-current'
-                          (eq (selected-window) (old-selected-window))))
+                          (eq (selected-window) (old-selected-window))
+                          (and (memq 'tab-line-tab-face-modified
+                                     tab-line-tab-face-functions)
+                               (buffer-file-name) (buffer-modified-p))))
          (cache (window-parameter nil 'tab-line-cache)))
     ;; Enable auto-hscroll again after it was disabled on manual scrolling.
     ;; The moment to enable it is when the window-buffer was updated.
@@ -663,20 +689,20 @@ the selected tab visible."
     (when window
       (force-mode-line-update t))))
 
-(defun tab-line-hscroll-right (&optional arg mouse-event)
+(defun tab-line-hscroll-right (&optional arg event)
   (interactive (list current-prefix-arg last-nonmenu-event))
-  (let ((window (and (listp mouse-event) (posn-window (event-start mouse-event)))))
+  (let ((window (and (listp event) (posn-window (event-start event)))))
     (tab-line-hscroll arg window)
     (force-mode-line-update window)))
 
-(defun tab-line-hscroll-left (&optional arg mouse-event)
+(defun tab-line-hscroll-left (&optional arg event)
   (interactive (list current-prefix-arg last-nonmenu-event))
-  (let ((window (and (listp mouse-event) (posn-window (event-start mouse-event)))))
+  (let ((window (and (listp event) (posn-window (event-start event)))))
     (tab-line-hscroll (- (or arg 1)) window)
     (force-mode-line-update window)))
 
 
-(defun tab-line-new-tab (&optional mouse-event)
+(defun tab-line-new-tab (&optional event)
   "Add a new tab to the tab line.
 Usually is invoked by clicking on the plus-shaped button.
 But any switching to other buffer also adds a new tab
@@ -685,20 +711,20 @@ corresponding to the switched buffer."
   (if (functionp tab-line-new-tab-choice)
       (funcall tab-line-new-tab-choice)
     (let ((tab-line-tabs-buffer-groups mouse-buffer-menu-mode-groups))
-      (if (and (listp mouse-event)
+      (if (and (listp event)
                (display-popup-menus-p)
                (not tty-menu-open-use-tmm))
-          (mouse-buffer-menu mouse-event) ; like (buffer-menu-open)
+          (mouse-buffer-menu event) ; like (buffer-menu-open)
         ;; tty menu doesn't support mouse clicks, so use tmm
         (tmm-prompt (mouse-buffer-menu-keymap))))))
 
-(defun tab-line-select-tab (&optional e)
+(defun tab-line-select-tab (&optional event)
   "Switch to the selected tab.
 This command maintains the original order of prev/next buffers.
 So for example, switching to a previous tab is equivalent to
 using the `previous-buffer' command."
   (interactive "e")
-  (let* ((posnp (event-start e))
+  (let* ((posnp (event-start event))
          (tab (get-pos-property 1 'tab (car (posn-string posnp))))
          (buffer (if (bufferp tab) tab (cdr (assq 'buffer tab)))))
     (if buffer
@@ -740,12 +766,12 @@ when `tab-line-tabs-function' is `tab-line-tabs-window-buffers'."
   :group 'tab-line
   :version "28.1")
 
-(defun tab-line-switch-to-prev-tab (&optional mouse-event)
+(defun tab-line-switch-to-prev-tab (&optional event)
   "Switch to the previous tab.
 Its effect is the same as using the `previous-buffer' command
 (\\[previous-buffer])."
   (interactive (list last-nonmenu-event))
-  (let ((window (and (listp mouse-event) (posn-window (event-start mouse-event)))))
+  (let ((window (and (listp event) (posn-window (event-start event)))))
     (if (eq tab-line-tabs-function #'tab-line-tabs-window-buffers)
         (switch-to-prev-buffer window)
       (with-selected-window (or window (selected-window))
@@ -764,12 +790,12 @@ Its effect is the same as using the `previous-buffer' command
           (when (bufferp buffer)
             (switch-to-buffer buffer)))))))
 
-(defun tab-line-switch-to-next-tab (&optional mouse-event)
+(defun tab-line-switch-to-next-tab (&optional event)
   "Switch to the next tab.
 Its effect is the same as using the `next-buffer' command
 (\\[next-buffer])."
   (interactive (list last-nonmenu-event))
-  (let ((window (and (listp mouse-event) (posn-window (event-start mouse-event)))))
+  (let ((window (and (listp event) (posn-window (event-start event)))))
     (if (eq tab-line-tabs-function #'tab-line-tabs-window-buffers)
         (switch-to-next-buffer window)
       (with-selected-window (or window (selected-window))
@@ -803,13 +829,13 @@ This option is useful when `tab-line-tabs-function' has the value
   :group 'tab-line
   :version "27.1")
 
-(defun tab-line-close-tab (&optional mouse-event)
+(defun tab-line-close-tab (&optional event)
   "Close the selected tab.
 Usually is invoked by clicking on the close button on the right side
 of the tab.  This command buries the buffer, so it goes out of sight
 from the tab line."
   (interactive (list last-nonmenu-event))
-  (let* ((posnp (and (listp mouse-event) (event-start mouse-event)))
+  (let* ((posnp (and (listp event) (event-start event)))
          (window (and posnp (posn-window posnp)))
          (tab (get-pos-property 1 'tab (car (posn-string posnp))))
          (buffer (if (bufferp tab) tab (cdr (assq 'buffer tab))))
@@ -828,6 +854,22 @@ from the tab line."
        ((functionp tab-line-close-tab-function)
         (funcall tab-line-close-tab-function tab)))
       (force-mode-line-update))))
+
+(defun tab-line-tab-context-menu (&optional event)
+  "Pop up context menu for the tab."
+  (interactive "e")
+  (let ((menu (make-sparse-keymap (propertize "Context Menu" 'hide t))))
+    (define-key-after menu [close]
+      '(menu-item "Close" tab-line-close-tab :help "Close the tab"))
+    (popup-menu menu event)))
+
+(defun tab-line-context-menu (&optional event)
+  "Pop up context menu for the tab line."
+  (interactive "e")
+  (let ((menu (make-sparse-keymap (propertize "Context Menu" 'hide t))))
+    (define-key-after menu [close]
+      '(menu-item "New tab" tab-line-new-tab :help "Create a new tab"))
+    (popup-menu menu event)))
 
 
 ;;;###autoload
@@ -862,6 +904,8 @@ from the tab line."
   :version "27.1")
 
 
+(global-set-key [tab-line down-mouse-3] 'tab-line-context-menu)
+
 (global-set-key [tab-line mouse-4]    'tab-line-hscroll-left)
 (global-set-key [tab-line mouse-5]    'tab-line-hscroll-right)
 (global-set-key [tab-line wheel-up]   'tab-line-hscroll-left)

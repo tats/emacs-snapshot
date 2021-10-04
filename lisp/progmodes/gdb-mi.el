@@ -5,10 +5,9 @@
 ;; Author: Nick Roberts <nickrob@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: unix, tools
+;; URL: https://www.emacswiki.org/emacs/GDB-MI
 
 ;; This file is part of GNU Emacs.
-
-;; Homepage: https://www.emacswiki.org/emacs/GDB-MI
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -100,6 +99,19 @@
 (declare-function speedbar-change-expand-button-char "speedbar" (char))
 (declare-function speedbar-delete-subblock "speedbar" (indent))
 (declare-function speedbar-center-buffer-smartly "speedbar" ())
+
+;; FIXME: The declares below are necessary because we don't call `gud-def'
+;; at toplevel, so the compiler doesn't know under which circumstances
+;; they're defined.
+(declare-function gud-until  "gud" (arg))
+(declare-function gud-print  "gud" (arg))
+(declare-function gud-down   "gud" (arg))
+(declare-function gud-up     "gud" (arg))
+(declare-function gud-jump   "gud" (arg))
+(declare-function gud-finish "gud" (arg))
+(declare-function gud-next   "gud" (arg))
+(declare-function gud-stepi  "gud" (arg))
+(declare-function gud-tbreak "gud" (arg))
 
 (defvar tool-bar-map)
 (defvar speedbar-initial-expansion-list-name)
@@ -455,8 +467,8 @@ GDB session needs to be restarted for this setting to take effect."
 ;; TODO Some commands can't be called with --all (give a notice about
 ;; it in setting doc)
 (defcustom gdb-gud-control-all-threads t
-  "When non-nil, GUD execution commands affect all threads when
-in non-stop mode.  Otherwise, only current thread is affected."
+  "When non-nil, GUD execution commands affect all threads when in non-stop mode.
+Otherwise, only current thread is affected."
   :type 'boolean
   :group 'gdb-non-stop
   :version "23.2")
@@ -567,6 +579,23 @@ stopped thread is already selected."
   :type 'boolean
   :group 'gdb-buffers
   :version "23.2")
+
+(defcustom gdb-registers-enable-filter nil
+  "If non-nil, enable register name filter in register buffer.
+Use `gdb-registers-filter-pattern-list' to control what register to
+filter."
+  :type 'boolean
+  :group 'gdb-buffers
+  :version "28.1")
+
+(defcustom gdb-registers-filter-pattern-list nil
+  "Patterns for names that are displayed in register buffer.
+Each pattern is a regular expression.  GDB displays registers
+whose name matches any pattern in the list.  Refresh the register
+buffer for the change to take effect."
+  :type '(repeat regexp)
+  :group 'gdb-buffers
+  :version "28.1")
 
 (defvar gdb-debug-log nil
   "List of commands sent to and replies received from GDB.
@@ -737,7 +766,9 @@ NOARG must be t when this macro is used outside `gud-def'."
       ;; Apparently we're not running with -i=mi (or we're, for
       ;; instance, debugging something inside a Docker instance with
       ;; Emacs on the outside).
-      (let ((msg "Error: Either -i=mi wasn't specified on the GDB command line, or the extra socket couldn't be established.  Consider using `M-x gud-gdb' instead."))
+      (let ((msg (substitute-command-keys
+                  "Error: Either -i=mi wasn't specified on the GDB command line,\
+ or the extra socket couldn't be established.  Consider using \\[gud-gdb] instead.")))
         (message msg)
         (setq string (concat (propertize msg 'font-lock-face 'error)
                              "\n" string)))
@@ -759,7 +790,7 @@ becomes the initial working directory and source-file directory
 for your debugger.
 If COMMAND-LINE requests that gdb attaches to a process PID, gdb
 will run in *gud-PID*, otherwise it will run in *gud*; in these
-cases the initial working directory is the default-directory of
+cases the initial working directory is the `default-directory' of
 the buffer in which this command was invoked.
 
 COMMAND-LINE should include \"-i=mi\" to use gdb's MI text interface.
@@ -965,6 +996,8 @@ detailed description of this mode.
     'gdb-mouse-jump)
   (define-key gud-minor-mode-map [left-margin C-mouse-3]
     'gdb-mouse-jump)
+
+  (gud-set-repeat-map-property 'gud-gdb-repeat-map)
 
   (setq-local gud-gdb-completion-function 'gud-gdbmi-completions)
 
@@ -1350,7 +1383,7 @@ With arg, enter name of variable to be watched in the minibuffer."
     (string-match "\\(\\S-+\\)" text)
     (let* ((var (nth (- (count-lines (point-min) (point)) 2) gdb-var-list))
            (varnum (car var)))
-      (if (string-match "\\." (car var))
+      (if (string-search "." (car var))
           (message-box "Can only delete a root expression")
         (gdb-var-delete-1 var varnum)))))
 
@@ -1447,14 +1480,14 @@ With arg, enter name of variable to be watched in the minibuffer."
 TEXT is the text of the button we clicked on, a + or - item.
 TOKEN is data related to this node.
 INDENT is the current indentation depth."
-  (cond ((string-match "\\+" text)        ;expand this node
+  (cond ((string-search "+" text)        ;expand this node
 	 (let* ((var (assoc token gdb-var-list))
 		(expr (nth 1 var)) (children (nth 2 var)))
 	   (if (or (<= (string-to-number children) gdb-max-children)
 		   (y-or-n-p
-		    (format "%s has %s children. Continue? " expr children)))
+                    (format "%s has %s children.  Continue?" expr children)))
 	       (gdb-var-list-children token))))
-	((string-match "-" text)	;contract this node
+	((string-search "-" text)	;contract this node
 	 (dolist (var gdb-var-list)
 	   (if (string-match (concat token "\\.") (car var))
 	       (setq gdb-var-list (delq var gdb-var-list))))
@@ -1931,7 +1964,7 @@ commands to be prefixed by \"-interpreter-exec console\".")
 The string is enclosed in double quotes.
 All embedded quotes, newlines, and backslashes are preceded with a backslash."
   (setq string (replace-regexp-in-string "\\([\"\\]\\)" "\\\\\\&" string))
-  (setq string (replace-regexp-in-string "\n" "\\n" string t t))
+  (setq string (string-replace "\n" "\\n" string))
   (concat "\"" string "\""))
 
 (defun gdb-input (command handler-function &optional trigger-name)
@@ -2384,7 +2417,7 @@ rule from an incomplete data stream.  The parser will stay in this state until
 the end of the current result or async record is reached."
   (when (< gdbmi-bnf-offset (length gud-marker-acc))
     ;; Search the data stream for the end of the current record:
-    (let* ((newline-pos (string-match "\n" gud-marker-acc gdbmi-bnf-offset))
+    (let* ((newline-pos (string-search "\n" gud-marker-acc gdbmi-bnf-offset))
 	   (is-progressive (equal (cdr class-command) 'progressive))
        (is-complete (not (null newline-pos)))
        result-str)
@@ -4380,6 +4413,26 @@ member."
  'gdb-registers-mode
  'gdb-invalidate-registers)
 
+(defun gdb-header-click-event-handler (function)
+  "Return a function that handles clicking event on gdb header buttons.
+
+This function switches to the window where the header locates and
+executes FUNCTION."
+  (lambda (event)
+    (interactive "e")
+    (save-selected-window
+      ;; Make sure we are in the right buffer.
+      (select-window (posn-window (event-start event)))
+      (funcall function))))
+
+(defun gdb-registers-toggle-filter ()
+  "Toggle register filter."
+  (interactive)
+  (setq gdb-registers-enable-filter
+        (not gdb-registers-enable-filter))
+  ;; Update the register buffer.
+  (gdb-invalidate-registers 'update))
+
 (defun gdb-registers-handler-custom ()
   (when gdb-register-names
     (let ((register-values
@@ -4390,17 +4443,27 @@ member."
                (value (gdb-mi--field register 'value))
                (register-name (nth (string-to-number register-number)
                                    gdb-register-names)))
-          (gdb-table-add-row
-           table
-           (list
-            (propertize register-name
-                        'font-lock-face font-lock-variable-name-face)
-            (if (member register-number gdb-changed-registers)
-                (propertize value 'font-lock-face font-lock-warning-face)
-              value))
-           `(mouse-face highlight
-                        help-echo "mouse-2: edit value"
-                        gdb-register-name ,register-name))))
+          ;; Add register if `gdb-registers-filter-pattern-list' is nil;
+          ;; or any pattern that `gdb-registers-filter-pattern-list'
+          ;; matches.
+          (when (or (null gdb-registers-enable-filter)
+                    ;; Return t if any register name matches a pattern.
+                    (cl-loop for pattern
+                             in gdb-registers-filter-pattern-list
+                             if (string-match pattern register-name)
+                             return t
+                             finally return nil))
+            (gdb-table-add-row
+             table
+             (list
+              (propertize register-name
+                          'font-lock-face font-lock-variable-name-face)
+              (if (member register-number gdb-changed-registers)
+                  (propertize value 'font-lock-face font-lock-warning-face)
+                value))
+             `(mouse-face highlight
+                          help-echo "mouse-2: edit value"
+                          gdb-register-name ,register-name)))))
       (insert (gdb-table-string table " ")))
     (setq mode-name
           (gdb-current-context-mode-name "Registers"))))
@@ -4428,6 +4491,7 @@ member."
                             (gdb-get-buffer-create
                              'gdb-locals-buffer
                              gdb-thread-number) t)))
+    (define-key map "f" #'gdb-registers-toggle-filter)
     map))
 
 (defvar gdb-registers-header
@@ -4437,7 +4501,31 @@ member."
                           mode-line-inactive)
    " "
    (gdb-propertize-header "Registers" gdb-registers-buffer
-			  nil nil mode-line)))
+			  nil nil mode-line)
+   " "
+   '(:eval
+     (format
+      "[filter %s %s]"
+      (propertize
+       (if gdb-registers-enable-filter "[on]" "[off]")
+       'face (if gdb-registers-enable-filter
+                 '(:weight bold :inherit success)
+               'shadow)
+       'help-echo "mouse-1: toggle filter"
+       'mouse-face 'mode-line-highlight
+       'local-map (gdb-make-header-line-mouse-map
+                   'mouse-1 (gdb-header-click-event-handler
+                             #'gdb-registers-toggle-filter)))
+      (propertize
+       "[set]"
+       'face 'mode-line
+       'help-echo "mouse-1: Customize filter patterns"
+       'mouse-face 'mode-line-highlight
+       'local-map (gdb-make-header-line-mouse-map
+                   'mouse-1 (lambda ()
+                              (interactive)
+                              (customize-variable-other-window
+                               'gdb-registers-filter-pattern-list))))))))
 
 (define-derived-mode gdb-registers-mode gdb-parent-mode "Registers"
   "Major mode for gdb registers."

@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "intervals.h"
 #include "pdumper.h"
+#include "composite.h"
 
 #include "regex-emacs.h"
 
@@ -2386,6 +2387,13 @@ since only regular expressions have distinguished subexpressions.  */)
   if (! NILP (string))
     CHECK_STRING (string);
 
+  /* Most replacement texts don't contain any backslash directives in
+     the replacements.  Check whether that's the case, which will
+     enable us to take the fast path later.  */
+  if (NILP (literal)
+      && !memchr (SSDATA (newtext), '\\', SBYTES (newtext)))
+    literal = Qt;
+
   case_action = nochange;	/* We tried an initialization */
 				/* but some C compilers blew it */
 
@@ -2723,10 +2731,9 @@ since only regular expressions have distinguished subexpressions.  */)
     }
 
   newpoint = sub_start + SCHARS (newtext);
-  ptrdiff_t newstart = sub_start == sub_end ? newpoint : sub_start;
 
   /* Replace the old text with the new in the cleanest possible way.  */
-  replace_range (sub_start, sub_end, newtext, 1, 0, 1, true);
+  replace_range (sub_start, sub_end, newtext, 1, 0, 1, true, true);
 
   if (case_action == all_caps)
     Fupcase_region (make_fixnum (search_regs.start[sub]),
@@ -2739,17 +2746,20 @@ since only regular expressions have distinguished subexpressions.  */)
   /* The replace_range etc. functions can trigger modification hooks
      (see signal_before_change and signal_after_change).  Try to error
      out if these hooks clobber the match data since clobbering can
-     result in confusing bugs.  Although this sanity check does not
-     catch all possible clobberings, it should catch many of them.  */
-  if (! (search_regs.num_regs == num_regs
-	 && search_regs.start[sub] == newstart
-	 && search_regs.end[sub] == newpoint))
+     result in confusing bugs.  We used to check for changes in
+     search_regs start and end, but that fails if modification hooks
+     remove or add text earlier in the buffer, so just check num_regs
+     now. */
+  if (search_regs.num_regs != num_regs)
     error ("Match data clobbered by buffer modification hooks");
 
   /* Put point back where it was in the text, if possible.  */
   TEMP_SET_PT (clip_to_bounds (BEGV, opoint + (opoint <= 0 ? ZV : 0), ZV));
   /* Now move point "officially" to the end of the inserted replacement.  */
   move_if_not_intangible (newpoint);
+
+  signal_after_change (sub_start, sub_end - sub_start, SCHARS (newtext));
+  update_compositions (sub_start, newpoint, CHECK_BORDER);
 
   return Qnil;
 }

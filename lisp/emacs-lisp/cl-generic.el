@@ -568,17 +568,17 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
               (cons method mt)
             ;; Keep the ordering; important for methods with :extra qualifiers.
             (mapcar (lambda (x) (if (eq x (car me)) method x)) mt)))
-    (let ((sym (cl--generic-name generic))) ; Actual name (for aliases).
+    (let ((sym (cl--generic-name generic)) ; Actual name (for aliases).
+          ;; FIXME: Try to avoid re-constructing a new function if the old one
+          ;; is still valid (e.g. still empty method cache)?
+          (gfun (cl--generic-make-function generic)))
       (unless (symbol-function sym)
         (defalias sym 'dummy))   ;Record definition into load-history.
       (cl-pushnew `(cl-defmethod . ,(cl--generic-load-hist-format
                                      (cl--generic-name generic)
                                      qualifiers specializers))
                   current-load-list :test #'equal)
-      ;; FIXME: Try to avoid re-constructing a new function if the old one
-      ;; is still valid (e.g. still empty method cache)?
-      (let ((gfun (cl--generic-make-function generic))
-            ;; Prevent `defalias' from recording this as the definition site of
+      (let (;; Prevent `defalias' from recording this as the definition site of
             ;; the generic function.
             current-load-list
             ;; BEWARE!  Don't purify this function definition, since that leads
@@ -960,7 +960,7 @@ Can only be used from within the lexical body of a primary or around method."
 ;;; Add support for describe-function
 
 (defun cl--generic-search-method (met-name)
-  "For `find-function-regexp-alist'.  Searches for a cl-defmethod.
+  "For `find-function-regexp-alist'.  Search for a `cl-defmethod'.
 MET-NAME is as returned by `cl--generic-load-hist-format'."
   (let ((base-re (concat "(\\(?:cl-\\)?defmethod[ \t]+"
                          (regexp-quote (format "%s" (car met-name)))
@@ -1026,7 +1026,10 @@ MET-NAME is as returned by `cl--generic-load-hist-format'."
     (when generic
       (require 'help-mode)              ;Needed for `help-function-def' button!
       (save-excursion
-        (insert "\n\nThis is a generic function.\n\n")
+        ;; Ensure that we have two blank lines (but not more).
+        (unless (looking-back "\n\n" (- (point) 2))
+          (insert "\n"))
+        (insert "This is a generic function.\n\n")
         (insert (propertize "Implementations:\n\n" 'face 'bold))
         ;; Loop over fanciful generics
         (dolist (method (cl--generic-method-table generic))
@@ -1153,12 +1156,27 @@ These match if the argument is a cons cell whose car is `eql' to VAL."
 
 (cl-generic-define-generalizer cl--generic-eql-generalizer
   100 (lambda (name &rest _) `(gethash ,name cl--generic-eql-used))
-  (lambda (tag &rest _) (if (eq (car-safe tag) 'eql) (list tag))))
+  (lambda (tag &rest _) (if (eq (car-safe tag) 'eql) (cdr tag))))
 
 (cl-defmethod cl-generic-generalizers ((specializer (head eql)))
   "Support for (eql VAL) specializers.
 These match if the argument is `eql' to VAL."
-  (puthash (cadr specializer) specializer cl--generic-eql-used)
+  (let* ((form (cadr specializer))
+         (val (if (or (not (symbolp form)) (macroexp-const-p form))
+                  (eval form t)
+                ;; FIXME: Compatibility with Emacs<28.  For now emitting
+                ;; a warning would be annoying for third party packages
+                ;; which can't use the new form without breaking compatibility
+                ;; with older Emacsen, but in the future we should emit
+                ;; a warning.
+                ;; (message "Quoting obsolete `eql' form: %S" specializer)
+                form))
+         (specializers (cdr (gethash val cl--generic-eql-used))))
+    ;; The `specializers-function' needs to return all the (eql EXP) that
+    ;; were used for the same VALue (bug#49866).
+    ;; So we keep this info in `cl--generic-eql-used'.
+    (cl-pushnew specializer specializers :test #'equal)
+    (puthash val `(eql . ,specializers) cl--generic-eql-used))
   (list cl--generic-eql-generalizer))
 
 (cl--generic-prefill-dispatchers 0 (eql nil))

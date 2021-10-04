@@ -2389,8 +2389,13 @@ rand_as183 (void)
 int
 random (void)
 {
-  /* rand_as183 () gives us 15 random bits...hack together 30 bits.  */
+  /* rand_as183 () gives us 15 random bits...hack together 30 bits for
+     Emacs with 32-bit EMACS_INT, and at least 31 bit for wider EMACS_INT.  */
+#if EMACS_INT_MAX > INT_MAX
+  return ((rand_as183 () << 30) | (rand_as183 () << 15) | rand_as183 ());
+#else
   return ((rand_as183 () << 15) | rand_as183 ());
+#endif
 }
 
 void
@@ -8753,7 +8758,7 @@ int
 _sys_read_ahead (int fd)
 {
   child_process * cp;
-  int rc;
+  int rc = 0;
 
   if (fd < 0 || fd >= MAXDESC)
     return STATUS_READ_ERROR;
@@ -10585,6 +10590,45 @@ w32_my_exename (void)
     }
 
   return exename;
+}
+
+/* Emulate Posix 'realpath'.  This is needed in
+   comp-el-to-eln-rel-filename.  */
+char *
+realpath (const char *file_name, char *resolved_name)
+{
+  char *tgt = chase_symlinks (file_name);
+  char target[MAX_UTF8_PATH];
+
+  if (tgt == file_name)
+    {
+      /* If FILE_NAME is not a symlink, chase_symlinks returns its
+	 argument, possibly not in canonical absolute form.  Make sure
+	 we return a canonical file name.  */
+      if (w32_unicode_filenames)
+	{
+	  wchar_t file_w[MAX_PATH], tgt_w[MAX_PATH];
+
+	  filename_to_utf16 (file_name, file_w);
+	  if (GetFullPathNameW (file_w, MAX_PATH, tgt_w, NULL) == 0)
+	    return NULL;
+	  filename_from_utf16 (tgt_w, target);
+	}
+      else
+	{
+	  char file_a[MAX_PATH], tgt_a[MAX_PATH];
+
+	  filename_to_ansi (file_name, file_a);
+	  if (GetFullPathNameA (file_a, MAX_PATH, tgt_a, NULL) == 0)
+	    return NULL;
+	  filename_from_ansi (tgt_a, target);
+	}
+      tgt = target;
+    }
+
+  if (resolved_name)
+    return strcpy (resolved_name, tgt);
+  return xstrdup (tgt);
 }
 
 /*

@@ -575,9 +575,8 @@ preferably use the `c-mode-menu' language constant directly."
 (make-variable-buffer-local 'c-max-syn-tab-mkr)
 
 (defun c-basic-common-init (mode default-style)
-  "Do the necessary initialization for the syntax handling routines
-and the line breaking/filling code.  Intended to be used by other
-packages that embed CC Mode.
+  "Initialize the syntax handling routines and the line breaking/filling code.
+Intended to be used by other packages that embed CC Mode.
 
 MODE is the CC Mode flavor to set up, e.g. `c-mode' or `java-mode'.
 DEFAULT-STYLE tells which indentation style to install.  It has the
@@ -1003,8 +1002,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (when (c-major-mode-is 'c++-mode)
-	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
+      (when c-ml-string-opener-re
+	(save-excursion (c-depropertize-ml-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) end)
@@ -1014,8 +1013,8 @@ Note that the style variables are always made local to the buffer."
       (setq m-beg (point))
       (c-end-of-macro))
     (when (and ss-found (> (point) end))
-      (when (c-major-mode-is 'c++-mode)
-	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
+      (when c-ml-string-opener-re
+	(save-excursion (c-depropertize-ml-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) c-new-END)
@@ -1023,8 +1022,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (when (c-major-mode-is 'c++-mode)
-	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
+      (when c-ml-string-opener-re
+	(save-excursion (c-depropertize-ml-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value
        m-beg (point) 'syntax-table '(1)))))
 
@@ -1174,12 +1173,15 @@ Note that the style variables are always made local to the buffer."
 	  )))))
 
 (defun c-unescaped-nls-in-string-p (&optional quote-pos)
-  ;; Return whether unescaped newlines can be inside strings.
+  ;; Return whether unescaped newlines can be inside strings.  If the current
+  ;; language handles multi-line strings, the value of this function is always
+  ;; nil.
   ;;
   ;; QUOTE-POS, if present, is the position of the opening quote of a string.
   ;; Depending on the language, there might be a special character before it
   ;; signifying the validity of such NLs.
   (cond
+   (c-ml-string-opener-re nil)
    ((null c-multiline-string-start-char) nil)
    ((c-characterp c-multiline-string-start-char)
     (and quote-pos
@@ -1323,13 +1325,13 @@ Note that the style variables are always made local to the buffer."
 	(setq pos (c-min-property-position pos c-max-syn-tab-mkr
 					   'c-fl-syn-tab))
 	(when (< pos c-max-syn-tab-mkr)
-	  (goto-char pos))
-	(when (and (save-match-data
-		     (c-search-backward-char-property-with-value-on-char
-		      'c-fl-syn-tab '(15) ?\"
-		      (max (- (point) 500) (point-min))))
-		   (not (equal (c-get-char-property (point) 'syntax-table) '(1))))
-	  (setq pos (1+ pos)))
+	  (goto-char pos)
+	  (when (and (save-match-data
+		       (c-search-backward-char-property-with-value-on-char
+			'c-fl-syn-tab '(15) ?\"
+			(max (- (point) 500) (point-min))))
+		     (not (equal (c-get-char-property (point) 'syntax-table) '(1))))
+	    (setq pos (1+ pos))))
 	(while (< pos c-max-syn-tab-mkr)
 	  (setq pos
 		(c-min-property-position pos c-max-syn-tab-mkr 'c-fl-syn-tab))
@@ -1435,7 +1437,8 @@ Note that the style variables are always made local to the buffer."
     ;; quotes up until the next unescaped EOL.  Also guard against the change
     ;; being the insertion of \ before an EOL, escaping it.
     (cond
-     ((c-characterp c-multiline-string-start-char)
+     ((and (not c-ml-string-opener-re)
+	   (c-characterp c-multiline-string-start-char))
       ;; The text about to be inserted might contain a multiline string
       ;; opener.  Set c-new-END after anything which might be affected.
       ;; Go to the end of the putative multiline string.
@@ -1461,7 +1464,8 @@ Note that the style variables are always made local to the buffer."
 	       (< (point) (point-max))))))
       (setq c-new-END (max (point) c-new-END)))
 
-     (c-multiline-string-start-char
+     ((and (not c-ml-string-opener-re)
+	   c-multiline-string-start-char)
       (setq c-bc-changed-stringiness
 	    (not (eq (eq end-literal-type 'string)
 		     (eq beg-literal-type 'string))))
@@ -1506,7 +1510,7 @@ Note that the style variables are always made local to the buffer."
 	    ;; Opening " at EOB.
 	    (c-clear-syn-tab (1- (point))))
 	(when (and (c-search-backward-char-property 'syntax-table '(15) c-new-BEG)
-		   (memq (char-after) c-string-delims)) ; Ignore an unterminated raw string's (.
+		   (memq (char-after) c-string-delims)) ; Ignore an unterminated ml string's (.
 	  ;; Opening " on last line of text (without EOL).
 	  (c-remove-string-fences)
 	  (setq c-new-BEG (min c-new-BEG (point))))))
@@ -1520,13 +1524,16 @@ Note that the style variables are always made local to the buffer."
 
     (unless
 	(or (and
-	     ;; Don't set c-new-BEG/END if we're in a raw string.
+	     ;; Don't set c-new-BEG/END if we're in an ml string.
+	     c-ml-string-opener-re
 	     (eq beg-literal-type 'string)
-	     (c-at-c++-raw-string-opener (car beg-limits)))
+	     (c-ml-string-opener-at-or-around-point (car beg-limits)))
 	    (and c-multiline-string-start-char
+		 (not c-ml-string-opener-re)
 		 (not (c-characterp c-multiline-string-start-char))))
       (when (and (eq end-literal-type 'string)
-		 (not (eq (char-before (cdr end-limits)) ?\())
+		 (or (memq (char-before (cdr end-limits)) c-string-delims)
+		     (memq (char-before (cdr end-limits)) '(?\n ?\r)))
 		 (memq (char-after (car end-limits)) c-string-delims))
 	(setq c-new-END (max c-new-END (cdr end-limits)))
 	(when (equal (c-get-char-property (car end-limits) 'syntax-table)
@@ -1549,6 +1556,7 @@ Note that the style variables are always made local to the buffer."
   ;; This function is called exclusively as an after-change function via
   ;; `c-before-font-lock-functions'.
   (if (and c-multiline-string-start-char
+	   (not c-ml-string-opener-re)
 	   (not (c-characterp c-multiline-string-start-char)))
       ;; Only the last " might need to be marked.
       (c-save-buffer-state
@@ -1591,6 +1599,7 @@ Note that the style variables are always made local to the buffer."
 	   ((and (null beg-literal-type)
 		 (goto-char beg)
 		 (and (not (bobp))
+		      (not c-ml-string-opener-re)
 		      (eq (char-before) c-multiline-string-start-char))
 		 (memq (char-after) c-string-delims))
 	    (cons (point)
@@ -1615,6 +1624,7 @@ Note that the style variables are always made local to the buffer."
 	     (point))
 	   c-new-END))
 	 s)
+
       (goto-char
        (cond ((null beg-literal-type)
 	      c-new-BEG)
@@ -1638,8 +1648,9 @@ Note that the style variables are always made local to the buffer."
 	     (and (memq (char-before) c-string-delims)
 		  (not (nth 4 s)))))	; Check we're actually out of the
 					; comment. not stuck at EOB
-	(unless (and (c-major-mode-is 'c++-mode)
-		     (c-maybe-re-mark-raw-string))
+	(unless
+	    (and c-ml-string-opener-re
+		 (c-maybe-re-mark-ml-string))
 	  (if (c-unescaped-nls-in-string-p (1- (point)))
 	      (looking-at "\\(\\\\\\(.\\|\n\\)\\|[^\"]\\)*")
 	    (looking-at (cdr (assq (char-before) c-string-innards-re-alist))))
@@ -1678,21 +1689,15 @@ Note that the style variables are always made local to the buffer."
 	     (progn (goto-char end)
 		    (setq lit-start (c-literal-start)))
 	     (memq (char-after lit-start) c-string-delims)
-	     (or (not (c-major-mode-is 'c++-mode))
+	     (or (not c-ml-string-opener-re)
 		 (progn
 		   (goto-char lit-start)
-		   (and (not (and (eq (char-before) ?R)
-				  (looking-at c-c++-raw-string-opener-1-re)))
-			(not (and (eq (char-after) ?\()
-				  (equal (c-get-char-property
-					  (point) 'syntax-table)
-					 '(15))))))
+		   (not (c-ml-string-opener-at-or-around-point)))
 		 (save-excursion
 		   (c-beginning-of-macro))))
       (goto-char (1+ end))		; After the \
-      ;; Search forward for EOLL
-      (setq lim (re-search-forward "\\(?:\\\\\\(?:.\\|\n\\)\\|[^\\\n\r]\\)*"
-				   nil t))
+      ;; Search forward for EOLL.
+      (setq lim (c-point 'eoll))
       (goto-char (1+ end))
       (when (c-search-forward-char-property-with-value-on-char
 	     'syntax-table '(15) ?\" lim)
@@ -2562,17 +2567,17 @@ opening \" and the next unescaped end of line."
 
 (defvar c-mode-syntax-table
   (funcall (c-lang-const c-make-mode-syntax-table c))
-  "Syntax table used in c-mode buffers.")
+  "Syntax table used in `c-mode' buffers.")
 
 (defvar c-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in c-mode buffers.")
+  "Keymap used in `c-mode' buffers.")
 ;; Add bindings which are only useful for C.
 (define-key c-mode-map "\C-c\C-e"  'c-macro-expand)
 
 
-(easy-menu-define c-c-menu c-mode-map "C Mode Commands"
+(easy-menu-define c-c-menu c-mode-map "C Mode Commands."
 		  (cons "C" (c-lang-const c-mode-menu c)))
 
 ;; In XEmacs >= 21.5 modes should add their own entries to
@@ -2611,7 +2616,7 @@ opening \" and the next unescaped end of line."
   "Major mode for editing C code.
 
 To submit a problem report, enter `\\[c-submit-bug-report]' from a
-c-mode buffer.  This automatically sets up a mail buffer with version
+`c-mode' buffer.  This automatically sets up a mail buffer with version
 information already added.  You just need to add a description of the
 problem, including a reproducible test case, and send the message.
 
@@ -2695,7 +2700,7 @@ the code is C or C++ and based on that chooses whether to enable
 (define-key c++-mode-map "<"        'c-electric-lt-gt)
 (define-key c++-mode-map ">"        'c-electric-lt-gt)
 
-(easy-menu-define c-c++-menu c++-mode-map "C++ Mode Commands"
+(easy-menu-define c-c++-menu c++-mode-map "C++ Mode Commands."
 		  (cons "C++" (c-lang-const c-mode-menu c++)))
 
 ;;;###autoload
@@ -2732,16 +2737,16 @@ Key bindings:
 
 (defvar objc-mode-syntax-table
   (funcall (c-lang-const c-make-mode-syntax-table objc))
-  "Syntax table used in objc-mode buffers.")
+  "Syntax table used in `objc-mode' buffers.")
 
 (defvar objc-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in objc-mode buffers.")
+  "Keymap used in `objc-mode' buffers.")
 ;; Add bindings which are only useful for Objective-C.
 (define-key objc-mode-map "\C-c\C-e" 'c-macro-expand)
 
-(easy-menu-define c-objc-menu objc-mode-map "ObjC Mode Commands"
+(easy-menu-define c-objc-menu objc-mode-map "ObjC Mode Commands."
 		  (cons "ObjC" (c-lang-const c-mode-menu objc)))
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.m\\'" . objc-mode))
@@ -2750,7 +2755,7 @@ Key bindings:
 (define-derived-mode objc-mode prog-mode "ObjC"
   "Major mode for editing Objective C code.
 To submit a problem report, enter `\\[c-submit-bug-report]' from an
-objc-mode buffer.  This automatically sets up a mail buffer with
+`objc-mode' buffer.  This automatically sets up a mail buffer with
 version information already added.  You just need to add a description
 of the problem, including a reproducible test case, and send the
 message.
@@ -2779,12 +2784,12 @@ Key bindings:
 
 (defvar java-mode-syntax-table
   (funcall (c-lang-const c-make-mode-syntax-table java))
-  "Syntax table used in java-mode buffers.")
+  "Syntax table used in `java-mode' buffers.")
 
 (defvar java-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in java-mode buffers.")
+  "Keymap used in `java-mode' buffers.")
 ;; Add bindings which are only useful for Java.
 
 ;; Regexp trying to describe the beginning of a Java top-level
@@ -2794,7 +2799,7 @@ Key bindings:
 (defconst c-Java-defun-prompt-regexp
   "^[ \t]*\\(\\(\\(public\\|protected\\|private\\|const\\|abstract\\|synchronized\\|final\\|static\\|threadsafe\\|transient\\|native\\|volatile\\)\\s-+\\)*\\(\\(\\([[a-zA-Z][][_$.a-zA-Z0-9]+\\|[[a-zA-Z]\\)\\s-*\\)\\s-+\\)\\)?\\(\\([[a-zA-Z][][_$.a-zA-Z0-9]*\\s-+\\)\\s-*\\)?\\([_a-zA-Z][^][ \t:;.,{}()\^?=]*\\|\\([_$a-zA-Z][_$.a-zA-Z0-9]*\\)\\)\\s-*\\(([^);{}]*)\\)?\\([] \t]*\\)\\(\\s-*\\<throws\\>\\s-*\\(\\([_$a-zA-Z][_$.a-zA-Z0-9]*\\)[, \t\n\r\f\v]*\\)+\\)?\\s-*")
 
-(easy-menu-define c-java-menu java-mode-map "Java Mode Commands"
+(easy-menu-define c-java-menu java-mode-map "Java Mode Commands."
 		  (cons "Java" (c-lang-const c-mode-menu java)))
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.java\\'" . java-mode))
@@ -2803,7 +2808,7 @@ Key bindings:
 (define-derived-mode java-mode prog-mode "Java"
   "Major mode for editing Java code.
 To submit a problem report, enter `\\[c-submit-bug-report]' from a
-java-mode buffer.  This automatically sets up a mail buffer with
+`java-mode' buffer.  This automatically sets up a mail buffer with
 version information already added.  You just need to add a description
 of the problem, including a reproducible test case, and send the
 message.
@@ -2830,15 +2835,15 @@ Key bindings:
 
 (defvar idl-mode-syntax-table
   (funcall (c-lang-const c-make-mode-syntax-table idl))
-  "Syntax table used in idl-mode buffers.")
+  "Syntax table used in `idl-mode' buffers.")
 
 (defvar idl-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in idl-mode buffers.")
+  "Keymap used in `idl-mode' buffers.")
 ;; Add bindings which are only useful for IDL.
 
-(easy-menu-define c-idl-menu idl-mode-map "IDL Mode Commands"
+(easy-menu-define c-idl-menu idl-mode-map "IDL Mode Commands."
 		  (cons "IDL" (c-lang-const c-mode-menu idl)))
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.idl\\'" . idl-mode))
@@ -2847,7 +2852,7 @@ Key bindings:
 (define-derived-mode idl-mode prog-mode "IDL"
   "Major mode for editing CORBA's IDL, PSDL and CIDL code.
 To submit a problem report, enter `\\[c-submit-bug-report]' from an
-idl-mode buffer.  This automatically sets up a mail buffer with
+`idl-mode' buffer.  This automatically sets up a mail buffer with
 version information already added.  You just need to add a description
 of the problem, including a reproducible test case, and send the
 message.
@@ -2873,16 +2878,16 @@ Key bindings:
 
 (defvar pike-mode-syntax-table
   (funcall (c-lang-const c-make-mode-syntax-table pike))
-  "Syntax table used in pike-mode buffers.")
+  "Syntax table used in `pike-mode' buffers.")
 
 (defvar pike-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in pike-mode buffers.")
+  "Keymap used in `pike-mode' buffers.")
 ;; Additional bindings.
 (define-key pike-mode-map "\C-c\C-e" 'c-macro-expand)
 
-(easy-menu-define c-pike-menu pike-mode-map "Pike Mode Commands"
+(easy-menu-define c-pike-menu pike-mode-map "Pike Mode Commands."
 		  (cons "Pike" (c-lang-const c-mode-menu pike)))
 
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.\\(u?lpc\\|pike\\|pmod\\(\\.in\\)?\\)\\'" . pike-mode))
@@ -2892,7 +2897,7 @@ Key bindings:
 (define-derived-mode pike-mode prog-mode "Pike"
   "Major mode for editing Pike code.
 To submit a problem report, enter `\\[c-submit-bug-report]' from a
-pike-mode buffer.  This automatically sets up a mail buffer with
+`pike-mode' buffer.  This automatically sets up a mail buffer with
 version information already added.  You just need to add a description
 of the problem, including a reproducible test case, and send the
 message.
@@ -2926,7 +2931,7 @@ Key bindings:
 (defvar awk-mode-map
   (let ((map (c-make-inherited-keymap)))
     map)
-  "Keymap used in awk-mode buffers.")
+  "Keymap used in `awk-mode' buffers.")
 ;; Add bindings which are only useful for awk.
 (define-key awk-mode-map "#" 'self-insert-command);Overrides electric parent binding.
 (define-key awk-mode-map "/" 'self-insert-command);Overrides electric parent binding.
@@ -2939,7 +2944,7 @@ Key bindings:
 (define-key awk-mode-map "\C-\M-a" 'c-awk-beginning-of-defun)
 (define-key awk-mode-map "\C-\M-e" 'c-awk-end-of-defun)
 
-(easy-menu-define c-awk-menu awk-mode-map "AWK Mode Commands"
+(easy-menu-define c-awk-menu awk-mode-map "AWK Mode Commands."
 		  (cons "AWK" (c-lang-const c-mode-menu awk)))
 
 ;; (require 'cc-awk) brings these in.
@@ -2950,7 +2955,7 @@ Key bindings:
 (define-derived-mode awk-mode prog-mode "AWK"
   "Major mode for editing AWK code.
 To submit a problem report, enter `\\[c-submit-bug-report]' from an
-awk-mode buffer.  This automatically sets up a mail buffer with version
+`awk-mode' buffer.  This automatically sets up a mail buffer with version
 information already added.  You just need to add a description of the
 problem, including a reproducible test case, and send the message.
 
@@ -2979,7 +2984,7 @@ Key bindings:
 ;; bug reporting
 
 (defconst c-mode-help-address
-  "submit@debbugs.gnu.org"
+  "bug-gnu-emacs@gnu.org"
   "Address(es) for CC Mode bug reports.")
 
 (defun c-version ()

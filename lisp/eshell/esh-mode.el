@@ -499,7 +499,7 @@ and the hook `eshell-exit-hook'."
     (yank)))
 
 (defun eshell-bol ()
-  "Goes to the beginning of line, then skips past the prompt, if any."
+  "Go to the beginning of line, then skip past the prompt, if any."
   (interactive)
   (beginning-of-line)
   (and eshell-skip-prompt-function
@@ -993,8 +993,6 @@ This function could be in the list `eshell-output-filter-functions'."
 
 ;;; Bookmark support:
 
-(declare-function bookmark-make-record-default
-                  "bookmark" (&optional no-file no-context posn))
 (declare-function bookmark-prop-get "bookmark" (bookmark prop))
 
 (defun eshell-bookmark-name ()

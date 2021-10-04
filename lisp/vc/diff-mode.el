@@ -357,6 +357,18 @@ well."
      :foreground "green" :extend t))
   "`diff-mode' face used to highlight added lines.")
 
+(defface diff-changed-unspecified
+  '((default
+     :inherit diff-changed)
+    (((class color) (min-colors 88) (background light))
+     :background "grey90" :extend t)
+    (((class color) (min-colors 88) (background dark))
+     :background "grey20" :extend t)
+    (((class color))
+     :foreground "grey" :extend t))
+  "`diff-mode' face used to highlight changed lines."
+  :version "28.1")
+
 (defface diff-changed
   '((t nil))
   "`diff-mode' face used to highlight changed lines."
@@ -436,9 +448,10 @@ well."
 (defvar diff-use-changed-face (and (face-differs-from-default-p 'diff-changed)
 				   (not (face-equal 'diff-changed 'diff-added))
 				   (not (face-equal 'diff-changed 'diff-removed)))
-  "If non-nil, use the face `diff-changed' for changed lines in context diffs.
-Otherwise, use the face `diff-removed' for removed lines,
-and the face `diff-added' for added lines.")
+  "Controls how changed lines are fontified in context diffs.
+If non-nil, use the face `diff-changed-unspecified'.  Otherwise,
+use the face `diff-removed' for removed lines, and the face
+`diff-added' for added lines.")
 
 (defvar diff-font-lock-keywords
   `((,(concat "\\(" diff-hunk-header-re-unified "\\)\\(.*\\)$")
@@ -470,7 +483,7 @@ and the face `diff-added' for added lines.")
 		  diff-indicator-added-face
 		diff-indicator-removed-face)))))
      (2 (if diff-use-changed-face
-	    'diff-changed
+	    'diff-changed-unspecified
 	  ;; Otherwise, use the same method as above.
 	  (save-match-data
 	    (let ((limit (save-excursion (diff-beginning-of-hunk))))
@@ -956,11 +969,11 @@ If the OLD prefix arg is passed, tell the file NAME of the old file."
 	       (list (match-string 1)))
 	     header-files
              ;; this assumes that there are no spaces in filenames
-	     (when (re-search-backward
-		    "^diff \\(-\\S-+ +\\)*\\(\\S-+\\)\\( +\\(\\S-+\\)\\)?"
-		    nil t)
-	       (list (if old (match-string 2) (match-string 4))
-		     (if old (match-string 4) (match-string 2)))))))))
+             (and (re-search-backward "^diff " nil t)
+                  (looking-at
+		   "^diff \\(-[^ \t\nL]+ +\\)*\\(-L +\\S-+ +\\)*\\(\\S-+\\)\\( +\\(\\S-+\\)\\)?")
+	          (list (if old (match-string 3) (match-string 5))
+		        (if old (match-string 4) (match-string 3)))))))))
 
 (defun diff-find-file-name (&optional old noprompt prefix)
   "Return the file corresponding to the current patch.
@@ -1342,7 +1355,11 @@ else cover the whole buffer."
 	      (pcase (char-after)
 		(?\s (cl-incf space))
 		(?+ (cl-incf plus))
-		(?- (cl-incf minus))
+		(?- (unless ;; In git format-patch "^-- $" signifies
+                            ;; the end of the patch.
+			(and (eq diff-buffer-type 'git)
+			     (looking-at "^-- $"))
+		      (cl-incf minus)))
 		(?! (cl-incf bang))
 		((or ?\\ ?#) nil)
 		(?\n (if diff-valid-unified-empty-line
@@ -1466,7 +1483,7 @@ Supports unified and context diffs as well as (to a lesser extent)
 normal diffs.
 
 When the buffer is read-only, the ESC prefix is not necessary.
-If you edit the buffer manually, diff-mode will try to update the hunk
+If you edit the buffer manually, `diff-mode' will try to update the hunk
 headers for you on-the-fly.
 
 You can also switch between context diff and unified diff with \\[diff-context->unified],
@@ -1767,13 +1784,26 @@ char-offset in TEXT."
 	    (delete-region (point-min) keep))
 	  ;; Remove line-prefix characters, and unneeded lines (unified diffs).
           ;; Also skip lines like "\ No newline at end of file"
-	  (let ((kill-chars (list (if destp ?- ?+) ?\\)))
+	  (let ((kill-chars (list (if destp ?- ?+) ?\\))
+                curr-char last-char)
 	    (goto-char (point-min))
 	    (while (not (eobp))
-	      (if (memq (char-after) kill-chars)
-		  (delete-region (point) (progn (forward-line 1) (point)))
+	      (setq curr-char (char-after))
+	      (if (memq curr-char kill-chars)
+		  (delete-region
+		   ;; Check for "\ No newline at end of file"
+		   (if (and (eq curr-char ?\\)
+			    (not (eq last-char (if destp ?- ?+)))
+			    (save-excursion
+			      (forward-line 1)
+			      (or (eobp) (and (eq last-char ?-)
+					      (eq (char-after) ?+)))))
+		       (max (1- (point)) (point-min))
+		     (point))
+		   (progn (forward-line 1) (point)))
 		(delete-char num-pfx-chars)
-		(forward-line 1)))))
+		(forward-line 1))
+	      (setq last-char curr-char))))
 
 	(let ((text (buffer-substring-no-properties (point-min) (point-max))))
 	  (if char-offset (cons text (- (point) (point-min))) text))))))
@@ -2252,17 +2282,20 @@ Call FUN with two args (BEG and END) for each hunk."
       ;; same hunk.
       (goto-char (next-single-char-property-change
                   (point) 'diff--font-lock-refined nil max)))
-    (diff--iterate-hunks
-     max
-     (lambda (beg end)
-       (unless (get-char-property beg 'diff--font-lock-refined)
-         (diff--refine-hunk beg end)
-         (let ((ol (make-overlay beg end)))
-           (overlay-put ol 'diff--font-lock-refined t)
-           (overlay-put ol 'diff-mode 'fine)
-           (overlay-put ol 'evaporate t)
-           (overlay-put ol 'modification-hooks
-                        '(diff--overlay-auto-delete))))))))
+    ;; Ignore errors that diff cannot be found so that custom font-lock
+    ;; keywords after `diff--font-lock-refined' can still be evaluated.
+    (ignore-error file-missing
+      (diff--iterate-hunks
+       max
+       (lambda (beg end)
+         (unless (get-char-property beg 'diff--font-lock-refined)
+           (diff--refine-hunk beg end)
+           (let ((ol (make-overlay beg end)))
+             (overlay-put ol 'diff--font-lock-refined t)
+             (overlay-put ol 'diff-mode 'fine)
+             (overlay-put ol 'evaporate t)
+             (overlay-put ol 'modification-hooks
+                          '(diff--overlay-auto-delete)))))))))
 
 (defun diff--overlay-auto-delete (ol _after _beg _end &optional _len)
   (delete-overlay ol))

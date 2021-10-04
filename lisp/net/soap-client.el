@@ -8,7 +8,7 @@
 ;; Version: 3.2.0
 ;; Keywords: soap, web-services, comm, hypermedia
 ;; Package: soap-client
-;; Homepage: https://github.com/alex-hhh/emacs-soap-client
+;; URL: https://github.com/alex-hhh/emacs-soap-client
 ;; Package-Requires: ((cl-lib "0.6.1"))
 ;;FIXME: Put in `Package-Requires:' the Emacs version we expect.
 
@@ -659,7 +659,7 @@ representing leap seconds."
             (if second
                 (if second-fraction
                     (let* ((second-fraction-significand
-                            (replace-regexp-in-string "\\." "" second-fraction))
+                            (string-replace "." "" second-fraction))
                            (hertz
                             (expt 10 (length second-fraction-significand)))
                            (ticks (+ (* hertz (string-to-number second))
@@ -1938,7 +1938,7 @@ This is a specialization of `soap-decode-type' for
                   (e-name (soap-xs-element-name element))
                   ;; Heuristic: guess if we need to decode using local
                   ;; namespaces.
-                  (use-fq-names (string-match ":" (symbol-name (car node))))
+                  (use-fq-names (string-search ":" (symbol-name (car node))))
                   (children (if e-name
                                 (if use-fq-names
                                     ;; Find relevant children

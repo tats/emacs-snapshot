@@ -152,6 +152,9 @@ truncation; a @samp{\} on the rightmost column indicates a line that
 wraps.  (The display table can specify alternate characters to use
 for this; @pxref{Display Tables}).
 
+   Since wrapping and truncation of text contradict each other, Emacs
+turns off line truncation when wrapping is requested, and vice versa.
+
 @defopt truncate-lines
 If this buffer-local variable is non-@code{nil}, lines that extend
 beyond the right edge of the window are truncated; otherwise, they are
@@ -646,9 +649,9 @@ If the value is zero, then command input is not echoed.
 
 @defvar message-truncate-lines
 Normally, displaying a long message resizes the echo area to display
-the entire message.  But if the variable @code{message-truncate-lines}
-is non-@code{nil}, the echo area does not resize, and the message is
-truncated to fit it.
+the entire message, wrapping long line as needed.  But if the variable
+@code{message-truncate-lines} is non-@code{nil}, long lines of
+echo-area message are instead truncated to fit the mini-window width.
 @end defvar
 
   The variable @code{max-mini-window-height}, which specifies the
@@ -1861,9 +1864,12 @@ from the buffer.
 @item keymap
 @cindex keymap of character (and overlays)
 @kindex keymap @r{(overlay property)}
-If this property is non-@code{nil}, it specifies a keymap for a portion of the
-text.  This keymap is used when the character after point is within the
-overlay, and takes precedence over most other keymaps.  @xref{Active Keymaps}.
+If this property is non-@code{nil}, it specifies a keymap for a
+portion of the text.  This keymap takes precedence over most other
+keymaps (@pxref{Active Keymaps}), and it is used when point is within
+the overlay, where the front-
+and rear-advance properties define whether the boundaries are
+considered as being @emph{within} or not.
 
 @item local-map
 @kindex local-map @r{(overlay property)}
@@ -1914,7 +1920,8 @@ This function returns a list of the overlays that overlap the region
 contains one or more characters in the region; empty overlays
 (@pxref{Managing Overlays, empty overlay}) overlap if they are at
 @var{beg}, strictly between @var{beg} and @var{end}, or at @var{end}
-when @var{end} denotes the position at the end of the buffer.
+when @var{end} denotes the position at the end of the accessible part
+of the buffer.
 @end defun
 
 @defun next-overlay-change pos
@@ -3007,9 +3014,10 @@ This function returns non-@code{nil} if face @var{face} specifies
 a non-@code{nil} @code{:inverse-video} attribute.
 @end defun
 
-@defun face-extend-p face &optional frame
+@defun face-extend-p face &optional frame inherit
 This function returns non-@code{nil} if face @var{face} specifies
-a non-@code{nil} @code{:extend} attribute.
+a non-@code{nil} @code{:extend} attribute.  The @var{inherit} argument
+is passed to @code{face-attribute}.
 @end defun
 
 
@@ -5965,7 +5973,7 @@ To @var{svg} add an embedded (raster) image placed at
 @code{:base-uri} specifies a (possibly non-existing) file name of the
 svg image to be created, thus all the embedded files are searched
 relatively to the @code{:base-uri} filename's directory.  If
-@code{:base-uri} is ommited, then filename from where svg image is
+@code{:base-uri} is omitted, then filename from where svg image is
 loaded is used.  Using @code{:base-uri} improves the performance of
 embedding large images, comparing to @code{svg-embed}, because all the
 work is done directly by librsvg.
@@ -7615,7 +7623,7 @@ Chars}.
   The above display conventions apply even when there is a display
 table, for any character whose entry in the active display table is
 @code{nil}.  Thus, when you set up a display table, you need only
-specify the characters for which you want special behavior.
+specify the characters for which you want special display behavior.
 
   The following variables affect how certain characters are displayed
 on the screen.  Since they change the number of columns the characters
@@ -7649,7 +7657,8 @@ command @code{tab-to-tab-stop}.  @xref{Indent Tabs}.
 (@pxref{Char-Tables}), with @code{display-table} as its subtype, which
 is used to override the usual character display conventions.  This
 section describes how to make, inspect, and assign elements to a
-display table object.
+display table object.  The next section (@pxref{Active Display Table})
+describes the various standard display tables and their precedence.
 
 @defun make-display-table
 This creates and returns a display table.  The table initially has
@@ -7942,6 +7951,11 @@ Non-@acronym{ASCII}, non-printing characters @code{U+0080} to
 Characters of Unicode General Category [Cf], such as U+200E
 @sc{left-to-right mark}, but excluding characters that have graphic
 images, such as U+00AD @sc{soft hyphen}.
+
+@item variation-selectors
+Unicode VS-1 through VS-16 (U+FE00 through U+FE0F), which are used to
+select between different glyphs for the same codepoints (typically
+emojis).
 
 @item no-font
 Characters for which there is no suitable font, or which cannot be

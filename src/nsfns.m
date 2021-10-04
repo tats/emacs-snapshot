@@ -947,11 +947,7 @@ frame_parm_handler ns_frame_parm_handlers[] =
   0, /* x_set_sticky */
   0, /* x_set_tool_bar_position */
   0, /* x_set_inhibit_double_buffering */
-#ifdef NS_IMPL_COCOA
   ns_set_undecorated,
-#else
-  0, /* ns_set_undecorated */
-#endif
   ns_set_parent_frame,
   0, /* x_set_skip_taskbar */
   ns_set_no_focus_on_map,
@@ -1346,6 +1342,11 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
   f->output_data.ns->current_pointer = f->output_data.ns->text_cursor;
 
   f->output_data.ns->in_animation = NO;
+
+#ifdef NS_IMPL_COCOA
+  /* If the app has previously been disabled, start it up again.  */
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+#endif
 
   [[EmacsView alloc] initFrameFromEmacs: f];
 
@@ -1953,8 +1954,11 @@ DEFUN ("ns-hide-emacs", Fns_hide_emacs, Sns_hide_emacs,
        doc: /* If ON is non-nil, the entire Emacs application is hidden.
 Otherwise if Emacs is hidden, it is unhidden.
 If ON is equal to `activate', Emacs is unhidden and becomes
-the active application.  */)
-     (Lisp_Object on)
+the active application.
+If ON is equal to `activate-front', Emacs is unhidden and
+becomes the active application, but only the selected frame
+is layered in front of the windows of other applications.  */)
+  (Lisp_Object on)
 {
   check_window_system (NULL);
   if (EQ (on, intern ("activate")))
@@ -1962,6 +1966,14 @@ the active application.  */)
       [NSApp unhide: NSApp];
       [NSApp activateIgnoringOtherApps: YES];
     }
+#if GNUSTEP_GUI_MAJOR_VERSION > 0 || GNUSTEP_GUI_MINOR_VERSION >= 27
+  else if (EQ (on, intern ("activate-front")))
+    {
+      [NSApp unhide: NSApp];
+      [[NSRunningApplication currentApplication]
+        activateWithOptions: NSApplicationActivateIgnoringOtherApps];
+    }
+#endif
   else if (NILP (on))
     [NSApp unhide: NSApp];
   else
@@ -3024,7 +3036,8 @@ all_nonzero_ascii (unsigned char *str, ptrdiff_t n)
 }
 
 @implementation NSString (EmacsString)
-/* Make an NSString from a Lisp string.  */
+/* Make an NSString from a Lisp string.  STRING must not be in an
+   encoded form (e.g. UTF-8).  */
 + (NSString *)stringWithLispString:(Lisp_Object)string
 {
   /* Shortcut for the common case.  */

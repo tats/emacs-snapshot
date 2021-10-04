@@ -1029,8 +1029,8 @@ font_expand_wildcards (Lisp_Object *field, int n)
    X font backend driver, it is a font-entity.  In that case, NAME is
    a fully specified XLFD.  */
 
-int
-font_parse_xlfd (char *name, ptrdiff_t len, Lisp_Object font)
+static int
+font_parse_xlfd_1 (char *name, ptrdiff_t len, Lisp_Object font, int segments)
 {
   int i, j, n;
   char *f[XLFD_LAST_INDEX + 1];
@@ -1040,17 +1040,27 @@ font_parse_xlfd (char *name, ptrdiff_t len, Lisp_Object font)
   if (len > 255 || !len)
     /* Maximum XLFD name length is 255. */
     return -1;
+
   /* Accept "*-.." as a fully specified XLFD. */
   if (name[0] == '*' && (len == 1 || name[1] == '-'))
     i = 1, f[XLFD_FOUNDRY_INDEX] = name;
   else
     i = 0;
+
+  /* Split into segments. */
   for (p = name + i; *p; p++)
     if (*p == '-')
       {
-	f[i++] = p + 1;
-	if (i == XLFD_LAST_INDEX)
-	  break;
+	/* If we have too many segments, then gather them up into the
+	   FAMILY part of the name.  This allows using fonts with
+	   dashes in the FAMILY bit. */
+	if (segments > XLFD_LAST_INDEX && i == XLFD_WEIGHT_INDEX)
+	  segments--;
+	else {
+	  f[i++] = p + 1;
+	  if (i == XLFD_LAST_INDEX)
+	    break;
+	}
       }
   f[i] = name + len;
 
@@ -1214,6 +1224,28 @@ font_parse_xlfd (char *name, ptrdiff_t len, Lisp_Object font)
 
   return 0;
 }
+
+int
+font_parse_xlfd (char *name, ptrdiff_t len, Lisp_Object font)
+{
+  int found = font_parse_xlfd_1 (name, len, font, -1);
+  if (found > -1)
+    return found;
+
+  int segments = 0;
+  /* Count how many segments we have. */
+  for (char *p = name; *p; p++)
+    if (*p == '-')
+      segments++;
+
+  /* If we have a surplus of segments, then we try to parse again, in
+     case there's a font with dashes in the family name. */
+  if (segments > XLFD_LAST_INDEX)
+    return font_parse_xlfd_1 (name, len, font, segments);
+  else
+    return -1;
+}
+
 
 /* Store XLFD name of FONT (font-spec or font-entity) in NAME (NBYTES
    length), and return the name length.  If FONT_SIZE_INDEX of FONT is
@@ -3834,6 +3866,9 @@ font_at (int c, ptrdiff_t pos, struct face *face, struct window *w,
    If STRING is not nil, it is the string to check instead of the current
    buffer.  In that case, FACE must be not NULL.
 
+   CH is the character that actually caused the composition
+   process to start, it may be different from the character at POS.
+
    The return value is the font-object for the character at POS.
    *LIMIT is set to the position where that font can't be used.
 
@@ -3841,15 +3876,16 @@ font_at (int c, ptrdiff_t pos, struct face *face, struct window *w,
 
 Lisp_Object
 font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
-	    struct window *w, struct face *face, Lisp_Object string)
+	    struct window *w, struct face *face, Lisp_Object string,
+	    int ch)
 {
   ptrdiff_t ignore;
   int c;
   Lisp_Object font_object = Qnil;
+  struct frame *f = XFRAME (w->frame);
 
   if (!face)
     {
-      struct frame *f = XFRAME (w->frame);
       int face_id;
 
       if (NILP (string))
@@ -3866,6 +3902,24 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
 	                                     face_id, false, 0);
 	}
       face = FACE_FROM_ID (f, face_id);
+    }
+
+  /* If the composition was triggered by an emoji, use a character
+     from 'script-representative-chars', rather than the first
+     character in the string, to determine the font to use.  */
+  if (EQ (CHAR_TABLE_REF (Vchar_script_table, ch),
+	  Qemoji))
+    {
+      Lisp_Object val = assq_no_quit (Qemoji, Vscript_representative_chars);
+      if (CONSP (val))
+	{
+	  val = XCDR (val);
+	  if (CONSP (val))
+	    val = XCAR (val);
+	  else if (VECTORP (val))
+	    val = AREF (val, 0);
+	  font_object = font_for_char (face, XFIXNAT (val), pos - 1, string);
+	}
     }
 
   while (pos < *limit)
@@ -5391,6 +5445,7 @@ syms_of_font (void)
   DEFSYM (Qiso8859_1, "iso8859-1");
   DEFSYM (Qiso10646_1, "iso10646-1");
   DEFSYM (Qunicode_bmp, "unicode-bmp");
+  DEFSYM (Qemoji, "emoji");
 
   /* Symbols representing keys of font extra info.  */
   DEFSYM (QCotf, ":otf");

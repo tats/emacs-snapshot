@@ -549,7 +549,11 @@ It is the default value of the variable `top-level'."
       ;; When $HOME is set to '/nonexistent' means we are running the
       ;; testsuite, add a temporary folder in front to produce there
       ;; new compilations.
-      (when (equal (getenv "HOME") "/nonexistent")
+      (when (and (equal (getenv "HOME") "/nonexistent")
+                 ;; We may be running in a chroot environment where we
+                 ;; can't write anything.
+                 (file-writable-p (expand-file-name
+                                   (or temporary-file-directory ""))))
         (let ((tmp-dir (make-temp-file "emacs-testsuite-" t)))
           (add-hook 'kill-emacs-hook (lambda () (delete-directory tmp-dir t)))
           (push tmp-dir native-comp-eln-load-path))))
@@ -1197,11 +1201,11 @@ please check its value")
 
   ;; Re-evaluate predefined variables whose initial value depends on
   ;; the runtime context.
-  (setq custom-delayed-init-variables
-        ;; Initialize them in the same order they were loaded, in case there
-        ;; are dependencies between them.
-        (nreverse custom-delayed-init-variables))
-  (mapc #'custom-reevaluate-setting custom-delayed-init-variables)
+  (when (listp custom-delayed-init-variables)
+    (mapc #'custom-reevaluate-setting
+          ;; Initialize them in the same order they were loaded, in
+          ;; case there are dependencies between them.
+          (reverse custom-delayed-init-variables)))
   (setq custom-delayed-init-variables t)
 
   ;; Warn for invalid user name.
@@ -1784,9 +1788,19 @@ a face or button specification."
 	 (window-width (window-width)))
     (when img
       (when (> window-width image-width)
-	;; Center the image in the window.
-	(insert (propertize " " 'display
-			    `(space :align-to (+ center (-0.5 . ,img)))))
+        ;; Center the image above text.
+        ;;  NB. The logo used to be centered in the window, which made
+        ;;      it align poorly with the non-centered text on large
+        ;;      displays.  Arguably it would be better to center both
+        ;;      text and image, but this will do for now.  -- SK
+        (let ((text-width 80)
+              ;; The below value chosen to avoid splash screen being
+              ;; visually unbalanced.  This needs to be eye-balled.
+              (adjust-left 3))
+          (insert (propertize " " 'display
+                              `(space :align-to (+ ,(- (/ text-width 2)
+                                                       adjust-left)
+                                                   (-0.5 . ,img))))))
 
 	;; Change the color of the XPM version of the splash image
 	;; so that it is visible with a dark frame background.
@@ -2317,6 +2331,9 @@ A fancy display is used on graphic displays, normal otherwise."
         (set-buffer-major-mode (current-buffer))
         (current-buffer))))
 
+;; This avoids byte-compiler warning in the unexec build.
+(declare-function pdumper-stats "pdumper.c" ())
+
 (defun command-line-1 (args-left)
   "A subroutine of `command-line'."
   (display-startup-echo-area-message)
@@ -2388,6 +2405,7 @@ nil default-directory" name)
 				  (command-line-normalize-file-name name)
 				  dir))
 			   (buf (find-file-noselect file)))
+                      (file-name-history--add file)
 		      (setq displayable-buffers (cons buf displayable-buffers))
                       ;; Set the file buffer to the current buffer so
                       ;; that it will be used with "--eval" and
@@ -2497,7 +2515,7 @@ nil default-directory" name)
                                    (or argval (pop command-line-args-left))))
                             ;; Take file from default dir if it exists there;
                             ;; otherwise let `load' search for it.
-                            (file-ex (expand-file-name file)))
+                            (file-ex (file-truename (expand-file-name file))))
                        (when (file-regular-p file-ex)
                          (setq file file-ex))
                        (load file nil t)))
@@ -2508,7 +2526,7 @@ nil default-directory" name)
                      (let* ((file (command-line-normalize-file-name
                                    (or argval (pop command-line-args-left))))
                             ;; Take file from default dir.
-                            (file-ex (expand-file-name file)))
+                            (file-ex (file-truename (expand-file-name file))))
                        (load file-ex nil t t)))
 
                     ((equal argi "-insert")

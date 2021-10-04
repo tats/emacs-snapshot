@@ -1452,8 +1452,8 @@ DEFUN ("insert-char", Finsert_char, Sinsert_char, 1, 3,
               (prefix-numeric-value current-prefix-arg)\
               t))",
        doc: /* Insert COUNT copies of CHARACTER.
-Interactively, prompt for CHARACTER.  You can specify CHARACTER in one
-of these ways:
+Interactively, prompt for CHARACTER using `read-char-by-name'.
+You can specify CHARACTER in one of these ways:
 
  - As its Unicode character name, e.g. \"LATIN SMALL LETTER A\".
    Completion is available; if you type a substring of the name
@@ -2137,7 +2137,7 @@ nil.  */)
 	 the file now.  */
       if (SAVE_MODIFF == MODIFF
 	  && STRINGP (BVAR (a, file_truename)))
-	unlock_file (BVAR (a, file_truename));
+	Funlock_file (BVAR (a, file_truename));
     }
 
   return Qt;
@@ -2371,7 +2371,7 @@ Both characters must have the same length of multi-byte form.  */)
 	      /* replace_range is less efficient, because it moves the gap,
 		 but it handles combining correctly.  */
 	      replace_range (pos, pos + 1, string,
-			     false, false, true, false);
+			     false, false, true, false, false);
 	      pos_byte_next = CHAR_TO_BYTE (pos);
 	      if (pos_byte_next > pos_byte)
 		/* Before combining happened.  We should not increment
@@ -2578,7 +2578,7 @@ It returns the number of characters changed.  */)
 		     but it should handle multibyte characters correctly.  */
 		  string = make_multibyte_string ((char *) str, 1, str_len);
 		  replace_range (pos, pos + 1, string,
-				 true, false, true, false);
+				 true, false, true, false, false);
 		  len = str_len;
 		}
 	      else
@@ -2613,7 +2613,8 @@ It returns the number of characters changed.  */)
 		= (VECTORP (val)
 		   ? Fconcat (1, &val)
 		   : Fmake_string (make_fixnum (1), val, Qnil));
-	      replace_range (pos, pos + len, string, true, false, true, false);
+	      replace_range (pos, pos + len, string, true, false, true, false,
+			     false);
 	      pos_byte += SBYTES (string);
 	      pos += SCHARS (string);
 	      characters_changed += SCHARS (string);
@@ -3390,7 +3391,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  ptrdiff_t nch, nby;
 		  nchars_string = SCHARS (arg);
 		  width = lisp_string_width (arg, 0, nchars_string, prec,
-					     &nch, &nby);
+					     &nch, &nby, false);
 		  if (prec < 0)
 		    nbytes = SBYTES (arg);
 		  else

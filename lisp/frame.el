@@ -36,7 +36,7 @@ as its argument.")
 (cl-generic-define-context-rewriter window-system (value)
   ;; If `value' is a `consp', it's probably an old-style specializer,
   ;; so just use it, and anyway `eql' isn't very useful on cons cells.
-  `(window-system ,(if (consp value) value `(eql ,value))))
+  `(window-system ,(if (consp value) value `(eql ',value))))
 
 (cl-defmethod frame-creation-function (params &context (window-system nil))
   ;; It's tempting to get rid of tty-create-frame-with-faces and turn it into
@@ -701,9 +701,8 @@ Return nil if we don't know how to interpret DISPLAY."
   "Make a frame on display DISPLAY.
 The optional argument PARAMETERS specifies additional frame parameters."
   (interactive (if (fboundp 'x-display-list)
-                   (list (completing-read
-                          (format "Make frame on display: ")
-                          (x-display-list)))
+                   (list (completing-read "Make frame on display: "
+                                          (x-display-list)))
                  (user-error "This Emacs build does not support X displays")))
   (make-frame (cons (cons 'display display) parameters)))
 
@@ -786,6 +785,26 @@ When called from Lisp, returns the new frame."
   (if (display-graphic-p)
       (make-frame)
     (select-frame (make-frame))))
+
+(defun clone-frame (&optional frame use-default-parameters)
+  "Make a new frame with the same parameters as FRAME.
+With a prefix arg (USE-DEFAULT-PARAMETERS), use
+`default-frame-alist' instead.
+
+FRAME defaults to the selected frame.  The frame is created on the
+same terminal as FRAME.  If the terminal is a text-only terminal then
+also select the new frame."
+  (interactive "i\nP")
+  (if use-default-parameters
+      (make-frame-command)
+    (let* ((default-frame-alist (seq-filter
+                                 (lambda (elem)
+                                   (not (eq (car elem) 'name)))
+                                 (frame-parameters frame)))
+           (new-frame (make-frame)))
+      (unless (display-graphic-p)
+        (select-frame new-frame))
+      new-frame)))
 
 (defvar before-make-frame-hook nil
   "Functions to run before `make-frame' creates a new frame.")
@@ -1231,7 +1250,7 @@ face specs for the new background mode."
                          ;; during startup with -rv on the command
                          ;; line for the initial frame, because frames
                          ;; are not recorded in the pdump file.
-                         (assq face (frame-face-alist frame))
+                         (gethash face (frame--face-hash-table))
                          (face-spec-match-p face
                                             (face-user-default-spec face)
                                             frame)))
@@ -1397,7 +1416,7 @@ FRAME defaults to the selected frame."
 (declare-function x-list-fonts "xfaces.c"
                   (pattern &optional face frame maximum width))
 
-(defun set-frame-font (font &optional keep-size frames)
+(defun set-frame-font (font &optional keep-size frames inhibit-customize)
   "Set the default font to FONT.
 When called interactively, prompt for the name of a font, and use
 that font on the selected frame.  When called from Lisp, FONT
@@ -1414,7 +1433,10 @@ If FRAMES is non-nil, it should be a list of frames to act upon,
 or t meaning all existing graphical frames.
 Also, if FRAMES is non-nil, alter the user's Customization settings
 as though the font-related attributes of the `default' face had been
-\"set in this session\", so that the font is applied to future frames."
+\"set in this session\", so that the font is applied to future frames.
+
+If INHIBIT-CUSTOMIZE is non-nil, don't update the user's
+Customization settings."
   (interactive
    (let* ((completion-ignore-case t)
           (default (frame-parameter nil 'font))
@@ -1451,7 +1473,8 @@ as though the font-related attributes of the `default' face had been
 	       f
 	       (list (cons 'height (round height (frame-char-height f)))
 		     (cons 'width  (round width  (frame-char-width f))))))))
-      (when frames
+      (when (and frames
+                 (not inhibit-customize))
 	;; Alter the user's Custom setting of the `default' face, but
 	;; only for font-related attributes.
 	(let ((specs (cadr (assq 'user (get 'default 'theme-face))))
@@ -1503,7 +1526,7 @@ To get the frame's current background color, use `frame-parameters'."
   "Set the foreground color of the selected frame to COLOR-NAME.
 When called interactively, prompt for the name of the color to use.
 To get the frame's current foreground color, use `frame-parameters'."
-  (interactive (list (read-color "Foreground color: ")))
+  (interactive (list (read-color "Foreground color: " nil nil nil t)))
   (modify-frame-parameters (selected-frame)
 			   (list (cons 'foreground-color color-name)))
   (or window-system
@@ -2803,6 +2826,7 @@ See also `toggle-frame-maximized'."
 (define-key ctl-x-5-map "0" #'delete-frame)
 (define-key ctl-x-5-map "o" #'other-frame)
 (define-key ctl-x-5-map "5" #'other-frame-prefix)
+(define-key ctl-x-5-map "c" #'clone-frame)
 (define-key global-map [f11] #'toggle-frame-fullscreen)
 (define-key global-map [(meta f10)] #'toggle-frame-maximized)
 (define-key esc-map    [f10]        #'toggle-frame-maximized)

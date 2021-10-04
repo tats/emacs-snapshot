@@ -3153,19 +3153,16 @@ image_find_image_fd (Lisp_Object file, int *pfd)
   /* Try to find FILE in data-directory/images, then x-bitmap-file-path.  */
   fd = openp (search_path, file, Qnil, &file_found,
 	      pfd ? Qt : make_fixnum (R_OK), false, false);
-  if (fd >= 0 || fd == -2)
+  if (fd == -2)
     {
-      file_found = ENCODE_FILE (file_found);
-      if (fd == -2)
-	{
-	  /* The file exists locally, but has a file name handler.
-	     (This happens, e.g., under Auto Image File Mode.)
-	     'openp' didn't open the file, so we should, because the
-	     caller expects that.  */
-	  fd = emacs_open (SSDATA (file_found), O_RDONLY, 0);
-	}
+      /* The file exists locally, but has a file name handler.
+	 (This happens, e.g., under Auto Image File Mode.)
+	 'openp' didn't open the file, so we should, because the
+	 caller expects that.  */
+      Lisp_Object encoded_name = ENCODE_FILE (file_found);
+      fd = emacs_open (SSDATA (encoded_name), O_RDONLY, 0);
     }
-  else	/* fd < 0, but not -2 */
+  else if (fd < 0)
     return Qnil;
   if (pfd)
     *pfd = fd;
@@ -3173,8 +3170,8 @@ image_find_image_fd (Lisp_Object file, int *pfd)
 }
 
 /* Find image file FILE.  Look in data-directory/images, then
-   x-bitmap-file-path.  Value is the encoded full name of the file
-   found, or nil if not found.  */
+   x-bitmap-file-path.  Value is the full name of the file found, or
+   nil if not found.  */
 
 Lisp_Object
 image_find_image_file (Lisp_Object file)
@@ -4994,7 +4991,7 @@ xpm_load_image (struct frame *f,
 
   while (num_colors-- > 0)
     {
-      char *color, *max_color;
+      char *color, *max_color = NULL;
       int key, next_key, max_key = 0;
       Lisp_Object symbol_color = Qnil, color_val;
       Emacs_Color cdef;
@@ -5055,7 +5052,7 @@ xpm_load_image (struct frame *f,
 						   cdef.blue));
 	    }
 	}
-      if (NILP (color_val) && max_key > 0)
+      if (NILP (color_val) && max_color)
 	{
 	  if (xstrcasecmp (max_color, "None") == 0)
 	    color_val = Qt;
@@ -7777,6 +7774,13 @@ tiff_image_p (Lisp_Object object)
 
 # include <tiffio.h>
 
+/* libtiff version 4.3.0 deprecated uint32 typedef.  */
+#if TIFFLIB_VERSION >= 20210416
+# define UINT32 uint32_t
+#else
+# define UINT32 uint32
+#endif
+
 # ifdef WINDOWSNT
 
 /* TIFF library details.  */
@@ -7788,7 +7792,7 @@ DEF_DLL_FN (TIFF *, TIFFClientOpen,
 	     TIFFReadWriteProc, TIFFSeekProc, TIFFCloseProc, TIFFSizeProc,
 	     TIFFMapFileProc, TIFFUnmapFileProc));
 DEF_DLL_FN (int, TIFFGetField, (TIFF *, ttag_t, ...));
-DEF_DLL_FN (int, TIFFReadRGBAImage, (TIFF *, uint32, uint32, uint32 *, int));
+DEF_DLL_FN (int, TIFFReadRGBAImage, (TIFF *, UINT32, UINT32, UINT32 *, int));
 DEF_DLL_FN (void, TIFFClose, (TIFF *));
 DEF_DLL_FN (int, TIFFSetDirectory, (TIFF *, tdir_t));
 
@@ -7980,7 +7984,7 @@ tiff_load (struct frame *f, struct image *img)
   Lisp_Object specified_data;
   TIFF *tiff;
   int width, height, x, y, count;
-  uint32 *buf;
+  UINT32 *buf;
   int rc;
   Emacs_Pix_Container ximg;
   tiff_memory_source memsrc;
@@ -8106,11 +8110,11 @@ tiff_load (struct frame *f, struct image *img)
   /* Process the pixel raster.  Origin is in the lower-left corner.  */
   for (y = 0; y < height; ++y)
     {
-      uint32 *row = buf + y * width;
+      UINT32 *row = buf + y * width;
 
       for (x = 0; x < width; ++x)
 	{
-	  uint32 abgr = row[x];
+	  UINT32 abgr = row[x];
 	  int r = TIFFGetR (abgr) << 8;
 	  int g = TIFFGetG (abgr) << 8;
 	  int b = TIFFGetB (abgr) << 8;
@@ -10035,7 +10039,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 #if LIBRSVG_CHECK_VERSION (2, 46, 0)
   RsvgRectangle zero_rect, viewbox, out_logical_rect;
 
-  /* Try the instrinsic dimensions first.  */
+  /* Try the intrinsic dimensions first.  */
   gboolean has_width, has_height, has_viewbox;
   RsvgLength iwidth, iheight;
   double dpi = FRAME_DISPLAY_INFO (f)->resx;
@@ -10070,7 +10074,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
     }
   else
     {
-      /* We haven't found a useable set of sizes, so try working out
+      /* We haven't found a usable set of sizes, so try working out
          the visible area.  */
       rsvg_handle_get_geometry_for_layer (rsvg_handle, NULL,
                                           &zero_rect, &viewbox,

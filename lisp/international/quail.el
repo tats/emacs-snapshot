@@ -471,7 +471,8 @@ conversion region is active.  It is an alist of single key character
 vs. corresponding command to be called.
 
 If SIMPLE is non-nil, then we do not alter the meanings of
-commands such as C-f, C-b, C-n, C-p and TAB; they are treated as
+commands such as \\[forward-char], \\[backward-char], \\[next-line], \
+\\[previous-line] and \\[indent-for-tab-command]; they are treated as
 non-Quail commands."
   (let (translation-keymap conversion-keymap)
     (if deterministic (setq forget-last-selection t))
@@ -1368,6 +1369,30 @@ If STR has `advice' text property, append the following special event:
       (delete-region (overlay-start quail-overlay)
 		     (overlay-end quail-overlay))))
 
+;; Quail puts keys back in `unread-command-events' to be re-read
+;; again, but these keys have already been recorded in recent-keys and
+;; in the keyboard macro, if one is being defined, which means that
+;; recording them again creates duplicates.  This function is a
+;; wrapper around adding input events to `unread-command-events', but
+;; it makes sure these events will not be recorded a second time.
+(defun quail-add-unread-command-events (key &optional reset)
+  "Add KEY to `unread-command-events', but avoid recording it a second time.
+If KEY is a character, it is prepended to `unread-command-events' as
+a cons cell of the form (no-record . KEY).
+If KEY is a vector of events, the events in the vector are prepended
+to `unread-command-events', after converting each event to a cons cell
+of the form (no-record . EVENT).
+If RESET is non-nil, the events in `unread-command-events' are first
+discarded, i.e. in this case KEY will end up being the only key
+in `unread-command-events'."
+  (if reset (setq unread-command-events nil))
+  (setq unread-command-events
+        (if (characterp key)
+            (cons (cons 'no-record key) unread-command-events)
+          (append (mapcan (lambda (e) (list (cons 'no-record e)))
+                          (append key nil))
+                  unread-command-events))))
+
 (defun quail-start-translation (key)
   "Start translation of the typed character KEY by the current Quail package.
 Return the input string."
@@ -1385,13 +1410,11 @@ Return the input string."
 	     ;; (generated-events nil)     ;FIXME: What is this?
 	     (input-method-function nil)
 	     (modified-p (buffer-modified-p))
-	     last-command-event last-command this-command inhibit-record)
+	     last-command-event last-command this-command)
 	(setq quail-current-key ""
 	      quail-current-str ""
 	      quail-translating t)
-	(if key
-	    (setq unread-command-events (cons key unread-command-events)
-                  inhibit-record t))
+	(if key (quail-add-unread-command-events key))
 	(while quail-translating
 	  (set-buffer-modified-p modified-p)
 	  (quail-show-guidance)
@@ -1400,13 +1423,8 @@ Return the input string."
 				     (or input-method-previous-message "")
 				     quail-current-str
 				     quail-guidance-str)))
-                 ;; We inhibit record_char only for the first key,
-                 ;; because it was already recorded before read_char
-                 ;; called quail-input-method.
-                 (inhibit--record-char inhibit-record)
 		 (keyseq (read-key-sequence prompt nil nil t))
 		 (cmd (lookup-key (quail-translation-keymap) keyseq)))
-            (setq inhibit-record nil)
 	    (if (if key
 		    (and (commandp cmd) (not (eq cmd 'quail-other-command)))
 		  (eq cmd 'quail-self-insert-command))
@@ -1420,9 +1438,7 @@ Return the input string."
 		    (quail-error (message "%s" (cdr err)) (beep))))
 	      ;; KEYSEQ is not defined in the translation keymap.
 	      ;; Let's return the event(s) to the caller.
-	      (setq unread-command-events
-		    (append (this-single-command-raw-keys)
-                            unread-command-events))
+	      (quail-add-unread-command-events (this-single-command-raw-keys))
 	      (setq quail-translating nil))))
 	(quail-delete-region)
 	quail-current-str)
@@ -1450,15 +1466,13 @@ Return the input string."
 	     ;; (generated-events nil)     ;FIXME: What is this?
 	     (input-method-function nil)
 	     (modified-p (buffer-modified-p))
-	     last-command-event last-command this-command inhibit-record)
+	     last-command-event last-command this-command)
 	(setq quail-current-key ""
 	      quail-current-str ""
 	      quail-translating t
 	      quail-converting t
 	      quail-conversion-str "")
-	(if key
-	    (setq unread-command-events (cons key unread-command-events)
-                  inhibit-record t))
+	(if key (quail-add-unread-command-events key))
 	(while quail-converting
 	  (set-buffer-modified-p modified-p)
 	  (or quail-translating
@@ -1474,13 +1488,8 @@ Return the input string."
 				     quail-conversion-str
 				     quail-current-str
 				     quail-guidance-str)))
-                 ;; We inhibit record_char only for the first key,
-                 ;; because it was already recorded before read_char
-                 ;; called quail-input-method.
-                 (inhibit--record-char inhibit-record)
 		 (keyseq (read-key-sequence prompt nil nil t))
 		 (cmd (lookup-key (quail-conversion-keymap) keyseq)))
-            (setq inhibit-record nil)
 	    (if (if key (commandp cmd) (eq cmd 'quail-self-insert-command))
 		(progn
 		  (setq last-command-event (aref keyseq (1- (length keyseq)))
@@ -1503,9 +1512,7 @@ Return the input string."
 			    (setq quail-converting nil)))))
 	      ;; KEYSEQ is not defined in the conversion keymap.
 	      ;; Let's return the event(s) to the caller.
-	      (setq unread-command-events
-		    (append (this-single-command-raw-keys)
-                            unread-command-events))
+	      (quail-add-unread-command-events (this-single-command-raw-keys))
 	      (setq quail-converting nil))))
 	(setq quail-translating nil)
 	(if (overlay-start quail-conv-overlay)
@@ -1551,9 +1558,8 @@ with more keys."
 	       (or input-method-exit-on-first-char
 		   (while (> len control-flag)
 		     (setq len (1- len))
-		     (setq unread-command-events
-			   (cons (aref quail-current-key len)
-				 unread-command-events))))))
+		     (quail-add-unread-command-events
+		      (aref quail-current-key len))))))
 	    ((null control-flag)
 	     (unless quail-current-str
 	       (setq quail-current-str
@@ -1799,8 +1805,7 @@ sequence counting from the head."
 	  (setcar indices (1+ (car indices)))
 	  (quail-update-current-translations)
 	  (quail-update-translation nil)))
-    (setq unread-command-events
-	  (cons last-command-event unread-command-events))
+    (quail-add-unread-command-events last-command-event)
     (quail-terminate-translation)))
 
 (defun quail-prev-translation ()
@@ -1814,8 +1819,7 @@ sequence counting from the head."
 	  (setcar indices (1- (car indices)))
 	  (quail-update-current-translations)
 	  (quail-update-translation nil)))
-    (setq unread-command-events
-	  (cons last-command-event unread-command-events))
+    (quail-add-unread-command-events last-command-event)
     (quail-terminate-translation)))
 
 (defun quail-next-translation-block ()
@@ -1830,8 +1834,7 @@ sequence counting from the head."
 	  (setcar indices (+ (nth 2 indices) offset))
 	  (quail-update-current-translations)
 	  (quail-update-translation nil)))
-    (setq unread-command-events
-	  (cons last-command-event unread-command-events))
+    (quail-add-unread-command-events last-command-event)
     (quail-terminate-translation)))
 
 (defun quail-prev-translation-block ()
@@ -1850,8 +1853,7 @@ sequence counting from the head."
 		(setcar indices (+ (nth 1 indices) offset))
 		(quail-update-current-translations)))
 	  (quail-update-translation nil)))
-    (setq unread-command-events
-	  (cons last-command-event unread-command-events))
+    (quail-add-unread-command-events last-command-event)
     (quail-terminate-translation)))
 
 (defun quail-abort-translation ()
@@ -2006,8 +2008,8 @@ Remaining args are for FUNC."
     (sit-for 1000000)
     (delete-region point-max (point-max))
     (when quit-flag
-      (setq quit-flag nil
-	    unread-command-events '(7)))))
+      (setq quit-flag nil)
+      (quail-add-unread-command-events 7 t))))
 
 (defun quail-show-guidance ()
   "Display a guidance for Quail input method in some window.
@@ -2019,7 +2021,7 @@ minibuffer and the selected frame has no other windows)."
   (bury-buffer quail-completion-buf)
 
   ;; Then, show the guidance.
-  (when (and 
+  (when (and
          ;; Don't try to display guidance on an expired minibuffer.  This
          ;; would go into an infinite wait rather than executing the user's
          ;; command.  Bug #45792.

@@ -364,9 +364,6 @@ do_debug_on_call (Lisp_Object code, ptrdiff_t count)
   call_debugger (list1 (code));
 }
 
-/* NOTE!!! Every function that can call EVAL must protect its args
-   and temporaries from garbage collection while it needs them.
-   The definition of `For' shows what you have to do.  */
 
 DEFUN ("or", For, Sor, 0, UNEVALLED, 0,
        doc: /* Eval args until one of them yields non-nil, then return that value.
@@ -462,7 +459,7 @@ DEFUN ("progn", Fprogn, Sprogn, 0, UNEVALLED, 0,
 usage: (progn BODY...)  */)
   (Lisp_Object body)
 {
-  Lisp_Object val = Qnil;
+  Lisp_Object CACHEABLE val = Qnil;
 
   while (CONSP (body))
     {
@@ -1174,23 +1171,12 @@ usage: (catch TAG BODY...)  */)
    FUNC should return a Lisp_Object.
    This is how catches are done from within C code.  */
 
-/* MINIBUFFER_QUIT_LEVEL is to handle quitting from nested minibuffers by
-   throwing t to tag `exit'.
-   0 means there is no (throw 'exit t) in progress, or it wasn't from
-     a minibuffer which isn't the most nested;
-   N > 0 means the `throw' was done from the minibuffer at level N which
-     wasn't the most nested.  */
-EMACS_INT minibuffer_quit_level = 0;
-
 Lisp_Object
 internal_catch (Lisp_Object tag,
 		Lisp_Object (*func) (Lisp_Object), Lisp_Object arg)
 {
   /* This structure is made part of the chain `catchlist'.  */
   struct handler *c = push_handler (tag, CATCHER);
-
-  if (EQ (tag, Qexit))
-    minibuffer_quit_level = 0;
 
   /* Call FUNC.  */
   if (! sys_setjmp (c->jmp))
@@ -1205,17 +1191,6 @@ internal_catch (Lisp_Object tag,
       Lisp_Object val = handlerlist->val;
       clobbered_eassert (handlerlist == c);
       handlerlist = handlerlist->next;
-      if (EQ (tag, Qexit) && EQ (val, Qt) && minibuffer_quit_level > 0)
-	/* If we've thrown t to tag `exit' from within a minibuffer, we
-	   exit all minibuffers more deeply nested than the current
-	   one.  */
-	{
-	  if (minibuf_level > minibuffer_quit_level
-	      && !NILP (Fminibuffer_innermost_command_loop_p (Qnil)))
-            Fthrow (Qexit, Qt);
-	  else
-	    minibuffer_quit_level = 0;
-	}
       return val;
     }
 }
@@ -1370,7 +1345,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 		     || CONSP (XCAR (tem))))))
 	error ("Invalid condition handler: %s",
 	       SDATA (Fprin1_to_string (tem, Qt)));
-      if (EQ (XCAR (tem), QCsuccess))
+      if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
 	success_handler = XCDR (tem);
       else
 	clausenb++;
@@ -1387,8 +1362,11 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
   Lisp_Object volatile *clauses = alloca (clausenb * sizeof *clauses);
   clauses += clausenb;
   for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
-    if (!EQ (XCAR (XCAR (tail)), QCsuccess))
-      *--clauses = XCAR (tail);
+    {
+      Lisp_Object tem = XCAR (tail);
+      if (!(CONSP (tem) && EQ (XCAR (tem), QCsuccess)))
+	*--clauses = tem;
+    }
   for (ptrdiff_t i = 0; i < clausenb; i++)
     {
       Lisp_Object clause = clauses[i];
@@ -1426,7 +1404,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	}
     }
 
-  Lisp_Object result = eval_sub (bodyform);
+  Lisp_Object CACHEABLE result = eval_sub (bodyform);
   handlerlist = oldhandlerlist;
   if (!NILP (success_handler))
     {
@@ -2023,6 +2001,18 @@ skip_debugger (Lisp_Object conditions, Lisp_Object data)
   return 0;
 }
 
+/* Say whether SIGNAL is a `quit' symbol (or inherits from it).  */
+bool
+signal_quit_p (Lisp_Object signal)
+{
+  Lisp_Object list;
+
+  return EQ (signal, Qquit)
+    || (!NILP (Fsymbolp (signal))
+	&& CONSP (list = Fget (signal, Qerror_conditions))
+	&& !NILP (Fmemq (Qquit, list)));
+}
+
 /* Call the debugger if calling it is currently enabled for CONDITIONS.
    SIG and DATA describe the signal.  There are two ways to pass them:
     = SIG is the error symbol, and DATA is the rest of the data.
@@ -2041,7 +2031,7 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
       ! input_blocked_p ()
       && NILP (Vinhibit_debugger)
       /* Does user want to enter debugger for this kind of error?  */
-      && (EQ (sig, Qquit)
+      && (signal_quit_p (sig)
 	  ? debug_on_quit
 	  : wants_debugger (Vdebug_on_error, conditions))
       && ! skip_debugger (conditions, combined_data)
@@ -3255,6 +3245,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
     emacs_abort ();
 
   i = optional = rest = 0;
+  bool previous_rest = false;
   for (; CONSP (syms_left); syms_left = XCDR (syms_left))
     {
       maybe_quit ();
@@ -3265,13 +3256,14 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 
       if (EQ (next, Qand_rest))
         {
-          if (rest)
+          if (rest || previous_rest)
             xsignal1 (Qinvalid_function, fun);
           rest = 1;
+	  previous_rest = true;
         }
       else if (EQ (next, Qand_optional))
         {
-          if (optional || rest)
+          if (optional || rest || previous_rest)
             xsignal1 (Qinvalid_function, fun);
           optional = 1;
         }
@@ -3297,10 +3289,11 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	  else
 	    /* Dynamically bind NEXT.  */
 	    specbind (next, arg);
+	  previous_rest = false;
 	}
     }
 
-  if (!NILP (syms_left))
+  if (!NILP (syms_left) || previous_rest)
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
@@ -4318,13 +4311,19 @@ syms_of_eval (void)
 {
   DEFVAR_INT ("max-specpdl-size", max_specpdl_size,
 	      doc: /* Limit on number of Lisp variable bindings and `unwind-protect's.
-If Lisp code tries to increase the total number past this amount,
-an error is signaled.
-You can safely use a value considerably larger than the default value,
-if that proves inconveniently small.  However, if you increase it too far,
-Emacs could run out of memory trying to make the stack bigger.
-Note that this limit may be silently increased by the debugger
-if `debug-on-error' or `debug-on-quit' is set.  */);
+
+If Lisp code tries to use more bindings than this amount, an error is
+signaled.
+
+You can safely increase this variable substantially if the default
+value proves inconveniently small.  However, if you increase it too
+much, Emacs could run out of memory trying to make the stack bigger.
+Note that this limit may be silently increased by the debugger if
+`debug-on-error' or `debug-on-quit' is set.
+
+\"spec\" is short for \"special variables\", i.e., dynamically bound
+variables.  \"PDL\" is short for \"push-down list\", which is an old
+term for \"stack\".  */);
 
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
 	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.

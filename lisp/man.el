@@ -141,11 +141,21 @@ the manpage buffer."
   :group 'man
   :version "24.3")
 
-(defvar Man-ansi-color-map (let ((ansi-color-faces-vector
-				  [ default Man-overstrike default Man-underline
-				    Man-underline default default Man-reverse ]))
-			     (ansi-color-make-color-map))
-  "The value used here for `ansi-color-map'.")
+(defvar Man-ansi-color-basic-faces-vector
+  [nil Man-overstrike nil Man-underline Man-underline nil nil Man-reverse]
+  "The value used here for `ansi-color-basic-faces-vector'.")
+
+(defvar Man-ansi-color-map
+  (with-no-warnings
+    (let ((ansi-color-faces-vector
+           [ default Man-overstrike default Man-underline
+             Man-underline default default Man-reverse ]))
+      (ansi-color-make-color-map)))
+  "The value formerly used here for `ansi-color-map'.
+This variable is obsolete.  To customize the faces used by ansi-color,
+set `Man-ansi-color-basic-faces-vector'.")
+(make-obsolete-variable 'Man-ansi-color-map
+                        'Man-ansi-color-basic-faces-vector "28.1")
 
 (defcustom Man-notify-method 'friendly
   "Selects the behavior when manpage is ready.
@@ -801,8 +811,8 @@ POS defaults to `point'."
           ;; doesn't include a hyphen, we consider the hyphen to be
           ;; added by troff, and remove it.
           (or (not (eq (string-to-char (substring 1st-part -1)) ?-))
-              (string-match-p "-" (substring 1st-part 0 -1))
-              (setq word (replace-regexp-in-string "-" "" word))))
+              (string-search "-" (substring 1st-part 0 -1))
+              (setq word (string-replace "-" "" word))))
 	;; Make sure the section number gets included by the code below.
 	(goto-char (match-end 1)))
       (when (string-match "[-._‐]+$" word)
@@ -1243,7 +1253,7 @@ Same for the ANSI bold and normal escape sequences."
   (goto-char (point-min))
   ;; Fontify ANSI escapes.
   (let ((ansi-color-apply-face-function #'ansi-color-apply-text-property-face)
-	(ansi-color-map Man-ansi-color-map))
+	(ansi-color-basic-faces-vector Man-ansi-color-basic-faces-vector))
     (ansi-color-apply-on-region (point-min) (point-max)))
   ;; Other highlighting.
   (let ((buffer-undo-list t))

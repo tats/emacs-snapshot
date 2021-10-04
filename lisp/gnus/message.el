@@ -1658,6 +1658,11 @@ starting with `not' and followed by regexps."
   "Face used for displaying MML."
   :group 'message-faces)
 
+(defface message-signature-separator '((t :bold t))
+  "Face used for displaying the signature separator."
+  :group 'message-faces
+  :version "28.1")
+
 (defun message-match-to-eoh (_limit)
   (let ((start (point)))
     (rfc822-goto-eoh)
@@ -1751,8 +1756,21 @@ number of levels specified in the faces `message-cited-text-*'."
                 (0 ',cited-text-face))
               keywords))
        (setq level (1+ level)))
-     keywords))
+     keywords)
+   ;; Match signature.  This `field' stuff ensures that hitting `RET'
+   ;; after the signature separator doesn't remove the trailing space.
+   (list
+    '(message--match-signature (0 '( face message-signature-separator
+                                     rear-nonsticky t
+                                     field signature)))))
   "Additional expressions to highlight in Message mode.")
+
+(defun message--match-signature (limit)
+  (save-excursion
+    (and (re-search-forward message-signature-separator limit t)
+         ;; It's the last one in the buffer.
+         (not (save-excursion
+                (re-search-forward message-signature-separator nil t))))))
 
 (defvar message-face-alist
   '((bold . message-bold-region)
@@ -3554,8 +3572,18 @@ Prefix arg means justify as well."
     (when (looking-at message-cite-prefix-regexp)
       (setq quoted (match-string 0))
       (goto-char (match-end 0))
-      (looking-at "[ \t]*")
-      (setq leading-space (match-string 0)))
+      (let ((after (point)))
+        ;; This is a line with no text after the cite prefix.  In that
+        ;; case, the trailing space is commonly not present, so look
+        ;; around for other lines that have some data.
+        (when (looking-at-p "\n")
+          (let ((regexp (concat "^" message-cite-prefix-regexp "[ \t]")))
+            (when (or (re-search-backward regexp nil t)
+                      (re-search-forward regexp nil t))
+              (goto-char (1- (match-end 0))))))
+        (looking-at "[ \t]*")
+        (setq leading-space (match-string 0))
+        (goto-char after)))
     (if (and quoted
 	     (not not-break)
 	     (not bolp)
@@ -3572,7 +3600,7 @@ Prefix arg means justify as well."
 		      (equal quoted (match-string 0)))
 	    (goto-char (match-end 0))
 	    (looking-at "[ \t]*")
-	    (when (< (length leading-space) (length (match-string 0)))
+	    (when (> (length leading-space) (length (match-string 0)))
 	      (setq leading-space (match-string 0)))
 	    (forward-line 1))
 	  (setq end (point))
@@ -3823,7 +3851,7 @@ text was killed."
   "Caesar rotate all letters in the current buffer by 13 places.
 Used to encode/decode possibly offensive messages (commonly in rec.humor).
 With prefix arg, specifies the number of places to rotate each letter forward.
-Mail and USENET news headers are not rotated unless WIDE is non-nil."
+Mail and Usenet news headers are not rotated unless WIDE is non-nil."
   (interactive (if current-prefix-arg
 		   (list (prefix-numeric-value current-prefix-arg))
 		 (list nil))
@@ -4904,6 +4932,7 @@ Each line should be no more than 79 characters long."
 (defvar smtpmail-smtp-service)
 (defvar smtpmail-smtp-user)
 (defvar smtpmail-stream-type)
+(defvar smtpmail-store-queue-variables)
 
 (defun message-multi-smtp-send-mail ()
   "Send the current buffer to `message-send-mail-function'.
@@ -4919,7 +4948,8 @@ that instead."
 	(message-send-mail-with-sendmail))
        ((equal (car method) "smtp")
 	(require 'smtpmail)
-	(let* ((smtpmail-smtp-server (nth 1 method))
+	(let* ((smtpmail-store-queue-variables t)
+               (smtpmail-smtp-server (nth 1 method))
 	       (service (nth 2 method))
 	       (port (string-to-number service))
 	       ;; If we're talking to the TLS SMTP port, then force a
@@ -5320,7 +5350,7 @@ Otherwise, generate and save a value for `canlock-password' first."
 	   (followup-to (message-fetch-field "followup-to"))
 	   to)
        (when (and newsgroups
-		  (string-match "," newsgroups)
+		  (string-search "," newsgroups)
 		  (not followup-to)
 		  (not
 		   (zerop
@@ -5337,7 +5367,7 @@ Otherwise, generate and save a value for `canlock-password' first."
    ;; Check "Shoot me".
    (message-check 'shoot
      (if (re-search-forward
-	  "Message-ID.*.i-did-not-set--mail-host-address--so-tickle-me" nil t)
+	  "Message-ID.*.mail-host-address-is-not-set" nil t)
 	 (y-or-n-p "You appear to have a misconfigured system.  Really post? ")
        t))
    ;; Check for Approved.
@@ -5351,11 +5381,11 @@ Otherwise, generate and save a value for `canlock-password' first."
 	    (message-id (message-fetch-field "message-id" t)))
        (or (not message-id)
 	   ;; Is there an @ in the ID?
-	   (and (string-match "@" message-id)
+	   (and (string-search "@" message-id)
 		;; Is there a dot in the ID?
 		(string-match "@[^.]*\\." message-id)
 		;; Does the ID end with a dot?
-		(not (string-match "\\.>" message-id)))
+		(not (string-search ".>" message-id)))
 	   (y-or-n-p
 	    (format "The Message-ID looks strange: \"%s\".  Really post? "
 		    message-id)))))
@@ -5477,8 +5507,8 @@ Otherwise, generate and save a value for `canlock-password' first."
 		   "@[^\\.]*\\."
 		   (setq ad (nth 1 (mail-extract-address-components
 				    from))))) ;larsi@ifi
-	     (string-match "\\.\\." ad)	;larsi@ifi..uio
-	     (string-match "@\\." ad)	;larsi@.ifi.uio
+	     (string-search ".." ad)	;larsi@ifi..uio
+	     (string-search "@." ad)	;larsi@.ifi.uio
 	     (string-match "\\.$" ad)	;larsi@ifi.uio.
 	     (not (string-match "^[^@]+@[^@]+$" ad)) ;larsi.ifi.uio
 	     (string-match "(.*).*(.*)" from)) ;(lars) (lars)
@@ -5503,7 +5533,7 @@ Otherwise, generate and save a value for `canlock-password' first."
        (cond
 	((not reply-to)
 	 t)
-	((string-match "," reply-to)
+	((string-search "," reply-to)
 	 (y-or-n-p
 	  (format "Multiple Reply-To addresses: \"%s\". Really post? "
 		  reply-to)))
@@ -5511,8 +5541,8 @@ Otherwise, generate and save a value for `canlock-password' first."
 		   "@[^\\.]*\\."
 		   (setq ad (nth 1 (mail-extract-address-components
 				    reply-to))))) ;larsi@ifi
-	     (string-match "\\.\\." ad)	;larsi@ifi..uio
-	     (string-match "@\\." ad)	;larsi@.ifi.uio
+	     (string-search ".." ad)	;larsi@ifi..uio
+	     (string-search "@." ad)	;larsi@.ifi.uio
 	     (string-match "\\.$" ad)	;larsi@ifi.uio.
 	     (not (string-match "^[^@]+@[^@]+$" ad)) ;larsi.ifi.uio
 	     (string-match "(.*).*(.*)" reply-to)) ;(lars) (lars)
@@ -5786,7 +5816,7 @@ In posting styles use `(\"Expires\" (make-expires-date 30))'."
 			     (mail-header-subject message-reply-headers))
 			    (message-strip-subject-re psubject))))
 		 (and psupersedes
-		      (string-match "_-_@" psupersedes)))
+		      (string-search "_-_@" psupersedes)))
 		"_-_" ""))
 	  "@" (message-make-fqdn) ">"))
 
@@ -6002,7 +6032,7 @@ give as trustworthy answer as possible."
   "Return the pertinent part of `user-mail-address'."
   (when (and user-mail-address
 	     (string-match "@.*\\." user-mail-address))
-    (if (string-match " " user-mail-address)
+    (if (string-search " " user-mail-address)
 	(nth 1 (mail-extract-address-components user-mail-address))
       user-mail-address)))
 
@@ -6033,7 +6063,7 @@ give as trustworthy answer as possible."
       message-user-fqdn)
      ;; A system name without any dots is unlikely to be a good fully
      ;; qualified domain name.
-     ((and (string-match "[.]" sysname)
+     ((and (string-search "." sysname)
 	   (not (string-match message-bogus-system-names sysname)))
       ;; `system-name' returned the right result.
       sysname)
@@ -6048,8 +6078,7 @@ give as trustworthy answer as possible."
       user-domain)
      ;; Default to this bogus thing.
      (t
-      (concat sysname
-	      ".i-did-not-set--mail-host-address--so-tickle-me")))))
+      (concat sysname ".mail-host-address-is-not-set")))))
 
 (defun message-make-domain ()
   "Return the domain name."
@@ -7034,7 +7063,7 @@ article, it has the value of
 
 " mft "
 
-which directs your response to " (if (string-match "," mft)
+which directs your response to " (if (string-search "," mft)
 				     "the specified addresses"
 				   "that address only") ".
 
@@ -7338,7 +7367,7 @@ want to get rid of this query permanently."))
 You should normally obey the Followup-To: header.
 
 	`Followup-To: " followup-to "'
-directs your response to " (if (string-match "," followup-to)
+directs your response to " (if (string-search "," followup-to)
 			       "the specified newsgroups"
 			     "that newsgroup only") ".
 
@@ -8580,7 +8609,7 @@ From headers in the original article."
     (let ((value (message-field-value header)))
       (dolist (string (mail-header-parse-addresses value 'raw))
 	(setq string
-	      (replace-regexp-in-string
+	      (string-replace
 	       "\n" ""
 	       (replace-regexp-in-string "^ +\\| +$" "" string)))
 	(ecomplete-add-item 'mail (car (mail-header-parse-address string))
@@ -8722,17 +8751,18 @@ Header and body are separated by `mail-header-separator'."
 
 (defun message-replace-header (header new-value &optional after force)
   "Remove HEADER and insert the NEW-VALUE.
-If AFTER, insert after this header.  If FORCE, insert new field
-even if NEW-VALUE is empty."
+If AFTER, insert after this header.  AFTER may be a list of
+headers.  If FORCE, insert new field even if NEW-VALUE is empty."
   ;; Similar to `nnheader-replace-header' but for message buffers.
   (save-excursion
     (save-restriction
       (message-narrow-to-headers)
       (message-remove-header header))
     (when (or force (> (length new-value) 0))
-      (if after
-	  (message-position-on-field header after)
-	(message-position-on-field header))
+      (apply #'message-position-on-field header
+             (if (listp after)
+                 after
+               (list after)))
       (insert new-value))))
 
 (make-obsolete-variable
@@ -8869,7 +8899,7 @@ used to take the screenshot."
 
 (defun message-parse-mailto-url (url)
   "Parse a mailto: url."
-  (setq url (replace-regexp-in-string "\n" " " url))
+  (setq url (string-replace "\n" " " url))
   (when (string-match "mailto:/*\\(.*\\)" url)
     (setq url (substring url (match-beginning 1) nil)))
   (setq url (if (string-match "^\\?" url)
@@ -8911,9 +8941,9 @@ will then start up Emacs ready to compose mail.  For emacsclient use
     (dolist (arg args)
       (unless (equal (car arg) "body")
 	(message-position-on-field (capitalize (car arg)))
-	(insert (replace-regexp-in-string
+	(insert (string-replace
 		 "\r\n" "\n"
-		 (mapconcat #'identity (reverse (cdr arg)) ", ") nil t))))
+		 (mapconcat #'identity (reverse (cdr arg)) ", ")))))
     (when (assoc "body" args)
       (message-goto-body)
       (dolist (body (cdr (assoc "body" args)))

@@ -1555,6 +1555,14 @@ STRING_MULTIBYTE (Lisp_Object str)
 
 /* Convenience functions for dealing with Lisp strings.  */
 
+/* WARNING: Use the 'char *' pointers to string data with care in code
+   that could GC: GC can relocate string data, invalidating such
+   pointers.  It is best to use string character or byte index
+   instead, delaying the access through SDATA/SSDATA pointers to the
+   latest possible moment.  If you must use the 'char *' pointers
+   (e.g., for speed), be sure to adjust them after any call that could
+   potentially GC.  */
+
 INLINE unsigned char *
 SDATA (Lisp_Object string)
 {
@@ -1613,6 +1621,13 @@ STRING_SET_CHARS (Lisp_Object string, ptrdiff_t newsize)
 	   ? 0 <= newsize && newsize <= SBYTES (string)
 	   : newsize == SCHARS (string));
   XSTRING (string)->u.s.size = newsize;
+}
+
+INLINE void
+CHECK_STRING_NULL_BYTES (Lisp_Object string)
+{
+  CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
+	      Qfilenamep, string);
 }
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
@@ -2812,9 +2827,8 @@ enum Lisp_Compiled
   };
 
 /* Flag bits in a character.  These also get used in termhooks.h.
-   Richard Stallman <rms@gnu.ai.mit.edu> thinks that MULE
-   (MUlti-Lingual Emacs) might need 22 bits for the character value
-   itself, so we probably shouldn't use any bits lower than 0x0400000.  */
+   Emacs needs 22 bits for the character value itself, see MAX_CHAR,
+   so we shouldn't use any bits lower than 0x0400000.  */
 enum char_bits
   {
     CHAR_ALT = 0x0400000,
@@ -3586,6 +3600,7 @@ extern Lisp_Object detect_coding_system (const unsigned char *, ptrdiff_t,
 extern void init_coding (void);
 extern void init_coding_once (void);
 extern void syms_of_coding (void);
+extern bool string_ascii_p (Lisp_Object);
 
 /* Defined in character.c.  */
 extern ptrdiff_t chars_in_text (const unsigned char *, ptrdiff_t);
@@ -3716,7 +3731,8 @@ extern void adjust_markers_for_delete (ptrdiff_t, ptrdiff_t,
 				       ptrdiff_t, ptrdiff_t);
 extern void adjust_markers_bytepos (ptrdiff_t, ptrdiff_t,
 				    ptrdiff_t, ptrdiff_t, int);
-extern void replace_range (ptrdiff_t, ptrdiff_t, Lisp_Object, bool, bool, bool, bool);
+extern void replace_range (ptrdiff_t, ptrdiff_t, Lisp_Object, bool, bool,
+			   bool, bool, bool);
 extern void replace_range_2 (ptrdiff_t, ptrdiff_t, ptrdiff_t, ptrdiff_t,
 			     const char *, ptrdiff_t, ptrdiff_t, bool);
 extern void syms_of_insdel (void);
@@ -4064,10 +4080,10 @@ extern ptrdiff_t doprnt (char *, ptrdiff_t, const char *, const char *,
 			 va_list);
 extern ptrdiff_t esprintf (char *, char const *, ...)
   ATTRIBUTE_FORMAT_PRINTF (2, 3);
-extern ptrdiff_t exprintf (char **, ptrdiff_t *, char const *, ptrdiff_t,
+extern ptrdiff_t exprintf (char **, ptrdiff_t *, char *, ptrdiff_t,
 			   char const *, ...)
   ATTRIBUTE_FORMAT_PRINTF (5, 6);
-extern ptrdiff_t evxprintf (char **, ptrdiff_t *, char const *, ptrdiff_t,
+extern ptrdiff_t evxprintf (char **, ptrdiff_t *, char *, ptrdiff_t,
 			    char const *, va_list)
   ATTRIBUTE_FORMAT_PRINTF (5, 0);
 
@@ -4111,11 +4127,11 @@ intern_c_string (const char *str)
 }
 
 /* Defined in eval.c.  */
-extern EMACS_INT minibuffer_quit_level;
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
 extern Lisp_Object Vsignaling_function;
 extern Lisp_Object inhibit_lisp_code;
+extern bool signal_quit_p (Lisp_Object);
 
 /* To run a normal hook, use the appropriate function from the list below.
    The calling convention:
@@ -4377,6 +4393,7 @@ extern EMACS_INT this_minibuffer_depth (Lisp_Object);
 extern EMACS_INT minibuf_level;
 extern Lisp_Object get_minibuffer (EMACS_INT);
 extern void init_minibuf_once (void);
+extern void set_initial_minibuffer_mode (void);
 extern void syms_of_minibuf (void);
 extern void barf_if_interaction_inhibited (void);
 
@@ -4416,7 +4433,7 @@ extern bool detect_input_pending_ignore_squeezables (void);
 extern bool detect_input_pending_run_timers (bool);
 extern void safe_run_hooks (Lisp_Object);
 extern void cmd_error_internal (Lisp_Object, const char *);
-extern Lisp_Object command_loop_1 (void);
+extern Lisp_Object command_loop_2 (Lisp_Object);
 extern Lisp_Object read_menu_command (void);
 extern Lisp_Object recursive_edit_1 (void);
 extern void record_auto_save (void);
@@ -4620,8 +4637,6 @@ extern int str_collate (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern void syms_of_sysdep (void);
 
 /* Defined in filelock.c.  */
-extern void lock_file (Lisp_Object);
-extern void unlock_file (Lisp_Object);
 extern void unlock_all_files (void);
 extern void unlock_buffer (struct buffer *);
 extern void syms_of_filelock (void);
@@ -4650,6 +4665,7 @@ extern AVOID fatal (const char *msgid, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
 
 /* Defined in terminal.c.  */
 extern void syms_of_terminal (void);
+extern char * tty_type_name (Lisp_Object);
 
 /* Defined in font.c.  */
 extern void syms_of_font (void);

@@ -491,12 +491,17 @@ confirm the aborting of the current minibuffer and all contained ones.  */)
       array[1] = make_fixnum (minibuf_level - minibuf_depth + 1);
       if (!NILP (Fyes_or_no_p (Fformat (2, array))))
 	{
-	  minibuffer_quit_level = minibuf_depth;
-	  Fthrow (Qexit, Qt);
+	  /* Due to the above check, the current minibuffer is in the
+	     most nested command loop, which means that we don't have
+	     to abort any extra non-minibuffer recursive edits.  Thus,
+	     the number of recursive edits we have to abort equals the
+	     number of minibuffers we have to abort.  */
+	  CALLN (Ffuncall, intern ("minibuffer-quit-recursive-edit"),
+		 array[1]);
 	}
     }
   else
-    Fthrow (Qexit, Qt);
+    CALLN (Ffuncall, intern ("minibuffer-quit-recursive-edit"));
   return Qnil;
 }
 
@@ -653,11 +658,12 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
       return unbind_to (count, val);
     }
 
-  minibuf_level++;         /* Before calling choose_minibuf_frame.  */
-  /* Ensure now that the latest minibuffer has been created, in case
-     anything happens which depends on MINNIBUF_LEVEL and
-     Vminibuffer_list being consistent with eachother.  */
-  minibuffer = get_minibuffer (minibuf_level);
+  /* Ensure now that the latest minibuffer has been created and pushed
+     onto Vminibuffer_list before incrementing minibuf_level, in case
+     a hook called during the minibuffer creation calls
+     Factive_minibuffer_window.  */
+  minibuffer = get_minibuffer (minibuf_level + 1);
+  minibuf_level++;		/* Before calling choose_minibuf_frame.  */
 
   /* Choose the minibuffer window and frame, and take action on them.  */
 
@@ -688,12 +694,15 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
     call1 (Qpush_window_buffer_onto_prev, minibuf_window);
 
   record_unwind_protect_void (minibuffer_unwind);
-  record_unwind_protect (restore_window_configuration,
-			 list3 (Fcurrent_window_configuration (Qnil), Qt, Qt));
+  if (read_minibuffer_restore_windows)
+    record_unwind_protect (restore_window_configuration,
+			   list3 (Fcurrent_window_configuration (Qnil),
+				  Qt, Qt));
 
   /* If the minibuffer window is on a different frame, save that
      frame's configuration too.  */
-  if (!EQ (mini_frame, selected_frame))
+  if (read_minibuffer_restore_windows &&
+      !EQ (mini_frame, selected_frame))
     record_unwind_protect (restore_window_configuration,
 			   list3 (Fcurrent_window_configuration (mini_frame),
 				  Qnil, Qt));
@@ -1209,7 +1218,7 @@ read_minibuf_unwind (void)
 		     WINDOW_FRAME (XWINDOW (minibuf_window))))
 	    Fset_frame_selected_window (selected_frame, prev, Qnil);
 	}
-      else
+      else if (WINDOW_LIVE_P (calling_window))
 	Fset_frame_selected_window (calling_frame, calling_window, Qnil);
     }
 
@@ -1283,8 +1292,8 @@ Fifth arg HIST, if non-nil, specifies a history list and optionally
   HISTPOS is the initial position for use by the minibuffer history
   commands.  For consistency, you should also specify that element of
   the history as the value of INITIAL-CONTENTS.  Positions are counted
-  starting from 1 at the beginning of the list.  If HIST is the symbol
-  `t', history is not recorded.
+  starting from 1 at the beginning of the list.  If HIST is t, history
+  is not recorded.
 
   If `history-add-new-input' is non-nil (the default), the result will
   be added to the history list using `add-to-history'.
@@ -2028,8 +2037,7 @@ HIST, if non-nil, specifies a history list and optionally the initial
   (This is the only case in which you should use INITIAL-INPUT instead
   of DEF.)  Positions are counted starting from 1 at the beginning of
   the list.  The variable `history-length' controls the maximum length
-  of a history list.  If HIST is the symbol `t', history is not
-  recorded.
+  of a history list.  If HIST is t, history is not recorded.
 
 DEF, if non-nil, is the default value or the list of default values.
 
@@ -2051,7 +2059,11 @@ See also `completing-read-function'.  */)
 /* Test whether TXT is an exact completion.  */
 DEFUN ("test-completion", Ftest_completion, Stest_completion, 2, 3, 0,
        doc: /* Return non-nil if STRING is a valid completion.
+For instance, if COLLECTION is a list of strings, STRING is a
+valid completion if it appears in the list and PREDICATE is satisfied.
+
 Takes the same arguments as `all-completions' and `try-completion'.
+
 If COLLECTION is a function, it is called with three arguments:
 the values STRING, PREDICATE and `lambda'.  */)
   (Lisp_Object string, Lisp_Object collection, Lisp_Object predicate)
@@ -2270,6 +2282,13 @@ If no minibuffer is active, return nil.  */)
 
 
 
+void
+set_initial_minibuffer_mode (void)
+{
+  Lisp_Object minibuf = get_minibuffer (0);
+  set_minibuffer_mode (minibuf, 0);
+}
+
 static void init_minibuf_once_for_pdumper (void);
 
 void
@@ -2377,7 +2396,7 @@ default top level value is used.  */);
   Vminibuffer_setup_hook = Qnil;
 
   DEFVAR_LISP ("minibuffer-exit-hook", Vminibuffer_exit_hook,
-	       doc: /* Normal hook run just after exit from minibuffer.  */);
+	       doc: /* Normal hook run whenever a minibuffer is exited.  */);
   Vminibuffer_exit_hook = Qnil;
 
   DEFVAR_LISP ("history-length", Vhistory_length,
@@ -2466,7 +2485,7 @@ is added with
   (set minibuffer-history-variable
        (cons STRING (symbol-value minibuffer-history-variable)))
 
- If the variable is the symbol `t', no history is recorded.  */);
+ If the variable is t, no history is recorded.  */);
   XSETFASTINT (Vminibuffer_history_variable, 0);
 
   DEFVAR_LISP ("minibuffer-history-position", Vminibuffer_history_position,
@@ -2518,6 +2537,19 @@ for instance when running a headless Emacs server.  Functions like
 `read-from-minibuffer' (and the like) will signal `inhibited-interaction'
 instead. */);
   inhibit_interaction = 0;
+
+  DEFVAR_BOOL ("read-minibuffer-restore-windows", read_minibuffer_restore_windows,
+	       doc: /* Non-nil means restore window configurations on exit from minibuffer.
+If this is non-nil (the default), reading input with the minibuffer will
+restore, on exit, the window configurations of the frame where the
+minibuffer was entered from and, if it is different, the frame that owns
+the associated minibuffer window.
+
+If this is nil, window configurations are not restored upon exiting
+the minibuffer.  However, if `minibuffer-restore-windows' is present
+in `minibuffer-exit-hook', exiting the minibuffer will remove the window
+showing the *Completions* buffer, if any.  */);
+  read_minibuffer_restore_windows = true;
 
   defsubr (&Sactive_minibuffer_window);
   defsubr (&Sset_minibuffer_window);

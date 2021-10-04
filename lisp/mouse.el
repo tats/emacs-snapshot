@@ -46,7 +46,7 @@
   :type 'boolean)
 
 (defcustom mouse-drag-copy-region nil
-  "If non-nil, copy to kill-ring upon mouse adjustments of the region.
+  "If non-nil, copy to kill ring upon mouse adjustments of the region.
 
 This affects `mouse-save-then-kill' (\\[mouse-save-then-kill]) in
 addition to mouse drags.
@@ -180,7 +180,7 @@ items `Turn Off' and `Help'."
                   `(keymap
                     ,(format "%s - %s" indicator
 			     (capitalize
-			      (replace-regexp-in-string
+			      (string-replace
 			       "-" " " (format "%S" minor-mode))))
                     (turn-off menu-item "Turn off minor mode" ,mm-fun)
                     (help menu-item "Help for minor mode"
@@ -275,6 +275,296 @@ not it is actually displayed."
            global-menu
            local-menu
            minor-mode-menus)))
+
+
+;; Context menus.
+
+(defcustom context-menu-functions '(context-menu-undo
+                                    context-menu-region
+                                    context-menu-middle-separator
+                                    context-menu-local
+                                    context-menu-minor)
+  "List of functions that produce the contents of the context menu.
+Each function receives the menu and the mouse click event as its arguments
+and should return the same menu with changes such as added new menu items."
+  :type '(repeat
+          (choice (function-item context-menu-undo)
+                  (function-item context-menu-region)
+                  (function-item context-menu-middle-separator)
+                  (function-item context-menu-toolbar)
+                  (function-item context-menu-global)
+                  (function-item context-menu-local)
+                  (function-item context-menu-minor)
+                  (function-item context-menu-buffers)
+                  (function-item context-menu-vc)
+                  (function-item context-menu-ffap)
+                  (function :tag "Custom function")))
+  :version "28.1")
+
+(defcustom context-menu-filter-function nil
+  "Function that can filter the list produced by `context-menu-functions'."
+  :type '(choice (const nil) function)
+  :version "28.1")
+
+(defun context-menu-map (&optional click)
+  "Return menu map constructed for context near mouse CLICK.
+The menu is populated by calling functions from `context-menu-functions'.
+Each function receives the menu and the mouse click event
+and returns the same menu after adding own menu items to the composite menu.
+When there is a text property `context-menu-function' at CLICK,
+it overrides all functions from `context-menu-functions'.
+At the end, it's possible to modify the final menu by specifying
+the function `context-menu-filter-function'."
+  (let* ((menu (make-sparse-keymap (propertize "Context Menu" 'hide t)))
+         (click (or click last-input-event))
+         (fun (mouse-posn-property (event-start click)
+                                   'context-menu-function)))
+
+    (if (functionp fun)
+        (setq menu (funcall fun menu click))
+      (run-hook-wrapped 'context-menu-functions
+                        (lambda (fun)
+                          (setq menu (funcall fun menu click))
+                          nil)))
+
+    ;; Remove duplicate separators
+    (let ((l menu))
+      (while (consp l)
+        (when (and (equal (cdr-safe (car l)) menu-bar-separator)
+                   (equal (cdr-safe (cadr l)) menu-bar-separator))
+          (setcdr l (cddr l)))
+        (setq l (cdr l))))
+
+    (when (functionp context-menu-filter-function)
+      (setq menu (funcall context-menu-filter-function menu click)))
+    menu))
+
+(defun context-menu-middle-separator (menu _click)
+  "Add separator to the middle of the context menu.
+Some context functions add menu items below the separator."
+  (define-key-after menu [middle-separator] menu-bar-separator)
+  menu)
+
+(defun context-menu-toolbar (menu _click)
+  "Populate MENU with submenus from the tool bar."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-toolbar] menu-bar-separator)
+  (map-keymap (lambda (key binding)
+                (when (consp binding)
+                  (define-key-after menu (vector key)
+                    (copy-sequence binding))))
+              (lookup-key global-map [tool-bar]))
+  menu)
+
+(defun context-menu-global (menu _click)
+  "Populate MENU with submenus from the global menu."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-global] menu-bar-separator)
+  (map-keymap (lambda (key binding)
+                (when (consp binding)
+                  (define-key-after menu (vector key)
+                    (copy-sequence binding))))
+              (lookup-key global-map [menu-bar]))
+  menu)
+
+(defun context-menu-local (menu _click)
+  "Populate MENU with submenus provided by major mode."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-local] menu-bar-separator)
+  (let ((keymap (local-key-binding [menu-bar])))
+    (when keymap
+      (map-keymap (lambda (key binding)
+                    (when (consp binding)
+                      (define-key-after menu (vector key)
+                        (copy-sequence binding))))
+                  keymap)))
+  menu)
+
+(defun context-menu-minor (menu _click)
+  "Populate MENU with submenus provided by minor modes."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-minor] menu-bar-separator)
+  (dolist (mode (reverse (minor-mode-key-binding [menu-bar])))
+    (when (and (consp mode) (symbol-value (car mode)))
+      (map-keymap (lambda (key binding)
+                    (when (consp binding)
+                      (define-key-after menu (vector key)
+                        (copy-sequence binding))))
+                  (cdr mode))))
+  menu)
+
+(defun context-menu-buffers (menu _click)
+  "Populate MENU with the buffer submenus to buffer switching."
+  (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+  (define-key-after menu [separator-buffers] menu-bar-separator)
+  (map-keymap (lambda (key binding)
+                (when (consp binding)
+                  (define-key-after menu (vector key)
+                    (copy-sequence binding))))
+              (mouse-buffer-menu-keymap))
+  menu)
+
+(defun context-menu-vc (menu _click)
+  "Populate MENU with Version Control commands."
+  (define-key-after menu [separator-vc] menu-bar-separator)
+  (define-key-after menu [vc-menu] vc-menu-entry)
+  menu)
+
+(defun context-menu-undo (menu _click)
+  "Populate MENU with undo commands."
+  (define-key-after menu [separator-undo] menu-bar-separator)
+  (when (and (not buffer-read-only)
+             (not (eq t buffer-undo-list))
+             (if (eq last-command 'undo)
+                 (listp pending-undo-list)
+               (consp buffer-undo-list)))
+    (define-key-after menu [undo]
+      `(menu-item ,(if (region-active-p) "Undo in Region" "Undo") undo
+                  :help "Undo last edits")))
+  (when (and (not buffer-read-only)
+             (undo--last-change-was-undo-p buffer-undo-list))
+    (define-key-after menu [undo-redo]
+      `(menu-item (if undo-in-region "Redo in Region" "Redo") undo-redo
+                  :help "Redo last undone edits")))
+  menu)
+
+(defun context-menu-region (menu click)
+  "Populate MENU with region commands."
+  (define-key-after menu [separator-region] menu-bar-separator)
+  (when (and mark-active (not buffer-read-only))
+    (define-key-after menu [cut]
+      '(menu-item "Cut" kill-region
+                  :help
+                  "Cut (kill) text in region between mark and current position")))
+  (when mark-active
+    (define-key-after menu [copy]
+      ;; ns-win.el said: Substitute a Copy function that works better
+      ;; under X (for GNUstep).
+      `(menu-item "Copy" ,(if (featurep 'ns)
+                              'ns-copy-including-secondary
+                            'kill-ring-save)
+                  :help "Copy text in region between mark and current position"
+                  :keys ,(if (featurep 'ns)
+                             "\\[ns-copy-including-secondary]"
+                           "\\[kill-ring-save]"))))
+  (when (and (or (gui-backend-selection-exists-p 'CLIPBOARD)
+                 (if (featurep 'ns) ; like paste-from-menu
+                     (cdr yank-menu)
+                   kill-ring))
+             (not buffer-read-only))
+    (define-key-after menu [paste]
+      `(menu-item "Paste" mouse-yank-at-click
+                  :help "Paste (yank) text most recently cut/copied")))
+  (when (and (cdr yank-menu) (not buffer-read-only))
+    (let ((submenu (make-sparse-keymap (propertize "Paste from Kill Menu")))
+          (i 0))
+      (dolist (item (reverse yank-menu))
+        (when (consp item)
+          (define-key submenu (vector (setq i (1+ i)))
+            `(menu-item ,(cadr item)
+                        ,(lambda () (interactive)
+                           (mouse-yank-from-menu click (car item)))))))
+      (define-key-after menu (if (featurep 'ns) [select-paste] [paste-from-menu])
+        `(menu-item ,(if (featurep 'ns) "Select and Paste" "Paste from Kill Menu")
+                    ,submenu
+                    :help "Choose a string from the kill ring and paste it"))))
+  (when (and mark-active (not buffer-read-only))
+    (define-key-after menu [clear]
+      '(menu-item "Clear" delete-active-region
+                  :help
+                  "Delete text in region between mark and current position")))
+
+  (let ((submenu (make-sparse-keymap (propertize "Select"))))
+    (define-key-after submenu [mark-whole-buffer]
+      `(menu-item "All"
+                  ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'buffer))
+                  :help "Mark the whole buffer for a subsequent cut/copy"))
+    (when (let* ((pos (posn-point (event-end click)))
+                 (char (when pos (char-after pos))))
+            (or (and char (eq (char-syntax char) ?\"))
+                (nth 3 (save-excursion (syntax-ppss pos)))))
+      (define-key-after submenu [mark-string]
+        `(menu-item "String"
+                    ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'string))
+                    :help "Mark the string at click for a subsequent cut/copy")))
+    (define-key-after submenu [mark-line]
+      `(menu-item "Line"
+                  ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'line))
+                  :help "Mark the line at click for a subsequent cut/copy"))
+    (when (region-active-p)
+      (define-key-after submenu [mark-none]
+        `(menu-item "None"
+                    ,(lambda (_e) (interactive "e") (deactivate-mark))
+                    :help "Deactivate the region")))
+
+    (define-key-after menu [select-region]
+      `(menu-item "Select" ,submenu)))
+  menu)
+
+(defun context-menu-ffap (menu click)
+  "Populate MENU with commands that find file at point."
+  (save-excursion
+    (mouse-set-point click)
+    (when (ffap-guess-file-name-at-point)
+      (define-key menu [ffap-separator] menu-bar-separator)
+      (define-key menu [ffap-at-mouse]
+        '(menu-item "Find File or URL" ffap-at-mouse
+                    :help "Find file or URL from text around mouse click"))))
+  menu)
+
+(defvar context-menu-entry
+  `(menu-item ,(purecopy "Context Menu") ignore
+              :filter (lambda (_) (context-menu-map)))
+  "Menu item that creates the context menu and can be bound to a mouse key.")
+
+(defvar context-menu-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-3] nil)
+    (define-key map [down-mouse-3] context-menu-entry)
+    (define-key map [menu] #'context-menu-open)
+    (if (featurep 'w32)
+        (define-key map [apps] #'context-menu-open))
+    (when (featurep 'ns)
+      (define-key map [C-mouse-1] nil)
+      (define-key map [C-down-mouse-1] context-menu-entry))
+    map)
+  "Context Menu mode map.")
+
+(define-minor-mode context-menu-mode
+  "Toggle Context Menu mode.
+
+When Context Menu mode is enabled, clicking the mouse button down-mouse-3
+activates the menu whose contents depends on its surrounding context."
+  :global t :group 'mouse)
+
+(defun context-menu-open ()
+  "Start key navigation of the context menu.
+This is the keyboard interface to \\[context-menu-map]."
+  (interactive)
+  (let ((inhibit-mouse-event-check t))
+    (popup-menu (context-menu-map) (point))))
+
+(global-set-key [S-f10] 'context-menu-open)
+
+(defun mark-thing-at-mouse (click thing)
+  "Activate the region around THING found near the mouse CLICK."
+  (let ((bounds (bounds-of-thing-at-mouse click thing)))
+    (when bounds
+      (goto-char (if mouse-select-region-move-to-beginning
+                     (car bounds) (cdr bounds)))
+      (push-mark (if mouse-select-region-move-to-beginning
+                     (cdr bounds) (car bounds))
+                 t 'activate))))
+
+(defun mouse-yank-from-menu (click string)
+  "Insert STRING at mouse CLICK."
+  ;; Give temporary modes such as isearch a chance to turn off.
+  (run-hooks 'mouse-leave-buffer-hook)
+  (when select-active-regions
+    (deactivate-mark))
+  (or mouse-yank-at-point (mouse-set-point click))
+  (push-mark)
+  (insert string))
 
 
 ;; Commands that operate on windows.
@@ -415,7 +705,7 @@ must be one of the symbols `header', `mode', or `vertical'."
 		(when (window-live-p (setq posn-window (posn-window start)))
 		  ;; Add left edge of `posn-window' to `position'.
 		  (setq position (+ (window-pixel-left posn-window) position))
-		  (unless (nth 1 start)
+		  (unless (posn-area start)
 		    ;; Add width of objects on the left of the text area to
 		    ;; `position'.
 		    (when (eq (window-current-scroll-bars posn-window) 'left)
@@ -494,9 +784,11 @@ must be one of the symbols `header', `mode', or `vertical'."
 	       (define-key map [header-line] map)
 	       (define-key map [vertical-line] map)
 	       ;; ... and some maybe even with a right- or bottom-divider
-	       ;; prefix.
+	       ;; or left- or right-margin prefix ...
 	       (define-key map [right-divider] map)
 	       (define-key map [bottom-divider] map)
+	       (define-key map [left-margin] map)
+	       (define-key map [right-margin] map)
 	       map)
 	     t (lambda () (setq track-mouse old-track-mouse)))))))
 
@@ -546,6 +838,18 @@ the frame instead."
         (mouse-drag-line start-event 'header)
       (let ((frame (window-frame window)))
         (when (frame-parameter frame 'drag-with-header-line)
+          (mouse-drag-frame-move start-event))))))
+
+(defun mouse-drag-tab-line (start-event)
+  "Drag frame with tab line in its topmost window.
+START-EVENT is the starting mouse event of the drag action."
+  (interactive "e")
+  (let* ((start (event-start start-event))
+	 (window (posn-window start)))
+    (when (and (window-live-p window)
+               (window-at-side-p window 'top))
+      (let ((frame (window-frame window)))
+        (when (frame-parameter frame 'drag-with-tab-line)
           (mouse-drag-frame-move start-event))))))
 
 (defun mouse-drag-vertical-line (start-event)
@@ -676,6 +980,7 @@ frame with the mouse."
              ;; with a mode-line, header-line or vertical-line prefix ...
              (define-key map [mode-line] map)
              (define-key map [header-line] map)
+             (define-key map [tab-line] map)
              (define-key map [vertical-line] map)
              ;; ... and some maybe even with a right- or bottom-divider
              ;; prefix.
@@ -902,6 +1207,7 @@ frame with the mouse."
              ;; with a mode-line, header-line or vertical-line prefix ...
              (define-key map [mode-line] map)
              (define-key map [header-line] map)
+             (define-key map [tab-line] map)
              (define-key map [vertical-line] map)
              ;; ... and some maybe even with a right- or bottom-divider
              ;; prefix.
@@ -1170,9 +1476,10 @@ its value is returned."
             ;; Mouse clicks in the fringe come with a position in
             ;; (nth 5).  This is useful but is not exactly where we clicked, so
             ;; don't look up that position's properties!
-	    (and pt (not (memq (posn-area pos) '(left-fringe right-fringe
-                                                 left-margin right-margin)))
-		 (get-char-property pt property w))))
+            (and pt (not (memq (posn-area pos)
+                               '(left-fringe right-fringe
+                                 left-margin right-margin tab-bar)))
+                 (get-char-property pt property w))))
     (get-char-property pos property)))
 
 (defun mouse-on-link-p (pos)
@@ -1192,7 +1499,7 @@ overlay property, the value of that property determines what to do.
 for the `follow-link' event, the binding of that event determines
 what to do.
 
-The resulting value determine whether POS is inside a link:
+The resulting value determines whether POS is inside a link:
 
 - If the value is `mouse-face', POS is inside a link if there
 is a non-nil `mouse-face' property at POS.  Return t in this case.
@@ -1341,8 +1648,15 @@ The region will be defined with mark and point."
      t (lambda ()
          (setq track-mouse old-track-mouse)
          (setq auto-hscroll-mode auto-hscroll-mode-saved)
-         (deactivate-mark)
-         (pop-mark)))))
+         ;; Don't deactivate the mark when the context menu was invoked
+         ;; by down-mouse-3 immediately after down-mouse-1 and without
+         ;; releasing the mouse button with mouse-1. This allows to use
+         ;; region-related context menu to operate on the selected region.
+         (unless (and context-menu-mode
+                      (eq (car-safe (aref (this-command-keys-vector) 0))
+                          'down-mouse-3))
+           (deactivate-mark)
+           (pop-mark))))))
 
 (defun mouse--drag-set-mark-and-point (start click click-count)
   (let* ((range (mouse-start-end start click click-count))
@@ -2865,8 +3179,8 @@ is copied instead of being cut."
           (set-marker (nth 2 state) nil))
         (with-current-buffer (window-buffer window)
           (setq cursor-type (nth 3 state)))))))
-
 
+
 ;;; Bindings for mouse commands.
 
 (global-set-key [down-mouse-1]	'mouse-drag-region)
@@ -2906,6 +3220,7 @@ is copied instead of being cut."
 ;; versions.
 (global-set-key [header-line down-mouse-1] 'mouse-drag-header-line)
 (global-set-key [header-line mouse-1] 'mouse-select-window)
+(global-set-key [tab-line down-mouse-1] 'mouse-drag-tab-line)
 (global-set-key [tab-line mouse-1] 'mouse-select-window)
 ;; (global-set-key [mode-line drag-mouse-1] 'mouse-select-window)
 (global-set-key [mode-line down-mouse-1] 'mouse-drag-mode-line)

@@ -96,6 +96,7 @@
     (file-exists-p . tramp-handle-file-exists-p)
     (file-in-directory-p . tramp-handle-file-in-directory-p)
     (file-local-copy . tramp-handle-file-local-copy)
+    (file-locked-p . tramp-handle-file-locked-p)
     (file-modes . tramp-handle-file-modes)
     (file-name-all-completions . tramp-fuse-handle-file-name-all-completions)
     (file-name-as-directory . tramp-handle-file-name-as-directory)
@@ -122,9 +123,11 @@
     (insert-directory . tramp-handle-insert-directory)
     (insert-file-contents . tramp-handle-insert-file-contents)
     (load . tramp-handle-load)
+    (lock-file . tramp-handle-lock-file)
     (make-auto-save-file-name . tramp-handle-make-auto-save-file-name)
     (make-directory . tramp-fuse-handle-make-directory)
     (make-directory-internal . ignore)
+    (make-lock-file-name . tramp-handle-make-lock-file-name)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
     (make-process . ignore)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
@@ -143,6 +146,7 @@
     (tramp-get-remote-uid . ignore)
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
+    (unlock-file . tramp-handle-unlock-file)
     (vc-registered . ignore)
     (verify-visited-file-modtime . tramp-handle-verify-visited-file-modtime)
     (write-region . tramp-handle-write-region))
@@ -358,6 +362,10 @@ connection if a previous connection has died for some reason."
 	  (process-put p 'vector vec)
 	  (set-process-query-on-exit-flag p nil)
 
+	  ;; Mark process for filelock.
+	  (tramp-set-connection-property
+	   p "lock-pid" (truncate (time-to-seconds)))
+
 	  ;; Set connection-local variables.
 	  (tramp-set-connection-local-variables vec)))
 
@@ -378,6 +386,7 @@ connection if a previous connection has died for some reason."
 	  (tramp-cleanup-connection vec 'keep-debug 'keep-password))
 
 	;; Mark it as connected.
+	(add-to-list 'tramp-fuse-mount-points (tramp-file-name-unify vec))
 	(tramp-set-connection-property
 	 (tramp-get-connection-process vec) "connected" t))))
 

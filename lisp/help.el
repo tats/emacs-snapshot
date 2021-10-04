@@ -561,6 +561,12 @@ To record all your input, use `open-dribble-file'."
               'font-lock-face 'help-key-binding
               'face 'help-key-binding))
 
+(defcustom describe-bindings-outline nil
+  "Non-nil enables outlines in the output buffer of `describe-bindings'."
+  :type 'boolean
+  :group 'help
+  :version "28.1")
+
 (defun describe-bindings (&optional prefix buffer)
   "Display a buffer showing a list of all defined keys, and their definitions.
 The keys are displayed in order of precedence.
@@ -578,23 +584,26 @@ or a buffer name."
     ;; Be aware that `describe-buffer-bindings' puts its output into
     ;; the current buffer.
     (with-current-buffer (help-buffer)
-      (describe-buffer-bindings buffer prefix))))
+      (describe-buffer-bindings buffer prefix)
 
-(defun describe-bindings-internal (&optional menus prefix)
-  "Show a list of all defined keys, and their definitions.
-We put that list in a buffer, and display the buffer.
-
-The optional argument MENUS, if non-nil, says to mention menu bindings.
-\(Ordinarily these are omitted from the output.)
-The optional argument PREFIX, if non-nil, should be a key sequence;
-then we display only bindings that start with that prefix."
-  (declare (obsolete describe-buffer-bindings "24.4"))
-  (let ((buf (current-buffer)))
-    (with-help-window (help-buffer)
-      ;; Be aware that `describe-buffer-bindings' puts its output into
-      ;; the current buffer.
-      (with-current-buffer (help-buffer)
-	(describe-buffer-bindings buf prefix menus)))))
+      (when describe-bindings-outline
+        (setq-local outline-regexp ".*:$")
+        (setq-local outline-heading-end-regexp ":\n")
+        (setq-local outline-level (lambda () 1))
+        (setq-local outline-minor-mode-cycle t
+                    outline-minor-mode-highlight t)
+        (outline-minor-mode 1)
+        (save-excursion
+          (let ((inhibit-read-only t))
+            (goto-char (point-min))
+            (insert (substitute-command-keys
+                     (concat "\\<outline-minor-mode-cycle-map>Type "
+                             "\\[outline-cycle] or \\[outline-cycle-buffer] "
+                             "on headings to cycle their visibility.\n\n")))
+            ;; Hide the longest body
+            (when (and (re-search-forward "Key translations" nil t)
+                       (fboundp 'outline-cycle))
+              (outline-cycle))))))))
 
 (defun where-is (definition &optional insert)
   "Print message listing key sequences that invoke the command DEFINITION.
@@ -686,7 +695,11 @@ Returns a list of the form (BRIEF-DESC DEFN EVENT MOUSE-MSG)."
 	 (mouse-msg (if (or (memq 'click modifiers) (memq 'down modifiers)
 			    (memq 'drag modifiers))
                         " at that spot" ""))
-	 (defn (key-binding key t)))
+         ;; Use mouse-set-point to handle the case when a menu item
+         ;; is selected from the context menu that should describe KEY
+         ;; at the position of mouse click that opened the context menu.
+         ;; When no mouse was involved, it defaults to window-point.
+	 (defn (save-excursion (mouse-set-point event) (key-binding key t))))
     ;; Handle the case where we faked an entry in "Select and Paste" menu.
     (when (and (eq defn nil)
 	       (stringp (aref key (1- (length key))))
@@ -934,12 +947,7 @@ current buffer."
           (when defn
             (when (> (length info-list) 1)
               (with-current-buffer standard-output
-                (insert "\n\n"
-                        ;; FIXME: Can't use eval-when-compile because purified
-                        ;; strings lose their text properties :-(
-                        (propertize "\n" 'face
-                                    '(:height 0.1 :inverse-video t :extend t))
-                        "\n")))
+                (insert "\n\n" (make-separator-line) "\n")))
 
             (princ brief-desc)
             (when locus
@@ -948,8 +956,11 @@ current buffer."
 	    (describe-function-1 defn)))))))
 
 (defun search-forward-help-for-help ()
-  "Search forward \"help window\"."
+  "Search forward in the help-for-help window.
+This command is meant to be used after issuing the `C-h C-h' command."
   (interactive)
+  (unless (get-buffer help-for-help-buffer-name)
+    (error "No %s buffer; use `C-h C-h' first" help-for-help-buffer-name))
   ;; Move cursor to the "help window".
   (pop-to-buffer help-for-help-buffer-name)
   ;; Do incremental search forward.
@@ -1908,7 +1919,7 @@ the same names as used in the original source code, when possible."
                            (let ((name (symbol-name arg)))
                              (if (eq (aref name 0) ?&)
                                  (memq arg '(&rest &optional))
-                               (not (string-match "\\." name)))))
+                               (not (string-search "." name)))))
                 (setq valid nil)))
             (when valid arglist)))
         (let* ((arity (func-arity def))

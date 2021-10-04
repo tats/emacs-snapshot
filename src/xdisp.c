@@ -4288,11 +4288,16 @@ handle_fontified_prop (struct it *it)
       struct buffer *obuf = current_buffer;
       ptrdiff_t begv = BEGV, zv = ZV;
       bool old_clip_changed = current_buffer->clip_changed;
+      bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
 
       val = Vfontification_functions;
       specbind (Qfontification_functions, Qnil);
 
       eassert (it->end_charpos == ZV);
+
+      /* Don't allow Lisp that runs from 'fontification-functions'
+	 clear our face and image caches behind our back.  */
+      it->f->inhibit_clear_image_cache = true;
 
       if (!CONSP (val) || EQ (XCAR (val), Qlambda))
 	safe_call1 (val, pos);
@@ -4327,6 +4332,7 @@ handle_fontified_prop (struct it *it)
 	    }
 	}
 
+      it->f->inhibit_clear_image_cache = saved_inhibit_flag;
       unbind_to (count, Qnil);
 
       /* Fontification functions routinely call `save-restriction'.
@@ -4472,7 +4478,13 @@ face_at_pos (const struct it *it, enum lface_attribute_index attr_filter)
 static enum prop_handled
 handle_face_prop (struct it *it)
 {
+  ptrdiff_t count = SPECPDL_INDEX ();
+  /* Don't allow the user to quit out of face-merging code, in case
+     this is called when redisplaying a non-selected window, with
+     point temporarily moved to window-point.  */
+  specbind (Qinhibit_quit, Qt);
   const int new_face_id = face_at_pos (it, 0);
+  unbind_to (count, Qnil);
 
 
   /* Is this a start of a run of characters with box face?
@@ -4557,11 +4569,13 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
       ptrdiff_t bufpos, charpos;
       int base_face_id;
 
-      /* No face change past the end of the string (for the case
-	 we are padding with spaces).  No face change before the
-	 string start.  */
+      /* No face change past the end of the string (for the case we
+	 are padding with spaces).  No face change before the string
+	 start.  Ignore face changes before the first visible
+	 character on this display line.  */
       if (IT_STRING_CHARPOS (*it) >= SCHARS (it->string)
-	  || (IT_STRING_CHARPOS (*it) == 0 && before_p))
+	  || (IT_STRING_CHARPOS (*it) == 0 && before_p)
+	  || it->current_x <= it->first_visible_x)
 	return it->face_id;
 
       if (!it->bidi_p)
@@ -4580,51 +4594,48 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
 	}
       else
 	{
-	  if (before_p)
+	  /* With bidi iteration, the character before the current in
+	     the visual order cannot be found by simple iteration,
+	     because "reverse" reordering is not supported.  Instead,
+	     we need to start from the string beginning and go all the
+	     way to the current string position, remembering the
+	     visually-previous position.  We need to start from the
+	     string beginning for the character after the current as
+	     well, since the iterator state in IT may have been
+	     pushed, and the bidi cache is no longer coherent with the
+	     string's text.  */
+	  SAVE_IT (it_copy, *it, it_copy_data);
+	  IT_STRING_CHARPOS (it_copy) = 0;
+	  bidi_init_it (0, 0, FRAME_WINDOW_P (it_copy.f), &it_copy.bidi_it);
+	  it_copy.bidi_it.scan_dir = 0;
+
+	  do
 	    {
-	      /* With bidi iteration, the character before the current
-		 in the visual order cannot be found by simple
-		 iteration, because "reverse" reordering is not
-		 supported.  Instead, we need to start from the string
-		 beginning and go all the way to the current string
-		 position, remembering the previous position.  */
-	      /* Ignore face changes before the first visible
-		 character on this display line.  */
-	      if (it->current_x <= it->first_visible_x)
-		return it->face_id;
-	      SAVE_IT (it_copy, *it, it_copy_data);
-	      IT_STRING_CHARPOS (it_copy) = 0;
-	      bidi_init_it (0, 0, FRAME_WINDOW_P (it_copy.f), &it_copy.bidi_it);
-
-	      do
-		{
-		  charpos = IT_STRING_CHARPOS (it_copy);
-		  if (charpos >= SCHARS (it->string))
-		    break;
-		  bidi_move_to_visually_next (&it_copy.bidi_it);
-		}
-	      while (IT_STRING_CHARPOS (it_copy) != IT_STRING_CHARPOS (*it));
-
-	      RESTORE_IT (it, it, it_copy_data);
+	      charpos = it_copy.bidi_it.charpos;
+	      if (charpos >= SCHARS (it->string))
+		break;
+	      bidi_move_to_visually_next (&it_copy.bidi_it);
 	    }
-	  else
+	  while (it_copy.bidi_it.charpos != IT_STRING_CHARPOS (*it));
+
+	  if (!before_p)
 	    {
 	      /* Set charpos to the string position of the character
 		 that comes after IT's current position in the visual
 		 order.  */
 	      int n = (it->what == IT_COMPOSITION ? it->cmp_it.nchars : 1);
-
-	      it_copy = *it;
-	      /* If this is the first display element,
+	      /* If this is the first string character,
 		 bidi_move_to_visually_next will deliver character at
 		 current position without moving, so we need to enlarge N.  */
-	      if (it->bidi_it.first_elt)
+	      if (it_copy.bidi_it.first_elt)
 		n++;
 	      while (n--)
 		bidi_move_to_visually_next (&it_copy.bidi_it);
 
 	      charpos = it_copy.bidi_it.charpos;
 	    }
+
+	  RESTORE_IT (it, it, it_copy_data);
 	}
       eassert (0 <= charpos && charpos <= SCHARS (it->string));
 
@@ -5783,8 +5794,15 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 #ifdef HAVE_WINDOW_SYSTEM
       else
 	{
+	  ptrdiff_t count = SPECPDL_INDEX ();
+
 	  it->what = IT_IMAGE;
+	  /* Don't allow quitting from lookup_image, for when we are
+	     displaying a non-selected window, and the buffer's point
+	     was temporarily moved to the window-point.  */
+	  specbind (Qinhibit_quit, Qt);
 	  it->image_id = lookup_image (it->f, value, it->face_id);
+	  unbind_to (count, Qnil);
 	  it->position = start_pos;
 	  it->object = NILP (object) ? it->w->contents : object;
 	  it->method = GET_FROM_IMAGE;
@@ -10795,6 +10813,9 @@ include the height of both, if present, in the return value.  */)
 	  it.max_descent = max (it.max_descent, it.descent);
 	}
     }
+  else
+    bidi_unshelve_cache (it2data, true);
+
   if (!NILP (x_limit))
     {
       /* Don't return more than X-LIMIT.  */
@@ -11756,7 +11777,7 @@ display_echo_area (struct window *w)
   /* If there is no message, we must call display_echo_area_1
      nevertheless because it resizes the window.  But we will have to
      reset the echo_area_buffer in question to nil at the end because
-     with_echo_area_buffer will sets it to an empty buffer.  */
+     with_echo_area_buffer will set it to an empty buffer.  */
   bool i = display_last_displayed_message_p;
   /* According to the C99, C11 and C++11 standards, the integral value
      of a "bool" is always 0 or 1, so this array access is safe here,
@@ -13744,7 +13765,7 @@ get_tab_bar_item (struct frame *f, int x, int y, struct glyph **glyph,
    false for button release.  MODIFIERS is event modifiers for button
    release.  */
 
-void
+Lisp_Object
 handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
 		      int modifiers)
 {
@@ -13758,16 +13779,13 @@ handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
 
   frame_to_window_pixel_xy (w, &x, &y);
   ts = get_tab_bar_item (f, x, y, &glyph, &hpos, &vpos, &prop_idx, &close_p);
-  if (ts == -1
-      /* If the button is released on a tab other than the one where
-	 it was pressed, don't generate the tab-bar button click event.  */
-      || (ts != 0 && !down_p))
-    return;
+  if (ts == -1)
+    return Fcons (Qtab_bar, Qnil);
 
   /* If item is disabled, do nothing.  */
   enabled_p = AREF (f->tab_bar_items, prop_idx + TAB_BAR_ITEM_ENABLED_P);
   if (NILP (enabled_p))
-    return;
+    return Qnil;
 
   if (down_p)
     {
@@ -13778,24 +13796,24 @@ handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
     }
   else
     {
-      Lisp_Object key, frame;
-      struct input_event event;
-      EVENT_INIT (event);
-
       /* Show item in released state.  */
       if (!NILP (Vmouse_highlight))
 	show_mouse_face (hlinfo, DRAW_IMAGE_RAISED);
-
-      key = AREF (f->tab_bar_items, prop_idx + TAB_BAR_ITEM_KEY);
-
-      XSETFRAME (frame, f);
-      event.kind = TAB_BAR_EVENT;
-      event.frame_or_window = frame;
-      event.arg = key;
-      event.modifiers = close_p ? ctrl_modifier | modifiers : modifiers;
-      kbd_buffer_store_event (&event);
       f->last_tab_bar_item = -1;
     }
+
+  Lisp_Object caption =
+    Fcopy_sequence (AREF (f->tab_bar_items, prop_idx + TAB_BAR_ITEM_CAPTION));
+
+  AUTO_LIST2 (props, Qmenu_item,
+	      list3 (AREF (f->tab_bar_items, prop_idx + TAB_BAR_ITEM_KEY),
+		     AREF (f->tab_bar_items, prop_idx + TAB_BAR_ITEM_BINDING),
+		     close_p ? Qt : Qnil));
+
+  Fadd_text_properties (make_fixnum (0), make_fixnum (SCHARS (caption)),
+			props, caption);
+
+  return Fcons (Qtab_bar, Fcons (caption, make_fixnum (0)));
 }
 
 
@@ -13893,7 +13911,7 @@ note_tab_bar_highlight (struct frame *f, int x, int y)
 
 /* Find the tab-bar item at X coordinate and return its information.  */
 static Lisp_Object
-tty_get_tab_bar_item (struct frame *f, int x, int *idx, ptrdiff_t *end)
+tty_get_tab_bar_item (struct frame *f, int x, int *prop_idx, bool *close_p)
 {
   ptrdiff_t clen = 0;
 
@@ -13906,8 +13924,11 @@ tty_get_tab_bar_item (struct frame *f, int x, int *idx, ptrdiff_t *end)
       clen += SCHARS (caption);
       if (x < clen)
 	{
-	  *idx = i;
-	  *end = clen;
+	  *prop_idx = i;
+	  *close_p = !NILP (Fget_text_property (make_fixnum (SCHARS (caption)
+							     - (clen - x)),
+						Qclose_tab,
+						caption));
 	  return caption;
 	}
     }
@@ -13919,61 +13940,45 @@ tty_get_tab_bar_item (struct frame *f, int x, int *idx, ptrdiff_t *end)
    structure, store it in keyboard queue, and return true; otherwise
    return false.  MODIFIERS are event modifiers for generating the tab
    release event.  */
-bool
+Lisp_Object
 tty_handle_tab_bar_click (struct frame *f, int x, int y, bool down_p,
 			  struct input_event *event)
 {
   /* Did they click on the tab bar?  */
   if (y < FRAME_MENU_BAR_LINES (f)
       || y >= FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
-    return false;
+    return Qnil;
 
   /* Find the tab-bar item where the X,Y coordinates belong.  */
   int prop_idx;
-  ptrdiff_t clen;
-  Lisp_Object caption = tty_get_tab_bar_item (f, x, &prop_idx, &clen);
+  bool close_p;
+  Lisp_Object caption = tty_get_tab_bar_item (f, x, &prop_idx, &close_p);
 
   if (NILP (caption))
-    return false;
+    return Qnil;
 
   if (NILP (AREF (f->tab_bar_items,
 		  prop_idx * TAB_BAR_ITEM_NSLOTS + TAB_BAR_ITEM_ENABLED_P)))
-    return false;
+    return Qnil;
 
   if (down_p)
     f->last_tab_bar_item = prop_idx;
   else
-    {
-      /* Force reset of up_modifier bit from the event modifiers.  */
-      if (event->modifiers & up_modifier)
-        event->modifiers &= ~up_modifier;
+    f->last_tab_bar_item = -1;
 
-      /* Generate a TAB_BAR_EVENT event.  */
-      Lisp_Object frame;
-      Lisp_Object key = AREF (f->tab_bar_items,
-			      prop_idx * TAB_BAR_ITEM_NSLOTS
-			      + TAB_BAR_ITEM_KEY);
-      /* Kludge alert: we assume the last two characters of a tab
-	 label are " x", and treat clicks on those 2 characters as a
-	 Close Tab command.  */
-      eassert (STRINGP (caption));
-      int lastc = SSDATA (caption)[SCHARS (caption) - 1];
-      bool close_p = false;
-      if ((x == clen - 1 || (clen > 1 && x == clen - 2)) && lastc == 'x')
-	close_p = true;
+  caption = Fcopy_sequence (caption);
 
-      event->code = 0;
-      XSETFRAME (frame, f);
-      event->kind = TAB_BAR_EVENT;
-      event->frame_or_window = frame;
-      event->arg = key;
-      if (close_p)
-	event->modifiers |= ctrl_modifier;
-      kbd_buffer_store_event (event);
-      f->last_tab_bar_item = -1;
-    }
+  AUTO_LIST2 (props, Qmenu_item,
+	      list3 (AREF (f->tab_bar_items, prop_idx * TAB_BAR_ITEM_NSLOTS
+			   + TAB_BAR_ITEM_KEY),
+		     AREF (f->tab_bar_items, prop_idx * TAB_BAR_ITEM_NSLOTS
+			   + TAB_BAR_ITEM_BINDING),
+		     close_p ? Qt : Qnil));
 
-  return true;
+  Fadd_text_properties (make_fixnum (0), make_fixnum (SCHARS (caption)),
+			props, caption);
+
+  return Fcons (Qtab_bar, Fcons (caption, make_fixnum (0)));
 }
 
 
@@ -14883,7 +14888,15 @@ hscroll_window_tree (Lisp_Object window)
 
       if (WINDOWP (w->contents))
 	hscrolled_p |= hscroll_window_tree (w->contents);
-      else if (w->cursor.vpos >= 0)
+      else if (w->cursor.vpos >= 0
+	       /* Don't allow hscroll in mini-windows that display
+		  echo-area messages.  This is because desired_matrix
+		  of such windows was prepared while momentarily
+		  switched to an echo-area buffer, which is different
+		  from w->contents, and we simply cannot hscroll such
+		  windows safely.  */
+	       && !(w == XWINDOW (echo_area_window)
+		    && !NILP (echo_area_buffer[0])))
 	{
 	  int h_margin;
 	  int text_area_width;
@@ -15081,11 +15094,12 @@ hscroll_window_tree (Lisp_Object window)
 	      else
 		{
 		  if (hscroll_relative_p)
-		    wanted_x = text_area_width * hscroll_step_rel
-		      	       + h_margin;
+		    wanted_x =
+		      text_area_width * hscroll_step_rel + h_margin + x_offset;
 		  else
-		    wanted_x = hscroll_step_abs * FRAME_COLUMN_WIDTH (it.f)
-		      	       + h_margin;
+		    wanted_x =
+		      hscroll_step_abs * FRAME_COLUMN_WIDTH (it.f)
+		      + h_margin + x_offset;
 		  hscroll
 		    = max (0, it.current_x - wanted_x) / FRAME_COLUMN_WIDTH (it.f);
 		}
@@ -16053,12 +16067,13 @@ redisplay_internal (void)
 	      if (FRAME_VISIBLE_P (f) && !FRAME_OBSCURED_P (f))
 		{
 
-		  /* Don't allow freeing images for this frame as long
-		     as the frame's update wasn't completed.  This
-		     prevents crashes when some Lisp that runs from
-		     the various hooks or font-lock decides to clear
-		     the frame's image cache, when the images in that
-		     cache are referenced by the desired matrix.  */
+		  /* Don't allow freeing images and faces for this
+		     frame as long as the frame's update wasn't
+		     completed.  This prevents crashes when some Lisp
+		     that runs from the various hooks or font-lock
+		     decides to clear the frame's image cache and face
+		     cache, when the images and faces in those caches
+		     are referenced by the desired matrix.  */
 		  f->inhibit_clear_image_cache = true;
 		  redisplay_windows (FRAME_ROOT_WINDOW (f));
 		}
@@ -17273,8 +17288,11 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 
   if (!NILP (Vwindow_scroll_functions))
     {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      specbind (Qinhibit_quit, Qt);
       run_hook_with_args_2 (Qwindow_scroll_functions, window,
 			    make_fixnum (CHARPOS (startp)));
+      unbind_to (count, Qnil);
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
       /* In case the hook functions switch buffers.  */
       set_buffer_internal (XBUFFER (w->contents));
@@ -19267,7 +19285,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   w->start_at_line_beg = (CHARPOS (startp) == BEGV
 			  || FETCH_BYTE (BYTEPOS (startp) - 1) == '\n');
 
-  /* Display the mode line, if we must.  */
+  /* Display the mode line, header line, and tab-line, if we must.  */
   if ((update_mode_line
        /* If window not full width, must redo its mode line
 	  if (a) the window to its side is being redone and
@@ -19286,8 +19304,11 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  || window_wants_header_line (w)
 	  || window_wants_tab_line (w)))
     {
+      ptrdiff_t count1 = SPECPDL_INDEX ();
 
+      specbind (Qinhibit_quit, Qt);
       display_mode_lines (w);
+      unbind_to (count1, Qnil);
 
       /* If mode line height has changed, arrange for a thorough
 	 immediate redisplay using the correct mode line height.  */
@@ -19335,7 +19356,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
  finish_menu_bars:
 
   /* When we reach a frame's selected window, redo the frame's menu
-     bar and the frame's title.  */
+     bar, tool bar, tab-bar, and the frame's title.  */
   if (update_mode_line
       && EQ (FRAME_SELECTED_WINDOW (f), window))
     {
@@ -22103,10 +22124,17 @@ extend_face_to_end_of_line (struct it *it)
 	   || WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0))
     return;
 
+  ptrdiff_t count = SPECPDL_INDEX ();
+
+  /* Don't allow the user to quit out of face-merging code, in case
+     this is called when redisplaying a non-selected window, with
+     point temporarily moved to window-point.  */
+  specbind (Qinhibit_quit, Qt);
   const int extend_face_id = (it->face_id == DEFAULT_FACE_ID
                               || it->s != NULL)
     ? DEFAULT_FACE_ID
     : face_at_pos (it, LFACE_EXTEND_INDEX);
+  unbind_to (count, Qnil);
 
   /* Face extension extends the background and box of IT->extend_face_id
      to the end of the line.  If the background equals the background
@@ -22386,15 +22414,23 @@ extend_face_to_end_of_line (struct it *it)
       it->face_id = (it->glyph_row->ends_at_zv_p ?
                      default_face->id : face->id);
 
-      /* Display fill-column indicator if needed.  */
-      const int indicator_column = fill_column_indicator_column (it, 1);
-
       /* Make sure our idea of current_x is in sync with the glyphs
 	 actually in the glyph row.  They might differ because
 	 append_space_for_newline can insert one glyph without
 	 updating current_x.  */
       it->current_x = it->glyph_row->used[TEXT_AREA];
 
+      /* The above assignment causes the code below to use a
+	 non-standard semantics of it->current_x: it is measured
+	 relative to the beginning of the text-area, thus disregarding
+	 the window's hscroll.  That is why we need to correct the
+	 indicator column for the hscroll, otherwise the indicator
+	 will not move together with the text as result of horizontal
+	 scrolling.  */
+      const int indicator_column =
+	fill_column_indicator_column (it, 1) - it->first_visible_x;
+
+      /* Display fill-column indicator if needed.  */
       while (it->current_x <= it->last_visible_x)
 	{
 	  if (it->current_x != indicator_column)
@@ -22754,6 +22790,22 @@ get_it_property (struct it *it, Lisp_Object prop)
   return Fget_char_property (position, prop, object);
 }
 
+/* Return the line-prefix/wrap-prefix property, checking both the
+   current IT->OBJECT and the underlying buffer text.  */
+
+static Lisp_Object
+get_line_prefix_it_property (struct it *it, Lisp_Object prop)
+{
+  Lisp_Object prefix = get_it_property (it, prop);
+
+  /* If we are looking at a display or overlay string, check also the
+     underlying buffer text.  */
+  if (NILP (prefix) && it->sp > 0 && STRINGP (it->object))
+    return Fget_char_property (make_fixnum (IT_CHARPOS (*it)), prop,
+			       it->w->contents);
+  return prefix;
+}
+
 /* See if there's a line- or wrap-prefix, and if so, push it on IT.  */
 
 static void
@@ -22763,13 +22815,13 @@ handle_line_prefix (struct it *it)
 
   if (it->continuation_lines_width > 0)
     {
-      prefix = get_it_property (it, Qwrap_prefix);
+      prefix = get_line_prefix_it_property (it, Qwrap_prefix);
       if (NILP (prefix))
 	prefix = Vwrap_prefix;
     }
   else
     {
-      prefix = get_it_property (it, Qline_prefix);
+      prefix = get_line_prefix_it_property (it, Qline_prefix);
       if (NILP (prefix))
 	prefix = Vline_prefix;
     }
@@ -25402,8 +25454,9 @@ redisplay_mode_lines (Lisp_Object window, bool force)
 }
 
 
-/* Display the mode and/or header line of window W.  Value is the
-   sum number of mode lines and header lines displayed.  */
+/* Display the mode line, the header line, and the tab-line of window
+   W.  Value is the sum number of mode lines, header lines, and tab
+   lines actually displayed.  */
 
 static int
 display_mode_lines (struct window *w)
@@ -26983,7 +27036,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	Lisp_Object val = Qnil;
 
 	if (STRINGP (curdir))
-	  val = call1 (intern ("file-remote-p"), curdir);
+	  val = safe_call1 (intern ("file-remote-p"), curdir);
 
 	val = unbind_to (count, val);
 
@@ -30290,7 +30343,7 @@ produce_glyphless_glyph (struct it *it, bool for_no_font, Lisp_Object acronym)
 
       /* +4 is for vertical bars of a box plus 1-pixel spaces at both side.  */
       width = max (metrics_upper.width, metrics_lower.width) + 4;
-      upper_xoff = upper_yoff = 2; /* the typical case */
+      upper_xoff = lower_xoff = 2; /* the typical case */
       if (base_width >= width)
 	{
 	  /* Align the upper to the left, the lower to the right.  */
@@ -30304,13 +30357,7 @@ produce_glyphless_glyph (struct it *it, bool for_no_font, Lisp_Object acronym)
 	  if (metrics_upper.width >= metrics_lower.width)
 	    lower_xoff = (width - metrics_lower.width) / 2;
 	  else
-	    {
-	      /* FIXME: This code doesn't look right.  It formerly was
-		 missing the "lower_xoff = 0;", which couldn't have
-		 been right since it left lower_xoff uninitialized.  */
-	      lower_xoff = 0;
-	      upper_xoff = (width - metrics_upper.width) / 2;
-	    }
+	    upper_xoff = (width - metrics_upper.width) / 2;
 	}
 
       /* +5 is for horizontal bars of a box plus 1-pixel spaces at
@@ -33231,7 +33278,8 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
      of the mode line without any text (e.g. past the right edge of
      the mode line text), use that windows's mode line help echo if it
      has been set.  */
-  if (STRINGP (string) || area == ON_MODE_LINE)
+  if (STRINGP (string) || area == ON_MODE_LINE || area == ON_HEADER_LINE
+      || area == ON_TAB_LINE)
     {
       /* Arrange to display the help by setting the global variables
 	 help_echo_string, help_echo_object, and help_echo_pos.  */
@@ -33288,6 +33336,19 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
 	    }
 	  else if (draggable && area == ON_MODE_LINE)
 	    cursor = FRAME_OUTPUT_DATA (f)->vertical_drag_cursor;
+	  else if ((area == ON_MODE_LINE
+		    && WINDOW_BOTTOMMOST_P (w)
+		    && !FRAME_HAS_MINIBUF_P (f)
+		    && !NILP (Fframe_parameter
+			      (w->frame, Qdrag_with_mode_line)))
+		   || (((area == ON_HEADER_LINE
+			 && !NILP (Fframe_parameter
+				   (w->frame, Qdrag_with_header_line)))
+			|| (area == ON_TAB_LINE
+			    && !NILP (Fframe_parameter
+				      (w->frame, Qdrag_with_tab_line))))
+		       && WINDOW_TOPMOST_P (w)))
+	    cursor = FRAME_OUTPUT_DATA (f)->hand_cursor;
 	  else
 	    cursor = FRAME_OUTPUT_DATA (f)->nontext_cursor;
 	}
@@ -33499,7 +33560,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 	  && y < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f)))
     {
       int prop_idx;
-      ptrdiff_t ignore;
+      bool ignore;
       Lisp_Object caption = tty_get_tab_bar_item (f, x, &prop_idx, &ignore);
 
       if (!NILP (caption))
@@ -34375,7 +34436,7 @@ gui_draw_bottom_divider (struct window *w)
 		  && !NILP (XWINDOW (p->parent)->next))))
 	x1 -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
 
-	FRAME_RIF (f)->draw_window_divider (w, x0, x1, y0, y1);
+      FRAME_RIF (f)->draw_window_divider (w, x0, x1, y0, y1);
     }
 }
 
@@ -34877,6 +34938,10 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (Qdragging, "dragging");
   DEFSYM (Qdropping, "dropping");
 
+  DEFSYM (Qdrag_with_mode_line, "drag-with-mode-line");
+  DEFSYM (Qdrag_with_header_line, "drag-with-header-line");
+  DEFSYM (Qdrag_with_tab_line, "drag-with-tab-line");
+
   DEFSYM (Qinhibit_free_realized_faces, "inhibit-free-realized-faces");
 
   list_of_error = list1 (list2 (Qerror, Qvoid_variable));
@@ -35062,7 +35127,10 @@ not span the full frame width.
 
 A value of nil means to respect the value of `truncate-lines'.
 
-If `word-wrap' is enabled, you might want to reduce this.  */);
+If `word-wrap' is enabled, you might want to reduce the value of this.
+
+Don't set this to a non-nil value when `visual-line-mode' is
+turned on, as it could produce confusing results.  */);
   Vtruncate_partial_width_windows = make_fixnum (50);
 
   DEFVAR_BOOL("word-wrap-by-category", word_wrap_by_category, doc: /*
@@ -35371,7 +35439,7 @@ and `scroll-right' overrides this variable's effect.  */);
   Vhscroll_step = make_fixnum (0);
 
   DEFVAR_BOOL ("message-truncate-lines", message_truncate_lines,
-    doc: /* If non-nil, messages are truncated instead of resizing the echo area.
+    doc: /* If non-nil, messages are truncated when displaying the echo area.
 Bind this around calls to `message' to let it take effect.  */);
   message_truncate_lines = false;
 
@@ -35645,8 +35713,10 @@ as usual.  If the function returns a string, the returned string is
 displayed in the echo area.  If this function returns any other non-nil
 value, this means that the message was already handled, and the original
 message text will not be displayed in the echo area.
-See also `clear-message-function' that can be used to clear the
-message displayed by this function.  */);
+
+Also see `clear-message-function' (which can be used to clear the
+message displayed by this function), and `command-error-function'
+(which controls how error messages are displayed).  */);
   Vset_message_function = Qnil;
 
   DEFVAR_LISP ("clear-message-function", Vclear_message_function,

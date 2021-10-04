@@ -406,7 +406,7 @@ Entries are (SYMBOL EXPR DOC-STRING TEMP-TYPE BASE-UNITS).")
 If EXPR is nil, return nil."
   (if expr
       (let ((cexpr (math-compose-expr expr 0)))
-        (replace-regexp-in-string
+        (string-replace
          " / " "/"
          (if (stringp cexpr)
              cexpr
@@ -529,7 +529,7 @@ If COMP or STD is non-nil, put that in the units table instead."
   (calc-slow-wrapper
    (let* ((expr (calc-top-n 1)))
      (unless (math-units-in-expr-p expr t)
-       (error "No units in expression."))
+       (error "No units in expression"))
      (let* ((old-units (math-extract-units expr))
             (defunits (math-get-default-units expr))
             units

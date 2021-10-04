@@ -40,7 +40,7 @@
 
 ;;; Classes:
 (defclass semanticdb-table-emacs-lisp (semanticdb-abstract-table)
-  ((major-mode :initform emacs-lisp-mode)
+  ((major-mode :initform #'emacs-lisp-mode)
    )
   "A table for returning search results from Emacs.")
 
@@ -63,7 +63,7 @@ It does not need refreshing."
 
 (defclass semanticdb-project-database-emacs-lisp
   (semanticdb-project-database eieio-singleton)
-  ((new-table-class :initform semanticdb-table-emacs-lisp
+  ((new-table-class :initform 'semanticdb-table-emacs-lisp
 		    :type class
 		    :documentation
 		    "New tables created for this database are of this class.")
@@ -328,7 +328,7 @@ Like `semanticdb-find-tags-for-completion-method' for Emacs Lisp."
 ;;
 (cl-defmethod semanticdb-find-tags-external-children-of-type-method
   ((_table semanticdb-table-emacs-lisp) type &optional tags)
-  "Find all nonterminals which are child elements of TYPE
+  "Find all nonterminals which are child elements of TYPE.
 Optional argument TAGS is a list of tags to search.
 Return a list of tags."
   (if tags (cl-call-next-method)

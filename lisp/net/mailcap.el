@@ -93,7 +93,7 @@ The elements of the list are alists of the following structure
    (type   . MIME-TYPE)
    (test   . TEST))
 
-where VIEWER is either a lisp command, e.g., a major-mode, or a
+where VIEWER is either a Lisp command, e.g., a major mode, or a
 string containing a shell command for viewing files of the
 defined MIME-TYPE.  In case of a shell command, %s will be
 replaced with the file.
@@ -101,7 +101,7 @@ replaced with the file.
 MIME-TYPE is a regular expression being matched against the
 actual MIME type.  It is implicitly surrounded with ^ and $.
 
-TEST is a lisp form which is evaluated in order to test if the
+TEST is a Lisp form which is evaluated in order to test if the
 entry should be chosen.  The `test' entry is optional.
 
 When selecting a viewer for a given MIME type, the first viewer
@@ -1075,7 +1075,7 @@ For instance, \"foo.png\" will result in \"image/png\"."
       (dolist (data mailcap--computed-mime-data)
         (dolist (info (cdr data))
           (setq type (cdr (assq 'type (cdr info))))
-          (unless (string-match-p "\\*" type)
+          (unless (string-search "*" type)
             (push type res))))
       (nreverse res)))))
 
@@ -1155,6 +1155,46 @@ current buffer after passing its contents to the shell command."
           (delete-region (point-min) (point-max))
           (mailcap--async-shell method file))
       (funcall method))))
+
+(defun mailcap-view-file (file)
+  "View FILE according to rules given by the mailcap system.
+This normally involves executing some external program to display
+the file.
+
+See \"~/.mailcap\", `mailcap-mime-data' and related files and variables."
+  (interactive "fOpen file with mailcap: ")
+  (setq file (expand-file-name file))
+  (mailcap-parse-mailcaps)
+  (let ((command (mailcap-mime-info
+                  (mailcap-extension-to-mime (file-name-extension file)))))
+    (unless command
+      (error "No viewer for %s" (file-name-extension file)))
+    ;; Remove quotes around the file name - we'll use shell-quote-argument.
+    (while (string-match "['\"]%s['\"]" command)
+      (setq command (replace-match "%s" t t command)))
+    (setq command (replace-regexp-in-string
+		   "%s"
+		   (shell-quote-argument (convert-standard-filename file))
+		   command
+		   nil t))
+    ;; Handlers such as "gio open" and kde-open5 start viewer in background
+    ;; and exit immediately.  Avoid `start-process' since it assumes
+    ;; :connection-type `pty' and kills children processes with SIGHUP
+    ;; when temporary terminal session is finished (Bug#44824).
+    ;; An alternative is `process-connection-type' let-bound to nil for
+    ;; `start-process-shell-command' call (with no chance to report failure).
+    (make-process
+     :name "mailcap-view-file"
+     :connection-type 'pipe
+     :buffer nil ; "*Messages*" may be suitable for debugging
+     :sentinel (lambda (proc event)
+                 (when (and (memq (process-status proc) '(exit signal))
+                            (/= (process-exit-status proc) 0))
+                   (message
+                    "Command %s: %s."
+                    (mapconcat #'identity (process-command proc) " ")
+                    (substring event 0 -1))))
+     :command (list shell-file-name shell-command-switch command))))
 
 (provide 'mailcap)
 

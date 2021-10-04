@@ -116,9 +116,9 @@ or one if there's just one execution unit."
   :version "28.1")
 
 (defcustom native-comp-async-cu-done-functions nil
-  "List of functions to call after asynchronously compiling one compilation unit.
-Called with one argument FILE, the filename used as input to
-compilation."
+  "List of functions to call when asynchronous compilation of a file is done.
+Each function is called with one argument FILE, the filename whose
+compilation has completed."
   :type 'hook
   :version "28.1")
 
@@ -148,8 +148,13 @@ As asynchronous native compilation always starts from a pristine
 environment, it is more sensitive to such omissions, and might be
 unable to compile such Lisp source files correctly.
 
-Set this variable to nil if these warnings annoy you."
-  :type 'boolean
+Set this variable to nil to suppress warnings altogether, or to
+the symbol `silent' to log warnings but not pop up the *Warnings*
+buffer."
+  :type '(choice
+          (const :tag "Do not report warnings" nil)
+          (const :tag "Report and display warnings" t)
+          (const :tag "Report but do not display warnings" silent))
   :version "28.1")
 
 (defcustom native-comp-async-query-on-exit nil
@@ -159,6 +164,16 @@ asynchronous native compilations if any are running.  If nil, when you
 exit Emacs, it will silently kill those asynchronous compilations even
 if `confirm-kill-processes' is non-nil."
   :type 'boolean
+  :version "28.1")
+
+(defcustom native-comp-compiler-options nil
+  "Command line options passed verbatim to GCC compiler.
+Note that not all options are meaningful and some options might even
+break your Emacs.  Use at your own risk.
+
+Passing these options is only available in libgccjit version 9
+and above."
+  :type '(repeat string)
   :version "28.1")
 
 (defcustom native-comp-driver-options nil
@@ -194,6 +209,9 @@ Emacs Lisp file:
 
 \;; Local Variables:\n;; no-native-compile: t\n;; End:")
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
+
+(defvar native-compile-target-directory nil
+  "When non-nil force the target directory for the eln files being compiled.")
 
 (defvar comp-log-time-report nil
   "If non-nil, log a time report for each pass.")
@@ -747,6 +765,8 @@ Returns ELT."
          :documentation "Default speed for this compilation unit.")
   (debug native-comp-debug :type number
          :documentation "Default debug level for this compilation unit.")
+  (compiler-options native-comp-compiler-options :type list
+                    :documentation "Options for the GCC compiler.")
   (driver-options native-comp-driver-options :type list
          :documentation "Options for the GCC driver.")
   (top-level-forms () :type list
@@ -881,8 +901,8 @@ non local exit (ends with an `unreachable' insn)."))
   (lap () :type list
        :documentation "LAP assembly representation.")
   (ssa-status nil :type symbol
-       :documentation "SSA status either: 'nil', 'dirty' or 't'.
-Once in SSA form this *must* be set to 'dirty' every time the topology of the
+       :documentation "SSA status either: nil, `dirty' or t.
+Once in SSA form this *must* be set to `dirty' every time the topology of the
 CFG is mutated by a pass.")
   (frame-size nil :type integer)
   (vframe-size 0 :type integer)
@@ -1163,7 +1183,7 @@ clashes."
 	                   do (aset str j (aref byte 0))
 	                      (aset str (1+ j) (aref byte 1))
 	                   finally return str))
-         (human-readable (replace-regexp-in-string
+         (human-readable (string-replace
                           "-" "_" orig-name))
          (human-readable (replace-regexp-in-string
                           (rx (not (any "0-9a-z_"))) "" human-readable)))
@@ -1332,12 +1352,15 @@ clashes."
   (unless (comp-ctxt-output comp-ctxt)
     (setf (comp-ctxt-output comp-ctxt) (comp-el-to-eln-filename
                                         filename
-                                        (when byte-native-for-bootstrap
-                                          (car (last native-comp-eln-load-path))))))
+                                        (or native-compile-target-directory
+                                            (when byte+native-compile
+                                              (car (last native-comp-eln-load-path)))))))
   (setf (comp-ctxt-speed comp-ctxt) (alist-get 'native-comp-speed
                                                byte-native-qualities)
         (comp-ctxt-debug comp-ctxt) (alist-get 'native-comp-debug
                                                byte-native-qualities)
+        (comp-ctxt-compiler-options comp-ctxt) (alist-get 'native-comp-compiler-options
+                                                        byte-native-qualities)
         (comp-ctxt-driver-options comp-ctxt) (alist-get 'native-comp-driver-options
                                                         byte-native-qualities)
         (comp-ctxt-top-level-forms comp-ctxt)
@@ -3638,7 +3661,7 @@ Prepare every function for final compilation and drive the C back-end."
     ;; unless during bootstrap or async compilation (bug#45056).  GCC
     ;; leaks memory but also interfere with the ability of Emacs to
     ;; detect when a sub-process completes (TODO understand why).
-    (if (or byte-native-for-bootstrap comp-async-compilation)
+    (if (or byte+native-compile comp-async-compilation)
 	(comp-final1)
       ;; Call comp-final1 in a child process.
       (let* ((output (comp-ctxt-output comp-ctxt))
@@ -3654,6 +3677,8 @@ Prepare every function for final compilation and drive the C back-end."
                            comp-libgccjit-reproducer ,comp-libgccjit-reproducer
                            comp-ctxt ,comp-ctxt
                            native-comp-eln-load-path ',native-comp-eln-load-path
+                           native-comp-compiler-options
+                           ',native-comp-compiler-options
                            native-comp-driver-options
                            ',native-comp-driver-options
                            load-path ',load-path)
@@ -3779,8 +3804,9 @@ Return the trampoline if found or nil otherwise."
 
 ;;;###autoload
 (defun comp-clean-up-stale-eln (file)
-  "Given FILE remove all its *.eln files in `native-comp-eln-load-path'
-sharing the original source filename (including FILE)."
+  "Remove all FILE*.eln* files found in `native-comp-eln-load-path'.
+The files to be removed are those produced from the original source
+filename (including FILE)."
   (when (string-match (rx "-" (group-n 1 (1+ hex)) "-" (1+ hex) ".eln" eos)
                       file)
     (cl-loop
@@ -3874,14 +3900,18 @@ processes from `comp-async-compilations'"
 (defun comp-accept-and-process-async-output (process)
   "Accept PROCESS output and check for diagnostic messages."
   (if native-comp-async-report-warnings-errors
-      (with-current-buffer (process-buffer process)
-        (save-excursion
-          (accept-process-output process)
-          (goto-char (or comp-last-scanned-async-output (point-min)))
-          (while (re-search-forward "^.*?\\(?:Error\\|Warning\\): .*$"
-                                    nil t)
-            (display-warning 'comp (match-string 0)))
-          (setq comp-last-scanned-async-output (point-max))))
+      (let ((warning-suppress-types
+             (if (eq native-comp-async-report-warnings-errors 'silent)
+                 (cons '(comp) warning-suppress-types)
+               warning-suppress-types)))
+        (with-current-buffer (process-buffer process)
+          (save-excursion
+            (accept-process-output process)
+            (goto-char (or comp-last-scanned-async-output (point-min)))
+            (while (re-search-forward "^.*?\\(?:Error\\|Warning\\): .*$"
+                                      nil t)
+              (display-warning 'comp (match-string 0)))
+            (setq comp-last-scanned-async-output (point-max)))))
     (accept-process-output process)))
 
 (defun comp-run-async-workers ()
@@ -3905,12 +3935,16 @@ display a message."
          do (let* ((expr `((require 'comp)
                            ,(when (boundp 'backtrace-line-length)
                               `(setf backtrace-line-length ,backtrace-line-length))
-                           (setf native-comp-speed ,native-comp-speed
+                           (setf comp-file-preloaded-p ,comp-file-preloaded-p
+                                 native-compile-target-directory ,native-compile-target-directory
+                                 native-comp-speed ,native-comp-speed
                                  native-comp-debug ,native-comp-debug
                                  native-comp-verbose ,native-comp-verbose
                                  comp-libgccjit-reproducer ,comp-libgccjit-reproducer
                                  comp-async-compilation t
                                  native-comp-eln-load-path ',native-comp-eln-load-path
+                                 native-comp-compiler-options
+                                 ',native-comp-compiler-options
                                  native-comp-driver-options
                                  ',native-comp-driver-options
                                  load-path ',load-path
@@ -3923,7 +3957,9 @@ display a message."
                                (concat "emacs-async-comp-"
                                        (file-name-base source-file) "-")
                                nil ".el"))
-                   (expr-strings (mapcar #'prin1-to-string expr))
+                   (expr-strings (let ((print-length nil)
+                                       (print-level nil))
+                                   (mapcar #'prin1-to-string expr)))
                    (_ (progn
                         (with-temp-file temp-file
                           (mapc #'insert expr-strings))
@@ -3932,7 +3968,11 @@ display a message."
                    (load1 load)
                    (process (make-process
                              :name (concat "Compiling: " source-file)
-                             :buffer (get-buffer-create comp-async-buffer-name)
+                             :buffer (with-current-buffer
+                                         (get-buffer-create
+                                          comp-async-buffer-name)
+                                       (setf buffer-read-only t)
+			               (current-buffer))
                              :command (list
                                        (expand-file-name invocation-name
                                                          invocation-directory)
@@ -3961,8 +4001,9 @@ display a message."
     (run-hooks 'native-comp-async-all-done-hook)
     (with-current-buffer (get-buffer-create comp-async-buffer-name)
       (save-excursion
-        (goto-char (point-max))
-        (insert "Compilation finished.\n")))
+        (let ((buffer-read-only nil))
+          (goto-char (point-max))
+          (insert "Compilation finished.\n"))))
     ;; `comp-deferred-pending-h' should be empty at this stage.
     ;; Reset it anyway.
     (clrhash comp-deferred-pending-h)))
@@ -4150,33 +4191,41 @@ form, return the compiled function."
   (comp--native-compile function-or-file nil output))
 
 ;;;###autoload
-(defun batch-native-compile ()
-  "Perform native compilation on remaining command-line arguments.
-Use this from the command line, with ‘-batch’;
-it won’t work in an interactive Emacs.
-Native compilation equivalent to `batch-byte-compile'."
+(defun batch-native-compile (&optional for-tarball)
+  "Perform batch native compilation of remaining command-line arguments.
+
+Native compilation equivalent of `batch-byte-compile'.
+Use this from the command line, with `-batch'; it won't work
+in an interactive Emacs session.
+Optional argument FOR-TARBALL non-nil means the file being compiled
+as part of building the source tarball, in which case the .eln file
+will be placed under the native-lisp/ directory (actually, in the
+last directory in `native-comp-eln-load-path')."
   (comp-ensure-native-compiler)
-  (cl-loop for file in command-line-args-left
-           if (or (null byte-native-for-bootstrap)
-                  (cl-notany (lambda (re) (string-match re file))
-                             native-comp-bootstrap-deny-list))
-           do (comp--native-compile file)
-           else
-           do (byte-compile-file file)))
+  (let ((native-compile-target-directory
+         (if for-tarball
+             (car (last native-comp-eln-load-path)))))
+    (cl-loop for file in command-line-args-left
+             if (or (null byte+native-compile)
+                    (cl-notany (lambda (re) (string-match re file))
+                               native-comp-bootstrap-deny-list))
+             do (comp--native-compile file)
+             else
+             do (byte-compile-file file))))
 
 ;;;###autoload
-(defun batch-byte-native-compile-for-bootstrap ()
+(defun batch-byte+native-compile ()
   "Like `batch-native-compile', but used for bootstrap.
 Generate .elc files in addition to the .eln files.
 Force the produced .eln to be outputted in the eln system
-directory (the last entry in `native-comp-eln-load-path').
-If the environment variable 'NATIVE_DISABLED' is set, only byte
-compile."
+directory (the last entry in `native-comp-eln-load-path') unless
+`native-compile-target-directory' is non-nil.  If the environment
+variable 'NATIVE_DISABLED' is set, only byte compile."
   (comp-ensure-native-compiler)
   (if (equal (getenv "NATIVE_DISABLED") "1")
       (batch-byte-compile)
     (cl-assert (length= command-line-args-left 1))
-    (let ((byte-native-for-bootstrap t)
+    (let ((byte+native-compile t)
           (byte-to-native-output-file nil))
       (batch-native-compile)
       (pcase byte-to-native-output-file

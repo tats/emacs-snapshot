@@ -606,7 +606,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	  break;
 
 	case 'e':		/* The invoking event.  */
-	  if (next_event >= key_count)
+	  if (!inhibit_mouse_event_check && next_event >= key_count)
 	    error ("%s must be bound to an event with parameters",
 		   (SYMBOLP (function)
 		    ? SSDATA (SYMBOL_NAME (function))
@@ -892,10 +892,21 @@ behave as if the mark were still active.  */);
   Vmark_even_if_inactive = Qt;
 
   DEFVAR_LISP ("mouse-leave-buffer-hook", Vmouse_leave_buffer_hook,
-	       doc: /* Hook to run when about to switch windows with a mouse command.
+	       doc: /* Hook run when the user mouse-clicks in a window.
+It can be run both before and after switching windows, or even when
+not actually switching windows.
+
 Its purpose is to give temporary modes such as Isearch mode
 a way to turn themselves off when a mouse command switches windows.  */);
   Vmouse_leave_buffer_hook = Qnil;
+
+  DEFVAR_BOOL ("inhibit-mouse-event-check", inhibit_mouse_event_check,
+    doc: /* Whether the interactive spec "e" requires a mouse gesture event.
+If non-nil, `(interactive "e")' doesn't signal an error when the command
+was invoked by an input event that is not a mouse gesture: a click, a drag,
+etc.  To create the event data when the input was some other event,
+use `event-start', `event-end', and `event-click-count'.  */);
+  inhibit_mouse_event_check = false;
 
   defsubr (&Sinteractive);
   defsubr (&Scall_interactively);

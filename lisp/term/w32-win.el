@@ -410,7 +410,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 ;;; Fix interface to (X-specific) mouse.el
 (defun w32--set-selection (type value)
   (if (eq type 'CLIPBOARD)
-      (w32-set-clipboard-data (replace-regexp-in-string "\0" "\\0" value t t))
+      (w32-set-clipboard-data (string-replace "\0" "\\0" value))
     (put 'x-selections (or type 'PRIMARY) value)))
 
 (defun w32--get-selection  (&optional type data-type)
@@ -532,7 +532,7 @@ characters from these blocks.")
   (let (val)
     (dolist (elt script-representative-chars)
       (let ((subranges w32-no-usb-subranges)
-            (chars (cdr elt))
+            (chars (append (cdr elt) nil)) ; handle vectors as well
             ch found subrange)
         (while (and (consp chars) (not found))
           (setq ch (car chars)
@@ -595,7 +595,11 @@ default font on FRAME, or its best approximation."
                                              0 nchars script-chars)
                           '[nil]))
                   ;; Does this font support ALL of the script's
-                  ;; representative characters?
+                  ;; representative characters?  Note that, when the
+                  ;; representative characters are specified as a
+                  ;; vector, this is a more stringent test than font
+                  ;; selection does, because supporting _any_
+                  ;; character from the vector is enough.
                   (setq idx 0)
                   (while (and (< idx nchars) (not (null (aref glyphs idx))))
                     (setq idx (1+ idx)))

@@ -154,7 +154,7 @@ is slower."
 	(and (string-match "(.+)" from)
 	     (setq name (substring from (1+ (match-beginning 0))
 				   (1- (match-end 0)))))
-	(and (string-match "()" from)
+	(and (string-search "()" from)
 	     (setq name address))
 	;; XOVER might not support folded From headers.
 	(and (string-match "(.*" from)
@@ -265,7 +265,7 @@ If END is non-nil, use the end of the span instead."
 (defun gnus-newsgroup-directory-form (newsgroup)
   "Make hierarchical directory name from NEWSGROUP name."
   (let* ((newsgroup (gnus-newsgroup-savable-name newsgroup))
-	 (idx (string-match ":" newsgroup)))
+	 (idx (string-search ":" newsgroup)))
     (concat
      (if idx (substring newsgroup 0 idx))
      (if idx "/")
@@ -408,7 +408,7 @@ Cache the result as a text property stored in DATE."
 
 (defun gnus-mode-string-quote (string)
   "Quote all \"%\"'s in STRING."
-  (replace-regexp-in-string "%" "%%" string))
+  (string-replace "%" "%%" string))
 
 (defsubst gnus-make-hashtable (&optional size)
   "Make a hash table of SIZE, testing on `equal'."
@@ -533,7 +533,7 @@ ARGS are passed to `message'."
 
 (defun gnus-extract-references (references)
   "Return a list of Message-IDs in REFERENCES (in In-Reply-To
-  format), trimmed to only contain the Message-IDs."
+format), trimmed to only contain the Message-IDs."
   (let ((ids (gnus-split-references references))
 	refs)
     (dolist (id ids)
@@ -1291,61 +1291,6 @@ forbidden in URL encoding."
     (setq tmp (concat tmp str))
     tmp))
 
-(defun gnus-base64-repad (str &optional reject-newlines line-length no-check)
-  "Take a base 64-encoded string and return it padded correctly.
-Existing padding is ignored.
-
-If any combination of CR and LF characters are present and
-REJECT-NEWLINES is nil, remove them; otherwise raise an error.
-If LINE-LENGTH is set and the string (or any line in the string
-if REJECT-NEWLINES is nil) is longer than that number, raise an
-error.  Common line length for input characters are 76 plus CRLF
-\(RFC 2045 MIME), 64 plus CRLF (RFC 1421 PEM), and 1000 including
-CRLF (RFC 5321 SMTP).
-
-If NOCHECK, don't check anything, but just repad."
-  ;; RFC 4648 specifies that:
-  ;; - three 8-bit inputs make up a 24-bit group
-  ;; - the 24-bit group is broken up into four 6-bit values
-  ;; - each 6-bit value is mapped to one character of the base 64 alphabet
-  ;; - if the final 24-bit quantum is filled with only 8 bits the output
-  ;;   will be two base 64 characters followed by two "=" padding characters
-  ;; - if the final 24-bit quantum is filled with only 16 bits the output
-  ;;   will be three base 64 character followed by one "=" padding character
-  ;;
-  ;; RFC 4648 section 3 considerations:
-  ;; - if reject-newlines is nil (default), concatenate multi-line
-  ;;   input (3.1, 3.3)
-  ;; - if line-length is set, error on input exceeding the limit (3.1)
-  ;; - reject characters outside base encoding (3.3, also section 12)
-  ;;
-  ;; RFC 5322 section 2.2.3 consideration:
-  ;; Because base 64-encoded strings can appear in long header fields, remove
-  ;; folding whitespace while still observing the RFC 4648 decisions above.
-  (when no-check
-    (setq str (replace-regexp-in-string "[\n\r \t]+" "" str)));
-  (let ((splitstr (split-string str "[ \t]*[\r\n]+[ \t]?" t)))
-    (when (and reject-newlines (> (length splitstr) 1))
-      (error "Invalid Base64 string"))
-    (dolist (substr splitstr)
-      (when (and line-length (> (length substr) line-length))
-	(error "Base64 string exceeds line-length"))
-      (when (string-match "[^A-Za-z0-9+/=]" substr)
-	(error "Invalid Base64 string")))
-    (let* ((str (string-join splitstr))
-	   (len (length str)))
-      (when (string-match "=" str)
-	(setq len (match-beginning 0)))
-      (concat
-       (substring str 0 len)
-       (make-string (/
-		     (- 24
-			(pcase (mod (* len 6) 24)
-			  (`0 24)
-			  (n n)))
-		     6)
-		    ?=)))))
-
 (defun gnus-make-predicate (spec)
   "Transform SPEC into a function that can be called.
 SPEC is a predicate specifier that contains stuff like `or', `and',
@@ -1583,8 +1528,8 @@ sequence, this is like `mapcar'.  With several, it is like the Common Lisp
      (t emacs-version))))
 
 (defun gnus-rename-file (old-path new-path &optional trim)
-  "Rename OLD-PATH as NEW-PATH.  If TRIM, recursively delete
-empty directories from OLD-PATH."
+  "Rename OLD-PATH as NEW-PATH.
+If TRIM, recursively delete empty directories from OLD-PATH."
   (when (file-exists-p old-path)
     (let* ((old-dir (file-name-directory old-path))
 	   ;; (old-name (file-name-nondirectory old-path))
@@ -1604,7 +1549,7 @@ empty directories from OLD-PATH."
 			  (concat old-dir "..")))))))))
 
 (defun gnus-set-file-modes (filename mode &optional flag)
-  "Wrapper for set-file-modes."
+  "Wrapper for `set-file-modes'."
   (ignore-errors
     (set-file-modes filename mode flag)))
 

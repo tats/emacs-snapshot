@@ -181,7 +181,7 @@ it should be a Lisp function.  BUFFER is currently ignored."
 	;; We should perhaps go via a temporary buffer and copy it
 	;; back, in case of errors.
 	(if (and (zerop (save-window-excursion
-			  (shell-command-on-region from to method t t
+			  (shell-command-on-region from to method t 'no-mark
 						   error-buff)))
 		 ;; gzip gives zero exit status with bad args, for instance.
 		 (zerop (with-current-buffer error-buff
@@ -1013,6 +1013,12 @@ either strings, or lists of the form (PARAMETER VALUE)."
 				    prop-alist (car old) nil))
 			      close)
 		      old (cdr old)))
+              ;; If the font is on the format (:background "red"),
+              ;; then we have a single face.  We're assuming a list of
+              ;; faces, so transform.
+              (when (and (listp new)
+                         (keywordp (car new)))
+                (setq new (list new)))
 	      (while new
 		(setq open
 		      (append (cdr (format-annotate-atomic-property-change

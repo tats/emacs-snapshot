@@ -426,7 +426,7 @@ synchronously."
   :version "28.1")
 
 (defcustom package-archive-column-width 8
-  "Column width for the Package status in the package menu."
+  "Column width for the Package archive in the package menu."
   :type 'number
   :version "28.1")
 
@@ -1118,9 +1118,9 @@ is wrapped around any parts requiring it."
 
 (declare-function lm-header "lisp-mnt" (header))
 (declare-function lm-header-multiline "lisp-mnt" (header))
-(declare-function lm-homepage "lisp-mnt" (&optional file))
+(declare-function lm-website "lisp-mnt" (&optional file))
 (declare-function lm-keywords-list "lisp-mnt" (&optional file))
-(declare-function lm-maintainer "lisp-mnt" (&optional file))
+(declare-function lm-maintainers "lisp-mnt" (&optional file))
 (declare-function lm-authors "lisp-mnt" (&optional file))
 
 (defun package-buffer-info ()
@@ -1153,7 +1153,7 @@ boundaries."
             (or (lm-header "package-version") (lm-header "version")))
            (pkg-version (package-strip-rcs-id version-info))
            (keywords (lm-keywords-list))
-           (homepage (lm-homepage)))
+           (website (lm-website)))
       (unless pkg-version
          (if version-info
              (error "Unrecognized package version: %s" version-info)
@@ -1164,9 +1164,12 @@ boundaries."
          (package--prepare-dependencies
           (package-read-from-string (mapconcat #'identity require-lines " "))))
        :kind 'single
-       :url homepage
+       :url website
        :keywords keywords
-       :maintainer (lm-maintainer)
+       :maintainer
+       ;; For backward compatibility, use a single string if there's only
+       ;; one maintainer (the most common case).
+       (let ((maints (lm-maintainers))) (if (cdr maints) maints (car maints)))
        :authors (lm-authors)))))
 
 (defun package--read-pkg-desc (kind)
@@ -1305,7 +1308,10 @@ is non-nil, don't propagate connection errors (does not apply to
 errors signaled by ERROR-FORM or by BODY).
 
 \(fn URL &key ASYNC FILE ERROR-FORM NOERROR &rest BODY)"
-  (declare (indent defun) (debug t))
+  (declare (indent defun)
+           ;; FIXME: This should be something like
+           ;; `form def-body &rest form', but that doesn't work.
+           (debug (form &rest sexp)))
   (while (keywordp (car body))
     (setq body (cdr (cdr body))))
   `(package--with-response-buffer-1 ,url (lambda () ,@body)
@@ -1363,11 +1369,9 @@ errors signaled by ERROR-FORM or by BODY).
                 (kill-buffer buffer)
                 (goto-char (point-min))))))
       (package--unless-error body
-        (let ((url (expand-file-name file url)))
-          (unless (file-name-absolute-p url)
-            (error "Location %s is not a url nor an absolute file name"
-                   url))
-          (insert-file-contents-literally url)))))
+        (unless (file-name-absolute-p url)
+          (error "Location %s is not a url nor an absolute file name" url))
+        (insert-file-contents-literally (expand-file-name file url)))))
 
 (define-error 'bad-signature "Failed to verify signature")
 
@@ -1582,7 +1586,7 @@ If the archive version is too new, signal an error."
         (if package
             (package--add-to-archive-contents package archive)
           (lwarn '(package refresh) :warning
-                 "Ignoring `nil' package on `%s' package archive" archive))))))
+                 "Ignoring nil package on `%s' package archive" archive))))))
 
 (defvar package--old-archive-priorities nil
   "Store currently used `package-archive-priorities'.
@@ -2166,7 +2170,7 @@ Otherwise return nil."
       ;; to make sure we use a "canonical name"!
       (if l (package-version-join l)))))
 
-(declare-function lm-homepage "lisp-mnt" (&optional file))
+(declare-function lm-website "lisp-mnt" (&optional file))
 
 ;;;###autoload
 (defun package-install-from-buffer ()
@@ -2192,8 +2196,24 @@ Downloads and installs required packages as needed."
             ((derived-mode-p 'tar-mode)
              (package-tar-file-info))
             (t
-             (save-excursion
-              (package-buffer-info)))))
+             ;; Package headers should be parsed from decoded text
+             ;; (see Bug#48137) where possible.
+             (if (and (eq buffer-file-coding-system 'no-conversion)
+                      buffer-file-name)
+                 (let* ((package-buffer (current-buffer))
+                        (decoding-system
+                         (car (find-operation-coding-system
+                               'insert-file-contents
+                               (cons buffer-file-name
+                                     package-buffer)))))
+                   (with-temp-buffer
+                     (insert-buffer-substring package-buffer)
+                     (decode-coding-region (point-min) (point-max)
+                                           decoding-system)
+                     (package-buffer-info)))
+
+               (save-excursion
+                 (package-buffer-info))))))
          (name (package-desc-name pkg-desc)))
     ;; Download and install the dependencies.
     (let* ((requires (package-desc-reqs pkg-desc))
@@ -2219,6 +2239,7 @@ directory."
           (setq default-directory file)
           (dired-mode))
       (insert-file-contents-literally file)
+      (set-visited-file-name file)
       (when (string-match "\\.tar\\'" file) (tar-mode)))
     (package-install-from-buffer)))
 
@@ -2247,7 +2268,9 @@ confirmation to install packages."
                            (mapconcat #'symbol-name available " "))))
           (mapc (lambda (p) (package-install p 'dont-select)) available)))
        ((> difference 0)
-        (message "Packages that are not available: %d (the rest is already installed), maybe you need to `M-x package-refresh-contents'"
+        (message (substitute-command-keys
+                  "Packages that are not available: %d (the rest is already \
+installed), maybe you need to \\[package-refresh-contents]")
                  difference))
        (t
         (message "All your packages are already installed"))))))
@@ -2483,7 +2506,7 @@ Helper function for `describe-package'."
          (version (if desc (package-desc-version desc)))
          (archive (if desc (package-desc-archive desc)))
          (extras (and desc (package-desc-extras desc)))
-         (homepage (cdr (assoc :url extras)))
+         (website (cdr (assoc :url extras)))
          (commit (cdr (assoc :commit extras)))
          (keywords (if desc (package-desc--keywords desc)))
          (built-in (eq pkg-dir 'builtin))
@@ -2596,15 +2619,20 @@ Helper function for `describe-package'."
             (help-insert-xref-button text 'help-package
                                      (package-desc-name pkg))))
         (insert "\n")))
-    (when homepage
-      ;; Prefer https for the homepage of packages on gnu.org.
-      (if (string-match-p "^http://\\(elpa\\|www\\)\\.gnu\\.org/" homepage)
-          (let ((gnu (cdr (assoc "gnu" package-archives))))
-            (and gnu (string-match-p "^https" gnu)
-                 (setq homepage
-                       (replace-regexp-in-string "^http" "https" homepage)))))
-      (package--print-help-section "Homepage")
-      (help-insert-xref-button homepage 'help-url homepage)
+    (when website
+      ;; Prefer https for the website of packages on common domains.
+      (when (string-match-p (rx bol "http://" (or "elpa." "www." "git." "")
+                                (or "nongnu.org" "gnu.org" "sr.ht"
+                                    "emacswiki.org" "gitlab.com" "github.com")
+                                "/")
+                            website)
+        ;; But only if the user has "https" in `package-archives'.
+        (let ((gnu (cdr (assoc "gnu" package-archives))))
+          (and gnu (string-match-p "^https" gnu)
+               (setq website
+                     (replace-regexp-in-string "^http" "https" website)))))
+      (package--print-help-section "Website")
+      (help-insert-xref-button website 'help-url website)
       (insert "\n"))
     (when keywords
       (package--print-help-section "Keywords")
@@ -2786,8 +2814,8 @@ either a full name or nil, and EMAIL is a valid email address."
   "Menu for `package-menu-mode'."
   '("Package"
     ["Describe Package" package-menu-describe-package :help "Display information about this package"]
-    ["Open Package Homepage" package-browse-url
-     :help "Open the homepage of this package"]
+    ["Open Package Website" package-browse-url
+     :help "Open the website of this package"]
     ["Help" package-menu-quick-help :help "Show short key binding help for package-menu-mode"]
     "--"
     ["Refresh Package List" revert-buffer
@@ -3371,7 +3399,8 @@ If optional arg BUTTON is non-nil, describe its associated package."
         (forward-line 1)))))
 
 (defvar package--quick-help-keys
-  '(("install," "delete," "unmark," ("execute" . 1))
+  '((("mark for installation," . 9)
+     ("mark for deletion," . 9) "unmark," ("execute marked actions" . 1))
     ("next," "previous")
     ("Hide-package," "(-toggle-hidden")
     ("g-refresh-contents," "/-filter," "help")))
@@ -3579,8 +3608,10 @@ packages list, respectively."
 
 (defun package-menu-execute (&optional noquery)
   "Perform marked Package Menu actions.
-Packages marked for installation are downloaded and installed;
-packages marked for deletion are removed.
+Packages marked for installation are downloaded and installed,
+packages marked for deletion are removed,
+and packages marked for upgrading are downloaded and upgraded.
+
 Optional argument NOQUERY non-nil means do not ask the user to confirm."
   (interactive nil package-menu-mode)
   (package--ensure-package-menu-mode)
@@ -3950,9 +3981,14 @@ packages."
   (package--ensure-package-menu-mode)
   (if (or (not status) (string-empty-p status))
       (package-menu--generate t t)
-    (package-menu--filter-by (lambda (pkg-desc)
-                        (string-match-p status (package-desc-status pkg-desc)))
-                      (format "status:%s" status))))
+    (let ((status-list
+           (if (listp status)
+               status
+             (split-string status ","))))
+      (package-menu--filter-by
+       (lambda (pkg-desc)
+         (member (package-desc-status pkg-desc) status-list))
+       (format "status:%s" (string-join status-list ","))))))
 
 (defun package-menu-filter-by-version (version predicate)
   "Filter the \"*Packages*\" buffer by VERSION and PREDICATE.
@@ -4128,6 +4164,10 @@ activations need to be changed, such as when `package-load-list' is modified."
         (package-activated-list ())
         ;; Make sure we can load this file without load-source-file-function.
         (coding-system-for-write 'emacs-internal)
+        ;; Ensure that `pp' and `prin1-to-string' calls further down
+        ;; aren't truncated.
+        (print-length nil)
+        (print-level nil)
         (Info-directory-list '("")))
     (dolist (elt package-alist)
       (condition-case err
@@ -4197,7 +4237,7 @@ beginning of the line."
             (package-desc-summary package-desc))))
 
 (defun package-browse-url (desc &optional secondary)
-  "Open the home page of the package under point in a browser.
+  "Open the website of the package under point in a browser.
 `browse-url' is used to determine the browser to be used.
 If SECONDARY (interactively, the prefix), use the secondary browser."
   (interactive (list (tabulated-list-get-id)
@@ -4207,7 +4247,7 @@ If SECONDARY (interactively, the prefix), use the secondary browser."
     (user-error "No package here"))
   (let ((url (cdr (assoc :url (package-desc-extras desc)))))
     (unless url
-      (user-error "No home page for %s" (package-desc-name desc)))
+      (user-error "No website for %s" (package-desc-name desc)))
     (if secondary
 	(funcall browse-url-secondary-browser-function url)
       (browse-url url))))

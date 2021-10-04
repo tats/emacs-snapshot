@@ -132,7 +132,7 @@ transformed."
 
 (defcustom gnus-search-ignored-newsgroups ""
   "A regexp to match newsgroups in the active file that should
-  be skipped when searching."
+be skipped when searching."
   :version "24.1"
   :type 'regexp)
 
@@ -172,8 +172,7 @@ This variable can also be set per-server."
   :type 'regexp)
 
 (defcustom gnus-search-swish++-raw-queries-p nil
-  "If t, all Swish++ engines will only accept raw search query
-  strings."
+  "If t, all Swish++ engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -217,8 +216,7 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-swish-e-raw-queries-p nil
-  "If t, all Swish-e engines will only accept raw search query
-  strings."
+  "If t, all Swish-e engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -266,8 +264,7 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-namazu-raw-queries-p nil
-  "If t, all Namazu engines will only accept raw search query
-  strings."
+  "If t, all Namazu engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
@@ -305,14 +302,12 @@ This variable can also be set per-server."
   :version "28.1")
 
 (defcustom gnus-search-notmuch-raw-queries-p nil
-  "If t, all Notmuch engines will only accept raw search query
-  strings."
+  "If t, all Notmuch engines will only accept raw search query strings."
   :type 'boolean
   :version "28.1")
 
 (defcustom gnus-search-imap-raw-queries-p nil
-  "If t, all IMAP engines will only accept raw search query
-  strings."
+  "If t, all IMAP engines will only accept raw search query strings."
   :version "28.1"
   :type 'boolean)
 
@@ -350,8 +345,7 @@ This variable can also be set per-server."
   :type 'regexp)
 
 (defcustom gnus-search-mairix-raw-queries-p nil
-  "If t, all Mairix engines will only accept raw search query
-  strings."
+  "If t, all Mairix engines will only accept raw search query strings."
   :version "28.1"
   :type 'boolean)
 
@@ -403,7 +397,7 @@ expressions.  Key is most often a mail header, but there are
 other keys.  Value is a string, quoted if it contains spaces.
 Key and value are separated by a colon, no space.  Expressions
 are implicitly ANDed; the \"or\" keyword can be used to
-OR. \"not\" will negate the following expression, or keys can be
+OR.  \"not\" will negate the following expression, or keys can be
 prefixed with a \"-\".  The \"near\" operator will work for
 engines that understand it; other engines will convert it to
 \"or\".  Parenthetical groups work as expected.
@@ -413,7 +407,7 @@ header.
 
 Search keys can be expanded with TAB during entry, or left
 abbreviated so long as they remain unambiguous, ie \"f\" will
-search the \"from\" header. \"s\" will raise an error.
+search the \"from\" header.  \"s\" will raise an error.
 
 Other keys:
 
@@ -433,7 +427,7 @@ It's also possible to use Gnus' internal marks, ie \"mark:R\"
 will be interpreted as mark:read.
 
 \"tag\" will search tags -- right now that's translated to
-\"keyword\" in IMAP, and left as \"tag\" for notmuch. At some
+\"keyword\" in IMAP, and left as \"tag\" for notmuch.  At some
 point this should also be used to search marks in the Gnus
 registry.
 
@@ -448,10 +442,10 @@ auto-completion of contact names and addresses for keys like
 Date values (any key in `gnus-search-date-keys') can be provided
 in any format that `parse-time-string' can parse (note that this
 can produce weird results).  Dates with missing bits will be
-interpreted as the most recent occurence thereof (ie \"march 03\"
-is the most recent March 3rd).  Lastly, relative specifications
-such as 1d (one day ago) are understood.  This also accepts w, m,
-and y.  m is assumed to be 30 days.
+interpreted as the most recent occurrence thereof (i.e. \"march
+03\" is the most recent March 3rd).  Lastly, relative
+specifications such as 1d (one day ago) are understood.  This
+also accepts w, m, and y.  m is assumed to be 30 days.
 
 This function will accept pretty much anything as input.  Its
 only job is to parse the query into a sexp, and pass that on --
@@ -572,7 +566,7 @@ nil.
 If VALUE is a relative time, interpret it as relative to
 REL-DATE, or (current-time) if REL-DATE is nil."
   ;; Time parsing doesn't seem to work with slashes.
-  (let ((value (replace-regexp-in-string "/" "-" value))
+  (let ((value (string-replace "/" "-" value))
 	(now (append '(0 0 0)
 		     (seq-subseq (decode-time (or rel-date
 						  (current-time)))
@@ -629,25 +623,30 @@ gnus-*-mark marks, and return an appropriate string."
     mark))
 
 (defun gnus-search-query-expand-key (key)
-  (cond ((test-completion key gnus-search-expandable-keys)
-	 ;; We're done!
-	 key)
-	;; There is more than one possible completion.
-	((consp (cdr (completion-all-completions
-		      key gnus-search-expandable-keys #'stringp 0)))
-	 (signal 'gnus-search-parse-error
-		 (list (format "Ambiguous keyword: %s" key))))
-	;; Return KEY, either completed or untouched.
-	((car-safe (completion-try-completion
-		    key gnus-search-expandable-keys
-		    #'stringp 0)))))
+  "Attempt to expand KEY to a full keyword.
+Use `gnus-search-expandable-keys' as a completion table; return
+KEY directly if it can't be completed.  Raise an error if KEY is
+ambiguous, meaning that it is a prefix of multiple known
+keywords.  This means that it's not possible to enter a custom
+keyword that happens to be a prefix of a known keyword."
+  (let ((comp (try-completion key gnus-search-expandable-keys)))
+    (if (or (eql comp 't)		; Already a key.
+	    (null comp))		; An unknown key.
+	key
+      (if (null (member comp gnus-search-expandable-keys))
+	  ;; KEY is a prefix of multiple known keywords, and could not
+	  ;; be completed to something unique.
+	  (signal 'gnus-search-parse-error
+		  (list (format "Ambiguous keyword: %s" key)))
+	;; We completed to a unique known key.
+	comp))))
 
 (defun gnus-search-query-return-string (&optional delimited trim)
   "Return a string from the current buffer.
 If DELIMITED is non-nil, assume the next character is a delimiter
 character, and return everything between point and the next
-occurence of the delimiter, including the delimiters themselves.
-If TRIM is non-nil, do not return the delimiters. Otherwise,
+occurrence of the delimiter, including the delimiters themselves.
+If TRIM is non-nil, do not return the delimiters.  Otherwise,
 return one word."
   ;; This function cannot handle nested delimiters, as it's not a
   ;; proper parser.  Ie, you cannot parse "to:bob or (from:bob or
@@ -975,7 +974,7 @@ Responsible for handling and, or, and parenthetical expressions.")
 
 ;; Most search engines use implicit ANDs.
 (cl-defmethod gnus-search-transform-expression ((_ gnus-search-engine)
-						(_expr (eql and)))
+						(_expr (eql 'and)))
   nil)
 
 ;; Most search engines use explicit infixed ORs.
@@ -1278,24 +1277,30 @@ elements are present."
       str)))
 
 (defun gnus-search-imap-handle-flag (flag)
-  "Make sure string FLAG is something IMAP will recognize."
-  ;; What else?  What about the KEYWORD search key?
+  "Adjust string FLAG to help IMAP recognize it.
+If it's one of the RFC3501 flags, make sure it's upcased.
+Otherwise, if FLAG starts with a \"$\", treat as a KEYWORD
+search.  Otherwise, drop the flag."
   (setq flag
 	(pcase flag
 	  ("flag" "flagged")
 	  ("read" "seen")
 	  ("replied" "answered")
 	  (_ flag)))
-  (if (member flag '("seen" "answered" "deleted" "draft" "flagged"))
-      (upcase flag)
-    ""))
+  (cond
+   ((member flag '("seen" "answered" "deleted" "draft" "flagged" "recent"))
+    (upcase flag))
+   ((string-prefix-p "$" flag)
+    (format "KEYWORD %s" flag))
+   ;; TODO: Provide a user option to treat *all* marks as a KEYWORDs?
+   (t "")))
 
 ;;; Methods for the indexed search engines.
 
 ;; First, some common methods.
 
-(cl-defgeneric gnus-search-indexed-parse-output (engine server &optional groups)
-  "Parse the results of ENGINE's query against SERVER in GROUPS.
+(cl-defgeneric gnus-search-indexed-parse-output (engine server query &optional groups)
+  "Parse the results of ENGINE's QUERY against SERVER in GROUPS.
 Locally-indexed search engines return results as a list of
 filenames, sometimes with additional information.  Returns a list
 of viable results, in the form of a list of [group article score]
@@ -1345,65 +1350,61 @@ Returns a list of [group article score] vectors."
 
 (cl-defmethod gnus-search-indexed-parse-output ((engine gnus-search-indexed)
 						server query &optional groups)
-  (let ((prefix (slot-value engine 'remove-prefix))
-	(group-regexp (when groups
-			(mapconcat
-			 (lambda (group-name)
-			   (mapconcat #'regexp-quote
-				      (split-string
-				       (gnus-group-real-name group-name)
-				       "[.\\/]")
-				      "[.\\\\/]"))
-			 groups
-			 "\\|")))
-	artlist vectors article group)
+  (let ((prefix (or (slot-value engine 'remove-prefix)
+                    ""))
+        (groups (mapcar #'gnus-group-short-name groups))
+	artlist article group)
     (goto-char (point-min))
-    (while (not (eobp))
+    ;; Prep prefix, we want to at least be removing the root
+    ;; filesystem separator.
+    (when (stringp prefix)
+      (setq prefix (file-name-as-directory
+                    (expand-file-name prefix "/"))))
+    (while (not (or (eobp)
+                    (looking-at-p
+                     "\\(?:[[:space:]\n]+\\)?Process .+ finished")))
       (pcase-let ((`(,f-name ,score) (gnus-search-indexed-extract engine)))
-	(when (and (file-readable-p f-name)
-		   (null (file-directory-p f-name))
-		   (or (null groups)
-		       (and (gnus-search-single-p query)
-			    (alist-get 'thread query))
-		       (string-match-p group-regexp f-name)))
-	  (push (list f-name score) artlist))))
+	(when (and f-name
+                   (file-readable-p f-name)
+		   (null (file-directory-p f-name)))
+          (setq group
+                (replace-regexp-in-string
+	         "[/\\]" "."
+	         (replace-regexp-in-string
+	          "/?\\(cur\\|new\\|tmp\\)?/\\'" ""
+	          (replace-regexp-in-string
+	           "\\`\\." ""
+	           (string-remove-prefix
+                    prefix (file-name-directory f-name))
+                   nil t)
+	          nil t)
+	         nil t))
+          (setq article (file-name-nondirectory f-name)
+                article
+                ;; TODO: Provide a cleaner way of producing final
+                ;; article numbers for the various backends.
+                (if (string-match-p "\\`[[:digit:]]+\\'" article)
+		    (string-to-number article)
+		  (nnmaildir-base-name-to-article-number
+		   (substring article 0 (string-search ":" article))
+		   group (string-remove-prefix "nnmaildir:" server))))
+          (when (and (numberp article)
+                     (or (null groups)
+                         (member group groups)))
+	    (push (list f-name article group score)
+                  artlist)))))
     ;; Are we running an additional grep query?
     (when-let ((grep-reg (alist-get 'grep query)))
       (setq artlist (gnus-search-grep-search engine artlist grep-reg)))
-    ;; Prep prefix.
-    (when (and prefix (null (string-empty-p prefix)))
-      (setq prefix (file-name-as-directory (expand-file-name prefix))))
-    ;; Turn (file-name score) into [group article score].
-    (pcase-dolist (`(,f-name ,score) artlist)
-      (setq article (file-name-nondirectory f-name)
-	    group (file-name-directory f-name))
-      ;; Remove prefix.
-      (when prefix
-	(setq group (string-remove-prefix prefix group)))
-      ;; Break the directory name down until it's something that
-      ;; (probably) can be used as a group name.
-      (setq group
-	    (replace-regexp-in-string
-	     "[/\\]" "."
-	     (replace-regexp-in-string
-	      "/?\\(cur\\|new\\|tmp\\)?/\\'" ""
-	      (replace-regexp-in-string
-	       "^[./\\]" ""
-	       group nil t)
-	      nil t)
-	     nil t))
-
-      (push (vector (gnus-group-full-name group server)
-		    (if (string-match-p "\\`[[:digit:]]+\\'" article)
-			(string-to-number article)
-		      (nnmaildir-base-name-to-article-number
-		       (substring article 0 (string-match ":" article))
-		       group (string-remove-prefix "nnmaildir:" server)))
-		    (if (numberp score)
-			score
-		      (string-to-number score)))
-	    vectors))
-    vectors))
+    ;; Munge into the list of vectors expected by nnselect.
+    (mapcar (pcase-lambda (`(,_ ,article ,group ,score))
+              (vector
+               (gnus-group-full-name group server)
+               article
+               (if (numberp score)
+		   score
+		 (string-to-number score))))
+            artlist)))
 
 (cl-defmethod gnus-search-indexed-extract ((_engine gnus-search-indexed))
   "Base implementation treats the whole line as a filename, and
@@ -1662,7 +1663,7 @@ cross our fingers for the rest of it."
 Mairix negation requires a \"~\" preceding string search terms,
 and \"-\" before marks."
   (let ((next (gnus-search-transform-expression engine (cadr expr))))
-    (replace-regexp-in-string
+    (string-replace
      ":"
      (if (eql (caadr expr) 'mark)
 	 ":-"
@@ -1856,9 +1857,9 @@ Assume \"size\" key is equal to \"larger\"."
 				  group
 				(if (file-directory-p
 				     (setq group
-					   (replace-regexp-in-string
-					    "\\." "/"
-					    group nil t)))
+					   (string-replace
+					    "." "/"
+					    group)))
 				    group))))))
 		     (unless group
 		       (signal 'gnus-search-config-error
@@ -2129,7 +2130,7 @@ article came from is also searched."
 		  ;; If the value contains spaces, make sure it's
 		  ;; quoted.
 		  (when (and (memql status '(exact finished))
-			     (or (string-match-p " " str)
+			     (or (string-search " " str)
 				 in-string))
 		    (unless (looking-at-p "\\s\"")
 		      (insert "\""))

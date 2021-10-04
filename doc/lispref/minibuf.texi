@@ -469,6 +469,18 @@ If @var{default} is a non-@code{nil} list, the first element of the
 list is used in the prompt.
 @end defun
 
+@defvar read-minibuffer-restore-windows
+If this option is non-@code{nil} (the default), getting input from the
+minibuffer will restore, on exit, the window configurations of the frame
+where the minibuffer was entered from and, if it is different, the frame
+that owns the minibuffer window.  This means that if, for example, a
+user splits a window while getting input from the minibuffer on the same
+frame, that split will be undone when exiting the minibuffer.
+
+If this option is @code{nil}, no such restorations are done.  Hence, the
+window split mentioned above will persist after exiting the minibuffer.
+@end defvar
+
 @node Object from Minibuffer
 @section Reading Lisp Objects with the Minibuffer
 @cindex minibuffer input, reading lisp objects
@@ -1943,6 +1955,16 @@ the completion string in the @file{*Completions*} buffer, and
 a suffix displayed after the completion string.  This function
 takes priority over @code{annotation-function}.
 
+@item group-function
+The value should be a function for grouping the completion candidates.
+The function must take two arguments, @var{completion}, which is a
+completion candidate and @var{transform}, which is a boolean flag.  If
+@var{transform} is @code{nil}, the function must return the group
+title of the group to which the candidate belongs.  The returned title
+can also be @code{nil}.  Otherwise the function must return the
+transformed candidate.  The transformation can for example remove a
+redundant prefix, which is displayed in the group title.
+
 @item display-sort-function
 The value should be a function for sorting completions.  The function
 should take one argument, a list of completion strings, and return a
@@ -2187,7 +2209,7 @@ Here is an example:
 
 @smallexample
 @group
-(yes-or-no-p "Do you really want to remove everything? ")
+(yes-or-no-p "Do you really want to remove everything?")
 
 ;; @r{After evaluation of the preceding expression,}
 ;;   @r{the following prompt appears,}

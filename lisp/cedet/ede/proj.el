@@ -220,7 +220,7 @@ This enables the creation of your target type."
   ((extension :initform ".ede")
    (file-header-line :initform ";; EDE Project Files are auto generated: Do Not Edit")
    (makefile-type :initarg :makefile-type
-		  :initform Makefile
+		  :initform 'Makefile
 		  :type symbol
 		  :custom (choice (const Makefile)
 				  ;(const Makefile.in)
@@ -240,7 +240,7 @@ in targets.")
 	      :documentation "Variables to set in this Makefile.")
    (configuration-variables
     :initarg :configuration-variables
-    :initform ("debug" (("DEBUG" . "1")))
+    :initform '("debug" (("DEBUG" . "1")))
     :type list
     :custom (repeat (cons (string :tag "Configuration")
 			  (repeat
@@ -269,10 +269,10 @@ These files can contain additional rules, variables, and customizations.")
     :documentation
     "Non-nil to do implement automatic dependencies in the Makefile.")
    (menu :initform
-	 (
-	  [ "Regenerate Makefiles" ede-proj-regenerate t ]
-	  [ "Upload Distribution" ede-upload-distribution t ]
-	  )
+	 '(
+	   [ "Regenerate Makefiles" ede-proj-regenerate t ]
+	   [ "Upload Distribution" ede-upload-distribution t ]
+	   )
 	 )
    (metasubproject
     :initarg :metasubproject
@@ -562,7 +562,7 @@ Converts all symbols into the objects to be used."
 	  ;; Provide a good error msg.
 	  (unless comp
 	    (error "Could not find compiler match for source code extension \"%s\".
-You may need to add support for this type of file."
+You may need to add support for this type of file"
 		   (if sources
 		       (file-name-extension (car sources))
 		     "")))
