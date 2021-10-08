@@ -80,6 +80,14 @@ This was only ever relevant when building from a repository checkout.
 This now requires makeinfo, which is part of the texinfo package.
 
 ---
+** There is a new configure option '--disable-year2038' to cause
+Emacs to use only 32-bit time_t on platforms that have both 32- and
+64-bit time_t.  This may help link Emacs to a library with ABI
+requiring traditional 32-bit time_t.  This option currently affects
+only 32-bit ARM and x86 running GNU/Linux with glibc 2.34 and later.
+Emacs now defaults to 64-bit time_t on these platforms.
+
+---
 ** Support for building with '-fcheck-pointer-bounds' has been removed.
 GCC has withdrawn the '-fcheck-pointer-bounds' option and support for
 its implementation has been removed from the Linux kernel.
@@ -344,8 +352,8 @@ of the next command to be displayed in a new frame.
 
 +++
 *** New command 'clone-frame' (bound to 'C-x 5 c').
-This is like 'C-x 5 2', but uses the frame parameters of the current
-frame instead of 'default-frame-alist'.
+This is like 'C-x 5 2', but uses the window configuration and frame
+parameters of the current frame instead of 'default-frame-alist'.
 
 ---
 *** Default values of 'frame-title-format' and 'icon-title-format' have changed.
@@ -820,7 +828,24 @@ buffers.  This can be controlled by customizing the user option
 *** 'nobreak-char-display' now also affects all non-ASCII space characters.
 Previously, this was limited only to 'NO-BREAK SPACE' and hyphen
 characters.  Now it also covers the rest of the non-ASCII Unicode
-space characters.
+space characters.  Also, unlike in previous versions of Emacs, the
+non-ASCII characters are displayed as themselves when
+'nobreak-char-display' is t, i.e. they are not replaced on display
+with the ASCII space and hyphen characters.
+
+---
+*** New backward compatibility variable 'nobreak-char-ascii-display'.
+This variable is nil by default, and non-ASCII space and hyphen
+characters are displayed as themselves, even if 'nobreak-char-display'
+is non-nil.  If 'nobreak-char-ascii-display' is set to a non-nil
+value, the non-ASCII space and hyphen characters are instead displayed
+as their ASCII counterparts: spaces and ASCII hyphen (a.k.a. "dash")
+characters.  This provides backward compatibility feature for the
+change described above, where the non-ASCII characters are no longer
+replaced with their ASCII counterparts when 'nobreak-char-display' is
+t.  You may need this on text-mode terminals that produce messed up
+display when non-ASCII spaces and hyphens are written to the display.
+(This variable is only effective when 'nobreak-char-display' is t.)
 
 +++
 *** Improved support for terminal emulators that encode the Meta flag.
@@ -989,11 +1014,12 @@ further tweak whether to complete or indent.
 ---
 ** 'indent-tabs-mode' is now a global minor mode instead of just a variable.
 
----
++++
 ** New choice 'permanent' for 'shift-select-mode'.
 When the mark was activated by shifted motion keys, non-shifted motion
 keys don't deactivate the mark after customizing 'shift-select-mode'
-to 'permanent'.
+to 'permanent'.  Similarly, the active mark will not be deactivated by
+typing shifted motion keys.
 
 +++
 ** The "Edit => Clear" menu item now obeys a rectangular region.
@@ -1142,7 +1168,7 @@ search string is at least this long.  'lazy-highlight-initial-delay'
 still applies for shorter search strings, which avoids flicker in the
 search buffer due to too many matches being highlighted.
 
----
++++
 *** The default 'search-whitespace-regexp' value has changed.
 This used to be "\\s-+", which meant that it was mode-dependent whether
 newlines were included in the whitespace set.  This has now been
@@ -2423,8 +2449,10 @@ Those are 'shr-h1', 'shr-h2', 'shr-h3', 'shr-h4', 'shr-h5', 'shr-h6'.
 
 ** Project
 
+---
 *** New user option 'project-vc-merge-submodules'.
 
+---
 *** Project commands now have their own history.
 Previously used project directories are now suggested by all commands
 that prompt for a project directory.
@@ -2651,7 +2679,9 @@ This allows mode-specific alterations to how 'thing-at-point' works.
 'symbol-at-point') will narrow to the current field (if any) before
 trying to identify the thing at point.
 
+---
 *** New function 'thing-at-mouse'.
+This is like 'thing-at-point', but uses the mouse event position instead.
 
 ** image-dired
 
@@ -2822,76 +2852,8 @@ non-nil.
 
 ** ERC
 
----
-*** NickServ passwords can now be retrieved from auth-source.
-The 'erc-use-auth-source-for-nickserv-password' user option enables
-querying auth-source for NickServ passwords.  To enable this, add the
-following to your init file:
-
-    (setq erc-use-auth-source-for-nickserv-password t)
-
----
-*** NickServ identification now prompts for password last.
-When 'erc-prompt-for-nickserv-password' is non-nil, the user used to
-be unconditionally prompted interactively for a password, regardless
-of the value of 'erc-nickserv-passwords', which was effectively
-ignored (same for the new
-'erc-use-auth-source-for-nickserv-password').  This limitation is now
-lifted, and the user is interactively prompted last, after the other
-identification methods have run.
-
----
-*** The '/ignore' command will now ask for a timeout to stop ignoring the user.
-Allowed inputs are seconds or ISO8601-like periods like "1h" or "4h30m".
-
----
-*** ERC now recognizes 'C-]' for italic text.
-Italic text is displayed in the new 'erc-italic-face'.
-
----
-*** erc-match.el now supports 'message' highlight type (not including the nick).
-The 'erc-current-nick-highlight-type', 'erc-pal-highlight-type',
-'erc-fool-highlight-type', 'erc-keyword-highlight-type', and
-'erc-dangerous-host-highlight-type' user options now support a
-'message' type for highlighting the entire message but not the
-sender's nick.
-
----
-*** erc-status-sidebar.el is now part of ERC.
-The 'erc-status-sidebar' package which provides a HexChat-like
-activity overview sidebar for joined IRC channels is now part of ERC.
-
-+++
-*** erc-tls now supports specifying a TLS client certificate.
-The 'erc-tls' function has been updated to allow specifying a TLS
-client certificate for authentication, as an alternative to NickServ
-password-based authentication.  This is referred to as "CertFP" (short
-for Certificate Fingerprint) by several IRC networks.  See the Info
-node "(erc) Connecting" in the ERC manual for more details and
-examples on how to specify and use TLS client certificates with
-'erc-tls'.
-
----
-*** Add 'erc-track-select-mode-line-face' (obsoletes 'erc-track-find-face').
-The 'erc-track-find-face' function of the erc-track module has been
-declared obsolete and rewritten as 'erc-track-select-mode-line-face',
-with different expected arguments (the current and old faces are now
-separated) and clearer documentation.
-
----
-*** Add '/opme' and '/deopme' convenience commands.
-The new '/opme' convenience command asks ChanServ to set the operator
-status for the current nick in the current channel, and '/deopme'
-unsets it.
-
----
-*** Add '/wii' convenience command for whois with idle time.
-The new '/wii' convenience command calls the '/whois' command with the
-given nick as both arguments, which is useful for displaying the whois
-information for the nick along with idle time, even if the nick is on
-a different server than the one the current user is connected to.
-Using the given nick itself instead of the server it is connected to
-is not standardized, but is widely supported across IRC networks.
+*** Starting with Emacs 28.1 and ERC 5.4, see the ERC-NEWS file for
+user-visible changes in ERC.
 
 ** xwidget-webkit mode
 
@@ -3002,6 +2964,9 @@ Face 'mh-folder-whitelisted' is renamed 'mh-folder-allowlisted'.
 *** rcirc now supports SASL authentication.
 
 ---
+*** #emacs on Libera.chat has been added to 'rcirc-server-alist'.
+
+---
 *** rcirc connects asynchronously.
 
 ---
@@ -3035,7 +3000,7 @@ See 'rcirc-reconnect-attempts'.
 ---
 *** New command 'mpc-goto-playing-song'.
 This command, bound to 'o' in any 'mpc-mode' buffer, moves point to
-the currently playing song in the "*Songs*" buffer.
+the currently playing song in the "*MPC-Songs*" buffer.
 
 ---
 *** New user option 'mpc-cover-image-re'.

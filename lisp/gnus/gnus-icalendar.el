@@ -196,7 +196,9 @@
     (cl-labels
 	((attendee-role (prop)
                         ;; RFC5546: default ROLE is REQ-PARTICIPANT
-                        (or (plist-get (cadr prop) 'ROLE) "REQ-PARTICIPANT"))
+                        (and prop
+                             (or (plist-get (cadr prop) 'ROLE)
+                                 "REQ-PARTICIPANT")))
 	 (attendee-name
 	  (prop)
 	  (or (plist-get (cadr prop) 'CN)
@@ -228,7 +230,9 @@
                       ical attendee-name-or-email)))
          (attendee-names (gnus-icalendar-event--get-attendee-names ical))
          ;; RFC5546: default ROLE is REQ-PARTICIPANT
-         (role (or (plist-get (cadr attendee) 'ROLE) "REQ-PARTICIPANT"))
+         (role (and attendee
+                    (or (plist-get (cadr attendee) 'ROLE)
+                        "REQ-PARTICIPANT")))
          (participation-type (pcase role
                                ("REQ-PARTICIPANT" 'required)
                                ("OPT-PARTICIPANT" 'optional)
@@ -1058,13 +1062,14 @@ These will be used to retrieve the RSVP information from ical events."
   (add-to-list 'mm-automatic-display "text/calendar")
   (add-to-list 'mm-inline-media-tests '("text/calendar" gnus-icalendar-mm-inline identity))
 
-  (gnus-define-keys (gnus-summary-calendar-map "i" gnus-summary-mode-map)
-    "a" gnus-icalendar-reply-accept
-    "t" gnus-icalendar-reply-tentative
-    "d" gnus-icalendar-reply-decline
-    "c" gnus-icalendar-event-check-agenda
-    "e" gnus-icalendar-event-export
-    "s" gnus-icalendar-event-show)
+  (define-key gnus-summary-mode-map "i"
+    (define-keymap :prefix 'gnus-summary-calendar-map
+      "a" #'gnus-icalendar-reply-accept
+      "t" #'gnus-icalendar-reply-tentative
+      "d" #'gnus-icalendar-reply-decline
+      "c" #'gnus-icalendar-event-check-agenda
+      "e" #'gnus-icalendar-event-export
+      "s" #'gnus-icalendar-event-show))
 
   (require 'gnus-art)
   (add-to-list 'gnus-mime-action-alist

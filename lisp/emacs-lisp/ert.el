@@ -219,11 +219,7 @@ it has to be wrapped in `(eval (quote ...))'.
                             `(:expected-result-type ,expected-result))
                         ,@(when tags-supplied-p
                             `(:tags ,tags))
-                        :body (lambda ()
-                                ;; Use the value of `lexical-binding' in
-                                ;; the source file when evaluating the body.
-                                (let ((lexical-binding ,lexical-binding))
-                                  ,@body))))
+                        :body (lambda () ,@body)))
          ',name))))
 
 (defvar ert--find-test-regexp
@@ -263,7 +259,7 @@ DATA is displayed to the user and should state the reason for skipping."
 ;; See Bug#24402 for why this exists
 (defun ert--should-signal-hook (error-symbol data)
   "Stupid hack to stop `condition-case' from catching ert signals.
-It should only be stopped when ran from inside ert--run-test-internal."
+It should only be stopped when ran from inside `ert--run-test-internal'."
   (when (and (not (symbolp debugger))   ; only run on anonymous debugger
              (memq error-symbol '(ert-test-failed ert-test-skipped)))
     (funcall debugger 'error (cons error-symbol data))))
@@ -780,7 +776,8 @@ This mainly sets up debugger-related bindings."
         ;; handle ert errors. Once that's done, remove
         ;; `ert--should-signal-hook'.  See Bug#24402 and Bug#11218 for
         ;; details.
-        (let ((debugger (lambda (&rest args)
+        (let ((lexical-binding t)
+              (debugger (lambda (&rest args)
                           (ert--run-test-debugger test-execution-info
                                                   args)))
               (debug-on-error t)

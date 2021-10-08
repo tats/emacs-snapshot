@@ -74,6 +74,20 @@
 (require 'ring)
 (require 'project)
 
+(eval-and-compile
+  (when (version< emacs-version "28")
+    ;; etags.el in Emacs 26 and 27 uses EIEIO, and its location type
+    ;; inherits from `xref-location'.
+    (require 'eieio)
+
+    ;; Suppressing byte-compilation warnings (in Emacs 28+) about
+    ;; `defclass' not being defined, which happens because the
+    ;; `require' statement above is not evaluated either.
+    ;; FIXME: Use `with-suppressed-warnings' when we stop supporting Emacs 26.
+    (with-no-warnings
+      (defclass xref-location () ()
+        :documentation "(Obsolete) location represents a position in a file or buffer."))))
+
 (defgroup xref nil "Cross-referencing commands."
   :version "25.1"
   :group 'tools)
@@ -1025,7 +1039,7 @@ Return an alist of the form ((GROUP . (XREF ...)) ...)."
                    (eq xref-file-name-display 'project-relative)
                    (project-current)))
          (project-root (and project
-                            (expand-file-name (project-root project)))))
+                            (expand-file-name (xref--project-root project)))))
     (mapcar
      (lambda (pair)
        (cons (xref--group-name-for-display (car pair) project-root)
@@ -1310,12 +1324,17 @@ definitions."
                (xref--prompt-p this-command))
            (let ((id
                   (completing-read
-                   (if def
-                       (format "%s (default %s): "
-                               (substring prompt 0 (string-match
-                                                    "[ :]+\\'" prompt))
-                               def)
-                     prompt)
+                   ;; `format-prompt' is new in Emacs 28.1
+                   (if (fboundp 'format-prompt)
+                       (format-prompt (substring prompt 0 (string-match
+                                                           "[ :]+\\'" prompt))
+                                      def)
+                     (if def
+                         (format "%s (default %s): "
+                                 (substring prompt 0 (string-match
+                                                      "[ :]+\\'" prompt))
+                                 def)
+                       prompt))
                    (xref-backend-identifier-completion-table backend)
                    nil nil nil
                    'xref--read-identifier-history def)))

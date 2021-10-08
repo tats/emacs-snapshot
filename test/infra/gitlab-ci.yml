@@ -116,6 +116,7 @@ default:
     - test -n "$(docker ps -aq -f name=${test_name})" && docker rm ${test_name}
 
 .build-template:
+  needs: []
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
@@ -146,7 +147,7 @@ default:
 
 .test-template:
   # Do not block later stages.
-  allow_failure: true
+  # allow_failure: true
   # Do not run fast and normal test jobs when scheduled.
   rules:
     - if: '$CI_JOB_STAGE =~ "fast|normal" && $CI_PIPELINE_SOURCE == "schedule"'
@@ -270,43 +271,31 @@ test-gnustep:
     target: emacs-gnustep
     make_params: install
 
-build-native-bootstrap-speed0:
+build-native-comp-speed0:
   stage: native-comp-images
   extends: [.job-template, .build-template, .native-comp-template]
   variables:
     target: emacs-native-comp-speed0
 
-# build-native-bootstrap-speed0:
-#   # Test a full native bootstrap
-#   # Run for now only speed 0 to limit memory usage and compilation time.
-#   stage: native-comp-images
-#   # Uncomment the following to run it only when scheduled.
-#   # only:
-#   #   - schedules
-#   script:
-#     - DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y -qq -o=Dpkg::Use-Pty=0 libgccjit-6-dev
-#     - ./autogen.sh autoconf
-#     - ./configure --with-native-compilation
-#     - make bootstrap NATIVE_FULL_AOT=1 BYTE_COMPILE_EXTRA_FLAGS='--eval "(setq comp-speed 0)"' -j2
-#   timeout: 8 hours
+build-native-comp-speed1:
+  stage: native-comp-images
+  extends: [.job-template, .build-template, .native-comp-template]
+  variables:
+    target: emacs-native-comp-speed1
 
-# build-native-bootstrap-speed1:
-#   stage: native-comp-images
-#   script:
-#     - DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y -qq -o=Dpkg::Use-Pty=0 libgccjit-6-dev
-#     - ./autogen.sh autoconf
-#     - ./configure --with-native-compilation
-#     - make bootstrap BYTE_COMPILE_EXTRA_FLAGS='--eval "(setq comp-speed 1)"'
-#   timeout: 8 hours
+build-native-comp-speed2:
+  stage: native-comp-images
+  extends: [.job-template, .build-template, .native-comp-template]
+  variables:
+    target: emacs-native-comp-speed2
 
-# build-native-bootstrap-speed2:
-#   stage: native-comp-images
-#   script:
-#     - DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y -qq -o=Dpkg::Use-Pty=0 libgccjit-6-dev
-#     - ./autogen.sh autoconf
-#     - ./configure --with-native-compilation
-#     - make bootstrap
-#   timeout: 8 hours
+test-native-comp-speed0:
+  stage: native-comp
+  needs: [build-native-comp-speed0]
+  extends: [.job-template, .test-template, .native-comp-template]
+  variables:
+    target: emacs-native-comp-speed0
+    make_params: "-C test comp-tests.log"
 
 test-all-inotify:
   # This tests also file monitor libraries inotify and inotifywatch.

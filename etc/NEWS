@@ -51,6 +51,23 @@ These forms now indent like this:
 This change also affects 'cl-macrolet', 'cl-flet*' and
 'cl-symbol-macrolet'.
 
++++
+** New user option 'translate-upper-case-key-bindings'.
+This can be set to nil to inhibit translating upper case keys to lower
+case keys.
+
++++
+** New command 'ensure-empty-lines'.
+This command increases (or decreases) the number of empty lines before
+point.
+
+---
+*** Improved mouse behavior with auto-scrolling modes.
+When clicking inside the `scroll-margin' or `hscroll-margin' region
+the point is now moved only when releasing the mouse button.  This no
+longer results in a bogus selection, unless the mouse has been
+effectively dragged.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
@@ -60,6 +77,33 @@ This change also affects 'cl-macrolet', 'cl-flet*' and
 *** New command for the thumbnail buffer.
 The new command 'image-dired-unmark-all-marks' has been added with a
 binding in the menu.
+
+---
+*** info-look specs can now be expanded at run time instead of a load time.
+The new ':doc-spec-function' element can be used to compute the
+':doc-spec' element when the user asks for info on that particular
+mode (instead of at load time).
+
+** subr-x
+
++++
+*** New macro 'with-memoization' provides a very primitive form of memoization
+
+** ansi-color.el
+
+---
+*** Support for ANSI 256-color and 24-bit colors.
+256-color and 24-bit color codes are now handled by ANSI color
+filters and displayed with the specified color.
+
+** term-mode
+
+---
+*** Support for ANSI 256-color and 24-bit colors, italic and other fonts.
+Term-mode can now display 256-color and 24-bit color codes.  It can
+also handle ANSI codes for faint, italic and blinking text, displaying
+it with new 'ansi-term-faint/italic/slow-blinking/fast-blinking'
+faces.
 
 
 * New Modes and Packages in Emacs 29.1
@@ -73,8 +117,49 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 * Incompatible Lisp Changes in Emacs 29.1
 
+---
+** The 'inhibit-changing-match-data' variable is now obsolete.
+Instead, functions like 'string-match' and 'looking-at' now take an
+optional 'inhibit-modify' argument.
+
+---
+** 'gnus-define-keys' is now obsolete.
+Use 'define-keymap' instead.
+
+---
+** MozRepl has been removed from js.el.
+MozRepl was removed from Firefox in 2017, so this code doesn't work
+with recent versions of Firefox.
+
 
 * Lisp Changes in Emacs 29.1
+
++++
+** New major mode 'clean-mode'.
+This is a new major mode meant for debugging.  It kills absolutely all
+local variables and removes overlays and text properties.
+
++++
+** 'kill-all-local-variables' can now kill all local variables.
+If given the new optional KILL-PERMANENT argument, also kill permanent
+local variables.
+
++++
+** Third 'mapconcat' argument 'separator' is now optional.
+An explicit nil always meant the empty string, now it can be left out.
+
+---
+** Themes can now be made obsolete.
+Using 'make-obsolete' on a theme is now supported.  This will make
+'load-theme' issue a warning when loading the theme.
+
++++
+** New function 'define-keymap'.
+This function allows defining a number of keystrokes with one form.
+
++++
+** New macro 'defvar-keymap'.
+This macro allows defining keymap variables more conveniently.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems

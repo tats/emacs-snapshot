@@ -29,18 +29,17 @@
 (require 'mh-e)
 
 (eval-and-compile
-  (mh-require 'gnus-util nil t)
-  (mh-require 'mm-bodies nil t)
-  (mh-require 'mm-decode nil t)
-  (mh-require 'mm-view nil t)
-  (mh-require 'mml nil t))
+  (require 'gnus-util nil t)
+  (require 'mm-bodies nil t)
+  (require 'mm-decode nil t)
+  (require 'mm-view nil t)
+  (require 'mml nil t))
 
 ;; Copy of function from gnus-util.el.
 ;; TODO This is not in Gnus 5.11.
 (defun-mh mh-gnus-local-map-property gnus-local-map-property (map)
   "Return a list suitable for a text property list specifying keymap MAP."
-  (cond ((featurep 'xemacs) (list 'keymap map))
-        ((>= emacs-major-version 21) (list 'keymap map))
+  (cond ((>= emacs-major-version 21) (list 'keymap map))
         (t (list 'local-map map))))
 
 ;; Copy of function from mm-decode.el.
