@@ -193,7 +193,7 @@ set earlier in the `setq-local'.  The return value of the
   "Define VAR as a buffer-local variable with default value VAL.
 Like `defvar' but additionally marks the variable as being automatically
 buffer-local wherever it is set."
-  (declare (debug defvar) (doc-string 3))
+  (declare (debug defvar) (doc-string 3) (indent 2))
   ;; Can't use backquote here, it's too early in the bootstrap.
   (list 'progn (list 'defvar var val docstring)
         (list 'make-variable-buffer-local (list 'quote var))))
@@ -1000,6 +1000,7 @@ Bindings are always added before any inherited map.
 
 The order of bindings in a keymap matters only when it is used as
 a menu, so this function is not useful for non-menu keymaps."
+  (declare (indent defun))
   (unless after (setq after t))
   (or (keymapp keymap)
       (signal 'wrong-type-argument (list 'keymapp keymap)))
@@ -3036,6 +3037,7 @@ If there is a natural number at point, use it as default."
     (set-keymap-parent map minibuffer-local-map)
 
     (define-key map [remap self-insert-command] #'read-char-from-minibuffer-insert-char)
+    (define-key map [remap exit-minibuffer] #'read-char-from-minibuffer-insert-other)
 
     (define-key map [remap recenter-top-bottom] #'minibuffer-recenter-top-bottom)
     (define-key map [remap scroll-up-command] #'minibuffer-scroll-up-command)
@@ -3153,9 +3155,10 @@ There is no need to explicitly add `help-char' to CHARS;
     (define-key map [remap scroll-other-window] #'minibuffer-scroll-other-window)
     (define-key map [remap scroll-other-window-down] #'minibuffer-scroll-other-window-down)
 
-    (define-key map [escape] #'abort-recursive-edit)
-    (dolist (symbol '(quit exit exit-prefix))
+    (define-key map [remap exit] #'y-or-n-p-insert-other)
+    (dolist (symbol '(exit-prefix quit))
       (define-key map (vector 'remap symbol) #'abort-recursive-edit))
+    (define-key map [escape] #'abort-recursive-edit)
 
     ;; FIXME: try catch-all instead of explicit bindings:
     ;; (define-key map [remap t] #'y-or-n-p-insert-other)
@@ -3565,6 +3568,9 @@ If either NAME or VAL are specified, both should be specified."
 
 (defvar suspend-resume-hook nil
   "Normal hook run by `suspend-emacs', after Emacs is continued.")
+
+(defvar after-pdump-load-hook nil
+  "Normal hook run after loading the .pdmp file.")
 
 (defvar temp-buffer-show-hook nil
   "Normal hook run by `with-output-to-temp-buffer' after displaying the buffer.
@@ -4384,11 +4390,6 @@ is allowed once again.  (Immediately, if `inhibit-quit' is nil.)"
 	   ;; call, and that might allow it to exit thru a condition-case
 	   ;; that intends to handle the quit signal next time.
 	   (eval '(ignore nil)))))
-
-;; Don't throw `throw-on-input' on those events by default.
-(setq while-no-input-ignore-events
-      '(focus-in focus-out help-echo iconify-frame
-        make-frame-visible selection-request))
 
 (defmacro while-no-input (&rest body)
   "Execute BODY only as long as there's no pending input.
@@ -5572,6 +5573,7 @@ If HOOKVAR is nil, `mail-send-hook' is used.
 
 The properties used on SYMBOL are `composefunc', `sendfunc',
 `abortfunc', and `hookvar'."
+  (declare (indent defun))
   (put symbol 'composefunc composefunc)
   (put symbol 'sendfunc sendfunc)
   (put symbol 'abortfunc (or abortfunc #'kill-buffer))
@@ -6491,6 +6493,7 @@ also be the special symbol `:menu', in which case DEFINITION
 should be a MENU form as accepted by `easy-menu-define'.
 
 \(fn &key FULL PARENT SUPPRESS NAME PREFIX KEYMAP &rest [KEY DEFINITION]...)"
+  (declare (indent defun))
   (define-keymap--define definitions))
 
 (defun define-keymap--define (definitions)
@@ -6548,6 +6551,7 @@ macro also accepts a `:doc' keyword, which (if present) is used
 as the variable documentation string.
 
 \(fn VARIABLE-NAME &key DOC FULL PARENT SUPPRESS NAME PREFIX KEYMAP &rest [KEY DEFINITION]...)"
+  (declare (indent 1))
   (let ((opts nil)
         doc)
     (while (and defs

@@ -27,6 +27,16 @@ applies, and please also update docstrings as needed.
 
 * Startup Changes in Emacs 29.1
 
++++
+** Emacs now has a --fingerprint option.
+This will output a string identifying the current Emacs build.
+
++++
+** New hook 'after-pdump-load-hook'.
+This is run at the end of the Emacs startup process, and it meant to
+be used to reinitialize structures that would normally be done at load
+time.
+
 
 * Changes in Emacs 29.1
 
@@ -68,8 +78,26 @@ the point is now moved only when releasing the mouse button.  This no
 longer results in a bogus selection, unless the mouse has been
 effectively dragged.
 
++++
+** 'kill-ring-max' now defaults to 120.
+
+---
+** New user option 'yank-menu-max-items'.
+Customize this option to limit the amount of entries in the menu
+"Edit->Paste from Kill Menu".  The default is 60.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** eww
+
++++
+*** New user option to automatically rename EWW buffers.
+The 'eww-auto-rename-buffer' user option can be configured to rename
+rendered web pages by using their title, URL, or a user-defined
+function which returns a string.  For the first two cases, the length
+of the resulting name is controlled by 'eww-buffer-name-length'.  By
+default, no automatic renaming is performed.
 
 ** image-dired
 
@@ -105,6 +133,11 @@ also handle ANSI codes for faint, italic and blinking text, displaying
 it with new 'ansi-term-faint/italic/slow-blinking/fast-blinking'
 faces.
 
+** Xref
+
+*** 'project-find-file' and 'project-or-external-find-file' now accept
+a prefix argument which is interpreted to mean "include all files".
+
 
 * New Modes and Packages in Emacs 29.1
 
@@ -133,6 +166,11 @@ with recent versions of Firefox.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** :keys in 'menu-item' can now be a function.
+If so, it is called whenever the menu is computed, and can be used to
+calculate the keys dynamically.
 
 +++
 ** New major mode 'clean-mode'.

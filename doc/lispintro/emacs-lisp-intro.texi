@@ -8767,7 +8767,7 @@ keeps the kill ring from growing too long.  It looks like this:
 
 The code checks whether the length of the kill ring is greater than
 the maximum permitted length.  This is the value of
-@code{kill-ring-max} (which is 60, by default).  If the length of the
+@code{kill-ring-max} (which is 120, by default).  If the length of the
 kill ring is too long, then this code sets the last element of the
 kill ring to @code{nil}.  It does this by using two functions,
 @code{nthcdr} and @code{setcdr}.
@@ -17456,9 +17456,9 @@ Manual}, for more information.
 @findex line-to-top-of-window
 @cindex Simple extension in @file{.emacs} file
 
-Here is a simple extension to Emacs that moves the line point is on to
-the top of the window.  I use this all the time, to make text easier
-to read.
+Here is a simple extension to Emacs that moves the line that point is
+on to the top of the window.  I use this all the time, to make text
+easier to read.
 
 You can put the following code into a separate file and then load it
 from your @file{.emacs} file, or you can include it within your

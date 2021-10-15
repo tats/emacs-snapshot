@@ -133,6 +133,7 @@ extern char etext;
 #endif
 
 #include "pdumper.h"
+#include "fingerprint.h"
 #include "epaths.h"
 
 static const char emacs_version[] = PACKAGE_VERSION;
@@ -255,6 +256,7 @@ Initialization options:\n\
 #ifdef HAVE_PDUMPER
     "\
 --dump-file FILE            read dumped state from FILE\n\
+--fingerprint               output fingerprint and exit\n\
 ",
 #endif
 #if SECCOMP_USABLE
@@ -830,6 +832,8 @@ load_pdump (int argc, char **argv)
   const char *const suffix = ".pdmp";
   int result;
   char *emacs_executable = argv[0];
+  ptrdiff_t hexbuf_size;
+  char *hexbuf;
   const char *strip_suffix =
 #if defined DOS_NT || defined CYGWIN
     ".exe"
@@ -927,9 +931,15 @@ load_pdump (int argc, char **argv)
   /* Look for "emacs.pdmp" in PATH_EXEC.  We hardcode "emacs" in
      "emacs.pdmp" so that the Emacs binary still works if the user
      copies and renames it.  */
+  hexbuf_size = 2 * sizeof fingerprint;
+  hexbuf = xmalloc (hexbuf_size + 1);
+  hexbuf_digest (hexbuf, (char *) fingerprint, sizeof fingerprint);
+  hexbuf[hexbuf_size] = '\0';
   needed = (strlen (path_exec)
 	    + 1
 	    + strlen (argv0_base)
+	    + 1
+	    + strlen (hexbuf)
 	    + strlen (suffix)
 	    + 1);
   if (bufsize < needed)
@@ -937,8 +947,8 @@ load_pdump (int argc, char **argv)
       xfree (dump_file);
       dump_file = xpalloc (NULL, &bufsize, needed - bufsize, -1, 1);
     }
-  sprintf (dump_file, "%s%c%s%s",
-           path_exec, DIRECTORY_SEP, argv0_base, suffix);
+  sprintf (dump_file, "%s%c%s-%s%s",
+           path_exec, DIRECTORY_SEP, argv0_base, hexbuf, suffix);
 #if !defined (NS_SELF_CONTAINED)
   /* Assume the Emacs binary lives in a sibling directory as set up by
      the default installation configuration.  */
@@ -1386,6 +1396,24 @@ main (int argc, char **argv)
 	      PACKAGE_NAME, version, copyright, PACKAGE_NAME, PACKAGE_NAME);
       exit (0);
     }
+
+#ifdef HAVE_PDUMPER
+  if (argmatch (argv, argc, "-fingerprint", "--fingerprint", 4,
+		NULL, &skip_args))
+    {
+      if (initialized)
+        {
+          dump_fingerprint (stdout, "",
+			    (unsigned char *) fingerprint);
+          exit (0);
+        }
+      else
+        {
+          fputs ("Not initialized\n", stderr);
+          exit (1);
+        }
+    }
+#endif
 
   emacs_wd = emacs_get_current_dir_name ();
 #ifdef HAVE_PDUMPER
@@ -2304,6 +2332,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   if (dump_mode)
     Vdump_mode = build_string (dump_mode);
+
+#ifdef HAVE_PDUMPER
+  /* Allow code to be run (mostly useful after redumping). */
+  safe_run_hooks (Qafter_pdump_load_hook);
+#endif
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();

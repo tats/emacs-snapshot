@@ -695,11 +695,13 @@ Returns a list of the form (BRIEF-DESC DEFN EVENT MOUSE-MSG)."
 	 (mouse-msg (if (or (memq 'click modifiers) (memq 'down modifiers)
 			    (memq 'drag modifiers))
                         " at that spot" ""))
-         ;; Use mouse-set-point to handle the case when a menu item
+         ;; Use `mouse-set-point' to handle the case when a menu item
          ;; is selected from the context menu that should describe KEY
          ;; at the position of mouse click that opened the context menu.
-         ;; When no mouse was involved, it defaults to window-point.
-	 (defn (save-excursion (mouse-set-point event) (key-binding key t))))
+         ;; When no mouse was involved, don't use `mouse-set-point'.
+         (defn (if (consp event)
+                   (save-excursion (mouse-set-point event) (key-binding key t))
+                 (key-binding key t))))
     ;; Handle the case where we faked an entry in "Select and Paste" menu.
     (when (and (eq defn nil)
 	       (stringp (aref key (1- (length key))))
@@ -1596,10 +1598,16 @@ and some others."
       (add-hook 'temp-buffer-show-hook 'resize-temp-buffer-window 'append)
     (remove-hook 'temp-buffer-show-hook 'resize-temp-buffer-window)))
 
+(defvar resize-temp-buffer-window-inhibit nil
+  "Non-nil means `resize-temp-buffer-window' should not resize.")
+
 (defun resize-temp-buffer-window (&optional window)
   "Resize WINDOW to fit its contents.
 WINDOW must be a live window and defaults to the selected one.
-Do not resize if WINDOW was not created by `display-buffer'.
+Do not resize if WINDOW was not created by `display-buffer'.  Do
+not resize either if a `window-height', `window-width' or
+`window-size' entry in `display-buffer-alist' prescribes some
+alternative resizing for WINDOW's buffer.
 
 If WINDOW is part of a vertical combination, restrain its new
 size by `temp-buffer-max-height' and do not resize if its minimum
@@ -1614,27 +1622,33 @@ provided `fit-frame-to-buffer' is non-nil.
 This function may call `preserve-window-size' to preserve the
 size of WINDOW."
   (setq window (window-normalize-window window t))
-  (let ((height (if (functionp temp-buffer-max-height)
+  (let* ((buffer (window-buffer window))
+         (height (if (functionp temp-buffer-max-height)
+		     (with-selected-window window
+		       (funcall temp-buffer-max-height buffer))
+		   temp-buffer-max-height))
+	 (width (if (functionp temp-buffer-max-width)
 		    (with-selected-window window
-		      (funcall temp-buffer-max-height (window-buffer)))
-		  temp-buffer-max-height))
-	(width (if (functionp temp-buffer-max-width)
-		   (with-selected-window window
-		     (funcall temp-buffer-max-width (window-buffer)))
-		 temp-buffer-max-width))
-	(quit-cadr (cadr (window-parameter window 'quit-restore))))
-    ;; Resize WINDOW iff it was made by `display-buffer'.
+		      (funcall temp-buffer-max-width buffer))
+		  temp-buffer-max-width))
+	 (quit-cadr (cadr (window-parameter window 'quit-restore))))
+    ;; Resize WINDOW only if it was made by `display-buffer'.
     (when (or (and (eq quit-cadr 'window)
 		   (or (and (window-combined-p window)
 			    (not (eq fit-window-to-buffer-horizontally
 				     'only))
-			    (pos-visible-in-window-p (point-min) window))
+			    (pos-visible-in-window-p
+                             (with-current-buffer buffer (point-min))
+                             window)
+                            (not resize-temp-buffer-window-inhibit))
 		       (and (window-combined-p window t)
-			    fit-window-to-buffer-horizontally)))
+			    fit-window-to-buffer-horizontally
+                            (not resize-temp-buffer-window-inhibit))))
 	      (and (eq quit-cadr 'frame)
                    fit-frame-to-buffer
-                   (eq window (frame-root-window window))))
-	(fit-window-to-buffer window height nil width nil t))))
+                   (eq window (frame-root-window window))
+                   (not resize-temp-buffer-window-inhibit)))
+      (fit-window-to-buffer window height nil width nil t))))
 
 ;;; Help windows.
 (defcustom help-window-select nil

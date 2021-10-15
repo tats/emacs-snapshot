@@ -514,7 +514,11 @@
                                          (cdr yank-menu)
                                        kill-ring))
                                     (not buffer-read-only))))
-                  :help "Paste (yank) text most recently cut/copied"))
+                  :help "Paste (yank) text most recently cut/copied"
+                  :keys (lambda ()
+                          (if cua-mode
+                              "\\[cua-paste]"
+                            "\\[yank]"))))
     (bindings--define-key menu [copy]
       ;; ns-win.el said: Substitute a Copy function that works better
       ;; under X (for GNUstep).
@@ -523,14 +527,23 @@
                             'kill-ring-save)
                   :enable mark-active
                   :help "Copy text in region between mark and current position"
-                  :keys ,(if (featurep 'ns)
-                             "\\[ns-copy-including-secondary]"
-                           "\\[kill-ring-save]")))
+                  :keys (lambda ()
+                          (cond
+                           ((featurep 'ns)
+                            "\\[ns-copy-including-secondary]")
+                           ((and cua-mode mark-active)
+                            "\\[cua-copy-handler]")
+                           (t
+                            "\\[kill-ring-save]")))))
     (bindings--define-key menu [cut]
       '(menu-item "Cut" kill-region
                   :enable (and mark-active (not buffer-read-only))
                   :help
-                  "Cut (kill) text in region between mark and current position"))
+                  "Cut (kill) text in region between mark and current position"
+                  :keys (lambda ()
+                          (if (and cua-mode mark-active)
+                              "\\[cua-cut-handler]"
+                            "\\[kill-region]"))))
     ;; ns-win.el said: Separate undo from cut/paste section.
     (if (featurep 'ns)
         (bindings--define-key menu [separator-undo] menu-bar-separator))
@@ -2156,9 +2169,15 @@ otherwise it could decide to silently do nothing."
     (> count 1)))
 
 (defcustom yank-menu-length 20
-  "Maximum length to display in the `yank-menu'."
+  "Items in `yank-menu' longer than this will be truncated."
   :type 'integer
   :group 'menu)
+
+(defcustom yank-menu-max-items 60
+  "Maximum number of entries to display in the `yank-menu'."
+  :type 'integer
+  :group 'menu
+  :version "29.1")
 
 (defun menu-bar-update-yank-menu (string old)
   (let ((front (car (cdr yank-menu)))
@@ -2183,8 +2202,9 @@ otherwise it could decide to silently do nothing."
 	      (cons
 	       (cons string (cons menu-string 'menu-bar-select-yank))
 	       (cdr yank-menu)))))
-  (if (> (length (cdr yank-menu)) kill-ring-max)
-      (setcdr (nthcdr kill-ring-max yank-menu) nil)))
+  (let ((max-items (min yank-menu-max-items kill-ring-max)))
+    (if (> (length (cdr yank-menu)) max-items)
+        (setcdr (nthcdr max-items yank-menu) nil))))
 
 (put 'menu-bar-select-yank 'apropos-inhibit t)
 (defun menu-bar-select-yank ()

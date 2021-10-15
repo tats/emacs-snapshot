@@ -333,8 +333,8 @@ configuration and is used when the search folder is dismissed."
             (not (y-or-n-p "Reuse pattern? ")))
         (mh-make-pick-template)
       (message ""))
-    (mh-make-local-vars 'mh-current-folder folder
-                        'mh-previous-window-config window-config)
+    (setq-local mh-current-folder folder
+                mh-previous-window-config window-config)
     (message "%s" (substitute-command-keys
                    (concat "Type \\[mh-index-do-search] to search messages, "
                            "\\[mh-pick-do-search] to use pick, "
@@ -1412,9 +1412,6 @@ being the list of messages originally from that folder."
     (set-buffer-modified-p old-buffer-modified-flag)))
 
 (eval-and-compile (require 'which-func nil t))
-
-;; Shush compiler.
-(defvar which-func-mode)                ; < Emacs 22, XEmacs
 
 ;;;###mh-autoload
 (defun mh-index-create-imenu-index ()

@@ -69,24 +69,25 @@ default:
     test_name: ${CI_JOB_NAME}-${CI_COMMIT_SHORT_SHA}
   rules:
     - changes:
-        - "**/Makefile.in"
+        - "**Makefile.in"
         - .gitlab-ci.yml
         - aclocal.m4
         - autogen.sh
         - configure.ac
         - lib/*.{h,c}
-        - lisp/**/*.el
+        - lisp/**.el
         - src/*.{h,c}
         - test/infra/*
         - test/lib-src/*.el
-        - test/lisp/**/*.el
+        - test/lisp/**.el
+        - test/misc/*.el
         - test/src/*.el
     - changes:
         # gfilemonitor, kqueue
         - src/gfilenotify.c
         - src/kqueue.c
         # MS Windows
-        - "**/w32*"
+        - "**w32*"
         # GNUstep
         - lisp/term/ns-win.el
         - src/ns*.{h,m}
@@ -107,13 +108,14 @@ default:
     # TODO: with make -j4 several of the tests were failing, for
     # example shadowfile-tests, but passed without it.
     - 'export PWD=$(pwd)'
-    - 'docker run -i -e EMACS_EMBA_CI=${EMACS_EMBA_CI} --volumes-from $(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=${CI_JOB_ID}"):ro --name ${test_name} ${CI_REGISTRY_IMAGE}:${target}-${BUILD_TAG} /bin/bash -c "git fetch ${PWD} HEAD && echo checking out these updated files && git diff --name-only FETCH_HEAD && ( git diff --name-only FETCH_HEAD | xargs git checkout -f FETCH_HEAD ) && make -j4 && make ${make_params}"'
+    - 'timeout 7200s docker run -i -e EMACS_EMBA_CI=${EMACS_EMBA_CI} --volumes-from $(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=${CI_JOB_ID}"):ro --name ${test_name} ${CI_REGISTRY_IMAGE}:${target}-${BUILD_TAG} /bin/bash -c "git fetch ${PWD} HEAD && echo checking out these updated files && git diff --name-only FETCH_HEAD && ( git diff --name-only FETCH_HEAD | xargs git checkout -f FETCH_HEAD ) && make -j4 && timeout -s ABRT 3600s make ${make_params}"'
   after_script:
-    # - docker ps -a
-    # - printenv
-    # - test -n "$(docker ps -aq -f name=${test_name})" && ( docker export ${test_name} | tar -tvf - )
+    - docker ps -a
+    - printenv
+    - test -n "$(docker ps -aq -f name=${test_name})" && ( docker export ${test_name} | tar -tvf - )
     - test -n "$(docker ps -aq -f name=${test_name})" && docker cp ${test_name}:checkout/test ${test_name}
     - test -n "$(docker ps -aq -f name=${test_name})" && docker rm ${test_name}
+    - ls -alR ${test_name}
 
 .build-template:
   needs: []
@@ -121,7 +123,7 @@ default:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - changes:
-        - "**/Makefile.in"
+        - "**Makefile.in"
         - .gitlab-ci.yml
         - aclocal.m4
         - autogen.sh
@@ -135,7 +137,7 @@ default:
         - src/gfilenotify.c
         - src/kqueue.c
         # MS Windows
-        - "**/w32*"
+        - "**w32*"
         # GNUstep
         - lisp/term/ns-win.el
         - src/ns*.{h,m}
@@ -146,8 +148,6 @@ default:
     - docker push ${CI_REGISTRY_IMAGE}:${target}-${BUILD_TAG}
 
 .test-template:
-  # Do not block later stages.
-  # allow_failure: true
   # Do not run fast and normal test jobs when scheduled.
   rules:
     - if: '$CI_JOB_STAGE =~ "fast|normal" && $CI_PIPELINE_SOURCE == "schedule"'
@@ -158,20 +158,23 @@ default:
     public: true
     expire_in: 1 week
     paths:
-      - "${test_name}/**/*.log"
+      - ${test_name}/**/*.log
+      - ${test_name}/**/core
+      - ${test_name}/core
+    when: always
 
 .gnustep-template:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       changes:
-        - "**/Makefile.in"
+        - "**Makefile.in"
         - .gitlab-ci.yml
         - configure.ac
         - src/ns*.{h,m}
         - src/macfont.{h,m}
         - lisp/term/ns-win.el
-        - nextstep/**/*
+        - nextstep/**
         - test/infra/*
 
 .filenotify-gio-template:
@@ -179,7 +182,7 @@ default:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       changes:
-        - "**/Makefile.in"
+        - "**Makefile.in"
         - .gitlab-ci.yml
         - lisp/autorevert.el
         - lisp/filenotify.el
@@ -194,7 +197,7 @@ default:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       changes:
-        - "**/Makefile.in"
+        - "**Makefile.in"
         - .gitlab-ci.yml
         - lisp/emacs-lisp/comp.el
         - lisp/emacs-lisp/comp-cstr.el
