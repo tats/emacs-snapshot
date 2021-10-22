@@ -6421,9 +6421,8 @@ image_can_use_native_api (Lisp_Object type)
 }
 
 /*
- * These functions are actually defined in the OS-native implementation
- * file.  Currently, for Windows GDI+ interface, w32image.c, but other
- * operating systems can follow suit.
+ * These functions are actually defined in the OS-native implementation file.
+ * Currently, for Windows GDI+ interface, w32image.c, and nsimage.m for macOS.
  */
 
 /* Indices of image specification fields in native format, below.  */
@@ -8740,8 +8739,286 @@ gif_load (struct frame *f, struct image *img)
 #endif /* HAVE_GIF */
 
 
+#ifdef HAVE_WEBP
+
+
+/***********************************************************************
+				 WebP
+ ***********************************************************************/
+
+#include "webp/decode.h"
+
+/* Indices of image specification fields in webp_format, below.  */
+
+enum webp_keyword_index
+{
+  WEBP_TYPE,
+  WEBP_DATA,
+  WEBP_FILE,
+  WEBP_ASCENT,
+  WEBP_MARGIN,
+  WEBP_RELIEF,
+  WEBP_ALGORITHM,
+  WEBP_HEURISTIC_MASK,
+  WEBP_MASK,
+  WEBP_BACKGROUND,
+  WEBP_LAST
+};
+
+/* Vector of image_keyword structures describing the format
+   of valid user-defined image specifications.  */
+
+static const struct image_keyword webp_format[WEBP_LAST] =
+{
+  {":type",		IMAGE_SYMBOL_VALUE,			1},
+  {":data",		IMAGE_STRING_VALUE,			0},
+  {":file",		IMAGE_STRING_VALUE,			0},
+  {":ascent",		IMAGE_ASCENT_VALUE,			0},
+  {":margin",		IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR, 0},
+  {":relief",		IMAGE_INTEGER_VALUE,			0},
+  {":conversion",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
+  {":heuristic-mask",	IMAGE_DONT_CHECK_VALUE_TYPE,		0},
+  {":mask",		IMAGE_DONT_CHECK_VALUE_TYPE,		0},
+  {":background",	IMAGE_STRING_OR_NIL_VALUE,		0}
+};
+
+/* Return true if OBJECT is a valid WebP image specification.  */
+
+static bool
+webp_image_p (Lisp_Object object)
+{
+  struct image_keyword fmt[WEBP_LAST];
+  memcpy (fmt, webp_format, sizeof fmt);
+
+  if (!parse_image_spec (object, fmt, WEBP_LAST, Qwebp))
+    return false;
+
+  /* Must specify either the :data or :file keyword.  */
+  return fmt[WEBP_FILE].count + fmt[WEBP_DATA].count == 1;
+}
+
+#ifdef WINDOWSNT
+
+/* WebP library details.  */
+
+DEF_DLL_FN (int, WebPGetInfo, (const uint8_t *, size_t, int *, int *));
+/* WebPGetFeatures is a static inline function defined in WebP's
+   decode.h.  Since we cannot use that with dynamically-loaded libwebp
+   DLL, we instead load the internal function it calls and redirect to
+   that through a macro.  */
+DEF_DLL_FN (VP8StatusCode, WebPGetFeaturesInternal,
+	    (const uint8_t *, size_t, WebPBitstreamFeatures *, int));
+DEF_DLL_FN (uint8_t *, WebPDecodeRGBA, (const uint8_t *, size_t, int *, int *));
+DEF_DLL_FN (uint8_t *, WebPDecodeRGB, (const uint8_t *, size_t, int *, int *));
+DEF_DLL_FN (void, WebPFree, (void *));
+
+static bool
+init_webp_functions (void)
+{
+  HMODULE library;
+
+  if (!(library = w32_delayed_load (Qwebp)))
+    return false;
+
+  LOAD_DLL_FN (library, WebPGetInfo);
+  LOAD_DLL_FN (library, WebPGetFeaturesInternal);
+  LOAD_DLL_FN (library, WebPDecodeRGBA);
+  LOAD_DLL_FN (library, WebPDecodeRGB);
+  LOAD_DLL_FN (library, WebPFree);
+  return true;
+}
+
+#undef WebPGetInfo
+#undef WebPGetFeatures
+#undef WebPDecodeRGBA
+#undef WebPDecodeRGB
+#undef WebPFree
+
+#define WebPGetInfo fn_WebPGetInfo
+#define WebPGetFeatures(d,s,f)					\
+  fn_WebPGetFeaturesInternal(d,s,f,WEBP_DECODER_ABI_VERSION)
+#define WebPDecodeRGBA fn_WebPDecodeRGBA
+#define WebPDecodeRGB fn_WebPDecodeRGB
+#define WebPFree fn_WebPFree
+
+#endif /* WINDOWSNT */
+
+/* Load WebP image IMG for use on frame F.  Value is true if
+   successful.  */
+
+static bool
+webp_load (struct frame *f, struct image *img)
+{
+  ptrdiff_t size = 0;
+  uint8_t *contents;
+  Lisp_Object file;
+
+  /* Open the WebP file.  */
+  Lisp_Object specified_file = image_spec_value (img->spec, QCfile, NULL);
+  Lisp_Object specified_data = image_spec_value (img->spec, QCdata, NULL);
+
+  if (NILP (specified_data))
+    {
+      int fd;
+      file = image_find_image_fd (specified_file, &fd);
+      if (!STRINGP (file))
+	{
+	  image_error ("Cannot find image file `%s'", specified_file);
+	  return false;
+	}
+
+      contents = (uint8_t *) slurp_file (fd, &size);
+      if (contents == NULL)
+	{
+	  image_error ("Error loading WebP image `%s'", file);
+	  return false;
+	}
+    }
+  else
+    {
+      if (!STRINGP (specified_data))
+	{
+	  image_error ("Invalid image data `%s'", specified_data);
+	  return false;
+	}
+      contents = SDATA (specified_data);
+      size = SBYTES (specified_data);
+    }
+
+  /* Validate the WebP image header.  */
+  if (!WebPGetInfo (contents, size, NULL, NULL))
+    {
+      if (!NILP (specified_data))
+	image_error ("Not a WebP file: `%s'", file);
+      else
+	image_error ("Invalid header in WebP image data");
+      goto webp_error1;
+    }
+
+  /* Get WebP features.  */
+  WebPBitstreamFeatures features;
+  VP8StatusCode result = WebPGetFeatures (contents, size, &features);
+  switch (result)
+    {
+    case VP8_STATUS_OK:
+      break;
+    case VP8_STATUS_NOT_ENOUGH_DATA:
+    case VP8_STATUS_OUT_OF_MEMORY:
+    case VP8_STATUS_INVALID_PARAM:
+    case VP8_STATUS_BITSTREAM_ERROR:
+    case VP8_STATUS_UNSUPPORTED_FEATURE:
+    case VP8_STATUS_SUSPENDED:
+    case VP8_STATUS_USER_ABORT:
+    default:
+      /* Error out in all other cases.  */
+      if (!NILP (specified_data))
+	image_error ("Error when interpreting WebP image data: `%s'", file);
+      else
+	image_error ("Error when interpreting WebP image data");
+      goto webp_error1;
+    }
+
+  /* Decode WebP data.  */
+  uint8_t *decoded;
+  int width, height;
+  if (features.has_alpha)
+    /* Linear [r0, g0, b0, a0, r1, g1, b1, a1, ...] order.  */
+    decoded = WebPDecodeRGBA (contents, size, &width, &height);
+  else
+    /* Linear [r0, g0, b0, r1, g1, b1, ...] order.  */
+    decoded = WebPDecodeRGB (contents, size, &width, &height);
+
+  if (!(width <= INT_MAX && height <= INT_MAX
+	&& check_image_size (f, width, height)))
+    {
+      image_size_error ();
+      goto webp_error2;
+    }
+
+  /* Create the x image and pixmap.  */
+  Emacs_Pix_Container ximg, mask_img;
+  if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, false))
+    goto webp_error2;
+
+  /* Create an image and pixmap serving as mask if the WebP image
+     contains an alpha channel.  */
+  if (features.has_alpha
+      && !image_create_x_image_and_pixmap (f, img, width, height, 1, &mask_img, true))
+    {
+      image_destroy_x_image (ximg);
+      image_clear_image_1 (f, img, CLEAR_IMAGE_PIXMAP);
+      goto webp_error2;
+    }
+
+  /* Fill the X image and mask from WebP data.  */
+  init_color_table ();
+
+  uint8_t *p = decoded;
+  for (int y = 0; y < height; ++y)
+    {
+      for (int x = 0; x < width; ++x)
+	{
+	  int r = *p++ << 8;
+	  int g = *p++ << 8;
+	  int b = *p++ << 8;
+	  PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, r, g, b));
+
+	  /* An alpha channel associates variable transparency with an
+	     image.  WebP allows up to 256 levels of partial transparency.
+	     We handle this like with PNG (which see), using the frame's
+	     background color to combine the image with.  */
+	  if (features.has_alpha)
+	    {
+	      if (mask_img)
+		PUT_PIXEL (mask_img, x, y, *p > 0 ? PIX_MASK_DRAW : PIX_MASK_RETAIN);
+	      ++p;
+	    }
+	}
+    }
+
+#ifdef COLOR_TABLE_SUPPORT
+  /* Remember colors allocated for this image.  */
+  img->colors = colors_in_color_table (&img->ncolors);
+  free_color_table ();
+#endif /* COLOR_TABLE_SUPPORT */
+
+  /* Put ximg into the image.  */
+  image_put_x_image (f, img, ximg, 0);
+
+  /* Same for the mask.  */
+  if (mask_img)
+    {
+      /* Fill in the background_transparent field while we have the
+	 mask handy.  Casting avoids a GCC warning.  */
+      image_background_transparent (img, f, (Emacs_Pix_Context)mask_img);
+
+      image_put_x_image (f, img, mask_img, 1);
+    }
+
+  img->width = width;
+  img->height = height;
+
+  /* Clean up.  */
+  WebPFree (decoded);
+  if (NILP (specified_data))
+    xfree (contents);
+  return true;
+
+ webp_error2:
+  WebPFree (decoded);
+
+ webp_error1:
+  if (NILP (specified_data))
+    xfree (contents);
+  return false;
+}
+
+#endif /* HAVE_WEBP */
+
+
 #ifdef HAVE_IMAGEMAGICK
 
+
 /***********************************************************************
 				 ImageMagick
 ***********************************************************************/
@@ -9996,10 +10273,16 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   if (!STRINGP (lcss))
     {
       /* Generate the CSS for the SVG image.  */
-      const char *css_spec = "svg{font-family:\"%s\";font-size:%4dpx}";
-      int css_len = strlen (css_spec) + strlen (img->face_font_family);
+      /* FIXME: The below calculations leave enough space for a font
+	 size up to 9999, if it overflows we just throw an error but
+	 should probably increase the buffer size.  */
+      const char *css_spec = "svg{font-family:\"%s\";font-size:%dpx}";
+      int css_len = strlen (css_spec) + strlen (img->face_font_family) + 1;
       css = xmalloc (css_len);
-      snprintf (css, css_len, css_spec, img->face_font_family, img->face_font_size);
+      if (css_len <= snprintf (css, css_len, css_spec,
+			       img->face_font_family, img->face_font_size))
+	goto rsvg_error;
+
       rsvg_handle_set_stylesheet (rsvg_handle, (guint8 *)css, strlen (css), NULL);
     }
   else
@@ -10157,12 +10440,11 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 
     wrapped_contents = xmalloc (buffer_size);
 
-    if (!wrapped_contents
-        || buffer_size <= snprintf (wrapped_contents, buffer_size, wrapper,
-                                    foreground & 0xFFFFFF, width, height,
-                                    viewbox_width, viewbox_height,
-                                    background & 0xFFFFFF,
-                                    SSDATA (encoded_contents)))
+    if (buffer_size <= snprintf (wrapped_contents, buffer_size, wrapper,
+				 foreground & 0xFFFFFF, width, height,
+				 viewbox_width, viewbox_height,
+				 background & 0xFFFFFF,
+				 SSDATA (encoded_contents)))
       goto rsvg_error;
 
     wrapped_size = strlen (wrapped_contents);
@@ -10722,6 +11004,10 @@ static struct image_type const image_types[] =
  { SYMBOL_INDEX (Qxpm), xpm_image_p, xpm_load, image_clear_image,
    IMAGE_TYPE_INIT (init_xpm_functions) },
 #endif
+#if defined HAVE_WEBP
+ { SYMBOL_INDEX (Qwebp), webp_image_p, webp_load, image_clear_image,
+   IMAGE_TYPE_INIT (init_webp_functions) },
+#endif
  { SYMBOL_INDEX (Qxbm), xbm_image_p, xbm_load, image_clear_image },
  { SYMBOL_INDEX (Qpbm), pbm_image_p, pbm_load, image_clear_image },
 };
@@ -10885,6 +11171,11 @@ non-numeric, there is no explicit limit on the size of images.  */);
 #if defined (HAVE_PNG) || defined (HAVE_NATIVE_IMAGE_API)
   DEFSYM (Qpng, "png");
   add_image_type (Qpng);
+#endif
+
+#if defined (HAVE_WEBP)
+  DEFSYM (Qwebp, "webp");
+  add_image_type (Qwebp);
 #endif
 
 #if defined (HAVE_IMAGEMAGICK)

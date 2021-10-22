@@ -823,7 +823,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
                            ;; Advised & aliased function.
                            (and advised (symbolp real-function)
                                 (not (eq 'autoload (car-safe def))))
-                           (and (subrp def)
+                           (and (subrp def) (symbolp function)
                                 (not (string= (subr-name def)
                                               (symbol-name function)))))))
 	 (real-def (cond
@@ -1561,7 +1561,7 @@ If FRAME is omitted or nil, use the selected frame."
 		  (:fontset . "Fontset")
                   (:extend . "Extend")
 		  (:inherit . "Inherit")))
-	 (max-width (apply #'max (mapcar #'(lambda (x) (length (cdr x)))
+         (max-width (apply #'max (mapcar (lambda (x) (length (cdr x)))
 					 attrs))))
     (dolist (a attrs)
       (let ((attr (face-attribute face (car a) frame)))

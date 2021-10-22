@@ -479,7 +479,7 @@ See user option `bookmark-set-fringe'."
       (dolist (buf (buffer-list))
         (with-current-buffer buf
           (when (equal filename buffer-file-name)
-            (setq overlays (overlays-in pos pos))
+            (setq overlays (overlays-in pos (1+ pos)))
             (while (and (not found) (setq temp (pop overlays)))
               (when (eq 'bookmark (overlay-get temp 'category))
                 (delete-overlay (setq found temp))))))))))
@@ -2314,10 +2314,10 @@ Prompt with completion for the new path."
             (lambda ()
               (setq timer (run-with-idle-timer
                            bookmark-search-delay 'repeat
-                           #'(lambda (buf)
-                               (with-current-buffer buf
-                                 (bookmark-bmenu-filter-alist-by-regexp
-                                  (minibuffer-contents))))
+                           (lambda (buf)
+                             (with-current-buffer buf
+                               (bookmark-bmenu-filter-alist-by-regexp
+                                (minibuffer-contents))))
                            (current-buffer))))
           (read-string "Pattern: ")
           (when timer (cancel-timer timer) (setq timer nil)))

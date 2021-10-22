@@ -35,13 +35,13 @@
 ;;;
 
 (defvar-keymap cvs-status-mode-map
-  :inherit 'cvs-mode-map
+  :parent     'cvs-mode-map
   "n"         #'next-line
   "p"         #'previous-line
   "N"         #'cvs-status-next
   "P"         #'cvs-status-prev
-  (kbd "M-n") #'cvs-status-next
-  (kbd "M-p") #'cvs-status-prev
+  ["M-n"]     #'cvs-status-next
+  ["M-p"]     #'cvs-status-prev
   "t"         #'cvs-status-cvstrees
   "T"         #'cvs-status-trees
   ">"         #'cvs-mode-checkout)
