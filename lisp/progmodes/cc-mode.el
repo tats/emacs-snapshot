@@ -133,6 +133,12 @@
 ;; The variable which holds the repeating idle timer which triggers off the
 ;; background type finding search.
 
+(defvar c-inhibit-type-finder nil)
+;; When non-nil (set by `c-post-gc-hook') don't perform the type finding
+;; activities the next time `c-type-finder-timer' triggers.  This ensures
+;; keyboard/mouse input will be dealt with when garbage collection is taking a
+;; large portion of CPU time.
+
 ;; The following three really belong to cc-fonts.el, but they are required
 ;; even when cc-fonts.el hasn't been loaded (this happens in XEmacs when
 ;; font-lock-mode is nil).
@@ -191,6 +197,7 @@
 		       c-buffer-is-cc-mode))
 		(throw 'found nil)))
 	  (remove-hook 'post-command-hook 'c-post-command)
+	  (remove-hook 'post-gc-hook 'c-post-gc-hook)
 	  (and c-type-finder-timer
 	       (progn (cancel-timer c-type-finder-timer)
 		      (setq c-type-finder-timer nil)))))
@@ -771,10 +778,14 @@ that requires a literal mode spec at compile time."
 	(save-restriction
 	  (widen)
 	  (move-marker (make-marker) (point-min))))
+
+  ;; Install the functionality for seeking "found types" at mode startup:
   (or c-type-finder-timer
       (setq c-type-finder-timer
 	    (run-at-time
-	     t c-type-finder-repeat-time #'c-types-finder-timer-func)))
+	     c-type-finder-repeat-time nil #'c-type-finder-timer-func)))
+  (add-hook 'post-gc-hook #'c-post-gc-hook)
+
   (when (boundp 'font-lock-extend-after-change-region-function)
     (set (make-local-variable 'font-lock-extend-after-change-region-function)
          'c-extend-after-change-region))) ; Currently (2009-05) used by all
@@ -2016,6 +2027,9 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
     (setq c-new-id-start nil
 	  c-new-id-end nil
 	  c-new-id-is-type nil)))
+
+(defun c-post-gc-hook (&optional _stats) ; For XEmacs.
+  (setq c-inhibit-type-finder t))
 
 (defun c-before-change (beg end)
   ;; Function to be put on `before-change-functions'.  Primarily, this calls

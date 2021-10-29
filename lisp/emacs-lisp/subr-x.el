@@ -441,6 +441,14 @@ is inserted before adjusting the number of empty lines."
      ((< (- (point) start) lines)
       (insert (make-string (- lines (- (point) start)) ?\n))))))
 
+;;;###autoload
+(defun string-pixel-width (string)
+  "Return the width of STRING in pixels."
+  (with-temp-buffer
+    (insert string)
+    (car (window-text-pixel-size
+          (current-buffer) (point-min) (point)))))
+
 (provide 'subr-x)
 
 ;;; subr-x.el ends here

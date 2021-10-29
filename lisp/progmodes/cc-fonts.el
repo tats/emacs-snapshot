@@ -94,6 +94,8 @@
 (cc-bytecomp-defvar c-reference-face-name)
 (cc-bytecomp-defvar c-block-comment-flag)
 (cc-bytecomp-defvar c-type-finder-pos)
+(cc-bytecomp-defvar c-inhibit-type-finder)
+(cc-bytecomp-defvar c-type-finder-timer)
 (cc-bytecomp-defun c-fontify-recorded-types-and-refs)
 (cc-bytecomp-defun c-font-lock-declarators)
 (cc-bytecomp-defun c-font-lock-objc-method)
@@ -1607,16 +1609,21 @@ casts and declarations are fontified.  Used on level 2 and higher."
   ;; occurrences of the type to be prepared for fontification throughout the
   ;; buffer.
   ;;
+  ;; Return POINT at the end of the function.  This should be at or after
+  ;; LIMIT, and not later than the next decl-spot after LIMIT.
+  ;;
   ;; This function is called from the timer `c-type-finder-timer'.  It may do
   ;; hidden buffer changes.
   (save-excursion
     (save-restriction
       (widen)
       (goto-char start)
-      (c-skip-comments-and-strings limit)
+      ;; If we're in a (possibly large) literal, skip over it.
+      (let ((lit-bounds (nth 2 (c-full-pp-to-literal (point)))))
+	(if lit-bounds
+	    (goto-char (cdr lit-bounds))))
       (when (< (point) limit)
-	(let (
-	      ;; o - 'decl if we're in an arglist containing declarations
+	(let (;; o - 'decl if we're in an arglist containing declarations
 	      ;;   (but if `c-recognize-paren-inits' is set it might also be
 	      ;;   an initializer arglist);
 	      ;; o - '<> if the arglist is of angle bracket type;
@@ -1711,46 +1718,58 @@ casts and declarations are fontified.  Used on level 2 and higher."
 			 (setq max-type-decl-end-before-token (point)))
 		     (when (> (point) max-type-decl-end)
 		       (setq max-type-decl-end (point)))))
-		  (t t)))))))))))
+		  (t t))))))))
+      (point))))
 
-(defun c-types-finder-timer-func ()
+(defun c-type-finder-timer-func ()
   ;; A CC Mode idle timer function for finding "found types".  It triggers
   ;; every `c-type-finder-repeat-time' seconds and processes buffer chunks of
   ;; size around `c-type-finder-chunk-size' characters, and runs for (a little
   ;; over) `c-type-finder-time-slot' seconds.  The types it finds are inserted
   ;; into `c-found-types', and their occurrences throughout the buffer are
   ;; prepared for fontification.
-  (let* ((stop-time (+ (float-time) c-type-finder-time-slot))
-	 (buf-list (buffer-list)))
-    ;; One CC Mode buffer needing processing each time around this loop.
-    (while buf-list
-      ;; Cdr through BUF-LIST to find the next buffer needing processing.
-      (while (and buf-list
-		  (not (with-current-buffer (car buf-list) c-type-finder-pos)))
-	(setq buf-list (cdr buf-list)))
-      (when buf-list
-	(with-current-buffer (car buf-list)
-	  (save-restriction
-	    (widen)
-	    ;; Process one `c-type-finder-chunk-size' chunk each time around
-	    ;; this loop.
-	    (while (and c-type-finder-pos
-			(< (float-time) stop-time))			
-	      ;; Process one chunk per iteration.
-	      (c-save-buffer-state
-		  ((beg (marker-position c-type-finder-pos))
-		   (end (min (+ beg c-type-finder-chunk-size) (point-max)))
-		   (region (c-before-context-fl-expand-region beg end)))
-		(setq beg (car region)
-		      end (cdr region))
-		(c-find-types-background beg end)
-		(move-marker c-type-finder-pos
-			     (if (save-excursion (goto-char end) (eobp))
-				 nil
-			       end))
-		(when (not (marker-position c-type-finder-pos))
-		  (setq c-type-finder-pos nil))))))
-	(setq buf-list (cdr buf-list))))))
+  (when (and c-type-finder-time-slot
+	     (boundp 'font-lock-support-mode)
+	     (eq font-lock-support-mode 'jit-lock-mode))
+    (if c-inhibit-type-finder ; No processing immediately after a GC operation.
+	(setq c-inhibit-type-finder nil)
+      (let* ((stop-time (+ (float-time) c-type-finder-time-slot))
+	     (buf-list (buffer-list)))
+	;; One CC Mode buffer needing processing each time around this loop.
+	(while (and buf-list
+		    (< (float-time) stop-time))
+	  ;; Cdr through BUF-LIST to find the next buffer needing processing.
+	  (while (and buf-list
+		      (not (with-current-buffer (car buf-list) c-type-finder-pos)))
+	    (setq buf-list (cdr buf-list)))
+	  (when buf-list
+	    (with-current-buffer (car buf-list)
+	      ;; (message "%s" (current-buffer)) ; Useful diagnostic.
+	      (save-restriction
+		(widen)
+		;; Process one `c-type-finder-chunk-size' chunk each time
+		;; around this loop.
+		(while (and c-type-finder-pos
+			    (< (float-time) stop-time))
+		  ;; Process one chunk per iteration.
+		  (save-match-data
+		    (c-save-buffer-state
+			(case-fold-search
+			 (beg (marker-position c-type-finder-pos))
+			 (end (min (+ beg c-type-finder-chunk-size) (point-max)))
+			 (region (c-before-context-fl-expand-region beg end)))
+		      (setq beg (car region)
+			    end (cdr region))
+		      (setq beg (max (c-find-types-background beg end) end))
+		      (move-marker c-type-finder-pos
+				   (if (save-excursion (goto-char beg) (eobp))
+				       nil
+				     beg))
+		      (when (not (marker-position c-type-finder-pos))
+			(setq c-type-finder-pos nil))))))))))))
+  ;; Set the timer to run again.
+  (setq c-type-finder-timer
+	(run-at-time c-type-finder-repeat-time nil #'c-type-finder-timer-func)))
 
 (defun c-font-lock-enum-body (limit)
   ;; Fontify the identifiers of each enum we find by searching forward.
