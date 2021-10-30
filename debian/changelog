@@ -1,4 +1,10 @@
-emacs28 (28.0.60+0.20211003-0.2) UNRELEASED; urgency=medium
+emacs28 (28.0.60+0.20211029-0.1) UNRELEASED; urgency=medium
+
+  [ Dima Kogan ]
+  * native-comp can be turned on/off with a build-time var
+  * emacs builds now require the -el packages
+  * patch update
+  * Packaging emacs.metainfo.xml not emacs.appdata.xml
 
   [ Tatsuya Kinoshita ]
   * Sync debian/control.in with the latest change
@@ -11,21 +17,14 @@ emacs28 (28.0.60+0.20211003-0.2) UNRELEASED; urgency=medium
   * Enable native compilation with libgccjit-10-dev
   * Install emacs-module.h as $(flavor)-module.h
   * Set NATIVE_FULL_AOT to native compile ahead-of-time
-
-  [ Dima Kogan ]
-  * emacs builds now require the -el packages
-  * patch update
-  * Packaging emacs.metainfo.xml not emacs.appdata.xml
-
-  [ Tatsuya Kinoshita ]
-  * New upstream version 28.0.60+0.20211003
-    - emacs-28 branch, emacs-27.1-10059-g48314261586 on 2021-10-03
   * Disable debian/patches/0006*.patch
   * Don't install desktop files in -common to avoid conflicts
   * Don't install info files in -common to avoid conflicts
   * Switch to libgccjit-11-dev
+  * New upstream version 28.0.60+0.20211029
+    - emacs-28 branch, emacs-27.1-10342-g3f998a3fc82 on 2021-10-29
 
- -- Tatsuya Kinoshita <tats@debian.org>  Mon, 11 Oct 2021 22:10:58 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Sat, 30 Oct 2021 10:49:23 +0900
 
 emacs-snapshot (2:20210405+emacs-27.1-5691-ge0c3925961c-1) unstable; urgency=medium
 
