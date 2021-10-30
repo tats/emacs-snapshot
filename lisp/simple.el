@@ -590,7 +590,7 @@ A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
   (interactive "*P\np")
   (barf-if-buffer-read-only)
   (when (and arg
-             (< arg 0))
+             (< (prefix-numeric-value arg) 0))
     (error "Repetition argument has to be non-negative"))
   ;; Call self-insert so that auto-fill, abbrev expansion etc. happen.
   ;; Set last-command-event to tell self-insert what to insert.
@@ -5285,12 +5285,16 @@ Lisp programs should use this function for killing text.
 Supply two arguments, character positions BEG and END indicating the
  stretch of text to be killed.  If the optional argument REGION is
  non-nil, the function ignores BEG and END, and kills the current
- region instead."
+ region instead.  Interactively, REGION is always non-nil, and so
+ this command always kills the current region."
   ;; Pass mark first, then point, because the order matters when
   ;; calling `kill-append'.
-  (interactive (list (mark) (point) 'region))
-  (unless (and beg end)
-    (user-error "The mark is not set now, so there is no region"))
+  (interactive (progn
+                 (let ((beg (mark))
+                       (end (point)))
+                   (unless (and beg end)
+                     (user-error "The mark is not set now, so there is no region"))
+                   (list beg end 'region))))
   (condition-case nil
       (let ((string (if region
                         (funcall region-extract-function 'delete)
@@ -8419,16 +8423,29 @@ presented."
 
 (defcustom blink-matching-paren t
   "Non-nil means show matching open-paren when close-paren is inserted.
-If t, highlight the paren.  If `jump', briefly move cursor to its
-position.  If `jump-offscreen', move cursor there even if the
-position is off screen.  With any other non-nil value, the
-off-screen position of the opening paren will be shown in the
-echo area."
+If this is non-nil, then when you type a closing delimiter, such as a
+closing parenthesis or brace, Emacs briefly indicates the location
+of the matching opening delimiter.
+
+The valid values are:
+
+  t                 Highlight the matching open-paren if it is visible
+                    in the window, otherwise show the text with matching
+                    open-paren in the echo area.  This is the default.
+  `jump'            If the matching open-paren is visible in the window,
+                    briefly move cursor to its position; otherwise show
+                    the text with matching open-paren in the echo area.
+  `jump-offscreen'  Briefly move cursor to the matching open-paren
+                    even if it is not visible in the window.
+  nil               Don't show the matching open-paren.
+
+Any other non-nil value is handled the same as t."
+
   :type '(choice
           (const :tag "Disable" nil)
-          (const :tag "Highlight" t)
-          (const :tag "Move cursor" jump)
-          (const :tag "Move cursor, even if off screen" jump-offscreen))
+          (const :tag "Highlight open-paren if visible" t)
+          (const :tag "Move cursor to open-paren if visible" jump)
+          (const :tag "Move cursor even if it's off screen" jump-offscreen))
   :group 'paren-blinking)
 
 (defcustom blink-matching-paren-on-screen t

@@ -165,15 +165,11 @@ INFO is the export state, as a property list."
                          (org-cite-biblatex--atomic-arguments (list r) info))
                        (org-cite-get-references citation)
                        "")
-            ;; According to biblatex manual, left braces or brackets
+            ;; According to BibLaTeX manual, left braces or brackets
             ;; following a multicite command could be parsed as other
-            ;; arguments. So we look ahead and insert a \relax if
-            ;; needed.
-            (and (let ((next (org-export-get-next-element citation info)))
-                   (and next
-                        (string-match (rx string-start (or "{" "["))
-                                      (org-export-data next info))))
-                 "\\relax"))))
+            ;; arguments. So we stop any further parsing by inserting
+            ;; a \relax unconditionally.
+            "\\relax")))
 
 (defun org-cite-biblatex--command (citation info base &optional multi no-opt)
   "Return biblatex command using BASE name for CITATION object.
@@ -217,8 +213,8 @@ PROPS is the local properties of the bibliography, as a property list."
 
 (defun org-cite-biblatex-export-citation (citation style _ info)
   "Export CITATION object.
-STYLE is the citation style, as a string or nil.  INFO is the export state, as
-a property list."
+STYLE is the citation style, as a pair of either strings or nil.
+INFO is the export state, as a property list."
   (apply
    #'org-cite-biblatex--command citation info
    (pcase style
@@ -314,6 +310,7 @@ to the document, and set styles."
   '((("author" "a") ("caps" "c") ("full" "f") ("caps-full" "cf"))
     (("locators" "l") ("bare" "b") ("caps" "c") ("bare-caps" "bc"))
     (("noauthor" "na"))
+    (("nocite" "n"))
     (("text" "t") ("caps" "c"))
     (("nil") ("bare" "b") ("caps" "c") ("bare-caps" "bc"))))
 

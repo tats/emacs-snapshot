@@ -1580,9 +1580,7 @@ ID-FORMAT valid values are `string' and `integer'."
   "Like `file-readable-p' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (with-tramp-file-property v localname "file-readable-p"
-      ;; Examine `file-attributes' cache to see if request can be
-      ;; satisfied without remote operation.
-      (or (tramp-check-cached-permissions v ?r)
+      (or (tramp-handle-file-readable-p filename)
 	  (tramp-run-test "-r" filename)))))
 
 ;; Functions implemented using the basic functions above.
@@ -2771,8 +2769,8 @@ implementation will be used."
 	      (stderr (plist-get args :stderr)))
 	  (unless (stringp name)
 	    (signal 'wrong-type-argument (list #'stringp name)))
-	  (unless (or (null buffer) (bufferp buffer) (stringp buffer))
-	    (signal 'wrong-type-argument (list #'stringp buffer)))
+	  (unless (or (bufferp buffer) (string-or-null-p buffer))
+	    (signal 'wrong-type-argument (list #'bufferp buffer)))
 	  (unless (or (null command) (consp command))
 	    (signal 'wrong-type-argument (list #'consp command)))
 	  (unless (or (null coding)
@@ -2785,11 +2783,11 @@ implementation will be used."
 	    (setq connection-type 'pty))
 	  (unless (memq connection-type '(nil pipe pty))
 	    (signal 'wrong-type-argument (list #'symbolp connection-type)))
-	  (unless (or (null filter) (functionp filter))
+	  (unless (or (null filter) (eq filter t) (functionp filter))
 	    (signal 'wrong-type-argument (list #'functionp filter)))
 	  (unless (or (null sentinel) (functionp sentinel))
 	    (signal 'wrong-type-argument (list #'functionp sentinel)))
-	  (unless (or (null stderr) (bufferp stderr) (stringp stderr))
+	  (unless (or (bufferp stderr) (string-or-null-p stderr))
 	    (signal 'wrong-type-argument (list #'bufferp stderr)))
 	  (when (and (stringp stderr)
 		     (not (tramp-equal-remote default-directory stderr)))
@@ -3513,7 +3511,7 @@ implementation will be used."
 	  (tramp-compat-funcall 'unlock-file lockname))
 
 	(when (and (null noninteractive)
-		   (or (eq visit t) (null visit) (stringp visit)))
+		   (or (eq visit t) (string-or-null-p visit)))
 	  (tramp-message v 0 "Wrote %s" filename))
 	(run-hooks 'tramp-handle-write-region-hook)))))
 

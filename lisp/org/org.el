@@ -95,6 +95,7 @@
 (require 'org-keys)
 (require 'ol)
 (require 'oc)
+(require 'oc-basic)
 (require 'org-table)
 
 ;; `org-outline-regexp' ought to be a defconst but is let-bound in
@@ -15362,7 +15363,7 @@ The value is a list, with zero or more of the symbols `effort', `appt',
   "Save all Org buffers without user confirmation."
   (interactive)
   (message "Saving all Org buffers...")
-  (save-some-buffers t (lambda () (derived-mode-p 'org-mode)))
+  (save-some-buffers t (lambda () (and (derived-mode-p 'org-mode) t)))
   (when (featurep 'org-id) (org-id-locations-save))
   (message "Saving all Org buffers... done"))
 

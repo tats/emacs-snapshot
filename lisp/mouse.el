@@ -364,7 +364,7 @@ Some context functions add menu items below the separator."
                 (when (consp binding)
                   (define-key-after menu (vector key)
                     (copy-sequence binding))))
-              (lookup-key global-map [menu-bar]))
+              (menu-bar-keymap global-map))
   menu)
 
 (defun context-menu-local (menu _click)
@@ -571,7 +571,8 @@ This is the keyboard interface to \\[context-menu-map]."
 
 (defun mouse-minibuffer-check (event)
   (let ((w (posn-window (event-start event))))
-    (and (window-minibuffer-p w)
+    (and (windowp w)
+         (window-minibuffer-p w)
 	 (not (minibuffer-window-active-p w))
 	 (user-error "Minibuffer window is not active")))
   ;; Give temporary modes such as isearch a chance to turn off.

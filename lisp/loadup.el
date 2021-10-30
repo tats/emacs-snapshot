@@ -354,8 +354,7 @@
 (load "electric")
 (load "paren")
 
-(load "shorthands")
-(setq load-source-file-function #'load-with-shorthands-and-code-conversion)
+(load "emacs-lisp/shorthands")
 
 (load "emacs-lisp/eldoc")
 (load "cus-start") ;Late to reduce customize-rogue (needs loaddefs.el anyway)

@@ -977,6 +977,17 @@ evaluation of BODY."
     (should (equal (elisp--xref-infer-namespace p7) 'variable)))
 
   (elisp-mode-test--with-buffer
+      (concat "(let (({p1}alpha {p2}beta)\n"
+              "      ({p3}gamma ({p4}delta {p5}epsilon)))\n"
+              "  ({p6}zeta))\n")
+    (should (equal (elisp--xref-infer-namespace p1) 'variable))
+    (should (equal (elisp--xref-infer-namespace p2) 'variable))
+    (should (equal (elisp--xref-infer-namespace p3) 'variable))
+    (should (equal (elisp--xref-infer-namespace p4) 'function))
+    (should (equal (elisp--xref-infer-namespace p5) 'maybe-variable))
+    (should (equal (elisp--xref-infer-namespace p6) 'function)))
+
+  (elisp-mode-test--with-buffer
       (concat "(defun {p1}alpha () {p2}beta)\n"
               "(defface {p3}gamma ...)\n"
               "(defvar {p4}delta {p5}epsilon)\n"
@@ -1092,6 +1103,17 @@ evaluation of BODY."
     (should-not (intern-soft "elisp--foo-test4---"))
     (should (= 84 (funcall (intern-soft "f-test4---"))))
     (should (unintern "f-test4---"))))
+
+(ert-deftest elisp-dont-shadow-punctuation-only-symbols ()
+  (let* ((shorthanded-form '(/= 42 (-foo 42)))
+         (expected-longhand-form '(/= 42 (fooey-foo 42)))
+         (observed (let ((read-symbol-shorthands
+                          '(("-" . "fooey-"))))
+                     (car (read-from-string
+                           (with-temp-buffer
+                             (print shorthanded-form (current-buffer))
+                             (buffer-string)))))))
+    (should (equal observed expected-longhand-form))))
 
 (ert-deftest test-cl-flet-indentation ()
   :expected-result :failed              ; FIXME: bug#9622
