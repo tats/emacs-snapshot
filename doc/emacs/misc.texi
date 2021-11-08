@@ -1992,6 +1992,11 @@ the new frame displays the @file{*scratch*} buffer by default.  You
 can customize this behavior with the variable @code{initial-buffer-choice}
 (@pxref{Entering Emacs}).
 
+@item -r
+@itemx --reuse-frame
+Create a new graphical client frame if none exists, otherwise use an
+existing Emacs frame.
+
 @item -F @var{alist}
 @itemx --frame-parameters=@var{alist}
 Set the parameters for a newly-created graphical frame
@@ -2947,6 +2952,33 @@ the specified URL@.  The buffer is put in the Xwidget-WebKit mode
 one-key commands for scrolling the widget, changing its size, and
 reloading it.  Type @w{@kbd{C-h b}} in that buffer to see the key
 bindings.
+
+@findex xwidget-webkit-edit-mode
+@cindex xwidget-webkit-edit-mode
+  By default, typing a self-inserting character inside an xwidget
+webkit buffer will do nothing, or trigger some special action.  To
+make those characters and other common editing keys insert themselves
+when pressed, you can enable @code{xwidget-webkit-edit-mode}, which
+redefines them to be passed through to the WebKit xwidget.
+
+You can also enable @code{xwidget-webkit-edit-mode} by typing @kbd{e}
+inside the xwidget webkit buffer.
+
+@findex xwidget-webkit-isearch-mode
+@cindex searching in webkit buffers
+  @code{xwidget-webkit-isearch-mode} is a minor mode that behaves
+similarly to incremental search (@pxref{Incremental Search}), but
+operates on the contents of a WebKit widget instead of the current
+buffer.  It is bound to @kbd{C-s} and @kbd{C-r} inside xwidget-webkit
+buffers.  When it is invoked by @kbd{C-r}, the initial search will be
+performed in reverse direction.
+
+Typing any self-inserting character will cause the character to be
+inserted into the current search query.  Typing @kbd{C-s} will cause
+the WebKit widget to display the next search result, while typing
+@kbd{C-r} will cause it to display the previous one.
+
+To leave incremental search, you can type @kbd{C-g}.
 
 @node Browse-URL
 @subsection  Following URLs

@@ -46,12 +46,64 @@ time.
 
 * Changes in Emacs 29.1
 
+** Emoji
+
++++
+*** Emacs now has several new methods for inserting Emojis.
+The Emoji commands are under the new 'C-x 8 e' prefix.
+
++++
+*** New command 'emoji-insert' (bound to 'C-x 8 e e' and 'C-x 8 e i').
+This command guides you through various Emoji categories and
+combinations in a graphical menu system.
+
++++
+*** New command 'emoji-search' (bound to 'C-x 8 e s').
+This command lets you search for Emojis based on names.
+
++++
+*** New command 'emoji-list' (bound to 'C-x 8 e l').
+This command lists all Emojis (categorized by themes) in a special
+buffer and lets you choose one of them.
+
+---
+*** New command 'emoji-recent' (bound to 'C-x 8 e r').
+This command lets you choose among the Emojis you have recently
+inserted.
+
++++
+*** New command 'emoji-describe' (bound to 'C-x 8 e d').
+This command will tell you the name of the Emoji at point.  (This
+command also works for non-Emoji characters.)
+
 ** Help
+
+---
+*** 'C-h b' uses outlining by default.
+Set 'describe-bindings-outline' to nil to get the old behaviour.
 
 ---
 *** Jumping to function/variable source now saves mark before moving point.
 Jumping to source from "*Help*" buffer moves the point when the source
 buffer is already open.  Now, the old point is pushed to mark ring.
+
++++
+*** New key bindings in *Help* buffers: 'n' and 'p'.
+These will take you (respectively) to the next and previous "page".
+
+---
+*** 'describe-char' now also outputs the name of emoji combinations.
+
+** Outline Minor Mode
+
++++
+*** New user option 'outline-minor-mode-use-buttons'.
+If non-nil, Outline Minor Mode will use buttons to hide/show outlines
+in addition to the ellipsis.
+
+---
+*** New user option 'outline-minor-mode-buttons'.
+This is a list of pairs of open/close strings used to display buttons.
 
 ** Fonts
 
@@ -73,7 +125,24 @@ Image specifiers can now use ':type webp'.
 *** 'display-buffer' now can set up the body size of the chosen window.
 For example, an alist entry as '(window-width . (body-columns . 40))'
 will make the body of the chosen window 40 columns wide.
+
+** Better detection of text suspiciously reordered on display.
+The function 'bidi-find-overridden-directionality' has been extended
+to detect reordering effects produced by embeddings and isolates
+(started by directional formatting control characters such as RLO and
+LRI).  The new command 'highlight-confusing-reorderings' finds and
+highlights segments of buffer text whose reordering for display is
+suspicious and could be malicious.
+
 
+
+** Emacs server and client changes
+
++++
+*** New command-line option '-r' for emacsclient.
+With this command-line option, Emacs reuses an existing graphical client
+frame if one exists; otherwise it creates a new frame.
+
 * Editing Changes in Emacs 29.1
 
 ---
@@ -130,6 +199,125 @@ change the terminal used on a remote host.
 
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** vc
+
+---
+*** 'C-x v v' on an unregistered file will now use the most specific backend.
+Previously, if you had an SVN-covered ~/ directory, and a Git-covered
+directory in ~/foo/bar, using 'C-x v v' on a new, unregistered file
+~/foo/bar/zot would register it in the SVN repository in ~/ instead of
+in the Git repository in ~/foo/bar.  This makes this command
+consistent with 'vc-responsible-backend'.
+
+** Message
+
+---
+*** New user option 'mml-attach-file-at-the-end'.
+If non-nil, 'C-c C-a' will put attached files at the end of the message.
+
+---
+*** Message Mode now supports image yanking.
+
+---
+*** HTML Mode now supports text/html and image/* yanking.
+
+** Texinfo Mode
+
+---
+*** 'texinfo-mode' now has a specialised 'narrow-to-defun' definition.
+It narrows to the current node.
+
+** eww
+
++++
+*** New user option 'eww-url-transformers'.
+These are used to alter an URL before using it.  By default it removes
+the common utm_ trackers from URLs.
+
+** Gnus
+
++++
+*** New user option 'gnus-treat-emojize-symbols'.
+If non-nil, symbols that have an emoji representation will be
+displayed as emojis.
+
++++
+*** New command 'gnus-article-emojize-symbols'.
+This is bound to 'W D e' and will display symbols that have emoji
+representation as emojis.
+
+** EIEIO
+
++++
+*** New command 'C-x t C-r' to open file read-only in the other tab.
+
++++
+*** The tab bar now supports more mouse commands.
+Clicking 'mouse-2' closes the tab, 'mouse-3' displays the context menu
+with items that operate on the clicked tab.  Dragging the tab with
+'mouse-1' moves it to another position on the tab bar.  Mouse wheel
+scrolling switches to the previous/next tab, and holding the Shift key
+during scrolling moves the tab to the left/right.
+
++++
+*** Frame-specific appearance of the tab bar when 'tab-bar-show' is a number.
+When 'tab-bar-show' is a number, the tab bar on different frames can
+be shown or hidden independently, as determined by the number of tabs
+on each frame compared to the numerical value of 'tab-bar-show'.
+
++++
+*** New command 'toggle-frame-tab-bar'.
+It can be used to enable/disable the tab bar on the currently selected
+frame regardless of the values of 'tab-bar-mode' and 'tab-bar-show'.
+This allows enabling/disabling the tab bar independently on different
+frames.
+
++++
+*** New user option 'tab-bar-format' defines a list of tab bar items.
+When it contains 'tab-bar-format-global' (possibly appended after
+'tab-bar-format-align-right'), then after enabling 'display-time-mode'
+(or any other mode that uses 'global-mode-string') it displays time
+aligned to the right on the tab bar instead of on the mode line.
+When 'tab-bar-format-tabs' is replaced with 'tab-bar-format-tabs-groups',
+the tab bar displays tab groups.
+
++++
+*** New optional key binding for 'tab-last'.
+If you customize the user option 'tab-bar-select-tab-modifiers' to
+allow selecting tabs using their index numbers, the '<MODIFIER>-9' key
+is bound to 'tab-last', and switches to the last tab.  Here <MODIFIER>
+is any of the modifiers in the list that is the value of
+'tab-bar-select-tab-modifiers'.  You can also use positive indices,
+which count from the last tab: 1 is the last tab, 2 the one before
+that, etc.
+
+---
+*** New command 'tab-duplicate' bound to 'C-x t n'.
+
+---
+*** 'C-x t N' creates a new tab at the specified absolute position.
+The position is provided as prefix arg, and specifies an index that
+starts at 1.  Negative values count from the end of the tab bar.
+
+---
+*** 'C-x t M' moves the current tab to the specified absolute position.
+The position is provided as prefix arg, whose interpretation is as in
+'C-x t N'.
+
+---
+*** 'C-x t G' assigns a tab to a named group of tabs.
+'tab-close-group' closes all tabs that belong to the selected group.
+The user option 'tab-bar-new-tab-group' defines the default group of
+new tabs.  After customizing 'tab-bar-tab-post-change-group-functions'
+to 'tab-bar-move-tab-to-group', changing the group of a tab will also
+move it closer to other tabs in the same group.
+
+---
+*** New user option 'tab-bar-tab-name-format-function'.
+
+---
+*** New user option 'tab-line-tab-name-format-function'.
 
 ** align
 
@@ -209,7 +397,44 @@ To improve security, if an sql product has ':password-in-comint' set
 to t, a password supplied via the minibuffer will be sent in-process,
 as opposed to via the command-line.
 
+** Image Mode
+
++++
+*** New command 'image-transform-fit-to-window'.
+This command fits the image to the current window by scaling down or
+up as necessary.  Unlike 'image-transform-fit-both', this does not
+only scale the image down, but up as well.  It is bound to "s w" in
+Image Mode by default.
+
++++
+*** 'image-transform-fit-to-(height|width)' are now obsolete.
+Use the new command 'image-transform-fit-to-window' instead.
+The keybinding for 'image-transform-fit-to-width' is now 's i'.
+
+---
+*** User option 'image-auto-resize' can now be set to 'fit-window'.
+This works like 'image-transform-fit-to-window'.
+
+*** New user option 'image-auto-resize-max-scale-percent'.
+The new 'fit-window' options will never scale an image more than this
+much (in percent).  It is nil by default.
+
 ** Image-Dired
+
++++
+*** 'image-dired-display-image-mode' is now based on 'image-mode'.
+This avoids converting images in the background, and makes Image-Dired
+noticeably faster.  New keybindings from 'image-mode' are now
+available in the "*image-dired-display-image*" buffer; press '?' or
+'h' in that buffer to see the full list.  Finally, some commands and
+user options that are no longer needed are now obsolete:
+'image-dired-cmd-create-temp-image-options',
+'image-dired-cmd-create-temp-image-program',
+'image-dired-display-current-image-full',
+'image-dired-display-current-image-sized',
+'image-dired-display-window-height-correction',
+'image-dired-display-window-width-correction',
+'image-dired-temp-image-file'.
 
 ---
 *** Reduce dependency on external "exiftool" command.
@@ -220,8 +445,8 @@ external "exiftool" command to be available.  The user options
 
 ---
 *** New command for the thumbnail buffer.
-The new command 'image-dired-unmark-all-marks' has been added with a
-binding in the menu.
+The new command 'image-dired-unmark-all-marks' has been added.  It is
+bound to "U" in the thumbnail buffer.
 
 ---
 *** Support Thumbnail Managing Standard v0.9.0 (Dec 2020).
@@ -234,6 +459,12 @@ to use it; it is not enabled by default.
 *** Support GraphicsMagick command line tools.
 Support for the GraphicsMagick command line tool ("gm") has been
 added, and is used instead of ImageMagick when it is available.
+
+---
+*** New face 'image-dired-thumb-flagged'.
+If 'image-dired-thumb-mark' is non-nil (the default), this face is
+used for images that are flagged for deletion in the Dired buffer
+associated with Image-Dired.
 
 ---
 *** Support for bookmark.el.
@@ -271,6 +502,31 @@ the buffer will take you to that directory.
 This is a convenience function to extract the field data from
 'exif-parse-file' and 'exif-parse-buffer'.
 
+** Xwidgets
+
++++
+*** New minor mode 'xwidget-webkit-edit-mode'.
+When this mode is enabled, self-inserting characters and other common
+web browser shotcut keys are redefined to send themselves to the
+WebKit widget.
+
++++
+*** New minor mode 'xwidget-webkit-isearch-mode'.
+This mode acts similarly to incremental search, and allows to search
+the contents of a WebKit widget.  In xwidget-webkit mode, it is bound
+to 'C-s' and 'C-r'.
+
+---
+*** On X11, the WebKit inspector is now available inside xwidgets.
+To access the inspector, right click on the widget and select "Inspect
+Element".
+
+---
+*** "Open in New Window" in a WebKit widget's context menu now works.
+The newly created buffer will be displayed via 'display-buffer', which
+can be customized through the usual mechanism of 'display-buffer-alist'
+and friends.
+
 
 * New Modes and Packages in Emacs 29.1
 
@@ -282,6 +538,12 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
+** Keymap descriptions have changed.
+'help--describe-command', 'C-h b' and associated functions that output
+keymap descriptions have changed.  In particular, prefix commands are
+not output at all, and instead of "??" for closures/functions,
+"[closure]"/"[lambda]" is output.
 
 ---
 ** 'downcase' details have changed slightly.
@@ -336,6 +598,50 @@ Use 'exif-parse-file' and 'exif-field' instead.
 
 * Lisp Changes in Emacs 29.1
 
++++
+*** New command 'yank-media'.
+This command supports yanking non-plain-text media like images and
+HTML from other applications into Emacs.  It is only supported in
+modes that have registered support for it, and only on capable
+platforms.
+
++++
+*** New command 'yank-media-types'.
+This command lets you examine all data in the current selection and
+the clipboard, and insert it into the buffer.
+
++++
+*** New text property 'inhibit-isearch'.
+If set, 'isearch' will skip these areas, which can be useful (for
+instance) when covering huge amounts of data (that has no meaningful
+searchable data, like image data) with a 'display' text property.
+
++++
+*** 'insert-image' now takes an INHIBIT-ISEARCH optional parameter.
+It marks the image with the 'inhibit-isearch' text parameter, which
+inhibits 'isearch' matching the STRING parameter.
+
+---
+*** New user option 'pp-use-max-width'.
+If non-nil, 'pp' will attempt to limit the line length when formatting
+long lists and vectors.
+
+---
+*** New function 'pp-emacs-lisp-code'.
+'pp' formats general Lisp sexps.  This function does much the same,
+but applies formatting rules appropriate for Emacs Lisp code.
+
++++
+*** New function 'file-has-changed-p'.
+This convenience function is useful when writing code that parses
+files at run-time, and allows Lisp programs to re-parse files only
+when they have changed.
+
+---
+*** New function 'font-has-char-p'.
+This can be used to check whether a specific font has a glyph for a
+character.
+
 ** XDG support
 
 *** New function 'xdg-state-home' returns $XDG_STATE_HOME.
@@ -364,6 +670,14 @@ This holds the value of the previous call to 'set-locale-environment'.
 *** New macro 'with-locale-environment'.
 This macro can be used to change the locale temporarily while
 executing code.
+
+** Tabulated List Mode
+
++++
+*** A column can now be set to an image descriptor.
+The `tabulated-list-entries' variable now supports using an image
+descriptor, which means to insert an image in that column instead of
+text.  See the documentation string of that variable for details.
 
 +++
 ** 'define-key' now understands a new strict 'kbd' representation for keys.
@@ -426,6 +740,12 @@ This returns the width of a string in pixels.  This can be useful when
 dealing with variable pitch fonts and glyphs that have widths that
 aren't integer multiples of the default font.
 
++++
+** New function 'string-glyph-split'.
+This function splits a string into a list of strings representing
+separate glyphs.  This takes into account combining characters and
+grapheme clusters.
+
 ---
 ** 'lookup-key' is more allowing when searching for extended menu items.
 In Emacs 28.1, the behavior of 'lookup-key' was changed: when looking
@@ -438,8 +758,52 @@ an exact match, then the lowercased '[menu-bar foo\ bar]' and finally
 '[menu-bar foo-bar]'.  This further improves backwards-compatibility
 when converting menus to use 'easy-menu-define'.
 
++++
+** xwidgets
+
+*** The function 'make-xwidget' now accepts an optional RELATED argument.
+This argument is used as another widget for the newly created WebKit
+widget to share settings and subprocesses with.  It must be another
+WebKit widget.
+
++++
+*** New function 'xwidget-perform-lispy-event'.
+This function allows you to send events to xwidgets.  Usually, some
+equivalent of the event will be sent, but there is no guarantee of
+what the widget will actually receive.
+
+On GTK+, only key and function key events are implemented.
+
++++
+*** New functions for performing searches on WebKit xwidgets.
+Some new functions, such as 'xwidget-webkit-search', have been added
+for performing searches on WebKit xwidgets.
+
++++
+*** 'load-changed' xwidget events are now more detailed.
+In particular, they can now have different arguments based on the
+state of the WebKit widget.  'load-finished' is sent when a load has
+completed, 'load-started' when a load first starts, 'load-redirected'
+after a redirect, and 'load-committed' when the WebKit widget first
+commits to the load.
+
++++
+*** New event type 'xwidget-display-event'.
+These events are sent whenever an xwidget requests that Emacs display
+another xwidget.  The only argument to this event is the xwidget that
+should be displayed.
+
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems
+
+** MS-Windows
+
++++
+*** Emacs now supports system dark mode.
+On Windows 10 (version 1809 and higher) and Windows 11, Emacs will now
+follow the system's dark mode: GUI frames use the appropriate light or
+dark title bar and scroll bars, based on the user's Windows-wide color
+settings.
 
 
 ----------------------------------------------------------------------

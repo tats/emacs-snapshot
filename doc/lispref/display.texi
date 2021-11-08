@@ -2023,11 +2023,11 @@ If a multi-column character in @var{string} exceeds the goal
 result can sometimes fall short of @var{width}, but cannot go beyond
 it.
 
-The optional argument @var{start-column} specifies the starting column.
-If this is non-@code{nil}, then the first @var{start-column} columns of
-the string are omitted from the result.  If one multi-column character in
-@var{string} extends across the column @var{start-column}, that
-character is omitted.
+The optional argument @var{start-column} specifies the starting
+column; it defaults to zero.  If this is non-@code{nil}, then the
+first @var{start-column} columns of the string are omitted from the
+result.  If one multi-column character in @var{string} extends across
+the column @var{start-column}, that character is omitted.
 
 The optional argument @var{padding}, if non-@code{nil}, is a padding
 character added at the beginning and end of the result string, to
@@ -2052,12 +2052,22 @@ means hide the excess parts of @var{string} with a @code{display} text
 property (@pxref{Display Property}) showing the ellipsis, instead of
 actually truncating the string.
 
+@group
 @example
 (truncate-string-to-width "\tab\t" 12 4)
      @result{} "ab"
 (truncate-string-to-width "\tab\t" 12 4 ?\s)
      @result{} "    ab  "
 @end example
+@end group
+
+This function uses @code{string-width} and @code{char-width} to find
+the suitable truncation point when @var{string} is too wide, so it
+suffers from the same basic issues as @code{string-width} does.  In
+particular, when character composition happens within @var{string},
+the display width of a string could be smaller than the sum of widths
+of the constituent characters, and this function might return
+inaccurate results.
 @end defun
 
 @defun truncate-string-ellipsis
@@ -2200,6 +2210,31 @@ to compute the width of @var{string} (in pixels).
 This function returns the height in pixels of the line at point in the
 selected window.  The value includes the line spacing of the line
 (@pxref{Line Height}).
+@end defun
+
+@cindex grapheme cluster
+@defun string-glyph-split string
+When character compositions are in effect, sequence of characters can
+be composed for display to form @dfn{grapheme clusters}, for example
+to display accented characters, or ligatures, or Emoji, or when
+complex text shaping requires that for some scripts.  When that
+happens, characters no longer map in a simple way to display columns,
+and display layout decisions with such strings, such as truncating too
+wide strings, can be a complex job.  This function helps in performing
+suvh jobs: it splits up its argument @var{string} into a list of
+substrings, where each substring produces a single grapheme cluster
+that should be displayed as a unit.  Lisp programs can then use this
+list to construct visually-valid substrings of @var{string} which will
+look correctly on display, or compute the width of any substring of
+@var{string} by adding the width of its constituents in the returned
+list, etc.
+
+For instance, if you want to display a string without the first glyph,
+you can say:
+
+@example
+(apply #'insert (cdr (string-glyph-split string))))
+@end example
 @end defun
 
 When a buffer is displayed with line numbers (@pxref{Display Custom,,,
@@ -2393,8 +2428,10 @@ value @code{unspecified}.  This special value means that the face
 doesn't specify that attribute directly.  An @code{unspecified}
 attribute tells Emacs to refer instead to a parent face (see the
 description @code{:inherit} attribute below); or, failing that, to an
-underlying face (@pxref{Displaying Faces}).  The @code{default} face
-must specify all attributes.
+underlying face (@pxref{Displaying Faces}).  (However,
+@code{unspecified} is not a valid value in @code{defface}.)
+
+  The @code{default} face must specify all attributes.
 
   Some of these attributes are meaningful only on certain kinds of
 displays.  If your display cannot handle a certain attribute, the
@@ -6468,7 +6505,7 @@ will compute a scaling factor based on the font pixel size.
 property yourself, but it is easier to use the functions in this
 section.
 
-@defun insert-image image &optional string area slice
+@defun insert-image image &optional string area slice inhibit-isearch
 This function inserts @var{image} in the current buffer at point.  The
 value @var{image} should be an image descriptor; it could be a value
 returned by @code{create-image}, or the value of a symbol defined with
@@ -6493,7 +6530,9 @@ image.
 
 Internally, this function inserts @var{string} in the buffer, and gives
 it a @code{display} property which specifies @var{image}.  @xref{Display
-Property}.
+Property}.  By default, doing interactive searches in the buffer will
+consider @var{string} when searching.  If @var{inhibit-isearch} is
+non-@code{nil}, this is inhibited.
 @end defun
 
 @cindex slice, image
@@ -6745,7 +6784,10 @@ xwidget object, and then use that object as the display specifier
 in a @code{display} text or overlay property (@pxref{Display
 Property}).
 
-@defun make-xwidget type title width height arguments &optional buffer
+  Embedded widgets can send events notifying Lisp code about changes
+occurring within them.  (@pxref{Xwidget Events}).
+
+@defun make-xwidget type title width height arguments &optional buffer related
 This creates and returns an xwidget object.  If
 @var{buffer} is omitted or @code{nil}, it defaults to the current
 buffer.  If @var{buffer} names a buffer that doesn't exist, it will be
@@ -6758,7 +6800,10 @@ The WebKit component.
 @end table
 
 The @var{width} and @var{height} arguments specify the widget size in
-pixels, and @var{title}, a string, specifies its title.
+pixels, and @var{title}, a string, specifies its title.  @var{related}
+is used internally by the WebKit widget, and specifies another WebKit
+widget that the newly created widget should share settings and
+subprocesses with.
 @end defun
 
 @defun xwidgetp object
@@ -6777,6 +6822,10 @@ property list given by @var{plist}.
 
 @defun xwidget-buffer xwidget
 This function returns the buffer of @var{xwidget}.
+@end defun
+
+@defun set-xwidget-buffer xwidget buffer
+This function sets the buffer of @var{xwidget} to @var{buffer}.
 @end defun
 
 @defun get-buffer-xwidgets buffer
@@ -6837,6 +6886,61 @@ Emacs will query the user, otherwise it will not.
 @defun xwidget-query-on-exit-flag xwidget
 This function returns the current setting of @var{xwidget}s
 query-on-exit flag, either @code{t} or @code{nil}.
+@end defun
+
+@defun xwidget-perform-lispy-event xwidget event frame
+Send an input event @var{event} to @var{xwidget}.  The precise action
+performed is platform-specific.  @xref{Input Events}.
+
+You can optionally pass the frame on which the event was generated via
+@var{frame}.  On X11, modifier keys in key events will not be
+considered if @var{frame} is @code{nil}, and the selected frame is not
+an X-Windows frame.
+
+On GTK, only keyboard and function key events are supported.  Mouse,
+motion, and click events are dispatched to the xwidget without going
+through Lisp code, and as such shouldn't require this function to be
+called.
+@end defun
+
+@defun xwidget-webkit-search query xwidget &optional case-insensitive backwards wrap-around
+Start an incremental search on the WebKit widget @var{xwidget} with
+the string @var{query} as the query.  @var{case-insensitive} denotes
+whether or not the search is case-insensitive, @var{backwards}
+determines if the search is performed backwards towards the start of
+the document, and @var{wrap-around} determines whether or not the
+search terminates at the end of the document.
+
+If the function is called while a search query is already present,
+then the query specified here will replace the existing query.
+
+To stop a search query, use @code{xwidget-webkit-finish-search}.
+@end defun
+
+@defun xwidget-webkit-next-result xwidget
+Display the next search result in @var{xwidget}.  This function will
+signal an error if a search query has not been already started in
+@var{xwidget} through @code{xwidget-webkit-search}.
+
+If @code{wrap-around} was non-nil when @code{xwidget-webkit-search}
+was called, then the search will restart from the beginning of the
+document when its end is reached.
+@end defun
+
+@defun xwidget-webkit-previous-result xwidget
+Display the previous search result in @var{xwidget}.  This function
+signals an error if a search query has not been already started in
+@var{xwidget} through @code{xwidget-webkit-search}.
+
+If @code{wrap-around} was non-nil when @code{xwidget-webkit-search}
+was called, then the search will restart from the end of the
+document when its beginning is reached.
+@end defun
+
+@defun xwidget-webkit-finish-search xwidget
+Finish a search operation started with @code{xwidget-webkit-search} in
+@var{xwidget}.  If there is no query currently ongoing, this function
+signals an error.
 @end defun
 
 @node Buttons
@@ -7032,7 +7136,7 @@ This inserts a button with the label @var{label} at point, using text
 properties.
 @end defun
 
-@defun button-buttonize string callback &optional data
+@defun buttonize string callback &optional data
 Sometimes it's more convenient to make a string into a button without
 inserting it into a buffer immediately, for instance when creating
 data structures that may then, later, be inserted into a buffer.  This

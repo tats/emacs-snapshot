@@ -231,6 +231,13 @@ See also `eww-form-checkbox-selected-symbol'."
                  (const "☐")            ; Unicode BALLOT BOX
                  string))
 
+(defcustom eww-url-transformers '(eww-remove-tracking)
+  "This is a list of transforming functions applied to an URL before usage.
+The functions will be called with the URL as the single
+parameter, and should return the (possibly) transformed URL."
+  :type '(repeat function)
+  :version "29.1")
+
 (defface eww-form-submit
   '((((type x w32 ns) (class color))	; Like default mode line
      :box (:line-width 2 :style released-button)
@@ -345,13 +352,13 @@ will start Emacs and browse the GNU web site."
 
 
 ;;;###autoload
-(defun eww (url &optional arg buffer)
+(defun eww (url &optional new-buffer buffer)
   "Fetch URL and render the page.
 If the input doesn't look like an URL or a domain name, the
 word(s) will be searched for via `eww-search-prefix'.
 
-If called with a prefix ARG, use a new buffer instead of reusing
-the default EWW buffer.
+If NEW-BUFFER is non-nil (interactively, the prefix arg), use a
+new buffer instead of reusing the default EWW buffer.
 
 If BUFFER, the data to be rendered is in that buffer.  In that
 case, this function doesn't actually fetch URL.  BUFFER will be
@@ -361,11 +368,11 @@ killed after rendering."
      (list (read-string (format-prompt "Enter URL or keywords"
                                        (and uris (car uris)))
                         nil 'eww-prompt-history uris)
-           (prefix-numeric-value current-prefix-arg))))
+           current-prefix-arg)))
   (setq url (eww--dwim-expand-url url))
   (pop-to-buffer-same-window
    (cond
-    ((eq arg 4)
+    (new-buffer
      (generate-new-buffer "*eww*"))
     ((eq major-mode 'eww-mode)
      (current-buffer))
@@ -385,6 +392,7 @@ killed after rendering."
       (while (string-match "\\`/[.][.]/" (url-filename parsed))
         (setf (url-filename parsed) (substring (url-filename parsed) 3))))
     (setq url (url-recreate-url parsed)))
+  (setq url (eww--transform-url url))
   (plist-put eww-data :url url)
   (plist-put eww-data :title "")
   (eww--after-page-change)
@@ -1831,6 +1839,17 @@ The browser to used is specified by the
   (funcall browse-url-secondary-browser-function
            (or url (plist-get eww-data :url))))
 
+(defun eww-remove-tracking (url)
+  "Remove the commong utm_ tracking cookies from URLs."
+  (replace-regexp-in-string ".utm_.*" "" url))
+
+(defun eww--transform-url (url)
+  "Appy `eww-url-transformers'."
+  (when url
+    (dolist (func eww-url-transformers)
+      (setq url (funcall func url)))
+    url))
+
 (defun eww-follow-link (&optional external mouse-event)
   "Browse the URL under point.
 If EXTERNAL is single prefix, browse the URL using
@@ -1841,7 +1860,8 @@ If EXTERNAL is double prefix, browse in new buffer."
    (list current-prefix-arg last-nonmenu-event)
    eww-mode)
   (mouse-set-point mouse-event)
-  (let ((url (get-text-property (point) 'shr-url)))
+  (let* ((orig-url (get-text-property (point) 'shr-url))
+         (url (eww--transform-url orig-url)))
     (cond
      ((not url)
       (message "No link under point"))
@@ -1860,7 +1880,7 @@ If EXTERNAL is double prefix, browse in new buffer."
 	(plist-put eww-data :url url)
 	(eww-display-html 'utf-8 url dom nil (current-buffer))))
      (t
-      (eww-browse-url url external)))))
+      (eww-browse-url orig-url external)))))
 
 (defun eww-same-page-p (url1 url2)
   "Return non-nil if URL1 and URL2 represent the same page.

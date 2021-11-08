@@ -2878,11 +2878,15 @@ Note: Other faces cannot inherit from the cursor face."
      :background "grey96" :foreground "DarkBlue"
      ;; We use negative thickness of the horizontal box border line to
      ;; avoid enlarging the height of the echo-area display, which
-     ;; would then move the mode line a few pixels up.
-     :box (:line-width (1 . -1) :color "grey80"))
+     ;; would then move the mode line a few pixels up.  We use
+     ;; negative thickness for the vertical border line to avoid
+     ;; making the characters wider, which then would cause unpleasant
+     ;; horizontal shifts of the cursor during C-n/C-p movement
+     ;; through a line with this face.
+     :box (:line-width (-1 . -1) :color "grey80"))
     (((class color) (min-colors 88) (background dark))
      :background "grey19" :foreground "LightBlue"
-     :box (:line-width (1 . -1) :color "grey35"))
+     :box (:line-width (-1 . -1) :color "grey35"))
     (((class color grayscale) (background light)) :background "grey90")
     (((class color grayscale) (background dark)) :background "grey25")
     (t :background "grey90"))

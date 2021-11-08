@@ -1518,7 +1518,10 @@ Returns nil if point is not in a def or class."
       (python-util-forward-comment -1)
       (forward-line 1)
       ;; Ensure point moves forward.
-      (and (> beg-pos (point)) (goto-char beg-pos)))))
+      (and (> beg-pos (point)) (goto-char beg-pos))
+      ;; Return non-nil if we did something (because then we were in a
+      ;; def/class).
+      (/= beg-pos (point)))))
 
 (defun python-nav--syntactically (fn poscompfn &optional contextfn)
   "Move point using FN avoiding places with specific context.
@@ -3703,6 +3706,8 @@ def __PYTHON_EL_native_completion_setup():
             readline.parse_and_bind('tab: complete')
             # Require just one tab to send output.
             readline.parse_and_bind('set show-all-if-ambiguous on')
+            # Avoid replacing common prefix with ellipsis.
+            readline.parse_and_bind('set completion-prefix-display-length 0')
 
         print ('python.el: native completion setup loaded')
     except:
@@ -3800,7 +3805,7 @@ With argument MSG show activation/deactivation message."
                   (comint-redirect-perform-sanity-check nil)
                   (comint-redirect-insert-matching-regexp t)
                   (comint-redirect-finished-regexp
-                   "1__dummy_completion__[[:space:]]*\n")
+                   "1__dummy_completion__.*\n")
                   (comint-redirect-output-buffer redirect-buffer))
               ;; Compatibility with Emacs 24.x.  Comint changed and
               ;; now `comint-redirect-filter' gets 3 args.  This

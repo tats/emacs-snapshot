@@ -365,6 +365,7 @@ Editing Types
 * Keymap Type::             What function a keystroke invokes.
 * Overlay Type::            How an overlay is represented.
 * Font Type::               Fonts for displaying text.
+* Xwidget Type::            Embeddable widgets.
 
 Numbers
 
@@ -1123,6 +1124,7 @@ Frames
 * Dialog Boxes::            Displaying a box to ask yes or no.
 * Pointer Shape::           Specifying the shape of the mouse pointer.
 * Window System Selections::Transferring text to and from other X clients.
+* Yanking Media::           Yanking things that aren't plain text.
 * Drag and Drop::           Internals of Drag-and-Drop implementation.
 * Color Names::             Getting the definitions of color names.
 * Text Terminal Colors::    Defining colors for text terminals.
@@ -1316,6 +1318,7 @@ Regular Expressions
 * Rx Notation::             An alternative, structured regexp notation.
 @end ifnottex
 * Regexp Functions::        Functions for operating on regular expressions.
+* Regexp Problems::         Some problems and how they may be avoided.
 
 Syntax of Regular Expressions
 

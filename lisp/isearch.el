@@ -3787,8 +3787,10 @@ Isearch, at least partially, as determined by `isearch-range-invisible'.
 If `search-invisible' is t, which allows Isearch matches inside
 invisible text, this function will always return non-nil, regardless
 of what `isearch-range-invisible' says."
-  (or (eq search-invisible t)
-      (not (isearch-range-invisible beg end))))
+  (and (or (eq search-invisible t)
+           (not (isearch-range-invisible beg end)))
+       (not (text-property-not-all (min beg end) (max beg end)
+                                   'inhibit-isearch nil))))
 
 
 ;; General utilities

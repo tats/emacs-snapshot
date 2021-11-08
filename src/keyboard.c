@@ -3993,6 +3993,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 #endif
 #ifdef HAVE_XWIDGETS
       case XWIDGET_EVENT:
+      case XWIDGET_DISPLAY_EVENT:
 #endif
       case SAVE_SESSION_EVENT:
       case NO_EVENT:
@@ -4897,7 +4898,7 @@ static const char *const lispy_kana_keys[] =
 
 /* You'll notice that this table is arranged to be conveniently
    indexed by X Windows keysym values.  */
-static const char *const lispy_function_keys[] =
+const char *const lispy_function_keys[] =
   {
     /* X Keysym value */
 
@@ -6122,23 +6123,20 @@ make_lispy_event (struct input_event *event)
 
 #ifdef HAVE_DBUS
     case DBUS_EVENT:
-      {
-	return Fcons (Qdbus_event, event->arg);
-      }
+      return Fcons (Qdbus_event, event->arg);
 #endif /* HAVE_DBUS */
 
 #ifdef THREADS_ENABLED
     case THREAD_EVENT:
-      {
-	return Fcons (Qthread_event, event->arg);
-      }
+      return Fcons (Qthread_event, event->arg);
 #endif /* THREADS_ENABLED */
 
 #ifdef HAVE_XWIDGETS
     case XWIDGET_EVENT:
-      {
-        return Fcons (Qxwidget_event, event->arg);
-      }
+      return Fcons (Qxwidget_event, event->arg);
+
+    case XWIDGET_DISPLAY_EVENT:
+      return list2 (Qxwidget_display_event, event->arg);
 #endif
 
 #ifdef USE_FILE_NOTIFY
@@ -11331,6 +11329,8 @@ The elements of this list correspond to the arguments of
 DEFUN ("posn-at-x-y", Fposn_at_x_y, Sposn_at_x_y, 2, 4, 0,
        doc: /* Return position information for pixel coordinates X and Y.
 By default, X and Y are relative to text area of the selected window.
+Note that the text area includes the header-line and the tab-line of
+the window, if any of them are present.
 Optional third arg FRAME-OR-WINDOW non-nil specifies frame or window.
 If optional fourth arg WHOLE is non-nil, X is relative to the left
 edge of the window.
@@ -11730,6 +11730,7 @@ syms_of_keyboard (void)
 
 #ifdef HAVE_XWIDGETS
   DEFSYM (Qxwidget_event, "xwidget-event");
+  DEFSYM (Qxwidget_display_event, "xwidget-display-event");
 #endif
 
 #ifdef USE_FILE_NOTIFY

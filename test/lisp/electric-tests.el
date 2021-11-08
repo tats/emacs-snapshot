@@ -176,7 +176,7 @@ The buffer's contents should %s:
           expected-string
           expected-point
           bindings
-          (modes '(quote (ruby-mode js-mode python-mode)))
+          (modes '(quote (ruby-mode js-mode python-mode c-mode)))
           (test-in-comments t)
           (test-in-strings t)
           (test-in-code t)
@@ -428,7 +428,9 @@ baz\"\""
   :bindings '((electric-pair-skip-whitespace . chomp))
   :test-in-strings nil
   :test-in-code nil
-  :test-in-comments t)
+  :test-in-comments t
+  :fixture-fn (lambda () (when (eq major-mode 'c-mode)
+                           (c-toggle-comment-style -1))))
 
 (define-electric-pair-test whitespace-skipping-for-quotes-not-outside
   "  \"  \"" "\"-----" :expected-string "\"\"  \"  \""

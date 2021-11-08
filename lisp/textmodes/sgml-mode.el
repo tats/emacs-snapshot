@@ -2415,6 +2415,8 @@ To work around that, do:
     (setq-local css-id-list-function #'html-current-buffer-ids))
 
   (setq imenu-create-index-function 'html-imenu-index)
+  (yank-media-handler 'text/html #'html-mode--html-yank-handler)
+  (yank-media-handler "image/.*" #'html-mode--image-yank-handler)
 
   (setq-local sgml-empty-tags
 	      ;; From HTML-4.01's loose.dtd, parsed with
@@ -2429,6 +2431,30 @@ To work around that, do:
   ;; (make-local-variable 'imenu-sort-function)
   ;; (setq imenu-sort-function nil) ; sorting the menu defeats the purpose
   )
+
+(defun html-mode--html-yank-handler (_type html)
+  (save-restriction
+    (insert html)
+    (ignore-errors
+      (sgml-pretty-print (point-min) (point-max)))))
+
+(defun html-mode--image-yank-handler (type image)
+  (let ((file (read-file-name (format "Save %s image to: " type))))
+    (when (file-directory-p file)
+      (user-error "%s is a directory"))
+    (when (and (file-exists-p file)
+               (not (yes-or-no-p (format "%s exists; overwrite?" file))))
+      (user-error "%s exists"))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (insert image)
+      (write-region (point-min) (point-max) file))
+    (insert (format "<img src=%S>\n" (file-relative-name file)))
+    (insert-image
+     (create-image file (mailcap-mime-type-to-extension type) nil
+		   :max-width 200
+		   :max-height 200)
+     " ")))
 
 (defvar html-imenu-regexp
   "\\s-*<h\\([1-9]\\)[^\n<>]*>\\(<[^\n<>]*>\\)*\\s-*\\([^\n<>]*\\)"

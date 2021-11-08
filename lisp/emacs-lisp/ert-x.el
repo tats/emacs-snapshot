@@ -352,7 +352,6 @@ convert it to a string and pass it to COLLECTOR first."
 (defvar ert-resource-directory-trim-right-regexp "\\(-tests?\\)?\\.el"
   "Regexp for `string-trim' (right) used by `ert-resource-directory'.")
 
-;; Has to be a macro for `load-file-name'.
 (defmacro ert-resource-directory ()
   "Return absolute file name of the resource (test data) directory.
 
@@ -385,6 +384,96 @@ file name will be trimmed using `string-trim' with arguments
 A resource file is defined as any file placed in the resource
 directory as returned by `ert-resource-directory'."
   `(expand-file-name ,file (ert-resource-directory)))
+
+(defvar ert-temp-file-prefix "emacs-test-"
+  "Prefix used by `ert-with-temp-file' and `ert-with-temp-directory'.")
+
+(defvar ert-temp-file-suffix nil
+  "Suffix used by `ert-with-temp-file' and `ert-with-temp-directory'.")
+
+(defun ert--with-temp-file-generate-suffix (filename)
+  "Generate temp file suffix from FILENAME."
+  (thread-last
+    (file-name-base filename)
+    (replace-regexp-in-string (rx string-start
+                                  (group (+? not-newline))
+                                  (regexp "-?tests?")
+                                  string-end)
+                              "\\1")
+    (concat "-")))
+
+(defmacro ert-with-temp-file (name &rest body)
+  "Bind NAME to the name of a new temporary file and evaluate BODY.
+Delete the temporary file after BODY exits normally or
+non-locally.  NAME will be bound to the file name of the temporary
+file.
+
+The following keyword arguments are supported:
+
+:prefix STRING  If non-nil, pass STRING to `make-temp-file' as
+                the PREFIX argument.  Otherwise, use the value of
+                `ert-temp-file-prefix'.
+
+:suffix STRING  If non-nil, pass STRING to `make-temp-file' as the
+                SUFFIX argument.  Otherwise, use the value of
+                `ert-temp-file-suffix'; if the value of that
+                variable is nil, generate a suffix based on the
+                name of the file that `ert-with-temp-file' is
+                called from.
+
+:text STRING    If non-nil, pass STRING to `make-temp-file' as
+                the TEXT argument.
+
+See also `ert-with-temp-directory'."
+  (declare (indent 1) (debug (symbolp body)))
+  (cl-check-type name symbol)
+  (let (keyw prefix suffix directory text extra-keywords)
+    (while (keywordp (setq keyw (car body)))
+      (setq body (cdr body))
+      (pcase keyw
+        (:prefix (setq prefix (pop body)))
+        (:suffix (setq suffix (pop body)))
+        (:directory (setq directory (pop body)))
+        (:text (setq text (pop body)))
+        (_ (push keyw extra-keywords) (pop body))))
+    (when extra-keywords
+      (error "Invalid keywords: %s" (mapconcat #'symbol-name extra-keywords " ")))
+    (let ((temp-file (make-symbol "temp-file"))
+          (prefix (or prefix ert-temp-file-prefix))
+          (suffix (or suffix ert-temp-file-suffix
+                      (ert--with-temp-file-generate-suffix
+                       (or (macroexp-file-name) buffer-file-name)))))
+      `(let* ((,temp-file (,(if directory 'file-name-as-directory 'identity)
+                           (make-temp-file ,prefix ,directory ,suffix ,text)))
+              (,name ,(if directory
+                          `(file-name-as-directory ,temp-file)
+                        temp-file)))
+         (unwind-protect
+             (progn ,@body)
+           (ignore-errors
+             ,(if directory
+                  `(delete-directory ,temp-file :recursive)
+                `(delete-file ,temp-file))))))))
+
+(defmacro ert-with-temp-directory (name &rest body)
+  "Bind NAME to the name of a new temporary directory and evaluate BODY.
+Delete the temporary directory after BODY exits normally or
+non-locally.
+
+NAME is bound to the directory name, not the directory file
+name.  (In other words, it will end with the directory delimiter;
+on Unix-like systems, it will end with \"/\".)
+
+The same keyword arguments are supported as in
+`ert-with-temp-file' (which see), except for :text."
+  (declare (indent 1) (debug (symbolp body)))
+  (let ((tail body) keyw)
+    (while (keywordp (setq keyw (car tail)))
+      (setq tail (cddr tail))
+      (pcase keyw (:text (error "Invalid keyword for directory: :text")))))
+  `(ert-with-temp-file ,name
+     :directory t
+     ,@body))
 
 (provide 'ert-x)
 

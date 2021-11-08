@@ -3547,10 +3547,8 @@ convert_mono_to_color_image (struct frame *f, struct image *img,
   release_frame_dc (f, hdc);
   old_prev = SelectObject (old_img_dc, img->pixmap);
   new_prev = SelectObject (new_img_dc, new_pixmap);
-  /* Windows convention for mono bitmaps is black = background,
-     white = foreground.  */
-  SetTextColor (new_img_dc, background);
-  SetBkColor (new_img_dc, foreground);
+  SetTextColor (new_img_dc, foreground);
+  SetBkColor (new_img_dc, background);
 
   BitBlt (new_img_dc, 0, 0, img->width, img->height, old_img_dc,
 	  0, 0, SRCCOPY);
@@ -4116,9 +4114,9 @@ struct xpm_cached_color
 };
 
 /* The hash table used for the color cache, and its bucket vector
-   size.  */
+   size (which should be prime).  */
 
-#define XPM_COLOR_CACHE_BUCKETS	1001
+#define XPM_COLOR_CACHE_BUCKETS 1009
 static struct xpm_cached_color **xpm_color_cache;
 
 /* Initialize the color cache.  */
@@ -8232,23 +8230,24 @@ gif_image_p (Lisp_Object object)
 #   undef DrawText
 #  endif
 
-/* Giflib before 5.0 didn't define these macros (used only if HAVE_NTGUI).  */
-#  ifndef GIFLIB_MINOR
-#   define GIFLIB_MINOR 0
-#  endif
-#  ifndef GIFLIB_RELEASE
-#   define GIFLIB_RELEASE 0
-#  endif
-
 # else /* HAVE_NTGUI */
 
 #  include <gif_lib.h>
 
 # endif /* HAVE_NTGUI */
 
-/* Giflib before 5.0 didn't define these macros.  */
+/* Giflib before 4.1.6 didn't define these macros.  */
 # ifndef GIFLIB_MAJOR
 #  define GIFLIB_MAJOR 4
+# endif
+# ifndef GIFLIB_MINOR
+#  define GIFLIB_MINOR 0
+# endif
+# ifndef GIFLIB_RELEASE
+#  define GIFLIB_RELEASE 0
+# endif
+/* Giflib before 5.0 didn't define these macros.  */
+# if GIFLIB_MAJOR < 5
 #  define DISPOSAL_UNSPECIFIED    0    /* No disposal specified.  */
 #  define DISPOSE_DO_NOT          1    /* Leave image in place.  */
 #  define DISPOSE_BACKGROUND      2    /* Set area too background color.  */
@@ -8277,6 +8276,8 @@ DEF_DLL_FN (GifFileType *, DGifOpenFileName, (const char *));
 #  else
 DEF_DLL_FN (GifFileType *, DGifOpen, (void *, InputFunc, int *));
 DEF_DLL_FN (GifFileType *, DGifOpenFileName, (const char *, int *));
+DEF_DLL_FN (int, DGifSavedExtensionToGCB,
+	    (GifFileType *, int, GraphicsControlBlock *));
 #  endif
 #  if HAVE_GIFERRORSTRING
 DEF_DLL_FN (char const *, GifErrorString, (int));
@@ -8294,6 +8295,9 @@ init_gif_functions (void)
   LOAD_DLL_FN (library, DGifSlurp);
   LOAD_DLL_FN (library, DGifOpen);
   LOAD_DLL_FN (library, DGifOpenFileName);
+#  if GIFLIB_MAJOR >= 5
+  LOAD_DLL_FN (library, DGifSavedExtensionToGCB);
+#  endif
 #  if HAVE_GIFERRORSTRING
   LOAD_DLL_FN (library, GifErrorString);
 #  endif
@@ -8304,12 +8308,18 @@ init_gif_functions (void)
 #  undef DGifOpen
 #  undef DGifOpenFileName
 #  undef DGifSlurp
+#  if GIFLIB_MAJOR >= 5
+#   undef DGifSavedExtensionToGCB
+#  endif
 #  undef GifErrorString
 
 #  define DGifCloseFile fn_DGifCloseFile
 #  define DGifOpen fn_DGifOpen
 #  define DGifOpenFileName fn_DGifOpenFileName
 #  define DGifSlurp fn_DGifSlurp
+#  if GIFLIB_MAJOR >= 5
+#   define DGifSavedExtensionToGCB fn_DGifSavedExtensionToGCB
+#  endif
 #  define GifErrorString fn_GifErrorString
 
 # endif /* WINDOWSNT */
@@ -9962,14 +9972,15 @@ DEF_DLL_FN (void, rsvg_handle_get_intrinsic_dimensions,
 DEF_DLL_FN (gboolean, rsvg_handle_get_geometry_for_layer,
 	    (RsvgHandle *, const char *, const RsvgRectangle *,
 	     RsvgRectangle *, RsvgRectangle *, GError **));
+#  else
+DEF_DLL_FN (void, rsvg_handle_get_dimensions,
+	    (RsvgHandle *, RsvgDimensionData *));
 #  endif
 
 #  if LIBRSVG_CHECK_VERSION (2, 48, 0)
 DEF_DLL_FN (gboolean, rsvg_handle_set_stylesheet,
 	    (RsvgHandle *, const guint8 *, gsize, GError **));
 #  endif
-DEF_DLL_FN (void, rsvg_handle_get_dimensions,
-	    (RsvgHandle *, RsvgDimensionData *));
 DEF_DLL_FN (GdkPixbuf *, rsvg_handle_get_pixbuf, (RsvgHandle *));
 DEF_DLL_FN (int, gdk_pixbuf_get_width, (const GdkPixbuf *));
 DEF_DLL_FN (int, gdk_pixbuf_get_height, (const GdkPixbuf *));
@@ -10020,11 +10031,12 @@ init_svg_functions (void)
 #if LIBRSVG_CHECK_VERSION (2, 46, 0)
   LOAD_DLL_FN (library, rsvg_handle_get_intrinsic_dimensions);
   LOAD_DLL_FN (library, rsvg_handle_get_geometry_for_layer);
+#else
+  LOAD_DLL_FN (library, rsvg_handle_get_dimensions);
 #endif
 #if LIBRSVG_CHECK_VERSION (2, 48, 0)
   LOAD_DLL_FN (library, rsvg_handle_set_stylesheet);
 #endif
-  LOAD_DLL_FN (library, rsvg_handle_get_dimensions);
   LOAD_DLL_FN (library, rsvg_handle_get_pixbuf);
 
   LOAD_DLL_FN (gdklib, gdk_pixbuf_get_width);
@@ -10062,8 +10074,9 @@ init_svg_functions (void)
 #  if LIBRSVG_CHECK_VERSION (2, 46, 0)
 #   undef rsvg_handle_get_intrinsic_dimensions
 #   undef rsvg_handle_get_geometry_for_layer
+#  else
+#   undef rsvg_handle_get_dimensions
 #  endif
-#  undef rsvg_handle_get_dimensions
 #  if LIBRSVG_CHECK_VERSION (2, 48, 0)
 #   undef rsvg_handle_set_stylesheet
 #  endif
@@ -10098,8 +10111,9 @@ init_svg_functions (void)
 	fn_rsvg_handle_get_intrinsic_dimensions
 #   define rsvg_handle_get_geometry_for_layer	\
 	fn_rsvg_handle_get_geometry_for_layer
+#  else
+#   define rsvg_handle_get_dimensions fn_rsvg_handle_get_dimensions
 #  endif
-#  define rsvg_handle_get_dimensions fn_rsvg_handle_get_dimensions
 #  if LIBRSVG_CHECK_VERSION (2, 48, 0)
 #   define rsvg_handle_set_stylesheet fn_rsvg_handle_set_stylesheet
 #  endif
@@ -10374,21 +10388,13 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
       viewbox_width = viewbox.x + viewbox.width;
       viewbox_height = viewbox.y + viewbox.height;
     }
-
-  if (viewbox_width == 0 || viewbox_height == 0)
+#else
+  /* In librsvg before 2.46.0, guess the viewbox from the image dimensions.  */
+  RsvgDimensionData dimension_data;
+  rsvg_handle_get_dimensions (rsvg_handle, &dimension_data);
+  viewbox_width = dimension_data.width;
+  viewbox_height = dimension_data.height;
 #endif
-  {
-    /* The functions used above to get the geometry of the visible
-       area of the SVG are only available in librsvg 2.46 and above,
-       so in certain circumstances this code path can result in some
-       parts of the SVG being cropped.  */
-    RsvgDimensionData dimension_data;
-
-    rsvg_handle_get_dimensions (rsvg_handle, &dimension_data);
-
-    viewbox_width = dimension_data.width;
-    viewbox_height = dimension_data.height;
-  }
 
   compute_image_size (viewbox_width, viewbox_height, img,
                       &width, &height);
