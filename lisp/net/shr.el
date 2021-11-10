@@ -1626,6 +1626,14 @@ url if no type is specified.  The value should be a float in the range 0.0 to
   :version "24.4"
   :type '(alist :key-type regexp :value-type float))
 
+(defcustom shr-use-xwidgets-for-media nil
+  "If non-nil, use xwidgets to display video and audio elements.
+This also depends on Emacs being built with xwidgets capability.
+Note that this is experimental, and may lead to instability on
+some platforms."
+  :type 'boolean
+  :version "29.1")
+
 (defun shr--get-media-pref (elem)
   "Determine the preference for ELEM.
 The preference is a float determined from `shr-prefer-media-type'."
@@ -1662,16 +1670,39 @@ The preference is a float determined from `shr-prefer-media-type'."
                       pref (cdr ret)))))))))
   (cons url pref))
 
+(declare-function xwidget-webkit-execute-script "xwidget.c"
+                  (xwidget script &optional callback))
+
 (defun shr-tag-video (dom)
   (let ((image (dom-attr dom 'poster))
         (url (dom-attr dom 'src))
         (start (point)))
     (unless url
       (setq url (car (shr--extract-best-source dom))))
-    (if (> (length image) 0)
-	(shr-indirect-call 'img nil image)
-      (shr-insert " [video] "))
-    (shr-urlify start (shr-expand-url url))))
+    (if (and shr-use-xwidgets-for-media
+             (fboundp 'make-xwidget))
+        ;; Play the video.
+        (progn
+          (require 'xwidget)
+          (let ((widget (make-xwidget
+                         'webkit
+			 "Video"
+                         (truncate (* (window-pixel-width) 0.8))
+                         (truncate (* (window-pixel-width) 0.8 0.75)))))
+            (insert
+             (propertize
+              " [video] "
+              'display (list 'xwidget :xwidget widget)))
+            (xwidget-webkit-execute-script
+             widget (format "document.body.innerHTML = %S;"
+                            (format
+                             "<style>body { margin: 0px; }</style><div style='background: black; height: 100%%; display: flex; align-items: center; justify-content: center;'><video autoplay loop muted controls style='max-width: 100%%; max-height: 100%%;'><source src=%S type='video/mp4\'></source></video></div>"
+                             url)))))
+      ;; No xwidgets.
+      (if (> (length image) 0)
+	  (shr-indirect-call 'img nil image)
+        (shr-insert " [video] "))
+      (shr-urlify start (shr-expand-url url)))))
 
 (defun shr-tag-audio (dom)
   (let ((url (dom-attr dom 'src))

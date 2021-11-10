@@ -52,6 +52,9 @@ static void synthesize_focus_in_event (GtkWidget *);
 static GdkDevice *find_suitable_keyboard (struct frame *);
 static gboolean webkit_script_dialog_cb (WebKitWebView *, WebKitScriptDialog *,
 					 gpointer);
+static void record_osr_embedder (struct xwidget_view *);
+static void from_embedder (GdkWindow *, double, double, gpointer, gpointer, gpointer);
+static void to_embedder (GdkWindow *, double, double, gpointer, gpointer, gpointer);
 #endif
 
 static struct xwidget *
@@ -104,7 +107,7 @@ static void mouse_target_changed (WebKitWebView *, WebKitHitTestResult *, guint,
 
 DEFUN ("make-xwidget",
        Fmake_xwidget, Smake_xwidget,
-       5, 7, 0,
+       4, 7, 0,
        doc: /* Make an xwidget of TYPE.
 If BUFFER is nil, use the current buffer.
 If BUFFER is a string and no such buffer exists, create it.
@@ -127,6 +130,9 @@ fails.  */)
   CHECK_SYMBOL (type);
   CHECK_FIXNAT (width);
   CHECK_FIXNAT (height);
+
+  if (!EQ (type, Qwebkit))
+    error ("Bad xwidget type");
 
   struct xwidget *xw = allocate_xwidget ();
   Lisp_Object val;
@@ -211,6 +217,12 @@ fails.  */)
       gtk_widget_show (xw->widget_osr);
       gtk_widget_show (xw->widgetwindow_osr);
       synthesize_focus_in_event (xw->widgetwindow_osr);
+
+
+      g_signal_connect (G_OBJECT (gtk_widget_get_window (xw->widgetwindow_osr)),
+			"from-embedder", G_CALLBACK (from_embedder), NULL);
+      g_signal_connect (G_OBJECT (gtk_widget_get_window (xw->widgetwindow_osr)),
+			"to-embedder", G_CALLBACK (to_embedder), NULL);
 
       /* Store some xwidget data in the gtk widgets for convenient
          retrieval in the event handlers.  */
@@ -454,6 +466,106 @@ xwidget_from_id (uint32_t id)
 }
 
 #ifdef USE_GTK
+static void
+record_osr_embedder (struct xwidget_view *view)
+{
+  struct xwidget *xw;
+  GdkWindow *window, *embedder;
+
+  xw = XXWIDGET (view->model);
+  window = gtk_widget_get_window (xw->widgetwindow_osr);
+  embedder = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (view->frame));
+
+  gdk_offscreen_window_set_embedder (window, embedder);
+  xw->embedder = view->frame;
+  xw->embedder_view = view;
+}
+
+static struct xwidget *
+find_xwidget_for_offscreen_window (GdkWindow *window)
+{
+  Lisp_Object tem;
+  struct xwidget *xw;
+  GdkWindow *w;
+
+  for (tem = Vxwidget_list; CONSP (tem); tem = XCDR (tem))
+    {
+      if (XWIDGETP (XCAR (tem)))
+	{
+	  xw = XXWIDGET (XCAR (tem));
+	  w = gtk_widget_get_window (xw->widgetwindow_osr);
+
+	  if (w == window)
+	    return xw;
+	}
+    }
+
+  return NULL;
+}
+
+static void
+from_embedder (GdkWindow *window, double x, double y,
+	       gpointer x_out_ptr, gpointer y_out_ptr,
+	       gpointer user_data)
+{
+  double *xout = x_out_ptr;
+  double *yout = y_out_ptr;
+  struct xwidget *xw = find_xwidget_for_offscreen_window (window);
+  struct xwidget_view *xvw;
+  gint xoff, yoff;
+
+  if (!xw)
+    emacs_abort ();
+
+  xvw = xw->embedder_view;
+
+  if (!xvw)
+    {
+      *xout = x;
+      *yout = y;
+    }
+  else
+    {
+      gtk_widget_translate_coordinates (FRAME_GTK_WIDGET (xvw->frame),
+					FRAME_GTK_OUTER_WIDGET (xvw->frame),
+					0, 0, &xoff, &yoff);
+
+      *xout = x - xvw->x - xoff;
+      *yout = y - xvw->y - yoff;
+    }
+}
+
+static void
+to_embedder (GdkWindow *window, double x, double y,
+	     gpointer x_out_ptr, gpointer y_out_ptr,
+	     gpointer user_data)
+{
+  double *xout = x_out_ptr;
+  double *yout = y_out_ptr;
+  struct xwidget *xw = find_xwidget_for_offscreen_window (window);
+  struct xwidget_view *xvw;
+  gint xoff, yoff;
+
+  if (!xw)
+    emacs_abort ();
+
+  xvw = xw->embedder_view;
+
+  if (!xvw)
+    {
+      *xout = x;
+      *yout = y;
+    }
+  else
+    {
+      gtk_widget_translate_coordinates (FRAME_GTK_WIDGET (xvw->frame),
+					FRAME_GTK_OUTER_WIDGET (xvw->frame),
+					0, 0, &xoff, &yoff);
+
+      *xout = x + xvw->x + xoff;
+      *yout = y + xvw->y + yoff;
+    }
+}
 
 static GdkDevice *
 find_suitable_pointer (struct frame *f)
@@ -694,6 +806,8 @@ xwidget_button (struct xwidget_view *view,
 		bool down_p, int x, int y, int button,
 		int modifier_state, Time time)
 {
+  record_osr_embedder (view);
+
   if (button < 4 || button > 8)
     xwidget_button_1 (view, down_p, x, y, button, modifier_state, time);
   else
@@ -753,15 +867,16 @@ xwidget_motion_or_crossing (struct xwidget_view *view, const XEvent *event)
   GtkWidget *target = find_widget_at_pos (model->widgetwindow_osr,
 					  (event->type == MotionNotify
 					   ? event->xmotion.x + view->clip_left
-					   : event->xmotion.y + view->clip_top),
+					   : event->xcrossing.x + view->clip_left),
 					  (event->type == MotionNotify
-					   ? event->xmotion.y + view->clip_left
+					   ? event->xmotion.y + view->clip_top
 					   : event->xcrossing.y + view->clip_top),
 					  &x, &y);
 
   if (!target)
-    target = model->widgetwindow_osr;
+    target = model->widget_osr;
 
+  record_osr_embedder (view);
   xg_event->any.window = gtk_widget_get_window (target);
   g_object_ref (xg_event->any.window); /* The window will be unrefed
 					  later by gdk_event_free.  */
@@ -855,8 +970,8 @@ xv_do_draw (struct xwidget_view *xw, struct xwidget *w)
   cairo_save (xw->cr_context);
   if (surface)
     {
-      cairo_set_source_surface (xw->cr_context, surface, xw->clip_left,
-				xw->clip_top);
+      cairo_translate (xw->cr_context, -xw->clip_left, -xw->clip_top);
+      cairo_set_source_surface (xw->cr_context, surface, 0, 0);
       cairo_set_operator (xw->cr_context, CAIRO_OPERATOR_SOURCE);
       cairo_paint (xw->cr_context);
     }
@@ -1260,6 +1375,8 @@ webkit_script_dialog_cb (WebKitWebView *webview,
   GtkWidget *dialog;
   GtkWidget *entry;
   GtkWidget *content_area;
+  GtkWidget *box;
+  GtkWidget *label;
   const gchar *content;
   const gchar *message;
   gint result;
@@ -1275,23 +1392,32 @@ webkit_script_dialog_cb (WebKitWebView *webview,
   content = webkit_script_dialog_get_message (script_dialog);
 
   if (type == WEBKIT_SCRIPT_DIALOG_ALERT)
-    dialog = gtk_dialog_new_with_buttons (content, GTK_WINDOW (widget),
+    dialog = gtk_dialog_new_with_buttons ("Alert", GTK_WINDOW (widget),
 					  GTK_DIALOG_MODAL,
 					  "Dismiss", 1, NULL);
   else
-    dialog = gtk_dialog_new_with_buttons (content, GTK_WINDOW (widget),
+    dialog = gtk_dialog_new_with_buttons ("Question", GTK_WINDOW (widget),
 					  GTK_DIALOG_MODAL,
 					  "OK", 0, "Cancel", 1, NULL);
+
+  box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 8);
+  label = gtk_label_new (content);
+  content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+  gtk_container_add (GTK_CONTAINER (content_area), box);
+
+  gtk_widget_show (box);
+  gtk_widget_show (label);
+
+  gtk_box_pack_start (GTK_BOX (box), label, TRUE, TRUE, 0);
 
   if (type == WEBKIT_SCRIPT_DIALOG_PROMPT)
     {
       entry = gtk_entry_new ();
       message = webkit_script_dialog_prompt_get_default_text (script_dialog);
-      content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
 
       gtk_widget_show (entry);
       gtk_entry_set_text (GTK_ENTRY (entry), message);
-      gtk_container_add (GTK_CONTAINER (content_area), entry);
+      gtk_box_pack_end (GTK_BOX (box), entry, TRUE, TRUE, 0);
     }
 
   result = gtk_dialog_run (GTK_DIALOG (dialog));
@@ -1402,22 +1528,6 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
   window_box (s->w, TEXT_AREA, &text_area_x, &text_area_y,
               &text_area_width, &text_area_height);
 
-  /* On X11, this keeps generating expose events.  */
-#ifndef USE_GTK
-  /* Resize xwidget webkit if its container window size is changed in
-     some ways, for example, a buffer became hidden in small split
-     window, then it can appear front in merged whole window.  */
-  if (EQ (xww->type, Qwebkit)
-      && (xww->width != text_area_width || xww->height != text_area_height))
-    {
-      Lisp_Object xwl;
-      XSETXWIDGET (xwl, xww);
-      Fxwidget_resize (xwl,
-                       make_int (text_area_width),
-                       make_int (text_area_height));
-    }
-#endif
-
   clip_left = max (0, text_area_x - x);
   clip_right = max (clip_left,
 		    min (xww->width, text_area_x + text_area_width - x));
@@ -1451,6 +1561,13 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
       XSetWindowAttributes a;
       a.event_mask = (ExposureMask | ButtonPressMask | ButtonReleaseMask
 		      | PointerMotionMask | EnterWindowMask | LeaveWindowMask);
+
+      if (clip_right - clip_left <= 0
+	  || clip_bottom - clip_top <= 0)
+	{
+	  unblock_input ();
+	  return;
+	}
 
       xv->wdesc = XCreateWindow (xv->dpy, FRAME_X_WINDOW (s->f),
 				 x + clip_left, y + clip_top,
@@ -1497,8 +1614,17 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
 #ifdef USE_GTK
       if (!wdesc_was_none && !moved)
 	{
-	  XResizeWindow (xv->dpy, xv->wdesc, clip_right - clip_left,
-			 clip_bottom - clip_top);
+	  if (clip_right - clip_left <= 0
+	      || clip_bottom - clip_top <= 0)
+	    {
+	      XUnmapWindow (xv->dpy, xv->wdesc);
+	      xv->hidden = true;
+	    }
+	  else
+	    {
+	      XResizeWindow (xv->dpy, xv->wdesc, clip_right - clip_left,
+			     clip_bottom - clip_top);
+	    }
 	  XFlush (xv->dpy);
 	  cairo_xlib_surface_set_size (xv->cr_surface, clip_right - clip_left,
 				       clip_bottom - clip_top);
@@ -1740,9 +1866,10 @@ DEFUN ("xwidget-resize", Fxwidget_resize, Sxwidget_resize, 3, 3, 0,
     {
       gtk_window_resize (GTK_WINDOW (xw->widgetwindow_osr), xw->width,
                          xw->height);
-      gtk_container_resize_children (GTK_CONTAINER (xw->widgetwindow_osr));
       gtk_widget_set_size_request (GTK_WIDGET (xw->widget_osr), xw->width,
                                    xw->height);
+
+      gtk_widget_queue_allocate (GTK_WIDGET (xw->widget_osr));
     }
 #elif defined NS_IMPL_COCOA
   nsxwidget_resize (xw);
@@ -1861,6 +1988,9 @@ DEFUN ("delete-xwidget-view",
   CHECK_XWIDGET_VIEW (xwidget_view);
   struct xwidget_view *xv = XXWIDGET_VIEW (xwidget_view);
 #ifdef USE_GTK
+  struct xwidget *xw = XXWIDGET (xv->model);
+  GdkWindow *w;
+
   if (xv->wdesc != None)
     {
       block_input ();
@@ -1869,6 +1999,16 @@ DEFUN ("delete-xwidget-view",
       XDestroyWindow (xv->dpy, xv->wdesc);
       Fremhash (make_fixnum (xv->wdesc), x_window_to_xwv_map);
       unblock_input ();
+    }
+
+  if (xw->embedder_view == xv)
+    {
+      w = gtk_widget_get_window (xw->widgetwindow_osr);
+
+      XXWIDGET (xv->model)->embedder_view = NULL;
+      XXWIDGET (xv->model)->embedder = NULL;
+
+      gdk_offscreen_window_set_embedder (w, NULL);
     }
 #elif defined NS_IMPL_COCOA
   nsxwidget_delete_view (xv);
@@ -2400,7 +2540,8 @@ kill_frame_xwidget_views (struct frame *f)
   for (Lisp_Object tail = Vxwidget_view_list; CONSP (tail);
        tail = XCDR (tail))
     {
-      if (XXWIDGET_VIEW (XCAR (tail))->frame == f)
+      if (XWIDGET_VIEW_P (XCAR (tail))
+	  && XXWIDGET_VIEW (XCAR (tail))->frame == f)
 	rem = Fcons (XCAR (tail), rem);
     }
 

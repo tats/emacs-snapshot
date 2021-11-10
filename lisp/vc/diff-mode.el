@@ -1540,16 +1540,7 @@ a diff with \\[diff-reverse-direction].
                 #'diff--filter-substring)
   (unless buffer-file-name
     (hack-dir-local-variables-non-file-buffer))
-  (save-excursion
-    (setq-local diff-buffer-type
-                (if (re-search-forward "^diff --git" nil t)
-                    'git
-                  nil)))
-  (when (eq diff-buffer-type 'git)
-    (setq diff-outline-regexp
-          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)"))
-    (setq-local outline-level #'diff--outline-level))
-  (setq-local outline-regexp diff-outline-regexp))
+  (diff-setup-buffer-type))
 
 ;;;###autoload
 (define-minor-mode diff-minor-mode
@@ -1584,6 +1575,21 @@ modified lines of the diff."
                 (if (eq style 'context)
                     "^[-+!] .*?\\([\t ]+\\)$"
                   "^[-+!<>].*?\\([\t ]+\\)$"))))
+
+(defun diff-setup-buffer-type ()
+  "Try to guess the `diff-buffer-type' from content of current Diff mode buffer.
+`outline-regexp' is updated accordingly."
+  (save-excursion
+    (goto-char (point-min))
+    (setq-local diff-buffer-type
+                (if (re-search-forward "^diff --git" nil t)
+                    'git
+                  nil)))
+  (when (eq diff-buffer-type 'git)
+    (setq diff-outline-regexp
+          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)"))
+    (setq-local outline-level #'diff--outline-level))
+  (setq-local outline-regexp diff-outline-regexp))
 
 (defun diff-delete-if-empty ()
   ;; An empty diff file means there's no more diffs to integrate, so we

@@ -105,14 +105,6 @@ in addition to the ellipsis.
 *** New user option 'outline-minor-mode-buttons'.
 This is a list of pairs of open/close strings used to display buttons.
 
-** Fonts
-
----
-*** Emacs now supports "medium" fonts.
-Emacs previously didn't distinguish between the "regular" weight and
-the "medium" weight, but it now also supports the (heavier) "medium"
-weight.
-
 +++
 ** Support for the WebP image format.
 This support is built by default when the libwebp library is
@@ -228,7 +220,14 @@ If non-nil, 'C-c C-a' will put attached files at the end of the message.
 *** 'texinfo-mode' now has a specialised 'narrow-to-defun' definition.
 It narrows to the current node.
 
-** eww
+** eww/shr
+
++++
+*** New user option 'shr-use-xwidgets-for-media'.
+If non-nil (and Emacs has been built with support for xwidgets),
+display <video> elements with an xwidget.  Note that this is
+experimental, and is known to crash Emacs on some systems, and just
+doesn't work on other systems.  Also see etc/PROBLEMS.
 
 +++
 *** New user option 'eww-url-transformers'.
@@ -504,6 +503,10 @@ This is a convenience function to extract the field data from
 
 ** Xwidgets
 
+---
+*** New user option 'xwidget-webkit-buffer-name-prefix'.
+This allows the user to change the webkit buffer names.
+
 +++
 *** New minor mode 'xwidget-webkit-edit-mode'.
 When this mode is enabled, self-inserting characters and other common
@@ -538,6 +541,17 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
+** Fonts
+
+---
+*** Emacs now supports `medium' fonts.
+Emacs previously didn't distinguish between the `regular'/`normal'
+weight and the `medium' weight, but it now also supports the (heavier)
+`medium' weight.  However, this means that if you previously specified
+a weight of `normal' and the font doesn't have this weight, Emacs
+won't find the font spec.  In these cases, replacing ":weight 'normal"
+with ":weight 'medium" should fix the issue.
 
 ** Keymap descriptions have changed.
 'help--describe-command', 'C-h b' and associated functions that output
@@ -597,6 +611,14 @@ Use 'exif-parse-file' and 'exif-field' instead.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+*** New function 'file-name-split'.
+This returns a list of all the components of a file name.
+
++++
+*** New macro 'with-undo-amalgamate'
+It records a particular sequence of operations as a single undo step
 
 +++
 *** New command 'yank-media'.
