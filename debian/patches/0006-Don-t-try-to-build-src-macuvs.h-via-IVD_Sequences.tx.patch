@@ -9,7 +9,7 @@ over the licensing.
  1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index a953044..566c395 100644
+index 701fb92..60e27e6 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
 @@ -40,17 +40,12 @@ unifiles =
@@ -18,7 +18,7 @@ index a953044..566c395 100644
  
 -all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
 +all: ${unifiles} ${unidir}/charscript.el \
-   ${unidir}/charprop.el ${unidir}/emoji-zwj.el
+   ${unidir}/charprop.el ${unidir}/emoji-zwj.el ${unidir}/emoji-labels.el
  
  ## Specify .elc as an order-only prereq so as to not needlessly rebuild
  ## target just because the .elc is missing.
