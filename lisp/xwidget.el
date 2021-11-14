@@ -33,6 +33,7 @@
 
 (require 'cl-lib)
 (require 'bookmark)
+(require 'format-spec)
 
 (declare-function make-xwidget "xwidget.c"
                   (type title width height arguments &optional buffer related))
@@ -95,8 +96,12 @@ This returns the result of `make-xwidget'."
   :group 'web
   :prefix "xwidget-webkit-")
 
-(defcustom xwidget-webkit-buffer-name-prefix "*xwidget-webkit: "
-  "Buffer name prefix used by `xwidget-webkit' buffers."
+(defcustom xwidget-webkit-buffer-name-format "*xwidget-webkit: %T*"
+  "Template for naming `xwidget-webkit' buffers.
+It can use the following special constructs:
+
+  %T -- the title of the Web page loaded by the xwidget.
+  %U -- the URI of the Web page loaded by the xwidget."
   :type 'string
   :version "29.1")
 
@@ -141,11 +146,36 @@ in `split-window-right' with a new xwidget webkit session."
 
 (declare-function xwidget-perform-lispy-event "xwidget.c")
 
-(defun xwidget-webkit-pass-command-event ()
-  "Pass `last-command-event' to the current buffer's WebKit widget."
+(defvar xwidget-webkit--input-method-events nil
+  "Internal variable used to store input method events.")
+
+(defun xwidget-webkit-pass-command-event-with-input-method ()
+  "Handle a `with-input-method' event."
   (interactive)
-  (xwidget-perform-lispy-event (xwidget-webkit-current-session)
-                               last-command-event))
+  (let ((key (pop unread-command-events)))
+    (setq xwidget-webkit--input-method-events
+          (funcall input-method-function key))
+    (exit-minibuffer)))
+
+(defun xwidget-webkit-pass-command-event ()
+  "Pass `last-command-event' to the current buffer's WebKit widget.
+If `current-input-method' is non-nil, consult `input-method-function'
+for the actual events that will be sent."
+  (interactive)
+  (if (and current-input-method
+           (characterp last-command-event))
+      (let ((xwidget-webkit--input-method-events nil)
+            (minibuffer-local-map (make-keymap)))
+        (define-key minibuffer-local-map [with-input-method]
+          'xwidget-webkit-pass-command-event-with-input-method)
+        (push last-command-event unread-command-events)
+        (push 'with-input-method unread-command-events)
+        (read-from-minibuffer "" nil nil nil nil nil t)
+        (dolist (event xwidget-webkit--input-method-events)
+          (xwidget-perform-lispy-event (xwidget-webkit-current-session)
+                                       event)))
+    (xwidget-perform-lispy-event (xwidget-webkit-current-session)
+                                 last-command-event)))
 
 ;;todo.
 ;; - check that the webkit support is compiled in
@@ -358,7 +388,8 @@ XWIDGET instance, XWIDGET-EVENT-TYPE depends on the originating xwidget."
       (xwidget-log
        "error: callback called for xwidget with dead buffer")
     (cond ((eq xwidget-event-type 'load-changed)
-           (let ((title (xwidget-webkit-title xwidget)))
+           (let ((title (xwidget-webkit-title xwidget))
+                 (uri (xwidget-webkit-uri xwidget)))
              ;; This funciton will be called multi times, so only
              ;; change buffer name when the load actually completes
              ;; this can limit buffer-name flicker in mode-line.
@@ -372,9 +403,12 @@ XWIDGET instance, XWIDGET-EVENT-TYPE depends on the originating xwidget."
                  ;; Do not adjust webkit size to window here, the
                  ;; selected window can be the mini-buffer window
                  ;; unwantedly.
-                 (rename-buffer (concat xwidget-webkit-buffer-name-prefix
-                                        title "*")
-                                t)))))
+                 (rename-buffer
+                  (format-spec
+                   xwidget-webkit-buffer-name-format
+                   `((?T . ,title)
+                     (?U . ,uri)))
+                  t)))))
           ((eq xwidget-event-type 'decide-policy)
            (let ((strarg  (nth 3 last-input-event)))
              (if (string-match ".*#\\(.*\\)" strarg)
@@ -762,7 +796,8 @@ Return the buffer."
   "Goto URL with xwidget webkit."
   (if (xwidget-webkit-current-session)
       (progn
-        (xwidget-webkit-goto-uri (xwidget-webkit-current-session) url))
+        (xwidget-webkit-goto-uri (xwidget-webkit-current-session) url)
+        (switch-to-buffer (xwidget-buffer (xwidget-webkit-current-session))))
     (xwidget-webkit-new-session url)))
 
 (defun xwidget-webkit-back ()
@@ -863,6 +898,8 @@ WebKit widget."
   "The current search query.")
 (defvar-local xwidget-webkit-isearch--is-reverse nil
   "Whether or not the current isearch should be reverse.")
+(defvar xwidget-webkit-isearch--read-string-buffer nil
+  "The buffer we are reading input method text for, if any.")
 
 (defun xwidget-webkit-isearch--update (&optional only-message)
   "Update the current buffer's WebKit widget's search query.
@@ -873,8 +910,9 @@ WebKit widget.  The query will be set to the contents of
     (xwidget-webkit-search xwidget-webkit-isearch--string
                            (xwidget-webkit-current-session)
                            t xwidget-webkit-isearch--is-reverse t))
-  (message (concat (propertize "Search contents: " 'face 'minibuffer-prompt)
-                   xwidget-webkit-isearch--string)))
+  (let ((message-log-max nil))
+    (message (concat (propertize "Search contents: " 'face 'minibuffer-prompt)
+                     xwidget-webkit-isearch--string))))
 
 (defun xwidget-webkit-isearch-erasing-char (count)
   "Erase the last COUNT characters of the current query."
@@ -885,13 +923,43 @@ WebKit widget.  The query will be set to the contents of
                      (- (length xwidget-webkit-isearch--string) count))))
   (xwidget-webkit-isearch--update))
 
+(defun xwidget-webkit-isearch-with-input-method ()
+  "Handle a request to use the input method to modify the search query."
+  (interactive)
+  (let ((key (car unread-command-events))
+	events)
+    (setq unread-command-events (cdr unread-command-events)
+	  events (funcall input-method-function key))
+    (dolist (k events)
+      (with-current-buffer xwidget-webkit-isearch--read-string-buffer
+        (setq xwidget-webkit-isearch--string
+              (concat xwidget-webkit-isearch--string
+                      (char-to-string k)))))
+    (exit-minibuffer)))
+
+(defun xwidget-webkit-isearch-printing-char-with-input-method (char)
+  "Handle printing char CHAR with the current input method."
+  (let ((minibuffer-local-map (make-keymap))
+        (xwidget-webkit-isearch--read-string-buffer (current-buffer)))
+    (define-key minibuffer-local-map [with-input-method]
+      'xwidget-webkit-isearch-with-input-method)
+    (setq unread-command-events
+          (cons 'with-input-method
+                (cons char unread-command-events)))
+    (read-string "Search contents: "
+                 xwidget-webkit-isearch--string
+                 'junk-hist nil t)
+    (xwidget-webkit-isearch--update)))
+
 (defun xwidget-webkit-isearch-printing-char (char &optional count)
   "Add ordinary character CHAR to the search string and search.
 With argument, add COUNT copies of CHAR."
   (interactive (list last-command-event
                      (prefix-numeric-value current-prefix-arg)))
-  (setq xwidget-webkit-isearch--string (concat xwidget-webkit-isearch--string
-                                               (make-string (or count 1) char)))
+  (if current-input-method
+      (xwidget-webkit-isearch-printing-char-with-input-method char)
+    (setq xwidget-webkit-isearch--string (concat xwidget-webkit-isearch--string
+                                                 (make-string (or count 1) char))))
   (xwidget-webkit-isearch--update))
 
 (defun xwidget-webkit-isearch-forward (count)
@@ -900,7 +968,8 @@ With argument, add COUNT copies of CHAR."
   (let ((was-reverse xwidget-webkit-isearch--is-reverse))
     (setq xwidget-webkit-isearch--is-reverse nil)
     (when was-reverse
-      (xwidget-webkit-isearch--update)))
+      (xwidget-webkit-isearch--update)
+      (setq count (1- count))))
   (let ((i 0))
     (while (< i count)
       (xwidget-webkit-next-result (xwidget-webkit-current-session))
@@ -913,7 +982,8 @@ With argument, add COUNT copies of CHAR."
   (let ((was-reverse xwidget-webkit-isearch--is-reverse))
     (setq xwidget-webkit-isearch--is-reverse t)
     (unless was-reverse
-      (xwidget-webkit-isearch--update)))
+      (xwidget-webkit-isearch--update)
+      (setq count (1- count))))
   (let ((i 0))
     (while (< i count)
       (xwidget-webkit-previous-result (xwidget-webkit-current-session))
@@ -945,6 +1015,8 @@ With argument, add COUNT copies of CHAR."
 (define-key xwidget-webkit-isearch-mode-map "\C-g" 'xwidget-webkit-isearch-exit)
 (define-key xwidget-webkit-isearch-mode-map "\C-r" 'xwidget-webkit-isearch-backward)
 (define-key xwidget-webkit-isearch-mode-map "\C-s" 'xwidget-webkit-isearch-forward)
+(define-key xwidget-webkit-isearch-mode-map "\C-y" 'xwidget-webkit-isearch-yank-kill)
+(define-key xwidget-webkit-isearch-mode-map "\C-\\" 'toggle-input-method)
 (define-key xwidget-webkit-isearch-mode-map "\t" 'xwidget-webkit-isearch-printing-char)
 
 (let ((meta-map (make-keymap)))
@@ -966,6 +1038,9 @@ To navigate around the search results, type
 \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-forward] to move forward, and
 \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-backward] to move backward.
 
+To insert the string at the front of the kill ring into the
+search query, type \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-yank-kill].
+
 Press \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-exit] to exit incremental search."
   :keymap xwidget-webkit-isearch-mode-map
   (if xwidget-webkit-isearch-mode
@@ -975,6 +1050,15 @@ Press \\<xwidget-webkit-isearch-mode-map>\\[xwidget-webkit-isearch-exit] to exit
         (xwidget-webkit-isearch--update))
     (xwidget-webkit-finish-search (xwidget-webkit-current-session))))
 
+(defun xwidget-webkit-isearch-yank-kill ()
+  "Append the most recent kill from `kill-ring' to the current query."
+  (interactive)
+  (unless xwidget-webkit-isearch-mode
+    (xwidget-webkit-isearch-mode t))
+  (setq xwidget-webkit-isearch--string
+        (concat xwidget-webkit-isearch--string
+                (current-kill 0)))
+  (xwidget-webkit-isearch--update))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar xwidget-view-list)              ; xwidget.c

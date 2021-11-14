@@ -4579,7 +4579,6 @@ commands:
 	(let ((summary gnus-summary-buffer))
 	  (with-current-buffer name
             (setq-local gnus-article-edit-mode nil)
-	    (gnus-article-stop-animations)
 	    (when gnus-article-mime-handles
 	      (mm-destroy-parts gnus-article-mime-handles)
 	      (setq gnus-article-mime-handles nil))
@@ -4605,6 +4604,7 @@ commands:
 	  (current-buffer))))))
 
 (defun gnus-article-stop-animations ()
+  (declare (obsolete nil "29.1"))
   (cancel-function-timers 'image-animate-timeout))
 
 (defun gnus-stop-downloads ()
@@ -6897,8 +6897,8 @@ KEY is a string or a vector."
 	       unread-command-events))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
-	  (describe-key (cons (read-key-sequence nil t)
-			      (this-single-command-raw-keys))
+	  (describe-key (list (cons (read-key-sequence nil t)
+			            (this-single-command-raw-keys)))
 			(current-buffer))))
     (describe-key key)))
 
@@ -6922,8 +6922,8 @@ KEY is a string or a vector."
 	       unread-command-events))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
-	  (describe-key-briefly (cons (read-key-sequence nil t)
-				      (this-single-command-raw-keys))
+	  (describe-key-briefly (list (cons (read-key-sequence nil t)
+				            (this-single-command-raw-keys)))
 				insert (current-buffer))))
     (describe-key-briefly key insert)))
 

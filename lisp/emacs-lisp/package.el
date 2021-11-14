@@ -2202,6 +2202,7 @@ directory."
           (dired-mode))
       (insert-file-contents-literally file)
       (set-visited-file-name file)
+      (set-buffer-modified-p nil)
       (when (string-match "\\.tar\\'" file) (tar-mode)))
     (package-install-from-buffer)))
 
@@ -4178,6 +4179,7 @@ activations need to be changed, such as when `package-load-list' is modified."
               (replace-match (if (match-end 1) "" pfile) t t)))
           (unless (bolp) (insert "\n"))
           (insert ")\n")))
+      (pp `(defvar package-activated-list) (current-buffer))
       (pp `(setq package-activated-list
                  (append ',(mapcar #'package-desc-name package--quickstart-pkgs)
                          package-activated-list))
@@ -4195,6 +4197,7 @@ activations need to be changed, such as when `package-load-list' is modified."
 ;; Local\sVariables:
 ;; version-control: never
 ;; no-update-autoloads: t
+;; byte-compile-warnings: (not make-local)
 ;; End:
 "))
     ;; FIXME: Do it asynchronously in an Emacs subprocess, and

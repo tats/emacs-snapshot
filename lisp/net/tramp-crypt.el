@@ -293,8 +293,9 @@ arguments to pass to the OPERATION."
 
 (defun tramp-crypt-config-file-name (vec)
   "Return the encfs config file name for VEC."
-  (locate-user-emacs-file
-   (concat "tramp-" (tramp-file-name-host vec) tramp-crypt-encfs-config)))
+  (expand-file-name
+   (locate-user-emacs-file
+    (concat "tramp-" (tramp-file-name-host vec) tramp-crypt-encfs-config))))
 
 (defun tramp-crypt-maybe-open-connection (vec)
   "Maybe open a connection VEC.
@@ -595,7 +596,7 @@ absolute file names."
 
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(unless (file-exists-p filename)
-	  (tramp-compat-file-missing v filename))
+	  (tramp-error v 'file-missing filename))
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
 	(when (and (file-directory-p newname)
@@ -697,7 +698,7 @@ absolute file names."
     (directory &optional full match nosort count)
   "Like `directory-files' for Tramp files."
   (unless (file-exists-p directory)
-    (tramp-compat-file-missing (tramp-dissect-file-name directory) directory))
+    (tramp-error (tramp-dissect-file-name directory) 'file-missing directory))
   (when (file-directory-p directory)
     (setq directory (file-name-as-directory (expand-file-name directory)))
     (let* (tramp-crypt-enabled

@@ -3829,7 +3829,7 @@ restore_window_points (Lisp_Object window_markers, ptrdiff_t inserted,
 	Lisp_Object oldpos = XCDR (car);
 	if (MARKERP (marker) && FIXNUMP (oldpos)
 	    && XFIXNUM (oldpos) > same_at_start
-	    && XFIXNUM (oldpos) < same_at_end)
+	    && XFIXNUM (oldpos) <= same_at_end)
 	  {
 	    ptrdiff_t oldsize = same_at_end - same_at_start;
 	    ptrdiff_t newsize = inserted;
