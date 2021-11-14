@@ -119,7 +119,7 @@ index ccb5d93..fd73d7d 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 11c4313..b6dfadd 100755
+index a54c5ac..afe7b5f 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -260,8 +260,7 @@ info_dir ()
@@ -133,10 +133,10 @@ index 11c4313..b6dfadd 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 33e7037..05cd6bd 100644
+index c231c2c..34ad553 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6058,7 +6058,7 @@ AC_DEFUN
+@@ -6075,7 +6075,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index 33e7037..05cd6bd 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6113,15 +6113,6 @@ m4_define
+@@ -6130,15 +6130,6 @@ m4_define
  fi
  ])
  
@@ -189,7 +189,7 @@ index 7982c0d..a9b1395 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index b2772f4..7be9bcf 100644
+index 4470e6b..e437b41 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -357,6 +357,14 @@ view-help-file
