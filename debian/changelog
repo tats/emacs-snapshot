@@ -1,4 +1,4 @@
-emacs28 (28.0.60+0.20211029-0.1) UNRELEASED; urgency=medium
+emacs28 (28.0.60+0.20211120-0.1) UNRELEASED; urgency=medium
 
   [ Dima Kogan ]
   * native-comp can be turned on/off with a build-time var
@@ -21,10 +21,11 @@ emacs28 (28.0.60+0.20211029-0.1) UNRELEASED; urgency=medium
   * Don't install desktop files in -common to avoid conflicts
   * Don't install info files in -common to avoid conflicts
   * Switch to libgccjit-11-dev
-  * New upstream version 28.0.60+0.20211029
-    - emacs-28 branch, emacs-27.1-10342-g3f998a3fc82 on 2021-10-29
+  * Prefer libgccjit-11-dev over libgccjit-10-dev
+  * New upstream version 28.0.60+0.20211020
+    - emacs-28 branch, emacs-27.1-10447-g0dd3883defc on 2021-11-20
 
- -- Tatsuya Kinoshita <tats@debian.org>  Sat, 30 Oct 2021 10:49:23 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 22 Nov 2021 00:18:29 +0900
 
 emacs-snapshot (2:20210405+emacs-27.1-5691-ge0c3925961c-1) unstable; urgency=medium
 
