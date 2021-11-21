@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"
 #include "termhooks.h"
 #include "window.h"
+#include "process.h"
 
 /* Include xwidget bottom end headers.  */
 #ifdef USE_GTK
@@ -39,9 +40,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <JavaScriptCore/JavaScript.h>
 #include <cairo.h>
 #include <X11/Xlib.h>
+#ifdef HAVE_XINPUT2
+#include <X11/extensions/XInput2.h>
+#endif
 #elif defined NS_IMPL_COCOA
 #include "nsxwidget.h"
 #endif
+
+#include <math.h>
 
 static Lisp_Object id_to_xwidget_map;
 static Lisp_Object internal_xwidget_view_list;
@@ -58,6 +64,7 @@ static gboolean webkit_script_dialog_cb (WebKitWebView *, WebKitScriptDialog *,
 static void record_osr_embedder (struct xwidget_view *);
 static void from_embedder (GdkWindow *, double, double, gpointer, gpointer, gpointer);
 static void to_embedder (GdkWindow *, double, double, gpointer, gpointer, gpointer);
+static GdkWindow *pick_embedded_child (GdkWindow *, double, double, gpointer);
 #endif
 
 static struct xwidget *
@@ -187,16 +194,20 @@ fails.  */)
 	      || !XWIDGETP (related)
 	      || !EQ (XXWIDGET (related)->type, Qwebkit))
 	    {
-	      xw->widget_osr = webkit_web_view_new ();
+	      WebKitWebContext *ctx = webkit_web_context_new ();
+	      xw->widget_osr = webkit_web_view_new_with_context (ctx);
+	      g_object_unref (ctx);
 
+	      g_signal_connect (G_OBJECT (ctx),
+				"download-started",
+				G_CALLBACK (webkit_download_cb), xw);
+
+	      webkit_web_view_load_uri (WEBKIT_WEB_VIEW (xw->widget_osr),
+					"about:blank");
 	      /* webkitgtk uses GSubprocess which sets sigaction causing
 		 Emacs to not catch SIGCHLD with its usual handle setup in
 		 'catch_child_signal'.  This resets the SIGCHLD sigaction.  */
-	      struct sigaction old_action;
-	      sigaction (SIGCHLD, NULL, &old_action);
-	      webkit_web_view_load_uri (WEBKIT_WEB_VIEW (xw->widget_osr),
-					"about:blank");
-	      sigaction (SIGCHLD, &old_action, NULL);
+	      catch_child_signal ();
 	    }
 	  else
 	    {
@@ -225,13 +236,16 @@ fails.  */)
 
       gtk_widget_show (xw->widget_osr);
       gtk_widget_show (xw->widgetwindow_osr);
+#ifndef HAVE_XINPUT2
       synthesize_focus_in_event (xw->widgetwindow_osr);
-
+#endif
 
       g_signal_connect (G_OBJECT (gtk_widget_get_window (xw->widgetwindow_osr)),
 			"from-embedder", G_CALLBACK (from_embedder), NULL);
       g_signal_connect (G_OBJECT (gtk_widget_get_window (xw->widgetwindow_osr)),
 			"to-embedder", G_CALLBACK (to_embedder), NULL);
+      g_signal_connect (G_OBJECT (gtk_widget_get_window (xw->widgetwindow_osr)),
+			"pick-embedded-child", G_CALLBACK (pick_embedded_child), NULL);
 
       /* Store some xwidget data in the gtk widgets for convenient
          retrieval in the event handlers.  */
@@ -244,10 +258,6 @@ fails.  */)
           g_signal_connect (G_OBJECT (xw->widget_osr),
                             "load-changed",
                             G_CALLBACK (webkit_view_load_changed_cb), xw);
-
-          g_signal_connect (G_OBJECT (webkit_context),
-                            "download-started",
-                            G_CALLBACK (webkit_download_cb), xw);
 
           g_signal_connect (G_OBJECT (xw->widget_osr),
                             "decide-policy",
@@ -325,6 +335,10 @@ selected frame is not an X-Windows frame.  */)
   GtkContainerClass *klass;
   GtkWidget *widget;
   GtkWidget *temp = NULL;
+#ifdef HAVE_XINPUT2
+  GdkWindow *embedder;
+  GdkWindow *osw;
+#endif
 #endif
 
   CHECK_LIVE_XWIDGET (xwidget);
@@ -336,6 +350,16 @@ selected frame is not an X-Windows frame.  */)
     f = SELECTED_FRAME ();
 
 #ifdef USE_GTK
+#ifdef HAVE_XINPUT2
+  /* XI2 GDK devices crash if we try this without an embedder set.  */
+  if (!f)
+    return Qnil;
+
+  osw = gtk_widget_get_window (xw->widgetwindow_osr);
+  embedder = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
+
+  gdk_offscreen_window_set_embedder (osw, embedder);
+#endif
   widget = gtk_window_get_focus (GTK_WINDOW (xw->widgetwindow_osr));
 
   if (!widget)
@@ -489,6 +513,32 @@ xwidget_from_id (uint32_t id)
 }
 
 #ifdef USE_GTK
+static GdkWindow *
+pick_embedded_child (GdkWindow *window, double x, double y,
+		     gpointer user_data)
+{
+  GtkWidget *widget;
+  GtkWidget *child;
+  GdkEvent event;
+  int xout, yout;
+
+  event.any.window = window;
+  event.any.type = GDK_NOTHING;
+
+  widget = gtk_get_event_widget (&event);
+
+  if (!widget)
+    return NULL;
+
+  child = find_widget_at_pos (widget, lrint (x), lrint (y),
+			      &xout, &yout);
+
+  if (!child)
+    return NULL;
+
+  return gtk_widget_get_window (child);
+}
+
 static void
 record_osr_embedder (struct xwidget_view *view)
 {
@@ -896,7 +946,12 @@ xwidget_button (struct xwidget_view *view,
 
   if (button < 4 || button > 8)
     xwidget_button_1 (view, down_p, x, y, button, modifier_state, time);
+#ifndef HAVE_XINPUT2
   else
+#else
+  else if (!FRAME_DISPLAY_INFO (view->frame)->supports_xi2
+	   || FRAME_DISPLAY_INFO (view->frame)->xi2_version < 1)
+#endif
     {
       GdkEvent *xg_event = gdk_event_new (GDK_SCROLL);
       struct xwidget *model = XXWIDGET (view->model);
@@ -938,6 +993,93 @@ xwidget_button (struct xwidget_view *view,
       gdk_event_free (xg_event);
     }
 }
+
+#ifdef HAVE_XINPUT2
+void
+xwidget_motion_notify (struct xwidget_view *view,
+		       double x, double y, uint state, Time time)
+{
+  GdkEvent *xg_event;
+  GtkWidget *target;
+  struct xwidget *model = XXWIDGET (view->model);
+  int target_x, target_y;
+
+  if (NILP (model->buffer))
+    return;
+
+  record_osr_embedder (view);
+
+  target = find_widget_at_pos (model->widgetwindow_osr,
+			       lrint (x), lrint (y),
+			       &target_x, &target_y);
+
+  if (!target)
+    {
+      target_x = lrint (x);
+      target_y = lrint (y);
+      target = model->widget_osr;
+    }
+
+  xg_event = gdk_event_new (GDK_MOTION_NOTIFY);
+  xg_event->any.window = gtk_widget_get_window (target);
+  xg_event->motion.x = target_x;
+  xg_event->motion.y = target_y;
+  xg_event->motion.x_root = lrint (x);
+  xg_event->motion.y_root = lrint (y);
+  xg_event->motion.time = time;
+  xg_event->motion.state = state;
+  xg_event->motion.device = find_suitable_pointer (view->frame);
+
+  g_object_ref (xg_event->any.window);
+
+  gtk_main_do_event (xg_event);
+  gdk_event_free (xg_event);
+}
+
+void
+xwidget_scroll (struct xwidget_view *view, double x, double y,
+		double dx, double dy, uint state, Time time)
+{
+  GdkEvent *xg_event;
+  GtkWidget *target;
+  struct xwidget *model = XXWIDGET (view->model);
+  int target_x, target_y;
+
+  if (NILP (model->buffer))
+    return;
+
+  record_osr_embedder (view);
+
+  target = find_widget_at_pos (model->widgetwindow_osr,
+			       lrint (x), lrint (y),
+			       &target_x, &target_y);
+
+  if (!target)
+    {
+      target_x = lrint (x);
+      target_y = lrint (y);
+      target = model->widget_osr;
+    }
+
+  xg_event = gdk_event_new (GDK_SCROLL);
+  xg_event->any.window = gtk_widget_get_window (target);
+  xg_event->scroll.direction = GDK_SCROLL_SMOOTH;
+  xg_event->scroll.x = target_x;
+  xg_event->scroll.y = target_y;
+  xg_event->scroll.x_root = lrint (x);
+  xg_event->scroll.y_root = lrint (y);
+  xg_event->scroll.time = time;
+  xg_event->scroll.state = state;
+  xg_event->scroll.delta_x = dx;
+  xg_event->scroll.delta_y = dy;
+  xg_event->scroll.device = find_suitable_pointer (view->frame);
+
+  g_object_ref (xg_event->any.window);
+
+  gtk_main_do_event (xg_event);
+  gdk_event_free (xg_event);
+}
+#endif
 
 void
 xwidget_motion_or_crossing (struct xwidget_view *view, const XEvent *event)
@@ -1011,7 +1153,7 @@ synthesize_focus_in_event (GtkWidget *offscreen_window)
   wnd = gtk_widget_get_window (offscreen_window);
 
   focus_event = gdk_event_new (GDK_FOCUS_CHANGE);
-  focus_event->any.window = wnd;
+  focus_event->focus_change.window = wnd;
   focus_event->focus_change.in = TRUE;
 
   if (FRAME_WINDOW_P (SELECTED_FRAME ()))
@@ -1061,6 +1203,9 @@ xv_do_draw (struct xwidget_view *xw, struct xwidget *w)
 {
   GtkOffscreenWindow *wnd;
   cairo_surface_t *surface;
+
+  if (xw->just_resized)
+    return;
 
   if (NILP (w->buffer))
     {
@@ -1578,6 +1723,7 @@ xwidget_init_view (struct xwidget *xww,
   xv->wdesc = None;
   xv->frame = s->f;
   xv->cursor = cursor_for_hit (xww->hit_result, s->f);
+  xv->just_resized = false;
 #elif defined NS_IMPL_COCOA
   nsxwidget_init_view (xv, xww, s, x, y);
   nsxwidget_resize_view(xv, xww->width, xww->height);
@@ -1609,6 +1755,8 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
 #ifdef USE_GTK
   if (!xv)
     xv = xwidget_init_view (xww, s, x, y);
+
+  xv->just_resized = false;
 #elif defined NS_IMPL_COCOA
   if (!xv)
     {
@@ -1631,7 +1779,9 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
     }
 #endif
 
-  window_box (s->w, TEXT_AREA, &text_area_x, &text_area_y,
+  xv->area = s->area;
+
+  window_box (s->w, xv->area, &text_area_x, &text_area_y,
               &text_area_width, &text_area_height);
 
   clip_left = max (0, text_area_x - x);
@@ -1681,6 +1831,23 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
 				 clip_bottom - clip_top, 0,
 				 CopyFromParent, CopyFromParent,
 				 CopyFromParent, CWEventMask, &a);
+#ifdef HAVE_XINPUT2
+      XIEventMask mask;
+      ptrdiff_t l = XIMaskLen (XI_LASTEVENT);
+      unsigned char *m;
+
+      if (FRAME_DISPLAY_INFO (s->f)->supports_xi2)
+	{
+	  mask.mask = m = alloca (l);
+	  memset (m, 0, l);
+	  mask.mask_len = l;
+	  mask.deviceid = XIAllMasterDevices;
+
+	  XISetMask (m, XI_Motion);
+	  XISelectEvents (xv->dpy, xv->wdesc, &mask, 1);
+	}
+#endif
+      XLowerWindow (xv->dpy, xv->wdesc);
       XDefineCursor (xv->dpy, xv->wdesc, xv->cursor);
       xv->cr_surface = cairo_xlib_surface_create (xv->dpy,
 						  xv->wdesc,
@@ -1771,6 +1938,11 @@ x_draw_xwidget_glyph_string (struct glyph_string *s)
     }
 #endif
 
+#ifdef HAVE_XINPUT2
+  record_osr_embedder (xv);
+  synthesize_focus_in_event (xww->widget_osr);
+#endif
+
 #ifdef USE_GTK
   unblock_input ();
 #endif
@@ -1832,6 +2004,7 @@ DEFUN ("xwidget-webkit-goto-uri",
   uri = ENCODE_FILE (uri);
 #ifdef USE_GTK
   webkit_web_view_load_uri (WEBKIT_WEB_VIEW (xw->widget_osr), SSDATA (uri));
+  catch_child_signal ();
 #elif defined NS_IMPL_COCOA
   nsxwidget_webkit_goto_uri (xw, SSDATA (uri));
 #endif
@@ -1967,6 +2140,28 @@ DEFUN ("xwidget-resize", Fxwidget_resize, Sxwidget_resize, 3, 3, 0,
   xw->width = w;
   xw->height = h;
 
+  block_input ();
+
+  for (Lisp_Object tail = internal_xwidget_view_list; CONSP (tail);
+       tail = XCDR (tail))
+    {
+      if (XWIDGET_VIEW_P (XCAR (tail)))
+        {
+          struct xwidget_view *xv = XXWIDGET_VIEW (XCAR (tail));
+          if (XXWIDGET (xv->model) == xw)
+            {
+#ifdef USE_GTK
+	      xv->just_resized = true;
+	      SET_FRAME_GARBAGED (xv->frame);
+#else
+	      wset_redisplay (XWINDOW (xv->w));
+#endif
+            }
+        }
+    }
+
+  redisplay ();
+
   /* If there is an offscreen widget resize it first.  */
 #ifdef USE_GTK
   if (xw->widget_osr)
@@ -1981,21 +2176,7 @@ DEFUN ("xwidget-resize", Fxwidget_resize, Sxwidget_resize, 3, 3, 0,
 #elif defined NS_IMPL_COCOA
   nsxwidget_resize (xw);
 #endif
-
-  for (Lisp_Object tail = internal_xwidget_view_list; CONSP (tail);
-       tail = XCDR (tail))
-    {
-      if (XWIDGET_VIEW_P (XCAR (tail)))
-        {
-          struct xwidget_view *xv = XXWIDGET_VIEW (XCAR (tail));
-          if (XXWIDGET (xv->model) == xw)
-            {
-	      wset_redisplay (XWINDOW (xv->w));
-            }
-        }
-    }
-
-  redisplay ();
+  unblock_input ();
 
   return Qnil;
 }
@@ -2504,7 +2685,7 @@ LIMIT is not specified or nil, it is treated as `50'.  */)
 
   if (parent)
     {
-      for (i = 1, tem = parent; parent; parent = parent->next, ++i)
+      for (i = 1, tem = parent; tem; tem = tem->next, ++i)
 	{
 	  item = tem->data;
 	  item_title = webkit_back_forward_list_item_get_title (item);
@@ -2522,7 +2703,7 @@ LIMIT is not specified or nil, it is treated as `50'.  */)
 
   if (parent)
     {
-      for (i = 1, tem = parent; parent; parent = parent->next, ++i)
+      for (i = 1, tem = parent; tem; tem = tem->next, ++i)
 	{
 	  item = tem->data;
 	  item_title = webkit_back_forward_list_item_get_title (item);
@@ -2538,7 +2719,87 @@ LIMIT is not specified or nil, it is treated as `50'.  */)
 
   return list3 (back, here, forward);
 }
+
+DEFUN ("xwidget-webkit-estimated-load-progress",
+       Fxwidget_webkit_estimated_load_progress, Sxwidget_webkit_estimated_load_progress,
+       1, 1, 0, doc: /* Get the estimated load progress of XWIDGET, a WebKit widget.
+Return a value ranging from 0.0 to 1.0, based on how close XWIDGET
+is to completely loading its page.  */)
+  (Lisp_Object xwidget)
+{
+  struct xwidget *xw;
+  WebKitWebView *webview;
+  double value;
+
+  CHECK_LIVE_XWIDGET (xwidget);
+  xw = XXWIDGET (xwidget);
+  CHECK_WEBKIT_WIDGET (xw);
+
+  block_input ();
+  webview = WEBKIT_WEB_VIEW (xw->widget_osr);
+  value = webkit_web_view_get_estimated_load_progress (webview);
+  unblock_input ();
+
+  return make_float (value);
+}
 #endif
+
+DEFUN ("xwidget-webkit-set-cookie-storage-file",
+       Fxwidget_webkit_set_cookie_storage_file, Sxwidget_webkit_set_cookie_storage_file,
+       2, 2, 0, doc: /* Make the WebKit widget XWIDGET load and store cookies in FILE.
+
+Cookies will be stored as plain text in FILE, which must be an
+absolute file name.  All xwidgets related to XWIDGET will also
+store cookies in FILE and load them from there.  */)
+  (Lisp_Object xwidget, Lisp_Object file)
+{
+#ifdef USE_GTK
+  struct xwidget *xw;
+  WebKitWebView *webview;
+  WebKitWebContext *context;
+  WebKitCookieManager *manager;
+
+  CHECK_LIVE_XWIDGET (xwidget);
+  xw = XXWIDGET (xwidget);
+  CHECK_WEBKIT_WIDGET (xw);
+  CHECK_STRING (file);
+
+  block_input ();
+  webview = WEBKIT_WEB_VIEW (xw->widget_osr);
+  context = webkit_web_view_get_context (webview);
+  manager = webkit_web_context_get_cookie_manager (context);
+  webkit_cookie_manager_set_persistent_storage (manager,
+						SSDATA (ENCODE_UTF_8 (file)),
+						WEBKIT_COOKIE_PERSISTENT_STORAGE_TEXT);
+  unblock_input ();
+#endif
+
+  return Qnil;
+}
+
+DEFUN ("xwidget-webkit-stop-loading", Fxwidget_webkit_stop_loading,
+       Sxwidget_webkit_stop_loading,
+       1, 1, 0, doc: /* Stop loading data in the WebKit widget XWIDGET.
+This will stop any data transfer that may still be in progress inside
+XWIDGET as part of loading a page.  */)
+  (Lisp_Object xwidget)
+{
+#ifdef USE_GTK
+  struct xwidget *xw;
+  WebKitWebView *webview;
+
+  CHECK_LIVE_XWIDGET (xwidget);
+  xw = XXWIDGET (xwidget);
+  CHECK_WEBKIT_WIDGET (xw);
+
+  block_input ();
+  webview = WEBKIT_WEB_VIEW (xw->widget_osr);
+  webkit_web_view_stop_loading (webview);
+  unblock_input ();
+#endif
+
+  return Qnil;
+}
 
 void
 syms_of_xwidget (void)
@@ -2580,9 +2841,12 @@ syms_of_xwidget (void)
   defsubr (&Sxwidget_webkit_next_result);
   defsubr (&Sxwidget_webkit_previous_result);
   defsubr (&Sset_xwidget_buffer);
+  defsubr (&Sxwidget_webkit_set_cookie_storage_file);
+  defsubr (&Sxwidget_webkit_stop_loading);
 #ifdef USE_GTK
   defsubr (&Sxwidget_webkit_load_html);
   defsubr (&Sxwidget_webkit_back_forward_list);
+  defsubr (&Sxwidget_webkit_estimated_load_progress);
 #endif
   defsubr (&Skill_xwidget);
 
@@ -2598,11 +2862,11 @@ syms_of_xwidget (void)
   DEFSYM (QCplist, ":plist");
 
   DEFVAR_LISP ("xwidget-list", Vxwidget_list,
-               doc:	/* xwidgets list.  */);
+               doc: /* List of all xwidgets that have not been killed.  */);
   Vxwidget_list = Qnil;
 
   DEFVAR_LISP ("xwidget-view-list", Vxwidget_view_list,
-             doc:	/* xwidget views list.  */);
+	       doc: /* List of all xwidget views.  */);
   Vxwidget_view_list = Qnil;
 
   Fprovide (intern ("xwidget-internal"), Qnil);
@@ -2807,6 +3071,20 @@ xwidget_end_redisplay (struct window *w, struct glyph_matrix *matrix)
 }
 
 #ifdef USE_GTK
+void
+lower_frame_xwidget_views (struct frame *f)
+{
+  struct xwidget_view *xv;
+
+  for (Lisp_Object tail = internal_xwidget_view_list; CONSP (tail);
+       tail = XCDR (tail))
+    {
+      xv = XXWIDGET_VIEW (XCAR (tail));
+      if (xv->frame == f && xv->wdesc != None)
+	XLowerWindow (xv->dpy, xv->wdesc);
+    }
+}
+
 void
 kill_frame_xwidget_views (struct frame *f)
 {

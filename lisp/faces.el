@@ -1172,7 +1172,7 @@ an integer value."
            (:height
             'integerp)
            (:stipple
-            (and (memq (window-system frame) '(x ns)) ; No stipple on w32
+            (and (memq (window-system frame) '(x ns)) ; No stipple on w32 or haiku
                  (mapcar #'list
                          (apply #'nconc
                                 (mapcar (lambda (dir)
@@ -2822,7 +2822,7 @@ Note: Other faces cannot inherit from the cursor face."
   '((default
      :box (:line-width 1 :style released-button)
      :foreground "black")
-    (((type x w32 ns) (class color))
+    (((type x w32 ns haiku) (class color))
      :background "grey75")
     (((type x) (class mono))
      :background "grey"))
@@ -2883,13 +2883,17 @@ Note: Other faces cannot inherit from the cursor face."
      ;; making the characters wider, which then would cause unpleasant
      ;; horizontal shifts of the cursor during C-n/C-p movement
      ;; through a line with this face.
-     :box (:line-width (-1 . -1) :color "grey80"))
+     :box (:line-width (-1 . -1) :color "grey80")
+     :inherit fixed-pitch)
     (((class color) (min-colors 88) (background dark))
      :background "grey19" :foreground "LightBlue"
-     :box (:line-width (-1 . -1) :color "grey35"))
-    (((class color grayscale) (background light)) :background "grey90")
-    (((class color grayscale) (background dark)) :background "grey25")
-    (t :background "grey90"))
+     :box (:line-width (-1 . -1) :color "grey35")
+     :inherit fixed-pitch)
+    (((class color grayscale) (background light)) :background "grey90"
+     :inherit fixed-pitch)
+    (((class color grayscale) (background dark)) :background "grey25"
+     :inherit fixed-pitch)
+    (t :background "grey90" :inherit fixed-pitch))
   "Face for keybindings in *Help* buffers.
 
 This face is added by `substitute-command-keys', which see.

@@ -15657,6 +15657,11 @@ redisplay_internal (void)
     }
 #endif
 
+#if defined (HAVE_HAIKU)
+  if (popup_activated_p)
+    return;
+#endif
+
   /* I don't think this happens but let's be paranoid.  */
   if (redisplaying_p)
     return;
@@ -25247,6 +25252,11 @@ display_menu_bar (struct window *w)
     return;
 #endif /* HAVE_NS */
 
+#ifdef HAVE_HAIKU
+  if (FRAME_HAIKU_P (f))
+    return;
+#endif /* HAVE_HAIKU */
+
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
   eassert (!FRAME_WINDOW_P (f));
   init_iterator (&it, w, -1, -1, f->desired_matrix->rows, MENU_FACE_ID);
@@ -33698,6 +33708,11 @@ note_mouse_highlight (struct frame *f, int x, int y)
     return;
 #endif
 
+#if defined (HAVE_HAIKU)
+  if (popup_activated_p)
+    return;
+#endif
+
   if (!f->glyphs_initialized_p
       || f->pointer_invisible)
     return;
@@ -35370,7 +35385,9 @@ line number may be omitted from the mode line.  */);
   line_number_display_limit_width = 200;
 
   DEFVAR_BOOL ("highlight-nonselected-windows", highlight_nonselected_windows,
-    doc: /* Non-nil means highlight region even in nonselected windows.  */);
+    doc: /* Non-nil means highlight active region even in nonselected windows.
+When nil (the default), the active region is only highlighted when
+the window is selected.  */);
   highlight_nonselected_windows = false;
 
   DEFVAR_BOOL ("multiple-frames", multiple_frames,
@@ -35934,11 +35951,13 @@ message displayed by its counterpart function specified by
   Vclear_message_function = Qnil;
 
   DEFVAR_LISP ("redisplay--all-windows-cause", Vredisplay__all_windows_cause,
-	       doc: /*  */);
+	       doc: /* Code of the cause for redisplaying all windows.
+Internal use only.  */);
   Vredisplay__all_windows_cause = Fmake_hash_table (0, NULL);
 
   DEFVAR_LISP ("redisplay--mode-lines-cause", Vredisplay__mode_lines_cause,
-	       doc: /*  */);
+	       doc: /* Code of the cause for redisplaying mode lines.
+Internal use only.  */);
   Vredisplay__mode_lines_cause = Fmake_hash_table (0, NULL);
 
   DEFVAR_BOOL ("redisplay--inhibit-bidi", redisplay__inhibit_bidi,
@@ -35964,10 +35983,11 @@ mouse stays within the extent of a single glyph (except for images).  */);
   tab_bar__dragging_in_progress = false;
 
   DEFVAR_BOOL ("redisplay-skip-initial-frame", redisplay_skip_initial_frame,
-    doc: /* Non-nil to skip redisplay in initial frame.
-The initial frame is not displayed anywhere, so skipping it is
-best except in special circumstances such as running redisplay tests
-in batch mode.   */);
+    doc: /* Non-nil means skip redisplay of the initial frame.
+The initial frame is the text-mode frame used by Emacs internally during
+the early stages of startup.  That frame is not displayed anywhere, so
+skipping it is best except in special circumstances such as running
+redisplay tests in batch mode.   */);
   redisplay_skip_initial_frame = true;
 
   DEFVAR_BOOL ("redisplay-skip-fontification-on-input",

@@ -1677,6 +1677,8 @@ If it's not a Tramp filename, return nil."
    ((tramp-tramp-file-p vec-or-filename)
     (tramp-dissect-file-name vec-or-filename))))
 
+(put #'tramp-ensure-dissected-file-name 'tramp-suppress-trace t)
+
 (defun tramp-dissect-hop-name (name &optional nodefault)
   "Return a `tramp-file-name' structure of `hop' part of NAME.
 See `tramp-dissect-file-name' for details."
@@ -1902,29 +1904,55 @@ The outline level is equal to the verbosity of the Tramp message."
 
 (put #'tramp-debug-outline-level 'tramp-suppress-trace t)
 
+;; This function takes action since Emacs 28.1, when
+;; `read-extended-command-predicate' is set to
+;; `command-completion-default-include-p'.
+(defun tramp-debug-buffer-command-completion-p (_symbol buffer)
+  "A predicate for Tramp interactive commands.
+They are completed by \"M-x TAB\" only in Tramp debug buffers."
+  (with-current-buffer buffer
+    (string-equal (buffer-substring 1 10) ";; Emacs:")))
+
+(put #'tramp-debug-buffer-command-completion-p 'tramp-suppress-trace t)
+
+(defun tramp-setup-debug-buffer ()
+  "Function to setup debug buffers."
+  ;; (declare (completion tramp-debug-buffer-command-completion-p))
+  (interactive)
+  (set-buffer-file-coding-system 'utf-8)
+  (setq buffer-undo-list t)
+  ;; Activate `outline-mode'.  This runs `text-mode-hook' and
+  ;; `outline-mode-hook'.  We must prevent that local processes die.
+  ;; Yes: I've seen `flyspell-mode', which starts "ispell".
+  ;; `(custom-declare-variable outline-minor-mode-prefix ...)'  raises
+  ;; on error in `(outline-mode)', we don't want to see it in the
+  ;; traces.
+  (let ((default-directory tramp-compat-temporary-file-directory))
+    (outline-mode))
+  (setq-local outline-level 'tramp-debug-outline-level)
+  (setq-local font-lock-keywords
+              ;; FIXME: This `(t FOO . BAR)' representation in
+              ;; `font-lock-keywords' is supposed to be an internal
+              ;; implementation "detail".  Don't abuse it here!
+              `(t (eval ,tramp-debug-font-lock-keywords t)
+                  ,(eval tramp-debug-font-lock-keywords t)))
+  ;; Do not edit the debug buffer.
+  (use-local-map special-mode-map)
+  ;; For debugging purposes.
+  (local-set-key "\M-n" 'clone-buffer)
+  (add-hook 'clone-buffer-hook #'tramp-setup-debug-buffer nil 'local))
+
+(put #'tramp-setup-debug-buffer 'tramp-suppress-trace t)
+
+(function-put
+ #'tramp-setup-debug-buffer 'completion-predicate
+ #'tramp-debug-buffer-command-completion-p)
+
 (defun tramp-get-debug-buffer (vec)
   "Get the debug buffer for VEC."
   (with-current-buffer (get-buffer-create (tramp-debug-buffer-name vec))
     (when (bobp)
-      (set-buffer-file-coding-system 'utf-8)
-      (setq buffer-undo-list t)
-      ;; Activate `outline-mode'.  This runs `text-mode-hook' and
-      ;; `outline-mode-hook'.  We must prevent that local processes
-      ;; die.  Yes: I've seen `flyspell-mode', which starts "ispell".
-      ;; `(custom-declare-variable outline-minor-mode-prefix ...)'
-      ;; raises on error in `(outline-mode)', we don't want to see it
-      ;; in the traces.
-      (let ((default-directory tramp-compat-temporary-file-directory))
-	(outline-mode))
-      (setq-local outline-level 'tramp-debug-outline-level)
-      (setq-local font-lock-keywords
-                  ;; FIXME: This `(t FOO . BAR)' representation in
-                  ;; `font-lock-keywords' is supposed to be an
-                  ;; internal implementation "detail".  Don't abuse it here!
-                  `(t (eval ,tramp-debug-font-lock-keywords t)
-                      ,(eval tramp-debug-font-lock-keywords t)))
-      ;; Do not edit the debug buffer.
-      (use-local-map special-mode-map))
+      (tramp-setup-debug-buffer))
     (current-buffer)))
 
 (put #'tramp-get-debug-buffer 'tramp-suppress-trace t)
@@ -2495,6 +2523,8 @@ Must be handled by the callers."
 	      file-system-info
 	      ;; Emacs 28+ only.
 	      file-locked-p lock-file make-lock-file-name unlock-file
+	      ;; Emacs 29+ only.
+	      abbreviate-file-name
 	      ;; Tramp internal magic file name function.
 	      tramp-set-file-uid-gid))
     (if (file-name-absolute-p (nth 0 args))
@@ -3282,6 +3312,28 @@ User is always nil."
 (defvar tramp-handle-write-region-hook nil
   "Normal hook to be run at the end of `tramp-*-handle-write-region'.")
 
+;; `directory-abbrev-apply' and `directory-abbrev-make-regexp' exists
+;; since Emacs 29.1.  Since this handler isn't called for older
+;; Emacsen, it is save to invoke them via `tramp-compat-funcall'.
+(defun tramp-handle-abbreviate-file-name (filename)
+  "Like `abbreviate-file-name' for Tramp files."
+  (let* ((case-fold-search (file-name-case-insensitive-p filename))
+	 (vec (tramp-dissect-file-name filename))
+         (home-dir
+          (with-tramp-connection-property vec "home-directory"
+            (tramp-compat-funcall
+	     'directory-abbrev-apply
+	     (expand-file-name (tramp-make-tramp-file-name vec "~"))))))
+    ;; If any elt of `directory-abbrev-alist' matches this name,
+    ;; abbreviate accordingly.
+    (setq filename (tramp-compat-funcall 'directory-abbrev-apply filename))
+    ;; Abbreviate home directory.
+    (if (string-match
+	 (tramp-compat-funcall 'directory-abbrev-make-regexp home-dir) filename)
+        (tramp-make-tramp-file-name
+	 vec (concat "~" (substring filename (match-beginning 1))))
+      filename)))
+
 (defun tramp-handle-access-file (filename string)
   "Like `access-file' for Tramp files."
   (setq filename (file-truename filename))
@@ -3402,13 +3454,16 @@ User is always nil."
       ;; Do not keep "/..".
       (when (string-match-p "^/\\.\\.?$" localname)
 	(setq localname "/"))
-      ;; Do normal `expand-file-name' (this does "/./" and "/../").
+      ;; Do normal `expand-file-name' (this does "/./" and "/../"),
+      ;; unless there are tilde characters in file name.
       ;; `default-directory' is bound, because on Windows there would
       ;; be problems with UNC shares or Cygwin mounts.
       (let ((default-directory tramp-compat-temporary-file-directory))
 	(tramp-make-tramp-file-name
-	 v (tramp-drop-volume-letter
-	    (tramp-run-real-handler #'expand-file-name (list localname))))))))
+	 v (if (string-match-p "\\`~" localname)
+	       localname
+	     (tramp-drop-volume-letter
+	      (tramp-run-real-handler #'expand-file-name (list localname)))))))))
 
 (defun tramp-handle-file-accessible-directory-p (filename)
   "Like `file-accessible-directory-p' for Tramp files."

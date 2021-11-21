@@ -246,6 +246,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_NS
 #define GCGraphicsExposures 0
 #endif /* HAVE_NS */
+
+#ifdef HAVE_HAIKU
+#define GCGraphicsExposures 0
+#endif /* HAVE_HAIKU */
 #endif /* HAVE_WINDOW_SYSTEM */
 
 #include "buffer.h"
@@ -555,8 +559,8 @@ x_free_gc (struct frame *f, Emacs_GC *gc)
 
 #endif  /* HAVE_NTGUI */
 
-#ifdef HAVE_NS
-/* NS emulation of GCs */
+#if defined (HAVE_NS) || defined (HAVE_HAIKU)
+/* NS and Haiku emulation of GCs */
 
 static Emacs_GC *
 x_create_gc (struct frame *f,
@@ -4837,7 +4841,7 @@ lookup_named_face (struct window *w, struct frame *f,
 
 /* Return the display face-id of the basic face whose canonical face-id
    is FACE_ID.  The return value will usually simply be FACE_ID, unless that
-   basic face has bee remapped via Vface_remapping_alist.  This function is
+   basic face has been remapped via Vface_remapping_alist.  This function is
    conservative: if something goes wrong, it will simply return FACE_ID
    rather than signal an error.  Window W, if non-NULL, is used to filter
    face specifications for remapping.  */
@@ -6368,20 +6372,19 @@ face_at_buffer_position (struct window *w, ptrdiff_t pos,
     int face_id;
 
     if (base_face_id >= 0)
-      {
-	face_id = base_face_id;
-	/* Make sure the base face ID is usable: if someone freed the
-	   cached faces since we've looked up the base face, we need
-	   to look it up again.  */
-	if (!FACE_FROM_ID_OR_NULL (f, face_id))
-	  face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
-      }
+      face_id = base_face_id;
     else if (NILP (Vface_remapping_alist))
       face_id = DEFAULT_FACE_ID;
     else
       face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
 
-    default_face = FACE_FROM_ID (f, face_id);
+    default_face = FACE_FROM_ID_OR_NULL (f, face_id);
+    /* Make sure the default face ID is usable: if someone freed the
+       cached faces since we've looked up these faces, we need to look
+       them up again.  */
+    if (!default_face)
+      default_face = FACE_FROM_ID (f,
+				   lookup_basic_face (w, f, DEFAULT_FACE_ID));
   }
 
   /* Optimize common cases where we can use the default face.  */
@@ -6566,7 +6569,9 @@ face_at_string_position (struct window *w, Lisp_Object string,
   else
     *endptr = -1;
 
-  base_face = FACE_FROM_ID (f, base_face_id);
+  base_face = FACE_FROM_ID_OR_NULL (f, base_face_id);
+  if (!base_face)
+    base_face = FACE_FROM_ID (f, lookup_basic_face (w, f, DEFAULT_FACE_ID));
 
   /* Optimize the default case that there is no face property.  */
   if (NILP (prop)

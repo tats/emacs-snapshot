@@ -211,6 +211,10 @@ The tests use this method if no configured MH variant is found."
              "/abso-folder/bar   has no messages."
              "/abso-folder/foo   has no messages."
              "/abso-folder/food  has no messages."))
+           (("folders" "-noheader" "-norecurse" "-nototal" "+/") .
+            ("/+             has no messages ; (others)."
+             "//abso-folder  has no messages ; (others)."
+             "//tmp          has no messages ; (others)."))
            ))
         (arglist (cons (file-name-base program) args)))
     (let ((response-list-cons (assoc arglist argument-responses)))
@@ -437,18 +441,24 @@ and the `should' macro requires idempotent evaluation anyway."
 
 (ert-deftest mh-folder-completion-function-08-plus-slash ()
   "Test `mh-folder-completion-function' with `+/'."
-  :expected-result :failed              ;to be fixed in a patch by mkupfer
-  (mh-test-folder-completion-1 "+/" "+/" "tmp/" nil)
-    ;; case "bb"
-    (with-mh-test-env
-      (should (equal nil
-                     (member (format "+%s/" mh-test-rel-folder)
-                             (mh-folder-completion-function "+/" nil t))))))
+  ;; This test fails with Mailutils 3.5, 3.7, and 3.13.
+  (with-mh-test-env
+    (skip-unless (not (and (stringp mh-variant-in-use)
+                           (string-search "GNU Mailutils" mh-variant-in-use)))))
+  (mh-test-folder-completion-1 "+/" "+/" "tmp/" t)
+  ;; case "bb"
+  (with-mh-test-env
+    (should (equal nil
+                   (member (format "+%s/" mh-test-rel-folder)
+                           (mh-folder-completion-function "+/" nil t))))))
 
 (ert-deftest mh-folder-completion-function-09-plus-slash-tmp ()
   "Test `mh-folder-completion-function' with `+/tmp'."
-  :expected-result :failed              ;to be fixed in a patch by mkupfer
-  (mh-test-folder-completion-1 "+/tmp" "+/tmp" "tmp/" t))
+  ;; This test fails with Mailutils 3.5, 3.7, and 3.13.
+  (with-mh-test-env
+    (skip-unless (not (and (stringp mh-variant-in-use)
+                           (string-search "GNU Mailutils" mh-variant-in-use)))))
+  (mh-test-folder-completion-1 "+/tmp" "+/tmp/" "tmp/" t))
 
 (ert-deftest mh-folder-completion-function-10-plus-slash-abs-folder ()
   "Test `mh-folder-completion-function' with `+/abso-folder'."
