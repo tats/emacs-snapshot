@@ -1059,8 +1059,10 @@ the function needs to examine, starting with FILE."
     (if root (file-name-as-directory root))))
 
 (defcustom user-emacs-directory-warning t
-  "Non-nil means warn if cannot access `user-emacs-directory'.
-Set this to nil at your own risk..."
+  "Non-nil means warn if unable to access or create `user-emacs-directory'.
+Set this to nil at your own risk, as it might lead to data loss
+when Emacs tries to write something to a non-existent or
+inaccessible location."
   :type 'boolean
   :group 'initialization
   :version "24.4")
@@ -1564,6 +1566,7 @@ This implementation works on magic file names."
 
 (defun make-nearby-temp-file (prefix &optional dir-flag suffix)
   "Create a temporary file as close as possible to `default-directory'.
+Return the absolute file name of the created file.
 If PREFIX is a relative file name, and `default-directory' is a
 remote file name or located on a mounted file systems, the
 temporary file is created in the directory returned by the

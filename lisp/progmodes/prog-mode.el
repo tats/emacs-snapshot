@@ -51,7 +51,7 @@
 
   (unless (xref-marker-stack-empty-p)
     (define-key-after menu [xref-pop]
-      '(menu-item "Back Definition" xref-pop-marker-stack
+      '(menu-item "Go Back" xref-pop-marker-stack
                   :help "Back to the position of the last search")
       'prog-separator))
 
@@ -88,7 +88,7 @@
 
   ;; Include text-mode select menu only in strings and comments.
   (when (nth 8 (save-excursion (syntax-ppss (posn-point (event-end click)))))
-    (text-mode-menu menu click))
+    (text-mode-context-menu menu click))
 
   menu)
 

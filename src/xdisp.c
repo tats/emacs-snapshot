@@ -25592,7 +25592,8 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
   push_kboard (FRAME_KBOARD (it.f));
   record_unwind_save_match_data ();
 
-  if (NILP (Vmode_line_compact))
+  if (NILP (Vmode_line_compact)
+      || face_id == HEADER_LINE_FACE_ID || face_id == TAB_LINE_FACE_ID)
     {
       mode_line_target = MODE_LINE_DISPLAY;
       display_mode_element (&it, 0, 0, 0, format, Qnil, false);
@@ -35204,7 +35205,9 @@ line number may be omitted from the mode line.  */);
   line_number_display_limit_width = 200;
 
   DEFVAR_BOOL ("highlight-nonselected-windows", highlight_nonselected_windows,
-    doc: /* Non-nil means highlight region even in nonselected windows.  */);
+    doc: /* Non-nil means highlight active region even in nonselected windows.
+When nil (the default), the active region is only highlighted when
+the window is selected.  */);
   highlight_nonselected_windows = false;
 
   DEFVAR_BOOL ("multiple-frames", multiple_frames,

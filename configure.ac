@@ -485,6 +485,7 @@ OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
 OPTION_DEFAULT_ON([modules],[don't compile with dynamic modules support])
 OPTION_DEFAULT_ON([threads],[don't compile with elisp threading support])
 OPTION_DEFAULT_OFF([native-compilation],[compile with Emacs Lisp native compiler support])
+OPTION_DEFAULT_OFF([cygwin32-native-compilation],[use native compilation on 32-bit Cygwin])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
  [use a file notification library (LIB one of: yes, inotify, kqueue, gfile, w32, no)])],
@@ -3814,6 +3815,16 @@ source on this site:
 HAVE_NATIVE_COMP=no
 LIBGCCJIT_LIBS=
 LIBGCCJIT_CFLAGS=
+if test "$canonical" = i686-pc-cygwin; then
+  if test "${with_cygwin32_native_compilation}" = yes; then
+    with_native_compilation=yes
+  elif test "${with_native_compilation}" != no; then
+    AC_MSG_ERROR([Native compilation is not supported on 32-bit Cygwin.
+If you really want to try it anyway, use the configure option
+'--with-cygwin32-native-compilation'.])
+  fi
+fi
+
 if test "${with_native_compilation}" != "no"; then
     if test "${HAVE_PDUMPER}" = no; then
        AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
@@ -4734,6 +4745,23 @@ AC_FUNC_FORK
 dnl AC_CHECK_FUNCS_ONCE wouldn’t be right for snprintf, which needs
 dnl the current CFLAGS etc.
 AC_CHECK_FUNCS(snprintf)
+
+dnl posix_spawn.  The chdir and setsid functionality is relatively
+dnl recent, so we check for it specifically.
+AC_CHECK_HEADERS([spawn.h])
+AC_SUBST([HAVE_SPAWN_H])
+AC_CHECK_FUNCS([posix_spawn \
+                posix_spawn_file_actions_addchdir \
+                posix_spawn_file_actions_addchdir_np \
+                posix_spawnattr_setflags])
+AC_SUBST([HAVE_POSIX_SPAWN])
+AC_SUBST([HAVE_POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR])
+AC_SUBST([HAVE_POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR_NP])
+AC_SUBST([HAVE_POSIX_SPAWNATTR_SETFLAGS])
+AC_CHECK_DECLS([POSIX_SPAWN_SETSID], [], [], [[
+               #include <spawn.h>
+               ]])
+AC_SUBST([HAVE_DECL_POSIX_SPAWN_SETSID])
 
 dnl Check for glib.  This differs from other library checks in that
 dnl Emacs need not link to glib unless some other library is already
