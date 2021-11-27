@@ -345,6 +345,7 @@ x_extension_initialize (struct x_display_info *dpyinfo)
   dpyinfo->ext_codes = ext_codes;
 }
 
+#endif /* HAVE_CAIRO */
 
 #ifdef HAVE_XINPUT2
 
@@ -370,6 +371,29 @@ x_free_xi_devices (struct x_display_info *dpyinfo)
 
   unblock_input ();
 }
+
+/* The code below handles the tracking of scroll valuators on XInput
+   2, in order to support scroll wheels that report information more
+   granular than a screen line.
+
+   On X, when the XInput 2 extension is being utilized, the states of
+   the mouse wheels in each axis are stored as absolute values inside
+   "valuators" attached to each mouse device.  To obtain the delta of
+   the scroll wheel from a motion event (which is used to report that
+   some valuator has changed), it is necessary to iterate over every
+   valuator that changed, and compare its previous value to the
+   current value of the valuator.
+
+   Each individual valuator also has an "interval", which is the
+   amount you must divide that delta by in order to obtain a delta in
+   the terms of scroll units.
+
+   This delta however is still intermediate, to make driver
+   implementations easier.  The XInput developers recommend (and most
+   programs use) the following algorithm to convert from scroll unit
+   deltas to pixel deltas:
+
+     pixels_scrolled = pow (window_height, 2.0 / 3.0) * delta;  */
 
 /* Setup valuator tracking for XI2 master devices on
    DPYINFO->display.  */
@@ -563,6 +587,8 @@ xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id)
 }
 
 #endif
+
+#ifdef USE_CAIRO
 
 void
 x_cr_destroy_frame_context (struct frame *f)
@@ -9870,7 +9896,25 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    x_display_set_last_user_time (dpyinfo, xi_event->time);
 	    x_detect_focus_change (dpyinfo, any, event, &inev.ie);
-	    xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid);
+
+	    /* One problem behind the design of XInput 2 scrolling is
+	       that valuators are not unique to each window, but only
+	       the window that has grabbed the valuator's device or
+	       the window that the device's pointer is on top of can
+	       receive motion events.  There is also no way to
+	       retrieve the value of a valuator outside of each motion
+	       event.
+
+	       As such, to prevent wildly inaccurate results when the
+	       valuators have changed outside Emacs, we reset our
+	       records of each valuator's value whenever the pointer
+	       re-enters a frame after its valuators have potentially
+	       been changed elsewhere.  */
+	    if (enter->detail != XINotifyInferior
+		&& enter->mode != XINotifyPassiveUngrab
+		&& enter->mode != XINotifyUngrab && any)
+	      xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid);
+
 	    f = any;
 
 	    if (f && x_mouse_click_focus_ignore_position)
@@ -9895,7 +9939,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    x_display_set_last_user_time (dpyinfo, xi_event->time);
 	    x_detect_focus_change (dpyinfo, any, event, &inev.ie);
-	    xi_reset_scroll_valuators_for_device_id (dpyinfo, leave->deviceid);
 
 	    f = x_top_window_to_frame (dpyinfo, leave->event);
 	    if (f)
@@ -9940,6 +9983,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    struct xi_scroll_valuator_t *val;
 		    double delta, scroll_unit;
 
+
+		    /* See the comment on top of
+		       x_init_master_valuators for more details on how
+		       scroll wheel movement is reported on XInput 2.  */
 		    delta = x_get_scroll_valuator_delta (dpyinfo, xev->deviceid,
 							 i, *values, &val);
 
@@ -9965,7 +10012,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      goto XI_OTHER;
 			  }
 
-			scroll_unit = pow (FRAME_PIXEL_HEIGHT (f), 2.0 / 3.0);
 			found_valuator = true;
 
 			if (signbit (delta) != signbit (val->emacs_value))
@@ -9991,6 +10037,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			inev.ie.modifiers
 			  |= x_x_to_emacs_modifiers (dpyinfo,
 						     xev->mods.effective);
+
+			scroll_unit = pow (FRAME_PIXEL_HEIGHT (f), 2.0 / 3.0);
 
 			if (val->horizontal)
 			  {
@@ -10037,6 +10085,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    ev.x = lrint (xev->event_x);
 	    ev.y = lrint (xev->event_y);
 	    ev.window = xev->event;
+	    ev.time = xev->time;
 
 	    previous_help_echo_string = help_echo_string;
 	    help_echo_string = Qnil;
@@ -10128,11 +10177,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      bool tool_bar_p = false;
 	      struct xi_device_t *device;
 
+#ifdef XIPointerEmulated
 	      /* Ignore emulated scroll events when XI2 native
 		 scroll events are present.  */
-	      if (dpyinfo->xi2_version >= 1 && xev->detail >= 4
-		  && xev->detail <= 8)
+	      if (dpyinfo->xi2_version >= 1
+		  && xev->detail >= 4
+		  && xev->detail <= 8
+		  && xev->flags & XIPointerEmulated)
 		goto XI_OTHER;
+#endif
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
@@ -10141,10 +10194,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      bv.x = lrint (xev->event_x);
 	      bv.y = lrint (xev->event_y);
 	      bv.window = xev->event;
-	      bv.state = xev->mods.base
-		| xev->mods.effective
-		| xev->mods.latched
-		| xev->mods.locked;
+	      bv.state = xev->mods.effective;
 	      bv.time = xev->time;
 
 	      memset (&compose_status, 0, sizeof (compose_status));
@@ -10292,10 +10342,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    }
 	  case XI_KeyPress:
 	    {
-	      int state = xev->mods.base
-		| xev->mods.effective
-		| xev->mods.latched
-		| xev->mods.locked;
+	      int state = xev->mods.effective;
 	      Lisp_Object c;
 #ifdef HAVE_XKB
 	      unsigned int mods_rtrn;
@@ -10305,11 +10352,39 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      char copy_buffer[81];
 	      char *copy_bufptr = copy_buffer;
 	      unsigned char *copy_ubufptr;
-#ifdef HAVE_XKB
 	      int copy_bufsiz = sizeof (copy_buffer);
-#endif
 	      ptrdiff_t i;
 	      int nchars, len;
+
+#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
+	      /* Dispatch XI_KeyPress events when in menu.  */
+	      if (popup_activated ())
+		goto XI_OTHER;
+#endif
+
+#ifdef HAVE_X_I18N
+	      XKeyPressedEvent xkey;
+
+	      memset (&xkey, 0, sizeof xkey);
+
+	      xkey.type = KeyPress;
+	      xkey.serial = xev->serial;
+	      xkey.send_event = xev->send_event;
+	      xkey.display = xev->display;
+	      xkey.window = xev->event;
+	      xkey.root = xev->root;
+	      xkey.subwindow = xev->child;
+	      xkey.time = xev->time;
+	      xkey.state = xev->mods.effective;
+	      xkey.keycode = xev->detail;
+	      xkey.same_screen = True;
+
+	      if (x_filter_event (dpyinfo, (XEvent *) &xkey))
+		{
+		  *finish = X_EVENT_DROP;
+		  goto XI_OTHER;
+		}
+#endif
 
 #ifdef HAVE_XKB
 	      if (dpyinfo->xkb_desc)
@@ -10339,12 +10414,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      x_display_set_last_user_time (dpyinfo, xev->time);
 	      ignore_next_mouse_click_timeout = 0;
-
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-	      /* Dispatch XI_KeyPress events when in menu.  */
-	      if (popup_activated ())
-		goto XI_OTHER;
-#endif
 
 	      f = x_any_window_to_frame (dpyinfo, xev->event);
 
@@ -10384,25 +10453,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  inev.ie.timestamp = xev->time;
 
 #ifdef HAVE_X_I18N
-		  XKeyPressedEvent xkey;
-
-		  memset (&xkey, 0, sizeof xkey);
-
-		  xkey.type = KeyPress;
-		  xkey.serial = 0;
-		  xkey.send_event = xev->send_event;
-		  xkey.display = xev->display;
-		  xkey.window = xev->event;
-		  xkey.root = xev->root;
-		  xkey.subwindow = xev->child;
-		  xkey.time = xev->time;
-		  xkey.state = state;
-		  xkey.keycode = keycode;
-		  xkey.same_screen = True;
-
-		  if (x_filter_event (dpyinfo, (XEvent *) &xkey))
-		    goto xi_done_keysym;
-
 		  if (FRAME_XIC (f))
 		    {
 		      Status status_return;
@@ -10433,53 +10483,38 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			emacs_abort ();
 		    }
 		  else
-		    {
 #endif
+		    {
 #ifdef HAVE_XKB
 		      int overflow = 0;
 		      KeySym sym = keysym;
 
 		      if (dpyinfo->xkb_desc)
 			{
-			  if (!(nbytes = XkbTranslateKeySym (dpyinfo->display, &sym,
-							     state & ~mods_rtrn, copy_bufptr,
-							     copy_bufsiz, &overflow)))
-			    goto XI_OTHER;
+			  nbytes = XkbTranslateKeySym (dpyinfo->display, &sym,
+						       state & ~mods_rtrn, copy_bufptr,
+						       copy_bufsiz, &overflow);
+			  if (overflow)
+			    {
+			      copy_bufptr = alloca ((copy_bufsiz += overflow)
+						    * sizeof *copy_bufptr);
+			      overflow = 0;
+			      nbytes = XkbTranslateKeySym (dpyinfo->display, &sym,
+							   state & ~mods_rtrn, copy_bufptr,
+							   copy_bufsiz, &overflow);
+
+			      if (overflow)
+				nbytes = 0;
+			    }
 			}
 		      else
-#else
-			{
-			  block_input ();
-			  char *str = XKeysymToString (keysym);
-			  if (!str)
-			    {
-			      unblock_input ();
-			      goto XI_OTHER;
-			    }
-			  nbytes = strlen (str) + 1;
-			  copy_bufptr = alloca (nbytes);
-			  strcpy (copy_bufptr, str);
-			  unblock_input ();
-			}
 #endif
-#ifdef HAVE_XKB
-		      if (overflow)
 			{
-			  overflow = 0;
-			  copy_bufptr = alloca (copy_bufsiz + overflow);
-			  keysym = sym;
-			  if (!(nbytes = XkbTranslateKeySym (dpyinfo->display, &sym,
-							     state & ~mods_rtrn, copy_bufptr,
-							     copy_bufsiz + overflow, &overflow)))
-			    goto XI_OTHER;
-
-			  if (overflow)
-			    goto XI_OTHER;
+			  nbytes = XLookupString (&xkey, copy_bufptr,
+						  copy_bufsiz, &keysym,
+						  &compose_status);
 			}
-#endif
-#ifdef HAVE_X_I18N
 		    }
-#endif
 
 		  /* First deal with keysyms which have defined
 		     translations to characters.  */
@@ -10652,6 +10687,25 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    }
 	  case XI_KeyRelease:
 	    x_display_set_last_user_time (dpyinfo, xev->time);
+#ifdef HAVE_X_I18N
+	    XKeyPressedEvent xkey;
+
+	    memset (&xkey, 0, sizeof xkey);
+
+	    xkey.type = KeyRelease;
+	    xkey.serial = xev->serial;
+	    xkey.send_event = xev->send_event;
+	    xkey.display = xev->display;
+	    xkey.window = xev->event;
+	    xkey.root = xev->root;
+	    xkey.subwindow = xev->child;
+	    xkey.time = xev->time;
+	    xkey.state = xev->mods.effective;
+	    xkey.keycode = xev->detail;
+	    xkey.same_screen = True;
+
+	    x_filter_event (dpyinfo, (XEvent *) &xkey);
+#endif
 	    goto XI_OTHER;
 	  case XI_PropertyEvent:
 	  case XI_HierarchyChanged:
@@ -15156,6 +15210,6 @@ always uses gtk_window_move and ignores the value of this variable.  */);
 	       doc: /* Non-nil means send a wheel event only for scrolling at least one screen line.
 Otherwise, a wheel event will be sent every time the mouse wheel is
 moved.  This option is only effective when Emacs is built with XInput
-2 or with Haiku windowing support.  */);
+2, with Haiku windowing support, or with NS.  */);
   x_coalesce_scroll_events = true;
 }

@@ -76,9 +76,36 @@ time.
 * Changes in Emacs 29.1
 
 +++
+** New face 'mode-line-active'.
+This inherits from the 'mode-line' face, but is the face actually used
+on the mode lines (along with 'mode-line-inactive').
+
+---
+** The mode line now uses a proportional font by default.
+To get the old monospaced mode line back, customize the
+'mode-line-active' and 'mode-line-inactive' faces not to inherit from
+the 'variable-pitch' face, or add this to your ~/.emacs:
+
+  (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
+  (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
+
++++
+** New function 'buffer-text-pixel-size'.
+This is similar to 'window-text-pixel-size', but can be used when the
+buffer isn't displayed.
+
++++
 ** New X resource: "borderThickness".
 This controls the thickness of the external borders of the menu bars
 and pop-up menus.
+
+---
+** New minor mode 'pixel-scroll-precision-mode'.
+When enabled, and if your mouse supports it, you can scroll the
+display up or down at pixel resolution, according to what your mouse
+wheel reports.  Unlike 'pixel-scroll-mode', this mode scrolls the
+display pixel-by-pixel, as opposed to only animating line-by-line
+scrolls.
 
 ** Terminal Emacs
 
@@ -99,8 +126,6 @@ Executing 'ert-deftest' with the same name as an existing test causes
 the previous definition to be discarded, which was probably not
 intended when this occurs in batch mode.  To remedy the error, rename
 tests so that they all have unique names.
-
-** Emacs now supports Unicode Standard version 14.0.
 
 ** Emoji
 
@@ -177,6 +202,11 @@ For example, a 'display-buffer-alist' entry of
 
 will make the body of the chosen window 40 columns wide.  For the
 height use 'window-height' in combination with 'body-lines'.
+
+** Tab Bars and Tab Lines
+
+---
+*** 'C-x t RET' creates a new tab when the provided tab name doesn't exist.
 
 ** Better detection of text suspiciously reordered on display.
 The function 'bidi-find-overridden-directionality' has been extended
@@ -318,6 +348,10 @@ the common "utm_" trackers from URLs.
 
 ** Gnus
 
+---
+*** New face 'gnus-header'.
+All other 'gnus-header-*' faces inherit from this face now.
+
 +++
 *** New user option 'gnus-treat-emojize-symbols'.
 If non-nil, symbols that have an emoji representation will be
@@ -431,7 +465,7 @@ This works like 'image-transform-fit-to-window'.
 
 *** New user option 'image-auto-resize-max-scale-percent'.
 The new 'fit-window' option will never scale an image more than this
-much (in percent).  It is nil by default.
+much (in percent).  It is nil by default, which means no limit.
 
 ** Image-Dired
 
@@ -544,7 +578,7 @@ WebKit widget.
 
 +++
 *** New minor mode 'xwidget-webkit-isearch-mode'.
-This mode acts similarly to incremental search, and allows to search
+This mode acts similarly to incremental search, and allows searching
 the contents of a WebKit widget.  In xwidget-webkit mode, it is bound
 to 'C-s' and 'C-r'.
 
@@ -660,6 +694,20 @@ Use 'exif-parse-file' and 'exif-field' instead.
 
 * Lisp Changes in Emacs 29.1
 
++++
+** New function 'get-display-property'.
+This is like 'get-text-property', but works on the 'display' text
+property.
+
++++
+** New function 'add-text-display-property'.
+This is like 'put-text-property', but works on the 'display' text
+property.
+
++++
+** New 'min-width' 'display' property.
+This allows setting a minimum display width for a region of text.
+
 ** Keymaps and key definitions
 
 +++
@@ -715,6 +763,15 @@ syntax.
 *** New function 'key-parse'.
 This is like 'kbd', but only returns vectors instead of a mix of
 vectors and strings.
+
++++
+** New substitution in docstrings and 'substitute-command-keys'.
+Use \\`KEYSEQ' to insert a literal key sequence "KEYSEQ" (for example
+\\`C-k') in a docstring or when calling 'substitute-command-keys',
+which will use the same face as a command substitution.  This should
+be used only when a key sequence has no corresponding command, for
+example when it is read directly with 'read-key-sequence'.  It must be
+a valid key sequence according to 'key-valid-p'.
 
 +++
 ** New function 'file-name-split'.
@@ -927,8 +984,8 @@ commits to the load.
 +++
 *** New event type 'xwidget-display-event'.
 These events are sent whenever an xwidget requests that Emacs display
-another xwidget.  The only argument to this event is the xwidget that
-should be displayed.
+another xwidget.  The only arguments to this event are the xwidget
+that should be displayed, and the xwidget that asked to display it.
 
 +++
 *** New function 'xwidget-webkit-set-cookie-storage-file'.
