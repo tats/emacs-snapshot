@@ -29,7 +29,7 @@ Status: new
  5 files changed, 31 insertions(+), 47 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 3c092fa..f157327 100644
+index 4b40d87..55c6664 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -163,7 +163,9 @@ man1dir=
@@ -189,7 +189,7 @@ index 7982c0d..a9b1395 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index bc3d477..7852c83 100644
+index 9122d96..831e99f 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -357,6 +357,14 @@ view-help-file
