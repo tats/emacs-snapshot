@@ -491,9 +491,6 @@ override_dh_auto_install: $(autogen_install_files)
 		$(pkgdir_common)/usr/share/info/$(info_subdir)/$$f; \
 	  done
 
-	  # Remove info files possibly conflicted with emacs-snapshot-common.
-	  rm -f $(pkgdir_common)/usr/share/info/$(info_subdir)/*.info
-
 	  gunzip $(pkgdir_common)/usr/share/man/man1/*.gz
 	  perl -pi -e "s|man1/etags\\.1|man1/etags\\.$(flavor)\\.1|" \
 	    $(pkgdir_common)/usr/share/man/man1/ctags.1
