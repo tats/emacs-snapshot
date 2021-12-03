@@ -1992,7 +1992,17 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	    }
 
 	  *x = top_x;
-	  *y = max (top_y + max (0, it.max_ascent - it.ascent), window_top_y);
+	  /* The condition below is a heuristic fix for the situation
+	     where move_it_to stops just after finishing the display
+	     of a fringe bitmap, which resets it.ascent to zero, and
+	     thus causes Y to be offset by it.max_ascent.  */
+	  if (it.ascent == 0 && it.what == IT_IMAGE
+	      && it.method != GET_FROM_IMAGE
+	      && it.image_id < 0
+	      && it.max_ascent > 0)
+	    *y = max (top_y, window_top_y);
+	  else
+	    *y = max (top_y + max (0, it.max_ascent - it.ascent), window_top_y);
 	  *rtop = max (0, window_top_y - top_y);
 	  *rbot = max (0, bottom_y - it.last_visible_y);
 	  *rowh = max (0, (min (bottom_y, it.last_visible_y)
@@ -2020,7 +2030,13 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	  RESTORE_IT (&it2, &it2, it2data);
 	  move_it_to (&it2, charpos, -1, -1, -1, MOVE_TO_POS);
 	  *x = it2.current_x;
-	  *y = it2.current_y + it2.max_ascent - it2.ascent;
+	  if (it2.ascent == 0 && it2.what == IT_IMAGE
+	      && it2.method != GET_FROM_IMAGE
+	      && it2.image_id < 0
+	      && it2.max_ascent > 0)
+	    *y = it2.current_y;
+	  else
+	    *y = it2.current_y + it2.max_ascent - it2.ascent;
 	  *rtop = max (0, -it2.current_y);
 	  *rbot = max (0, ((it2.current_y + it2.max_ascent + it2.max_descent)
 			   - it.last_visible_y));
@@ -29810,7 +29826,7 @@ append_stretch_glyph (struct it *it, Lisp_Object object,
 #endif	/* HAVE_WINDOW_SYSTEM */
 
 /* Produce a stretch glyph for iterator IT.  IT->object is the value
-   of the glyph property displayed.  The value must be a list
+   of the display property.  The value must be a list of the form
    `(space KEYWORD VALUE ...)' with the following KEYWORD/VALUE pairs
    being recognized:
 
@@ -29820,7 +29836,7 @@ append_stretch_glyph (struct it *it, Lisp_Object object,
 
    2. `:relative-width FACTOR' specifies that the width of the stretch
    should be computed from the width of the first character having the
-   `glyph' property, and should be FACTOR times that width.
+   `display' property, and should be FACTOR times that width.
 
    3. `:align-to HPOS' specifies that the space should be wide enough
    to reach HPOS, a value in canonical character units.
@@ -29832,7 +29848,7 @@ append_stretch_glyph (struct it *it, Lisp_Object object,
 
    5. `:relative-height FACTOR' specifies that the height of the
    stretch should be FACTOR times the height of the characters having
-   the glyph property.
+   the display property.
 
    Either none or exactly one of 4 or 5 must be present.
 
@@ -29853,10 +29869,11 @@ produce_stretch_glyph (struct it *it)
 #ifdef HAVE_WINDOW_SYSTEM
   int ascent = 0;
   bool zero_height_ok_p = false;
+  struct face *face = NULL;	/* shut up GCC's -Wmaybe-uninitialized */
 
   if (FRAME_WINDOW_P (it->f))
     {
-      struct face *face = FACE_FROM_ID (it->f, it->face_id);
+      face = FACE_FROM_ID (it->f, it->face_id);
       font = face->font ? face->font : FRAME_FONT (it->f);
       prepare_face_for_display (it->f, face);
     }
@@ -29877,14 +29894,27 @@ produce_stretch_glyph (struct it *it)
   else if (prop = Fplist_get (plist, QCrelative_width), NUMVAL (prop) > 0)
     {
       /* Relative width `:relative-width FACTOR' specified and valid.
-	 Compute the width of the characters having the `glyph'
+	 Compute the width of the characters having this `display'
 	 property.  */
       struct it it2;
-      unsigned char *p = BYTE_POS_ADDR (IT_BYTEPOS (*it));
+      Lisp_Object object = it->stack[it->sp - 1].string;
+      unsigned char *p = (STRINGP (object)
+			  ? SDATA (object) + IT_STRING_BYTEPOS (*it)
+			  : BYTE_POS_ADDR (IT_BYTEPOS (*it)));
+      bool multibyte_p =
+	STRINGP (object) ? STRING_MULTIBYTE (object) : it->multibyte_p;
 
       it2 = *it;
-      if (it->multibyte_p)
-	it2.c = it2.char_to_display = string_char_and_length (p, &it2.len);
+      if (multibyte_p)
+	{
+	  it2.c = it2.char_to_display = string_char_and_length (p, &it2.len);
+#ifdef HAVE_WINDOW_SYSTEM
+	  if (FRAME_WINDOW_P (it->f) && ! ASCII_CHAR_P (it2.c))
+	    it2.face_id = FACE_FOR_CHAR (it->f, face, it2.c,
+					 IT_CHARPOS (*it),
+					 STRINGP (object)? object : Qnil);
+#endif
+	}
       else
 	{
 	  it2.c = it2.char_to_display = *p, it2.len = 1;
