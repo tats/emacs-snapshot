@@ -3050,7 +3050,7 @@ To see the documentation for a defined struct type, use
                             `(,predicate cl-x))))
     (when pred-form
       (push `(,defsym ,predicate (cl-x)
-               (declare (side-effect-free error-free))
+               (declare (side-effect-free error-free) (pure t))
                ,(if (eq (car pred-form) 'and)
                     (append pred-form '(t))
                   `(and ,pred-form t)))
@@ -3365,6 +3365,7 @@ Of course, we really can't know that for sure, so it's just a heuristic."
                  (integer	. integerp)
                  (keyword	. keywordp)
                  (list		. listp)
+                 (natnum	. natnump)
                  (number	. numberp)
                  (null		. null)
                  (real		. numberp)

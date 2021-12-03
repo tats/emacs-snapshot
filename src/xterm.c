@@ -9813,6 +9813,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           x_find_modifier_meanings (dpyinfo);
 	  FALLTHROUGH;
         case MappingKeyboard:
+#ifdef HAVE_XKB
+	  if (dpyinfo->xkb_desc)
+	    XkbGetUpdatedMap (dpyinfo->display, XkbAllComponentsMask,
+			      dpyinfo->xkb_desc);
+#endif
           XRefreshKeyboardMapping ((XMappingEvent *) &event->xmapping);
         }
       goto OTHER;
@@ -10019,40 +10024,56 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 			val->emacs_value += delta;
 
-			if (x_coalesce_scroll_events
-			    && (fabs (val->emacs_value) < 1))
+			if (mwheel_coalesce_scroll_events
+			    && (fabs (val->emacs_value) < 1)
+			    && (fabs (delta) > 0))
 			  continue;
 
 			bool s = signbit (val->emacs_value);
-			inev.ie.kind = (val->horizontal
-					? HORIZ_WHEEL_EVENT
-					: WHEEL_EVENT);
+			inev.ie.kind = (fabs (delta) > 0
+					? (val->horizontal
+					   ? HORIZ_WHEEL_EVENT
+					   : WHEEL_EVENT)
+					: TOUCH_END_EVENT);
 			inev.ie.timestamp = xev->time;
 
 			XSETINT (inev.ie.x, lrint (xev->event_x));
 			XSETINT (inev.ie.y, lrint (xev->event_y));
 			XSETFRAME (inev.ie.frame_or_window, f);
 
-			inev.ie.modifiers = !s ? up_modifier : down_modifier;
-			inev.ie.modifiers
-			  |= x_x_to_emacs_modifiers (dpyinfo,
-						     xev->mods.effective);
+			if (fabs (delta) > 0)
+			  {
+			    inev.ie.modifiers = !s ? up_modifier : down_modifier;
+			    inev.ie.modifiers
+			      |= x_x_to_emacs_modifiers (dpyinfo,
+							 xev->mods.effective);
+			  }
 
 			scroll_unit = pow (FRAME_PIXEL_HEIGHT (f), 2.0 / 3.0);
 
-			if (val->horizontal)
+			if (NUMBERP (Vx_scroll_event_delta_factor))
+			  scroll_unit *= XFLOATINT (Vx_scroll_event_delta_factor);
+
+			if (fabs (delta) > 0)
 			  {
-			    inev.ie.arg
-			      = list3 (Qnil,
-				       make_float (val->emacs_value
-						   * scroll_unit),
-				       make_float (0));
+			    if (val->horizontal)
+			      {
+				inev.ie.arg
+				  = list3 (Qnil,
+					   make_float (val->emacs_value
+						       * scroll_unit),
+					   make_float (0));
+			      }
+			    else
+			      {
+				inev.ie.arg = list3 (Qnil, make_float (0),
+						     make_float (val->emacs_value
+								 * scroll_unit));
+			      }
 			  }
-                        else
+			else
 			  {
-			    inev.ie.arg = list3 (Qnil, make_float (0),
-						 make_float (val->emacs_value
-							     * scroll_unit));
+			    inev.ie.arg = Qnil;
 			  }
 
 			kbd_buffer_store_event_hold (&inev.ie, hold_quit);
@@ -15206,10 +15227,9 @@ consuming frame position adjustments.  In newer versions of GTK, Emacs
 always uses gtk_window_move and ignores the value of this variable.  */);
   x_gtk_use_window_move = true;
 
-  DEFVAR_BOOL ("x-coalesce-scroll-events", x_coalesce_scroll_events,
-	       doc: /* Non-nil means send a wheel event only for scrolling at least one screen line.
-Otherwise, a wheel event will be sent every time the mouse wheel is
-moved.  This option is only effective when Emacs is built with XInput
-2, with Haiku windowing support, or with NS.  */);
-  x_coalesce_scroll_events = true;
+  DEFVAR_LISP ("x-scroll-event-delta-factor", Vx_scroll_event_delta_factor,
+	       doc: /* A scale to apply to pixel deltas reported in scroll events.
+This option is only effective when Emacs is built with XInput 2
+support. */);
+  Vx_scroll_event_delta_factor = make_float (1.0);
 }

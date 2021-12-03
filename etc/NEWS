@@ -43,7 +43,7 @@ development files are present on your system, and configure Emacs with
 *** Double buffering is now enabled on the Haiku operating system.
 Unlike X, there is no compile-time option to enable or disable
 double-buffering.  If you wish to disable double-buffering, change the
-frame parameter `inhibit-double-buffering' instead.
+frame parameter 'inhibit-double-buffering' instead.
 
 ** Emacs now installs the ".pdmp" file using a unique fingerprint in the name.
 The file is typically installed using a file name akin to
@@ -56,7 +56,7 @@ If your X server has support and you have the XInput 2 development headers
 installed, you can configure Emacs with the option '--with-xinput2' to enable
 this support.
 
-The named feature `xinput2' can be used to test for the presence of
+The named feature 'xinput2' can be used to test for the presence of
 XInput 2 support from Lisp programs.
 
 
@@ -73,21 +73,45 @@ be used to reinitialize structures that would normally be done at load
 time.
 
 
-* Changes in Emacs 29.1
+* Incompatible changes in Emacs 29.1
 
-+++
-** New face 'mode-line-active'.
-This inherits from the 'mode-line' face, but is the face actually used
-on the mode lines (along with 'mode-line-inactive').
+---
+** 'C-x 8 .' has been moved to 'C-x 8 . .'.
+This is to open up the 'C-x 8 .' map to bind further characters there.
 
 ---
 ** The mode line now uses a proportional font by default.
 To get the old monospaced mode line back, customize the
 'mode-line-active' and 'mode-line-inactive' faces not to inherit from
-the 'variable-pitch' face, or add this to your ~/.emacs:
+the 'variable-pitch' face, or add this to your "~/.emacs":
 
   (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
   (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
+
+
+* Changes in Emacs 29.1
+
+---
+** 'write-file' will now copy some file mode bits.
+If the current buffer is visiting a file that is executable, the
+'C-x C-w' command will now make the new file executable, too.
+
++++
+** New user option 'process-error-pause-time'.
+This determines how long to pause Emacs after a process
+filter/sentinel error has been handled.
+
++++
+** New face 'variable-pitch-text'.
+This face is like 'variable-pitch' (from which it inherits), but is
+slightly larger, which should help with the visual size differences
+between the default, non-proportional font and proportional fonts when
+mixed.
+
++++
+** New face 'mode-line-active'.
+This inherits from the 'mode-line' face, but is the face actually used
+on the mode lines (along with 'mode-line-inactive').
 
 +++
 ** New function 'buffer-text-pixel-size'.
@@ -115,13 +139,15 @@ This is in addition to previously-supported ways of discovering 24-bit
 color support: either via the "RGB" or "setf24" capabilities, or if
 the 'COLORTERM' environment variable is set to the value "truecolor".
 
+** ERT
+
 +++
-** New ERT variables 'ert-batch-print-length' and 'ert-batch-print-level'.
+*** New ERT variables 'ert-batch-print-length' and 'ert-batch-print-level'.
 These variables will override 'print-length' and 'print-level' when
 printing Lisp values in ERT batch test results.
 
 ---
-** Redefining an ERT test in batch mode now signals an error
+*** Redefining an ERT test in batch mode now signals an error.
 Executing 'ert-deftest' with the same name as an existing test causes
 the previous definition to be discarded, which was probably not
 intended when this occurs in batch mode.  To remedy the error, rename
@@ -161,7 +187,7 @@ command also works for non-Emoji characters.)
 
 ---
 *** 'C-h b' uses outlining by default.
-Set 'describe-bindings-outline' to nil to get the old behaviour.
+Set 'describe-bindings-outline' to nil to get the old behavior.
 
 ---
 *** Jumping to function/variable source now saves mark before moving point.
@@ -295,6 +321,28 @@ received.
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+** New minor mode 'glyphless-display-mode'.
+This allows an easy way to toggle seeing all glyphless characters in
+the current buffer.
+
+** Registers
+
++++
+*** Buffer names can now be stored in registers.
+For instance, to enable jumping to the "*Messages*" buffer with
+'C-x r j m':
+
+    (set-register ?m '(buffer . "*Messages*"))
+
+** pixel-fill
+
++++
+*** This is a new package that deals with filling variable-pitch text.
+
++++
+*** New function 'pixel-fill-region'.
+This fills the region to be no wider than a specified pixel width.
+
 ** Info
 
 ---
@@ -347,6 +395,16 @@ These are used to alter an URL before using it.  By default it removes
 the common "utm_" trackers from URLs.
 
 ** Gnus
+
+---
+*** Gnus now uses a variable-pitch font in the headers by default.
+To get the monospace font back, you can put something like the
+following in your .gnus file:
+
+    (set-face-attribute 'gnus-header nil :inherit 'unspecified)
+
+---
+*** The default value of 'gnus-treat-fold-headers' is now 'head'.
 
 ---
 *** New face 'gnus-header'.
@@ -427,6 +485,10 @@ it with new 'term-{faint,italic,slow-blink,fast-blink}' faces.
 *** 'project-find-file' and 'project-or-external-find-file' now accept
 a prefix argument which is interpreted to mean "include all files".
 
+*** 'project-kill-buffers' can display the list of buffers to kill.
+Customize the user option 'project-kill-buffers-display-buffer-list'
+to enable the display of the buffer list.
+
 +++
 *** New command 'xref-go-forward'.
 It is bound to 'C-M-,' and jumps to the location where 'xref-go-back'
@@ -466,6 +528,12 @@ This works like 'image-transform-fit-to-window'.
 *** New user option 'image-auto-resize-max-scale-percent'.
 The new 'fit-window' option will never scale an image more than this
 much (in percent).  It is nil by default, which means no limit.
+
+---
+*** New user option 'image-text-based-formats'.
+This controls whether or not to show a message when opening certain
+image formats saying how to edit it as text.  The default is to show
+this message for SVG and XPM.
 
 ** Image-Dired
 
@@ -545,6 +613,13 @@ thumbnail, or 'M-x image-rotate' to rotate the thumbnail without
 updating the thumbnail file.
 
 ** Dired
+
+*** New user option 'dired-free-space'.
+Dired will now, by default, include the free space in the first line
+instead of having it on a separate line.  To get the previous behavior
+back, say:
+
+    (setq dired-free-space 'separate)
 
 ---
 *** New user option 'dired-make-directory-clickable'.
@@ -691,6 +766,16 @@ with recent versions of Firefox.
 ** The function 'image-dired-get-exif-data' is now obsolete.
 Use 'exif-parse-file' and 'exif-field' instead.
 
+---
+** 'insert-directory' alternatives should not change the free disk space line.
+This change is now applied in 'dired-insert-directory'.
+
+** Some functions and variables obsolete since Emacs 23 have been removed:
+'find-emacs-lisp-shadows', 'newsticker--cache-read-version1',
+'newsticker--cache-save-version1', 'newsticker--cache-update',
+'newsticker-cache-filename', 'unify-8859-on-decoding-mode',
+'unify-8859-on-encoding-mode', 'vc-arch-command'.
+
 
 * Lisp Changes in Emacs 29.1
 
@@ -707,6 +792,11 @@ property.
 +++
 ** New 'min-width' 'display' property.
 This allows setting a minimum display width for a region of text.
+
++++
+** New event type 'touch-end'.
+This event is sent whenever the user's finger moves off the mouse
+wheel on some mice, or when the user's finger moves off the touchpad.
 
 ** Keymaps and key definitions
 
@@ -991,6 +1081,9 @@ that should be displayed, and the xwidget that asked to display it.
 *** New function 'xwidget-webkit-set-cookie-storage-file'.
 This function is used to control where and if an xwidget stores
 cookies set by web pages on disk.
+
+** New variable 'help-buffer-under-preparation'.
+This variable is bound to t during the preparation of a "*Help*" buffer.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems
