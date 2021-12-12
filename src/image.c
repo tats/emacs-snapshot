@@ -3064,14 +3064,6 @@ gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
   XFreeGC (FRAME_X_DISPLAY (f), gc);
 #endif /* HAVE_X_WINDOWS */
 
-#ifdef HAVE_NTGUI
-#if 0  /* I don't think this is necessary looking at where it is used.  */
-  HDC hdc = get_frame_dc (f);
-  SetDIBits (hdc, pixmap, 0, height, pimg->data, &(pimg->info), DIB_RGB_COLORS);
-  release_frame_dc (f, hdc);
-#endif
-#endif /* HAVE_NTGUI */
-
 #ifdef HAVE_NS
   eassert (pimg == pixmap);
   ns_retain_object (pimg);
@@ -8970,7 +8962,7 @@ webp_load (struct frame *f, struct image *img)
 {
   ptrdiff_t size = 0;
   uint8_t *contents;
-  Lisp_Object file;
+  Lisp_Object file = Qnil;
 
   /* Open the WebP file.  */
   Lisp_Object specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -9007,7 +8999,7 @@ webp_load (struct frame *f, struct image *img)
   /* Validate the WebP image header.  */
   if (!WebPGetInfo (contents, size, NULL, NULL))
     {
-      if (NILP (specified_data))
+      if (!NILP (file))
 	image_error ("Not a WebP file: `%s'", file);
       else
 	image_error ("Invalid header in WebP image data");
@@ -9030,7 +9022,7 @@ webp_load (struct frame *f, struct image *img)
     case VP8_STATUS_USER_ABORT:
     default:
       /* Error out in all other cases.  */
-      if (NILP (specified_data))
+      if (!NILP (file))
 	image_error ("Error when interpreting WebP image data: `%s'", file);
       else
 	image_error ("Error when interpreting WebP image data");
@@ -9046,6 +9038,12 @@ webp_load (struct frame *f, struct image *img)
   else
     /* Linear [r0, g0, b0, r1, g1, b1, ...] order.  */
     decoded = WebPDecodeRGB (contents, size, &width, &height);
+
+  if (!decoded)
+    {
+      image_error ("Error when interpreting WebP image data");
+      goto webp_error1;
+    }
 
   if (!(width <= INT_MAX && height <= INT_MAX
 	&& check_image_size (f, width, height)))
@@ -10458,7 +10456,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 
   /* Get the image dimensions.  */
 #if LIBRSVG_CHECK_VERSION (2, 46, 0)
-  gdouble gviewbox_width, gviewbox_height;
+  gdouble gviewbox_width = 0, gviewbox_height = 0;
   gboolean has_viewbox = FALSE;
 # if LIBRSVG_CHECK_VERSION (2, 52, 1)
   has_viewbox = rsvg_handle_get_intrinsic_size_in_pixels (rsvg_handle,
@@ -10983,16 +10981,6 @@ x_kill_gs_process (Pixmap pixmap, struct frame *f)
 	  free_color_table ();
 #endif
 	  XDestroyImage (ximg);
-
-#if 0 /* This doesn't seem to be the case.  If we free the colors
-	 here, we get a BadAccess later in image_clear_image when
-	 freeing the colors.  */
-	  /* We have allocated colors once, but Ghostscript has also
-	     allocated colors on behalf of us.  So, to get the
-	     reference counts right, free them once.  */
-	  if (img->ncolors)
-	    x_free_colors (f, img->colors, img->ncolors);
-#endif
 	}
       else
 	image_error ("Cannot get X image of `%s'; colors will not be freed",

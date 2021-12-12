@@ -24,6 +24,11 @@ applies, and please also update docstrings as needed.
 
 * Installation Changes in Emacs 29.1
 
++++
+** Emacs can be built with built-in support for accessing SQLite databases.
+This uses the popular sqlite3 library, and can be disabled by using
+the '--without-sqlite3' option to the 'configure' script.
+
 ** Emacs has been ported to the Haiku operating system.
 The configuration process should automatically detect and build for
 Haiku.  There is also an optional window-system port to Haiku, which
@@ -85,11 +90,16 @@ To get the old monospaced mode line back, customize the
 'mode-line-active' and 'mode-line-inactive' faces not to inherit from
 the 'variable-pitch' face, or add this to your "~/.emacs":
 
-  (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
-  (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
+    (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
+    (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
 
 
 * Changes in Emacs 29.1
+
+** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
+This uses the new 'sqlite-mode' which allows listing the tables in a
+DB file, and examining and modifying the columns and the contents of
+those tables.
 
 ---
 ** 'write-file' will now copy some file mode bits.
@@ -553,6 +563,16 @@ user options that are no longer needed are now obsolete:
 'image-dired-temp-image-file'.
 
 ---
+*** Navigation and marking commands now work in image display buffer.
+The following new bindings have been added:
+
+  n / SPC   image-dired-display-next-thumbnail-original
+  p / DEL   image-dired-display-previous-thumbnail-original
+  m         image-dired-mark-thumb-original-file
+  d         image-dired-flag-thumb-original-file
+  u         image-dired-unmark-thumb-original-file
+
+---
 *** Reduce dependency on external "exiftool" command.
 The 'image-dired-copy-with-exif-file-name' no longer requires an
 external "exiftool" command to be available.  The user options
@@ -562,7 +582,7 @@ external "exiftool" command to be available.  The user options
 ---
 *** New command for the thumbnail buffer.
 The new command 'image-dired-unmark-all-marks' has been added.  It is
-bound to 'U' in the thumbnail buffer.
+bound to 'U' in the thumbnail and display buffer.
 
 ---
 *** Support Thumbnail Managing Standard v0.9.0 (Dec 2020).
@@ -583,19 +603,33 @@ used for images that are flagged for deletion in the Dired buffer
 associated with Image-Dired.
 
 ---
-*** The 'image-dired-slideshow-start' command has been revamped.
+*** 'image-dired-slideshow-start' is now bound to 'S'.
+It is bound in both the thumbnail and display buffer.
+
+---
+*** The 'image-dired-slideshow-start' command no longer prompts.
 It no longer inconveniently prompts for a number of images and a
 delay: it runs indefinitely, but stops automatically on any command.
 You can set the delay with a prefix argument, or a negative prefix
-argument to prompt anyways.  Customize the user option
-'image-dired-slideshow-delay' to change the default, which is 5
-seconds.  It is bound to 'S' in the thumbnail and display buffer.
+argument to prompt for a delay.  Customize the user option
+'image-dired-slideshow-delay' to change the default from 5 seconds.
 
 ---
 *** Support for bookmark.el.
 The command 'bookmark-set' (bound to 'C-x r m') is now supported in
 the thumbnail view, and will create a bookmark that opens the current
 directory in Image-Dired.
+
+---
+*** New user option 'image-dired-marking-shows-next'.
+If this option is non-nil (the default), marking, unmarking or
+flagging an image in either the thumbnail or display buffer shows the
+next image.
+
+---
+*** Image information is now shown in the header line.
+This replaces the message most navigation commands in the thumbnail
+buffer used to show at the bottom of the screen.
 
 +++
 *** 'image-dired-show-all-from-dir-max-files' has been increased to 500.
@@ -681,6 +715,18 @@ When calling 'abbreviate-file-name' on a Tramp filename, the result
 will abbreviate the user's home directory, for example by abbreviating
 "/ssh:user@host:/home/user" to "/ssh:user@host:~".
 
+** Browse URL
+
+---
+*** Support for the Netscape web browser has been removed.
+This support has been obsolete since Emacs 25.1.  The final version of
+the Netscape web browser was released in February, 2008.
+
+---
+*** Support for the Galeon web browser has been removed.
+This support has been obsolete since Emacs 25.1.  The final version of
+the Galeon web browser was released in September, 2008.
+
 
 * New Modes and Packages in Emacs 29.1
 
@@ -692,6 +738,11 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
+** User option 'mail-source-ignore-errors' is now obsolete.
+The whole mechanism for prompting users to continue in case of
+mail-source errors has been removed, so this option is no longer
+needed.
 
 ** Fonts
 

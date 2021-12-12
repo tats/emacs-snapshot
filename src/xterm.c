@@ -4045,6 +4045,10 @@ x_draw_glyph_string (struct glyph_string *s)
 
   if (!s->for_overlaps)
     {
+      /* Draw relief if not yet drawn.  */
+      if (!relief_drawn_p && s->face->box != FACE_NO_BOX)
+	x_draw_glyph_string_box (s);
+
       /* Draw underline.  */
       if (s->face->underline)
         {
@@ -4199,10 +4203,6 @@ x_draw_glyph_string (struct glyph_string *s)
 	      XSetForeground (display, s->gc, xgcv.foreground);
 	    }
 	}
-
-      /* Draw relief if not yet drawn.  */
-      if (!relief_drawn_p && s->face->box != FACE_NO_BOX)
-	x_draw_glyph_string_box (s);
 
       if (s->prev)
 	{
@@ -5144,9 +5144,13 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
         int focus_state
           = focus_frame ? focus_frame->output_data.x->focus_state : 0;
 
-	if (!((xi_event->evtype == XI_Enter
-	       || xi_event->evtype == XI_Leave)
-	      && (focus_state & FOCUS_EXPLICIT)))
+	if (((((xi_event->evtype == XI_Enter
+		|| xi_event->evtype == XI_Leave)
+	       && (((XIEnterEvent *) xi_event)->detail
+		   != XINotifyInferior)
+	       && !(focus_state & FOCUS_EXPLICIT))
+	      || xi_event->evtype == XI_FocusIn
+	      || xi_event->evtype == XI_FocusOut)))
 	  x_focus_changed ((xi_event->evtype == XI_Enter
 			    || xi_event->evtype == XI_FocusIn
 			    ? FocusIn : FocusOut),
@@ -9851,6 +9855,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	XIValuatorState *states;
 	double *values;
 	bool found_valuator = false;
+#ifdef HAVE_XWIDGETS
+	bool any_stop_p = false;
+#endif /* HAVE_XWIDGETS */
 
 	/* A fake XMotionEvent for x_note_mouse_movement. */
 	XMotionEvent ev;
@@ -9987,6 +9994,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  {
 		    struct xi_scroll_valuator_t *val;
 		    double delta, scroll_unit;
+		    int scroll_height;
+		    Lisp_Object window;
 
 
 		    /* See the comment on top of
@@ -10003,9 +10012,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    if (val->horizontal)
 			      xv_total_x += delta;
 			    else
-			      xv_total_y += -delta;
+			      xv_total_y += delta;
 
 			    found_valuator = true;
+
+			    if (delta == 0.0)
+			      any_stop_p = true;
+
 			    continue;
 			  }
 #endif
@@ -10049,7 +10062,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							 xev->mods.effective);
 			  }
 
-			scroll_unit = pow (FRAME_PIXEL_HEIGHT (f), 2.0 / 3.0);
+			window = window_from_coordinates (f, xev->event_x,
+							  xev->event_y, NULL,
+							  false, false);
+
+			if (WINDOWP (window))
+			  scroll_height = XWINDOW (window)->pixel_height;
+			else
+			  /* EVENT_X and EVENT_Y can be outside the
+			     frame if F holds the input grab, so fall
+			     back to the height of the frame instead.  */
+			  scroll_height = FRAME_PIXEL_HEIGHT (f);
+
+			scroll_unit = pow (scroll_height, 2.0 / 3.0);
 
 			if (NUMBERP (Vx_scroll_event_delta_factor))
 			  scroll_unit *= XFLOATINT (Vx_scroll_event_delta_factor);
@@ -10092,7 +10117,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		if (found_valuator)
 		  xwidget_scroll (xv, xev->event_x, xev->event_y,
 				  xv_total_x, xv_total_y, xev->mods.effective,
-				  xev->time);
+				  xev->time, any_stop_p);
 		else
 		  xwidget_motion_notify (xv, xev->event_x, xev->event_y,
 					 xev->mods.effective, xev->time);

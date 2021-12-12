@@ -133,12 +133,30 @@ This is only effective if supported by your mouse or touchpad."
   :type 'float
   :version "29.1")
 
-(defcustom pixel-scroll-precision-large-scroll-height 70
+(defcustom pixel-scroll-precision-large-scroll-height nil
   "Pixels that must be scrolled before an animation is performed.
 Nil means to not interpolate such scrolls."
   :group 'mouse
   :type '(choice (const :tag "Do not interpolate large scrolls" nil)
                  number)
+  :version "29.1")
+
+(defcustom pixel-scroll-precision-interpolation-total-time 0.1
+  "The total time in seconds to spend interpolating a large scroll."
+  :group 'mouse
+  :type 'float
+  :version "29.1")
+
+(defcustom pixel-scroll-precision-interpolation-factor 4.0
+  "A factor to apply to the distance of an interpolated scroll."
+  :group 'mouse
+  :type 'float
+  :version "29.1")
+
+(defcustom pixel-scroll-precision-interpolation-between-scroll 0.001
+  "The number of seconds between each step of an interpolated scroll."
+  :group 'mouse
+  :type 'float
   :version "29.1")
 
 (defun pixel-scroll-in-rush-p ()
@@ -379,7 +397,11 @@ returns nil."
 The returned value is a cons of the position of the first
 character on the unseen line just above the scope of current
 window, and the pixel height of that line."
-  (let* ((pos0 (window-start))
+  (let* ((pos0 (save-excursion
+                 (goto-char (window-start))
+                 (unless (bobp)
+                   (beginning-of-visual-line))
+                 (point)))
          (vscroll0 (window-vscroll nil t))
          (line-height nil)
          (pos
@@ -388,7 +410,8 @@ window, and the pixel height of that line."
             (if (bobp)
                 (point-min)
               (vertical-motion -1)
-              (setq line-height (line-pixel-height))
+              (setq line-height
+                    (cdr (window-text-pixel-size nil (point) pos0)))
               (point)))))
     ;; restore initial position
     (set-window-start nil pos0 t)
@@ -416,9 +439,13 @@ the height of the current window."
   (let* ((desired-pos (posn-at-x-y 0 (+ delta
 					(window-tab-line-height)
 					(window-header-line-height))))
-         (object (posn-object desired-pos))
 	 (desired-start (posn-point desired-pos))
-	 (desired-vscroll (cdr (posn-object-x-y desired-pos)))
+         (current-vs (window-vscroll nil t))
+         (start-posn (unless (eq desired-start (window-start))
+                       (posn-at-point desired-start)))
+	 (desired-vscroll (if start-posn
+                              (- delta (cdr (posn-x-y start-posn)))
+                            (+ current-vs delta)))
          (edges (window-edges nil t))
          (usable-height (- (nth 3 edges)
                            (nth 1 edges)))
@@ -427,37 +454,24 @@ the height of the current window."
                      (when (zerop (vertical-motion (1+ scroll-margin)))
                        (signal 'end-of-buffer nil))
                      (point)))
-         (end-pos (posn-at-x-y 0 (+ usable-height
-                                    (window-tab-line-height)
-				    (window-header-line-height)))))
-    (if (or (overlayp object)
-            (stringp object)
-            (and (consp object)
-                 (stringp (car object)))
-            (and (consp (posn-object end-pos))
-                 (> (cdr (posn-object-x-y end-pos)) 0)))
-        ;; We are either on an overlay or a string, so set vscroll
-        ;; directly.
-        (set-window-vscroll nil (+ (window-vscroll nil t)
-                                   delta)
-                            t)
-      (unless (eq (window-start) desired-start)
-        (set-window-start nil (if (zerop (window-hscroll))
-                                  desired-start
-                                (save-excursion
-                                  (goto-char desired-start)
-                                  (beginning-of-visual-line)
-                                  (point)))
-                          t))
-      (set-window-vscroll nil desired-vscroll t))
-    (if (and (or (< (point) next-pos))
-             (let ((pos-visibility (pos-visible-in-window-p next-pos nil t)))
-               (and pos-visibility
-                    (or (eq (length pos-visibility) 2)
-                        (when-let* ((posn (posn-at-point next-pos)))
-                          (> (cdr (posn-object-width-height posn))
-                             usable-height))))))
-        (goto-char next-pos))))
+         (scroll-preserve-screen-position nil)
+         (auto-window-vscroll nil))
+    (when (and (or (< (point) next-pos))
+               (let ((pos-visibility (pos-visible-in-window-p next-pos nil t)))
+                 (and pos-visibility
+                      (or (eq (length pos-visibility) 2)
+                          (when-let* ((posn (posn-at-point next-pos)))
+                            (> (cdr (posn-object-width-height posn))
+                               usable-height))))))
+      (goto-char next-pos))
+    (set-window-start nil (if (zerop (window-hscroll))
+                              desired-start
+                            (save-excursion
+                              (goto-char desired-start)
+                              (beginning-of-visual-line)
+                              (point)))
+                      t)
+    (set-window-vscroll nil desired-vscroll t)))
 
 (defun pixel-scroll-precision-scroll-down (delta)
   "Scroll the current window down by DELTA pixels."
@@ -510,43 +524,61 @@ the height of the current window."
               (goto-char (car position)))
             (setq delta (- delta (cdr position)))))
         (when (< delta 0)
-          (if-let* ((desired-pos (posn-at-x-y 0 (+ (- delta)
-					           (window-tab-line-height)
-					           (window-header-line-height))))
-	            (desired-start (posn-point desired-pos))
-	            (desired-vscroll (cdr (posn-object-x-y desired-pos))))
-              (progn
-                (set-window-start nil (if (zerop (window-hscroll))
-                                          desired-start
-                                        (save-excursion
-                                          (goto-char desired-start)
-                                          (beginning-of-visual-line)
-                                          (point)))
-                                  t)
-                (set-window-vscroll nil desired-vscroll t))
-            (set-window-vscroll nil (abs delta) t)))))))
+          (set-window-vscroll nil (- delta) t))))))
 
 (defun pixel-scroll-precision-interpolate (delta)
   "Interpolate a scroll of DELTA pixels.
 This results in the window being scrolled by DELTA pixels with an
 animation."
-  (while-no-input
-    (let ((percentage 0)
-          (total-time 0.01)
-          (time-elapsed 0.0)
-          (between-scroll 0.001))
-      (while (< percentage 1)
-        (sit-for between-scroll)
-        (setq time-elapsed (+ time-elapsed between-scroll)
-              percentage (/ time-elapsed total-time))
-        (if (< delta 0)
-            (pixel-scroll-precision-scroll-down
-             (ceiling (abs (* delta
-                              (/ between-scroll total-time)))))
-          (pixel-scroll-precision-scroll-up
-           (ceiling (* delta
-                       (/ between-scroll total-time)))))
-        (redisplay t)))))
+  (let ((percentage 0)
+        (total-time pixel-scroll-precision-interpolation-total-time)
+        (factor pixel-scroll-precision-interpolation-factor)
+        (last-time (float-time))
+        (time-elapsed 0.0)
+        (between-scroll pixel-scroll-precision-interpolation-between-scroll)
+        (rem (window-parameter nil 'interpolated-scroll-remainder))
+        (time (window-parameter nil 'interpolated-scroll-remainder-time)))
+    (when (and rem time
+               (< (- (float-time) time) 1.0)
+               (eq (< delta 0) (< rem 0)))
+      (setq delta (+ delta rem)))
+    (if (or (null rem)
+            (eq (< delta 0) (< rem 0)))
+        (while-no-input
+          (unwind-protect
+              (while (< percentage 1)
+                (redisplay t)
+                (sleep-for between-scroll)
+                (setq time-elapsed (+ time-elapsed
+                                      (- (float-time) last-time))
+                      percentage (/ time-elapsed total-time))
+                (let ((throw-on-input nil))
+                  (if (< delta 0)
+                      (pixel-scroll-precision-scroll-down
+                       (ceiling (abs (* (* delta factor)
+                                        (/ between-scroll total-time)))))
+                    (pixel-scroll-precision-scroll-up
+                     (ceiling (* (* delta factor)
+                                 (/ between-scroll total-time))))))
+                (setq last-time (float-time)))
+            (if (< percentage 1)
+                (progn
+                  (set-window-parameter nil 'interpolated-scroll-remainder
+                                        (* delta (- 1 percentage)))
+                  (set-window-parameter nil 'interpolated-scroll-remainder-time
+                                        (float-time)))
+              (set-window-parameter nil
+                                    'interpolated-scroll-remainder
+                                    nil)
+              (set-window-parameter nil
+                                    'interpolated-scroll-remainder-time
+                                    nil))))
+      (set-window-parameter nil
+                            'interpolated-scroll-remainder
+                            nil)
+      (set-window-parameter nil
+                            'interpolated-scroll-remainder-time
+                            nil))))
 
 (defun pixel-scroll-precision-scroll-up (delta)
   "Scroll the current window up by DELTA pixels."

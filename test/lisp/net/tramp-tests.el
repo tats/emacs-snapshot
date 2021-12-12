@@ -219,8 +219,7 @@ is greater than 10.
        (when (and (null tramp--test-instrument-test-case-p) (> tramp-verbose 3))
 	 (untrace-all)
 	 (dolist (buf (tramp-list-tramp-buffers))
-	   (with-current-buffer buf
-	     (message ";; %s\n%s" buf (buffer-string)))
+	   (message ";; %s\n%s" buf (tramp-get-buffer-string buf))
 	   (kill-buffer buf))))))
 
 (defsubst tramp--test-message (fmt-string &rest arguments)
@@ -240,8 +239,7 @@ is greater than 10.
      (unwind-protect
 	 (progn ,@body)
        (tramp--test-message
-	"%s %f sec"
-	,message (float-time (time-subtract (current-time) start))))))
+	"%s %f sec" ,message (float-time (time-subtract nil start))))))
 
 ;; `always' is introduced with Emacs 28.1.
 (defalias 'tramp--test-always
@@ -2292,7 +2290,7 @@ This checks also `file-name-as-directory', `file-name-directory',
   "Check that Tramp abbreviates file names correctly."
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-emacs29-p))
-  (skip-unless (tramp--test-ange-ftp-p))
+  (skip-unless (not (tramp--test-ange-ftp-p)))
 
   (let* ((remote-host (file-remote-p tramp-test-temporary-file-directory))
 	 ;; Not all methods can expand "~".
@@ -5054,8 +5052,8 @@ INPUT, if non-nil, is a string sent to the process."
 		   "echo foo >&2; echo bar" (current-buffer) stderr)
 		  (should (string-equal "bar\n" (buffer-string)))
 		  ;; Check stderr.
-		  (with-current-buffer stderr
-		    (should (string-equal "foo\n" (buffer-string)))))
+		  (should
+		   (string-equal "foo\n" (tramp-get-buffer-string stderr))))
 
 	      ;; Cleanup.
 	      (ignore-errors (kill-buffer stderr))))))

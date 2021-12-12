@@ -1712,10 +1712,10 @@ It is too wide if it has any lines longer than the largest of
                           (nth 2 form)))))
       (when (and (consp name) (eq (car name) 'quote))
         (setq name (cadr name)))
-      (setq name (if name (format " `%s'" name) ""))
+      (setq name (if name (format " `%s' " name) ""))
       (when (and kind docs (stringp docs)
                  (byte-compile--wide-docstring-p docs col))
-        (byte-compile-warn "%s%s docstring wider than %s characters"
+        (byte-compile-warn "%s%sdocstring wider than %s characters"
                            kind name col))))
   form)
 
@@ -2230,8 +2230,7 @@ With argument ARG, insert value in current buffer after the form."
 	(byte-compile-depth 0)
 	(byte-compile-maxdepth 0)
 	(byte-compile-output nil)
-	;; This allows us to get the positions of symbols read; it's
-	;; new in Emacs 22.1.
+        ;; This allows us to get the positions of symbols read.
 	(read-with-symbol-positions inbuffer)
 	(read-symbol-positions-list nil)
 	;;	  #### This is bound in b-c-close-variables.

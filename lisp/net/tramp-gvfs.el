@@ -1456,7 +1456,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 `file-notify' events."
   (let* ((events (process-get proc 'events))
 	 (rest-string (process-get proc 'rest-string))
-	 (dd (with-current-buffer (process-buffer proc) default-directory))
+	 (dd (tramp-get-default-directory (process-buffer proc)))
 	 (ddu (regexp-quote (tramp-gvfs-url-file-name dd))))
     (when rest-string
       (tramp-message proc 10 "Previous string:\n%s" rest-string))
@@ -1595,7 +1595,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
       "%s" (if (or (null time)
 		   (tramp-compat-time-equal-p time tramp-time-doesnt-exist)
 		   (tramp-compat-time-equal-p time tramp-time-dont-know))
-	       (current-time)
+	       nil
 	     time)))))
 
 (defun tramp-gvfs-handle-get-remote-uid (vec id-format)
@@ -2124,9 +2124,6 @@ connection if a previous connection has died for some reason."
 	      :server t :host 'local :service t :noquery t)))
       (process-put p 'vector vec)
       (set-process-query-on-exit-flag p nil)
-
-      ;; Mark process for filelock.
-      (tramp-set-connection-property p "lock-pid" (truncate (time-to-seconds)))
 
       ;; Set connection-local variables.
       (tramp-set-connection-local-variables vec)))
