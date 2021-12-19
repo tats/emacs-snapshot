@@ -149,6 +149,8 @@ fails.  */)
   if (!EQ (type, Qwebkit))
     error ("Bad xwidget type");
 
+  Frequire (Qxwidget, Qnil, Qnil);
+
   struct xwidget *xw = allocate_xwidget ();
   Lisp_Object val;
   xw->type = type;
@@ -183,8 +185,12 @@ fails.  */)
 # endif
 
       xw->widgetwindow_osr = gtk_offscreen_window_new ();
+#ifndef HAVE_PGTK
       gtk_window_resize (GTK_WINDOW (xw->widgetwindow_osr), xw->width,
                          xw->height);
+#else
+      gtk_container_check_resize (GTK_CONTAINER (xw->widgetwindow_osr));
+#endif
 
       if (EQ (xw->type, Qwebkit))
         {
