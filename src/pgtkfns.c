@@ -2083,42 +2083,6 @@ DEFUN ("x-server-max-request-size", Fx_server_max_request_size, Sx_server_max_re
 }
 
 
-DEFUN ("x-server-vendor", Fx_server_vendor, Sx_server_vendor, 0, 1, 0,
-       doc: /* Return the "vendor ID" string of the display server TERMINAL.
-\(Labeling every distributor as a "vendor" embodies the false assumption
-that operating systems cannot be developed and distributed noncommercially.)
-The optional argument TERMINAL specifies which display to ask about.
-TERMINAL should be a terminal object, a frame or a display name (a string).
-If omitted or nil, that stands for the selected frame's display.  */)
-  (Lisp_Object terminal)
-{
-  check_pgtk_display_info (terminal);
-  return Qnil;
-}
-
-
-DEFUN ("x-server-version", Fx_server_version, Sx_server_version, 0, 1, 0,
-       doc: /* Return the version numbers of the server of display TERMINAL.
-The value is a list of three integers: the major and minor
-version numbers of the X Protocol in use, and the distributor-specific release
-number.  See also the function `x-server-vendor'.
-
-The optional argument TERMINAL specifies which display to ask about.
-TERMINAL should be a terminal object, a frame or a display name (a string).
-If omitted or nil, that stands for the selected frame's display.  */ )
-  (Lisp_Object terminal)
-{
-  check_pgtk_display_info (terminal);
-  /*NOTE: it is unclear what would best correspond with "protocol";
-     we return 10.3, meaning Panther, since this is roughly the
-     level that GNUstep's APIs correspond to.
-     The last number is where we distinguish between the Apple
-     and GNUstep implementations ("distributor-specific release
-     number") and give int'ized versions of major.minor. */
-  return list3i (0, 0, 0);
-}
-
-
 DEFUN ("x-display-screens", Fx_display_screens, Sx_display_screens, 0, 1, 0,
        doc: /* Return the number of screens on the display server TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
@@ -2949,9 +2913,6 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
   gtk_window_set_decorated (GTK_WINDOW (tip_window), FALSE);
   gtk_window_set_type_hint (GTK_WINDOW (tip_window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
   f->output_data.pgtk->current_cursor = f->output_data.pgtk->text_cursor;
-  gtk_widget_show_all (FRAME_GTK_OUTER_WIDGET (f));
-  gdk_window_set_cursor (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f)),
-			 f->output_data.pgtk->current_cursor);
 
 #if 0
   x_make_gc (f);
@@ -3487,6 +3448,11 @@ Text larger than the specified size is clipped.  */)
   block_input ();
   gtk_window_resize (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (tip_f)), width, height);
   gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (tip_f)), root_x, root_y);
+  gtk_widget_show_all (FRAME_GTK_OUTER_WIDGET (tip_f));
+  SET_FRAME_VISIBLE (tip_f, 1);
+  gdk_window_set_cursor (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (tip_f)),
+			 f->output_data.pgtk->current_cursor);
+
   unblock_input ();
 
   pgtk_cr_update_surface_desired_size (tip_f, width, height, false);
@@ -4015,8 +3981,6 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sxw_color_defined_p);
   defsubr (&Sxw_color_values);
   defsubr (&Sx_server_max_request_size);
-  defsubr (&Sx_server_vendor);
-  defsubr (&Sx_server_version);
   defsubr (&Sx_display_pixel_width);
   defsubr (&Sx_display_pixel_height);
   defsubr (&Spgtk_display_monitor_attributes_list);

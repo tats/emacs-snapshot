@@ -2961,6 +2961,14 @@ setup_xi_event_mask (struct frame *f)
       XISetMask (m, XI_TouchBegin);
       XISetMask (m, XI_TouchUpdate);
       XISetMask (m, XI_TouchEnd);
+#ifdef XI_GesturePinchBegin
+      if (FRAME_DISPLAY_INFO (f)->xi2_version >= 4)
+	{
+	  XISetMask (m, XI_GesturePinchBegin);
+	  XISetMask (m, XI_GesturePinchUpdate);
+	  XISetMask (m, XI_GesturePinchEnd);
+	}
+#endif
     }
 #endif
   XISelectEvents (FRAME_X_DISPLAY (f),
@@ -4506,6 +4514,27 @@ If omitted or nil, that stands for the selected frame's display.  */)
 		 VendorRelease (dpy));
 }
 
+DEFUN ("x-server-input-extension-version", Fx_server_input_extension_version,
+       Sx_server_input_extension_version, 0, 1, 0,
+       doc: /* Return the version of the X Input Extension supported by TERMINAL.
+The value is nil if TERMINAL's X server doesn't support the X Input
+Extension extension, or if Emacs doesn't support the version present
+on that server.  Otherwise, the return value is a list of the the
+major and minor versions of the X Input Extension extension running on
+that server.  */)
+  (Lisp_Object terminal)
+{
+#ifdef HAVE_XINPUT2
+  struct x_display_info *dpyinfo = check_x_display_info (terminal);
+
+  return (dpyinfo->supports_xi2
+	  ? list2i (2, dpyinfo->xi2_version)
+	  : Qnil);
+#else
+  return Qnil;
+#endif
+}
+
 DEFUN ("x-display-screens", Fx_display_screens, Sx_display_screens, 0, 1, 0,
        doc: /* Return the number of screens on the X server of display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
@@ -5643,8 +5672,25 @@ The coordinates X and Y are interpreted in pixels relative to a position
   int yval = check_integer_range (y, INT_MIN, INT_MAX);
 
   block_input ();
-  XWarpPointer (FRAME_X_DISPLAY (f), None, DefaultRootWindow (FRAME_X_DISPLAY (f)),
-		0, 0, 0, 0, xval, yval);
+#ifdef HAVE_XINPUT2
+  int deviceid;
+
+  if (FRAME_DISPLAY_INFO (f)->supports_xi2)
+    {
+      XGrabServer (FRAME_X_DISPLAY (f));
+      if (XIGetClientPointer (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+			      &deviceid))
+	{
+	  XIWarpPointer (FRAME_X_DISPLAY (f), deviceid, None,
+			 DefaultRootWindow (FRAME_X_DISPLAY (f)),
+			 0, 0, 0, 0, xval, yval);
+	}
+      XUngrabServer (FRAME_X_DISPLAY (f));
+    }
+  else
+#endif
+    XWarpPointer (FRAME_X_DISPLAY (f), None, DefaultRootWindow (FRAME_X_DISPLAY (f)),
+		  0, 0, 0, 0, xval, yval);
   unblock_input ();
 
   return Qnil;
@@ -8176,6 +8222,7 @@ eliminated in future versions of Emacs.  */);
   defsubr (&Sx_server_max_request_size);
   defsubr (&Sx_server_vendor);
   defsubr (&Sx_server_version);
+  defsubr (&Sx_server_input_extension_version);
   defsubr (&Sx_display_pixel_width);
   defsubr (&Sx_display_pixel_height);
   defsubr (&Sx_display_mm_width);

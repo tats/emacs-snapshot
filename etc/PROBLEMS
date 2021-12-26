@@ -1681,6 +1681,18 @@ This happens on the proprietary X server ASTEC-X when the number of
 monitors is changed after the server has started.  A workaround is to
 restart the X server after the monitor configuration has been changed.
 
+*** Touchpad gestures don't work and emit warning messages.
+
+When pinching or swiping on your touchpad, you might see a warning
+message that looks like:
+
+  XInputWireToCookie: Unknown generic event. type 28
+
+This happens when your XInput headers support XInput 2.4, but the
+actual version of libXi installed does not.  The solution is to
+upgrade your libXi binaries to libXi 1.8.0 or later, to correspond
+with your XInput headers.
+
 * Runtime problems on character terminals
 
 *** With X forwarding, mouse highlighting can make Emacs slow.
@@ -2797,6 +2809,17 @@ file; for example:
     '("/usr/local/opt/gcc/lib/gcc/11"
       "/usr/local/opt/libgccjit/lib/gcc/11"
       "/usr/local/opt/gcc/lib/gcc/11/gcc/x86_64-apple-darwin20/11.2.0") ":"))
+
+* Runtime problems specific to PGTK
+
+** Some modifier keys doesn't work if Emacs is started in a systemd unit file.
+
+Environment variables may be different if there is a difference in the
+behavior of keys between when started in the systemd unit file and
+when started from the command line.
+
+Especially, PGTK Emacs needs environment variables LANG and
+GTK_IM_MODULE.
 
 * Build-time problems
 

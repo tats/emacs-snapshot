@@ -91,15 +91,6 @@ time.
 ** 'C-x 8 .' has been moved to 'C-x 8 . .'.
 This is to open up the 'C-x 8 .' map to bind further characters there.
 
----
-** The mode line now uses a proportional font by default.
-To get the old monospaced mode line back, customize the
-'mode-line-active' and 'mode-line-inactive' faces not to inherit from
-the 'variable-pitch' face, or add this to your "~/.emacs":
-
-    (set-face-attribute 'mode-line-active nil :inherit 'mode-line)
-    (set-face-attribute 'mode-line-inactive nil :inherit 'mode-line)
-
 
 * Changes in Emacs 29.1
 
@@ -301,6 +292,11 @@ case keys.
 This command increases (or decreases) the number of empty lines before
 point.
 
+** The *Completions* buffer can now be automatically selected.
+To enable this behavior, customize the option 'completion-auto-select'
+to t.  Then pressing TAB will switch to the *Completions* buffer when
+it pops up that buffer.
+
 ---
 *** Improved mouse behavior with auto-scrolling modes.
 When clicking inside the 'scroll-margin' or 'hscroll-margin' region
@@ -315,6 +311,8 @@ effectively dragged.
 ** New user option 'yank-menu-max-items'.
 Customize this option to limit the number of entries in the menu
 "Edit->Paste from Kill Menu".  The default is 60.
+
+** Performing a pinch gesture on a touchpad now increases the text scale.
 
 ** show-paren-mode
 
@@ -395,6 +393,11 @@ If non-nil, 'C-c C-a' will put attached files at the end of the message.
 
 ---
 *** Message Mode now supports image yanking.
+
+---
+*** New user option 'message-server-alist'.
+This controls automatic insertion of the "X-Message-SMTP-Method"
+header before sending a message.
 
 ** HTML Mode
 
@@ -848,6 +851,14 @@ This change is now applied in 'dired-insert-directory'.
 'unify-8859-on-decoding-mode', 'unify-8859-on-encoding-mode',
 'vc-arch-command'.
 
++++
+** Base64 encoding no longer tolerates latin-1 input.
+The functions 'base64-encode-string', 'base64url-encode-string',
+'base64-encode-region' and 'base64url-encode-region' no longer accept
+characters in the range U+0080..U+00FF as substitutes for single bytes
+in the range 128..255, but signal an error for all multibyte characters.
+The input must be encoded text.
+
 
 * Lisp Changes in Emacs 29.1
 
@@ -875,6 +886,12 @@ This allows setting a minimum display width for a region of text.
 ** New event type 'touch-end'.
 This event is sent whenever the user's finger moves off the mouse
 wheel on some mice, or when the user's finger moves off the touchpad.
+
++++
+** New event type 'pinch'.
+This event is sent when a user peforms a pinch gesture on a touchpad,
+which is comprised of placing two fingers on the touchpad and moving
+them towards or away from each other.
 
 ** Keymaps and key definitions
 
@@ -919,6 +936,10 @@ in the documentation.
 If non-nil, remove the definition from the keymap.  This is subtly
 different from setting a definition to nil (when the keymap has a
 parent).
+
++++
+*** 'read-multiple-choice' now takes an optional SHOW-HELP argument.
+If non-nil, show the help buffer immediately, before any user input.
 
 +++
 *** New function 'key-valid-p'.
@@ -1001,6 +1022,11 @@ character.
 This controls whether or not the last screen line of the text being
 measured will be counted for the purpose of calculating the text
 dimensions.
+
++++
+** 'window-text-pixel-size' understands a new meaning of 'from'.
+Specifying a cons as the from argument allows to start measuring text
+from a specified amount of pixels above or below a position.
 
 ** XDG support
 
