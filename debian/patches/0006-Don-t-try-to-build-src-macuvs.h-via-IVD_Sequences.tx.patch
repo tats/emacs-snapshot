@@ -9,7 +9,7 @@ over the licensing.
  1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index 701fb92..60e27e6 100644
+index 011e97b..6cc5cf6 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
 @@ -40,17 +40,12 @@ unifiles =
