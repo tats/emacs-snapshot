@@ -8,7 +8,7 @@
 @syncodeindex pg cp
 
 @copying
-Copyright @copyright{} 1995--2021 Free Software Foundation, Inc.
+Copyright @copyright{} 1995--2022 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -13477,7 +13477,7 @@ Also @pxref{Formatting Variables}.
 @subsection Server Commands
 @cindex server commands
 
-The following key binding are available in the server buffer.  Be aware
+The following key bindings are available in the server buffer.  Be aware
 that some of the commands will only work on servers that you've added
 through this interface (with @kbd{a}), not with servers you've defined
 in your init files.

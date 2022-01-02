@@ -1,6 +1,6 @@
 GNU Emacs NEWS -- history of user-visible changes.
 
-Copyright (C) 2021 Free Software Foundation, Inc.
+Copyright (C) 2021-2022 Free Software Foundation, Inc.
 See the end of the file for license conditions.
 
 Please send Emacs bug reports to 'bug-gnu-emacs@gnu.org'.
@@ -71,6 +71,11 @@ Unlike the default X and GTK build, the resulting Emacs binary will
 work on any underlying window system supported by GDK, such as
 Wayland and Broadway.
 
+---
+** The docstrings of preloaded files are not in 'etc/DOC' any more.
+Instead, they're fetched as needed from the corresponding '.elc' file,
+as was already the case for all the non-preloaded files.
+
 
 * Startup Changes in Emacs 29.1
 
@@ -86,6 +91,14 @@ time.
 
 
 * Incompatible changes in Emacs 29.1
+
+---
+** Support for old EIEIO functions is not autoloaded any more.
+You need an explicit (require 'eieio-compat) to use 'defmethod'
+and 'defgeneric' (which have been made obsolete in Emacs-25 with
+'cl-defmethod' and 'cl-defgeneric').
+Similarly you might need to (require 'eieio-compat) before loading
+files that were compiled with an old EIEIO (Emacs<25).
 
 ---
 ** 'C-x 8 .' has been moved to 'C-x 8 . .'.
@@ -166,6 +179,9 @@ tests so that they all have unique names.
 When environment variable 'EMACS_TEST_JUNIT_REPORT' is set, ERT
 generates a JUnit test report under this file name.  This is useful
 for Emacs integration into CI/CD test environments.
+
+*** Unbound test symbols now signal an 'ert-test-unbound' error.
+This affects the 'ert-select-tests' function and its callers.
 
 ** Emoji
 
@@ -248,6 +264,11 @@ height use 'window-height' in combination with 'body-lines'.
 ---
 *** 'C-x t RET' creates a new tab when the provided tab name doesn't exist.
 
+---
+*** New keymap 'tab-bar-history-mode-map'.
+By default, it contains 'C-c <left>' and 'C-c <right>' to browse
+the history of tab window configurations back and forward.
+
 ** Better detection of text suspiciously reordered on display.
 The function 'bidi-find-overridden-directionality' has been extended
 to detect reordering effects produced by embeddings and isolates
@@ -292,13 +313,8 @@ case keys.
 This command increases (or decreases) the number of empty lines before
 point.
 
-** The *Completions* buffer can now be automatically selected.
-To enable this behavior, customize the option 'completion-auto-select'
-to t.  Then pressing TAB will switch to the *Completions* buffer when
-it pops up that buffer.
-
 ---
-*** Improved mouse behavior with auto-scrolling modes.
+** Improved mouse behavior with auto-scrolling modes.
 When clicking inside the 'scroll-margin' or 'hscroll-margin' region
 the point is now moved only when releasing the mouse button.  This no
 longer results in a bogus selection, unless the mouse has been
@@ -342,9 +358,22 @@ received.
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+** Minibuffer and Completions
+
+*** The *Completions* buffer can now be automatically selected.
+To enable this behavior, customize the option 'completion-auto-select'
+to t.  Then pressing TAB will switch to the *Completions* buffer when
+it pops up that buffer.
+
+*** New user option 'completion-wrap-movement'.
+When non-nil, the commands 'next-completion' and 'previous-completion'
+automatically wrap around on reaching the beginning or the end of
+the *Completions* buffer.
+
 ** Isearch and Replace
 
-*** New user option 'char-fold-override' omits the default character-folding.
++++
+*** New user option 'char-fold-override' disables default character equivalences.
 
 ** New minor mode 'glyphless-display-mode'.
 This allows an easy way to toggle seeing all glyphless characters in
@@ -863,6 +892,9 @@ The input must be encoded text.
 * Lisp Changes in Emacs 29.1
 
 +++
+** New variable 'lisp-directory' holds the directory of Emacs's own Lisp files.
+
++++
 ** New facility for handling session state: 'multisession-value'.
 This can be used as a convenient way to store (simple) application
 state, and 'M-x list-multisession-values' allows users to list
@@ -952,6 +984,11 @@ syntax.
 *** New function 'key-parse'.
 This is like 'kbd', but only returns vectors instead of a mix of
 vectors and strings.
+
++++
+*** New ':type' for 'defcustom' for keys.
+The new 'key' type can be used for options that should be a valid key
+according to 'key-valid-p'.  The type 'key-sequence' is now obsolete.
 
 +++
 ** New substitution in docstrings and 'substitute-command-keys'.

@@ -1,6 +1,6 @@
 ;;; face-remap.el --- Functions for managing `face-remapping-alist'  -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Miles Bader <miles@gnu.org>
 ;; Keywords: faces, face remapping, display, user commands
@@ -417,8 +417,7 @@ a top-level keymap, `text-scale-increase' or
     (with-selected-window window
       (when (and (zerop dx)
                  (zerop dy)
-                 (zerop angle)
-                 (equal scale 1.0))
+                 (zerop angle))
         (setq text-scale--pinch-start-scale
               (if text-scale-mode text-scale-mode-amount 0)))
       (text-scale-set

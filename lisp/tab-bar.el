@@ -1,6 +1,6 @@
 ;;; tab-bar.el --- frame-local tabs with named persistent window configurations -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 ;; Author: Juri Linkov <juri@linkov.net>
 ;; Keywords: frames tabs
@@ -1883,6 +1883,10 @@ This navigates forward in the history of window configurations."
           (when (and (markerp wc-point) (marker-buffer wc-point))
             (goto-char wc-point)))
       (message "No more tab forward history"))))
+
+(defvar-keymap tab-bar-history-mode-map
+  "C-c <left>"  #'tab-bar-history-back
+  "C-c <right>" #'tab-bar-history-forward)
 
 (define-minor-mode tab-bar-history-mode
   "Toggle tab history mode for the tab bar.

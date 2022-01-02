@@ -1,6 +1,6 @@
 ;;; rmc.el --- read from a multiple choice question -*- lexical-binding: t -*-
 
-;; Copyright (C) 2016-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 
@@ -38,10 +38,10 @@
            ;; Not in the name string, or a special character.
            ((or (not pos)
                 (member desc '("ESC" "TAB" "RET" "DEL" "SPC")))
-            (format "[%s] %s"
+            (format "%s %s"
                     (if graphical-terminal
                         (propertize desc 'face 'read-multiple-choice-face)
-                      desc)
+                      (propertize desc 'face 'help-key-binding))
                     name))
            ;; The prompt character is in the name, so highlight
            ;; it on graphical terminals.

@@ -1,7 +1,7 @@
 /* A Gtk Widget that inherits GtkFixed, but can be shrunk.
 This file is only use when compiling with Gtk+ 3.
 
-Copyright (C) 2011-2021 Free Software Foundation, Inc.
+Copyright (C) 2011-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -27,7 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #else
 #include "xterm.h"
 #endif
-#include "xwidget.h"
 #include "emacsgtkfixed.h"
 
 /* Silence a bogus diagnostic; see GNOME bug 683906.  */

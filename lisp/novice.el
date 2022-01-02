@@ -1,6 +1,6 @@
 ;;; novice.el --- handling of disabled commands ("novice mode") for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1994, 2001-2021 Free Software Foundation,
+;; Copyright (C) 1985-1987, 1994, 2001-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -88,7 +88,7 @@ You can now type:
                                      '((?y "yes")
                                        (?n "no")
                                        (?! "yes; enable for session")
-                                       (?\s "yes; once"))
+                                       (?\s "(space bar) yes; once"))
                                      help-string
                                      "*Disabled Command*"))))
     (pcase char

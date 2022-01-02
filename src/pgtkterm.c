@@ -1,6 +1,6 @@
 /* Pure Gtk+-3 communication module.      -*- coding: utf-8 -*-
 
-Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2020 Free Software
+Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2022 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -245,6 +245,9 @@ x_free_frame_resources (struct frame *f)
 
   block_input ();
 
+#ifdef HAVE_XWIDGETS
+  kill_frame_xwidget_views (f);
+#endif
   free_frame_faces (f);
 
   if (FRAME_X_OUTPUT (f)->scale_factor_atimer != NULL)
@@ -2999,6 +3002,91 @@ pgtk_scroll_run (struct window *w, struct run *run)
 
   block_input ();
 
+#ifdef HAVE_XWIDGETS
+  /* "Copy" xwidget views in the area that will be scrolled.  */
+  GtkWidget *tem, *parent = FRAME_GTK_WIDGET (f);
+  GList *children = gtk_container_get_children (GTK_CONTAINER (parent));
+  GList *iter;
+  struct xwidget_view *view;
+
+  for (iter = children; iter; iter = iter->next)
+    {
+      tem = iter->data;
+      view = g_object_get_data (G_OBJECT (tem), XG_XWIDGET_VIEW);
+
+      if (view && !view->hidden)
+	{
+	  int window_y = view->y + view->clip_top;
+	  int window_height = view->clip_bottom - view->clip_top;
+
+	  Emacs_Rectangle r1, r2, result;
+	  r1.x = w->pixel_left;
+	  r1.y = from_y;
+	  r1.width = w->pixel_width;
+	  r1.height = height;
+	  r2 = r1;
+	  r2.y = window_y;
+	  r2.height = window_height;
+
+	  /* The window is offscreen, just unmap it.  */
+	  if (window_height == 0)
+	    {
+	      view->hidden = true;
+	      gtk_widget_hide (tem);
+	      continue;
+	    }
+
+	  bool intersects_p =
+	    gui_intersect_rectangles (&r1, &r2, &result);
+
+	  if (XWINDOW (view->w) == w && intersects_p)
+	    {
+	      int y = view->y + (to_y - from_y);
+	      int text_area_x, text_area_y, text_area_width, text_area_height;
+	      int clip_top, clip_bottom;
+
+	      window_box (w, view->area, &text_area_x, &text_area_y,
+			  &text_area_width, &text_area_height);
+
+	      view->y = y;
+
+	      clip_top = 0;
+	      clip_bottom = XXWIDGET (view->model)->height;
+
+	      if (y < text_area_y)
+		clip_top = text_area_y - y;
+
+	      if ((y + clip_bottom) > (text_area_y + text_area_height))
+		{
+		  clip_bottom -= (y + clip_bottom) - (text_area_y + text_area_height);
+		}
+
+	      view->clip_top = clip_top;
+	      view->clip_bottom = clip_bottom;
+
+	      /* This means the view has moved offscreen.  Unmap
+		 it and hide it here.  */
+	      if ((view->clip_bottom - view->clip_top) <= 0)
+		{
+		  view->hidden = true;
+		  gtk_widget_hide (tem);
+		}
+	      else
+		{
+		  gtk_fixed_move (GTK_FIXED (FRAME_GTK_WIDGET (f)),
+				  tem, view->x + view->clip_left,
+				  view->y + view->clip_top);
+		  gtk_widget_set_size_request (tem, view->clip_right - view->clip_left,
+					       view->clip_bottom - view->clip_top);
+		  gtk_widget_queue_allocate (tem);
+		}
+	    }
+	}
+    }
+
+  g_list_free (children);
+#endif
+
   /* Cursor off.  Will be switched on again in x_update_window_end.  */
   gui_clear_cursor (w);
 
@@ -4812,8 +4900,44 @@ pgtk_any_window_to_frame (GdkWindow * window)
 }
 
 static gboolean
-pgtk_handle_event (GtkWidget * widget, GdkEvent * event, gpointer * data)
+pgtk_handle_event (GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
+#if GTK_CHECK_VERSION (3, 18, 0)
+  struct frame *f;
+  union buffered_input_event inev;
+  GtkWidget *frame_widget;
+  gint x, y;
+
+  if (event->type == GDK_TOUCHPAD_PINCH
+      && (event->touchpad_pinch.phase
+	  != GDK_TOUCHPAD_GESTURE_PHASE_END))
+    {
+      f = pgtk_any_window_to_frame (gtk_widget_get_window (widget));
+      frame_widget = FRAME_GTK_WIDGET (f);
+
+      gtk_widget_translate_coordinates (widget, frame_widget,
+					lrint (event->touchpad_pinch.x),
+					lrint (event->touchpad_pinch.y),
+					&x, &y);
+      if (f)
+	{
+
+	  inev.ie.kind = PINCH_EVENT;
+	  XSETFRAME (inev.ie.frame_or_window, f);
+	  XSETINT (inev.ie.x, x);
+	  XSETINT (inev.ie.y, y);
+	  inev.ie.arg = list4 (make_float (event->touchpad_pinch.dx),
+			       make_float (event->touchpad_pinch.dy),
+			       make_float (event->touchpad_pinch.scale),
+			       make_float (event->touchpad_pinch.angle_delta));
+	  inev.ie.modifiers = pgtk_gtk_to_emacs_modifiers (FRAME_DISPLAY_INFO (f),
+							   event->touchpad_pinch.state);
+	  evq_enqueue (&inev);
+	}
+
+      return TRUE;
+    }
+#endif
   return FALSE;
 }
 
@@ -5063,7 +5187,7 @@ pgtk_gtk_to_emacs_modifiers (struct pgtk_display_info *dpyinfo, int state)
   return mod;
 }
 
-static int
+int
 pgtk_emacs_to_gtk_modifiers (struct pgtk_display_info *dpyinfo, int state)
 {
   int mod_ctrl;
@@ -6140,9 +6264,9 @@ scroll_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 			  ? HORIZ_WHEEL_EVENT
 			  : WHEEL_EVENT);
 	  inev.ie.modifiers |= (inev.ie.kind == HORIZ_WHEEL_EVENT
-				? (delta_x >= 0 ? down_modifier : up_modifier)
+				? (delta_x >= 0 ? up_modifier : down_modifier)
 				: (delta_y >= 0 ? down_modifier : up_modifier));
-	  inev.ie.arg = list3 (Qnil, make_float (delta_x * 100),
+	  inev.ie.arg = list3 (Qnil, make_float (-delta_x * 100),
 			       make_float (-delta_y * 100));
 	}
       else

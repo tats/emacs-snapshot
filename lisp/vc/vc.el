@@ -1,6 +1,6 @@
 ;;; vc.el --- drive a version-control system from within Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1998, 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1998, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: FSF (see below for full credits)
 ;; Maintainer: emacs-devel@gnu.org
@@ -2755,7 +2755,7 @@ to the working revision (except for keyword expansion)."
     (unwind-protect
 	(when (if vc-revert-show-diff
 		  (progn
-		    (setq diff-buffer (generate-new-buffer-name "*vc-diff*"))
+		    (setq diff-buffer (generate-new-buffer "*vc-diff*"))
 		    (vc-diff-internal vc-allow-async-revert vc-fileset
 				      nil nil nil diff-buffer))
 		;; Avoid querying the user again.

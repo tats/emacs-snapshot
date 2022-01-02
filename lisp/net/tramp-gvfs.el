@@ -1,6 +1,6 @@
 ;;; tramp-gvfs.el --- Tramp access functions for GVFS daemon  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2009-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -1524,8 +1524,10 @@ If FILE-SYSTEM is non-nil, return file system attributes."
       (when (or size free)
 	(list (and size (string-to-number size))
 	      (and free (string-to-number free))
-	      (and size used
-		   (- (string-to-number size) (string-to-number used))))))))
+	      ;; "mtp" connections do not return "filesystem::used".
+	      (or (and size used
+		       (- (string-to-number size) (string-to-number used)))
+		  (and free (string-to-number free))))))))
 
 (defun tramp-gvfs-handle-make-directory (dir &optional parents)
   "Like `make-directory' for Tramp files."

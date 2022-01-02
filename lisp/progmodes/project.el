@@ -1,6 +1,6 @@
 ;;; project.el --- Operations on the current project  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
 ;; Version: 0.8.1
 ;; Package-Requires: ((emacs "26.1") (xref "1.0.2"))
 
@@ -1015,7 +1015,7 @@ if one already exists."
          (default-project-shell-name (project-prefixed-buffer-name "shell"))
          (shell-buffer (get-buffer default-project-shell-name)))
     (if (and shell-buffer (not current-prefix-arg))
-        (pop-to-buffer-same-window shell-buffer)
+        (pop-to-buffer shell-buffer display-comint-buffer-action)
       (shell (generate-new-buffer-name default-project-shell-name)))))
 
 ;;;###autoload
@@ -1031,7 +1031,7 @@ if one already exists."
          (eshell-buffer-name (project-prefixed-buffer-name "eshell"))
          (eshell-buffer (get-buffer eshell-buffer-name)))
     (if (and eshell-buffer (not current-prefix-arg))
-        (pop-to-buffer-same-window eshell-buffer)
+        (pop-to-buffer eshell-buffer display-comint-buffer-action)
       (eshell t))))
 
 ;;;###autoload

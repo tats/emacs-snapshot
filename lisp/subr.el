@@ -1,6 +1,6 @@
 ;;; subr.el --- basic lisp subroutines for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2021 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -6549,7 +6549,7 @@ not a list, return a one-element list containing OBJECT."
   form)
 
 (defun define-keymap (&rest definitions)
-  "Create a new keymap and define KEY/DEFINITION pairs as key sequences.
+  "Create a new keymap and define KEY/DEFINITION pairs as key bindings.
 The new keymap is returned.
 
 Options can be given as keywords before the KEY/DEFINITION

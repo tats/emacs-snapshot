@@ -1,6 +1,6 @@
 /* Functions for the X Window System.
 
-Copyright (C) 1989, 1992-2021 Free Software Foundation, Inc.
+Copyright (C) 1989, 1992-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -4933,6 +4933,70 @@ x_get_monitor_attributes_xrandr (struct x_display_info *dpyinfo)
   int i, n_monitors, primary = -1;
   RROutput pxid = None;
   struct MonitorInfo *monitors;
+  bool randr15_p = false;
+
+#if RANDR_MAJOR > 1 || (RANDR_MAJOR == 1 && RANDR_MINOR >= 5)
+  XRRMonitorInfo *rr_monitors;
+
+  /* If RandR 1.5 or later is available, use that instead, as some
+     video drivers don't report correct dimensions via other versions
+     of RandR.  */
+  if (dpyinfo->xrandr_major_version > 1
+      || (dpyinfo->xrandr_major_version == 1
+	  && dpyinfo->xrandr_minor_version >= 5))
+    {
+      XRectangle workarea;
+      char *name;
+
+      rr_monitors = XRRGetMonitors (dpyinfo->display,
+				    dpyinfo->root_window,
+				    True, &n_monitors);
+      if (!rr_monitors)
+	goto fallback;
+
+      monitors = xzalloc (n_monitors * sizeof *monitors);
+
+      for (int i = 0; i < n_monitors; ++i)
+	{
+	  monitors[i].geom.x = rr_monitors[i].x;
+	  monitors[i].geom.y = rr_monitors[i].y;
+	  monitors[i].geom.width = rr_monitors[i].width;
+	  monitors[i].geom.height = rr_monitors[i].height;
+	  monitors[i].mm_width = rr_monitors[i].mwidth;
+	  monitors[i].mm_height = rr_monitors[i].mheight;
+
+	  name = XGetAtomName (dpyinfo->display, rr_monitors[i].name);
+	  if (name)
+	    {
+	      monitors[i].name = xstrdup (name);
+	      XFree (name);
+	    }
+	  else
+	    monitors[i].name = xstrdup ("Unknown Monitor");
+
+	  if (rr_monitors[i].primary)
+	    primary = i;
+
+	  if (rr_monitors[i].primary
+	      && x_get_net_workarea (dpyinfo, &workarea))
+	    {
+              monitors[i].work = workarea;
+              if (!gui_intersect_rectangles (&monitors[i].geom,
+					     &monitors[i].work,
+					     &monitors[i].work))
+		monitors[i].work = monitors[i].geom;
+	    }
+	  else
+	    monitors[i].work = monitors[i].geom;
+	}
+
+      XRRFreeMonitors (rr_monitors);
+      randr15_p = true;
+      goto out;
+    }
+
+ fallback:;
+#endif
 
 #define RANDR13_LIBRARY \
   (RANDR_MAJOR > 1 || (RANDR_MAJOR == 1 && RANDR_MINOR >= 3))
@@ -5021,12 +5085,16 @@ x_get_monitor_attributes_xrandr (struct x_display_info *dpyinfo)
       XRRFreeOutputInfo (info);
     }
   XRRFreeScreenResources (resources);
-
+#if RANDR_MAJOR > 1 || (RANDR_MAJOR == 1 && RANDR_MINOR >= 5)
+ out:
+#endif
   attributes_list = x_make_monitor_attribute_list (monitors,
                                                    n_monitors,
                                                    primary,
                                                    dpyinfo,
-                                                   "XRandr");
+                                                   (randr15_p
+						    ? "XRandR 1.5"
+						    : "XRandr"));
   free_monitors (monitors, n_monitors);
   return attributes_list;
 }
@@ -5041,17 +5109,9 @@ x_get_monitor_attributes (struct x_display_info *dpyinfo)
   (void) dpy; /* Suppress unused variable warning.  */
 
 #ifdef HAVE_XRANDR
-  int xrr_event_base, xrr_error_base;
-  bool xrr_ok = false;
-  xrr_ok = XRRQueryExtension (dpy, &xrr_event_base, &xrr_error_base);
-  if (xrr_ok)
-    {
-      XRRQueryVersion (dpy, &dpyinfo->xrandr_major_version,
-		       &dpyinfo->xrandr_minor_version);
-      xrr_ok = ((dpyinfo->xrandr_major_version == 1
-		 && dpyinfo->xrandr_minor_version >= 2)
-		|| dpyinfo->xrandr_major_version > 1);
-    }
+  bool xrr_ok = ((dpyinfo->xrandr_major_version == 1
+		  && dpyinfo->xrandr_minor_version >= 2)
+		 || dpyinfo->xrandr_major_version > 1);
 
   if (xrr_ok)
     attributes_list = x_get_monitor_attributes_xrandr (dpyinfo);
@@ -5075,6 +5135,65 @@ x_get_monitor_attributes (struct x_display_info *dpyinfo)
 }
 
 #endif /* !USE_GTK */
+
+#ifdef USE_LUCID
+/* This is used by the Lucid menu widget, but it's defined here so we
+   can make use of a great deal of existing code.  */
+static void
+xlw_monitor_dimensions_at_pos_1 (struct x_display_info *dpyinfo,
+				 Screen *screen, int src_x, int src_y,
+				 int *x, int *y, int *width, int *height)
+{
+  Lisp_Object attrs, tem, val;
+
+  attrs = x_get_monitor_attributes (dpyinfo);
+
+  for (tem = attrs; CONSP (tem); tem = XCDR (tem))
+    {
+      int sx, sy, swidth, sheight;
+      val = assq_no_quit (Qworkarea, XCAR (tem));
+      if (!NILP (val))
+	{
+	  sx = XFIXNUM (XCAR (XCDR (val)));
+	  sy = XFIXNUM (XCAR (XCDR (XCDR (val))));
+	  swidth = XFIXNUM (XCAR (XCDR (XCDR (XCDR (val)))));
+	  sheight = XFIXNUM (XCAR (XCDR (XCDR (XCDR (XCDR (val))))));
+
+	  if (sx <= src_x && src_x < (sx + swidth)
+	      && sy <= src_y && src_y < (sy + swidth))
+	    {
+	      *x = sx;
+	      *y = sy;
+	      *width = swidth;
+	      *height = sheight;
+	      return;
+	    }
+	}
+    }
+
+  *x = 0;
+  *y = 0;
+  *width = WidthOfScreen (screen);
+  *height = HeightOfScreen (screen);
+}
+
+void
+xlw_monitor_dimensions_at_pos (Display *dpy, Screen *screen, int src_x,
+			       int src_y, int *x, int *y, int *width, int *height)
+{
+  struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+
+  if (!dpyinfo)
+    emacs_abort ();
+
+  block_input ();
+  xlw_monitor_dimensions_at_pos_1 (dpyinfo, screen, src_x, src_y,
+				   x, y, width, height);
+
+  unblock_input ();
+}
+#endif
+
 
 DEFUN ("x-display-monitor-attributes-list", Fx_display_monitor_attributes_list,
        Sx_display_monitor_attributes_list,
@@ -7633,27 +7752,11 @@ present and mapped to the usual X keysyms.  */)
   struct frame *f = decode_window_system_frame (frame);
   Display *dpy = FRAME_X_DISPLAY (f);
   Lisp_Object have_keys;
-  int major, minor, op, event, error_code;
+
+  if (!FRAME_DISPLAY_INFO (f)->supports_xkb)
+    return Qlambda;
 
   block_input ();
-
-  /* Check library version in case we're dynamically linked.  */
-  major = XkbMajorVersion;
-  minor = XkbMinorVersion;
-  if (!XkbLibraryVersion (&major, &minor))
-    {
-      unblock_input ();
-      return Qlambda;
-    }
-
-  /* Check that the server supports XKB.  */
-  major = XkbMajorVersion;
-  minor = XkbMinorVersion;
-  if (!XkbQueryExtension (dpy, &op, &event, &error_code, &major, &minor))
-    {
-      unblock_input ();
-      return Qlambda;
-    }
 
   /* In this code we check that the keyboard has physical keys with names
      that start with BKSP (Backspace) and DELE (Delete), and that they

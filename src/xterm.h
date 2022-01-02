@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with X protocol.
-   Copyright (C) 1989, 1993-1994, 1998-2021 Free Software Foundation,
+   Copyright (C) 1989, 1993-1994, 1998-2022 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -522,6 +522,7 @@ struct x_display_info
 #endif
 
 #ifdef HAVE_XKB
+  bool supports_xkb;
   XkbDescPtr xkb_desc;
 #endif
 };
@@ -1240,6 +1241,10 @@ extern void x_change_tool_bar_height (struct frame *, int);
 extern void x_implicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
 extern void x_set_scroll_bar_default_width (struct frame *);
 extern void x_set_scroll_bar_default_height (struct frame *);
+#ifdef USE_LUCID
+extern void xlw_monitor_dimensions_at_pos (Display *, Screen *, int, int,
+					   int *, int *, int *, int *);
+#endif
 
 /* Defined in xselect.c.  */
 

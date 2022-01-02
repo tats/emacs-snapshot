@@ -1,7 +1,7 @@
 ;;; org.el --- Outline-based notes management and organizer -*- lexical-binding: t; -*-
 
 ;; Carstens outline-mode for keeping track of everything.
-;; Copyright (C) 2004-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Carsten Dominik <carsten.dominik@gmail.com>
 ;; Maintainer: Bastien Guerry <bzg@gnu.org>
@@ -9,7 +9,7 @@
 ;; Homepage: https://orgmode.org
 ;; Package-Requires: ((emacs "25.1"))
 
-;; Version: 9.5.1
+;; Version: 9.5.2
 
 ;; This file is part of GNU Emacs.
 ;;
@@ -5114,7 +5114,6 @@ stacked delimiters is N.  Escaping delimiters is not possible."
 				     '(invisible t))
 		(add-text-properties (match-beginning 3) (match-end 3)
 				     '(invisible t)))
-              (goto-char (match-end 0))
 	      (throw :exit t))))))))
 
 (defun org-emphasize (&optional char)

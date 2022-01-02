@@ -1,6 +1,6 @@
 ;;; files.el --- file input and output commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1992-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1992-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -2010,12 +2010,14 @@ otherwise a string <2> or <3> or ... is appended to get an unused name.
 Emacs treats buffers whose names begin with a space as internal buffers.
 To avoid confusion when visiting a file whose name begins with a space,
 this function prepends a \"|\" to the final result if necessary."
-  (let ((lastname (file-name-nondirectory filename)))
-    (if (string= lastname "")
-	(setq lastname filename))
-    (generate-new-buffer (if (string-prefix-p " " lastname)
-			     (concat "|" lastname)
-			   lastname))))
+  (let* ((lastname (file-name-nondirectory filename))
+	 (lastname (if (string= lastname "")
+	               filename lastname))
+	 (buf (generate-new-buffer (if (string-prefix-p " " lastname)
+			               (concat "|" lastname)
+			             lastname))))
+    (uniquify--create-file-buffer-advice buf filename)
+    buf))
 
 (defcustom automount-dir-prefix (purecopy "^/tmp_mnt/")
   "Regexp to match the automounter prefix in a directory name."
