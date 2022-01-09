@@ -222,6 +222,38 @@ xw_forward_event_from_view (GtkWidget *widget, GdkEvent *event,
 }
 #endif
 
+#ifdef HAVE_X_WINDOWS
+static guint
+xw_translate_x_modifiers (struct x_display_info *dpyinfo,
+			  unsigned int modifiers)
+{
+  guint mods = 0;
+
+  if (modifiers & dpyinfo->meta_mod_mask)
+    {
+      /* GDK always assumes Mod1 is alt, but that's no reason for
+	 us to make that mistake as well.  */
+      if (!dpyinfo->alt_mod_mask)
+	mods |= GDK_MOD1_MASK;
+      else
+	mods |= GDK_META_MASK;
+    }
+
+  if (modifiers & dpyinfo->alt_mod_mask)
+    mods |= GDK_MOD1_MASK;
+  if (modifiers & dpyinfo->super_mod_mask)
+    mods |= GDK_SUPER_MASK;
+  if (modifiers & dpyinfo->hyper_mod_mask)
+    mods |= GDK_HYPER_MASK;
+  if (modifiers & ControlMask)
+    mods |= GDK_CONTROL_MASK;
+  if (modifiers & ShiftMask)
+    mods |= GDK_SHIFT_MASK;
+
+  return mods;
+}
+#endif
+
 DEFUN ("make-xwidget",
        Fmake_xwidget, Smake_xwidget,
        4, 7, 0,
@@ -563,7 +595,13 @@ selected frame is not an X-Windows frame.  */)
     keycode = gdk_unicode_to_keyval (character);
 
   xg_event->key.keyval = keycode;
+#ifndef HAVE_X_WINDOWS
   xg_event->key.state = modifiers;
+#else
+  if (f)
+    xg_event->key.state = xw_translate_x_modifiers (FRAME_DISPLAY_INFO (f),
+						    modifiers);
+#endif
 
   if (keycode > -1)
     {
@@ -3572,6 +3610,8 @@ kill_xwidget (struct xwidget *xw)
   xw->widget_osr = NULL;
   xw->widgetwindow_osr = NULL;
   xw->find_text = NULL;
+
+  catch_child_signal ();
 #elif defined NS_IMPL_COCOA
   nsxwidget_kill (xw);
 #endif
@@ -3592,4 +3632,6 @@ kill_buffer_xwidgets (Lisp_Object buffer)
 	kill_xwidget (xw);
       }
     }
+
+  catch_child_signal ();
 }

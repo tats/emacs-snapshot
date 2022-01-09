@@ -169,6 +169,10 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   cairo_matrix_init_scale (&font_matrix, pixel_size, pixel_size);
   cairo_matrix_init_identity (&ctm);
   cairo_font_options_t *options = cairo_font_options_create ();
+#ifdef USE_BE_CAIRO
+  if (be_use_subpixel_antialiasing ())
+    cairo_font_options_set_antialias (options, CAIRO_ANTIALIAS_SUBPIXEL);
+#endif
   cairo_scaled_font_t *scaled_font
     = cairo_scaled_font_create (font_face, &font_matrix, &ctm, options);
   cairo_font_face_destroy (font_face);
@@ -545,13 +549,6 @@ ftcrfont_draw (struct glyph_string *s,
       return 0;
     }
   BView_cr_dump_clipping (FRAME_HAIKU_VIEW (f), cr);
-
-  if (s->left_overhang && s->clip_head && !s->for_overlaps)
-    {
-      cairo_rectangle (cr, s->clip_head->x, 0,
-		       FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
-      cairo_clip (cr);
-    }
 #endif
 
   if (with_background)

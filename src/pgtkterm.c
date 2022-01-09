@@ -4957,7 +4957,8 @@ void
 pgtk_clear_under_internal_border (struct frame *f)
 {
   if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0
-      && gtk_widget_get_realized (FRAME_GTK_OUTER_WIDGET (f)))
+      && (!FRAME_GTK_OUTER_WIDGET (f)
+	  || gtk_widget_get_realized (FRAME_GTK_OUTER_WIDGET (f))))
     {
       int border = FRAME_INTERNAL_BORDER_WIDTH (f);
       int width = FRAME_PIXEL_WIDTH (f);
@@ -5230,9 +5231,9 @@ pgtk_emacs_to_gtk_modifiers (struct pgtk_display_info *dpyinfo, int state)
 void
 pgtk_enqueue_string (struct frame *f, gchar * str)
 {
-  gunichar *ustr;
+  gunichar *ustr, *uptr;
 
-  ustr = g_utf8_to_ucs4 (str, -1, NULL, NULL, NULL);
+  uptr = ustr = g_utf8_to_ucs4 (str, -1, NULL, NULL, NULL);
   if (ustr == NULL)
     return;
   for (; *ustr != 0; ustr++)
@@ -5251,6 +5252,7 @@ pgtk_enqueue_string (struct frame *f, gchar * str)
       evq_enqueue (&inev);
     }
 
+  g_free (uptr);
 }
 
 void
@@ -5258,7 +5260,7 @@ pgtk_enqueue_preedit (struct frame *f, Lisp_Object preedit)
 {
   union buffered_input_event inev;
   EVENT_INIT (inev.ie);
-  inev.ie.kind = PGTK_PREEDIT_TEXT_EVENT;
+  inev.ie.kind = PREEDIT_TEXT_EVENT;
   inev.ie.arg = preedit;
   inev.ie.code = 0;
   XSETFRAME (inev.ie.frame_or_window, f);

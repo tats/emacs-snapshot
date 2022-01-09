@@ -2485,8 +2485,9 @@ GNU Emacs Manual}.
 @item :width
 Relative character width.  This should be one of the symbols
 @code{ultra-condensed}, @code{extra-condensed}, @code{condensed},
-@code{semi-condensed}, @code{normal}, @code{semi-expanded},
-@code{expanded}, @code{extra-expanded}, or @code{ultra-expanded}.
+@code{semi-condensed}, @code{normal}, @code{regular}, @code{medium},
+@code{semi-expanded}, @code{expanded}, @code{extra-expanded}, or
+@code{ultra-expanded}.
 
 @item :height
 The height of the font.  In the simplest case, this is an integer in
@@ -2801,7 +2802,7 @@ apply to.  Here are the possible values of @var{characteristic}:
 The kind of window system the terminal uses---either @code{graphic}
 (any graphics-capable display), @code{x}, @code{pc} (for the MS-DOS
 console), @code{w32} (for MS Windows 9X/NT/2K/XP), @code{haiku} (for
-Haiku), @code{pgtk} (for GTK), or @code{tty} (a non-graphics-capable
+Haiku), @code{pgtk} (for pure GTK), or @code{tty} (a non-graphics-capable
 display).  @xref{Window Systems, window-system}.
 
 @item class
@@ -8385,6 +8386,8 @@ GNUstep and macOS).
 Emacs is displaying the frame using MS-DOS direct screen writes.
 @item haiku
 Emacs is displaying the frame using the Application Kit on Haiku.
+@item pgtk
+Emacs is displaying the frame using pure GTK facilities.
 @item nil
 Emacs is displaying the frame on a character-based terminal.
 @end table

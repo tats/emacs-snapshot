@@ -144,6 +144,16 @@ buffer isn't displayed.
 This controls the thickness of the external borders of the menu bars
 and pop-up menus.
 
++++
+** New X resource: "inputStyle".
+This controls the style of the pre-edit and status areas of X input
+methods.
+
+---
+** New user option 'x-gtk-use-native-input'.
+This controls whether or not GTK input methods are used by Emacs,
+instead of XIM input methods.
+
 ---
 ** New minor mode 'pixel-scroll-precision-mode'.
 When enabled, and if your mouse supports it, you can scroll the
@@ -258,6 +268,11 @@ For example, a 'display-buffer-alist' entry of
 
 will make the body of the chosen window 40 columns wide.  For the
 height use 'window-height' in combination with 'body-lines'.
+
+** Rcirc
+
++++
+*** New command 'rcirc-when'.
 
 ** Tab Bars and Tab Lines
 
@@ -780,6 +795,14 @@ the Netscape web browser was released in February, 2008.
 *** Support for the Galeon web browser has been removed.
 This support has been obsolete since Emacs 25.1.  The final version of
 the Galeon web browser was released in September, 2008.
+
+** Miscellaneous
+
+---
+*** New minor mode 'elide-head-mode'.
+Enabling this minor mode turns on hiding header material, like
+'elide-head' does; disabling it shows the header.  The commands
+'elide-head' and 'elide-head-show' are now obsolete.
 
 
 * New Modes and Packages in Emacs 29.1

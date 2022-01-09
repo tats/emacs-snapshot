@@ -2129,6 +2129,45 @@ which @code{1.0} is the width and height of the touchpad
 respectively.  They are usually interpreted as being relative to the
 size of the object beneath the gesture: image, window, etc.
 
+@cindex @code{preedit-text} event
+@item (preedit-text @var{arg})
+This event is sent when a system input method tells Emacs to display
+some text to indicate to the user what will be inserted.  The contents
+of @var{arg} are dependent on the window system being used.
+
+On X, @var{arg} is a string describing some text to place behind the
+cursor.  It can be @code{nil}, which means to remove any text
+previously displayed.
+
+On PGTK frames (@pxref{Frames}), @var{arg} is a list of strings with
+information about their color and underline attributes.  It has the
+following form:
+
+@example
+@group
+   ((@var{string1}
+     (ul . @var{underline-color})
+     (bg . @var{background-color})
+     (fg . @var{foreground-color}))
+    (@var{string2}
+     (ul . @var{underline-color})
+     (bg . @var{background-color})
+     (fg . @var{foreground-color}))
+    @dots{}
+   )
+@end group
+@end example
+
+Color information can be omitted, leaving just the text of the
+strings.  @var{underline-color} can be @code{t}, meaning underlined
+text with default underline color, or it can be a string, the name of
+the color to draw the underline.
+
+This is a special event (@pxref{Special Events}), which normally
+should not be bound by the user to any command.  Emacs will typically
+display the text contained in the event in an overlay behind point
+when it is received.
+
 @cindex @code{drag-n-drop} event
 @item (drag-n-drop @var{position} @var{files})
 This kind of event is generated when a group of files is

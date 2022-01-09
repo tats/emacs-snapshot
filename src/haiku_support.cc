@@ -62,6 +62,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <kernel/scheduler.h>
 
 #include <private/interface/ToolTip.h>
+#include <private/interface/WindowPrivate.h>
 
 #include <cmath>
 #include <cstring>
@@ -111,6 +112,10 @@ static BLocker child_frame_lock;
    the input handling, but it will be good enough for most people.  */
 
 static BLocker movement_locker;
+
+/* This could be a private API, but it's used by (at least) the Qt
+   port, so it's probably here to stay.  */
+extern status_t get_subpixel_antialiasing (bool *);
 
 extern "C"
 {
@@ -169,6 +174,40 @@ map_shift (uint32_t kc, uint32_t *ch)
     return;
 
   int32_t m = key_map->shift_map[kc];
+  map_key (key_chars, m, ch);
+  key_map_lock.Unlock ();
+}
+
+static void
+map_caps (uint32_t kc, uint32_t *ch)
+{
+  if (!key_map_lock.Lock ())
+    gui_abort ("Failed to lock keymap");
+  if (!key_map)
+    get_key_map (&key_map, &key_chars);
+  if (!key_map)
+    return;
+  if (kc >= 128)
+    return;
+
+  int32_t m = key_map->caps_map[kc];
+  map_key (key_chars, m, ch);
+  key_map_lock.Unlock ();
+}
+
+static void
+map_caps_shift (uint32_t kc, uint32_t *ch)
+{
+  if (!key_map_lock.Lock ())
+    gui_abort ("Failed to lock keymap");
+  if (!key_map)
+    get_key_map (&key_map, &key_chars);
+  if (!key_map)
+    return;
+  if (kc >= 128)
+    return;
+
+  int32_t m = key_map->caps_shift_map[kc];
   map_key (key_chars, m, ch);
   key_map_lock.Unlock ();
 }
@@ -266,6 +305,9 @@ public:
   int zoomed_p = 0;
   int shown_flag = 0;
   volatile int was_shown_p = 0;
+  bool menu_bar_active_p = false;
+  window_look pre_override_redirect_style;
+  window_feel pre_override_redirect_feel;
 
   EmacsWindow () : BWindow (BRect (0, 0, 0, 0), "", B_TITLED_WINDOW_LOOK,
 			    B_NORMAL_WINDOW_FEEL, B_NO_SERVER_SIDE_WINDOW_MODIFIERS)
@@ -563,6 +605,15 @@ public:
     if (msg->what == B_KEY_DOWN || msg->what == B_KEY_UP)
       {
 	struct haiku_key_event rq;
+
+	/* Pass through key events to the regular dispatch mechanism
+	   if the menu bar active, so that key navigation can work.  */
+	if (menu_bar_active_p)
+	  {
+	    BWindow::DispatchMessage (msg, handler);
+	    return;
+	  }
+
 	rq.window = this;
 
 	int32_t code = msg->GetInt32 ("raw_char", 0);
@@ -588,9 +639,19 @@ public:
 	  BUnicodeChar::FromUTF8 (msg->GetString ("bytes"));
 
 	if ((mods & B_SHIFT_KEY) && rq.kc >= 0)
-	  map_shift (rq.kc, &rq.unraw_mb_char);
+	  {
+	    if (mods & B_CAPS_LOCK)
+	      map_caps_shift (rq.kc, &rq.unraw_mb_char);
+	    else
+	      map_shift (rq.kc, &rq.unraw_mb_char);
+	  }
 	else if (rq.kc >= 0)
-	  map_normal (rq.kc, &rq.unraw_mb_char);
+	  {
+	    if (mods & B_CAPS_LOCK)
+	      map_caps (rq.kc, &rq.unraw_mb_char);
+	    else
+	      map_normal (rq.kc, &rq.unraw_mb_char);
+	  }
 
 	haiku_write (msg->what == B_KEY_DOWN ? KEY_DOWN : KEY_UP, &rq);
       }
@@ -635,6 +696,7 @@ public:
     rq.window = this;
 
     haiku_write (MENU_BAR_OPEN, &rq);
+    menu_bar_active_p = true;
   }
 
   void
@@ -644,6 +706,7 @@ public:
     rq.window = this;
 
     haiku_write (MENU_BAR_CLOSE, &rq);
+    menu_bar_active_p = false;
   }
 
   void
@@ -809,8 +872,8 @@ public:
     zoomed_p = 0;
 
     EmacsMoveTo (pre_zoom_rect.left, pre_zoom_rect.top);
-    ResizeTo (pre_zoom_rect.Width (),
-	      pre_zoom_rect.Height ());
+    ResizeTo (BE_RECT_WIDTH (pre_zoom_rect),
+	      BE_RECT_HEIGHT (pre_zoom_rect));
   }
 
   void
@@ -821,14 +884,17 @@ public:
 
     if (parent)
       {
-	*width = parent->Frame ().Width ();
-	*height = parent->Frame ().Height ();
+	BRect frame = parent->Frame ();
+	*width = BE_RECT_WIDTH (frame);
+	*height = BE_RECT_HEIGHT (frame);
       }
     else
       {
 	BScreen s (this);
-	*width = s.Frame ().Width ();
-	*height = s.Frame ().Height ();
+	BRect frame = s.Frame ();
+
+	*width = BE_RECT_WIDTH (frame);
+	*height = BE_RECT_HEIGHT (frame);
       }
 
     child_frame_lock.Unlock ();
@@ -894,8 +960,8 @@ public:
 	flags &= ~(B_NOT_MOVABLE | B_NOT_ZOOMABLE);
 	EmacsMoveTo (pre_fullscreen_rect.left,
 		     pre_fullscreen_rect.top);
-	ResizeTo (pre_fullscreen_rect.Width (),
-		  pre_fullscreen_rect.Height ());
+	ResizeTo (BE_RECT_WIDTH (pre_fullscreen_rect),
+		  BE_RECT_HEIGHT (pre_fullscreen_rect));
       }
     SetFlags (flags);
   }
@@ -906,6 +972,14 @@ class EmacsMenuBar : public BMenuBar
 public:
   EmacsMenuBar () : BMenuBar (BRect (0, 0, 0, 0), NULL)
   {
+  }
+
+  void
+  AttachedToWindow (void)
+  {
+    BWindow *window = Window ();
+
+    window->SetKeyMenuBar (this);
   }
 
   void
@@ -978,11 +1052,12 @@ public:
       gui_abort ("Could not lock cr surface during attachment");
     if (cr_surface)
       gui_abort ("Trying to attach cr surface when one already exists");
+    BRect bounds = offscreen_draw_bitmap_1->Bounds ();
+
     cr_surface = cairo_image_surface_create_for_data
       ((unsigned char *) offscreen_draw_bitmap_1->Bits (),
-       CAIRO_FORMAT_ARGB32,
-       offscreen_draw_bitmap_1->Bounds ().IntegerWidth () + 1,
-       offscreen_draw_bitmap_1->Bounds ().IntegerHeight () + 1,
+       CAIRO_FORMAT_ARGB32, BE_RECT_WIDTH (bounds),
+       BE_RECT_HEIGHT (bounds),
        offscreen_draw_bitmap_1->BytesPerRow ());
     if (!cr_surface)
       gui_abort ("Cr surface allocation failed for double-buffered view");
@@ -1036,8 +1111,11 @@ public:
 	if (offscreen_draw_bitmap_1->InitCheck () != B_OK)
 	  gui_abort ("Offscreen draw bitmap initialization failed");
 
-	offscreen_draw_view->MoveTo (Frame ().left, Frame ().top);
-	offscreen_draw_view->ResizeTo (Frame ().Width (), Frame ().Height ());
+	BRect frame = Frame ();
+
+	offscreen_draw_view->MoveTo (frame.left, frame.top);
+	offscreen_draw_view->ResizeTo (BE_RECT_WIDTH (frame),
+				       BE_RECT_HEIGHT (frame));
 	offscreen_draw_bitmap_1->AddChild (offscreen_draw_view);
 #ifdef USE_BE_CAIRO
 	AttachCairoSurface ();
@@ -1426,7 +1504,7 @@ public:
       {
 	BRect r = menu->Frame ();
 	int w = menu->StringWidth (key);
-	menu->MovePenTo (BPoint (r.Width () - w - 4,
+	menu->MovePenTo (BPoint (BE_RECT_WIDTH (r) - w - 4,
 				 menu->PenLocation ().y));
 	menu->DrawString (key);
       }
@@ -1661,7 +1739,6 @@ BWindow_set_visible (void *window, int visible_p)
 	win->Minimize (false);
       win->EmacsHide ();
     }
-  win->Sync ();
 }
 
 /* Change the title of WINDOW to the multibyte string TITLE.  */
@@ -2275,8 +2352,14 @@ BMenuBar_delete (void *menubar)
 {
   BView *vw = (BView *) menubar;
   BView *p = vw->Parent ();
+  EmacsWindow *window = (EmacsWindow *) p->Window ();
+
   if (!p->LockLooper ())
     gui_abort ("Failed to lock menu bar parent while removing menubar");
+  window->SetKeyMenuBar (NULL);
+  /* MenusEnded isn't called if the menu bar is destroyed
+     before it closes.  */
+  window->menu_bar_active_p = false;
   vw->RemoveSelf ();
   p->UnlockLooper ();
   delete vw;
@@ -2683,7 +2766,6 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
   be_popup_file_dialog_safe_set_target (panel, w);
 
   panel->Show ();
-  panel->Window ()->Show ();
   unblock_input_function ();
 
   void *buf = alloca (200);
@@ -2890,8 +2972,9 @@ BView_cr_dump_clipping (void *view, cairo_t *ctx)
   for (int i = 0; i < cr.CountRects (); ++i)
     {
       BRect r = cr.RectAt (i);
-      cairo_rectangle (ctx, r.left, r.top, r.Width () + 1,
-		       r.Height () + 1);
+      cairo_rectangle (ctx, r.left, r.top,
+		       BE_RECT_WIDTH (r),
+		       BE_RECT_HEIGHT (r));
     }
 
   cairo_clip (ctx);
@@ -2991,4 +3074,61 @@ BWindow_set_size_alignment (void *window, int align_width, int align_height)
     gui_abort ("Invalid pixel alignment");
 #endif
   w->UnlockLooper ();
+}
+
+void
+BWindow_send_behind (void *window, void *other_window)
+{
+  BWindow *w = (BWindow *) window;
+  BWindow *other = (BWindow *) other_window;
+
+  if (!w->LockLooper ())
+    gui_abort ("Failed to lock window in order to send it behind another");
+  w->SendBehind (other);
+  w->UnlockLooper ();
+}
+
+bool
+BWindow_is_active (void *window)
+{
+  BWindow *w = (BWindow *) window;
+  return w->IsActive ();
+}
+
+bool
+be_use_subpixel_antialiasing (void)
+{
+  bool current_subpixel_antialiasing;
+
+  if (get_subpixel_antialiasing (&current_subpixel_antialiasing) != B_OK)
+    return false;
+
+  return current_subpixel_antialiasing;
+}
+
+/* This isn't implemented very properly (for example: what if
+   decorations are changed while the window is under override
+   redirect?) but it works well enough for most use cases.  */
+void
+BWindow_set_override_redirect (void *window, bool override_redirect_p)
+{
+  EmacsWindow *w = (EmacsWindow *) window;
+
+  if (w->LockLooper ())
+    {
+      if (override_redirect_p)
+	{
+	  w->pre_override_redirect_feel = w->Feel ();
+	  w->pre_override_redirect_style = w->Look ();
+	  w->SetFeel (kMenuWindowFeel);
+	  w->SetLook (B_NO_BORDER_WINDOW_LOOK);
+	}
+      else
+	{
+	  w->SetFeel (w->pre_override_redirect_feel);
+	  w->SetLook (w->pre_override_redirect_style);
+	}
+
+      w->UnlockLooper ();
+    }
 }

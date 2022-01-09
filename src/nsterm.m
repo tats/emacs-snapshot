@@ -1617,10 +1617,17 @@ ns_destroy_window (struct frame *f)
 
   /* If this frame has a parent window, detach it as not doing so can
      cause a crash in GNUStep.  */
-  if (FRAME_PARENT_FRAME (f) != NULL)
+  if (FRAME_PARENT_FRAME (f))
     {
       NSWindow *child = [FRAME_NS_VIEW (f) window];
-      NSWindow *parent = [FRAME_NS_VIEW (FRAME_PARENT_FRAME (f)) window];
+      NSWindow *parent;
+
+      /* Pacify a incorrect GCC warning about FRAME_PARENT_FRAME (f)
+	 being NULL. */
+      if (FRAME_PARENT_FRAME (f))
+	parent = [FRAME_NS_VIEW (FRAME_PARENT_FRAME (f)) window];
+      else
+	emacs_abort ();
 
       [parent removeChildWindow: child];
     }
@@ -2086,8 +2093,8 @@ ns_lisp_to_color (Lisp_Object color, NSColor **col)
   return 1;
 }
 
-void
-ns_query_color(void *col, Emacs_Color *color_def)
+static void
+ns_query_color (void *col, Emacs_Color *color_def)
 /* --------------------------------------------------------------------------
          Get ARGB values out of NSColor col and put them into color_def
          and set color_def pixel to the ARGB color.
@@ -4063,19 +4070,22 @@ ns_draw_glyph_string (struct glyph_string *s)
 	    /* As prev was drawn while clipped to its own area, we
 	       must draw the right_overhang part using s->hl now.  */
 	    enum draw_glyphs_face save = prev->hl;
-	    struct face *save_face = prev->face;
 
-	    prev->face = s->face;
+	    prev->hl = s->hl;
 	    NSRect r = NSMakeRect (s->x, s->y, s->width, s->height);
+	    NSRect rc;
+	    get_glyph_string_clip_rect (s, &rc);
 	    [[NSGraphicsContext currentContext] saveGraphicsState];
 	    NSRectClip (r);
+	    if (n)
+	      NSRectClip (rc);
 #ifdef NS_IMPL_GNUSTEP
 	    DPSgsave ([NSGraphicsContext currentContext]);
 	    DPSrectclip ([NSGraphicsContext currentContext], s->x, s->y,
 			 s->width, s->height);
+	    DPSrectclip ([NSGraphicsContext currentContext], NSMinX (rc),
+			 NSMinY (rc), NSWidth (rc), NSHeight (rc));
 #endif
-	    prev->num_clips = 1;
-	    prev->hl = s->hl;
 	    if (prev->first_glyph->type == CHAR_GLYPH)
 	      ns_draw_glyph_string_foreground (prev);
 	    else
@@ -4085,8 +4095,6 @@ ns_draw_glyph_string (struct glyph_string *s)
 #endif
 	    [[NSGraphicsContext currentContext] restoreGraphicsState];
 	    prev->hl = save;
-	    prev->face = save_face;
-	    prev->num_clips = 0;
 	  }
       ns_unfocus (s->f);
     }
@@ -4103,19 +4111,21 @@ ns_draw_glyph_string (struct glyph_string *s)
 	    /* As next will be drawn while clipped to its own area,
 	       we must draw the left_overhang part using s->hl now.  */
 	    enum draw_glyphs_face save = next->hl;
-	    struct face *save_face = next->face;
 
 	    next->hl = s->hl;
-	    next->face = s->face;
 	    NSRect r = NSMakeRect (s->x, s->y, s->width, s->height);
+	    NSRect rc;
+	    get_glyph_string_clip_rect (s, &rc);
 	    [[NSGraphicsContext currentContext] saveGraphicsState];
 	    NSRectClip (r);
+	    NSRectClip (rc);
 #ifdef NS_IMPL_GNUSTEP
 	    DPSgsave ([NSGraphicsContext currentContext]);
 	    DPSrectclip ([NSGraphicsContext currentContext], s->x, s->y,
 			 s->width, s->height);
+	    DPSrectclip ([NSGraphicsContext currentContext], NSMinX (rc),
+			 NSMinY (rc), NSWidth (rc), NSHeight (rc));
 #endif
-	    next->num_clips = 1;
 	    if (next->first_glyph->type == CHAR_GLYPH)
 	      ns_draw_glyph_string_foreground (next);
 	    else
@@ -4125,10 +4135,7 @@ ns_draw_glyph_string (struct glyph_string *s)
 #endif
 	    [[NSGraphicsContext currentContext] restoreGraphicsState];
 	    next->hl = save;
-	    next->num_clips = 0;
-	    next->face = save_face;
-	    next->clip_head = next;
-	    next->background_filled_p = 0;
+	    next->clip_head = s->next;
 	  }
       ns_unfocus (s->f);
     }
@@ -4481,7 +4488,7 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
 
 #ifdef HAVE_PTHREAD
 void
-ns_run_loop_break ()
+ns_run_loop_break (void)
 /* Break out of the NS run loop in ns_select or ns_read_socket.  */
 {
   NSTRACE_WHEN (NSTRACE_GROUP_EVENTS, "ns_run_loop_break");
@@ -6512,6 +6519,22 @@ not_in_argv (NSString *arg)
           int x = 0, y = 0;
           int scrollUp = NO;
 
+	  static bool end_flag = false;
+
+	  if (!ns_use_mwheel_momentum && !end_flag
+	      && [theEvent momentumPhase] != NSEventPhaseNone)
+	    {
+	      emacs_event->kind = TOUCH_END_EVENT;
+	      emacs_event->arg = Qnil;
+	      end_flag = [theEvent momentumPhase] != NSEventPhaseNone;
+	      XSETINT (emacs_event->x, lrint (p.x));
+	      XSETINT (emacs_event->y, lrint (p.y));
+	      EV_TRAILER (theEvent);
+	      return;
+	    }
+
+	  end_flag = [theEvent momentumPhase] != NSEventPhaseNone;
+
           /* FIXME: At the top or bottom of the buffer we should
            * ignore momentum-phase events.  */
           if (! ns_use_mwheel_momentum
@@ -7565,7 +7588,7 @@ not_in_argv (NSString *arg)
   EmacsWindow *w, *fw;
   BOOL onFirstScreen;
   struct frame *f;
-  NSRect r, wr;
+  NSRect r;
   NSColor *col;
 
   NSTRACE ("[EmacsView toggleFullScreen:]");
@@ -7584,7 +7607,6 @@ not_in_argv (NSString *arg)
   w = (EmacsWindow *)[self window];
   onFirstScreen = [[w screen] isEqual:[[NSScreen screens] objectAtIndex:0]];
   f = emacsframe;
-  wr = [w frame];
   col = [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND
 				 (FACE_FROM_ID (f, DEFAULT_FACE_ID))];
 
@@ -8435,6 +8457,15 @@ not_in_argv (NSString *arg)
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
   [ourView updateCollectionBehavior];
 #endif
+
+  /* Child frames are often used in ways that may mean they should
+     "disappear" into the contents of the parent frame.  macOs's
+     drop-shadows break this effect, so remove them on undecorated
+     child frames.  */
+  if (parentFrame && FRAME_UNDECORATED (ourFrame))
+    [self setHasShadow:NO];
+  else
+    [self setHasShadow:YES];
 #endif
 
 

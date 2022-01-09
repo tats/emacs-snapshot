@@ -560,8 +560,8 @@ If ARG is non-nil, instead prompt for connection parameters."
                      (auth (auth-source-search :host server
                                                :user user-name
                                                :port port))
-                     (fn (plist-get (car auth) :secret)))
-            (setq password (funcall fn)))
+                     (pwd (auth-info-password (car auth))))
+            (setq password pwd))
 	  (when server
 	    (let (connected)
 	      (dolist (p (rcirc-process-list))
@@ -2046,6 +2046,13 @@ connection."
         (sit-for 0)			; displayed text before hook
         (run-hook-with-args 'rcirc-print-functions
                             process sender response target text)))))
+
+(defun rcirc-when ()
+  "Show the time of reception of the message at point."
+  (interactive)
+  (if-let (time (get-text-property (point) 'rcirc-time))
+      (message (format-time-string "%c" time))
+    (message "No time information at point.")))
 
 (defun rcirc-generate-log-filename (process target)
   "Return filename for log file based on PROCESS and TARGET."

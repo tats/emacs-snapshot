@@ -186,18 +186,27 @@ pgtk_display_info_for_name (Lisp_Object name)
 static void
 x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  unsigned long fg;
+  unsigned long fg, old_fg;
 
+  block_input ();
+  old_fg = FRAME_FOREGROUND_COLOR (f);
   fg = x_decode_color (f, arg, BLACK_PIX_DEFAULT (f));
   FRAME_FOREGROUND_PIXEL (f) = fg;
   FRAME_X_OUTPUT (f)->foreground_color = fg;
 
   if (FRAME_GTK_WIDGET (f))
     {
+      if (FRAME_X_OUTPUT (f)->cursor_color == old_fg)
+	{
+	  FRAME_X_OUTPUT (f)->cursor_color = fg;
+	  FRAME_X_OUTPUT (f)->cursor_xgcv.background = fg;
+	}
+
       update_face_from_frame_parameter (f, Qforeground_color, arg);
       if (FRAME_VISIBLE_P (f))
 	SET_FRAME_GARBAGED (f);
     }
+  unblock_input ();
 }
 
 
@@ -206,6 +215,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   unsigned long bg;
 
+  block_input ();
   bg = x_decode_color (f, arg, WHITE_PIX_DEFAULT (f));
   FRAME_BACKGROUND_PIXEL (f) = bg;
 
@@ -214,12 +224,14 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     pgtk_clear_frame (f);
 
   FRAME_X_OUTPUT (f)->background_color = bg;
+  FRAME_X_OUTPUT (f)->cursor_xgcv.foreground = bg;
 
   xg_set_background_color (f, bg);
   update_face_from_frame_parameter (f, Qbackground_color, arg);
 
   if (FRAME_VISIBLE_P (f))
     SET_FRAME_GARBAGED (f);
+  unblock_input ();
 }
 
 static void
@@ -1454,9 +1466,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
     gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
 			   "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
 
-  /* This defaults to 1 in order to match xterm.  We recognize either
-     internalBorderWidth or internalBorder (which is what xterm calls
-     it).  */
   if (NILP (Fassq (Qinternal_border_width, parms)))
     {
       Lisp_Object value;
@@ -1468,13 +1477,18 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 	parms = Fcons (Fcons (Qinternal_border_width, value), parms);
     }
 
+  gui_default_parameter (f, parms, Qinternal_border_width,
+			 make_fixnum (0),
+			 "internalBorderWidth", "internalBorderWidth",
+			 RES_TYPE_NUMBER);
+
   /* Same for child frames.  */
   if (NILP (Fassq (Qchild_frame_border_width, parms)))
     {
       Lisp_Object value;
 
       value = gui_display_get_arg (dpyinfo, parms, Qchild_frame_border_width,
-                                   "childFrameBorderWidth", "childFrameBorderWidth",
+                                   "childFrameBorder", "childFrameBorder",
                                    RES_TYPE_NUMBER);
       if (! EQ (value, Qunbound))
 	parms = Fcons (Fcons (Qchild_frame_border_width, value),
@@ -1485,10 +1499,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
   gui_default_parameter (f, parms, Qchild_frame_border_width,
 			 make_fixnum (0),
 			 "childFrameBorderWidth", "childFrameBorderWidth",
-			 RES_TYPE_NUMBER);
-  gui_default_parameter (f, parms, Qinternal_border_width,
-			 make_fixnum (0),
-			 "internalBorderWidth", "internalBorderWidth",
 			 RES_TYPE_NUMBER);
   gui_default_parameter (f, parms, Qright_divider_width, make_fixnum (0),
 			 NULL, NULL, RES_TYPE_NUMBER);
