@@ -28,7 +28,7 @@ Status: new
  4 files changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index b72127d..94ee6d9 100644
+index 8ac6f52..f569ba5 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -166,7 +166,9 @@ man1dir=
@@ -42,7 +42,7 @@ index b72127d..94ee6d9 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -908,8 +910,7 @@ $(1)_$(2):
+@@ -911,8 +913,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -52,7 +52,7 @@ index b72127d..94ee6d9 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -1023,11 +1024,11 @@ test/%:
+@@ -1026,11 +1027,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -69,7 +69,7 @@ index b72127d..94ee6d9 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1058,9 +1059,6 @@ info-dir:
+@@ -1061,9 +1062,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -79,7 +79,7 @@ index b72127d..94ee6d9 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1082,14 +1080,10 @@ ${srcdir}/info/dir:
+@@ -1085,14 +1083,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -98,7 +98,7 @@ index b72127d..94ee6d9 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1107,14 +1101,10 @@ install-pdf:
+@@ -1110,14 +1104,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -118,10 +118,10 @@ index b72127d..94ee6d9 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index baf8c80..ddc4ace 100644
+index 955f091..bea2d48 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6405,7 +6405,7 @@ AC_DEFUN
+@@ -6370,7 +6370,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index baf8c80..ddc4ace 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6467,15 +6467,6 @@ m4_define
+@@ -6432,15 +6432,6 @@ m4_define
  fi
  ])
  
@@ -147,7 +147,7 @@ index baf8c80..ddc4ace 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 6c1e9cb..6c4f70ce 100644
+index d348dbc..33af2cd 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -63,18 +63,14 @@ INSTALL_DATA =
