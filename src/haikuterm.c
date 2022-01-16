@@ -55,6 +55,8 @@ struct unhandled_event
   uint8_t buffer[200];
 };
 
+static bool any_help_event_p = false;
+
 char *
 get_keysym_name (int keysym)
 {
@@ -107,6 +109,8 @@ haiku_delete_terminal (struct terminal *terminal)
 static const char *
 get_string_resource (void *ignored, const char *name, const char *class)
 {
+  const char *native;
+
   if (!name)
     return NULL;
 
@@ -114,6 +118,9 @@ get_string_resource (void *ignored, const char *name, const char *class)
 
   if (!NILP (lval))
     return SSDATA (XCDR (lval));
+
+  if ((native = be_find_setting (name)))
+    return native;
 
   return NULL;
 }
@@ -365,6 +372,13 @@ haiku_frame_raise_lower (struct frame *f, bool raise_p)
       BWindow_sync (FRAME_HAIKU_WINDOW (f));
       unblock_input ();
     }
+  else
+    {
+      block_input ();
+      BWindow_send_behind (FRAME_HAIKU_WINDOW (f), NULL);
+      BWindow_sync (FRAME_HAIKU_WINDOW (f));
+      unblock_input ();
+    }
 }
 
 /* Unfortunately, NOACTIVATE is not implementable on Haiku.  */
@@ -608,7 +622,12 @@ haiku_draw_text_decoration (struct glyph_string *s, struct face *face,
 	  unsigned long thickness, position;
 	  int y;
 
-	  if (s->prev && s->prev && s->prev->hl == DRAW_MOUSE_FACE)
+	  if (s->prev
+	      && s->prev->face->underline == FACE_UNDER_LINE
+	      && (s->prev->face->underline_at_descent_line_p
+		  == s->face->underline_at_descent_line_p)
+	      && (s->prev->face->underline_pixels_above_descent_line
+		  == s->face->underline_pixels_above_descent_line))
 	    {
 	      struct face *prev_face = s->prev->face;
 
@@ -639,7 +658,8 @@ haiku_draw_text_decoration (struct glyph_string *s, struct face *face,
 	      val = (WINDOW_BUFFER_LOCAL_VALUE
 		     (Qx_underline_at_descent_line, s->w));
 	      underline_at_descent_line
-		= !(NILP (val) || EQ (val, Qunbound));
+		= (!(NILP (val) || EQ (val, Qunbound))
+		   || s->face->underline_at_descent_line_p);
 
 	      val = (WINDOW_BUFFER_LOCAL_VALUE
 		     (Qx_use_underline_position_properties, s->w));
@@ -652,7 +672,9 @@ haiku_draw_text_decoration (struct glyph_string *s, struct face *face,
 	      else
 		thickness = 1;
 	      if (underline_at_descent_line)
-		position = (s->height - thickness) - (s->ybase - s->y);
+		position = ((s->height - thickness)
+			    - (s->ybase - s->y)
+			    - s->face->underline_pixels_above_descent_line);
 	      else
 		{
 		  /* Get the underline position.  This is the
@@ -2209,6 +2231,7 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
   void *view = FRAME_HAIKU_VIEW (XFRAME (WINDOW_FRAME (w)));
   struct face *face = p->face;
 
+  block_input ();
   BView_draw_lock (view);
   BView_StartClip (view);
 
@@ -2243,6 +2266,7 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
     }
   BView_EndClip (view);
   BView_draw_unlock (view);
+  unblock_input ();
 }
 
 static void
@@ -2457,10 +2481,7 @@ haiku_default_font_parameter (struct frame *f, Lisp_Object parms)
       struct haiku_font_pattern ptn;
       ptn.specified = 0;
 
-      if (f->tooltip)
-	BFont_populate_plain_family (&ptn);
-      else
-	BFont_populate_fixed_family (&ptn);
+      BFont_populate_fixed_family (&ptn);
 
       if (ptn.specified & FSPEC_FAMILY)
 	font = font_open_by_name (f, build_unibyte_string (ptn.family));
@@ -2575,6 +2596,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   struct unhandled_event *unhandled_events = NULL;
   int button_or_motion_p;
   int need_flush = 0;
+  int do_help = 0;
 
   if (!buf)
     buf = xmalloc (200);
@@ -2670,7 +2692,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct haiku_key_event *b = buf;
 	    Mouse_HLInfo *hlinfo = &x_display_list->mouse_highlight;
 	    struct frame *f = haiku_window_to_frame (b->window);
-	    int non_ascii_p;
 	    if (!f)
 	      continue;
 
@@ -2686,11 +2707,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		need_flush = 1;
 	      }
 
-	    inev.code = b->unraw_mb_char;
+	    inev.code = b->keysym ? b->keysym : b->multibyte_char;
 
-	    BMapKey (b->kc, &non_ascii_p, &inev.code);
-
-	    if (non_ascii_p)
+	    if (b->keysym)
 	      inev.kind = NON_ASCII_KEYSTROKE_EVENT;
 	    else
 	      inev.kind = inev.code > 127 ? MULTIBYTE_CHAR_KEYSTROKE_EVENT :
@@ -2758,8 +2777,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		  }
 
 		haiku_new_focus_frame (x_display_list->focused_frame);
-		help_echo_string = Qnil;
-		gen_help_event (Qnil, frame, Qnil, Qnil, 0);
+
+		if (any_help_event_p)
+		  do_help = -1;
 	      }
 	    else
 	      {
@@ -2804,9 +2824,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    remember_mouse_glyph (f, b->x, b->y,
 					  &FRAME_DISPLAY_INFO (f)->last_mouse_glyph);
 		    dpyinfo->last_mouse_glyph_frame = f;
-		    gen_help_event (help_echo_string, frame, help_echo_window,
-				    help_echo_object, help_echo_pos);
 		  }
+		else
+		  help_echo_string = previous_help_echo_string;
 
 		if (!NILP (Vmouse_autoselect_window))
 		  {
@@ -2826,6 +2846,10 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 		    last_mouse_window = window;
 		  }
+
+		if (!NILP (help_echo_string)
+		    || !NILP (previous_help_echo_string))
+		  do_help = 1;
 	      }
 	    break;
 	  }
@@ -3035,12 +3059,27 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	  {
 	    struct haiku_wheel_move_event *b = buf;
 	    struct frame *f = haiku_window_to_frame (b->window);
-	    int x, y;
+	    int x, y, scroll_width, scroll_height;
 	    static float px = 0.0f, py = 0.0f;
+	    Lisp_Object wheel_window;
 
 	    if (!f)
 	      continue;
+
 	    BView_get_mouse (FRAME_HAIKU_VIEW (f), &x, &y);
+
+	    wheel_window = window_from_coordinates (f, x, y, 0, false, false);
+
+	    if (NILP (wheel_window))
+	      {
+		scroll_width = FRAME_PIXEL_WIDTH (f);
+		scroll_height = FRAME_PIXEL_HEIGHT (f);
+	      }
+	    else
+	      {
+		scroll_width = XWINDOW (wheel_window)->pixel_width;
+		scroll_height = XWINDOW (wheel_window)->pixel_height;
+	      }
 
 	    inev.modifiers = haiku_modifiers_to_emacs (b->modifiers);
 
@@ -3053,9 +3092,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      py = 0;
 
 	    px += (b->delta_x
-		   * powf (FRAME_PIXEL_HEIGHT (f), 2.0f / 3.0f));
+		   * powf (scroll_width, 2.0f / 3.0f));
 	    py += (b->delta_y
-		   * powf (FRAME_PIXEL_HEIGHT (f), 2.0f / 3.0f));
+		   * powf (scroll_height, 2.0f / 3.0f));
 
 	    if (fabsf (py) >= FRAME_LINE_HEIGHT (f)
 		|| fabsf (px) >= FRAME_COLUMN_WIDTH (f)
@@ -3208,7 +3247,10 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct frame *f = haiku_window_to_frame (b->window);
 
 	    if (!f)
-	      continue;
+	      {
+		free (b->ref);
+		continue;
+	      }
 
 	    inev.kind = DRAG_N_DROP_EVENT;
 	    inev.arg = build_string_from_utf8 (b->ref);
@@ -3257,6 +3299,28 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
       struct unhandled_event *old = ev;
       ev = old->next;
       xfree (old);
+    }
+
+  if (do_help && !(hold_quit && hold_quit->kind != NO_EVENT))
+    {
+      Lisp_Object help_frame = Qnil;
+
+      if (x_display_list->last_mouse_frame)
+	XSETFRAME (help_frame,
+		   x_display_list->last_mouse_frame);
+
+      if (do_help > 0)
+	{
+	  any_help_event_p = true;
+	  gen_help_event (help_echo_string, help_frame,
+			  help_echo_window, help_echo_object,
+			  help_echo_pos);
+	}
+      else
+	{
+	  help_echo_string = Qnil;
+	  gen_help_event (Qnil, help_frame, Qnil, Qnil, 0);
+	}
     }
 
   if (need_flush)

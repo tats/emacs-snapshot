@@ -118,16 +118,16 @@ When it is a file name, it should be the \"expanded\" version.")
 (defcustom xref-file-name-display 'project-relative
   "Style of file name display in *xref* buffers.
 
-If the value is the symbol `abs', the default, show the file names
-in their full absolute form.
+If the value is the symbol `abs', show the file names in their
+full absolute form.
 
 If `nondirectory', show only the nondirectory (a.k.a. \"base name\")
 part of the file name.
 
-If `project-relative', show only the file name relative to the
-current project root.  If there is no current project, or if the
-file resides outside of its root, show that particular file name
-in its full absolute form."
+If `project-relative', the default, show only the file name
+relative to the current project root.  If there is no current
+project, or if the file resides outside of its root, show that
+particular file name in its full absolute form."
   :type '(choice (const :tag "absolute file name" abs)
                  (const :tag "nondirectory file name" nondirectory)
                  (const :tag "relative to project root" project-relative))
@@ -738,11 +738,20 @@ quit the *xref* buffer."
   "Perform interactive replacement of FROM with TO in all displayed xrefs.
 
 This command interactively replaces FROM with TO in the names of the
-references displayed in the current *xref* buffer."
+references displayed in the current *xref* buffer.
+
+When called interactively, it uses '.*' as FROM, which means
+replace the whole name.  Unless called with prefix argument, in
+which case the user is prompted for both FROM and TO."
   (interactive
-   (let ((fr (read-regexp "Xref query-replace (regexp)" ".*")))
-     (list fr
-           (read-regexp (format "Xref query-replace (regexp) %s with: " fr)))))
+   (let* ((fr
+           (if current-prefix-arg
+               (read-regexp "Query-replace (regexp)" ".*")
+             ".*"))
+          (prompt (if current-prefix-arg
+                      (format "Query-replace (regexp) %s with: " fr)
+                    "Query-replace all matches with: ")))
+     (list fr (read-regexp prompt))))
   (let* (item xrefs iter)
     (save-excursion
       (while (setq item (xref--search-property 'xref-item))
@@ -1468,6 +1477,22 @@ always prompt for the identifier.  If `xref-prompt-for-identifier'
 is nil, prompt only if there's no usable symbol at point."
   (interactive (list (xref--read-identifier "Find references of: ")))
   (xref--find-xrefs identifier 'references identifier nil))
+
+(defun xref-find-references-and-replace (from to)
+  "Replace all references to identifier FROM with TO."
+  (interactive
+   (let ((common
+          (query-replace-read-args "Query replace identifier" nil)))
+     (list (nth 0 common) (nth 1 common))))
+  (require 'xref)
+  (with-current-buffer
+      (let ((xref-show-xrefs-function
+             ;; Some future-proofing (bug#44905).
+             (custom--standard-value 'xref-show-xrefs-function))
+            ;; Disable auto-jumping, it will mess up replacement logic.
+            xref-auto-jump-to-first-xref)
+        (xref-find-references from))
+    (xref-query-replace-in-results ".*" to)))
 
 ;;;###autoload
 (defun xref-find-definitions-at-mouse (event)

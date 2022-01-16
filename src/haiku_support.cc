@@ -136,6 +136,87 @@ gui_abort (const char *msg)
   emacs_abort ();
 }
 
+/* Convert a raw character RAW produced by the keycode KEY into a key
+   symbol and place it in KEYSYM.
+
+   If RAW cannot be converted into a keysym, value is 0.  If RAW can
+   be converted into a keysym, but it should be ignored, value is -1.
+
+   Any other value means success, and that the keysym should be used
+   instead of mapping the keycode into a character.  */
+
+static int
+keysym_from_raw_char (int32 raw, int32 key, unsigned *code)
+{
+  switch (raw)
+    {
+    case B_BACKSPACE:
+      *code = XK_BackSpace;
+      break;
+    case B_RETURN:
+      *code = XK_Return;
+      break;
+    case B_TAB:
+      *code = XK_Tab;
+      break;
+    case B_ESCAPE:
+      *code = XK_Escape;
+      break;
+    case B_LEFT_ARROW:
+      *code = XK_Left;
+      break;
+    case B_RIGHT_ARROW:
+      *code = XK_Right;
+      break;
+    case B_UP_ARROW:
+      *code = XK_Up;
+      break;
+    case B_DOWN_ARROW:
+      *code = XK_Down;
+      break;
+    case B_INSERT:
+      *code = XK_Insert;
+      break;
+    case B_DELETE:
+      *code = XK_Delete;
+      break;
+    case B_HOME:
+      *code = XK_Home;
+      break;
+    case B_END:
+      *code = XK_End;
+      break;
+    case B_PAGE_UP:
+      *code = XK_Page_Up;
+      break;
+    case B_PAGE_DOWN:
+      *code = XK_Page_Down;
+      break;
+
+    case B_FUNCTION_KEY:
+      *code = XK_F1 + key - 2;
+
+      if (*code - XK_F1 == 12)
+	*code = XK_Print;
+      else if (*code - XK_F1 == 13)
+	/* Okay, Scroll Lock is a bit too much: keyboard.c doesn't
+	   know about it yet, and it shouldn't, since that's a
+	   modifier key.
+
+	   *code = XK_Scroll_Lock; */
+	return -1;
+      else if (*code - XK_F1 == 14)
+	*code = XK_Pause;
+
+      break;
+
+    default:
+      return 0;
+    }
+
+  return 1;
+}
+
 static void
 map_key (char *chars, int32 offset, uint32_t *c)
 {
@@ -232,8 +313,25 @@ map_normal (uint32_t kc, uint32_t *ch)
 class Emacs : public BApplication
 {
 public:
+  BMessage settings;
+  bool settings_valid_p = false;
+
   Emacs () : BApplication ("application/x-vnd.GNU-emacs")
   {
+    BPath settings_path;
+
+    if (find_directory (B_USER_SETTINGS_DIRECTORY, &settings_path) != B_OK)
+      return;
+
+    settings_path.Append (PACKAGE_NAME);
+
+    BEntry entry (settings_path.Path ());
+    BFile settings_file (&entry, B_READ_ONLY | B_CREATE_FILE);
+
+    if (settings.Unflatten (&settings_file) != B_OK)
+      return;
+
+    settings_valid_p = true;
   }
 
   void
@@ -616,7 +714,10 @@ public:
 
 	rq.window = this;
 
-	int32_t code = msg->GetInt32 ("raw_char", 0);
+	int32 raw, key;
+	int ret;
+	msg->FindInt32 ("raw_char", &raw);
+	msg->FindInt32 ("key", &key);
 
 	rq.modifiers = 0;
 	uint32_t mods = modifiers ();
@@ -633,24 +734,32 @@ public:
 	if (mods & B_OPTION_KEY)
 	  rq.modifiers |= HAIKU_MODIFIER_SUPER;
 
-	rq.mb_char = code;
-	rq.kc = msg->GetInt32 ("key", -1);
-	rq.unraw_mb_char =
-	  BUnicodeChar::FromUTF8 (msg->GetString ("bytes"));
+	ret = keysym_from_raw_char (raw, key, &rq.keysym);
 
-	if ((mods & B_SHIFT_KEY) && rq.kc >= 0)
+	if (!ret)
+	  rq.keysym = 0;
+
+	if (ret < 0)
+	  return;
+
+	rq.multibyte_char = 0;
+
+	if (!rq.keysym)
 	  {
-	    if (mods & B_CAPS_LOCK)
-	      map_caps_shift (rq.kc, &rq.unraw_mb_char);
+	    if (mods & B_SHIFT_KEY)
+	      {
+		if (mods & B_CAPS_LOCK)
+		  map_caps_shift (key, &rq.multibyte_char);
+		else
+		  map_shift (key, &rq.multibyte_char);
+	      }
 	    else
-	      map_shift (rq.kc, &rq.unraw_mb_char);
-	  }
-	else if (rq.kc >= 0)
-	  {
-	    if (mods & B_CAPS_LOCK)
-	      map_caps (rq.kc, &rq.unraw_mb_char);
-	    else
-	      map_normal (rq.kc, &rq.unraw_mb_char);
+	      {
+		if (mods & B_CAPS_LOCK)
+		  map_caps (key, &rq.multibyte_char);
+		else
+		  map_normal (key, &rq.multibyte_char);
+	      }
 	  }
 
 	haiku_write (msg->what == B_KEY_DOWN ? KEY_DOWN : KEY_UP, &rq);
@@ -1752,7 +1861,7 @@ BWindow_retitle (void *window, const char *title)
 void
 BWindow_resize (void *window, int width, int height)
 {
-  ((BWindow *) window)->ResizeTo (width, height);
+  ((BWindow *) window)->ResizeTo (width - 1, height - 1);
 }
 
 /* Activate WINDOW, making it the subject of keyboard focus and
@@ -1844,71 +1953,6 @@ void
 BWindow_Flush (void *window)
 {
   ((BWindow *) window)->Flush ();
-}
-
-/* Map the keycode KC, storing the result in CODE and 1 in
-   NON_ASCII_P if it should be used.  */
-void
-BMapKey (uint32_t kc, int *non_ascii_p, unsigned *code)
-{
-  if (*code == 10 && kc != 0x42)
-    {
-      *code = XK_Return;
-      *non_ascii_p = 1;
-      return;
-    }
-
-  switch (kc)
-    {
-    default:
-      *non_ascii_p = 0;
-      if (kc < 0xe && kc > 0x1)
-	{
-	  *code = XK_F1 + kc - 2;
-	  *non_ascii_p = 1;
-	}
-      return;
-    case 0x1e:
-      *code = XK_BackSpace;
-      break;
-    case 0x61:
-      *code = XK_Left;
-      break;
-    case 0x63:
-      *code = XK_Right;
-      break;
-    case 0x57:
-      *code = XK_Up;
-      break;
-    case 0x62:
-      *code = XK_Down;
-      break;
-    case 0x64:
-      *code = XK_Insert;
-      break;
-    case 0x65:
-      *code = XK_Delete;
-      break;
-    case 0x37:
-      *code = XK_Home;
-      break;
-    case 0x58:
-      *code = XK_End;
-      break;
-    case 0x39:
-      *code = XK_Page_Up;
-      break;
-    case 0x5a:
-      *code = XK_Page_Down;
-      break;
-    case 0x1:
-      *code = XK_Escape;
-      break;
-    case 0x68:
-      *code = XK_Menu;
-      break;
-    }
-  *non_ascii_p = 1;
 }
 
 /* Make a scrollbar, attach it to VIEW's window, and return it.  */
@@ -2180,7 +2224,11 @@ BWindow_set_tooltip_decoration (void *window)
   if (!w->LockLooper ())
     gui_abort ("Failed to lock window while setting ttip decoration");
   w->SetLook (B_BORDERED_WINDOW_LOOK);
-  w->SetFeel (B_FLOATING_APP_WINDOW_FEEL);
+  w->SetFeel (kMenuWindowFeel);
+  w->SetFlags (B_NOT_ZOOMABLE
+	       | B_NOT_MINIMIZABLE
+	       | B_AVOID_FRONT
+	       | B_AVOID_FOCUS);
   w->UnlockLooper ();
 }
 
@@ -2774,7 +2822,7 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
       enum haiku_event_type type;
       char *ptr = NULL;
 
-      if (!haiku_read_with_timeout (&type, buf, 200, 100000))
+      if (!haiku_read_with_timeout (&type, buf, 200, 1000000))
 	{
 	  block_input_function ();
 	  if (type != FILE_PANEL_EVENT)
@@ -3131,4 +3179,24 @@ BWindow_set_override_redirect (void *window, bool override_redirect_p)
 
       w->UnlockLooper ();
     }
+}
+
+/* Find a resource by the name NAME inside the settings file.  The
+   string returned is in UTF-8 encoding, and will stay allocated as
+   long as the BApplication (a.k.a display) is alive.  */
+const char *
+be_find_setting (const char *name)
+{
+  Emacs *app = (Emacs *) be_app;
+  const char *value;
+
+  /* Note that this is thread-safe since the constructor of `Emacs'
+     runs in the main thread.  */
+  if (!app->settings_valid_p)
+    return NULL;
+
+  if (app->settings.FindString (name, 0, &value) != B_OK)
+    return NULL;
+
+  return value;
 }

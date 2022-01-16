@@ -1608,6 +1608,7 @@ xg_create_frame_widgets (struct frame *f)
   /* Must use g_strdup because gtk_widget_modify_style does g_free.  */
   style->bg_pixmap_name[GTK_STATE_NORMAL] = g_strdup ("<none>");
   gtk_widget_modify_style (wfixed, style);
+  gtk_widget_set_can_focus (wfixed, TRUE);
 #else
   gtk_widget_set_can_focus (wfixed, TRUE);
 #ifdef HAVE_PGTK
@@ -6090,11 +6091,12 @@ xg_im_context_preedit_changed (GtkIMContext *imc, gpointer user_data)
   inev.kind = PREEDIT_TEXT_EVENT;
   inev.arg = build_string_from_utf8 (str);
 
-  Fput_text_property (make_fixnum (min (SCHARS (inev.arg),
-					max (0, cursor))),
-		      make_fixnum (min (SCHARS (inev.arg),
-					max (0, cursor) + 1)),
-		      Qcursor, Qt, inev.arg);
+  if (SCHARS (inev.arg))
+    Fput_text_property (make_fixnum (min (SCHARS (inev.arg) - 1,
+					  max (0, cursor))),
+			make_fixnum (min (SCHARS (inev.arg),
+					  max (0, cursor) + 1)),
+			Qcursor, Qt, inev.arg);
 
   kbd_buffer_store_event (&inev);
 
@@ -6122,9 +6124,6 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
   union buffered_input_event inev;
   guint keysym = event->key.keyval;
   unsigned int xstate;
-  gunichar *cb;
-  ptrdiff_t i;
-  glong len;
   gunichar uc;
 
   FOR_EACH_FRAME (tail, tem)
@@ -6234,40 +6233,19 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
       goto done;
     }
 
-  if (event->key.string)
+  uc = gdk_keyval_to_unicode (keysym);
+
+  if (uc)
     {
-      cb = g_utf8_to_ucs4_fast (event->key.string, -1, &len);
-
-      for (i = 0; i < len; ++i)
-	{
-	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (cb[i])
-			  ? ASCII_KEYSTROKE_EVENT
-			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-	  inev.ie.code = cb[i];
-
-	  kbd_buffer_store_buffered_event (&inev, &xg_pending_quit_event);
-	}
-
-      g_free (cb);
-
-      inev.ie.kind = NO_EVENT;
+      inev.ie.kind = (SINGLE_BYTE_CHAR_P (uc)
+		      ? ASCII_KEYSTROKE_EVENT
+		      : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+      inev.ie.code = uc;
     }
   else
     {
-      uc = gdk_keyval_to_unicode (keysym);
-
-      if (uc)
-	{
-	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (uc)
-			  ? ASCII_KEYSTROKE_EVENT
-			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-	  inev.ie.code = uc;
-	}
-      else
-	{
-	  inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
-	  inev.ie.code = keysym;
-	}
+      inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
+      inev.ie.code = keysym;
     }
 
  done:
@@ -6277,6 +6255,7 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
       kbd_buffer_store_buffered_event (&inev, &xg_pending_quit_event);
     }
 
+  XNoOp (FRAME_X_DISPLAY (f));
 #ifdef USABLE_SIGIO
   raise (SIGIO);
 #endif
@@ -6286,7 +6265,12 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
 bool
 xg_filter_key (struct frame *frame, XEvent *xkey)
 {
-  GdkEvent *xg_event = gdk_event_new (GDK_KEY_PRESS);
+  GdkEvent *xg_event = gdk_event_new ((xkey->type == KeyPress
+#ifdef HAVE_XINPUT2
+				       || (xkey->type == GenericEvent
+					   && xkey->xgeneric.evtype == XI_KeyPress)
+#endif
+				       ) ? GDK_KEY_PRESS : GDK_KEY_RELEASE);
   GdkDisplay *dpy = gtk_widget_get_display (FRAME_GTK_WIDGET (frame));
   GdkKeymap *keymap = gdk_keymap_get_for_display (dpy);
   GdkModifierType consumed;

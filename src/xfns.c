@@ -2643,11 +2643,7 @@ best_xim_style (struct x_display_info *dpyinfo,
   int nr_supported = ARRAYELTS (supported_xim_styles);
 
   if (dpyinfo->preferred_xim_style)
-    {
-      for (j = 0; j < xim->count_styles; ++j)
-	if (dpyinfo->preferred_xim_style == xim->supported_styles[j])
-	  return dpyinfo->preferred_xim_style;
-    }
+    return dpyinfo->preferred_xim_style;
 
   for (i = 0; i < nr_supported; ++i)
     for (j = 0; j < xim->count_styles; ++j)
@@ -2816,20 +2812,27 @@ free_frame_xic (struct frame *f)
 void
 xic_set_preeditarea (struct window *w, int x, int y)
 {
-  struct frame *f = XFRAME (w->frame);
+  struct frame *f = WINDOW_XFRAME (w);
   XVaNestedList attr;
   XPoint spot;
 
-  if (FRAME_XIC (WINDOW_XFRAME (w)))
+  if (FRAME_XIC (f))
     {
-      spot.x = WINDOW_TO_FRAME_PIXEL_X (w, x) + WINDOW_LEFT_FRINGE_WIDTH (w) + WINDOW_LEFT_MARGIN_WIDTH(w);
-      spot.y = WINDOW_TO_FRAME_PIXEL_Y (w, y) + FONT_BASE (FRAME_FONT (f));
-      attr = XVaCreateNestedList (0, XNSpotLocation, &spot,
-				  XNPreeditStartCallback, &Xxic_preedit_start_callback,
-				  XNPreeditDoneCallback, &Xxic_preedit_done_callback,
-				  XNPreeditDrawCallback, &Xxic_preedit_draw_callback,
-				  XNPreeditCaretCallback, &Xxic_preedit_caret_callback,
-				  NULL);
+      spot.x = (WINDOW_TO_FRAME_PIXEL_X (w, x)
+		+ WINDOW_LEFT_FRINGE_WIDTH (w)
+		+ WINDOW_LEFT_MARGIN_WIDTH (w));
+      spot.y = (WINDOW_TO_FRAME_PIXEL_Y (w, y)
+		+ w->phys_cursor_height);
+
+      if (FRAME_XIC_STYLE (f) & XIMPreeditCallbacks)
+	attr = XVaCreateNestedList (0, XNSpotLocation, &spot,
+				    XNPreeditStartCallback, &Xxic_preedit_start_callback,
+				    XNPreeditDoneCallback, &Xxic_preedit_done_callback,
+				    XNPreeditDrawCallback, &Xxic_preedit_draw_callback,
+				    XNPreeditCaretCallback, &Xxic_preedit_caret_callback,
+				    NULL);
+      else
+	attr = XVaCreateNestedList (0, XNSpotLocation, &spot, NULL);
       XSetICValues (FRAME_XIC (f), XNPreeditAttributes, attr, NULL);
       XFree (attr);
     }
@@ -2973,11 +2976,12 @@ xic_preedit_caret_callback (XIC xic, XPointer client_data,
 	  ie.arg = make_string_from_utf8 (output->preedit_chars,
 					  output->preedit_size);
 
-	  Fput_text_property (make_fixnum (min (SCHARS (ie.arg),
-						max (0, output->preedit_caret))),
-			      make_fixnum (max (SCHARS (ie.arg),
-						max (0, output->preedit_caret) + 1)),
-			      Qcursor, Qt, ie.arg);
+	  if (SCHARS (ie.arg))
+	    Fput_text_property (make_fixnum (min (SCHARS (ie.arg) - 1,
+						  max (0, output->preedit_caret))),
+				make_fixnum (max (SCHARS (ie.arg),
+						  max (0, output->preedit_caret) + 1)),
+				Qcursor, Qt, ie.arg);
 
 	  XSETINT (ie.x, 0);
 	  XSETINT (ie.y, 0);
@@ -3196,11 +3200,12 @@ xic_preedit_draw_callback (XIC xic, XPointer client_data,
       ie.arg = make_string_from_utf8 (output->preedit_chars,
 				      output->preedit_size);
 
-      Fput_text_property (make_fixnum (min (SCHARS (ie.arg),
-					    max (0, output->preedit_caret))),
-			  make_fixnum (min (SCHARS (ie.arg),
-					    max (0, output->preedit_caret) + 1)),
-			  Qcursor, Qt, ie.arg);
+      if (SCHARS (ie.arg))
+	Fput_text_property (make_fixnum (min (SCHARS (ie.arg) - 1,
+					      max (0, output->preedit_caret))),
+			    make_fixnum (min (SCHARS (ie.arg),
+					      max (0, output->preedit_caret) + 1)),
+			    Qcursor, Qt, ie.arg);
 
       XSETINT (ie.x, 0);
       XSETINT (ie.y, 0);
@@ -3338,6 +3343,8 @@ setup_xi_event_mask (struct frame *f)
   XISetMask (m, XI_Motion);
   XISetMask (m, XI_Enter);
   XISetMask (m, XI_Leave);
+  XISetMask (m, XI_FocusIn);
+  XISetMask (m, XI_FocusOut);
   XISetMask (m, XI_KeyPress);
   XISetMask (m, XI_KeyRelease);
   XISelectEvents (FRAME_X_DISPLAY (f),
@@ -3350,6 +3357,8 @@ setup_xi_event_mask (struct frame *f)
 #ifdef USE_X_TOOLKIT
   XISetMask (m, XI_KeyPress);
   XISetMask (m, XI_KeyRelease);
+  XISetMask (m, XI_FocusIn);
+  XISetMask (m, XI_FocusOut);
 
   XISelectEvents (FRAME_X_DISPLAY (f),
 		  FRAME_OUTER_WINDOW (f),

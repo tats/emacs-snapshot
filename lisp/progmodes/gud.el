@@ -744,10 +744,10 @@ The option \"--fullname\" must be included in this value."
 
     output))
 
-(easy-mmode-defmap gud-minibuffer-local-map
-  '(("\C-i" . comint-dynamic-complete-filename))
-  "Keymap for minibuffer prompting of gud startup command."
-  :inherit minibuffer-local-map)
+(defvar-keymap gud-minibuffer-local-map
+  :doc "Keymap for minibuffer prompting of gud startup command."
+  :parent minibuffer-local-map
+  "C-i" #'comint-dynamic-complete-filename)
 
 (defun gud-query-cmdline (minor-mode &optional init)
   (let* ((hist-sym (gud-symbol 'history nil minor-mode))
@@ -869,7 +869,8 @@ the buffer in which this command was invoked."
 COMMAND is the prefix for which we seek completion.
 CONTEXT is the text before COMMAND on the line."
   (let* ((complete-list
-	  (gud-gdb-run-command-fetch-lines (concat "complete " context command)
+	  (gud-gdb-run-command-fetch-lines (concat "server complete "
+                                                   context command)
 					   (current-buffer)
 					   ;; From string-match above.
 					   (length context))))

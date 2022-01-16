@@ -130,9 +130,8 @@ struct haiku_key_event
 {
   void *window;
   int modifiers;
-  uint32_t mb_char;
-  uint32_t unraw_mb_char;
-  short kc;
+  unsigned keysym;
+  uint32_t multibyte_char;
 };
 
 struct haiku_activation_event
@@ -560,9 +559,6 @@ extern "C"
   extern void
   BWindow_Flush (void *window);
 
-  extern void
-  BMapKey (uint32_t kc, int *non_ascii_p, unsigned *code);
-
   extern void *
   BScrollBar_make_for_view (void *view, int horizontal_p,
 			    int x, int y, int x1, int y1,
@@ -858,6 +854,9 @@ extern "C"
 
   extern void
   BWindow_set_override_redirect (void *window, bool override_redirect_p);
+
+  extern const char *
+  be_find_setting (const char *name);
 
 #ifdef __cplusplus
   extern void *

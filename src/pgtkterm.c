@@ -153,10 +153,24 @@ static int
 evq_flush (struct input_event *hold_quit)
 {
   struct event_queue_t *evq = &event_q;
-  int i, n = evq->nr;
-  for (i = 0; i < n; i++)
-    kbd_buffer_store_buffered_event (&evq->q[i], hold_quit);
-  evq->nr = 0;
+  int n = 0;
+
+  while (evq->nr > 0)
+    {
+      /* kbd_buffer_store_buffered_event may do longjmp, so
+	 we need to shift event queue first and pass the event
+	 to kbd_buffer_store_buffered_event so that events in
+	 queue are not processed twice.  Bug#52941 */
+      union buffered_input_event ev = evq->q[0];
+      int i;
+      for (i = 1; i < evq->nr; i++)
+	evq->q[i - 1] = evq->q[i];
+      evq->nr--;
+
+      kbd_buffer_store_buffered_event (&ev, hold_quit);
+      n++;
+    }
+
   return n;
 }
 
@@ -2527,8 +2541,12 @@ pgtk_draw_glyph_string (struct glyph_string *s)
 	      unsigned long thickness, position;
 	      int y;
 
-	      if (s->prev && s->prev->face->underline
-		  && s->prev->face->underline == FACE_UNDER_LINE)
+	      if (s->prev
+		  && s->prev->face->underline == FACE_UNDER_LINE
+		  && (s->prev->face->underline_at_descent_line_p
+		      == s->face->underline_at_descent_line_p)
+		  && (s->prev->face->underline_pixels_above_descent_line
+		      == s->face->underline_pixels_above_descent_line))
 		{
 		  /* We use the same underline style as the previous one.  */
 		  thickness = s->prev->underline_thickness;
@@ -2543,8 +2561,11 @@ pgtk_draw_glyph_string (struct glyph_string *s)
 		    thickness = font->underline_thickness;
 		  else
 		    thickness = 1;
-		  if (x_underline_at_descent_line)
-		    position = (s->height - thickness) - (s->ybase - s->y);
+		  if ((x_underline_at_descent_line
+		       || s->face->underline_at_descent_line_p))
+		    position = ((s->height - thickness)
+				- (s->ybase - s->y)
+				- s->face->underline_pixels_above_descent_line);
 		  else
 		    {
 		      /* Get the underline position.  This is the recommended
@@ -2563,7 +2584,11 @@ pgtk_draw_glyph_string (struct glyph_string *s)
 		      else
 			position = underline_minimum_offset;
 		    }
-		  position = max (position, underline_minimum_offset);
+
+		  /* Ignore minimum_offset if the amount of pixels was
+		     explictly specified.  */
+		  if (!s->face->underline_pixels_above_descent_line)
+		    position = max (position, underline_minimum_offset);
 		}
 	      /* Check the sanity of thickness and position.  We should
 	         avoid drawing underline out of the current line area.  */

@@ -5861,7 +5861,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
       /* We moved the window start towards ZV, so PT may be now
 	 in the scroll margin at the top.  */
-      move_it_to (&it, PT, -1, -1, -1, MOVE_TO_POS);
+      if (IT_CHARPOS (it) < PT)
+	move_it_to (&it, PT, -1, -1, -1, MOVE_TO_POS);
       if (IT_CHARPOS (it) == PT
 	  && it.current_y >= this_scroll_margin
 	  && it.current_y <= last_y - WINDOW_TAB_LINE_HEIGHT (w)
@@ -6307,10 +6308,12 @@ followed by all visible frames on the current terminal.  */)
       if (NILP (window))
 	window = display_buffer (Vother_window_scroll_buffer, Qt, Qnil);
     }
+  else if (FUNCTIONP (Vother_window_scroll_default))
+    /* Nothing specified; try to get a window from the function.  */
+    window = call0 (Vother_window_scroll_default);
   else
     {
-      /* Nothing specified; look for a neighboring window on the same
-	 frame.  */
+      /* Otherwise, look for a neighboring window on the same frame.  */
       window = Fnext_window (selected_window, Qlambda, Qnil);
 
       if (EQ (window, selected_window))
@@ -8267,6 +8270,14 @@ is displayed in the `mode-line' face.  */);
   DEFVAR_LISP ("other-window-scroll-buffer", Vother_window_scroll_buffer,
 	       doc: /* If this is a live buffer, \\[scroll-other-window] should scroll its window.  */);
   Vother_window_scroll_buffer = Qnil;
+
+  DEFVAR_LISP ("other-window-scroll-default", Vother_window_scroll_default,
+	       doc: /* Function that provides the window to scroll by \\[scroll-other-window].
+The function `other-window-for-scrolling' first tries to use
+`minibuffer-scroll-window' and `other-window-scroll-buffer'.
+But when both are nil, then by default it uses a neighboring window.
+This variable is intended to get another default instead of `next-window'.  */);
+  Vother_window_scroll_default = Qnil;
 
   DEFVAR_BOOL ("auto-window-vscroll", auto_window_vscroll_p,
 	       doc: /* Non-nil means to automatically adjust `window-vscroll' to view tall lines.  */);
