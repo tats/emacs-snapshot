@@ -325,38 +325,38 @@ which is
 
    Alt-Control-Hyper-Meta-Shift-super"
   (declare (pure t) (side-effect-free t))
-  (and
-   (stringp keys)
-   (string-match-p "\\`[^ ]+\\( [^ ]+\\)*\\'" keys)
-   (save-match-data
-     (catch 'exit
-       (let ((prefixes
-              "\\(A-\\)?\\(C-\\)?\\(H-\\)?\\(M-\\)?\\(S-\\)?\\(s-\\)?")
-             (case-fold-search nil))
-         (dolist (key (split-string keys " "))
-           ;; Every key might have these modifiers, and they should be
-           ;; in this order.
-           (when (string-match (concat "\\`" prefixes) key)
-             (setq key (substring key (match-end 0))))
-           (unless (or (and (= (length key) 1)
-                            ;; Don't accept control characters as keys.
-                            (not (< (aref key 0) ?\s))
-                            ;; Don't accept Meta'd characters as keys.
-                            (or (multibyte-string-p key)
-                                (not (<= 127 (aref key 0) 255))))
-                       (and (string-match-p "\\`<[-_A-Za-z0-9]+>\\'" key)
-                            ;; Don't allow <M-C-down>.
-                            (= (progn
-                                 (string-match
-                                  (concat "\\`<" prefixes) key)
-                                 (match-end 0))
-                               1))
-                       (string-match-p
-                        "\\`\\(NUL\\|RET\\|TAB\\|LFD\\|ESC\\|SPC\\|DEL\\)\\'"
-                        key))
-             ;; Invalid.
-             (throw 'exit nil)))
-         t)))))
+  (let ((case-fold-search nil))
+    (and
+     (stringp keys)
+     (string-match-p "\\`[^ ]+\\( [^ ]+\\)*\\'" keys)
+     (save-match-data
+       (catch 'exit
+         (let ((prefixes
+                "\\(A-\\)?\\(C-\\)?\\(H-\\)?\\(M-\\)?\\(S-\\)?\\(s-\\)?"))
+           (dolist (key (split-string keys " "))
+             ;; Every key might have these modifiers, and they should be
+             ;; in this order.
+             (when (string-match (concat "\\`" prefixes) key)
+               (setq key (substring key (match-end 0))))
+             (unless (or (and (= (length key) 1)
+                              ;; Don't accept control characters as keys.
+                              (not (< (aref key 0) ?\s))
+                              ;; Don't accept Meta'd characters as keys.
+                              (or (multibyte-string-p key)
+                                  (not (<= 127 (aref key 0) 255))))
+                         (and (string-match-p "\\`<[-_A-Za-z0-9]+>\\'" key)
+                              ;; Don't allow <M-C-down>.
+                              (= (progn
+                                   (string-match
+                                    (concat "\\`<" prefixes) key)
+                                   (match-end 0))
+                                 1))
+                         (string-match-p
+                          "\\`\\(NUL\\|RET\\|TAB\\|LFD\\|ESC\\|SPC\\|DEL\\)\\'"
+                          key))
+               ;; Invalid.
+               (throw 'exit nil)))
+           t))))))
 
 (defun key-translate (from to)
   "Translate character FROM to TO on the current terminal.
@@ -462,18 +462,19 @@ If MESSAGE (and interactively), message the result."
               (keywordp (car args))
               (not (eq (car args) :menu)))
     (unless (memq (car args) '(:full :keymap :parent :suppress :name :prefix))
-      (byte-compile-warn "Invalid keyword: %s" (car args)))
+      (byte-compile-warn-x (car args) "Invalid keyword: %s" (car args)))
     (setq args (cdr args))
     (when (null args)
-      (byte-compile-warn "Uneven number of keywords in %S" form))
+      (byte-compile-warn-x form "Uneven number of keywords in %S" form))
     (setq args (cdr args)))
   ;; Bindings.
   (while args
-    (let ((key (pop args)))
+    (let* ((wargs args)
+           (key (pop args)))
       (when (and (stringp key) (not (key-valid-p key)))
-        (byte-compile-warn "Invalid `kbd' syntax: %S" key)))
+        (byte-compile-warn-x wargs "Invalid `kbd' syntax: %S" key)))
     (when (null args)
-      (byte-compile-warn "Uneven number of key bindings in %S" form))
+      (byte-compile-warn-x form "Uneven number of key bindings in %S" form))
     (setq args (cdr args)))
   form)
 

@@ -759,6 +759,32 @@ prettify_key (const char *key)
 }
 
 #ifdef NS_IMPL_GNUSTEP
+/* The code below doesn't work on Mac OS X, because it runs a nested
+   Carbon-related event loop to track menu bar movement.
+
+   But it works fine aside from that, so it will work on GNUstep if
+   they start to call `willHighlightItem'.  */
+- (void) menu: (NSMenu *) menu willHighlightItem: (NSMenuItem *) item
+{
+  NSInteger idx = [item tag];
+  struct frame *f = SELECTED_FRAME ();
+  Lisp_Object vec = f->menu_bar_vector;
+  Lisp_Object help, frame;
+
+  if (idx >= ASIZE (vec))
+    return;
+
+  XSETFRAME (frame, f);
+  help = AREF (vec, idx + MENU_ITEMS_ITEM_HELP);
+
+  if (STRINGP (help) || NILP (help))
+    kbd_buffer_store_help_event (frame, help);
+
+  raise (SIGIO);
+}
+#endif
+
+#ifdef NS_IMPL_GNUSTEP
 - (void) close
 {
     /* Close all the submenus.  This has the unfortunate side-effect of
@@ -777,6 +803,25 @@ prettify_key (const char *key)
 /* GNUstep seems to have a number of required methods in
    NSMenuDelegate that are optional in Cocoa.  */
 
+- (BOOL) menu: (NSMenu*) menu updateItem: (NSMenuItem*) item
+      atIndex: (NSInteger) index shouldCancel: (BOOL) shouldCancel
+{
+  return YES;
+}
+
+- (BOOL) menuHasKeyEquivalent: (NSMenu*) menu
+		     forEvent: (NSEvent*) event
+		       target: (id*) target
+		       action: (SEL*) action
+{
+  return NO;
+}
+
+- (NSInteger) numberOfItemsInMenu: (NSMenu*) menu
+{
+  return [super numberOfItemsInMenu: menu];
+}
+
 - (void) menuWillOpen:(NSMenu *)menu
 {
 }
@@ -789,10 +834,6 @@ prettify_key (const char *key)
                         onScreen:(NSScreen *)screen
 {
   return NSZeroRect;
-}
-
-- (void)menu:(NSMenu *)menu willHighlightItem:(NSMenuItem *)item
-{
 }
 #endif
 

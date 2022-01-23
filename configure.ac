@@ -2913,40 +2913,6 @@ if test "${HAVE_GTK}" = "yes"; then
   fi
 fi
 
-
-dnl Enable xwidgets if GTK3 and WebKitGTK+ are available.
-dnl Enable xwidgets if macOS Cocoa and WebKit framework are available.
-HAVE_XWIDGETS=no
-XWIDGETS_OBJ=
-if test "$with_xwidgets" != "no"; then
-  if test "$USE_GTK_TOOLKIT" = "GTK3" && test "$window_system" != "none"; then
-    WEBKIT_REQUIRED=2.12
-    WEBKIT_MODULES="webkit2gtk-4.0 >= $WEBKIT_REQUIRED"
-    EMACS_CHECK_MODULES([WEBKIT], [$WEBKIT_MODULES])
-    HAVE_XWIDGETS=$HAVE_WEBKIT
-    XWIDGETS_OBJ="xwidget.o"
-  elif test "${NS_IMPL_COCOA}" = "yes"; then
-    dnl FIXME: Check framework WebKit2
-    dnl WEBKIT_REQUIRED=M.m.p
-    WEBKIT_LIBS="-Wl,-framework -Wl,WebKit"
-    WEBKIT_CFLAGS="-I/System/Library/Frameworks/WebKit.framework/Headers"
-    HAVE_WEBKIT="yes"
-    HAVE_XWIDGETS=$HAVE_WEBKIT
-    XWIDGETS_OBJ="xwidget.o"
-    NS_OBJC_OBJ="$NS_OBJC_OBJ nsxwidget.o"
-    dnl Update NS_OBJC_OBJ with added nsxwidget.o
-    AC_SUBST(NS_OBJC_OBJ)
-  else
-    AC_MSG_ERROR([xwidgets requested, it requires GTK3 as X window toolkit or macOS Cocoa as window system.])
-  fi
-
-  test $HAVE_XWIDGETS = yes ||
-    AC_MSG_ERROR([xwidgets requested but WebKitGTK+ or WebKit framework not found.])
-
-  AC_DEFINE([HAVE_XWIDGETS], 1, [Define to 1 if you have xwidgets support.])
-fi
-AC_SUBST(XWIDGETS_OBJ)
-
 CFLAGS=$OLD_CFLAGS
 LIBS=$OLD_LIBS
 
@@ -3433,6 +3399,13 @@ if test "${HAVE_X11}" = "yes"; then
     CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
     EMACS_CHECK_MODULES(CAIRO, $CAIRO_MODULE)
     if test $HAVE_CAIRO = yes; then
+      CAIRO_XCB_MODULE="cairo-xcb >= $CAIRO_REQUIRED"
+      EMACS_CHECK_MODULES(CAIRO_XCB, $CAIRO_XCB_MODULE)
+      if test $HAVE_CAIRO_XCB = yes; then
+	CAIRO_CFLAGS="$CAIRO_CFLAGS $CAIRO_XCB_CFLAGS"
+	CAIRO_LIBS="$CAIRO_LIBS $CAIRO_XCB_LIBS"
+	AC_DEFINE(USE_CAIRO_XCB, 1, [Define to 1 if cairo XCB surfaces are available.])
+      fi
       AC_DEFINE(USE_CAIRO, 1, [Define to 1 if using cairo.])
       CFLAGS="$CFLAGS $CAIRO_CFLAGS"
       LIBS="$LIBS $CAIRO_LIBS"
@@ -3443,6 +3416,51 @@ if test "${HAVE_X11}" = "yes"; then
     fi
   fi
 fi
+
+dnl Enable xwidgets if GTK3 and WebKitGTK+ are available.
+dnl Enable xwidgets if macOS Cocoa and WebKit framework are available.
+HAVE_XWIDGETS=no
+XWIDGETS_OBJ=
+if test "$with_xwidgets" != "no"; then
+  if test "$USE_GTK_TOOLKIT" = "GTK3" && test "$window_system" != "none"; then
+    WEBKIT_REQUIRED=2.12
+    WEBKIT_MODULES="webkit2gtk-4.0 >= $WEBKIT_REQUIRED"
+    EMACS_CHECK_MODULES([WEBKIT], [$WEBKIT_MODULES])
+    HAVE_XWIDGETS=$HAVE_WEBKIT
+    XWIDGETS_OBJ="xwidget.o"
+    if test "$HAVE_X_WINDOWS" = "yes" && test "${with_cairo}" = "no"; then
+      CAIRO_XLIB_MODULES="cairo >= 1.8.0 cairo-xlib >= 1.8.0"
+      EMACS_CHECK_MODULES(CAIRO_XLIB, $CAIRO_XLIB_MODULES)
+      if test $HAVE_CAIRO_XLIB = "yes"; then
+        CAIRO_CFLAGS="$CAIRO_XLIB_CFLAGS"
+	CAIRO_LIBS="$CAIRO_XLIB_LIBS"
+	AC_SUBST(CAIRO_CFLAGS)
+	AC_SUBST(CAIRO_LIBS)
+      else
+        AC_MSG_ERROR([xwidgets requested, but a suitable cairo installation wasn't found])
+      fi
+    fi
+  elif test "${NS_IMPL_COCOA}" = "yes"; then
+    dnl FIXME: Check framework WebKit2
+    dnl WEBKIT_REQUIRED=M.m.p
+    WEBKIT_LIBS="-Wl,-framework -Wl,WebKit"
+    WEBKIT_CFLAGS="-I/System/Library/Frameworks/WebKit.framework/Headers"
+    HAVE_WEBKIT="yes"
+    HAVE_XWIDGETS=$HAVE_WEBKIT
+    XWIDGETS_OBJ="xwidget.o"
+    NS_OBJC_OBJ="$NS_OBJC_OBJ nsxwidget.o"
+    dnl Update NS_OBJC_OBJ with added nsxwidget.o
+    AC_SUBST(NS_OBJC_OBJ)
+  else
+    AC_MSG_ERROR([xwidgets requested, it requires GTK3 as X window toolkit or macOS Cocoa as window system.])
+  fi
+
+  test $HAVE_XWIDGETS = yes ||
+    AC_MSG_ERROR([xwidgets requested but WebKitGTK+ or WebKit framework not found.])
+
+  AC_DEFINE([HAVE_XWIDGETS], 1, [Define to 1 if you have xwidgets support.])
+fi
+AC_SUBST(XWIDGETS_OBJ)
 
 if test "$window_system" = "pgtk"; then
   CAIRO_REQUIRED=1.12.0
@@ -3715,20 +3733,24 @@ AC_SUBST(LIBOTF_LIBS)
 AC_SUBST(M17N_FLT_CFLAGS)
 AC_SUBST(M17N_FLT_LIBS)
 
+XCB_LIBS=
 if test "${HAVE_X11}" = "yes"; then
   AC_CHECK_HEADER(X11/Xlib-xcb.h,
     AC_CHECK_LIB(xcb, xcb_translate_coordinates, HAVE_XCB=yes))
   if test "${HAVE_XCB}" = "yes"; then
     AC_CHECK_LIB(X11-xcb, XGetXCBConnection, HAVE_X11_XCB=yes)
     if test "${HAVE_X11_XCB}" = "yes"; then
-      AC_DEFINE(USE_XCB, 1,
+      AC_CHECK_LIB(xcb-util, xcb_aux_sync, HAVE_XCB_UTIL=yes)
+      if test "${HAVE_XCB_UTIL}" = "yes"; then
+        AC_DEFINE(USE_XCB, 1,
 [Define to 1 if you have the XCB library and X11-XCB library for mixed
-   X11/XCB programming.])
-      XCB_LIBS="-lX11-xcb -lxcb"
-      AC_SUBST(XCB_LIBS)
+  X11/XCB programming.])
+        XCB_LIBS="-lX11-xcb -lxcb -lxcb-util"
+      fi
     fi
   fi
 fi
+AC_SUBST(XCB_LIBS)
 
 ### Use -lXpm if available, unless '--with-xpm=no'.
 ### mingw32 doesn't use -lXpm, since it loads the library dynamically.

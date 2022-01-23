@@ -238,6 +238,9 @@ static void
 haiku_clear_frame (struct frame *f)
 {
   void *view = FRAME_HAIKU_VIEW (f);
+
+  mark_window_cursors_off (XWINDOW (FRAME_ROOT_WINDOW (f)));
+
   block_input ();
   BView_draw_lock (view);
   BView_StartClip (view);
@@ -283,7 +286,7 @@ haiku_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   else
     FRAME_CONFIG_SCROLL_BAR_COLS (f) = (14 + unit - 1) / unit;
 
-  if (FRAME_HAIKU_WINDOW (f))
+  if (FRAME_HAIKU_WINDOW (f) && !FRAME_TOOLTIP_P (f))
     {
       adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
 			 FRAME_LINES (f) * FRAME_LINE_HEIGHT (f),
@@ -2645,9 +2648,19 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    int width = lrint (b->px_widthf);
 	    int height = lrint (b->px_heightf);
 
+	    if (FRAME_TOOLTIP_P (f))
+	      {
+		FRAME_PIXEL_WIDTH (f) = width;
+		FRAME_PIXEL_HEIGHT (f) = height;
+
+		haiku_clear_under_internal_border (f);
+		continue;
+	      }
+
 	    BView_draw_lock (FRAME_HAIKU_VIEW (f));
 	    BView_resize_to (FRAME_HAIKU_VIEW (f), width, height);
 	    BView_draw_unlock (FRAME_HAIKU_VIEW (f));
+
 	    if (width != FRAME_PIXEL_WIDTH (f)
 		|| height != FRAME_PIXEL_HEIGHT (f)
 		|| (f->new_size_p
@@ -2715,6 +2728,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      inev.kind = inev.code > 127 ? MULTIBYTE_CHAR_KEYSTROKE_EVENT :
 		ASCII_KEYSTROKE_EVENT;
 
+	    inev.timestamp = b->time / 1000;
 	    inev.modifiers = haiku_modifiers_to_emacs (b->modifiers);
 	    XSETFRAME (inev.frame_or_window, f);
 	    break;
@@ -2753,7 +2767,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    Lisp_Object frame;
 	    XSETFRAME (frame, f);
 
-	    x_display_list->last_mouse_movement_time = time (NULL);
+	    x_display_list->last_mouse_movement_time = b->time / 1000;
 	    button_or_motion_p = 1;
 
 	    if (hlinfo->mouse_face_hidden)
@@ -2785,6 +2799,16 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      {
 		struct haiku_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
 		struct haiku_rect r = dpyinfo->last_mouse_glyph;
+
+		/* For an unknown reason Haiku sends phantom motion events when a
+		   tooltip frame is visible.  FIXME */
+		if (FRAMEP (tip_frame)
+		    && FRAME_LIVE_P (XFRAME (tip_frame))
+		    && FRAME_VISIBLE_P (XFRAME (tip_frame))
+		    && f == dpyinfo->last_mouse_motion_frame
+		    && b->x == dpyinfo->last_mouse_motion_x
+		    && b->y == dpyinfo->last_mouse_motion_y)
+		  continue;
 
 		dpyinfo->last_mouse_motion_x = b->x;
 		dpyinfo->last_mouse_motion_y = b->y;
@@ -2869,7 +2893,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    inev.modifiers = haiku_modifiers_to_emacs (b->modifiers);
 
 	    x_display_list->last_mouse_glyph_frame = 0;
-	    x_display_list->last_mouse_movement_time = time (NULL);
+	    x_display_list->last_mouse_movement_time = b->time / 1000;
 	    button_or_motion_p = 1;
 
 	    /* Is this in the tab-bar?  */
@@ -3274,20 +3298,20 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
       if (inev.kind != NO_EVENT)
 	{
-	  if (inev.kind != HELP_EVENT)
+	  if (inev.kind != HELP_EVENT && !inev.timestamp)
 	    inev.timestamp = (button_or_motion_p
 			      ? x_display_list->last_mouse_movement_time
-			      : time (NULL));
+			      : system_time () / 1000);
 	  kbd_buffer_store_event_hold (&inev, hold_quit);
 	  ++message_count;
 	}
 
       if (inev2.kind != NO_EVENT)
 	{
-	  if (inev2.kind != HELP_EVENT)
+	  if (inev2.kind != HELP_EVENT && !inev.timestamp)
 	    inev2.timestamp = (button_or_motion_p
 			       ? x_display_list->last_mouse_movement_time
-			       : time (NULL));
+			       : system_time () / 1000);
 	  kbd_buffer_store_event_hold (&inev2, hold_quit);
 	  ++message_count;
 	}
@@ -3541,7 +3565,10 @@ put_xrm_resource (Lisp_Object name, Lisp_Object val)
 void
 haiku_clear_under_internal_border (struct frame *f)
 {
-  if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0)
+  if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0
+      /* This is needed because tooltip frames set up the internal
+	 border before init_frame_faces.  */
+      && FRAME_FACE_CACHE (f))
     {
       int border = FRAME_INTERNAL_BORDER_WIDTH (f);
       int width = FRAME_PIXEL_WIDTH (f);

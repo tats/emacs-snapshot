@@ -1387,6 +1387,7 @@ static bool
 print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 		  char *buf)
 {
+  /* First do all the vectorlike types that have a readable syntax.  */
   switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
     {
     case PVEC_BIGNUM:
@@ -1398,77 +1399,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	strout (str, len, len, printcharfun);
 	SAFE_FREE ();
       }
-      break;
-
-    case PVEC_MARKER:
-      print_c_string ("#<marker ", printcharfun);
-      /* Do you think this is necessary?  */
-      if (XMARKER (obj)->insertion_type != 0)
-	print_c_string ("(moves after insertion) ", printcharfun);
-      if (! XMARKER (obj)->buffer)
-	print_c_string ("in no buffer", printcharfun);
-      else
-	{
-	  int len = sprintf (buf, "at %"pD"d in ", marker_position (obj));
-	  strout (buf, len, len, printcharfun);
-	  print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
-	}
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_OVERLAY:
-      print_c_string ("#<overlay ", printcharfun);
-      if (! XMARKER (OVERLAY_START (obj))->buffer)
-	print_c_string ("in no buffer", printcharfun);
-      else
-	{
-	  int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
-			     marker_position (OVERLAY_START (obj)),
-			     marker_position (OVERLAY_END   (obj)));
-	  strout (buf, len, len, printcharfun);
-	  print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
-			printcharfun);
-	}
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_USER_PTR:
-      {
-	print_c_string ("#<user-ptr ", printcharfun);
-	int i = sprintf (buf, "ptr=%p finalizer=%p",
-			 XUSER_PTR (obj)->p,
-			 XUSER_PTR (obj)->finalizer);
-	strout (buf, i, i, printcharfun);
-	printchar ('>', printcharfun);
-      }
-      break;
-
-    case PVEC_FINALIZER:
-      print_c_string ("#<finalizer", printcharfun);
-      if (NILP (XFINALIZER (obj)->function))
-	print_c_string (" used", printcharfun);
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_MISC_PTR:
-      {
-	/* This shouldn't happen in normal usage, but let's
-	   print it anyway for the benefit of the debugger.  */
-	int i = sprintf (buf, "#<ptr %p>", xmint_pointer (obj));
-	strout (buf, i, i, printcharfun);
-      }
-      break;
-
-    case PVEC_PROCESS:
-      if (escapeflag)
-	{
-	  print_c_string ("#<process ", printcharfun);
-	  print_string (XPROCESS (obj)->name, printcharfun);
-	  printchar ('>', printcharfun);
-	}
-      else
-	print_string (XPROCESS (obj)->name, printcharfun);
-      break;
+      return true;
 
     case PVEC_BOOL_VECTOR:
       {
@@ -1513,70 +1444,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  print_c_string (" ...", printcharfun);
 	printchar ('\"', printcharfun);
       }
-      break;
-
-    case PVEC_SUBR:
-      print_c_string ("#<subr ", printcharfun);
-      print_c_string (XSUBR (obj)->symbol_name, printcharfun);
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_XWIDGET:
-#ifdef HAVE_XWIDGETS
-      {
-	if (NILP (XXWIDGET (obj)->buffer))
-	  print_c_string ("#<killed xwidget>", printcharfun);
-	else
-	  {
-#ifdef USE_GTK
-	    int len = sprintf (buf, "#<xwidget %u %p>",
-			       XXWIDGET (obj)->xwidget_id,
-			       XXWIDGET (obj)->widget_osr);
-#else
-	    int len = sprintf (buf, "#<xwidget %u %p>",
-			       XXWIDGET (obj)->xwidget_id,
-			       XXWIDGET (obj)->xwWidget);
-#endif
-	    strout (buf, len, len, printcharfun);
-	  }
-	break;
-      }
-#else
-      emacs_abort ();
-#endif
-    case PVEC_XWIDGET_VIEW:
-      print_c_string ("#<xwidget view", printcharfun);
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_WINDOW:
-      {
-	int len = sprintf (buf, "#<window %"pI"d",
-			   XWINDOW (obj)->sequence_number);
-	strout (buf, len, len, printcharfun);
-	if (BUFFERP (XWINDOW (obj)->contents))
-	  {
-	    print_c_string (" on ", printcharfun);
-	    print_string (BVAR (XBUFFER (XWINDOW (obj)->contents), name),
-			  printcharfun);
-	  }
-	printchar ('>', printcharfun);
-      }
-      break;
-
-    case PVEC_TERMINAL:
-      {
-	struct terminal *t = XTERMINAL (obj);
-	int len = sprintf (buf, "#<terminal %d", t->id);
-	strout (buf, len, len, printcharfun);
-	if (t->name)
-	  {
-	    print_c_string (" on ", printcharfun);
-	    print_c_string (t->name, printcharfun);
-	  }
-	printchar ('>', printcharfun);
-      }
-      break;
+      return true;
 
     case PVEC_HASH_TABLE:
       {
@@ -1648,6 +1516,277 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  }
 
 	print_c_string ("))", printcharfun);
+      }
+      return true;
+
+    case PVEC_RECORD:
+      {
+	ptrdiff_t size = PVSIZE (obj);
+
+	/* Don't print more elements than the specified maximum.  */
+	ptrdiff_t n
+	  = (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size
+	     ? XFIXNAT (Vprint_length) : size);
+
+	print_c_string ("#s(", printcharfun);
+	for (ptrdiff_t i = 0; i < n; i ++)
+	  {
+	    if (i) printchar (' ', printcharfun);
+	    print_object (AREF (obj, i), printcharfun, escapeflag);
+	  }
+	if (n < size)
+	  print_c_string (" ...", printcharfun);
+	printchar (')', printcharfun);
+      }
+      return true;
+
+    case PVEC_SUB_CHAR_TABLE:
+    case PVEC_COMPILED:
+    case PVEC_CHAR_TABLE:
+    case PVEC_NORMAL_VECTOR:
+      {
+	ptrdiff_t size = ASIZE (obj);
+	if (COMPILEDP (obj))
+	  {
+	    printchar ('#', printcharfun);
+	    size &= PSEUDOVECTOR_SIZE_MASK;
+	  }
+	if (CHAR_TABLE_P (obj) || SUB_CHAR_TABLE_P (obj))
+	  {
+	    /* Print a char-table as if it were a vector,
+	       lumping the parent and default slots in with the
+	       character slots.  But add #^ as a prefix.  */
+
+	    /* Make each lowest sub_char_table start a new line.
+	       Otherwise we'll make a line extremely long, which
+	       results in slow redisplay.  */
+	    if (SUB_CHAR_TABLE_P (obj)
+		&& XSUB_CHAR_TABLE (obj)->depth == 3)
+	      printchar ('\n', printcharfun);
+	    print_c_string ("#^", printcharfun);
+	    if (SUB_CHAR_TABLE_P (obj))
+	      printchar ('^', printcharfun);
+	    size &= PSEUDOVECTOR_SIZE_MASK;
+	  }
+	if (size & PSEUDOVECTOR_FLAG)
+	  return false;
+
+	printchar ('[', printcharfun);
+
+	int idx = SUB_CHAR_TABLE_P (obj) ? SUB_CHAR_TABLE_OFFSET : 0;
+	Lisp_Object tem;
+	ptrdiff_t real_size = size;
+
+	/* For a sub char-table, print heading non-Lisp data first.  */
+	if (SUB_CHAR_TABLE_P (obj))
+	  {
+	    int i = sprintf (buf, "%d %d", XSUB_CHAR_TABLE (obj)->depth,
+			     XSUB_CHAR_TABLE (obj)->min_char);
+	    strout (buf, i, i, printcharfun);
+	  }
+
+	/* Don't print more elements than the specified maximum.  */
+	if (FIXNATP (Vprint_length)
+	    && XFIXNAT (Vprint_length) < size)
+	  size = XFIXNAT (Vprint_length);
+
+	for (int i = idx; i < size; i++)
+	  {
+	    if (i) printchar (' ', printcharfun);
+	    tem = AREF (obj, i);
+	    print_object (tem, printcharfun, escapeflag);
+	  }
+	if (size < real_size)
+	  print_c_string (" ...", printcharfun);
+	printchar (']', printcharfun);
+      }
+      return true;
+
+    default:
+      break;
+    }
+
+  /* Then do all the pseudovector types that don't have a readable
+     syntax.  First check whether this is handled by
+     `print-unreadable-function'.  */
+  if (!NILP (Vprint_unreadable_function)
+      && FUNCTIONP (Vprint_unreadable_function))
+    {
+      ptrdiff_t count = SPECPDL_INDEX ();
+      /* Bind `print-unreadable-function' to nil to avoid accidental
+	 infinite recursion in the function called.  */
+      Lisp_Object func = Vprint_unreadable_function;
+      specbind (Qprint_unreadable_function, Qnil);
+      Lisp_Object result = CALLN (Ffuncall, func, obj,
+				  escapeflag? Qt: Qnil);
+      unbind_to (count, Qnil);
+
+      if (!NILP (result))
+	{
+	  if (STRINGP (result))
+	    print_string (result, printcharfun);
+	  /* It's handled, so stop processing here.  */
+	  return true;
+	}
+    }
+
+  /* Not handled; print unreadable object.  */
+  switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
+    {
+    case PVEC_MARKER:
+      print_c_string ("#<marker ", printcharfun);
+      /* Do you think this is necessary?  */
+      if (XMARKER (obj)->insertion_type != 0)
+	print_c_string ("(moves after insertion) ", printcharfun);
+      if (! XMARKER (obj)->buffer)
+	print_c_string ("in no buffer", printcharfun);
+      else
+	{
+	  int len = sprintf (buf, "at %"pD"d in ", marker_position (obj));
+	  strout (buf, len, len, printcharfun);
+	  print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
+	}
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_SYMBOL_WITH_POS:
+      {
+        struct Lisp_Symbol_With_Pos *sp = XSYMBOL_WITH_POS (obj);
+        if (print_symbols_bare)
+          print_object (sp->sym, printcharfun, escapeflag);
+        else
+          {
+            print_c_string ("#<symbol ", printcharfun);
+            if (BARE_SYMBOL_P (sp->sym))
+              print_object (sp->sym, printcharfun, escapeflag);
+            else
+              print_c_string ("NOT A SYMBOL!!", printcharfun);
+            if (FIXNUMP (sp->pos))
+              {
+                print_c_string (" at ", printcharfun);
+                print_object (sp->pos, printcharfun, escapeflag);
+              }
+            else
+              print_c_string (" NOT A POSITION!!", printcharfun);
+            printchar ('>', printcharfun);
+          }
+      }
+      break;
+
+    case PVEC_OVERLAY:
+      print_c_string ("#<overlay ", printcharfun);
+      if (! XMARKER (OVERLAY_START (obj))->buffer)
+	print_c_string ("in no buffer", printcharfun);
+      else
+	{
+	  int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
+			     marker_position (OVERLAY_START (obj)),
+			     marker_position (OVERLAY_END   (obj)));
+	  strout (buf, len, len, printcharfun);
+	  print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
+			printcharfun);
+	}
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_USER_PTR:
+      {
+	print_c_string ("#<user-ptr ", printcharfun);
+	int i = sprintf (buf, "ptr=%p finalizer=%p",
+			 XUSER_PTR (obj)->p,
+			 XUSER_PTR (obj)->finalizer);
+	strout (buf, i, i, printcharfun);
+	printchar ('>', printcharfun);
+      }
+      break;
+
+    case PVEC_FINALIZER:
+      print_c_string ("#<finalizer", printcharfun);
+      if (NILP (XFINALIZER (obj)->function))
+	print_c_string (" used", printcharfun);
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_MISC_PTR:
+      {
+	/* This shouldn't happen in normal usage, but let's
+	   print it anyway for the benefit of the debugger.  */
+	int i = sprintf (buf, "#<ptr %p>", xmint_pointer (obj));
+	strout (buf, i, i, printcharfun);
+      }
+      break;
+
+    case PVEC_PROCESS:
+      if (escapeflag)
+	{
+	  print_c_string ("#<process ", printcharfun);
+	  print_string (XPROCESS (obj)->name, printcharfun);
+	  printchar ('>', printcharfun);
+	}
+      else
+	print_string (XPROCESS (obj)->name, printcharfun);
+      break;
+
+    case PVEC_SUBR:
+      print_c_string ("#<subr ", printcharfun);
+      print_c_string (XSUBR (obj)->symbol_name, printcharfun);
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_XWIDGET:
+#ifdef HAVE_XWIDGETS
+      {
+	if (NILP (XXWIDGET (obj)->buffer))
+	  print_c_string ("#<killed xwidget>", printcharfun);
+	else
+	  {
+#ifdef USE_GTK
+	    int len = sprintf (buf, "#<xwidget %u %p>",
+			       XXWIDGET (obj)->xwidget_id,
+			       XXWIDGET (obj)->widget_osr);
+#else
+	    int len = sprintf (buf, "#<xwidget %u %p>",
+			       XXWIDGET (obj)->xwidget_id,
+			       XXWIDGET (obj)->xwWidget);
+#endif
+	    strout (buf, len, len, printcharfun);
+	  }
+	break;
+      }
+#else
+      emacs_abort ();
+#endif
+    case PVEC_XWIDGET_VIEW:
+      print_c_string ("#<xwidget view", printcharfun);
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_WINDOW:
+      {
+	int len = sprintf (buf, "#<window %"pI"d",
+			   XWINDOW (obj)->sequence_number);
+	strout (buf, len, len, printcharfun);
+	if (BUFFERP (XWINDOW (obj)->contents))
+	  {
+	    print_c_string (" on ", printcharfun);
+	    print_string (BVAR (XBUFFER (XWINDOW (obj)->contents), name),
+			  printcharfun);
+	  }
+	printchar ('>', printcharfun);
+      }
+      break;
+
+    case PVEC_TERMINAL:
+      {
+	struct terminal *t = XTERMINAL (obj);
+	int len = sprintf (buf, "#<terminal %d", t->id);
+	strout (buf, len, len, printcharfun);
+	if (t->name)
+	  {
+	    print_c_string (" on ", printcharfun);
+	    print_c_string (t->name, printcharfun);
+	  }
+	printchar ('>', printcharfun);
       }
       break;
 
@@ -1756,89 +1895,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       printchar ('>', printcharfun);
       break;
 
-    case PVEC_RECORD:
-      {
-	ptrdiff_t size = PVSIZE (obj);
-
-	/* Don't print more elements than the specified maximum.  */
-	ptrdiff_t n
-	  = (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size
-	     ? XFIXNAT (Vprint_length) : size);
-
-	print_c_string ("#s(", printcharfun);
-	for (ptrdiff_t i = 0; i < n; i ++)
-	  {
-	    if (i) printchar (' ', printcharfun);
-	    print_object (AREF (obj, i), printcharfun, escapeflag);
-	  }
-	if (n < size)
-	  print_c_string (" ...", printcharfun);
-	printchar (')', printcharfun);
-      }
-      break;
-
-    case PVEC_SUB_CHAR_TABLE:
-    case PVEC_COMPILED:
-    case PVEC_CHAR_TABLE:
-    case PVEC_NORMAL_VECTOR:
-      {
-	ptrdiff_t size = ASIZE (obj);
-	if (COMPILEDP (obj))
-	  {
-	    printchar ('#', printcharfun);
-	    size &= PSEUDOVECTOR_SIZE_MASK;
-	  }
-	if (CHAR_TABLE_P (obj) || SUB_CHAR_TABLE_P (obj))
-	  {
-	    /* Print a char-table as if it were a vector,
-	       lumping the parent and default slots in with the
-	       character slots.  But add #^ as a prefix.  */
-
-	    /* Make each lowest sub_char_table start a new line.
-	       Otherwise we'll make a line extremely long, which
-	       results in slow redisplay.  */
-	    if (SUB_CHAR_TABLE_P (obj)
-		&& XSUB_CHAR_TABLE (obj)->depth == 3)
-	      printchar ('\n', printcharfun);
-	    print_c_string ("#^", printcharfun);
-	    if (SUB_CHAR_TABLE_P (obj))
-	      printchar ('^', printcharfun);
-	    size &= PSEUDOVECTOR_SIZE_MASK;
-	  }
-	if (size & PSEUDOVECTOR_FLAG)
-	  return false;
-
-	printchar ('[', printcharfun);
-
-	int idx = SUB_CHAR_TABLE_P (obj) ? SUB_CHAR_TABLE_OFFSET : 0;
-	Lisp_Object tem;
-	ptrdiff_t real_size = size;
-
-	/* For a sub char-table, print heading non-Lisp data first.  */
-	if (SUB_CHAR_TABLE_P (obj))
-	  {
-	    int i = sprintf (buf, "%d %d", XSUB_CHAR_TABLE (obj)->depth,
-			     XSUB_CHAR_TABLE (obj)->min_char);
-	    strout (buf, i, i, printcharfun);
-	  }
-
-	/* Don't print more elements than the specified maximum.  */
-	if (FIXNATP (Vprint_length)
-	    && XFIXNAT (Vprint_length) < size)
-	  size = XFIXNAT (Vprint_length);
-
-	for (int i = idx; i < size; i++)
-	  {
-	    if (i) printchar (' ', printcharfun);
-	    tem = AREF (obj, i);
-	    print_object (tem, printcharfun, escapeflag);
-	  }
-	if (size < real_size)
-	  print_c_string (" ...", printcharfun);
-	printchar (']', printcharfun);
-      }
-      break;
-
 #ifdef HAVE_MODULES
     case PVEC_MODULE_FUNCTION:
       {
@@ -1942,7 +1998,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	error ("Apparently circular structure being printed");
 
       for (i = 0; i < print_depth; i++)
-	if (EQ (obj, being_printed[i]))
+	if (BASE_EQ (obj, being_printed[i]))
 	  {
 	    int len = sprintf (buf, "#%d", i);
 	    strout (buf, len, len, printcharfun);
@@ -2446,6 +2502,13 @@ priorities.  Values other than nil or t are also treated as
 `default'.  */);
   Vprint_charset_text_property = Qdefault;
 
+  DEFVAR_BOOL ("print-symbols-bare", print_symbols_bare,
+               doc: /* A flag to control printing of symbols with position.
+If the value is nil, print these objects complete with position.
+Otherwise print just the bare symbol.  */);
+  print_symbols_bare = false;
+  DEFSYM (Qprint_symbols_bare, "print-symbols-bare");
+
   /* prin1_to_string_buffer initialized in init_buffer_once in buffer.c */
   staticpro (&Vprin1_to_string_buffer);
 
@@ -2464,4 +2527,19 @@ priorities.  Values other than nil or t are also treated as
 
   print_prune_charset_plist = Qnil;
   staticpro (&print_prune_charset_plist);
+
+  DEFVAR_LISP ("print-unreadable-function", Vprint_unreadable_function,
+	       doc: /* If non-nil, a function to call when printing unreadable objects.
+By default, Emacs printing functions (like `prin1') print unreadable
+objects as \"#<...>\", where \"...\" describes the object (for
+instance, \"#<marker in no buffer>\").
+
+If non-nil, it should be a function that will be called with two
+arguments: the object to be printed, and the NOESCAPE flag (see
+`prin1-to-string').  If this function returns nil, the object will be
+printed as usual.  If it returns a string, that string will then be
+printed.  If the function returns anything else, the object will not
+be printed.  */);
+  Vprint_unreadable_function = Qnil;
+  DEFSYM (Qprint_unreadable_function, "print-unreadable-function");
 }

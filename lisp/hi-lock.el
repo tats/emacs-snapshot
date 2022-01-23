@@ -727,11 +727,9 @@ with completion and history."
 			   (cdr (member last-used-face hi-lock-face-defaults))
 			   hi-lock-face-defaults))
 	 face)
-          (if (and hi-lock-auto-select-face (not current-prefix-arg))
+    (if (and hi-lock-auto-select-face (not current-prefix-arg))
 	(setq face (or (pop hi-lock--unused-faces) (car defaults)))
-      (setq face (completing-read
-		  (format-prompt "Highlight using face" (car defaults))
-		  obarray 'facep t nil 'face-name-history defaults))
+      (setq face (symbol-name (read-face-name "Highlight using face" defaults)))
       ;; Update list of un-used faces.
       (setq hi-lock--unused-faces (remove face hi-lock--unused-faces))
       ;; Grow the list of defaults.

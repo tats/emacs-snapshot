@@ -731,6 +731,7 @@ Interactively, N is the prefix numeric argument, and defaults to
 1."
   (interactive "p")
   (let ((start (current-column))
+        (entry (tabulated-list-get-entry))
         (nb-cols (length tabulated-list-format))
         (col-nb 0)
         (total-width 0)
@@ -738,12 +739,17 @@ Interactively, N is the prefix numeric argument, and defaults to
         col-width)
     (while (and (not found)
                 (< col-nb nb-cols))
-      (if (> start
-             (setq total-width
-                   (+ total-width
-                      (setq col-width
-                            (cadr (aref tabulated-list-format
-                                        col-nb))))))
+      (if (>= start
+              (setq total-width
+                    (+ total-width
+                       (max (setq col-width
+                                  (cadr (aref tabulated-list-format
+                                              col-nb)))
+                            (string-width (aref entry col-nb)))
+                       (or (plist-get (nthcdr 3 (aref tabulated-list-format
+                                                      col-nb))
+                                      :pad-right)
+                           1))))
           (setq col-nb (1+ col-nb))
         (setq found t)
         (setf (cadr (aref tabulated-list-format col-nb))
