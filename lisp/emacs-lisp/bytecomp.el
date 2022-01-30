@@ -796,11 +796,7 @@ the unwind-action")
 (byte-defop 144  0 byte-temp-output-buffer-setup-OBSOLETE)
 (byte-defop 145 -1 byte-temp-output-buffer-show-OBSOLETE)
 
-;; these ops are new to v19
-
-;; To unbind back to the beginning of this frame.
-;; Not used yet, but will be needed for tail-recursion elimination.
-(byte-defop 146  0 byte-unbind-all)
+;; unused: 146
 
 ;; these ops are new to v19
 (byte-defop 147 -2 byte-set-marker)
@@ -2215,9 +2211,7 @@ With argument ARG, insert value in current buffer after the form."
 	   (start-read-position (point))
 	   (byte-compile-last-warned-form 'nothing)
 	   (value (eval
-		   (let ((read-with-symbol-positions (current-buffer))
-			 (read-symbol-positions-list nil)
-                         (symbols-with-pos-enabled t))
+		   (let ((symbols-with-pos-enabled t))
 		     (displaying-byte-compile-warnings
 		      (byte-compile-sexp
                        (let ((form (read-positioning-symbols (current-buffer))))
@@ -2252,9 +2246,6 @@ With argument ARG, insert value in current buffer after the form."
 	(byte-compile-depth 0)
 	(byte-compile-maxdepth 0)
 	(byte-compile-output nil)
-        ;; This allows us to get the positions of symbols read.
-	(read-with-symbol-positions inbuffer)
-	(read-symbol-positions-list nil)
 	;;	  #### This is bound in b-c-close-variables.
 	;;	  (byte-compile-warnings byte-compile-warnings)
         (symbols-with-pos-enabled t))

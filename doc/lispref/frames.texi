@@ -2433,6 +2433,16 @@ opacity when it is not selected.
 
 Some window systems do not support the @code{alpha} parameter for child
 frames (@pxref{Child Frames}).
+
+@vindex alpha-background@r{, a frame parameter}
+@item alpha-background
+@cindex opacity, frame
+@cindex transparency, frame
+Sets the background transparency of the frame.  Unlike the @code{alpha}
+frame parameter, this only controls the transparency of the background
+while keeping foreground elements such as text fully opaque.  It
+should be an integer between 0 and 100, where 0 means
+completely transparent and 100 means completely opaque (default).
 @end table
 
 The following frame parameters are semi-obsolete in that they are
@@ -3743,6 +3753,13 @@ implemented with menu keymaps within the parent menu, and never with
 still use a menu keymap to implement it.  To make the contents vary, add
 a hook function to @code{menu-bar-update-hook} to update the contents of
 the menu keymap as necessary.
+
+@defvar x-pre-popup-menu-hook
+  A normal hook run immediately before a pop-up menu is displayed,
+either directly by calling @code{x-popup-menu}, or through a menu
+keymap.  It won't be called if @code{x-popup-menu} returns for some
+other reason without displaying a pop-up menu.
+@end defvar
 
 @node Dialog Boxes
 @section Dialog Boxes

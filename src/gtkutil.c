@@ -1467,6 +1467,10 @@ xg_create_frame_widgets (struct frame *f)
     }
   wtop = gtk_window_new (type);
   gtk_widget_add_events (wtop, GDK_ALL_EVENTS_MASK);
+
+  /* This prevents GTK from painting the window's background, which
+     would interfere with transparent background in some environments */
+  gtk_widget_set_app_paintable (wtop, TRUE);
 #endif
 
   /* gtk_window_set_has_resize_grip is a Gtk+ 3.0 function but Ubuntu
@@ -1587,6 +1591,17 @@ xg_create_frame_widgets (struct frame *f)
 #endif
                          | GDK_VISIBILITY_NOTIFY_MASK);
 
+  GdkScreen *screen = gtk_widget_get_screen (wtop);
+
+#if !defined HAVE_PGTK
+  if (FRAME_DISPLAY_INFO (f)->n_planes == 32)
+    {
+      GdkVisual *visual = gdk_screen_get_rgba_visual (screen);
+      gtk_widget_set_visual (wtop, visual);
+      gtk_widget_set_visual (wfixed, visual);
+    }
+#endif
+
 #ifndef HAVE_PGTK
   /* Must realize the windows so the X window gets created.  It is used
      by callers of this function.  */
@@ -1651,7 +1666,6 @@ xg_create_frame_widgets (struct frame *f)
 #endif
 
   {
-    GdkScreen *screen = gtk_widget_get_screen (wtop);
     GtkSettings *gs = gtk_settings_get_for_screen (screen);
     /* Only connect this signal once per screen.  */
     if (! g_signal_handler_find (G_OBJECT (gs),
@@ -4012,6 +4026,7 @@ xg_update_frame_menubar (struct frame *f)
 {
   xp_output *x = f->output_data.xp;
   GtkRequisition req;
+  int scale = xg_get_scale (f);
 
   if (!x->menubar_widget || gtk_widget_get_mapped (x->menubar_widget))
     return;
@@ -4029,9 +4044,9 @@ xg_update_frame_menubar (struct frame *f)
   gtk_widget_show_all (x->menubar_widget);
   gtk_widget_get_preferred_size (x->menubar_widget, NULL, &req);
   req.height *= xg_get_scale (f);
-  if (FRAME_MENUBAR_HEIGHT (f) != req.height)
+  if (FRAME_MENUBAR_HEIGHT (f) != (req.height * scale))
     {
-      FRAME_MENUBAR_HEIGHT (f) = req.height;
+      FRAME_MENUBAR_HEIGHT (f) = req.height * scale;
       adjust_frame_size (f, -1, -1, 2, 0, Qmenu_bar_lines);
     }
   unblock_input ();
@@ -5471,6 +5486,7 @@ xg_update_tool_bar_sizes (struct frame *f)
   GtkRequisition req;
   int nl = 0, nr = 0, nt = 0, nb = 0;
   GtkWidget *top_widget = x->toolbar_widget;
+  int scale = xg_get_scale (f);
 
   gtk_widget_get_preferred_size (GTK_WIDGET (top_widget), NULL, &req);
   if (x->toolbar_in_hbox)
@@ -5479,8 +5495,10 @@ xg_update_tool_bar_sizes (struct frame *f)
       gtk_container_child_get (GTK_CONTAINER (x->hbox_widget),
                                top_widget,
                                "position", &pos, NULL);
-      if (pos == 0) nl = req.width;
-      else nr = req.width;
+      if (pos == 0)
+	nl = req.width * scale;
+      else
+	nr = req.width * scale;
     }
   else
     {
@@ -5488,8 +5506,10 @@ xg_update_tool_bar_sizes (struct frame *f)
       gtk_container_child_get (GTK_CONTAINER (x->vbox_widget),
                                top_widget,
                                "position", &pos, NULL);
-      if (pos == 0 || (pos == 1 && x->menubar_widget)) nt = req.height;
-      else nb = req.height;
+      if (pos == 0 || (pos == 1 && x->menubar_widget))
+	nt = req.height * scale;
+      else
+	nb = req.height * scale;
     }
 
   if (nl != FRAME_TOOLBAR_LEFT_WIDTH (f)

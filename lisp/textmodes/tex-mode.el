@@ -505,7 +505,9 @@ An alternative value is \" . \", if you use a font with a narrow period."
 			"documentstyle" "documentclass" "verbatiminput"
 			"includegraphics" "includegraphics*")
 		      t))
-           (verbish (regexp-opt '("url" "nolinkurl" "path") t))
+           (verbish (regexp-opt '("url" "nolinkurl" "path"
+                                  "href" "ProvidesFile")
+                                t))
 	   ;; Miscellany.
 	   (slash "\\\\")
 	   (opt " *\\(\\[[^]]*\\] *\\)*")

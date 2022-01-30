@@ -1217,7 +1217,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 #endif
   int mask_color;
 
-  if (!EQ (Qnil, arg))
+  if (!NILP (arg))
     f->output_data.w32->mouse_pixel
       = w32_decode_color (f, arg, BLACK_PIX_DEFAULT (f));
   mask_color = FRAME_BACKGROUND_PIXEL (f);
@@ -1233,7 +1233,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   /* It's not okay to crash if the user selects a screwy cursor.  */
   count = x_catch_errors (FRAME_W32_DISPLAY (f));
 
-  if (!EQ (Qnil, Vx_pointer_shape))
+  if (!NILP (Vx_pointer_shape))
     {
       CHECK_FIXNUM (Vx_pointer_shape);
       cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f), XFIXNUM (Vx_pointer_shape));
@@ -1242,7 +1242,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f), XC_xterm);
   x_check_errors (FRAME_W32_DISPLAY (f), "bad text pointer cursor: %s");
 
-  if (!EQ (Qnil, Vx_nontext_pointer_shape))
+  if (!NILP (Vx_nontext_pointer_shape))
     {
       CHECK_FIXNUM (Vx_nontext_pointer_shape);
       nontext_cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f),
@@ -1252,7 +1252,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     nontext_cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f), XC_left_ptr);
   x_check_errors (FRAME_W32_DISPLAY (f), "bad nontext pointer cursor: %s");
 
-  if (!EQ (Qnil, Vx_hourglass_pointer_shape))
+  if (!NILP (Vx_hourglass_pointer_shape))
     {
       CHECK_FIXNUM (Vx_hourglass_pointer_shape);
       hourglass_cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f),
@@ -1263,7 +1263,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   x_check_errors (FRAME_W32_DISPLAY (f), "bad busy pointer cursor: %s");
 
   x_check_errors (FRAME_W32_DISPLAY (f), "bad nontext pointer cursor: %s");
-  if (!EQ (Qnil, Vx_mode_pointer_shape))
+  if (!NILP (Vx_mode_pointer_shape))
     {
       CHECK_FIXNUM (Vx_mode_pointer_shape);
       mode_cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f),
@@ -1273,7 +1273,7 @@ w32_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     mode_cursor = XCreateFontCursor (FRAME_W32_DISPLAY (f), XC_xterm);
   x_check_errors (FRAME_W32_DISPLAY (f), "bad modeline pointer cursor: %s");
 
-  if (!EQ (Qnil, Vx_sensitive_text_pointer_shape))
+  if (!NILP (Vx_sensitive_text_pointer_shape))
     {
       CHECK_FIXNUM (Vx_sensitive_text_pointer_shape);
       hand_cursor
@@ -6018,6 +6018,8 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
                          NULL, NULL, RES_TYPE_BOOLEAN);
   gui_default_parameter (f, parameters, Qno_special_glyphs, Qnil,
                          NULL, NULL, RES_TYPE_BOOLEAN);
+  gui_default_parameter (f, parameters, Qalpha_background, Qnil,
+                         "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   /* Process alpha here (Bug#16619).  On XP this fails with child
      frames.  For `no-focus-on-map' frames delay processing of alpha
@@ -6154,6 +6156,9 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
                          "fullscreen", "Fullscreen", RES_TYPE_SYMBOL);
   gui_default_parameter (f, parameters, Qz_group, Qnil,
                          NULL, NULL, RES_TYPE_SYMBOL);
+
+  gui_default_parameter (f, parameters, Qalpha_background, Qnil,
+                         "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   /* Make the window appear on the frame and enable display, unless
      the caller says not to.  However, with explicit parent, Emacs
@@ -7089,6 +7094,8 @@ w32_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   /* Process alpha here (Bug#17344).  */
   gui_default_parameter (f, parms, Qalpha, Qnil,
                          "alpha", "Alpha", RES_TYPE_NUMBER);
+  gui_default_parameter (f, parms, Qalpha_background, Qnil,
+                         "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   /* Add `tooltip' frame parameter's default value. */
   if (NILP (Fframe_parameter (frame, Qtooltip)))
@@ -10436,6 +10443,7 @@ frame_parm_handler w32_frame_parm_handlers[] =
   w32_set_z_group,
   0, /* x_set_override_redirect */
   gui_set_no_special_glyphs,
+  gui_set_alpha_background,
 };
 
 void

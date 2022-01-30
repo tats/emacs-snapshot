@@ -2342,14 +2342,19 @@ static void xic_preedit_caret_callback (XIC, XPointer, XIMPreeditCaretCallbackSt
 static void xic_preedit_done_callback (XIC, XPointer, XPointer);
 static int xic_preedit_start_callback (XIC, XPointer, XPointer);
 
+#ifndef HAVE_XICCALLBACK_CALLBACK
+#define XICCallback XIMCallback
+#define XICProc XIMProc
+#endif
+
 static XIMCallback Xxic_preedit_draw_callback = { NULL,
 						  (XIMProc) xic_preedit_draw_callback };
 static XIMCallback Xxic_preedit_caret_callback = { NULL,
 						   (XIMProc) xic_preedit_caret_callback };
 static XIMCallback Xxic_preedit_done_callback = { NULL,
 						  (XIMProc) xic_preedit_done_callback };
-static XIMCallback Xxic_preedit_start_callback = { NULL,
-						   (void *) xic_preedit_start_callback };
+static XICCallback Xxic_preedit_start_callback = { NULL,
+						   (XICProc) xic_preedit_start_callback };
 
 #if defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT
 /* Create an X fontset on frame F with base font name BASE_FONTNAME.  */
@@ -2844,14 +2849,16 @@ xic_set_preeditarea (struct window *w, int x, int y)
     }
 #ifdef USE_GTK
   GdkRectangle rect;
+  int scale = xg_get_scale (f);
+
   rect.x = (WINDOW_TO_FRAME_PIXEL_X (w, x)
 	    + WINDOW_LEFT_FRINGE_WIDTH (w)
-	    + WINDOW_LEFT_MARGIN_WIDTH (w));
+	    + WINDOW_LEFT_MARGIN_WIDTH (w)) / scale;
   rect.y = (WINDOW_TO_FRAME_PIXEL_Y (w, y)
 	    + FRAME_TOOLBAR_HEIGHT (f)
-	    + FRAME_MENUBAR_HEIGHT (f));
-  rect.width = w->phys_cursor_width;
-  rect.height = w->phys_cursor_height;
+	    + FRAME_MENUBAR_HEIGHT (f)) / scale;
+  rect.width = w->phys_cursor_width / scale;
+  rect.height = w->phys_cursor_height / scale;
 
   gtk_im_context_set_cursor_location (FRAME_X_OUTPUT (f)->im_context,
 				      &rect);
@@ -3072,7 +3079,7 @@ xic_preedit_draw_callback (XIC xic, XPointer client_data,
 {
   struct frame *f = x_xic_to_frame (xic);
   struct x_output *output;
-  ptrdiff_t text_length;
+  ptrdiff_t text_length = 0;
   ptrdiff_t charpos;
   ptrdiff_t original_size;
   char *text;
@@ -3267,6 +3274,17 @@ x_mark_frame_dirty (struct frame *f)
 static void
 set_up_x_back_buffer (struct frame *f)
 {
+#ifdef HAVE_XRENDER
+  block_input ();
+  if (FRAME_X_PICTURE (f) != None)
+    {
+      XRenderFreePicture (FRAME_X_DISPLAY (f),
+			  FRAME_X_PICTURE (f));
+      FRAME_X_PICTURE (f) = None;
+    }
+  unblock_input ();
+#endif
+
 #ifdef HAVE_XDBE
   block_input ();
   if (FRAME_X_WINDOW (f) && !FRAME_X_DOUBLE_BUFFERED_P (f))
@@ -3281,10 +3299,10 @@ set_up_x_back_buffer (struct frame *f)
              server ran out of memory or we don't have the right kind
              of visual, just use single-buffered rendering.  */
           x_catch_errors (FRAME_X_DISPLAY (f));
-          FRAME_X_RAW_DRAWABLE (f) = XdbeAllocateBackBufferName (
-            FRAME_X_DISPLAY (f),
-            FRAME_X_WINDOW (f),
-            XdbeCopied);
+          FRAME_X_RAW_DRAWABLE (f)
+	    = XdbeAllocateBackBufferName (FRAME_X_DISPLAY (f),
+					  FRAME_X_WINDOW (f),
+					  XdbeCopied);
           if (x_had_errors_p (FRAME_X_DISPLAY (f)))
             FRAME_X_RAW_DRAWABLE (f) = FRAME_X_WINDOW (f);
           x_uncatch_errors_after_check ();
@@ -3297,6 +3315,17 @@ set_up_x_back_buffer (struct frame *f)
 void
 tear_down_x_back_buffer (struct frame *f)
 {
+#ifdef HAVE_XRENDER
+  block_input ();
+  if (FRAME_X_PICTURE (f) != None)
+    {
+      XRenderFreePicture (FRAME_X_DISPLAY (f),
+			  FRAME_X_PICTURE (f));
+      FRAME_X_PICTURE (f) = None;
+    }
+  unblock_input ();
+#endif
+
 #ifdef HAVE_XDBE
   block_input ();
   if (FRAME_X_WINDOW (f) && FRAME_X_DOUBLE_BUFFERED_P (f))
@@ -4569,6 +4598,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
                          RES_TYPE_NUMBER);
   gui_default_parameter (f, parms, Qalpha, Qnil,
                          "alpha", "Alpha", RES_TYPE_NUMBER);
+  gui_default_parameter (f, parms, Qalpha_background, Qnil,
+                         "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   if (!NILP (parent_frame))
     {
@@ -6342,10 +6373,29 @@ select_visual (struct x_display_info *dpyinfo)
       int n_visuals;
       XVisualInfo *vinfo, vinfo_template;
 
-      dpyinfo->visual = DefaultVisualOfScreen (screen);
-
-      vinfo_template.visualid = XVisualIDFromVisual (dpyinfo->visual);
       vinfo_template.screen = XScreenNumberOfScreen (screen);
+
+#if !defined USE_X_TOOLKIT
+      /* First attempt to use 32-bit visual if available */
+
+      vinfo_template.depth = 32;
+
+      vinfo = XGetVisualInfo (dpy, VisualScreenMask | VisualDepthMask,
+			      &vinfo_template, &n_visuals);
+
+      if (n_visuals > 0)
+	{
+	  dpyinfo->n_planes = vinfo->depth;
+	  dpyinfo->visual = vinfo->visual;
+	  XFree (vinfo);
+	  return;
+	}
+
+#endif /* !USE_X_TOOLKIT */
+
+      /* 32-bit visual not available, fallback to default visual */
+      dpyinfo->visual = DefaultVisualOfScreen (screen);
+      vinfo_template.visualid = XVisualIDFromVisual (dpyinfo->visual);
       vinfo = XGetVisualInfo (dpy, VisualIDMask | VisualScreenMask,
 			      &vinfo_template, &n_visuals);
       if (n_visuals <= 0)
@@ -7203,6 +7253,8 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
                          "cursorType", "CursorType", RES_TYPE_SYMBOL);
   gui_default_parameter (f, parms, Qalpha, Qnil,
                          "alpha", "Alpha", RES_TYPE_NUMBER);
+  gui_default_parameter (f, parms, Qalpha_background, Qnil,
+                         "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   /* Add `tooltip' frame parameter's default value. */
   if (NILP (Fframe_parameter (frame, Qtooltip)))
@@ -8531,6 +8583,7 @@ frame_parm_handler x_frame_parm_handlers[] =
   x_set_z_group,
   x_set_override_redirect,
   gui_set_no_special_glyphs,
+  gui_set_alpha_background,
 };
 
 void

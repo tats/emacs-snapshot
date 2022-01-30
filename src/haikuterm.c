@@ -632,20 +632,12 @@ haiku_draw_text_decoration (struct glyph_string *s, struct face *face,
 	      && (s->prev->face->underline_pixels_above_descent_line
 		  == s->face->underline_pixels_above_descent_line))
 	    {
-	      struct face *prev_face = s->prev->face;
-
-	      if (prev_face && prev_face->underline == FACE_UNDER_LINE)
-		{
-		  /* We use the same underline style as the previous one.  */
-		  thickness = s->prev->underline_thickness;
-		  position = s->prev->underline_position;
-		}
-	      else
-		goto calculate_underline_metrics;
+	      /* We use the same underline style as the previous one.  */
+	      thickness = s->prev->underline_thickness;
+	      position = s->prev->underline_position;
 	    }
 	  else
 	    {
-	    calculate_underline_metrics:;
 	      struct font *font = font_for_underline_metrics (s);
 	      unsigned long minimum_offset;
 	      bool underline_at_descent_line;
@@ -2333,50 +2325,14 @@ haiku_scroll_run (struct window *w, struct run *run)
 	height = run->height;
     }
 
-  if (!height)
-    return;
-
   block_input ();
   gui_clear_cursor (w);
-  BView_draw_lock (view);
-#ifdef USE_BE_CAIRO
-  if (EmacsView_double_buffered_p (view))
-    {
-#endif
-      BView_StartClip (view);
-      BView_CopyBits (view, x, from_y, width, height,
-		      x, to_y, width, height);
-      BView_EndClip (view);
-#ifdef USE_BE_CAIRO
-    }
-  else
-    {
-      EmacsWindow_begin_cr_critical_section (FRAME_HAIKU_WINDOW (f));
-      cairo_surface_t *surface = FRAME_CR_SURFACE (f);
-      cairo_surface_t *s
-	= cairo_surface_create_similar (surface,
-					cairo_surface_get_content (surface),
-					width, height);
-      cairo_t *cr = cairo_create (s);
-      if (surface)
-	{
-	  cairo_set_source_surface (cr, surface, -x, -from_y);
-	  cairo_paint (cr);
-	  cairo_destroy (cr);
 
-	  cr = haiku_begin_cr_clip (f, NULL);
-	  cairo_save (cr);
-	  cairo_set_source_surface (cr, s, x, to_y);
-	  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-	  cairo_rectangle (cr, x, to_y, width, height);
-	  cairo_fill (cr);
-	  cairo_restore (cr);
-	  cairo_surface_destroy (s);
-	  haiku_end_cr_clip (cr);
-	}
-      EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));
-    }
-#endif
+  BView_draw_lock (view);
+  BView_StartClip (view);
+  BView_CopyBits (view, x, from_y, width, height,
+		  x, to_y, width, height);
+  BView_EndClip (view);
   BView_draw_unlock (view);
 
   unblock_input ();
@@ -2603,7 +2559,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
   if (!buf)
     buf = xmalloc (200);
-  haiku_read_size (&b_size);
+  haiku_read_size (&b_size, false);
   while (b_size >= 0)
     {
       enum haiku_event_type type;
@@ -2875,6 +2831,8 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    || !NILP (previous_help_echo_string))
 		  do_help = 1;
 	      }
+
+	    need_flush = FRAME_DIRTY_P (f);
 	    break;
 	  }
 	case BUTTON_UP:
@@ -2884,8 +2842,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct frame *f = haiku_window_to_frame (b->window);
 	    Lisp_Object tab_bar_arg = Qnil;
 	    int tab_bar_p = 0, tool_bar_p = 0;
+	    bool up_okay_p = false;
 
-	    if (!f)
+	    if (popup_activated_p || !f)
 	      continue;
 
 	    struct haiku_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
@@ -2936,10 +2895,12 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    if (type == BUTTON_UP)
 	      {
 		inev.modifiers |= up_modifier;
+		up_okay_p = (dpyinfo->grabbed & (1 << b->btn_no));
 		dpyinfo->grabbed &= ~(1 << b->btn_no);
 	      }
 	    else
 	      {
+		up_okay_p = true;
 		inev.modifiers |= down_modifier;
 		dpyinfo->last_mouse_frame = f;
 		dpyinfo->grabbed |= (1 << b->btn_no);
@@ -2949,7 +2910,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		  f->last_tool_bar_item = -1;
 	      }
 
-	    if (!(tab_bar_p && NILP (tab_bar_arg)) && !tool_bar_p)
+	    if (up_okay_p
+		&& !(tab_bar_p && NILP (tab_bar_arg))
+		&& !tool_bar_p)
 	      inev.kind = MOUSE_CLICK_EVENT;
 	    inev.arg = tab_bar_arg;
 	    inev.code = b->btn_no;
@@ -3178,7 +3141,11 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 	    if (type == MENU_BAR_OPEN)
 	      {
-		if (!FRAME_OUTPUT_DATA (f)->menu_up_to_date_p)
+		/* b->no_lock means that MenusBeginning was called
+		   from the main thread, which means tracking was
+		   started manually, and we have already updated the
+		   menu bar.  */
+		if (!b->no_lock)
 		  {
 		    BView_draw_lock (FRAME_HAIKU_VIEW (f));
 		    /* This shouldn't be here, but nsmenu does it, so
@@ -3190,8 +3157,14 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    waiting_for_input = was_waiting_for_input_p;
 		    BView_draw_unlock (FRAME_HAIKU_VIEW (f));
 		  }
+
+		/* But set the flag anyway, because the menu will end
+		   from the window thread.  */
 		FRAME_OUTPUT_DATA (f)->menu_bar_open_p = 1;
 		popup_activated_p += 1;
+
+		if (!b->no_lock)
+		  EmacsWindow_signal_menu_update_complete (b->window);
 	      }
 	    else
 	      {
@@ -3290,11 +3263,12 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	  }
 	case APP_QUIT_REQUESTED_EVENT:
 	case KEY_UP:
+	case DUMMY_EVENT:
 	default:
 	  break;
 	}
 
-      haiku_read_size (&b_size);
+      haiku_read_size (&b_size, false);
 
       if (inev.kind != NO_EVENT)
 	{
@@ -3319,7 +3293,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
   for (struct unhandled_event *ev = unhandled_events; ev;)
     {
-      haiku_write_without_signal (ev->type, &ev->buffer);
+      haiku_write_without_signal (ev->type, &ev->buffer, false);
       struct unhandled_event *old = ev;
       ev = old->next;
       xfree (old);
@@ -3351,6 +3325,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
     flush_dirty_back_buffers ();
 
   unblock_input ();
+
   return message_count;
 }
 

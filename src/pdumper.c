@@ -2068,7 +2068,7 @@ dump_interval_tree (struct dump_context *ctx,
 static dump_off
 dump_string (struct dump_context *ctx, const struct Lisp_String *string)
 {
-#if CHECK_STRUCTS && !defined (HASH_Lisp_String_348C2B2FDB)
+#if CHECK_STRUCTS && !defined (HASH_Lisp_String_C2CAF90352)
 # error "Lisp_String changed. See CHECK_STRUCTS comment in config.h."
 #endif
   /* If we have text properties, write them _after_ the string so that
@@ -2079,7 +2079,7 @@ dump_string (struct dump_context *ctx, const struct Lisp_String *string)
      we seldom write to string data and never relocate it, so lumping
      it together at the end of the dump saves on COW faults.
 
-     If, however, the string's size_byte field is -1, the string data
+     If, however, the string's size_byte field is -2, the string data
      is actually a pointer to Emacs data segment, so we can do even
      better by emitting a relocation instead of bothering to copy the
      string data.  */
@@ -2948,7 +2948,7 @@ dump_vectorlike (struct dump_context *ctx,
                  Lisp_Object lv,
                  dump_off offset)
 {
-#if CHECK_STRUCTS && !defined HASH_pvec_type_19F6CF5169
+#if CHECK_STRUCTS && !defined HASH_pvec_type_AFF6FED5BD
 # error "pvec_type changed. See CHECK_STRUCTS comment in config.h."
 #endif
   const struct Lisp_Vector *v = XVECTOR (lv);
@@ -3032,6 +3032,8 @@ dump_vectorlike (struct dump_context *ctx,
       error_unsupported_dump_object (ctx, lv, "sqlite");
     case PVEC_MODULE_FUNCTION:
       error_unsupported_dump_object (ctx, lv, "module function");
+    case PVEC_SYMBOL_WITH_POS:
+      error_unsupported_dump_object (ctx, lv, "symbol with pos");
     default:
       error_unsupported_dump_object(ctx, lv, "weird pseudovector");
     }

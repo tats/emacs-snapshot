@@ -54,6 +54,10 @@ typedef Widget xt_or_gtk_widget;
 #define GTK_CHECK_VERSION(i, j, k) false
 #endif
 
+#ifdef HAVE_XRENDER
+#include <X11/extensions/Xrender.h>
+#endif
+
 #ifdef USE_GTK
 /* Some definitions to reduce conditionals.  */
 typedef GtkWidget *xt_or_gtk_widget;
@@ -148,7 +152,7 @@ struct x_bitmap_record
   int height, width, depth;
 };
 
-#ifdef USE_CAIRO
+#if defined USE_CAIRO || defined HAVE_XRENDER
 struct x_gc_ext_data
 {
 #define MAX_CLIP_RECTS 2
@@ -158,7 +162,9 @@ struct x_gc_ext_data
   /* Clipping rectangles.  */
   XRectangle clip_rects[MAX_CLIP_RECTS];
 };
+#endif
 
+#ifdef USE_CAIRO
 extern cairo_pattern_t *x_bitmap_stipple (struct frame *, Pixmap);
 #endif
 
@@ -238,6 +244,11 @@ struct x_display_info
 
   /* The Visual being used for this display.  */
   Visual *visual;
+
+#ifdef HAVE_XRENDER
+  /* The picture format for this display.  */
+  XRenderPictFormat *pict_format;
+#endif
 
   /* The colormap being used.  */
   Colormap cmap;
@@ -509,7 +520,7 @@ struct x_display_info
   int xrandr_minor_version;
 #endif
 
-#ifdef USE_CAIRO
+#if defined USE_CAIRO || defined HAVE_XRENDER
   XExtCodes *ext_codes;
 #endif
 
@@ -615,6 +626,13 @@ struct x_output
      base, the window itself.  In the double-buffered case, the
      window's back buffer.  */
   Drawable draw_desc;
+
+#ifdef HAVE_XRENDER
+  /* The Xrender picture that corresponds to this drawable.  None
+     means no picture format was found, or the Xrender extension is
+     not present.  */
+  Picture picture;
+#endif
 
   /* Flag that indicates whether we've modified the back buffer and
      need to publish our modifications to the front buffer at a
@@ -933,6 +951,17 @@ extern void x_mark_frame_dirty (struct frame *f);
 /* This is the Visual which frame F is on.  */
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO (f)->visual
 
+#ifdef HAVE_XRENDER
+#define FRAME_X_PICTURE_FORMAT(f) FRAME_DISPLAY_INFO (f)->pict_format
+#define FRAME_X_PICTURE(f) ((f)->output_data.x->picture)
+#define FRAME_CHECK_XR_VERSION(f, major, minor)			\
+  (FRAME_DISPLAY_INFO (f)->xrender_supported_p			\
+   && ((FRAME_DISPLAY_INFO (f)->xrender_major == (major)	\
+	&& FRAME_DISPLAY_INFO (f)->xrender_minor >= (minor))	\
+       || (FRAME_DISPLAY_INFO (f)->xrender_major > (major))))
+#endif
+
+
 /* This is the Colormap which frame F uses.  */
 #define FRAME_X_COLORMAP(f) FRAME_DISPLAY_INFO (f)->cmap
 
@@ -1212,6 +1241,11 @@ extern void x_cr_draw_frame (cairo_t *, struct frame *);
 extern Lisp_Object x_cr_export_frames (Lisp_Object, cairo_surface_type_t);
 #endif
 
+#ifdef HAVE_XRENDER
+extern void x_xrender_color_from_gc_foreground (struct frame *, GC, XRenderColor *);
+extern void x_xrender_color_from_gc_background (struct frame *, GC, XRenderColor *);
+#endif
+
 INLINE int
 x_display_pixel_height (struct x_display_info *dpyinfo)
 {
@@ -1236,7 +1270,7 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time t)
 INLINE unsigned long
 x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
 {
-  unsigned long pr, pg, pb;
+  unsigned long pr, pg, pb, pa = 0;
 
   /* Scale down RGB values to the visual's bits per RGB, and shift
      them to the right position in the pixel color.  Note that the
@@ -1245,8 +1279,11 @@ x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
   pg = (g >> (16 - dpyinfo->green_bits)) << dpyinfo->green_offset;
   pb = (b >> (16 - dpyinfo->blue_bits))  << dpyinfo->blue_offset;
 
+  if (dpyinfo->n_planes == 32)
+    pa = ((unsigned long) 0xFF << 24);
+
   /* Assemble the pixel color.  */
-  return pr | pg | pb;
+  return pr | pg | pb | pa;
 }
 
 /* If display has an immutable color map, freeing colors is not

@@ -80,6 +80,9 @@ as was already the case for all the non-preloaded files.
 * Startup Changes in Emacs 29.1
 
 +++
+** Emacs now support setting 'user-emacs-directory' via --init-directory.
+
++++
 ** Emacs now has a '--fingerprint' option.
 This will output a string identifying the current Emacs build.
 
@@ -91,6 +94,13 @@ time.
 
 
 * Incompatible changes in Emacs 29.1
+
+---
+** New user option 'term-clear-full-screen-programs'.
+By default, term will now work like most terminals when displaying
+full-screen programs: When they exit, the output is cleared, leaving
+what was displayed in the window before the programs started.  Set
+this user option to nil to revert back to the old behavior.
 
 ---
 ** Support for old EIEIO functions is not autoloaded any more.
@@ -108,6 +118,16 @@ This is to open up the 'C-x 8 .' map to bind further characters there.
 ** 'source' and '.' in Eshell no longer accept the '--help' option.
 This is for compatibility with the shell versions of these commands,
 which don't handle options like '--help' in any special way.
+
+---
+** The 'delete-forward-char' command now deletes by grapheme clusters.
+This command is by default bound to the <Delete> function key
+(a.k.a. <deletechar>).  When invoked without a prefix argument or with
+a positive prefix numeric argument, the command will now delete
+complete grapheme clusters produced by character composition.  For
+example, if point is before an Emoji sequence, pressing <Delete> will
+delete the entire sequence, not just a single character at its
+beginning.
 
 
 * Changes in Emacs 29.1
@@ -256,6 +276,11 @@ These will take you (respectively) to the next and previous "page".
 
 ---
 *** 'describe-char' now also outputs the name of emoji combinations.
+
++++
+*** New key binding in *Help* buffers: 'I'.
+This will take you to the Emacs Lisp manual entry for the item
+displayed, if any.
 
 ** Outline Mode
 
@@ -423,6 +448,11 @@ To enable this behavior, customize the user option
 When non-nil, the commands 'next-completion' and 'previous-completion'
 automatically wrap around on reaching the beginning or the end of
 the "*Completions*" buffer.
+
+*** New user option 'completions-sort'.
+This option controls the sorting of the completion candidates in
+the *Completions* buffer.  Available styles are no sorting,
+alphabetical (the default), or a custom sort function.
 
 ** Isearch and Replace
 
@@ -858,6 +888,16 @@ the Galeon web browser was released in September, 2008.
 
 *** New user option 'ruby-toggle-block-space-before-parameters'.
 
+** Eshell
+
++++
+*** New feature to easily bypass Eshell's own pipelining.
+Prefixing '|', '<' or '>' with an asterisk, i.e. '*|', '*<' or '*>',
+will cause the whole command to be passed to the operating system
+shell.  This is particularly useful to bypass Eshell's own pipelining
+support for pipelines which will move a lot of data.  See "Running
+Shell Pipelines Natively" in the Eshell manual.
+
 ** Miscellaneous
 
 ---
@@ -983,6 +1023,10 @@ functions.
 
 * Lisp Changes in Emacs 29.1
 
+** New variable 'messages-buffer-name'.
+This variable (defaulting to "*Messages*") allows packages to override
+where messages are logged.
+
 +++
 ** New function 'readablep'.
 This function says whether an object can be written out and then
@@ -1044,6 +1088,11 @@ wheel on some mice, or when the user's finger moves off the touchpad.
 This event is sent when a user performs a pinch gesture on a touchpad,
 which is comprised of placing two fingers on the touchpad and moving
 them towards or away from each other.
+
++++
+** New hook 'x-pre-popup-menu-hook'.
+This hook is run before 'x-popup-menu' is about to display a
+deck-of-cards menu on screen.
 
 ** Text security and suspiciousness
 
@@ -1175,6 +1224,10 @@ searchable data, like image data) with a 'display' text property.
 ** 'insert-image' now takes an INHIBIT-ISEARCH optional parameter.
 It marks the image with the 'inhibit-isearch' text property, which
 inhibits 'isearch' matching the STRING parameter.
+
+---
+** New function 'replace-regexp-function'.
+It can be used to implement own regexp syntax for search/replace.
 
 ---
 ** New user option 'pp-use-max-width'.

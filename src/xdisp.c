@@ -741,10 +741,6 @@ int update_mode_lines;
 
 static bool line_number_displayed;
 
-/* The name of the *Messages* buffer, a string.  */
-
-static Lisp_Object Vmessages_buffer_name;
-
 /* Current, index 0, and last displayed echo area message.  Either
    buffers from echo_buffers, or nil to indicate no message.  */
 
@@ -10216,7 +10212,8 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
 			 could have both positions after TO_CHARPOS or
 			 both positions before it, due to bidi
 			 reordering.)  */
-		      if (IT_CHARPOS (*it) != to_charpos
+		      if (to_charpos > 0
+			  && IT_CHARPOS (*it) != to_charpos
 			  && ((IT_CHARPOS (it_backup) > to_charpos)
 			      == (IT_CHARPOS (*it) > to_charpos)))
 			{
@@ -11377,6 +11374,10 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
       old_deactivate_mark = Vdeactivate_mark;
       oldbuf = current_buffer;
 
+      /* Sanity check, in case the variable has been set to something
+	 invalid.  */
+      if (! STRINGP (Vmessages_buffer_name))
+	Vmessages_buffer_name = build_string ("*Messages*");
       /* Ensure the Messages buffer exists, and switch to it.
          If we created it, set the major-mode.  */
       bool newbuffer = NILP (Fget_buffer (Vmessages_buffer_name));
@@ -13928,6 +13929,8 @@ redisplay_tab_bar (struct frame *f)
   struct it it;
   struct glyph_row *row;
 
+  f->tab_bar_redisplayed = true;
+
   /* If frame hasn't a tab-bar window or if it is zero-height, don't
      do anything.  This means you must start with tab-bar-lines
      non-zero to get the auto-sizing effect.  Or in other words, you
@@ -13935,9 +13938,16 @@ redisplay_tab_bar (struct frame *f)
   if (!WINDOWP (f->tab_bar_window)
       || (w = XWINDOW (f->tab_bar_window),
           WINDOW_TOTAL_LINES (w) == 0))
-    return false;
+    {
+      /* Even if we do not display a tab bar initially, still pretend
+	 that we have resized it.  This avoids that a later activation
+	 of the tab bar resizes the frame, despite of the fact that the
+	 setting of 'frame-inhibit-implied-resize' should inhibit it
+	 (Bug#52986).  */
+      f->tab_bar_resized = true;
 
-  f->tab_bar_redisplayed = true;
+      return false;
+    }
 
   /* Set up an iterator for the tab-bar window.  */
   init_iterator (&it, w, -1, -1, w->desired_matrix->rows, TAB_BAR_FACE_ID);
@@ -14847,6 +14857,8 @@ redisplay_tool_bar (struct frame *f)
   struct it it;
   struct glyph_row *row;
 
+  f->tool_bar_redisplayed = true;
+
   /* If frame hasn't a tool-bar window or if it is zero-height, don't
      do anything.  This means you must start with tool-bar-lines
      non-zero to get the auto-sizing effect.  Or in other words, you
@@ -14854,9 +14866,16 @@ redisplay_tool_bar (struct frame *f)
   if (!WINDOWP (f->tool_bar_window)
       || (w = XWINDOW (f->tool_bar_window),
           WINDOW_TOTAL_LINES (w) == 0))
-    return false;
+    {
+      /* Even if we do not display a tool bar initially, still pretend
+	 that we have resized it already.  This avoids that a later
+	 activation of the tool bar resizes the frame, despite of the
+	 fact that a setting of 'frame-inhibit-implied-resize' should
+	 inhibit it (Bug#52986).  */
+      f->tool_bar_resized = true;
 
-  f->tool_bar_redisplayed = true;
+      return false;
+    }
 
   /* Set up an iterator for the tool-bar window.  */
   init_iterator (&it, w, -1, -1, w->desired_matrix->rows, TOOL_BAR_FACE_ID);
@@ -35607,8 +35626,13 @@ be let-bound around code that needs to disable messages temporarily. */);
   staticpro (&echo_area_buffer[0]);
   staticpro (&echo_area_buffer[1]);
 
-  Vmessages_buffer_name = build_pure_c_string ("*Messages*");
-  staticpro (&Vmessages_buffer_name);
+  DEFVAR_LISP ("messages-buffer-name", Vmessages_buffer_name,
+    doc: /* The name of the buffer where messages are logged.
+This is normally \"\*Messages*\", but can be rebound by packages that
+wish to redirect messages to a different buffer.  (If the buffer
+doesn't exist, it will be created and put into
+`messages-buffer-mode'.)  */);
+  Vmessages_buffer_name = build_string ("*Messages*");
 
   mode_line_proptrans_alist = Qnil;
   staticpro (&mode_line_proptrans_alist);

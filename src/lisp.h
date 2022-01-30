@@ -365,26 +365,29 @@ typedef EMACS_INT Lisp_Word;
    ((ok) ? (void) 0 : wrong_type_argument (predicate, x))
 #define lisp_h_CONSP(x) TAGGEDP (x, Lisp_Cons)
 #define lisp_h_BASE_EQ(x, y) (XLI (x) == XLI (y))
-/* #define lisp_h_EQ(x, y) (XLI (x) == XLI (y)) */
 
-#define lisp_h_EQ(x, y) ((XLI ((x)) == XLI ((y)))       \
-  || (symbols_with_pos_enabled    \
-  && (SYMBOL_WITH_POS_P ((x))                        \
-      ? BARE_SYMBOL_P ((y))                               \
-        ? XLI (XSYMBOL_WITH_POS((x))->sym) == XLI (y)           \
-        : SYMBOL_WITH_POS_P((y))                       \
-          && (XLI (XSYMBOL_WITH_POS((x))->sym)                   \
-              == XLI (XSYMBOL_WITH_POS((y))->sym))               \
-      : (SYMBOL_WITH_POS_P ((y))                     \
-         && BARE_SYMBOL_P ((x))                           \
-         && (XLI (x) == XLI ((XSYMBOL_WITH_POS ((y)))->sym))))))
+/* FIXME: Do we really need to inline the whole thing?
+ * What about keeping the part after `symbols_with_pos_enabled` in
+ * a separate function?  */
+#define lisp_h_EQ(x, y)                                     \
+  ((XLI ((x)) == XLI ((y)))                                 \
+   || (symbols_with_pos_enabled                             \
+       && (SYMBOL_WITH_POS_P ((x))                          \
+           ? (BARE_SYMBOL_P ((y))                           \
+              ? XLI (XSYMBOL_WITH_POS((x))->sym) == XLI (y) \
+              : SYMBOL_WITH_POS_P((y))                      \
+                && (XLI (XSYMBOL_WITH_POS((x))->sym)        \
+                    == XLI (XSYMBOL_WITH_POS((y))->sym)))   \
+           : (SYMBOL_WITH_POS_P ((y))                       \
+              && BARE_SYMBOL_P ((x))                        \
+              && (XLI (x) == XLI ((XSYMBOL_WITH_POS ((y)))->sym))))))
 
 #define lisp_h_FIXNUMP(x) \
    (! (((unsigned) (XLI (x) >> (USE_LSB_TAG ? 0 : FIXNUM_BITS)) \
 	- (unsigned) (Lisp_Int0 >> !USE_LSB_TAG)) \
        & ((1 << INTTYPEBITS) - 1)))
 #define lisp_h_FLOATP(x) TAGGEDP (x, Lisp_Float)
-#define lisp_h_NILP(x) /* x == Qnil */ /* ((XLI (x) == XLI (Qnil))) */ /* EQ (x, Qnil) */ BASE_EQ (x, Qnil)
+#define lisp_h_NILP(x)  BASE_EQ (x, Qnil)
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
@@ -617,6 +620,7 @@ extern bool symbols_with_pos_enabled;
 extern AVOID args_out_of_range_3 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern AVOID wrong_type_argument (Lisp_Object, Lisp_Object);
 extern Lisp_Object default_value (Lisp_Object symbol);
+extern void defalias (Lisp_Object symbol, Lisp_Object definition);
 
 
 /* Defined in emacs.c.  */
@@ -1554,7 +1558,9 @@ struct Lisp_String
     struct
     {
       ptrdiff_t size;           /* MSB is used as the markbit.  */
-      ptrdiff_t size_byte;      /* Set to -1 for unibyte strings.  */
+      ptrdiff_t size_byte;      /* Set to -1 for unibyte strings,
+				   -2 for data in rodata,
+				   -3 for immovable unibyte strings.  */
       INTERVAL intervals;	/* Text properties in this string.  */
       unsigned char *data;
     } s;
@@ -1700,6 +1706,13 @@ CHECK_STRING_NULL_BYTES (Lisp_Object string)
 {
   CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
 	      Qfilenamep, string);
+}
+
+/* True if STR is immovable (whose data won't move during GC).  */
+INLINE bool
+string_immovable_p (Lisp_Object str)
+{
+  return XSTRING (str)->u.s.size_byte == -3;
 }
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
@@ -3343,6 +3356,13 @@ SPECPDL_INDEX (void)
   return specpdl_ptr - specpdl;
 }
 
+INLINE bool
+backtrace_debug_on_exit (union specbinding *pdl)
+{
+  eassert (pdl->kind == SPECPDL_BACKTRACE);
+  return pdl->bt.debug_on_exit;
+}
+
 /* This structure helps implement the `catch/throw' and `condition-case/signal'
    control structures.  A struct handler contains all the information needed to
    restore the state of the interpreter after a non-local jump.
@@ -3406,11 +3426,33 @@ struct handler
 
 extern Lisp_Object memory_signal_data;
 
-extern void maybe_quit (void);
-
 /* True if ought to quit now.  */
 
 #define QUITP (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
+
+extern bool volatile pending_signals;
+extern void process_pending_signals (void);
+extern void probably_quit (void);
+
+/* Check quit-flag and quit if it is non-nil.  Typing C-g does not
+   directly cause a quit; it only sets Vquit_flag.  So the program
+   needs to call maybe_quit at times when it is safe to quit.  Every
+   loop that might run for a long time or might not exit ought to call
+   maybe_quit at least once, at a safe place.  Unless that is
+   impossible, of course.  But it is very desirable to avoid creating
+   loops where maybe_quit is impossible.
+
+   If quit-flag is set to `kill-emacs' the SIGINT handler has received
+   a request to exit Emacs when it is safe to do.
+
+   When not quitting, process any pending signals.  */
+
+INLINE void
+maybe_quit (void)
+{
+  if (!NILP (Vquit_flag) || pending_signals)
+    probably_quit ();
+}
 
 /* Process a quit rarely, based on a counter COUNT, for efficiency.
    "Rarely" means once per USHRT_MAX + 1 times; this is somewhat
@@ -4041,6 +4083,7 @@ extern Lisp_Object make_specified_string (const char *,
 					  ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_pure_string (const char *, ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_pure_c_string (const char *, ptrdiff_t);
+extern void pin_string (Lisp_Object string);
 
 /* Make a string allocated in pure space, use STR as string data.  */
 
@@ -4324,7 +4367,9 @@ extern AVOID verror (const char *, va_list)
   ATTRIBUTE_FORMAT_PRINTF (1, 0);
 extern Lisp_Object vformat_string (const char *, va_list)
   ATTRIBUTE_FORMAT_PRINTF (1, 0);
-extern void un_autoload (Lisp_Object);
+extern Lisp_Object load_with_autoload_queue
+           (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
+            Lisp_Object nosuffix, Lisp_Object must_suffix);
 extern Lisp_Object call_debugger (Lisp_Object arg);
 extern void init_eval_once (void);
 extern Lisp_Object safe_call (ptrdiff_t, Lisp_Object, ...);
@@ -4338,6 +4383,9 @@ extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+void do_debug_on_call (Lisp_Object code, ptrdiff_t count);
+Lisp_Object funcall_general (Lisp_Object fun,
+			     ptrdiff_t numargs, Lisp_Object *args);
 
 /* Defined in unexmacosx.c.  */
 #if defined DARWIN_OS && defined HAVE_UNEXEC
@@ -4680,7 +4728,7 @@ extern int read_bytecode_char (bool);
 /* Defined in bytecode.c.  */
 extern void syms_of_bytecode (void);
 extern Lisp_Object exec_byte_code (Lisp_Object, Lisp_Object, Lisp_Object,
-				   Lisp_Object, ptrdiff_t, Lisp_Object *);
+				   ptrdiff_t, ptrdiff_t, Lisp_Object *);
 extern Lisp_Object get_byte_code_arity (Lisp_Object);
 
 /* Defined in macros.c.  */

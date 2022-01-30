@@ -480,6 +480,10 @@ load_gccjit_if_necessary (bool mandatory)
 #define THIRD(x)				\
   XCAR (XCDR (XCDR (x)))
 
+/* Like call0 but stringify and intern.  */
+#define CALL0I(fun)				\
+  CALLN (Ffuncall, intern_c_string (STR (fun)))
+
 /* Like call1 but stringify and intern.  */
 #define CALL1I(fun, arg)				\
   CALLN (Ffuncall, intern_c_string (STR (fun)), arg)
@@ -1720,7 +1724,7 @@ emit_lisp_obj_rval (Lisp_Object obj)
   emit_comment (format_string ("const lisp obj: %s",
 			       SSDATA (Fprin1_to_string (obj, Qnil))));
 
-  if (EQ (obj, Qnil))
+  if (NILP (obj))
     {
       gcc_jit_rvalue *n;
       n = emit_rvalue_from_lisp_word ((Lisp_Word) iQnil);
@@ -2237,9 +2241,9 @@ emit_limple_insn (Lisp_Object insn)
       gcc_jit_block *target1 = retrive_block (arg[2]);
       gcc_jit_block *target2 = retrive_block (arg[3]);
 
-      if ((CALL1I (comp-cstr-imm-vld-p, arg[0])
+      if ((!NILP (CALL1I (comp-cstr-imm-vld-p, arg[0]))
 	   && NILP (CALL1I (comp-cstr-imm, arg[0])))
-	  || (CALL1I (comp-cstr-imm-vld-p, arg[1])
+	  || (!NILP (CALL1I (comp-cstr-imm-vld-p, arg[1]))
 	      && NILP (CALL1I (comp-cstr-imm, arg[1]))))
 	emit_cond_jump (emit_BASE_EQ (a, b), target1, target2);
       else
@@ -5128,7 +5132,7 @@ maybe_defer_native_compilation (Lisp_Object function_name,
   if (comp__loadable)
     {
       /* Startup is done, comp is usable.  */
-      Frequire (Qcomp, Qnil, Qnil);
+      CALL0I (startup--require-comp-safely);
       Fputhash (function_name, definition, Vcomp_deferred_pending_h);
       CALLN (Ffuncall, intern_c_string ("native--compile-async"),
 	     src, Qnil, Qlate);
@@ -5496,19 +5500,7 @@ This gets called by top_level_run during the load phase.  */)
     make_subr (SYMBOL_NAME (name), minarg, maxarg, c_name, type, doc_idx,
 	       intspec, comp_u);
 
-  if (AUTOLOADP (XSYMBOL (name)->u.s.function))
-    /* Remember that the function was already an autoload.  */
-    LOADHIST_ATTACH (Fcons (Qt, name));
-  LOADHIST_ATTACH (Fcons (Qdefun, name));
-
-  { /* Handle automatic advice activation (bug#42038).
-       See `defalias'.  */
-    Lisp_Object hook = Fget (name, Qdefalias_fset_function);
-    if (!NILP (hook))
-      call2 (hook, name, tem);
-    else
-      Ffset (name, tem);
-  }
+  defalias (name, tem);
 
   return tem;
 }

@@ -58,9 +58,11 @@ echo area, instead of making a pop-up window."
   (if (and tooltip-mode (fboundp 'x-show-tip))
       (progn
 	(add-hook 'pre-command-hook 'tooltip-hide)
-	(add-hook 'tooltip-functions 'tooltip-help-tips))
+	(add-hook 'tooltip-functions 'tooltip-help-tips)
+        (add-hook 'x-pre-popup-menu-hook 'tooltip-hide))
     (unless (and (boundp 'gud-tooltip-mode) gud-tooltip-mode)
-      (remove-hook 'pre-command-hook 'tooltip-hide))
+      (remove-hook 'pre-command-hook 'tooltip-hide)
+      (remove-hook 'x-pre-popup-menu-hook 'tooltip-hide))
     (remove-hook 'tooltip-functions 'tooltip-help-tips))
   (setq show-help-function
 	(if tooltip-mode 'tooltip-show-help 'tooltip-show-help-non-mode)))
@@ -375,12 +377,7 @@ It is also called if Tooltip mode is on, for text-only displays."
 (defun tooltip-show-help (msg)
   "Function installed as `show-help-function'.
 MSG is either a help string to display, or nil to cancel the display."
-  (if (and (display-graphic-p)
-           ;; On Haiku, system tooltips can't be displayed above
-           ;; menus.
-           (or (not (and (eq window-system 'haiku)
-                         haiku-use-system-tooltips))
-               (not (menu-or-popup-active-p))))
+  (if (and (display-graphic-p))
       (let ((previous-help tooltip-help-message))
 	(setq tooltip-help-message msg)
 	(cond ((null msg)

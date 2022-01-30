@@ -836,7 +836,6 @@ DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
        doc: /* Set SYMBOL's function definition to DEFINITION, and return DEFINITION.  */)
   (register Lisp_Object symbol, Lisp_Object definition)
 {
-  register Lisp_Object function;
   CHECK_SYMBOL (symbol);
   /* Perhaps not quite the right error signal, but seems good enough.  */
   if (NILP (symbol) && !NILP (definition))
@@ -844,17 +843,11 @@ DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
        think this one little sanity check is worth its cost, but anyway.  */
     xsignal1 (Qsetting_constant, symbol);
 
-  function = XSYMBOL (symbol)->u.s.function;
-
-  if (!NILP (Vautoload_queue) && !NILP (function))
-    Vautoload_queue = Fcons (Fcons (symbol, function), Vautoload_queue);
-
-  if (AUTOLOADP (function))
-    Fput (symbol, Qautoload, XCDR (function));
-
   eassert (valid_lisp_object_p (definition));
 
 #ifdef HAVE_NATIVE_COMP
+  register Lisp_Object function = XSYMBOL (symbol)->u.s.function;
+
   if (comp_enable_subr_trampolines
       && SUBRP (function)
       && !SUBR_NATIVE_COMPILEDP (function))
@@ -864,6 +857,38 @@ DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
   set_symbol_function (symbol, definition);
 
   return definition;
+}
+
+void
+defalias (Lisp_Object symbol, Lisp_Object definition)
+{
+  {
+    bool autoload = AUTOLOADP (definition);
+    if (!will_dump_p () || !autoload)
+      { /* Only add autoload entries after dumping, because the ones before are
+	   not useful and else we get loads of them from the loaddefs.el.  */
+        Lisp_Object function = XSYMBOL (symbol)->u.s.function;
+
+	if (AUTOLOADP (function))
+	  /* Remember that the function was already an autoload.  */
+	  LOADHIST_ATTACH (Fcons (Qt, symbol));
+	LOADHIST_ATTACH (Fcons (autoload ? Qautoload : Qdefun, symbol));
+
+        if (!NILP (Vautoload_queue) && !NILP (function))
+          Vautoload_queue = Fcons (Fcons (symbol, function), Vautoload_queue);
+
+        if (AUTOLOADP (function))
+          Fput (symbol, Qautoload, XCDR (function));
+      }
+  }
+
+  { /* Handle automatic advice activation.  */
+    Lisp_Object hook = Fget (symbol, Qdefalias_fset_function);
+    if (!NILP (hook))
+      call2 (hook, symbol, definition);
+    else
+      Ffset (symbol, definition);
+  }
 }
 
 DEFUN ("defalias", Fdefalias, Sdefalias, 2, 3, 0,
@@ -885,26 +910,7 @@ The return value is undefined.  */)
       && !KEYMAPP (definition))
     definition = Fpurecopy (definition);
 
-  {
-    bool autoload = AUTOLOADP (definition);
-    if (!will_dump_p () || !autoload)
-      { /* Only add autoload entries after dumping, because the ones before are
-	   not useful and else we get loads of them from the loaddefs.el.  */
-
-	if (AUTOLOADP (XSYMBOL (symbol)->u.s.function))
-	  /* Remember that the function was already an autoload.  */
-	  LOADHIST_ATTACH (Fcons (Qt, symbol));
-	LOADHIST_ATTACH (Fcons (autoload ? Qautoload : Qdefun, symbol));
-      }
-  }
-
-  { /* Handle automatic advice activation.  */
-    Lisp_Object hook = Fget (symbol, Qdefalias_fset_function);
-    if (!NILP (hook))
-      call2 (hook, symbol, definition);
-    else
-      Ffset (symbol, definition);
-  }
+  defalias (symbol, definition);
 
   maybe_defer_native_compilation (symbol, definition);
 

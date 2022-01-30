@@ -2757,8 +2757,7 @@ since only a single case-insensitive search through the alist is made."
 (defvar auto-mode-alist
   ;; Note: The entries for the modes defined in cc-mode.el (c-mode,
   ;; c++-mode, java-mode and more) are added through autoload
-  ;; directives in that file.  That way is discouraged since it
-  ;; spreads out the definition of the initial value.
+  ;; directives in that file.
   (mapcar
    (lambda (elt)
      (cons (purecopy (car elt)) (cdr elt)))
@@ -2929,7 +2928,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\|SQUASHFS\\)\\'" .
      ("\\.\\(diffs?\\|patch\\|rej\\)\\'" . diff-mode)
      ("\\.\\(dif\\|pat\\)\\'" . diff-mode) ; for MS-DOS
      ("\\.[eE]?[pP][sS]\\'" . ps-mode)
-     ("\\.\\(?:PDF\\|DVI\\|OD[FGPST]\\|DOCX\\|XLSX?\\|PPTX?\\|pdf\\|djvu\\|dvi\\|od[fgpst]\\|docx\\|xlsx?\\|pptx?\\)\\'" . doc-view-mode-maybe)
+     ("\\.\\(?:PDF\\|EPUB\\|CBZ\\|FB2\\|O?XPS\\|DVI\\|OD[FGPST]\\|DOCX\\|XLSX?\\|PPTX?\\|pdf\\|epub\\|cbz\\|fb2\\|o?xps\\|djvu\\|dvi\\|od[fgpst]\\|docx\\|xlsx?\\|pptx?\\)\\'" . doc-view-mode-maybe)
      ("configure\\.\\(ac\\|in\\)\\'" . autoconf-mode)
      ("\\.s\\(v\\|iv\\|ieve\\)\\'" . sieve-mode)
      ("BROWSE\\'" . ebrowse-tree-mode)
@@ -3056,8 +3055,7 @@ and `magic-mode-alist', which determines modes based on file contents.")
 (defvar interpreter-mode-alist
   ;; Note: The entries for the modes defined in cc-mode.el (awk-mode
   ;; and pike-mode) are added through autoload directives in that
-  ;; file.  That way is discouraged since it spreads out the
-  ;; definition of the initial value.
+  ;; file.
   (mapcar
    (lambda (l)
      (cons (purecopy (car l)) (cdr l)))
@@ -3249,6 +3247,7 @@ extra checks should be done."
                         (let ((case-fold-search t))
                           (assoc-default name alist 'string-match))))))
           (if (and mode
+                   (not (functionp mode))
                    (consp mode)
                    (cadr mode))
               (setq mode (car mode)
@@ -5817,6 +5816,27 @@ of the directory that was default during command invocation."
     (lambda () (file-in-directory-p default-directory root))))
 (put 'save-some-buffers-root 'save-some-buffers-function t)
 
+(defun files--buffers-needing-to-be-saved (pred)
+  "Return a list of buffers to save according to PRED.
+See `save-some-buffers' for PRED values."
+  (seq-filter
+   (lambda (buffer)
+     ;; Note that killing some buffers may kill others via
+     ;; hooks (e.g. Rmail and its viewing buffer).
+     (and (buffer-live-p buffer)
+	  (buffer-modified-p buffer)
+          (not (buffer-base-buffer buffer))
+          (or
+           (buffer-file-name buffer)
+           (with-current-buffer buffer
+             (or (eq buffer-offer-save 'always)
+                 (and pred buffer-offer-save
+                      (> (buffer-size) 0)))))
+          (or (not (functionp pred))
+              (with-current-buffer buffer
+                (funcall pred)))))
+   (buffer-list)))
+
 (defun save-some-buffers (&optional arg pred)
   "Save some modified file-visiting buffers.  Asks user about each one.
 You can answer \\`y' or \\`SPC' to save, \\`n' or \\`DEL' not to save, \\`C-r'
@@ -5873,49 +5893,36 @@ change the additional actions you can take on files."
           (setq files-done
 	        (map-y-or-n-p
                  (lambda (buffer)
-	           ;; Note that killing some buffers may kill others via
-	           ;; hooks (e.g. Rmail and its viewing buffer).
-	           (and (buffer-live-p buffer)
-		        (buffer-modified-p buffer)
-                        (not (buffer-base-buffer buffer))
-                        (or
-                         (buffer-file-name buffer)
-                         (with-current-buffer buffer
-                           (or (eq buffer-offer-save 'always)
-                               (and pred buffer-offer-save
-                                    (> (buffer-size) 0)))))
-                        (or (not (functionp pred))
-                            (with-current-buffer buffer (funcall pred)))
-                        (if arg
-                            t
-                          (setq queried t)
-                          (if (buffer-file-name buffer)
-                              (if (or
-                                   (equal (buffer-name buffer)
-                                          (file-name-nondirectory
-                                           (buffer-file-name buffer)))
-                                   (string-match
-                                    (concat "\\<"
-                                            (regexp-quote
-                                             (file-name-nondirectory
-                                              (buffer-file-name buffer)))
-                                            "<[^>]*>\\'")
-                                    (buffer-name buffer)))
-                                  ;; The buffer name is similar to the
-                                  ;; file name.
-                                  (format "Save file %s? "
-                                          (buffer-file-name buffer))
-                                ;; The buffer and file names are
-                                ;; dissimilar; display both.
-                                (format "Save file %s (buffer %s)? "
-                                        (buffer-file-name buffer)
-                                        (buffer-name buffer)))
-                            ;; No file name
-                            (format "Save buffer %s? " (buffer-name buffer))))))
+                   (if arg
+                       t
+                     (setq queried t)
+                     (if (buffer-file-name buffer)
+                         (if (or
+                              (equal (buffer-name buffer)
+                                     (file-name-nondirectory
+                                      (buffer-file-name buffer)))
+                              (string-match
+                               (concat "\\<"
+                                       (regexp-quote
+                                        (file-name-nondirectory
+                                         (buffer-file-name buffer)))
+                                       "<[^>]*>\\'")
+                               (buffer-name buffer)))
+                             ;; The buffer name is similar to the file
+                             ;; name.
+                             (format "Save file %s? "
+                                     (buffer-file-name buffer))
+                           ;; The buffer and file names are dissimilar;
+                           ;; display both.
+                           (format "Save file %s (buffer %s)? "
+                                   (buffer-file-name buffer)
+                                   (buffer-name buffer)))
+                       ;; No file name.
+                       (format "Save buffer %s? " (buffer-name buffer)))))
                  (lambda (buffer)
                    (with-current-buffer buffer
                      (save-buffer)))
-                 (buffer-list)
+                 (files--buffers-needing-to-be-saved pred)
 	         '("buffer" "buffers" "save")
 	         save-some-buffers-action-alist))
           ;; Maybe to save abbrevs, and record whether
@@ -7753,7 +7760,16 @@ if any returns nil.  If `confirm-kill-emacs' is non-nil, calls it."
   (interactive "P")
   ;; Don't use save-some-buffers-default-predicate, because we want
   ;; to ask about all the buffers before killing Emacs.
-  (save-some-buffers arg t)
+    (when (files--buffers-needing-to-be-saved t)
+      (if (use-dialog-box-p)
+          (pcase (x-popup-dialog
+                  t `("Unsaved Buffers"
+                      ("Close Without Saving" . no-save)
+                      ("Save All" . save-all)
+                      ("Cancel" . cancel)))
+            ('cancel (user-error "Exit cancelled"))
+            ('save-all (save-some-buffers t)))
+        (save-some-buffers arg t)))
   (let ((confirm confirm-kill-emacs))
     (and
      (or (not (memq t (mapcar (lambda (buf)
