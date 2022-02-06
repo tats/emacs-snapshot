@@ -2620,10 +2620,11 @@ if test "${HAVE_X11}" = "yes"; then
 	emacs_cv_xkb=yes, emacs_cv_xkb=no)])
   if test $emacs_cv_xkb = yes; then
     AC_DEFINE(HAVE_XKB, 1, [Define to 1 if you have the Xkb extension.])
+    AC_CHECK_FUNCS(XkbRefreshKeyboardMapping XkbFreeNames)
   fi
 
-  AC_CHECK_FUNCS(XrmSetDatabase XScreenResourceString \
-XScreenNumberOfScreen)
+  AC_CHECK_FUNCS(XrmSetDatabase XScreenResourceString XScreenNumberOfScreen)
+  AC_CHECK_FUNCS(XDisplayCells XDestroySubwindows)
 fi
 
 if test "${window_system}" = "x11"; then
@@ -4488,6 +4489,22 @@ This might lead to problems if your version of GTK+ is not built with support fo
 fi
 AC_SUBST(XINPUT_CFLAGS)
 AC_SUBST(XINPUT_LIBS)
+
+XSYNC_LIBS=
+XSYNC_CFLAGS=
+HAVE_XSYNC=no
+if test "${HAVE_X11}" = "yes"; then
+   AC_CHECK_HEADER(X11/extensions/sync.h,
+     AC_CHECK_LIB(Xext, XSyncQueryExtension, HAVE_XSYNC=yes),
+     [], [#include <X11/Xlib.h>])
+
+  if test "${HAVE_XSYNC}" = "yes"; then
+    AC_DEFINE(HAVE_XSYNC, 1, [Define to 1 if the X Synchronization Extension is available.])
+    XSYNC_LIBS="-lXext"
+  fi
+fi
+AC_SUBST(XSYNC_LIBS)
+AC_SUBST(XSYNC_CFLAGS)
 
 ### Use Xdbe (-lXdbe) if available
 HAVE_XDBE=no

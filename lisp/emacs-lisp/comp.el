@@ -1767,6 +1767,7 @@ This is responsible for generating the proper stack adjustment, when known,
 and the annotation emission."
   (declare (debug (body))
            (indent defun))
+  (declare-function comp-body-eff nil (body op-name sp-delta))
   `(pcase op
      ,@(cl-loop for (op . body) in cases
 		for sp-delta = (gethash op comp-op-stack-info)
@@ -1831,7 +1832,9 @@ and the annotation emission."
       (byte-listp auto)
       (byte-eq auto)
       (byte-memq auto)
-      (byte-not null)
+      (byte-not
+       (comp-emit-set-call (comp-call 'eq (comp-slot-n (comp-sp))
+                                      (make-comp-mvar :constant nil))))
       (byte-car auto)
       (byte-cdr auto)
       (byte-cons auto)

@@ -418,13 +418,20 @@ haiku_set_parent_frame (struct frame *f,
     }
 
   if (!NILP (old_value))
-    EmacsWindow_unparent (FRAME_HAIKU_WINDOW (f));
+    {
+      EmacsWindow_unparent (FRAME_HAIKU_WINDOW (f));
+      FRAME_OUTPUT_DATA (f)->parent_desc = NULL;
+    }
   if (!NILP (new_value))
     {
       EmacsWindow_parent_to (FRAME_HAIKU_WINDOW (f),
 			     FRAME_HAIKU_WINDOW (p));
       BWindow_set_offset (FRAME_HAIKU_WINDOW (f),
 			  f->left_pos, f->top_pos);
+
+      /* This isn't actually used for anything, but makes the
+	 `parent-id' parameter correct.  */
+      FRAME_OUTPUT_DATA (f)->parent_desc = FRAME_HAIKU_WINDOW (p);
     }
   fset_parent_frame (f, new_value);
   unblock_input ();
@@ -1905,10 +1912,8 @@ DEFUN ("x-display-visual-class", Fx_display_visual_class,
 
   if (planes == 8)
     return intern ("static-color");
-  else if (planes == 16 || planes == 15)
-    return intern ("pseudo-color");
 
-  return intern ("direct-color");
+  return intern ("true-color");
 }
 
 DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,

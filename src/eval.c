@@ -1873,18 +1873,19 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     }
 
   /* If we're in batch mode, print a backtrace unconditionally to help
-     with debugging.  Make sure to use `debug' unconditionally to not
-     interfere with ERT or other packages that install custom
-     debuggers.  Don't try to call the debugger while dumping or
-     bootstrapping, it wouldn't work anyway.  */
+     with debugging.  Make sure to use `debug-early' unconditionally
+     to not interfere with ERT or other packages that install custom
+     debuggers.  */
   if (!debugger_called && !NILP (error_symbol)
       && (NILP (clause) || EQ (h->tag_or_ch, Qerror))
       && noninteractive && backtrace_on_error_noninteractive
-      && !will_dump_p () && !will_bootstrap_p ()
-      && NILP (Vinhibit_debugger))
+      && NILP (Vinhibit_debugger)
+      && !NILP (Ffboundp (Qdebug_early)))
     {
+      max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 100);
+      max_ensure_room (&max_specpdl_size, SPECPDL_INDEX (), 200);
       ptrdiff_t count = SPECPDL_INDEX ();
-      specbind (Vdebugger, Qdebug);
+      specbind (Qdebugger, Qdebug_early);
       call_debugger (list2 (Qerror, Fcons (error_symbol, data)));
       unbind_to (count, Qnil);
     }
@@ -2250,21 +2251,17 @@ this does nothing and returns nil.  */)
 static void
 un_autoload (Lisp_Object oldqueue)
 {
-  Lisp_Object queue, first, second;
-
   /* Queue to unwind is current value of Vautoload_queue.
      oldqueue is the shadowed value to leave in Vautoload_queue.  */
-  queue = Vautoload_queue;
+  Lisp_Object queue = Vautoload_queue;
   Vautoload_queue = oldqueue;
   while (CONSP (queue))
     {
-      first = XCAR (queue);
-      second = Fcdr (first);
-      first = Fcar (first);
-      if (EQ (first, make_fixnum (0)))
-	Vfeatures = second;
+      Lisp_Object first = XCAR (queue);
+      if (CONSP (first) && EQ (XCAR (first), make_fixnum (0)))
+	Vfeatures = XCDR (first);
       else
-	Ffset (first, second);
+	Ffset (first, Fcar (Fcdr (Fget (first, Qfunction_history))));
       queue = XCDR (queue);
     }
 }
@@ -3108,80 +3105,65 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
 Lisp_Object
 funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
 {
-  if (numargs < subr->min_args
-      || (subr->max_args >= 0 && subr->max_args < numargs))
+  eassume (numargs >= 0);
+  if (numargs >= subr->min_args)
     {
-      Lisp_Object fun;
-      XSETSUBR (fun, subr);
-      xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
+      /* Conforming call to finite-arity subr.  */
+      if (numargs <= subr->max_args)
+	{
+	  Lisp_Object argbuf[8];
+	  Lisp_Object *a;
+	  if (numargs < subr->max_args)
+	    {
+	      eassume (subr->max_args <= ARRAYELTS (argbuf));
+	      a = argbuf;
+	      memcpy (a, args, numargs * word_size);
+	      memclear (a + numargs, (subr->max_args - numargs) * word_size);
+	    }
+	  else
+	    a = args;
+	  switch (subr->max_args)
+	    {
+	    case 0:
+	      return subr->function.a0 ();
+	    case 1:
+	      return subr->function.a1 (a[0]);
+	    case 2:
+	      return subr->function.a2 (a[0], a[1]);
+	    case 3:
+	      return subr->function.a3 (a[0], a[1], a[2]);
+	    case 4:
+	      return subr->function.a4 (a[0], a[1], a[2], a[3]);
+	    case 5:
+	      return subr->function.a5 (a[0], a[1], a[2], a[3], a[4]);
+	    case 6:
+	      return subr->function.a6 (a[0], a[1], a[2], a[3], a[4], a[5]);
+	    case 7:
+	      return subr->function.a7 (a[0], a[1], a[2], a[3], a[4], a[5],
+					a[6]);
+	    case 8:
+	      return subr->function.a8 (a[0], a[1], a[2], a[3], a[4], a[5],
+					a[6], a[7]);
+	    default:
+	      /* If a subr takes more than 8 arguments without using MANY
+		 or UNEVALLED, we need to extend this function to support it.
+		 Until this is done, there is no way to call the function.  */
+	      emacs_abort ();
+	    }
+	}
+
+      /* Call to n-adic subr.  */
+      if (subr->max_args == MANY)
+	return subr->function.aMANY (numargs, args);
     }
 
-  else if (subr->max_args == UNEVALLED)
-    {
-      Lisp_Object fun;
-      XSETSUBR (fun, subr);
-      xsignal1 (Qinvalid_function, fun);
-    }
-
-  else if (subr->max_args == MANY)
-    return (subr->function.aMANY) (numargs, args);
+  /* Anything else is an error.  */
+  Lisp_Object fun;
+  XSETSUBR (fun, subr);
+  if (subr->max_args == UNEVALLED)
+    xsignal1 (Qinvalid_function, fun);
   else
-    {
-      Lisp_Object internal_argbuf[8];
-      Lisp_Object *internal_args;
-      if (subr->max_args > numargs)
-        {
-          eassert (subr->max_args <= ARRAYELTS (internal_argbuf));
-          internal_args = internal_argbuf;
-          memcpy (internal_args, args, numargs * word_size);
-          memclear (internal_args + numargs,
-                    (subr->max_args - numargs) * word_size);
-        }
-      else
-        internal_args = args;
-      switch (subr->max_args)
-        {
-        case 0:
-          return (subr->function.a0 ());
-        case 1:
-          return (subr->function.a1 (internal_args[0]));
-        case 2:
-          return (subr->function.a2
-                  (internal_args[0], internal_args[1]));
-        case 3:
-          return (subr->function.a3
-                  (internal_args[0], internal_args[1], internal_args[2]));
-        case 4:
-          return (subr->function.a4
-                  (internal_args[0], internal_args[1], internal_args[2],
-                   internal_args[3]));
-        case 5:
-          return (subr->function.a5
-                  (internal_args[0], internal_args[1], internal_args[2],
-                   internal_args[3], internal_args[4]));
-        case 6:
-          return (subr->function.a6
-                  (internal_args[0], internal_args[1], internal_args[2],
-                   internal_args[3], internal_args[4], internal_args[5]));
-        case 7:
-          return (subr->function.a7
-                  (internal_args[0], internal_args[1], internal_args[2],
-                   internal_args[3], internal_args[4], internal_args[5],
-                   internal_args[6]));
-        case 8:
-          return (subr->function.a8
-                  (internal_args[0], internal_args[1], internal_args[2],
-                   internal_args[3], internal_args[4], internal_args[5],
-                   internal_args[6], internal_args[7]));
-
-        default:
-
-          /* If a subr takes more than 8 arguments without using MANY
-             or UNEVALLED, we need to extend this function to support it.
-             Until this is done, there is no way to call the function.  */
-          emacs_abort ();
-        }
-    }
+    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
 }
 
 /* Call the compiled Lisp function FUN.  If we have not yet read FUN's
@@ -4418,6 +4400,7 @@ before making `inhibit-quit' nil.  */);
   DEFSYM (Qclosure, "closure");
   DEFSYM (QCdocumentation, ":documentation");
   DEFSYM (Qdebug, "debug");
+  DEFSYM (Qdebug_early, "debug-early");
 
   DEFVAR_LISP ("inhibit-debugger", Vinhibit_debugger,
 	       doc: /* Non-nil means never enter the debugger.
@@ -4464,6 +4447,7 @@ might not be safe to continue.  */);
 	       doc: /* Non-nil means display call stack frames as lists. */);
   debugger_stack_frame_as_list = 0;
 
+  DEFSYM (Qdebugger, "debugger");
   DEFVAR_LISP ("debugger", Vdebugger,
 	       doc: /* Function to call to invoke debugger.
 If due to frame exit, args are `exit' and the value being returned;
@@ -4471,7 +4455,7 @@ If due to frame exit, args are `exit' and the value being returned;
 If due to error, args are `error' and a list of the args to `signal'.
 If due to `apply' or `funcall' entry, one arg, `lambda'.
 If due to `eval' entry, one arg, t.  */);
-  Vdebugger = Qnil;
+  Vdebugger = Qdebug_early;
 
   DEFVAR_LISP ("signal-hook-function", Vsignal_hook_function,
 	       doc: /* If non-nil, this is a function for `signal' to call.

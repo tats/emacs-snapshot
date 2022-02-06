@@ -32,10 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 #include "systime.h"
 
-#define C_FRAME struct frame *
-#define C_FONT struct font *
-#define C_TERMINAL struct terminal *
-
 #define HAVE_CHAR_CACHE_MAX 65535
 
 extern int popup_activated_p;
@@ -64,7 +60,7 @@ struct haiku_display_info
 {
   /* Chain of all haiku_display_info structures. */
   struct haiku_display_info *next;
-  C_TERMINAL terminal;
+  struct terminal *terminal;
 
   Lisp_Object name_list_element;
   Lisp_Object color_map;
@@ -86,7 +82,6 @@ struct haiku_display_info
   int n_planes;
   int color_p;
 
-  Window root_window;
   Lisp_Object rdb;
 
   Emacs_Cursor vertical_scroll_bar_cursor;
@@ -94,9 +89,9 @@ struct haiku_display_info
 
   Mouse_HLInfo mouse_highlight;
 
-  C_FRAME highlight_frame;
-  C_FRAME last_mouse_frame;
-  C_FRAME last_mouse_motion_frame;
+  struct frame *highlight_frame;
+  struct frame *last_mouse_frame;
+  struct frame *last_mouse_motion_frame;
 
   int last_mouse_motion_x;
   int last_mouse_motion_y;
@@ -110,6 +105,8 @@ struct haiku_display_info
   double resx, resy;
 
   Time last_mouse_movement_time;
+
+  Window root_window;
 };
 
 struct haiku_output
@@ -160,7 +157,7 @@ struct haiku_output
 
   int menu_bar_open_p;
 
-  C_FONT font;
+  struct font *font;
 
   int hourglass_p;
   uint32_t cursor_fg;
@@ -234,8 +231,10 @@ struct scroll_bar
 #define FRAME_CURSOR_COLOR(f) (FRAME_OUTPUT_DATA (f)->cursor_color)
 
 #ifdef USE_BE_CAIRO
-#define FRAME_CR_SURFACE(f) \
-  (FRAME_HAIKU_VIEW (f) ? EmacsView_cairo_surface (FRAME_HAIKU_VIEW (f)) : 0);
+#define FRAME_CR_CONTEXT(f)					\
+  (FRAME_HAIKU_VIEW (f)						\
+   ? EmacsView_cairo_context (FRAME_HAIKU_VIEW (f))		\
+   : NULL)
 #endif
 
 extern void syms_of_haikuterm (void);
@@ -295,4 +294,7 @@ haiku_begin_cr_clip (struct frame *f, struct glyph_string *s);
 extern void
 haiku_end_cr_clip (cairo_t *cr);
 #endif
+
+extern void haiku_merge_cursor_foreground (struct glyph_string *, unsigned long *,
+					   unsigned long *);
 #endif /* _HAIKU_TERM_H_ */

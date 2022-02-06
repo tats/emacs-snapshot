@@ -1149,8 +1149,17 @@ Subkeymaps may be modified but are not canonicalized."
       (setq map (map-keymap ;; -internal
                  (lambda (key item)
                    (if (consp key)
-                       ;; Treat char-ranges specially.
-                       (push (cons key item) ranges)
+                       (if (= (car key) (1- (cdr key)))
+                           ;; If we have a two-character range, then
+                           ;; treat it as two separate characters
+                           ;; (because this makes `describe-bindings'
+                           ;; look better and shouldn't affect
+                           ;; anything else).
+                           (progn
+                             (push (cons (car key) item) bindings)
+                             (push (cons (cdr key) item) bindings))
+                         ;; Treat char-ranges specially.
+                         (push (cons key item) ranges))
                      (push (cons key item) bindings)))
                  map)))
     ;; Create the new map.
@@ -4522,19 +4531,21 @@ It should contain a single %-sequence; e.g., \"Error: %S\".
 
 If `debug-on-error' is non-nil, run BODY without catching its errors.
 This is to be used around code that is not expected to signal an error
-but that should be robust in the unexpected case that an error is signaled.
-
-For backward compatibility, if FORMAT is not a constant string, it
-is assumed to be part of BODY, in which case the message format
-used is \"Error: %S\"."
+but that should be robust in the unexpected case that an error is signaled."
   (declare (debug t) (indent 1))
-  (let ((err (make-symbol "err"))
-        (format (if (and (stringp format) body) format
-                  (prog1 "Error: %S"
-                    (if format (push format body))))))
-    `(condition-case-unless-debug ,err
-         ,(macroexp-progn body)
-       (error (message ,format ,err) nil))))
+  (let* ((err (make-symbol "err"))
+         (orig-body body)
+         (format (if (and (stringp format) body) format
+                   (prog1 "Error: %S"
+                     (if format (push format body)))))
+         (exp
+          `(condition-case-unless-debug ,err
+               ,(macroexp-progn body)
+             (error (message ,format ,err) nil))))
+    (if (eq orig-body body) exp
+      ;; The use without `format' is obsolete, let's warn when we bump
+      ;; into any such remaining uses.
+      (macroexp-warn-and-return format "Missing format argument" exp))))
 
 (defmacro combine-after-change-calls (&rest body)
   "Execute BODY, but don't call the after-change functions till the end.

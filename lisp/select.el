@@ -168,20 +168,28 @@ text/plain\\;charset=utf-8)."
 Call `gui-get-selection' with an appropriate DATA-TYPE argument
 decided by `x-select-request-type'.  The return value is already
 decoded.  If `gui-get-selection' signals an error, return nil."
-  (let ((request-type (if (memq window-system '(x pgtk))
-                          (or x-select-request-type
-                              '(UTF8_STRING COMPOUND_TEXT STRING text/plain\;charset=utf-8))
-                        'STRING))
-	text)
-    (with-demoted-errors "gui-get-selection: %S"
-      (if (consp request-type)
-          (while (and request-type (not text))
-            (setq text (gui-get-selection type (car request-type)))
-            (setq request-type (cdr request-type)))
-        (setq text (gui-get-selection type request-type))))
-    (if text
-	(remove-text-properties 0 (length text) '(foreign-selection nil) text))
-    text))
+  ;; The doc string of `interprogram-paste-function' says to return
+  ;; nil if no other program has provided text to paste.
+  (unless (and
+           ;; `gui-backend-selection-owner-p' might be unreliable on
+           ;; some other window systems.
+           (memq window-system '(x haiku))
+           (eq type 'CLIPBOARD)
+           (gui-backend-selection-owner-p type))
+    (let ((request-type (if (memq window-system '(x pgtk))
+                            (or x-select-request-type
+                                '(UTF8_STRING COMPOUND_TEXT STRING text/plain\;charset=utf-8))
+                          'STRING))
+	  text)
+      (with-demoted-errors "gui-get-selection: %S"
+        (if (consp request-type)
+            (while (and request-type (not text))
+              (setq text (gui-get-selection type (car request-type)))
+              (setq request-type (cdr request-type)))
+          (setq text (gui-get-selection type request-type))))
+      (if text
+	  (remove-text-properties 0 (length text) '(foreign-selection nil) text))
+      text)))
 
 (defun gui-selection-value ()
   (let ((clip-text

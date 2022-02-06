@@ -99,6 +99,10 @@ typedef GtkWidget *xt_or_gtk_widget;
 #include <X11/XKBlib.h>
 #endif
 
+#ifdef HAVE_XSYNC
+#include <X11/extensions/sync.h>
+#endif
+
 #include "dispextern.h"
 #include "termhooks.h"
 
@@ -366,9 +370,9 @@ struct x_display_info
 
   /* More atoms, which are selection types.  */
   Atom Xatom_CLIPBOARD, Xatom_TIMESTAMP, Xatom_TEXT, Xatom_DELETE,
-  Xatom_COMPOUND_TEXT, Xatom_UTF8_STRING,
-  Xatom_MULTIPLE, Xatom_INCR, Xatom_EMACS_TMP, Xatom_TARGETS, Xatom_NULL,
-  Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER;
+    Xatom_COMPOUND_TEXT, Xatom_UTF8_STRING,
+    Xatom_MULTIPLE, Xatom_INCR, Xatom_EMACS_TMP, Xatom_TARGETS, Xatom_NULL,
+    Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER, Xatom_COUNTER;
 
   /* More atoms for font properties.  The last three are private
      properties, see the comments in src/fontset.h.  */
@@ -460,8 +464,9 @@ struct x_display_info
   int ncolor_cells;
 
   /* Bits and shifts to use to compose pixel values on TrueColor visuals.  */
-  int red_bits, blue_bits, green_bits;
-  int red_offset, blue_offset, green_offset;
+  int red_bits, blue_bits, green_bits, alpha_bits;
+  int red_offset, blue_offset, green_offset, alpha_offset;
+  unsigned long alpha_mask;
 
   /* The type of window manager we have.  If we move FRAME_OUTER_WINDOW
      to x/y 0/0, some window managers (type A) puts the window manager
@@ -496,7 +501,9 @@ struct x_display_info
     Xatom_net_wm_state_maximized_horz, Xatom_net_wm_state_maximized_vert,
     Xatom_net_wm_state_sticky, Xatom_net_wm_state_above, Xatom_net_wm_state_below,
     Xatom_net_wm_state_hidden, Xatom_net_wm_state_skip_taskbar,
-    Xatom_net_frame_extents, Xatom_net_current_desktop, Xatom_net_workarea;
+    Xatom_net_frame_extents, Xatom_net_current_desktop, Xatom_net_workarea,
+    Xatom_net_wm_opaque_region, Xatom_net_wm_ping, Xatom_net_wm_sync_request,
+    Xatom_net_wm_sync_request_counter, Xatom_net_wm_frame_drawn;
 
   /* XSettings atoms and windows.  */
   Atom Xatom_xsettings_sel, Xatom_xsettings_prop, Xatom_xsettings_mgr;
@@ -562,6 +569,12 @@ struct x_display_info
   bool xfixes_supported_p;
   int xfixes_major;
   int xfixes_minor;
+#endif
+
+#ifdef HAVE_XSYNC
+  bool xsync_supported_p;
+  int xsync_major;
+  int xsync_minor;
 #endif
 };
 
@@ -799,6 +812,16 @@ struct x_output
   XFontSet xic_xfs;
 #endif
 
+#ifdef HAVE_XSYNC
+  XSyncCounter basic_frame_counter;
+  XSyncCounter extended_frame_counter;
+  XSyncValue pending_basic_counter_value;
+  XSyncValue current_extended_counter_value;
+
+  bool_bf sync_end_pending_p : 1;
+  bool_bf ext_sync_end_pending_p : 1;
+#endif
+
   /* Relief GCs, colors etc.  */
   struct relief
   {
@@ -961,6 +984,10 @@ extern void x_mark_frame_dirty (struct frame *f);
        || (FRAME_DISPLAY_INFO (f)->xrender_major > (major))))
 #endif
 
+#ifdef HAVE_XSYNC
+#define FRAME_X_BASIC_COUNTER(f) FRAME_X_OUTPUT (f)->basic_frame_counter
+#define FRAME_X_EXTENDED_COUNTER(f) FRAME_X_OUTPUT (f)->extended_frame_counter
+#endif
 
 /* This is the Colormap which frame F uses.  */
 #define FRAME_X_COLORMAP(f) FRAME_DISPLAY_INFO (f)->cmap
@@ -1242,8 +1269,13 @@ extern Lisp_Object x_cr_export_frames (Lisp_Object, cairo_surface_type_t);
 #endif
 
 #ifdef HAVE_XRENDER
-extern void x_xrender_color_from_gc_foreground (struct frame *, GC, XRenderColor *);
-extern void x_xrender_color_from_gc_background (struct frame *, GC, XRenderColor *);
+extern void x_xrender_color_from_gc_foreground (struct frame *, GC,
+						XRenderColor *, bool);
+extern void x_xrender_color_from_gc_background (struct frame *, GC,
+						XRenderColor *, bool);
+extern void x_xr_ensure_picture (struct frame *f);
+extern void x_xr_apply_ext_clip (struct frame *f, GC gc);
+extern void x_xr_reset_ext_clip (struct frame *f);
 #endif
 
 INLINE int
@@ -1279,8 +1311,11 @@ x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
   pg = (g >> (16 - dpyinfo->green_bits)) << dpyinfo->green_offset;
   pb = (b >> (16 - dpyinfo->blue_bits))  << dpyinfo->blue_offset;
 
-  if (dpyinfo->n_planes == 32)
-    pa = ((unsigned long) 0xFF << 24);
+  if (dpyinfo->alpha_bits)
+    pa = (((unsigned long) 0xffff >> (16 - dpyinfo->alpha_bits))
+	  << dpyinfo->alpha_offset);
+  else
+    pa = 0;
 
   /* Assemble the pixel color.  */
   return pr | pg | pb | pa;

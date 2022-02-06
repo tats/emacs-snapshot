@@ -83,6 +83,10 @@ static void xg_im_context_preedit_end (GtkIMContext *, gpointer);
 static bool xg_widget_key_press_event_cb (GtkWidget *, GdkEvent *, gpointer);
 #endif
 
+#if GTK_CHECK_VERSION (3, 10, 0)
+static void xg_widget_style_updated (GtkWidget *, gpointer);
+#endif
+
 #ifndef HAVE_GTK3
 
 #ifdef HAVE_FREETYPE
@@ -1467,10 +1471,12 @@ xg_create_frame_widgets (struct frame *f)
     }
   wtop = gtk_window_new (type);
   gtk_widget_add_events (wtop, GDK_ALL_EVENTS_MASK);
+#endif
 
-  /* This prevents GTK from painting the window's background, which
-     would interfere with transparent background in some environments */
-  gtk_widget_set_app_paintable (wtop, TRUE);
+  gtk_widget_set_app_paintable (wtop, f->alpha_background != 1.0);
+#if GTK_CHECK_VERSION (3, 10, 0)
+  g_signal_connect (G_OBJECT (wtop), "style-updated",
+		    G_CALLBACK (xg_widget_style_updated), f);
 #endif
 
   /* gtk_window_set_has_resize_grip is a Gtk+ 3.0 function but Ubuntu
@@ -1594,13 +1600,17 @@ xg_create_frame_widgets (struct frame *f)
   GdkScreen *screen = gtk_widget_get_screen (wtop);
 
 #if !defined HAVE_PGTK
-  if (FRAME_DISPLAY_INFO (f)->n_planes == 32)
-    {
-      GdkVisual *visual = gdk_screen_get_rgba_visual (screen);
-      gtk_widget_set_visual (wtop, visual);
-      gtk_widget_set_visual (wfixed, visual);
-    }
+  GdkVisual *visual = gdk_x11_screen_lookup_visual (screen,
+						    XVisualIDFromVisual (FRAME_X_VISUAL (f)));
+
+  if (!visual)
+    emacs_abort ();
+#else
+  GdkVisual *visual = gdk_screen_get_rgba_visual (screen);
 #endif
+
+  gtk_widget_set_visual (wtop, visual);
+  gtk_widget_set_visual (wfixed, visual);
 
 #ifndef HAVE_PGTK
   /* Must realize the windows so the X window gets created.  It is used
@@ -4044,6 +4054,18 @@ xg_update_frame_menubar (struct frame *f)
   gtk_widget_show_all (x->menubar_widget);
   gtk_widget_get_preferred_size (x->menubar_widget, NULL, &req);
   req.height *= xg_get_scale (f);
+
+#if !defined HAVE_PGTK && defined HAVE_GTK3
+  if (FRAME_DISPLAY_INFO (f)->n_planes == 32)
+    {
+      GdkScreen *screen = gtk_widget_get_screen (x->menubar_widget);
+      GdkVisual *visual = gdk_screen_get_system_visual (screen);
+
+      gtk_widget_realize (x->menubar_widget);
+      gtk_widget_set_visual (x->menubar_widget, visual);
+    }
+#endif
+
   if (FRAME_MENUBAR_HEIGHT (f) != (req.height * scale))
     {
       FRAME_MENUBAR_HEIGHT (f) = req.height * scale;
@@ -4834,9 +4856,8 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 	     && event->type == GenericEvent
 	     && (event->xgeneric.extension
 		 == FRAME_DISPLAY_INFO (f)->xi2_opcode)
-	     && ((event->xgeneric.evtype == XI_ButtonPress
-		  && xev->detail < 4)
-		 || (event->xgeneric.evtype == XI_Motion)))
+	     && (event->xgeneric.evtype == XI_ButtonPress
+		 && xev->detail < 4))
 	    || (event->type == ButtonPress
 		&& event->xbutton.button < 4)))
 #else
@@ -4868,19 +4889,7 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 #else
       gwin = gdk_display_get_window_at_pointer (gdpy, NULL, NULL);
 #endif
-#ifndef HAVE_XINPUT2
       retval = gwin != gtk_widget_get_window (f->output_data.xp->edit_widget);
-#else
-      retval = (gwin
-		&& (gwin
-		    != gtk_widget_get_window (f->output_data.xp->edit_widget)));
-#endif
-#ifdef HAVE_XINPUT2
-      GtkWidget *grab = gtk_grab_get_current ();
-      if (event->type == GenericEvent
-	  && event->xgeneric.evtype == XI_Motion)
-	retval = retval || (grab && GTK_IS_SCROLLBAR (grab));
-#endif
     }
 #ifdef HAVE_XINPUT2
   else if (f && ((FRAME_DISPLAY_INFO (f)->supports_xi2
@@ -6378,8 +6387,10 @@ xg_filter_key (struct frame *frame, XEvent *xkey)
 					   NULL, NULL, &consumed);
       xg_add_virtual_mods (dpyinfo, &xg_event->key);
       xg_event->key.state &= ~consumed;
+#if GTK_CHECK_VERSION (3, 6, 0)
       xg_event->key.is_modifier = gdk_x11_keymap_key_is_modifier (keymap,
 								  xg_event->key.hardware_keycode);
+#endif
     }
 #endif
 
@@ -6389,6 +6400,30 @@ xg_filter_key (struct frame *frame, XEvent *xkey)
   gdk_event_free (xg_event);
 
   return result;
+}
+#endif
+
+#if GTK_CHECK_VERSION (3, 10, 0)
+static void
+xg_widget_style_updated (GtkWidget *widget, gpointer user_data)
+{
+  struct frame *f = user_data;
+
+  if (f->alpha_background < 1.0)
+    {
+#ifndef HAVE_PGTK
+      XChangeProperty (FRAME_X_DISPLAY (f),
+		       FRAME_X_WINDOW (f),
+		       FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
+		       XA_CARDINAL, 32, PropModeReplace,
+		       NULL, 0);
+#else
+      if (FRAME_GTK_OUTER_WIDGET (f)
+	  && gtk_widget_get_realized (FRAME_GTK_OUTER_WIDGET (f)))
+	gdk_window_set_opaque_region (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f)),
+				      NULL);
+#endif
+    }
 }
 #endif
 #endif /* USE_GTK */

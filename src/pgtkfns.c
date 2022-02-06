@@ -235,6 +235,24 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 }
 
 static void
+pgtk_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
+{
+  gui_set_alpha_background (f, arg, oldval);
+
+  /* This prevents GTK from painting the window's background, which
+     interferes with transparent background in some environments */
+
+  gtk_widget_set_app_paintable (FRAME_GTK_OUTER_WIDGET (f),
+				f->alpha_background != 1.0);
+
+  if (FRAME_GTK_OUTER_WIDGET (f)
+      && gtk_widget_get_realized (FRAME_GTK_OUTER_WIDGET (f))
+      && f->alpha_background != 1.0)
+    gdk_window_set_opaque_region (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f)),
+				  NULL);
+}
+
+static void
 x_set_border_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   int pix;
@@ -664,40 +682,6 @@ x_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
 }
 
-
-static void
-x_icon (struct frame *f, Lisp_Object parms)
-/* --------------------------------------------------------------------------
-   Strangely-named function to set icon position parameters in frame.
-   This is irrelevant under macOS, but might be needed under GNUstep,
-   depending on the window manager used.  Note, this is not a standard
-   frame parameter-setter; it is called directly from x-create-frame.
-   -------------------------------------------------------------------------- */
-{
-#if 0
-  Lisp_Object icon_x, icon_y;
-  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (Qnil);
-
-  FRAME_X_OUTPUT (f)->icon_top = -1;
-  FRAME_X_OUTPUT (f)->icon_left = -1;
-
-  /* Set the position of the icon.  */
-  icon_x =
-    gui_display_get_arg (dpyinfo, parms, Qicon_left, 0, 0, RES_TYPE_NUMBER);
-  icon_y =
-    gui_display_get_arg (dpyinfo, parms, Qicon_top, 0, 0, RES_TYPE_NUMBER);
-  if (!EQ (icon_x, Qunbound) && !EQ (icon_y, Qunbound))
-    {
-      CHECK_NUMBER (icon_x);
-      CHECK_NUMBER (icon_y);
-      FRAME_X_OUTPUT (f)->icon_top = XFIXNUM (icon_y);
-      FRAME_X_OUTPUT (f)->icon_left = XFIXNUM (icon_x);
-    }
-  else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
-    error ("Both left and top icon corners of icon must be specified");
-#endif
-}
-
 /**
  * x_set_undecorated:
  *
@@ -874,13 +858,10 @@ pgtk_set_scroll_bar_foreground (struct frame *f, Lisp_Object new_value,
       if (!pgtk_parse_color (f, SSDATA (new_value), &rgb))
 	error ("Unknown color.");
 
-      /* On pgtk, this frame parameter should be ignored, and honor gtk theme. */
-#if 0
       char css[64];
       sprintf (css, "scrollbar slider { background-color: #%06x; }",
 	       (unsigned int) rgb.pixel & 0xffffff);
       gtk_css_provider_load_from_data (css_provider, css, -1, NULL);
-#endif
       update_face_from_frame_parameter (f, Qscroll_bar_foreground, new_value);
 
     }
@@ -907,13 +888,13 @@ pgtk_set_scroll_bar_background (struct frame *f, Lisp_Object new_value,
       if (!pgtk_parse_color (f, SSDATA (new_value), &rgb))
 	error ("Unknown color.");
 
-      /* On pgtk, this frame parameter should be ignored, and honor gtk theme. */
-#if 0
+      /* On pgtk, this frame parameter should be ignored, and honor
+	 gtk theme.  (It honors the GTK theme if not explictly set, so
+	 I see no harm in letting users tinker a bit more.)  */
       char css[64];
       sprintf (css, "scrollbar trough { background-color: #%06x; }",
 	       (unsigned int) rgb.pixel & 0xffffff);
       gtk_css_provider_load_from_data (css_provider, css, -1, NULL);
-#endif
       update_face_from_frame_parameter (f, Qscroll_bar_background, new_value);
 
     }
@@ -1043,7 +1024,7 @@ frame_parm_handler pgtk_frame_parm_handlers[] = {
   x_set_z_group,
   x_set_override_redirect,
   gui_set_no_special_glyphs,
-  gui_set_alpha_background,
+  pgtk_set_alpha_background,
 };
 
 
@@ -1360,9 +1341,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 
   f->output_method = output_pgtk;
   FRAME_X_OUTPUT (f) = xzalloc (sizeof *FRAME_X_OUTPUT (f));
-#if 0
-  FRAME_X_OUTPUT (f)->icon_bitmap = -1;
-#endif
   FRAME_FONTSET (f) = -1;
   FRAME_X_OUTPUT (f)->white_relief.pixel = -1;
   FRAME_X_OUTPUT (f)->black_relief.pixel = -1;
@@ -1460,12 +1438,8 @@ This function is an internal primitive--use `make-frame' instead.  */ )
       error ("Invalid frame font");
     }
 
-  /* Frame contents get displaced if an embedded X window has a border.  */
-#if 0
-  if (!FRAME_X_EMBEDDED_P (f))
-#endif
-    gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
-			   "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
+  gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
+			 "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
 
   if (NILP (Fassq (Qinternal_border_width, parms)))
     {
@@ -1609,10 +1583,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 			 RES_TYPE_BOOLEAN);
   f->no_split = minibuffer_only || EQ (tem, Qt);
 
-#if 0
-  x_icon_verify (f, parms);
-#endif
-
   /* Create the X widget or window.  */
   /* x_window (f); */
   xg_create_frame_widgets (f);
@@ -1640,11 +1610,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 
 #undef INSTALL_CURSOR
 
-  x_icon (f, parms);
-#if 0
-  x_make_gc (f);
-#endif
-
   /* Now consider the frame official.  */
   f->terminal->reference_count++;
   FRAME_DISPLAY_INFO (f)->reference_count++;
@@ -1668,7 +1633,7 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 			 RES_TYPE_NUMBER);
   gui_default_parameter (f, parms, Qalpha, Qnil,
 			 "alpha", "Alpha", RES_TYPE_NUMBER);
-  gui_default_parameter (f, parms, Qalpha, Qnil,
+  gui_default_parameter (f, parms, Qalpha_background, Qnil,
                          "alphaBackground", "AlphaBackground", RES_TYPE_NUMBER);
 
   if (!NILP (parent_frame))
@@ -1800,21 +1765,6 @@ This function is an internal primitive--use `make-frame' instead.  */ )
 
   return unbind_to (count, frame);
 }
-
-
-#if 0
-static int
-pgtk_window_is_ancestor (PGTKWindow * win, PGTKWindow * candidate)
-/* Test whether CANDIDATE is an ancestor window of WIN. */
-{
-  if (candidate == NULL)
-    return 0;
-  else if (win == candidate)
-    return 1;
-  else
-    return pgtk_window_is_ancestor (win,[candidate parentWindow]);
-}
-#endif
 
 /**
  * x_frame_restack:
@@ -2799,9 +2749,6 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
      counts etc.  */
   f->output_method = output_pgtk;
   f->output_data.pgtk = xzalloc (sizeof *f->output_data.pgtk);
-#if 0
-  f->output_data.pgtk->icon_bitmap = -1;
-#endif
   FRAME_FONTSET (f) = -1;
   f->output_data.pgtk->white_relief.pixel = -1;
   f->output_data.pgtk->black_relief.pixel = -1;
@@ -2926,10 +2873,6 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
   gtk_window_set_decorated (GTK_WINDOW (tip_window), FALSE);
   gtk_window_set_type_hint (GTK_WINDOW (tip_window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
   f->output_data.pgtk->current_cursor = f->output_data.pgtk->text_cursor;
-
-#if 0
-  x_make_gc (f);
-#endif
 
   gui_default_parameter (f, parms, Qauto_raise, Qnil,
                          "autoRaise", "AutoRaiseLower", RES_TYPE_BOOLEAN);

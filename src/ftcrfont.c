@@ -522,12 +522,23 @@ ftcrfont_draw (struct glyph_string *s,
                int from, int to, int x, int y, bool with_background)
 {
   struct frame *f = s->f;
-  struct face *face = s->face;
   struct font_info *ftcrfont_info = (struct font_info *) s->font;
   cairo_t *cr;
   cairo_glyph_t *glyphs;
   int len = to - from;
   int i;
+#ifdef USE_BE_CAIRO
+  unsigned long be_foreground, be_background;
+
+  if (s->hl != DRAW_CURSOR)
+    {
+      be_foreground = s->face->foreground;
+      be_background = s->face->background;
+    }
+  else
+    haiku_merge_cursor_foreground (s, &be_foreground,
+				   &be_background);
+#endif
 
   block_input ();
 
@@ -538,12 +549,12 @@ ftcrfont_draw (struct glyph_string *s,
   cr = pgtk_begin_cr_clip (f);
 #endif
 #else
-  BView_draw_lock (FRAME_HAIKU_VIEW (f));
+  /* Presumably the draw lock is already held by
+     haiku_draw_glyph_string.  */
   EmacsWindow_begin_cr_critical_section (FRAME_HAIKU_WINDOW (f));
   cr = haiku_begin_cr_clip (f, s);
   if (!cr)
     {
-      BView_draw_unlock (FRAME_HAIKU_VIEW (f));
       EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));
       unblock_input ();
       return 0;
@@ -557,21 +568,18 @@ ftcrfont_draw (struct glyph_string *s,
 #ifdef HAVE_X_WINDOWS
       x_set_cr_source_with_gc_background (f, s->gc);
 #else
-      pgtk_set_cr_source_with_color (f, s->xgcv.background);
+      pgtk_set_cr_source_with_color (f, s->xgcv.background, true);
 #endif
 #else
-      struct face *face = s->face;
-
-      uint32_t col = s->hl == DRAW_CURSOR ?
-	FRAME_CURSOR_COLOR (s->f).pixel : face->background;
+      uint32_t col = be_background;
 
       cairo_set_source_rgb (cr, RED_FROM_ULONG (col) / 255.0,
 			    GREEN_FROM_ULONG (col) / 255.0,
 			    BLUE_FROM_ULONG (col) / 255.0);
 #endif
       s->background_filled_p = 1;
-      cairo_rectangle (cr, x, y - FONT_BASE (face->font),
-		       s->width, FONT_HEIGHT (face->font));
+      cairo_rectangle (cr, x, y - FONT_BASE (s->font),
+		       s->width, FONT_HEIGHT (s->font));
       cairo_fill (cr);
     }
 
@@ -589,11 +597,10 @@ ftcrfont_draw (struct glyph_string *s,
 #ifdef HAVE_X_WINDOWS
   x_set_cr_source_with_gc_foreground (f, s->gc);
 #else
-  pgtk_set_cr_source_with_color (f, s->xgcv.foreground);
+  pgtk_set_cr_source_with_color (f, s->xgcv.foreground, false);
 #endif
 #else
-  uint32_t col = s->hl == DRAW_CURSOR ?
-    FRAME_OUTPUT_DATA (s->f)->cursor_fg : face->foreground;
+  uint32_t col = be_foreground;
 
   cairo_set_source_rgb (cr, RED_FROM_ULONG (col) / 255.0,
 			GREEN_FROM_ULONG (col) / 255.0,
@@ -610,7 +617,6 @@ ftcrfont_draw (struct glyph_string *s,
 #else
   haiku_end_cr_clip (cr);
   EmacsWindow_end_cr_critical_section (FRAME_HAIKU_WINDOW (f));
-  BView_draw_unlock (FRAME_HAIKU_VIEW (f));
 #endif
   unblock_input ();
 

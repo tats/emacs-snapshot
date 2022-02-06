@@ -129,8 +129,17 @@ example, if point is before an Emoji sequence, pressing <Delete> will
 delete the entire sequence, not just a single character at its
 beginning.
 
+** 'load-history' does not treat autoloads specially any more.
+An autoload definition appears just as a (defun . NAME) and the
+(t . NAME) entries are not generated any more.
 
 * Changes in Emacs 29.1
+
+---
+** New user option 'find-library-include-other-files'.
+If set to nil, commands like 'M-x find-library' will only include library
+files in the completion candidates.  The default is t, which preserves
+previous behavior, whereby non-library files could also be included.
 
 ** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
 This uses the new 'sqlite-mode' which allows listing the tables in a
@@ -173,6 +182,19 @@ and pop-up menus.
 ** New X resource: "inputStyle".
 This controls the style of the pre-edit and status areas of X input
 methods.
+
++++
+** On X11, Emacs now tries to synchronize window resize with the window manager.
+This leads to less flicker and empty areas of a frame being displayed
+when a frame is being resized.  Unfortunately, it does not work on
+some ancient buggy window managers, so if Emacs appears to freeze, but
+is still responive to input, you can turn it off by setting the X
+resource "synchronizeResize" to "off".
+
++++
+** New frame parameter 'alpha-background' and X resource "alphaBackground".
+This controls the opacity of the text background when running on a
+composited display.
 
 ---
 ** New user option 'x-gtk-use-native-input'.
@@ -416,6 +438,11 @@ Customize this option to limit the number of entries in the menu
 When non-nil, if the point is in a closing delimiter and the opening
 delimiter is offscreen, shows some context around the opening
 delimiter in the echo area.  Default nil.
+
+May also be set to the symbol 'child-frame' in which case the context
+is shown in a child frame at the top left of the current window on
+graphical frames.  On non-graphical frames, the context is shown in
+the echo area.
 
 ** Comint
 
@@ -909,6 +936,10 @@ Enabling this minor mode turns on hiding header material, like
 
 * New Modes and Packages in Emacs 29.1
 
+---
+** New theme 'leuven-dark'.
+This is a dark version of the 'leuven' theme.
+
 +++
 ** New mode 'erts-mode'.
 This mode is used to edit files geared towards testing actions in
@@ -1023,6 +1054,12 @@ functions.
 
 * Lisp Changes in Emacs 29.1
 
++++
+** New utility predicate 'mode-line-window-selected-p'.
+This is meant to be used from ':eval' mode line constructs to create
+different mode line looks for selected and unselected windows.
+
++++
 ** New variable 'messages-buffer-name'.
 This variable (defaulting to "*Messages*") allows packages to override
 where messages are logged.
@@ -1228,6 +1265,20 @@ inhibits 'isearch' matching the STRING parameter.
 ---
 ** New function 'replace-regexp-function'.
 It can be used to implement own regexp syntax for search/replace.
+
+---
+** New variables to customize defaults of FROM for query-replace commands.
+The new variable 'query-replace-read-from-default' can be set to a
+function that returns the default value of FROM when 'query-replace'
+prompts for a string to be replaced.  An example of such a function is
+'find-tag-default'.
+
+The new variable 'query-replace-read-from-regexp-default' can be set
+to a function (such as 'find-tag-default-as-regexp') that returns the
+default value of FROM when 'query-replace-regexp' prompts for a regexp
+whose matches are to be replaced.  If these variables are nil (which
+is the default), 'query-replace' and 'query-replace-regexp' take the
+default value from the previous FROM-TO pair.
 
 ---
 ** New user option 'pp-use-max-width'.
@@ -1465,6 +1516,9 @@ a directory.
 The property ':position' now specifies the position of the underline
 when used as part of a property list specification for the
 ':underline' attribute.
+
+** 'defalias' records a more precise history of definitions.
+This is recorded in the `function-history` symbol property.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems

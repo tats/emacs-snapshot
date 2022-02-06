@@ -1563,6 +1563,19 @@ EVENT is a preedit-text event."
 
 (defvaralias 'x-gtk-use-system-tooltips 'use-system-tooltips)
 
+(declare-function x-internal-focus-input-context (focus frame) "xfns.c")
+
+(defun x-gtk-use-native-input-watcher (_symbol newval &rest _ignored)
+  "Variable watcher for `x-gtk-use-native-input'.
+If NEWVAL is non-nil and the selected frame is displayed through X,
+focus the GTK input context."
+  (when (and (featurep 'gtk)
+             (eq (framep (selected-frame)) 'x))
+    (x-internal-focus-input-context newval (selected-frame))))
+
+(add-variable-watcher 'x-gtk-use-native-input
+                      #'x-gtk-use-native-input-watcher)
+
 (provide 'x-win)
 (provide 'term/x-win)
 

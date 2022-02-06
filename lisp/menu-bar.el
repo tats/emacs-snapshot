@@ -2342,9 +2342,13 @@ It must accept a buffer as its only required argument.")
   (and (lookup-key (current-global-map) [menu-bar buffer])
        (or force (frame-or-buffer-changed-p))
        (let ((buffers (buffer-list))
-	     (frames (frame-list))
-	     buffers-menu)
-
+	     frames buffers-menu)
+         ;; Ignore the initial frame if present.  It can happen if
+         ;; Emacs was started as a daemon.  (bug#53740)
+         (dolist (frame (frame-list))
+           (unless (equal (terminal-name (frame-terminal frame))
+                          "initial_terminal")
+             (push frame frames)))
 	 ;; Make the menu of buffers proper.
 	 (setq buffers-menu
                (let ((i 0)
@@ -2537,7 +2541,7 @@ Use \\[menu-bar-mode] to make the menu bar appear."))))
 (put 'menu-bar-mode 'standard-value '(t))
 
 (defun toggle-menu-bar-mode-from-frame (&optional arg)
-  "Toggle display of the menu bar of the current frame.
+  "Toggle display of the menu bar.
 See `menu-bar-mode' for more information."
   (interactive (list (or current-prefix-arg 'toggle)))
   (if (eq arg 'toggle)

@@ -186,6 +186,12 @@ See `replace-regexp' and `query-replace-regexp-eval'.")
                         length)
              length)))))
 
+(defvar query-replace-read-from-default nil
+  "Function to get default non-regexp value for `query-replace-read-from'.")
+
+(defvar query-replace-read-from-regexp-default nil
+  "Function to get default regexp value for `query-replace-read-from'.")
+
 (defun query-replace-read-from-suggestions ()
   "Return a list of standard suggestions for `query-replace-read-from'.
 By default, the list includes the active region, the identifier
@@ -233,8 +239,12 @@ wants to replace FROM with TO."
 		       query-replace-defaults))
 	     (symbol-value query-replace-from-history-variable)))
 	   (minibuffer-allow-text-properties t) ; separator uses text-properties
+	   (default (when (and query-replace-read-from-default (not regexp-flag))
+		      (funcall query-replace-read-from-default)))
 	   (prompt
-	    (cond ((and query-replace-defaults separator)
+            (cond ((and query-replace-read-from-regexp-default regexp-flag) prompt)
+                  (default (format-prompt prompt default))
+                  ((and query-replace-defaults separator)
                    (format-prompt prompt (car minibuffer-history)))
                   (query-replace-defaults
                    (format-prompt
@@ -255,16 +265,26 @@ wants to replace FROM with TO."
                                 (append '((separator . t) (face . t))
                                         text-property-default-nonsticky)))
                 (if regexp-flag
-                    (read-regexp prompt nil 'minibuffer-history)
+                    (read-regexp
+                     (if query-replace-read-from-regexp-default
+                         (string-remove-suffix ": " prompt)
+                       prompt)
+                     query-replace-read-from-regexp-default
+                     'minibuffer-history)
                   (read-from-minibuffer
                    prompt nil nil nil nil
-                   (query-replace-read-from-suggestions) t)))))
+                   (if default
+                       (delete-dups
+                        (cons default (query-replace-read-from-suggestions)))
+                     (query-replace-read-from-suggestions))
+                   t)))))
            (to))
-      (if (and (zerop (length from)) query-replace-defaults)
+      (if (and (zerop (length from)) query-replace-defaults (not default))
 	  (cons (caar query-replace-defaults)
 		(query-replace-compile-replacement
 		 (cdar query-replace-defaults) regexp-flag))
-        (setq from (query-replace--split-string from))
+        (setq from (or (and (zerop (length from)) default)
+                       (query-replace--split-string from)))
         (when (consp from) (setq to (cdr from) from (car from)))
         (add-to-history query-replace-from-history-variable from nil t)
         ;; Warn if user types \n or \t, but don't reject the input.
@@ -1413,10 +1433,15 @@ To return to ordinary Occur mode, use \\[occur-cease-edit]."
                             (length s1)))))
                      (prefix-len (funcall common-prefix buf-str text))
                      (suffix-len (funcall common-prefix
-                                          (reverse buf-str) (reverse text))))
+                                          (reverse (substring
+                                                    buf-str prefix-len))
+                                          (reverse (substring
+                                                    text prefix-len)))))
                 (setq beg-pos (+ beg-pos prefix-len))
                 (setq end-pos (- end-pos suffix-len))
-                (setq text (substring text prefix-len (- suffix-len)))
+                (setq text (substring text prefix-len
+                                      (and (not (zerop suffix-len))
+                                           (- suffix-len))))
                 (delete-region beg-pos end-pos)
                 (goto-char beg-pos)
                 (insert text)))
