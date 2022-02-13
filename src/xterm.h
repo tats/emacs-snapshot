@@ -364,6 +364,8 @@ struct x_display_info
   Atom Xatom_wm_configure_denied; /* When our config request is denied */
   Atom Xatom_wm_window_moved;     /* When the WM moves us.  */
   Atom Xatom_wm_client_leader;    /* Id of client leader window.  */
+  Atom Xatom_wm_transient_for;    /* Id of whatever window we are
+				     transient for. */
 
   /* EditRes protocol */
   Atom Xatom_editres;
@@ -503,7 +505,8 @@ struct x_display_info
     Xatom_net_wm_state_hidden, Xatom_net_wm_state_skip_taskbar,
     Xatom_net_frame_extents, Xatom_net_current_desktop, Xatom_net_workarea,
     Xatom_net_wm_opaque_region, Xatom_net_wm_ping, Xatom_net_wm_sync_request,
-    Xatom_net_wm_sync_request_counter, Xatom_net_wm_frame_drawn;
+    Xatom_net_wm_sync_request_counter, Xatom_net_wm_frame_drawn,
+    Xatom_net_wm_user_time, Xatom_net_wm_user_time_window;
 
   /* XSettings atoms and windows.  */
   Atom Xatom_xsettings_sel, Xatom_xsettings_prop, Xatom_xsettings_mgr;
@@ -575,6 +578,10 @@ struct x_display_info
   bool xsync_supported_p;
   int xsync_major;
   int xsync_minor;
+#endif
+
+#ifdef HAVE_XINERAMA
+  bool xinerama_supported_p;
 #endif
 };
 
@@ -672,6 +679,12 @@ struct x_output
   Widget edit_widget;
 
   Widget menubar_widget;
+#endif
+
+#ifndef USE_GTK
+  /* A window used to store the user time property.  May be None or
+     the frame's outer window.  */
+  Window user_time_window;
 #endif
 
 #ifdef USE_GTK
@@ -820,6 +833,9 @@ struct x_output
 
   bool_bf sync_end_pending_p : 1;
   bool_bf ext_sync_end_pending_p : 1;
+#ifdef HAVE_GTK3
+  bool_bf xg_sync_end_pending_p : 1;
+#endif
 #endif
 
   /* Relief GCs, colors etc.  */
@@ -1262,8 +1278,8 @@ extern void x_cr_destroy_frame_context (struct frame *);
 extern void x_cr_update_surface_desired_size (struct frame *, int, int);
 extern cairo_t *x_begin_cr_clip (struct frame *, GC);
 extern void x_end_cr_clip (struct frame *);
-extern void x_set_cr_source_with_gc_foreground (struct frame *, GC);
-extern void x_set_cr_source_with_gc_background (struct frame *, GC);
+extern void x_set_cr_source_with_gc_foreground (struct frame *, GC, bool);
+extern void x_set_cr_source_with_gc_background (struct frame *, GC, bool);
 extern void x_cr_draw_frame (cairo_t *, struct frame *);
 extern Lisp_Object x_cr_export_frames (Lisp_Object, cairo_surface_type_t);
 #endif
@@ -1278,6 +1294,8 @@ extern void x_xr_apply_ext_clip (struct frame *f, GC gc);
 extern void x_xr_reset_ext_clip (struct frame *f);
 #endif
 
+extern void x_display_set_last_user_time (struct x_display_info *, Time);
+
 INLINE int
 x_display_pixel_height (struct x_display_info *dpyinfo)
 {
@@ -1290,19 +1308,10 @@ x_display_pixel_width (struct x_display_info *dpyinfo)
   return WidthOfScreen (dpyinfo->screen);
 }
 
-INLINE void
-x_display_set_last_user_time (struct x_display_info *dpyinfo, Time t)
-{
-#ifdef ENABLE_CHECKING
-  eassert (t <= X_ULONG_MAX);
-#endif
-  dpyinfo->last_user_time = t;
-}
-
 INLINE unsigned long
 x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
 {
-  unsigned long pr, pg, pb, pa = 0;
+  unsigned long pr, pg, pb, pa = dpyinfo->alpha_mask;
 
   /* Scale down RGB values to the visual's bits per RGB, and shift
      them to the right position in the pixel color.  Note that the
@@ -1310,12 +1319,6 @@ x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
   pr = (r >> (16 - dpyinfo->red_bits))   << dpyinfo->red_offset;
   pg = (g >> (16 - dpyinfo->green_bits)) << dpyinfo->green_offset;
   pb = (b >> (16 - dpyinfo->blue_bits))  << dpyinfo->blue_offset;
-
-  if (dpyinfo->alpha_bits)
-    pa = (((unsigned long) 0xffff >> (16 - dpyinfo->alpha_bits))
-	  << dpyinfo->alpha_offset);
-  else
-    pa = 0;
 
   /* Assemble the pixel color.  */
   return pr | pg | pb | pa;
@@ -1442,6 +1445,10 @@ extern void x_session_close (void);
 
 #ifdef USE_GTK
 extern struct input_event xg_pending_quit_event;
+#endif
+
+#ifdef HAVE_XINPUT2
+struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
 #endif
 
 /* Is the frame embedded into another application? */

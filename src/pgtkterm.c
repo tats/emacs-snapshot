@@ -450,8 +450,6 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
      External: Position the window
    -------------------------------------------------------------------------- */
 {
-  int modified_top, modified_left;
-
   if (change_gravity > 0)
     {
       f->top_pos = yoff;
@@ -469,44 +467,23 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
   block_input ();
   x_wm_set_size_hint (f, 0, false);
 
-  if (x_gtk_use_window_move)
+  if (change_gravity != 0)
     {
-      if (change_gravity != 0)
+      if (FRAME_GTK_OUTER_WIDGET (f))
 	{
-	  if (FRAME_GTK_OUTER_WIDGET (f))
-	    {
-	      gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-			       f->left_pos, f->top_pos);
-	    }
-	  else
-	    {
-	      GtkWidget *fixed = FRAME_GTK_WIDGET (f);
-	      GtkWidget *parent = gtk_widget_get_parent (fixed);
-	      gtk_fixed_move (GTK_FIXED (parent), fixed,
-			      f->left_pos, f->top_pos);
-	    }
+	  gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
+			   f->left_pos, f->top_pos);
 	}
-      unblock_input ();
-      return;
+      else
+	{
+	  GtkWidget *fixed = FRAME_GTK_WIDGET (f);
+	  GtkWidget *parent = gtk_widget_get_parent (fixed);
+	  gtk_fixed_move (GTK_FIXED (parent), fixed,
+			  f->left_pos, f->top_pos);
+	}
     }
-
-  modified_left = f->left_pos;
-  modified_top = f->top_pos;
-
-  if (FRAME_GTK_OUTER_WIDGET (f))
-    {
-      gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-		       modified_left, modified_top);
-    }
-  else
-    {
-      GtkWidget *fixed = FRAME_GTK_WIDGET (f);
-      GtkWidget *parent = gtk_widget_get_parent (fixed);
-      gtk_fixed_move (GTK_FIXED (parent), fixed,
-		      modified_left, modified_top);
-    }
-
   unblock_input ();
+  return;
 }
 
 static void
@@ -902,14 +879,6 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value,
 
       g_object_unref (fixed);
 
-      if (FRAME_GTK_OUTER_WIDGET (f))
-	{
-	  if (EQ (x_gtk_resize_child_frames, Qresize_mode))
-	    gtk_container_set_resize_mode
-	      (GTK_CONTAINER (FRAME_GTK_OUTER_WIDGET (f)),
-	       p ? GTK_RESIZE_IMMEDIATE : GTK_RESIZE_QUEUE);
-	}
-
       unblock_input ();
 
       fset_parent_frame (f, new_value);
@@ -1228,7 +1197,9 @@ pgtk_compute_glyph_string_overhangs (struct glyph_string *s)
 static void
 x_clear_glyph_string_rect (struct glyph_string *s, int x, int y, int w, int h)
 {
-  pgtk_fill_rectangle (s->f, s->xgcv.background, x, y, w, h, true);
+  pgtk_fill_rectangle (s->f, s->xgcv.background, x, y, w, h,
+		       (s->first_glyph->type != STRETCH_GLYPH
+			|| s->hl != DRAW_CURSOR));
 }
 
 
@@ -5567,6 +5538,7 @@ configure_event (GtkWidget *widget,
 		 gpointer *user_data)
 {
   struct frame *f = pgtk_any_window_to_frame (event->configure.window);
+
   if (f && widget == FRAME_GTK_OUTER_WIDGET (f))
     {
       if (any_help_event_p)
@@ -5578,6 +5550,15 @@ configure_event (GtkWidget *widget,
 	    frame = Qnil;
 	  help_echo_string = Qnil;
 	  gen_help_event (Qnil, frame, Qnil, Qnil, 0);
+	}
+
+      if (f->win_gravity == NorthWestGravity)
+	gtk_window_get_position (GTK_WINDOW (widget),
+				 &f->left_pos, &f->top_pos);
+      else
+	{
+	  f->top_pos = event->configure.y;
+	  f->left_pos = event->configure.x;
 	}
     }
   return FALSE;
@@ -6942,80 +6923,46 @@ syms_of_pgtkterm (void)
   Fput (Qcontrol, Qmodifier_value, make_fixnum (ctrl_modifier));
 
   DEFVAR_LISP ("x-ctrl-keysym", Vx_ctrl_keysym,
-	       doc: /* Which keys Emacs uses for the ctrl modifier.
-This should be one of the symbols `ctrl', `alt', `hyper', `meta',
-`super'.  For example, `ctrl' means use the Ctrl_L and Ctrl_R keysyms.
-The default is nil, which is the same as `ctrl'.  */ );
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_ctrl_keysym = Qnil;
 
   DEFVAR_LISP ("x-alt-keysym", Vx_alt_keysym,
-	       doc: /* Which keys Emacs uses for the alt modifier.
-This should be one of the symbols `ctrl', `alt', `hyper', `meta',
-`super'.  For example, `alt' means use the Alt_L and Alt_R keysyms.
-The default is nil, which is the same as `alt'.  */ );
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_alt_keysym = Qnil;
 
   DEFVAR_LISP ("x-hyper-keysym", Vx_hyper_keysym,
-	       doc: /* Which keys Emacs uses for the hyper modifier.
-This should be one of the symbols `ctrl', `alt', `hyper', `meta',
-`super'.  For example, `hyper' means use the Hyper_L and Hyper_R
-keysyms.  The default is nil, which is the same as `hyper'.  */ );
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_hyper_keysym = Qnil;
 
   DEFVAR_LISP ("x-meta-keysym", Vx_meta_keysym,
-	       doc: /* Which keys Emacs uses for the meta modifier.
-This should be one of the symbols `ctrl', `alt', `hyper', `meta',
-`super'.  For example, `meta' means use the Meta_L and Meta_R keysyms.
-The default is nil, which is the same as `meta'.  */ );
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_meta_keysym = Qnil;
 
   DEFVAR_LISP ("x-super-keysym", Vx_super_keysym,
-	       doc: /* Which keys Emacs uses for the super modifier.
-This should be one of the symbols `ctrl', `alt', `hyper', `meta',
-`super'.  For example, `super' means use the Super_L and Super_R
-keysyms.  The default is nil, which is the same as `super'.  */ );
+	       doc: /* SKIP: real doc in xterm.c.  */);
   Vx_super_keysym = Qnil;
 
-  /* TODO: move to common code */
-  DEFVAR_LISP ("x-toolkit-scroll-bars", Vx_toolkit_scroll_bars,
-	       doc: /* Which toolkit scroll bars Emacs uses, if any.
-A value of nil means Emacs doesn't use toolkit scroll bars.
-With the X Window system, the value is a symbol describing the
-X toolkit.  Possible values are: gtk, motif, xaw, or xaw3d.
-With MS Windows or Nextstep, the value is t.  */ );
-  /* Vx_toolkit_scroll_bars = Qt; */
-  Vx_toolkit_scroll_bars = intern_c_string ("gtk");
+  DEFVAR_BOOL ("x-use-underline-position-properties",
+	       x_use_underline_position_properties,
+     doc: /* SKIP: real doc in xterm.c.  */);
+  x_use_underline_position_properties = 1;
 
-  DEFVAR_BOOL ("x-use-underline-position-properties", x_use_underline_position_properties,
-	       doc: /*Non-nil means make use of UNDERLINE_POSITION font properties.
-A value of nil means ignore them.  If you encounter fonts with bogus
-UNDERLINE_POSITION font properties, for example 7x13 on XFree prior
-to 4.1, set this to nil. */);
-  x_use_underline_position_properties = 0;
-
-  DEFVAR_BOOL ("x-underline-at-descent-line", x_underline_at_descent_line,
-	       doc: /* Non-nil means to draw the underline at the same place as the descent line.
-A value of nil means to draw the underline according to the value of the
-variable `x-use-underline-position-properties', which is usually at the
-baseline level.  The default value is nil.  */);
+  DEFVAR_BOOL ("x-underline-at-descent-line",
+	       x_underline_at_descent_line,
+     doc: /* SKIP: real doc in xterm.c.  */);
   x_underline_at_descent_line = 0;
 
-  DEFVAR_BOOL ("x-gtk-use-window-move", x_gtk_use_window_move,
-	       doc: /* Non-nil means rely on gtk_window_move to set frame positions.
-If this variable is t (the default), the GTK build uses the function
-gtk_window_move to set or store frame positions and disables some time
-consuming frame position adjustments.  In newer versions of GTK, Emacs
-always uses gtk_window_move and ignores the value of this variable.  */);
-  x_gtk_use_window_move = true;
-
+  DEFVAR_LISP ("x-toolkit-scroll-bars", Vx_toolkit_scroll_bars,
+     doc: /* SKIP: real doc in xterm.c.  */);
+  Vx_toolkit_scroll_bars = intern_c_string ("gtk");
 
   DEFVAR_LISP ("pgtk-wait-for-event-timeout", Vpgtk_wait_for_event_timeout,
-	       doc: /* How long to wait for X events.
+	       doc: /* How long to wait for GTK events.
 
-Emacs will wait up to this many seconds to receive X events after
-making changes which affect the state of the graphical interface.
-Under some window managers this can take an indefinite amount of time,
-so it is important to limit the wait.
+Emacs will wait up to this many seconds to receive some GTK events
+after making changes which affect the state of the graphical
+interface.  Under some window managers this can take an indefinite
+amount of time, so it is important to limit the wait.
 
 If set to a non-float value, there will be no wait at all.  */);
   Vpgtk_wait_for_event_timeout = make_float (0.1);
@@ -7168,7 +7115,7 @@ pgtk_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
   int width, height;
   void (*surface_set_size_func) (cairo_surface_t *, double, double) = NULL;
   Lisp_Object acc = Qnil;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   specbind (Qredisplay_dont_pause, Qt);
   redisplay_preserve_echo_area (31);

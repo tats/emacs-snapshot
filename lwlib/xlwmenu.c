@@ -2105,7 +2105,8 @@ XlwMenuDestroy (Widget w)
     ungrab_all ((Widget)w, CurrentTime);
   pointer_grabbed = 0;
 
-  submenu_destroyed = 1;
+  if (!XtIsShell (XtParent (w)))
+    submenu_destroyed = 1;
 
   release_drawing_gcs (mw);
   release_shadow_gcs (mw);
@@ -2743,5 +2744,5 @@ pop_up_menu (XlwMenuWidget mw, XButtonPressedEvent *event)
   ((XMotionEvent*)event)->is_hint = 0;
   handle_motion_event (mw, (XMotionEvent*)event);
 
-  XlwMenuRedisplay ((XlwMenuWidget) mw, NULL, None);
+  XlwMenuRedisplay ((Widget) mw, NULL, None);
 }

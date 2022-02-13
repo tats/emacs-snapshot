@@ -3458,6 +3458,10 @@ User is always nil."
       (if (file-directory-p dir) dir (file-name-directory dir)) nil
     (tramp-flush-directory-properties v localname)))
 
+(defvar tramp-tolerate-tilde nil
+  "Indicator, that not expandable tilde shall be tolerated.
+Let-bind it when necessary.")
+
 (defun tramp-handle-expand-file-name (name &optional dir)
   "Like `expand-file-name' for Tramp files."
   ;; If DIR is not given, use DEFAULT-DIRECTORY or "/".
@@ -3474,18 +3478,21 @@ User is always nil."
     (with-parsed-tramp-file-name name nil
       (unless (tramp-run-real-handler #'file-name-absolute-p (list localname))
 	(setq localname (concat "/" localname)))
+      ;; Tilde expansion is not possible.
+      (when (and (not tramp-tolerate-tilde)
+		 (string-match-p "\\`\\(~[^/]*\\)\\(.*\\)\\'" localname))
+	(tramp-error v 'file-error "Cannot expand tilde in file `%s'" name))
       ;; Do not keep "/..".
       (when (string-match-p "^/\\.\\.?$" localname)
 	(setq localname "/"))
-      ;; Do normal `expand-file-name' (this does "/./" and "/../"),
-      ;; unless there are tilde characters in file name.
+      ;; Do normal `expand-file-name' (this does "/./" and "/../").
       ;; `default-directory' is bound, because on Windows there would
       ;; be problems with UNC shares or Cygwin mounts.
       (let ((default-directory tramp-compat-temporary-file-directory))
 	(tramp-make-tramp-file-name
-	 v (if (string-match-p "\\`~" localname)
-	       localname
-	     (tramp-drop-volume-letter
+	 v (tramp-drop-volume-letter
+	    (if (string-match-p "\\`\\(~[^/]*\\)\\(.*\\)\\'" localname)
+		localname
 	      (tramp-run-real-handler #'expand-file-name (list localname)))))))))
 
 (defun tramp-handle-file-accessible-directory-p (filename)
@@ -4292,7 +4299,9 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 	       (command (mapconcat #'tramp-shell-quote-argument command " "))
 	       ;; Set cwd and environment variables.
 	       (command
-	        (append `("cd" ,localname "&&" "(" "env") env `(,command ")"))))
+	        (append
+		 `("cd" ,(tramp-shell-quote-argument localname) "&&" "(" "env")
+		 env `(,command ")"))))
 
 	  ;; Check for `tramp-sh-file-name-handler', because something
 	  ;; is different between tramp-sh.el, and tramp-adb.el or
@@ -5400,7 +5409,8 @@ be granted."
         (offset (cond
                  ((eq ?r access) 1)
                  ((eq ?w access) 2)
-                 ((eq ?x access) 3))))
+                 ((eq ?x access) 3)
+                 ((eq ?s access) 3))))
     (dolist (suffix '("string" "integer") result)
       (setq
        result
@@ -5430,13 +5440,15 @@ be granted."
             ;; User accessible and owned by user.
             (and
              (eq access (aref (file-attribute-modes file-attr) offset))
-	     (or (equal remote-uid (file-attribute-user-id file-attr))
+	     (or (equal remote-uid unknown-id)
+		 (equal remote-uid (file-attribute-user-id file-attr))
 		 (equal unknown-id (file-attribute-user-id file-attr))))
             ;; Group accessible and owned by user's principal group.
             (and
              (eq access
 		 (aref (file-attribute-modes file-attr) (+ offset 3)))
-             (or (equal remote-gid (file-attribute-group-id file-attr))
+             (or (equal remote-gid unknown-id)
+		 (equal remote-gid (file-attribute-group-id file-attr))
 		 (equal unknown-id (file-attribute-group-id file-attr))))))))))))
 
 (defun tramp-get-remote-uid (vec id-format)

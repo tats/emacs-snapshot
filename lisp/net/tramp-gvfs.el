@@ -1151,6 +1151,10 @@ file names."
 		(replace-match
 		 (tramp-get-connection-property v "default-location" "~")
 		 nil t localname 1))))
+      ;; Tilde expansion is not possible.
+      (when (and (not tramp-tolerate-tilde)
+		 (string-match-p "\\`\\(~[^/]*\\)\\(.*\\)\\'" localname))
+	(tramp-error v 'file-error "Cannot expand tilde in file `%s'" name))
       (unless (tramp-run-real-handler #'file-name-absolute-p (list localname))
 	(setq localname (concat "/" localname)))
       ;; We do not pass "/..".
@@ -1168,7 +1172,7 @@ file names."
       ;; Do normal `expand-file-name' (this does "/./" and "/../"),
       ;; unless there are tilde characters in file name.
       (tramp-make-tramp-file-name
-       v (if (string-match-p "\\`~" localname)
+       v (if (string-match-p "\\`\\(~[^/]*\\)\\(.*\\)\\'" localname)
 	     localname
 	   (tramp-run-real-handler #'expand-file-name (list localname)))))))
 
@@ -1385,7 +1389,8 @@ If FILE-SYSTEM is non-nil, return file system attributes."
   "Like `file-executable-p' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (with-tramp-file-property v localname "file-executable-p"
-      (tramp-check-cached-permissions v ?x))))
+      (or (tramp-check-cached-permissions v ?x)
+	  (tramp-check-cached-permissions v ?s)))))
 
 (defun tramp-gvfs-handle-file-name-all-completions (filename directory)
   "Like `file-name-all-completions' for Tramp files."
@@ -1603,8 +1608,7 @@ ID-FORMAT valid values are `string' and `integer'."
       (tramp-file-name-user vec)
     (when-let ((localname
 		(tramp-get-connection-property
-		 (tramp-get-process vec) "share"
-		 (tramp-get-connection-property vec "default-location" nil))))
+		 (tramp-get-process vec) "share" nil)))
       (file-attribute-user-id
        (file-attributes (tramp-make-tramp-file-name vec localname) id-format)))))
 
@@ -1613,8 +1617,7 @@ ID-FORMAT valid values are `string' and `integer'."
 ID-FORMAT valid values are `string' and `integer'."
   (when-let ((localname
 	      (tramp-get-connection-property
-	       (tramp-get-process vec) "share"
-	       (tramp-get-connection-property vec "default-location" nil))))
+	       (tramp-get-process vec) "share" nil)))
     (file-attribute-group-id
      (file-attributes (tramp-make-tramp-file-name vec localname) id-format))))
 

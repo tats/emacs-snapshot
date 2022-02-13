@@ -687,7 +687,7 @@ x_defined_color (struct frame *f, const char *color_name,
    is a monochrome frame, return MONO_COLOR regardless of what ARG says.
    Signal an error if color can't be allocated.  */
 
-static int
+static unsigned long
 x_decode_color (struct frame *f, Lisp_Object color_name, int mono_color)
 {
   XColor cdef;
@@ -730,6 +730,11 @@ x_set_wait_for_wm (struct frame *f, Lisp_Object new_value, Lisp_Object old_value
 static void
 x_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
+#ifndef HAVE_GTK3
+  unsigned long opaque_region[] = {0, 0, FRAME_PIXEL_WIDTH (f),
+				   FRAME_PIXEL_HEIGHT (f)};
+#endif
+
   gui_set_alpha_background (f, arg, oldval);
 
 #ifdef USE_GTK
@@ -741,6 +746,9 @@ x_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 				  f->alpha_background != 1.0);
 #endif
 
+  if (!FRAME_DISPLAY_INFO (f)->alpha_bits)
+    return;
+
   if (f->alpha_background != 1.0)
     {
       XChangeProperty (FRAME_X_DISPLAY (f),
@@ -749,6 +757,14 @@ x_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 		       XA_CARDINAL, 32, PropModeReplace,
 		       NULL, 0);
     }
+#ifndef HAVE_GTK3
+  else
+    XChangeProperty (FRAME_X_DISPLAY (f),
+		     FRAME_X_WINDOW (f),
+		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
+		     XA_CARDINAL, 32, PropModeReplace,
+		     (unsigned char *) &opaque_region, 4);
+#endif
 }
 
 static void
@@ -1439,7 +1455,7 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
    F has an x-window.  */
 
 static void
-x_set_border_pixel (struct frame *f, int pix)
+x_set_border_pixel (struct frame *f, unsigned long pix)
 {
   unload_color (f, f->output_data.x->border_pixel);
   f->output_data.x->border_pixel = pix;
@@ -1469,7 +1485,7 @@ x_set_border_pixel (struct frame *f, int pix)
 static void
 x_set_border_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  int pix;
+  unsigned long pix;
 
   CHECK_STRING (arg);
   pix = x_decode_color (f, arg, BLACK_PIX_DEFAULT (f));
@@ -3182,6 +3198,14 @@ xic_preedit_draw_callback (XIC xic, XPointer client_data,
       if (!output->preedit_active)
 	return;
 
+      /* If we don't bail out here then GTK can crash
+	 from the resulting signal in `setup_coding_system'.  */
+      if (NILP (Fcoding_system_p (Vlocale_coding_system)))
+	{
+	  text = NULL;
+	  goto im_abort;
+	}
+
       if (call_data->text)
 	text = x_xim_text_to_utf8_unix (call_data->text, &text_length);
       else
@@ -4055,11 +4079,9 @@ x_make_gc (struct frame *f)
   /* Cursor has cursor-color background, background-color foreground.  */
   gc_values.foreground = FRAME_BACKGROUND_PIXEL (f);
   gc_values.background = f->output_data.x->cursor_pixel;
-  gc_values.fill_style = FillOpaqueStippled;
   f->output_data.x->cursor_gc
     = XCreateGC (FRAME_X_DISPLAY (f), FRAME_X_DRAWABLE (f),
-		 (GCForeground | GCBackground
-		  | GCFillStyle | GCLineWidth),
+		 (GCForeground | GCBackground | GCLineWidth),
 		 &gc_values);
 
   /* Create the gray border tile used when the pointer is not in
@@ -4288,7 +4310,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   bool minibuffer_only = false;
   bool undecorated = false, override_redirect = false;
   long window_prompting = 0;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object display;
   struct x_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -5706,10 +5728,7 @@ x_get_monitor_attributes (struct x_display_info *dpyinfo)
 #ifdef HAVE_XINERAMA
   if (NILP (attributes_list))
     {
-      int xin_event_base, xin_error_base;
-      bool xin_ok = false;
-      xin_ok = XineramaQueryExtension (dpy, &xin_event_base, &xin_error_base);
-      if (xin_ok && XineramaIsActive (dpy))
+      if (dpyinfo->xinerama_supported_p && XineramaIsActive (dpy))
         attributes_list = x_get_monitor_attributes_xinerama (dpyinfo);
     }
 #endif /* HAVE_XINERAMA */
@@ -6431,8 +6450,7 @@ visual_classes[] =
    the X function with the same name when that doesn't exist.  */
 
 int
-XScreenNumberOfScreen (scr)
-    register Screen *scr;
+XScreenNumberOfScreen (Screen *scr)
 {
   Display *dpy = scr->display;
   int i;
@@ -7123,7 +7141,7 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   struct frame *f;
   Lisp_Object frame;
   Lisp_Object name;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   bool face_change_before = face_change;
 
   if (!dpyinfo->terminal->name)
@@ -7285,19 +7303,6 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   gui_default_parameter (f, parms, Qno_special_glyphs, Qnil,
                          NULL, NULL, RES_TYPE_BOOLEAN);
 
-  /* Init faces before gui_default_parameter is called for the
-     scroll-bar-width parameter because otherwise we end up in
-     init_iterator with a null face cache, which should not happen.  */
-  init_frame_faces (f);
-
-  f->output_data.x->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
-
-  gui_default_parameter (f, parms, Qinhibit_double_buffering, Qnil,
-                         "inhibitDoubleBuffering", "InhibitDoubleBuffering",
-                         RES_TYPE_BOOLEAN);
-
-  gui_figure_window_size (f, parms, false, false);
-
   {
 #ifndef USE_XCB
     XSetWindowAttributes attrs;
@@ -7388,6 +7393,19 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
     unblock_input ();
 #endif
   }
+
+  /* Init faces before gui_default_parameter is called for the
+     scroll-bar-width parameter because otherwise we end up in
+     init_iterator with a null face cache, which should not happen.  */
+  init_frame_faces (f);
+
+  gui_default_parameter (f, parms, Qinhibit_double_buffering, Qnil,
+                         "inhibitDoubleBuffering", "InhibitDoubleBuffering",
+                         RES_TYPE_BOOLEAN);
+
+  gui_figure_window_size (f, parms, false, false);
+
+  f->output_data.x->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
 
   x_make_gc (f);
 
@@ -7624,10 +7642,9 @@ x_hide_tip (bool delete)
     return Qnil;
   else
     {
-      ptrdiff_t count;
       Lisp_Object was_open = Qnil;
 
-      count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       specbind (Qinhibit_redisplay, Qt);
       specbind (Qinhibit_quit, Qt);
 
@@ -7686,10 +7703,9 @@ x_hide_tip (bool delete)
     return Qnil;
   else
     {
-      ptrdiff_t count;
       Lisp_Object was_open = Qnil;
 
-      count = SPECPDL_INDEX ();
+      specpdl_ref count = SPECPDL_INDEX ();
       specbind (Qinhibit_redisplay, Qt);
       specbind (Qinhibit_quit, Qt);
 
@@ -7784,10 +7800,10 @@ Text larger than the specified size is clipped.  */)
   struct text_pos pos;
   int width, height;
   int old_windows_or_buffers_changed = windows_or_buffers_changed;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  ptrdiff_t count_1;
+  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object window, size, tip_buf;
   Window child;
+  XWindowAttributes child_attrs;
   int dest_x_return, dest_y_return;
   AUTO_STRING (tip, " *tip*");
 
@@ -7987,7 +8003,7 @@ Text larger than the specified size is clipped.  */)
 
   /* Insert STRING into root window's buffer and fit the frame to the
      buffer.  */
-  count_1 = SPECPDL_INDEX ();
+  specpdl_ref count_1 = SPECPDL_INDEX ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -8028,11 +8044,24 @@ Text larger than the specified size is clipped.  */)
 			     FRAME_DISPLAY_INFO (f)->root_window,
 			     root_x, root_y, &dest_x_return,
 			     &dest_y_return, &child))
-    XSetTransientForHint (FRAME_X_DISPLAY (tip_f),
-			  FRAME_X_WINDOW (tip_f), child);
+    {
+      /* But only if the child is not override-redirect, which can
+	 happen if the pointer is above a menu.  */
+
+      if (XGetWindowAttributes (FRAME_X_DISPLAY (f),
+				child, &child_attrs)
+	  || child_attrs.override_redirect)
+	XDeleteProperty (FRAME_X_DISPLAY (tip_f),
+			 FRAME_X_WINDOW (tip_f),
+			 FRAME_DISPLAY_INFO (tip_f)->Xatom_wm_transient_for);
+      else
+	XSetTransientForHint (FRAME_X_DISPLAY (tip_f),
+			      FRAME_X_WINDOW (tip_f), child);
+    }
   else
-    XSetTransientForHint (FRAME_X_DISPLAY (tip_f),
-			  FRAME_X_WINDOW (tip_f), None);
+    XDeleteProperty (FRAME_X_DISPLAY (tip_f),
+		     FRAME_X_WINDOW (tip_f),
+		     FRAME_DISPLAY_INFO (tip_f)->Xatom_wm_transient_for);
 
 #ifndef USE_XCB
   XMoveResizeWindow (FRAME_X_DISPLAY (tip_f), FRAME_X_WINDOW (tip_f),
@@ -8163,7 +8192,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
   Arg al[10];
   int ac = 0;
   XmString dir_xmstring, pattern_xmstring;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   check_window_system (f);
 
@@ -8330,7 +8359,7 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
   char *fn;
   Lisp_Object file = Qnil;
   Lisp_Object decoded_file;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   char *cdef_file;
 
   check_window_system (f);
@@ -8391,7 +8420,7 @@ nil, it defaults to the selected frame. */)
   Lisp_Object font;
   Lisp_Object font_param;
   char *default_name = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (popup_activated ())
     error ("Trying to use a menu from within a menu-entry");
@@ -8643,7 +8672,6 @@ Note: Text drawn with the `x' font backend is shown with hollow boxes.  */)
      (Lisp_Object frames)
 {
   Lisp_Object rest, tmp;
-  int count;
 
   if (!CONSP (frames))
     frames = list1 (frames);
@@ -8662,7 +8690,7 @@ Note: Text drawn with the `x' font backend is shown with hollow boxes.  */)
   frames = Fnreverse (tmp);
 
   /* Make sure the current matrices are up-to-date.  */
-  count = SPECPDL_INDEX ();
+  specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qredisplay_dont_pause, Qt);
   redisplay_preserve_echo_area (32);
   unbind_to (count, Qnil);

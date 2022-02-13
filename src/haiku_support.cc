@@ -433,7 +433,8 @@ public:
   int shown_flag = 0;
   volatile int was_shown_p = 0;
   bool menu_bar_active_p = false;
-  window_look pre_override_redirect_style;
+  bool override_redirect_p = false;
+  window_look pre_override_redirect_look;
   window_feel pre_override_redirect_feel;
   uint32 pre_override_redirect_workspaces;
   pthread_mutex_t menu_update_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1047,8 +1048,8 @@ public:
     zoomed_p = 0;
 
     EmacsMoveTo (pre_zoom_rect.left, pre_zoom_rect.top);
-    ResizeTo (BE_RECT_WIDTH (pre_zoom_rect),
-	      BE_RECT_HEIGHT (pre_zoom_rect));
+    ResizeTo (BE_RECT_WIDTH (pre_zoom_rect) - 1,
+	      BE_RECT_HEIGHT (pre_zoom_rect) - 1);
   }
 
   void
@@ -1128,15 +1129,15 @@ public:
 	int w, h;
 	EmacsMoveTo (0, 0);
 	GetParentWidthHeight (&w, &h);
-	ResizeTo (w, h);
+	ResizeTo (w - 1, h - 1);
       }
     else
       {
 	flags &= ~(B_NOT_MOVABLE | B_NOT_ZOOMABLE);
 	EmacsMoveTo (pre_fullscreen_rect.left,
 		     pre_fullscreen_rect.top);
-	ResizeTo (BE_RECT_WIDTH (pre_fullscreen_rect),
-		  BE_RECT_HEIGHT (pre_fullscreen_rect));
+	ResizeTo (BE_RECT_WIDTH (pre_fullscreen_rect) - 1,
+		  BE_RECT_HEIGHT (pre_fullscreen_rect) - 1);
       }
     SetFlags (flags);
   }
@@ -1173,7 +1174,6 @@ public:
 class EmacsView : public BView
 {
 public:
-  uint32_t visible_bell_color = 0;
   uint32_t previous_buttons = 0;
   int looper_locked_count = 0;
   BRegion sb_region;
@@ -1313,28 +1313,10 @@ public:
   }
 
   void
-  Pulse (void)
-  {
-    visible_bell_color = 0;
-    SetFlags (Flags () & ~B_PULSE_NEEDED);
-    Window ()->SetPulseRate (0);
-    Invalidate ();
-  }
-
-  void
   Draw (BRect expose_bounds)
   {
     struct haiku_expose_event rq;
     EmacsWindow *w = (EmacsWindow *) Window ();
-
-    if (visible_bell_color > 0)
-      {
-	PushState ();
-	BView_SetHighColorForVisibleBell (this, visible_bell_color);
-	FillRect (Frame ());
-	PopState ();
-	return;
-      }
 
     if (w->shown_flag && offscreen_draw_view)
       {
@@ -1369,18 +1351,6 @@ public:
 
 	haiku_write (FRAME_EXPOSED, &rq);
       }
-  }
-
-  void
-  DoVisibleBell (uint32_t color)
-  {
-    if (!LockLooper ())
-      gui_abort ("Failed to lock looper during visible bell");
-    visible_bell_color = color | (255 << 24);
-    SetFlags (Flags () | B_PULSE_NEEDED);
-    Window ()->SetPulseRate (100 * 1000);
-    Invalidate ();
-    UnlockLooper ();
   }
 
   void
@@ -1959,7 +1929,7 @@ BWindow_retitle (void *window, const char *title)
 void
 BWindow_resize (void *window, int width, int height)
 {
-  ((BWindow *) window)->ResizeTo (width, height);
+  ((BWindow *) window)->ResizeTo (width - 1, height - 1);
 }
 
 /* Activate WINDOW, making it the subject of keyboard focus and
@@ -2305,13 +2275,24 @@ BView_convert_from_screen (void *view, int *x, int *y)
 void
 BWindow_change_decoration (void *window, int decorate_p)
 {
-  BWindow *w = (BWindow *) window;
+  EmacsWindow *w = (EmacsWindow *) window;
   if (!w->LockLooper ())
     gui_abort ("Failed to lock window while changing its decorations");
-  if (decorate_p)
-    w->SetLook (B_TITLED_WINDOW_LOOK);
+
+  if (!w->override_redirect_p)
+    {
+      if (decorate_p)
+	w->SetLook (B_TITLED_WINDOW_LOOK);
+      else
+	w->SetLook (B_NO_BORDER_WINDOW_LOOK);
+    }
   else
-    w->SetLook (B_NO_BORDER_WINDOW_LOOK);
+    {
+      if (decorate_p)
+	w->pre_override_redirect_look = B_TITLED_WINDOW_LOOK;
+      else
+	w->pre_override_redirect_look = B_NO_BORDER_WINDOW_LOOK;
+    }
   w->UnlockLooper ();
 }
 
@@ -2967,7 +2948,7 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
 		      void (*unblock_input_function) (void),
 		      void (*maybe_quit_function) (void))
 {
-  ptrdiff_t idx = c_specpdl_idx_from_cxx ();
+  specpdl_ref idx = c_specpdl_idx_from_cxx ();
   /* setjmp/longjmp is UB with automatic objects. */
   block_input_function ();
   BWindow *w = (BWindow *) window;
@@ -3040,14 +3021,6 @@ be_app_quit (void)
       while (!be_app->Lock ());
       be_app->Quit ();
     }
-}
-
-/* Temporarily fill VIEW with COLOR.  */
-void
-EmacsView_do_visible_bell (void *view, uint32_t color)
-{
-  EmacsView *vw = (EmacsView *) view;
-  vw->DoVisibleBell (color);
 }
 
 /* Zoom WINDOW.  */
@@ -3339,9 +3312,6 @@ be_use_subpixel_antialiasing (void)
   return current_subpixel_antialiasing;
 }
 
-/* This isn't implemented very properly (for example: what if
-   decorations are changed while the window is under override
-   redirect?) but it works well enough for most use cases.  */
 void
 BWindow_set_override_redirect (void *window, bool override_redirect_p)
 {
@@ -3349,19 +3319,21 @@ BWindow_set_override_redirect (void *window, bool override_redirect_p)
 
   if (w->LockLooper ())
     {
-      if (override_redirect_p)
+      if (override_redirect_p && !w->override_redirect_p)
 	{
+	  w->override_redirect_p = true;
 	  w->pre_override_redirect_feel = w->Feel ();
-	  w->pre_override_redirect_style = w->Look ();
+	  w->pre_override_redirect_look = w->Look ();
 	  w->SetFeel (kMenuWindowFeel);
 	  w->SetLook (B_NO_BORDER_WINDOW_LOOK);
 	  w->pre_override_redirect_workspaces = w->Workspaces ();
 	  w->SetWorkspaces (B_ALL_WORKSPACES);
 	}
-      else
+      else if (w->override_redirect_p)
 	{
+	  w->override_redirect_p = false;
 	  w->SetFeel (w->pre_override_redirect_feel);
-	  w->SetLook (w->pre_override_redirect_style);
+	  w->SetLook (w->pre_override_redirect_look);
 	  w->SetWorkspaces (w->pre_override_redirect_workspaces);
 	}
 

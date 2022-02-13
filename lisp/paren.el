@@ -96,14 +96,18 @@ context includes the previous nonblank line.
 
 By default, the context is shown in the echo area.
 
+If set to the symbol `overlay', the context is shown in an
+overlay at the top-left of the window.
+
 If set to the symbol `child-frame', the context is shown in a
-child frame at the top left of the window.  You might want to
+child frame at the top-left of the window.  You might want to
 customize the `child-frame-border' face (especially the
 background color) to give the child frame a distinguished border.
 On non-graphical frames, the context is shown in the echo area."
   :type '(choice (const :tag "Off" nil)
                  (const :tag "In echo area" t)
-                 (const :tag "Child frame" child-frame))
+                 (const :tag "In overlay" overlay)
+                 (const :tag "In child-frame" child-frame))
   :version "29.1")
 
 (defvar show-paren--idle-timer nil)
@@ -276,7 +280,7 @@ It is the default value of `show-paren-data-function'."
   "Redirect focus from child frame."
   (redirect-frame-focus
    show-paren--context-child-frame
-   (frame-parent corfu--frame)))
+   (frame-parent show-paren--context-child-frame)))
 
 (defun show-paren--context-child-frame-buffer (text)
   (with-current-buffer
@@ -337,7 +341,8 @@ It is the default value of `show-paren-data-function'."
 
 (defun show-paren--delete-context-child-frame ()
   (when show-paren--context-child-frame
-    (delete-frame show-paren--context-child-frame))
+    (delete-frame show-paren--context-child-frame)
+    (setq show-paren--context-child-frame nil))
   (remove-hook 'post-command-hook
                #'show-paren--delete-context-child-frame))
 
@@ -367,6 +372,38 @@ It is the default value of `show-paren-data-function'."
       (add-hook 'post-command-hook
                 #'show-paren--delete-context-child-frame))))
 
+(defvar-local show-paren--context-overlay nil)
+
+(defun show-paren--delete-context-overlay ()
+  (when show-paren--context-overlay
+    (delete-overlay show-paren--context-overlay)
+    (setq show-paren--context-overlay nil))
+  (remove-hook 'post-command-hook #'show-paren--delete-overlays
+               'local))
+
+(defun show-paren--show-context-in-overlay (text)
+  "Show TEXT in an overlay at the top-left of the current window."
+  (setq text (replace-regexp-in-string "\n" " " text))
+  (show-paren--delete-context-overlay)
+  (let* ((beg (window-start))
+         (end (save-excursion
+                (goto-char beg)
+                (line-end-position))))
+    (setq show-paren--context-overlay (make-overlay beg end)))
+  (overlay-put show-paren--context-overlay 'display text)
+  (overlay-put show-paren--context-overlay
+               'face `(:box
+                       ( :line-width (1 . -1)
+                         :color ,(face-attribute 'shadow :foreground))))
+  (add-hook 'post-command-hook #'show-paren--delete-context-overlay
+            nil 'local))
+
+;; The last position of point for which `show-paren-function' was
+;; called.  We track it in order to C-g away a context overlay or
+;; child-frame without having it pop up again after
+;; `show-paren-delay'.
+(defvar-local show-paren--last-pos nil)
+
 (defun show-paren-function ()
   "Highlight the parentheses until the next input arrives."
   (let ((data (and show-paren-mode (funcall show-paren-data-function))))
@@ -375,7 +412,8 @@ It is the default value of `show-paren-data-function'."
           ;; If show-paren-mode is nil in this buffer or if not at a paren that
           ;; has a match, turn off any previous paren highlighting.
           (delete-overlay show-paren--overlay)
-          (delete-overlay show-paren--overlay-1))
+          (delete-overlay show-paren--overlay-1)
+          (setq show-paren--last-pos (point)))
 
       ;; Found something to highlight.
       (let* ((here-beg (nth 0 data))
@@ -427,22 +465,27 @@ It is the default value of `show-paren-data-function'."
                             (current-buffer))
             (move-overlay show-paren--overlay
                           there-beg there-end (current-buffer)))
-          ;; If `show-paren-open-line-when-offscreen' is t and point
-          ;; is at a close paren, show the line that contains the
-          ;; openparen in the echo area.
+          ;; If `show-paren-context-when-offscreen' is non-nil and
+          ;; point is at a closing paren, show the context around the
+          ;; opening paren.
           (let ((openparen (min here-beg there-beg)))
-            (if (and show-paren-context-when-offscreen
-                     (< there-beg here-beg)
-                     (not (pos-visible-in-window-p openparen)))
-                (let ((open-paren-line-string
-                       (blink-paren-open-paren-line-string openparen))
-                      (message-log-max nil))
-                  (if (and (eq show-paren-context-when-offscreen
-                               'child-frame)
-                           (display-graphic-p))
-                      (show-paren--show-context-in-child-frame
-                       open-paren-line-string)
-                    (minibuffer-message "Matches %s" open-paren-line-string)))))
+            (when (and show-paren-context-when-offscreen
+                       (not (eql show-paren--last-pos (point)))
+                       (< there-beg here-beg)
+                       (not (pos-visible-in-window-p openparen)))
+              (let ((context (blink-paren-open-paren-line-string
+                              openparen))
+                    (message-log-max nil))
+                (cond
+                 ((and
+                   (eq show-paren-context-when-offscreen 'child-frame)
+                   (display-graphic-p))
+                  (show-paren--show-context-in-child-frame context))
+                 ((eq show-paren-context-when-offscreen 'overlay)
+                  (show-paren--show-context-in-overlay context))
+                 (show-paren-context-when-offscreen
+                  (minibuffer-message "Matches %s" context))))))
+          (setq show-paren--last-pos (point))
           ;; Always set the overlay face, since it varies.
           (overlay-put show-paren--overlay 'priority show-paren-priority)
           (overlay-put show-paren--overlay 'face face))))))
