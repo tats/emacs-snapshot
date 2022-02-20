@@ -1808,6 +1808,17 @@ Access of a hadoop/hdfs file system.  A file is accessed via
 the user that you want to use, and @samp{node} is the name of the
 hadoop server.
 
+@item tramp-nspawn
+@cindex method @option{nspawn}
+@cindex @option{nspawn} method
+Access to environments provided by systemd-nspawn.  A file is accessed
+via @file{@trampfn{nspawn,user@@container,/path/to/file}}, where
+@samp{user} is the (optional) user that you want to use, and
+@samp{container} is the container to connect to.  systemd-nspawn and
+its container utilities often require super user access to run, use
+multi-hop file names with @option{doas} or @option{sudo} to raise your
+privileges.
+
 @item vagrant-tramp
 @cindex method @option{vagrant}
 @cindex @option{vagrant} method
@@ -1985,6 +1996,20 @@ file name syntax, must be appended to the machine and login items:
 @example
 machine melancholia#4711 port davs login daniel%BIZARRE password geheim
 @end example
+
+For the methods @option{doas}, @option{sudo} and @option{sudoedit} the
+password of the user requesting the connection is needed, and not the
+password of the target user.  If these connections happen on the local
+host, an entry with the local user and local host is used:
+
+@example
+machine @var{HOST} port sudo login @var{USER} password secret
+@end example
+
+@var{USER} and @var{HOST} are the strings returned by
+@code{(user-login-name)} and @code{(system-name)}.  If one of these
+methods is connected via a multi hop (@pxref{Multi-hops}), the
+credentials of the previous hop are used.
 
 @vindex auth-source-save-behavior
 If no proper entry exists, the password is read
@@ -3960,8 +3985,8 @@ Furthermore, this approach has the following limitations:
 
 @itemize
 @item
-It works only for connection methods defined in @file{tramp-sh.el} and
-@file{tramp-adb.el}.
+It works only for connection methods defined in @file{tramp-adb.el},
+@file{tramp-sh.el} and @file{tramp-sshfs.el}.
 
 @item
 It does not support interactive user authentication.  With

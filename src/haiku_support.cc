@@ -115,6 +115,7 @@ static BLocker child_frame_lock;
 static BLocker movement_locker;
 
 static BMessage volatile *popup_track_message;
+static int32 volatile alert_popup_value;
 
 /* This could be a private API, but it's used by (at least) the Qt
    port, so it's probably here to stay.  */
@@ -582,7 +583,6 @@ public:
 	fullscreen_p = 0;
 	MakeFullscreen (1);
       }
-    this->Sync ();
     window->LinkChild (this);
 
     child_frame_lock.Unlock ();
@@ -914,7 +914,6 @@ public:
       DoMove (f);
     child_frame_lock.Unlock ();
 
-    Sync ();
     BWindow::FrameMoved (newPosition);
   }
 
@@ -1168,6 +1167,27 @@ public:
 
     haiku_write (MENU_BAR_RESIZE, &rq);
     BMenuBar::FrameResized (newWidth, newHeight);
+  }
+
+  void
+  MouseMoved (BPoint point, uint32 transit, const BMessage *msg)
+  {
+    struct haiku_menu_bar_left_event rq;
+
+    if (transit == B_EXITED_VIEW)
+      {
+	rq.x = std::lrint (point.x);
+	rq.y = std::lrint (point.y);
+	rq.window = this->Window ();
+
+	if (movement_locker.Lock ())
+	  {
+	    haiku_write (MENU_BAR_LEFT, &rq);
+	    movement_locker.Unlock ();
+	  }
+      }
+
+    BMenuBar::MouseMoved (point, transit, msg);
   }
 };
 
@@ -2187,19 +2207,38 @@ BView_mouse_moved (void *view, int x, int y, uint32_t transit)
     }
 }
 
-/* Import BITS into BITMAP using the B_GRAY1 colorspace.  */
+/* Import fringe bitmap (short array, low bit rightmost) BITS into
+   BITMAP using the B_GRAY1 colorspace.  */
+void
+BBitmap_import_fringe_bitmap (void *bitmap, unsigned short *bits, int wd, int h)
+{
+  BBitmap *bmp = (BBitmap *) bitmap;
+  unsigned char *data = (unsigned char *) bmp->Bits ();
+  int i;
+
+  for (i = 0; i < h; i++)
+    {
+      if (wd <= 8)
+	data[0] = bits[i] & 0xff;
+      else
+	{
+	  data[1] = bits[i] & 0xff;
+	  data[0] = bits[i] >> 8;
+	}
+
+      data += bmp->BytesPerRow ();
+    }
+}
+
 void
 BBitmap_import_mono_bits (void *bitmap, void *bits, int wd, int h)
 {
   BBitmap *bmp = (BBitmap *) bitmap;
-  unsigned char *data = (unsigned char *) bmp->Bits ();
-  unsigned short *bts = (unsigned short *) bits;
 
-  for (int i = 0; i < (h * (wd / 8)); i++)
-    {
-      *((unsigned short *) data) = bts[i];
-      data += bmp->BytesPerRow ();
-    }
+  if (wd % 8)
+    wd += 8 - (wd % 8);
+
+  bmp->ImportBits (bits, wd / 8 * h, wd / 8, 0, B_GRAY1);
 }
 
 /* Make a scrollbar at X, Y known to the view VIEW.  */
@@ -2647,12 +2686,73 @@ BAlert_add_button (void *alert, const char *text)
   return al->ButtonAt (al->CountButtons () - 1);
 }
 
+static int32
+be_alert_thread_entry (void *thread_data)
+{
+  BAlert *alert = (BAlert *) thread_data;
+  int32 value;
+
+  if (alert->LockLooper ())
+    value = alert->Go ();
+  else
+    value = -1;
+
+  alert_popup_value = value;
+  return 0;
+}
+
 /* Run ALERT, returning the number of the button that was selected,
    or -1 if no button was selected before the alert was closed.  */
-int32_t
-BAlert_go (void *alert)
+int32
+BAlert_go (void *alert,
+	   void (*block_input_function) (void),
+	   void (*unblock_input_function) (void),
+	   void (*process_pending_signals_function) (void))
 {
-  return ((BAlert *) alert)->Go ();
+  struct object_wait_info infos[2];
+  ssize_t stat;
+  BAlert *alert_object = (BAlert *) alert;
+
+  infos[0].object = port_application_to_emacs;
+  infos[0].type = B_OBJECT_TYPE_PORT;
+  infos[0].events = B_EVENT_READ;
+
+  block_input_function ();
+  /* Alerts are created locked, just like other windows.  */
+  alert_object->UnlockLooper ();
+  infos[1].object = spawn_thread (be_alert_thread_entry,
+				  "Popup tracker",
+				  B_DEFAULT_MEDIA_PRIORITY,
+				  alert);
+  infos[1].type = B_OBJECT_TYPE_THREAD;
+  infos[1].events = B_EVENT_INVALID;
+  unblock_input_function ();
+
+  if (infos[1].object < B_OK)
+    return -1;
+
+  block_input_function ();
+  resume_thread (infos[1].object);
+  unblock_input_function ();
+
+  while (true)
+    {
+      stat = wait_for_objects ((object_wait_info *) &infos, 2);
+
+      if (stat == B_INTERRUPTED)
+	continue;
+      else if (stat < B_OK)
+	gui_abort ("Failed to wait for popup dialog");
+
+      if (infos[1].events & B_EVENT_INVALID)
+	return alert_popup_value;
+
+      if (infos[0].events & B_EVENT_READ)
+	process_pending_signals_function ();
+
+      infos[0].events = B_EVENT_READ;
+      infos[1].events = B_EVENT_INVALID;
+    }
 }
 
 /* Enable or disable BUTTON depending on ENABLED_P.  */

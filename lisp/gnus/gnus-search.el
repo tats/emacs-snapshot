@@ -167,10 +167,9 @@ Instead, use this:
 This variable can also be set per-server."
   :type '(repeat string))
 
-(defcustom gnus-search-swish++-remove-prefix (concat (getenv "HOME") "/Mail/")
+(defcustom gnus-search-swish++-remove-prefix (expand-file-name "Mail/" "~")
   "The prefix to remove from each file name returned by swish++
-in order to get a group name (albeit with / instead of .).  This is a
-regular expression.
+in order to get a group name (albeit with / instead of .).
 
 This variable can also be set per-server."
   :type 'regexp)
@@ -204,10 +203,9 @@ This variable can also be set per-server."
   :type '(repeat string)
   :version "28.1")
 
-(defcustom gnus-search-swish-e-remove-prefix (concat (getenv "HOME") "/Mail/")
+(defcustom gnus-search-swish-e-remove-prefix (expand-file-name "Mail/" "~")
   "The prefix to remove from each file name returned by swish-e
-in order to get a group name (albeit with / instead of .).  This is a
-regular expression.
+in order to get a group name (albeit with / instead of .).
 
 This variable can also be set per-server."
   :type 'regexp
@@ -252,7 +250,7 @@ This variable can also be set per-server."
   :type '(repeat string)
   :version "28.1")
 
-(defcustom gnus-search-namazu-remove-prefix (concat (getenv "HOME") "/Mail/")
+(defcustom gnus-search-namazu-remove-prefix (expand-file-name "Mail/" "~")
   "The prefix to remove from each file name returned by Namazu
 in order to get a group name (albeit with / instead of .).
 
@@ -296,10 +294,9 @@ This variable can also be set per-server."
   :type '(repeat string)
   :version "28.1")
 
-(defcustom gnus-search-notmuch-remove-prefix (concat (getenv "HOME") "/Mail/")
+(defcustom gnus-search-notmuch-remove-prefix (expand-file-name "Mail/" "~")
   "The prefix to remove from each file name returned by notmuch
-in order to get a group name (albeit with / instead of .).  This is a
-regular expression.
+in order to get a group name (albeit with / instead of .).
 
 This variable can also be set per-server."
   :type 'regexp
@@ -339,10 +336,9 @@ This variable can also be set per-server."
   :version "28.1"
   :type '(repeat string))
 
-(defcustom gnus-search-mairix-remove-prefix (concat (getenv "HOME") "/Mail/")
+(defcustom gnus-search-mairix-remove-prefix (expand-file-name "Mail/" "~")
   "The prefix to remove from each file name returned by mairix
-in order to get a group name (albeit with / instead of .).  This is a
-regular expression.
+in order to get a group name (albeit with / instead of .).
 
 This variable can also be set per-server."
   :version "28.1"
@@ -826,7 +822,7 @@ quirks.")
     :documentation "Location of the config file, if any.")
    (remove-prefix
     :initarg :remove-prefix
-    :initform (concat (getenv "HOME") "/Mail/")
+    :initform (expand-file-name "Mail/" "~")
     :type string
     :documentation
     "The path to the directory where the indexed mails are
@@ -1350,16 +1346,14 @@ This method is common to all indexed search engines.
 
 Returns a list of [group article score] vectors."
 
-  (save-excursion
-    (let* ((qstring (gnus-search-make-query-string engine query))
-	   (program (slot-value engine 'program))
-	   (buffer (slot-value engine 'proc-buffer))
-	   (cp-list (gnus-search-indexed-search-command
-		     engine qstring query groups))
-           proc exitstatus)
-      (set-buffer buffer)
+  (let* ((qstring (gnus-search-make-query-string engine query))
+	 (program (slot-value engine 'program))
+	 (buffer (slot-value engine 'proc-buffer))
+	 (cp-list (gnus-search-indexed-search-command
+		   engine qstring query groups))
+         proc exitstatus)
+    (with-current-buffer buffer
       (erase-buffer)
-
       (if groups
 	  (gnus-message 7 "Doing %s query on %s..." program groups)
 	(gnus-message 7 "Doing %s query..." program))
@@ -1378,7 +1372,7 @@ Returns a list of [group article score] vectors."
 	;; wants it.
 	(when (> gnus-verbose 6)
 	  (display-buffer buffer))
-	nil))))
+        nil))))
 
 (cl-defmethod gnus-search-indexed-parse-output ((engine gnus-search-indexed)
 						server query &optional groups)
@@ -1399,18 +1393,27 @@ Returns a list of [group article score] vectors."
 	(when (and f-name
                    (file-readable-p f-name)
 		   (null (file-directory-p f-name)))
-          (setq group
-                (replace-regexp-in-string
-	         "[/\\]" "."
-	         (replace-regexp-in-string
-	          "/?\\(cur\\|new\\|tmp\\)?/\\'" ""
+          ;; `expand-file-name' canoncalizes the file name,
+          ;; specifically collapsing multiple consecutive directory
+          ;; separators.
+          (setq f-name (expand-file-name f-name)
+                group
+                (delete
+                 "" ; forward slash at root leaves an empty string
+                 (file-name-split
 	          (replace-regexp-in-string
-	           "\\`\\." ""
-	           (string-remove-prefix
+	           "\\`\\." "" ; why do we do this?
+                   (string-remove-prefix
                     prefix (file-name-directory f-name))
-                   nil t)
-	          nil t)
-	         nil t))
+                   nil t)))
+                ;; Turn file name segments into a Gnus group name.
+                group (mapconcat
+                       #'identity
+                       (if (member (car (last group))
+                                   '("new" "tmp" "cur"))
+                           (nbutlast group)
+                         group)
+                       "."))
           (setq article (file-name-nondirectory f-name)
                 article
                 ;; TODO: Provide a cleaner way of producing final
@@ -1632,19 +1635,26 @@ Namazu provides a little more information, for instance a score."
 	       (cp-list (gnus-search-indexed-search-command
 			 engine qstring query groups))
 	       thread-ids proc)
-	  (set-buffer proc-buffer)
-	  (erase-buffer)
-	  (setq proc (apply #'start-process (format "search-%s" server)
-			    proc-buffer program cp-list))
-	  (while (process-live-p proc)
-	    (accept-process-output proc))
-	  (while (re-search-forward "^thread:\\([^ ]+\\)" (point-max) t)
-	    (push (match-string 1) thread-ids))
+	  (with-current-buffer proc-buffer
+	    (erase-buffer)
+	    (setq proc (apply #'start-process (format "search-%s" server)
+			      proc-buffer program cp-list))
+	    (while (process-live-p proc)
+	      (accept-process-output proc))
+            (goto-char (point-min))
+	    (while (re-search-forward
+                    "^thread:\\([^[:space:]\n]+\\)"
+                    (point-max) t)
+	      (cl-pushnew (match-string 1) thread-ids :test #'equal)))
 	  (cl-call-next-method
 	   engine server
-	   ;; Completely replace the query with our new thread-based one.
-	   (mapconcat (lambda (thrd) (concat "thread:" thrd))
-		      thread-ids " or ")
+	   ;; If we found threads, completely replace the query with
+	   ;; our new thread-based one.
+           (if thread-ids
+               `((query . ,(mapconcat (lambda (thrd)
+                                        (concat "thread:" thrd))
+                                      thread-ids " or ")))
+             query)
 	   nil)))
     (cl-call-next-method engine server query groups)))
 
@@ -1657,16 +1667,16 @@ Namazu provides a little more information, for instance a score."
   (let ((limit (alist-get 'limit query))
 	(thread (alist-get 'thread query)))
     (with-slots (switches config-file) engine
-      `(,(format "--config=%s" config-file)
-	"search"
-	,(if thread
-	     "--output=threads"
-	   "--output=files")
-	"--duplicate=1" ; I have found this necessary, I don't know why.
-	,@switches
-	,(if limit (format "--limit=%d" limit) "")
-	,qstring
-	))))
+      (append
+       (list (format "--config=%s" config-file)
+             "search"
+             (if thread
+                 "--output=threads"
+             "--output=files"))
+       (unless thread '("--duplicate=1"))
+       (when limit (list (format "--limit=%d" limit)))
+       switches
+       (list qstring)))))
 
 ;;; Mairix interface
 
@@ -2187,8 +2197,7 @@ article came from is also searched."
 		(read-from-minibuffer
 		 "Query: " nil gnus-search-minibuffer-map
 		 nil 'gnus-search-history)))
-	(cons 'raw
-              (or (gnus-nnselect-group-p (gnus-group-group-name)) arg))))
+	(cons 'raw arg)))
 
 (provide 'gnus-search)
 ;;; gnus-search.el ends here

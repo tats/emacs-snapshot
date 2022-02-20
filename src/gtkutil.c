@@ -6095,29 +6095,29 @@ xg_im_context_commit (GtkIMContext *imc, gchar *str,
 {
   struct frame *f = user_data;
   struct input_event ie;
-  gunichar *ucs4_str;
 
-  ucs4_str = g_utf8_to_ucs4_fast (str, -1, NULL);
+  EVENT_INIT (ie);
+  /* This used to use g_utf8_to_ucs4_fast, which led to bad results
+     when STR wasn't actually a UTF-8 string, which some input method
+     modules commit.  */
 
-  if (!ucs4_str)
-    return;
+  ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
+  ie.arg = decode_string_utf_8 (Qnil, str, strlen (str),
+				Qnil, false, Qnil, Qnil);
 
-  for (gunichar *c = ucs4_str; *c; c++)
-    {
-      EVENT_INIT (ie);
-      ie.kind = (SINGLE_BYTE_CHAR_P (*c)
-		 ? ASCII_KEYSTROKE_EVENT
-		 : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-      ie.arg = Qnil;
-      ie.code = *c;
-      XSETFRAME (ie.frame_or_window, f);
-      ie.modifiers = 0;
-      ie.timestamp = 0;
+  /* STR is invalid and not really encoded in UTF-8.  */
+  if (NILP (ie.arg))
+    ie.arg = build_unibyte_string (str);
 
-      kbd_buffer_store_event (&ie);
-    }
+  Fput_text_property (make_fixnum (0),
+		      make_fixnum (SCHARS (ie.arg)),
+		      Qcoding, Qt, ie.arg);
 
-  g_free (ucs4_str);
+  XSETFRAME (ie.frame_or_window, f);
+  ie.modifiers = 0;
+  ie.timestamp = 0;
+
+  kbd_buffer_store_event (&ie);
 }
 
 static void

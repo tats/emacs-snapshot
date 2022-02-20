@@ -610,7 +610,7 @@ x_relative_mouse_position (struct frame *f, int *x, int *y)
   block_input ();
 
   XQueryPointer (FRAME_X_DISPLAY (f),
-                 DefaultRootWindow (FRAME_X_DISPLAY (f)),
+                 FRAME_DISPLAY_INFO (f)->root_window,
 
                  /* The root window which contains the pointer.  */
                  &root,
@@ -910,7 +910,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       block_input ();
       XReparentWindow
 	(FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-	 p ? FRAME_X_WINDOW (p) : DefaultRootWindow (FRAME_X_DISPLAY (f)),
+	 p ? FRAME_X_WINDOW (p) : FRAME_DISPLAY_INFO (f)->root_window,
 	 f->left_pos, f->top_pos);
 #ifdef USE_GTK
       if (EQ (x_gtk_resize_child_frames, Qresize_mode))
@@ -3139,14 +3139,64 @@ xic_preedit_done_callback (XIC xic, XPointer client_data,
     }
 }
 
+struct x_xim_text_conversion_data
+{
+  struct coding_system *coding;
+  char *source;
+};
+
+static Lisp_Object
+x_xim_text_to_utf8_unix_1 (ptrdiff_t nargs,
+			   Lisp_Object *args)
+{
+  struct x_xim_text_conversion_data *data;
+  ptrdiff_t nbytes;
+
+  data = xmint_pointer (args[0]);
+  nbytes = strlen (data->source);
+
+  data->coding->destination = NULL;
+
+  setup_coding_system (Vlocale_coding_system,
+		       data->coding);
+  data->coding->mode |= (CODING_MODE_LAST_BLOCK
+			 | CODING_MODE_SAFE_ENCODING);
+  data->coding->source = (const unsigned char *) data->source;
+  data->coding->dst_bytes = 2048;
+  data->coding->destination = xmalloc (2048);
+  decode_coding_object (data->coding, Qnil, 0, 0,
+			nbytes, nbytes, Qnil);
+
+  return Qnil;
+}
+
+static Lisp_Object
+x_xim_text_to_utf8_unix_2 (Lisp_Object val,
+			   ptrdiff_t nargs,
+			   Lisp_Object *args)
+{
+  struct x_xim_text_conversion_data *data;
+
+  data = xmint_pointer (args[0]);
+
+  if (data->coding->destination)
+    xfree (data->coding->destination);
+
+  data->coding->destination = NULL;
+
+  return Qnil;
+}
+
 /* The string returned is not null-terminated.  */
 static char *
 x_xim_text_to_utf8_unix (XIMText *text, ptrdiff_t *length)
 {
   unsigned char *wchar_buf;
   ptrdiff_t wchar_actual_length, i;
-  ptrdiff_t nbytes;
   struct coding_system coding;
+  struct x_xim_text_conversion_data data;
+  bool was_waiting_for_input_p;
+  Lisp_Object arg;
 
   if (text->encoding_is_wchar)
     {
@@ -3161,17 +3211,16 @@ x_xim_text_to_utf8_unix (XIMText *text, ptrdiff_t *length)
       return (char *) wchar_buf;
     }
 
-  nbytes = strlen (text->string.multi_byte);
-  setup_coding_system (Vlocale_coding_system, &coding);
-  coding.mode |= (CODING_MODE_LAST_BLOCK
-		  | CODING_MODE_SAFE_ENCODING);
-  coding.source = (const unsigned char *) text->string.multi_byte;
-  coding.dst_bytes = 2048;
-  coding.destination = xmalloc (2048);
-  decode_coding_object (&coding, Qnil, 0, 0, nbytes, nbytes, Qnil);
+  data.coding = &coding;
+  data.source = text->string.multi_byte;
 
-  /* coding.destination has either been allocated by us, or
-     reallocated by decode_coding_object.  */
+  was_waiting_for_input_p = waiting_for_input;
+  /* Otherwise Fsignal will crash.  */
+  waiting_for_input = false;
+  arg = make_mint_ptr (&data);
+  internal_condition_case_n (x_xim_text_to_utf8_unix_1, 1, &arg,
+			     Qt, x_xim_text_to_utf8_unix_2);
+  waiting_for_input = was_waiting_for_input_p;
 
   *length = coding.produced;
   return (char *) coding.destination;
@@ -3198,16 +3247,14 @@ xic_preedit_draw_callback (XIC xic, XPointer client_data,
       if (!output->preedit_active)
 	return;
 
-      /* If we don't bail out here then GTK can crash
-	 from the resulting signal in `setup_coding_system'.  */
-      if (NILP (Fcoding_system_p (Vlocale_coding_system)))
-	{
-	  text = NULL;
-	  goto im_abort;
-	}
-
       if (call_data->text)
-	text = x_xim_text_to_utf8_unix (call_data->text, &text_length);
+	{
+	  text = x_xim_text_to_utf8_unix (call_data->text, &text_length);
+
+	  if (!text)
+	    /* Decoding the IM text failed.  */
+	    goto im_abort;
+	}
       else
 	text = NULL;
 
@@ -6372,7 +6419,7 @@ selected frame's display.  */)
 
   block_input ();
   XQueryPointer (FRAME_X_DISPLAY (f),
-                 DefaultRootWindow (FRAME_X_DISPLAY (f)),
+		 FRAME_DISPLAY_INFO (f)->root_window,
                  &root, &dummy_window, &x, &y, &dummy, &dummy,
                  (unsigned int *) &dummy);
   unblock_input ();
@@ -6406,14 +6453,15 @@ The coordinates X and Y are interpreted in pixels relative to a position
 			      &deviceid))
 	{
 	  XIWarpPointer (FRAME_X_DISPLAY (f), deviceid, None,
-			 DefaultRootWindow (FRAME_X_DISPLAY (f)),
+			 FRAME_DISPLAY_INFO (f)->root_window,
 			 0, 0, 0, 0, xval, yval);
 	}
       XUngrabServer (FRAME_X_DISPLAY (f));
     }
   else
 #endif
-    XWarpPointer (FRAME_X_DISPLAY (f), None, DefaultRootWindow (FRAME_X_DISPLAY (f)),
+    XWarpPointer (FRAME_X_DISPLAY (f), None,
+		  FRAME_DISPLAY_INFO (f)->root_window,
 		  0, 0, 0, 0, xval, yval);
   unblock_input ();
 
@@ -6526,28 +6574,45 @@ select_visual (struct x_display_info *dpyinfo)
 
       vinfo_template.screen = XScreenNumberOfScreen (screen);
 
-#if !defined USE_X_TOOLKIT && !(defined USE_GTK && !defined HAVE_GTK3)
-      /* First attempt to use 32-bit visual if available */
+#if !defined USE_X_TOOLKIT && !(defined USE_GTK && !defined HAVE_GTK3) \
+  && defined HAVE_XRENDER
+      int i;
+      XRenderPictFormat *format;
 
-      vinfo_template.depth = 32;
-      vinfo_template.class = TrueColor;
+      /* First attempt to find a visual with an alpha mask if
+	 available.  That information is only available when the
+	 render extension is present, and we cannot do much with such
+	 a visual if it isn't.  */
 
-      vinfo = XGetVisualInfo (dpy, (VisualScreenMask
-				    | VisualDepthMask
-				    | VisualClassMask),
-			      &vinfo_template, &n_visuals);
-
-      if (n_visuals > 0 && vinfo)
+      if (dpyinfo->xrender_supported_p)
 	{
-	  dpyinfo->n_planes = vinfo->depth;
-	  dpyinfo->visual = vinfo->visual;
-	  XFree (vinfo);
-	  return;
-	}
 
+	  vinfo = XGetVisualInfo (dpy, VisualScreenMask,
+				  &vinfo_template, &n_visuals);
+
+	  for (i = 0; i < n_visuals; ++i)
+	    {
+	      format = XRenderFindVisualFormat (dpy, vinfo[i].visual);
+
+	      if (format && format->type == PictTypeDirect
+		  && format->direct.alphaMask)
+		{
+		  dpyinfo->n_planes = vinfo[i].depth;
+		  dpyinfo->visual = vinfo[i].visual;
+		  dpyinfo->pict_format = format;
+
+		  XFree (vinfo);
+		  return;
+		}
+	    }
+
+	  if (vinfo)
+	    XFree (vinfo);
+	}
 #endif /* !USE_X_TOOLKIT */
 
-      /* 32-bit visual not available, fallback to default visual */
+      /* Visual with alpha channel (or the Render extension) not
+	 available, fallback to default visual.  */
       dpyinfo->visual = DefaultVisualOfScreen (screen);
       vinfo_template.visualid = XVisualIDFromVisual (dpyinfo->visual);
       vinfo = XGetVisualInfo (dpy, VisualIDMask | VisualScreenMask,
@@ -8043,7 +8108,8 @@ Text larger than the specified size is clipped.  */)
 			     FRAME_DISPLAY_INFO (f)->root_window,
 			     FRAME_DISPLAY_INFO (f)->root_window,
 			     root_x, root_y, &dest_x_return,
-			     &dest_y_return, &child))
+			     &dest_y_return, &child)
+      && child != None)
     {
       /* But only if the child is not override-redirect, which can
 	 happen if the pointer is above a menu.  */
@@ -8724,28 +8790,41 @@ DEFUN ("x-gtk-debug", Fx_gtk_debug, Sx_gtk_debug, 1, 1, 0,
 #endif	/* USE_GTK */
 
 DEFUN ("x-internal-focus-input-context", Fx_internal_focus_input_context,
-       Sx_internal_focus_input_context, 2, 2, 0,
-       doc: /* Focus and set the client window of FRAME's GTK input context.
+       Sx_internal_focus_input_context, 1, 1, 0,
+       doc: /* Focus and set the client window of all focused frames' GTK input context.
 If FOCUS is nil, focus out and remove the client window instead.
 This should be called from a variable watcher for `x-gtk-use-native-input'.  */)
-  (Lisp_Object focus, Lisp_Object frame)
+  (Lisp_Object focus)
 {
 #ifdef USE_GTK
-  struct frame *f = decode_window_system_frame (frame);
-  GtkWidget *widget = FRAME_GTK_OUTER_WIDGET (f);
+  struct x_display_info *dpyinfo;
+  struct frame *f;
+  GtkWidget *widget;
 
-  if (!NILP (focus))
+  block_input ();
+  for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
     {
-      gtk_im_context_focus_in (FRAME_X_OUTPUT (f)->im_context);
-      gtk_im_context_set_client_window (FRAME_X_OUTPUT (f)->im_context,
-					gtk_widget_get_window (widget));
+      f = dpyinfo->x_focus_frame;
+
+      if (f)
+	{
+	  widget = FRAME_GTK_OUTER_WIDGET (f);
+
+	  if (!NILP (focus))
+	    {
+	      gtk_im_context_focus_in (FRAME_X_OUTPUT (f)->im_context);
+	      gtk_im_context_set_client_window (FRAME_X_OUTPUT (f)->im_context,
+						gtk_widget_get_window (widget));
+	    }
+	  else
+	    {
+	      gtk_im_context_focus_out (FRAME_X_OUTPUT (f)->im_context);
+	      gtk_im_context_set_client_window (FRAME_X_OUTPUT (f)->im_context,
+						NULL);
+	    }
+	}
     }
-  else
-    {
-      gtk_im_context_focus_out (FRAME_X_OUTPUT (f)->im_context);
-      gtk_im_context_set_client_window (FRAME_X_OUTPUT (f)->im_context,
-					NULL);
-    }
+  unblock_input ();
 #endif
 
   return Qnil;

@@ -1596,8 +1596,8 @@ modified lines of the diff."
                   nil)))
   (when (eq diff-buffer-type 'git)
     (setq diff-outline-regexp
-          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)"))
-    (setq-local outline-level #'diff--outline-level))
+          (concat "\\(^diff --git.*\n\\|" diff-hunk-header-re "\\)")))
+  (setq-local outline-level #'diff--outline-level)
   (setq-local outline-regexp diff-outline-regexp))
 
 (defun diff-delete-if-empty ()
@@ -2603,17 +2603,19 @@ fixed, visit it in a buffer."
     (save-excursion
       ;; FIXME: Include the first space for context-style hunks!
       (while (re-search-forward "^[-+! ]" limit t)
-        (let ((spec (alist-get (char-before)
-                               '((?+ . (left-fringe diff-fringe-add diff-indicator-added))
-                                 (?- . (left-fringe diff-fringe-del diff-indicator-removed))
-                                 (?! . (left-fringe diff-fringe-rep diff-indicator-changed))
-                                 (?\s . (left-fringe diff-fringe-nul fringe))))))
-          (put-text-property (match-beginning 0) (match-end 0) 'display spec))))
+        (unless (eq (get-text-property (match-beginning 0) 'face) 'diff-header)
+          (let ((spec
+                 (alist-get
+                  (char-before)
+                  '((?+ . (left-fringe diff-fringe-add diff-indicator-added))
+                    (?- . (left-fringe diff-fringe-del diff-indicator-removed))
+                    (?! . (left-fringe diff-fringe-rep diff-indicator-changed))
+                    (?\s . (left-fringe diff-fringe-nul fringe))))))
+            (put-text-property (match-beginning 0) (match-end 0)
+                               'display spec)))))
     ;; Mimicks the output of Magit's diff.
     ;; FIXME: This has only been tested with Git's diff output.
     (while (re-search-forward "^diff " limit t)
-      ;; FIXME: Switching between context<->unified leads to messed up
-      ;; file headers by cutting the `display' property in chunks!
       (when (save-excursion
               (forward-line 0)
               (looking-at
@@ -2621,19 +2623,21 @@ fixed, visit it in a buffer."
                  (concat "diff.*\n"
                          "\\(?:\\(?:new file\\|deleted\\).*\n\\)?"
                          "\\(?:index.*\n\\)?"
-                         "--- \\(?:" null-device "\\|a/\\(.*\\)\\)\n"
-                         "\\+\\+\\+ \\(?:" null-device "\\|b/\\(.*\\)\\)\n"))))
-        (put-text-property (match-beginning 0) (1- (match-end 0))
-                           'display
-                           (propertize
-                            (cond
-                             ((null (match-string 1))
-                              (concat "new file  " (match-string 2)))
-                             ((null (match-string 2))
-                              (concat "deleted  " (match-string 1)))
-                             (t
-                              (concat "modified  " (match-string 1))))
-                            'face '(diff-file-header diff-header))))))
+                         "--- \\(?:" null-device "\\|[ab]/\\(.*\\)\\)\n"
+                         "\\+\\+\\+ \\(?:" null-device "\\|[ab]/\\(.*\\)\\)\n"))))
+        (add-text-properties
+         (match-beginning 0) (1- (match-end 0))
+         (list 'display
+               (propertize
+                (cond
+                 ((null (match-string 1))
+                  (concat "new file  " (match-string 2)))
+                 ((null (match-string 2))
+                  (concat "deleted  " (match-string 1)))
+                 (t
+                  (concat "modified  " (match-string 1))))
+                'face '(diff-file-header diff-header))
+               'font-lock-multiline t)))))
   nil)
 
 ;;; Syntax highlighting from font-lock

@@ -1493,8 +1493,13 @@ in all cases, since that is the standard symbol for byte."
                                (if (string= prefix "") "" "i")
                                (or unit "B"))
                             (concat prefix unit))))
-      (format (if (and (>= (mod file-size 1.0) 0.05)
+      ;; Mimic what GNU "ls -lh" does:
+      ;; If the formatted size will have just one digit before the decimal...
+      (format (if (and (< file-size 10)
+                       ;; ...and its fractional part is not too small...
+                       (>= (mod file-size 1.0) 0.05)
                        (< (mod file-size 1.0) 0.95))
+                  ;; ...then emit one digit after the decimal.
 		  "%.1f%s%s"
 	        "%.0f%s%s")
 	      file-size
@@ -5821,23 +5826,26 @@ of the directory that was default during command invocation."
 (defun files--buffers-needing-to-be-saved (pred)
   "Return a list of buffers to save according to PRED.
 See `save-some-buffers' for PRED values."
-  (seq-filter
-   (lambda (buffer)
-     ;; Note that killing some buffers may kill others via
-     ;; hooks (e.g. Rmail and its viewing buffer).
-     (and (buffer-live-p buffer)
-	  (buffer-modified-p buffer)
-          (not (buffer-base-buffer buffer))
-          (or
-           (buffer-file-name buffer)
-           (with-current-buffer buffer
-             (or (eq buffer-offer-save 'always)
-                 (and pred buffer-offer-save
-                      (> (buffer-size) 0)))))
-          (or (not (functionp pred))
-              (with-current-buffer buffer
-                (funcall pred)))))
-   (buffer-list)))
+  (let ((buffers
+         (mapcar (lambda (buffer)
+                   (if
+                       ;; Note that killing some buffers may kill others via
+                       ;; hooks (e.g. Rmail and its viewing buffer).
+                       (and (buffer-live-p buffer)
+	                    (buffer-modified-p buffer)
+                            (not (buffer-base-buffer buffer))
+                            (or
+                             (buffer-file-name buffer)
+                             (with-current-buffer buffer
+                               (or (eq buffer-offer-save 'always)
+                                   (and pred buffer-offer-save
+                                        (> (buffer-size) 0)))))
+                            (or (not (functionp pred))
+                                (with-current-buffer buffer
+                                  (funcall pred))))
+                       buffer))
+                 (buffer-list))))
+         (delq nil buffers)))
 
 (defun save-some-buffers (&optional arg pred)
   "Save some modified file-visiting buffers.  Asks user about each one.

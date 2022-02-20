@@ -543,6 +543,10 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
 
 #ifdef HAVE_HAIKU
   void *bitmap = BBitmap_new (width, height, 1);
+
+  if (!bitmap)
+    return -1;
+
   BBitmap_import_mono_bits (bitmap, bits, width, height);
 #endif
 
@@ -3677,6 +3681,48 @@ xbm_scan (char **s, char *end, char *sval, int *ival)
       *ival = value;
       return overflow ? XBM_TK_OVERFLOW : XBM_TK_NUMBER;
     }
+  /* Character literal.  XBM images typically contain hex escape
+     sequences and not actual characters, so we only try to handle
+     that here.  */
+  else if (c == '\'')
+    {
+      int value = 0, digit;
+      bool overflow = false;
+
+      if (*s == end)
+	return 0;
+
+      c = *(*s)++;
+
+      if (c != '\\' || *s == end)
+	return 0;
+
+      c = *(*s)++;
+
+      if (c == 'x')
+	{
+	  while (*s < end)
+	    {
+	      c = *(*s)++;
+
+	      if (c == '\'')
+		{
+		  *ival = value;
+		  return overflow ? XBM_TK_OVERFLOW : XBM_TK_NUMBER;
+		}
+
+	      digit = char_hexdigit (c);
+
+	      if (digit < 0)
+		return 0;
+
+	      overflow |= INT_MULTIPLY_WRAPV (value, 16, &value);
+	      value += digit;
+	    }
+	}
+
+      return 0;
+    }
   else if (c_isalpha (c) || c == '_')
     {
       *sval++ = c;
@@ -3800,7 +3846,7 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 				   data,
 				   img->width, img->height,
 				   fg, bg,
-				   DefaultDepthOfScreen (FRAME_X_SCREEN (f)));
+				   FRAME_DISPLAY_INFO (f)->n_planes);
 # if !defined USE_CAIRO && defined HAVE_XRENDER
   if (img->pixmap)
     img->picture = x_create_xrender_picture (f, img->pixmap, 0);
@@ -3815,6 +3861,21 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
     convert_mono_to_color_image (f, img, fg, bg);
 #elif defined HAVE_NS
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
+#elif defined HAVE_HAIKU
+  img->pixmap = BBitmap_new (img->width, img->height, 0);
+
+  if (img->pixmap)
+    {
+      int bytes_per_line = (img->width + 7) / 8;
+
+      for (int y = 0; y < img->height; y++)
+	{
+	  for (int x = 0; x < img->width; x++)
+	    PUT_PIXEL (img->pixmap, x, y,
+		       (data[x / 8] >> (x % 8)) & 1 ? fg : bg);
+	  data += bytes_per_line;
+	}
+    }
 #endif
 }
 
@@ -3999,6 +4060,7 @@ xbm_load_image (struct frame *f, struct image *img, char *contents, char *end)
 
   rc = xbm_read_bitmap_data (f, contents, end, &img->width, &img->height,
 			     &data, 0);
+
   if (rc)
     {
       unsigned long foreground = img->face_foreground;

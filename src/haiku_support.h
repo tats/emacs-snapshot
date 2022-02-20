@@ -87,7 +87,8 @@ enum haiku_event_type
     ZOOM_EVENT,
     REFS_EVENT,
     APP_QUIT_REQUESTED_EVENT,
-    DUMMY_EVENT
+    DUMMY_EVENT,
+    MENU_BAR_LEFT
   };
 
 struct haiku_quit_requested_event
@@ -158,6 +159,12 @@ struct haiku_mouse_motion_event
   int x;
   int y;
   bigtime_t time;
+};
+
+struct haiku_menu_bar_left_event
+{
+  void *window;
+  int x, y;
 };
 
 struct haiku_button_event
@@ -632,6 +639,10 @@ extern "C"
   BView_mouse_up (void *view, int x, int y);
 
   extern void
+  BBitmap_import_fringe_bitmap (void *bitmap, unsigned short *bits,
+				int wd, int h);
+
+  extern void
   BBitmap_import_mono_bits (void *bitmap, void *bits, int wd, int h);
 
   extern void
@@ -743,8 +754,11 @@ extern "C"
   extern void *
   BAlert_add_button (void *alert, const char *text);
 
-  extern int32_t
-  BAlert_go (void *alert);
+  extern int32
+  BAlert_go (void *alert,
+	     void (*block_input_function) (void),
+	     void (*unblock_input_function) (void),
+	     void (*process_pending_signals_function) (void));
 
   extern void
   BButton_set_enabled (void *button, int enabled_p);

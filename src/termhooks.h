@@ -80,10 +80,29 @@ enum event_kind
 				   which the key was typed.
 				   .timestamp gives a timestamp (in
 				   milliseconds) for the keystroke.  */
-  MULTIBYTE_CHAR_KEYSTROKE_EVENT,	/* The multibyte char code is in .code,
-				   perhaps with modifiers applied.
-				   The others are the same as
-				   ASCII_KEYSTROKE_EVENT.  */
+  MULTIBYTE_CHAR_KEYSTROKE_EVENT,	/* The multibyte char code is
+					   in .code, perhaps with
+					   modifiers applied.  The
+					   others are the same as
+					   ASCII_KEYSTROKE_EVENT,
+					   except when ARG is a
+					   string, which will be
+					   decoded and the decoded
+					   string's characters will be
+					   used as .code
+					   individually.
+
+					   The string can have a
+					   property `coding', which
+					   should be a symbol
+					   describing a coding system
+					   to use to decode the string.
+
+					   If it is nil, then the
+					   locale coding system will
+					   be used.  If it is t, then
+					   no decoding will take
+					   place.  */
   NON_ASCII_KEYSTROKE_EVENT,	/* .code is a number identifying the
 				   function key.  A code N represents
 				   a key whose name is

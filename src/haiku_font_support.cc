@@ -68,7 +68,11 @@ estimate_font_ascii (BFont *font, int *max_width,
 
   *min_width = min;
   *max_width = max;
-  *avg_width = total / count;
+
+  if (count)
+    *avg_width = total / count;
+  else
+    *avg_width = 0;
 }
 
 void
@@ -220,7 +224,9 @@ font_style_to_flags (char *st, struct haiku_font_pattern *pattern)
 	  if (pattern->weight == -1)
 	    pattern->weight = HAIKU_REGULAR;
 	}
-      else if (token && !strcmp (token, "SemiBold"))
+      else if (token && (!strcmp (token, "SemiBold")
+			 /* Likewise, this was reported by a user.  */
+			 || !strcmp (token, "Semibold")))
 	pattern->weight = HAIKU_SEMI_BOLD;
       else if (token && !strcmp (token, "Bold"))
 	pattern->weight = HAIKU_BOLD;

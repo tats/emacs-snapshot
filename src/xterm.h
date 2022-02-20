@@ -184,6 +184,7 @@ struct color_name_cache_entry
 struct xi_scroll_valuator_t
 {
   bool invalid_p;
+  bool pending_enter_reset;
   double current_value;
   double emacs_value;
   double increment;
@@ -524,6 +525,9 @@ struct x_display_info
   /* Virtual modifiers */
   Atom Xatom_Meta, Xatom_Super, Xatom_Hyper, Xatom_ShiftLock, Xatom_Alt;
 #endif
+
+  /* Core modifier map when XKB is not present.  */
+  XModifierKeymap *modmap;
 
 #ifdef HAVE_XRANDR
   int xrandr_major_version;

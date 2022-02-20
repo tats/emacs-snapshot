@@ -184,6 +184,7 @@
 	(runic #x16A0)
 	(khmer #x1780)
 	(mongolian #x1826)
+        (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
 	(symbol . [#x201C #x2200 #x2500])
 	(braille #x2800)
 	(ideographic-description #x2FF0)
@@ -282,7 +283,7 @@
 
 (defvar otf-script-alist)
 
-;; The below was synchronized with the latest Oct 8, 2020 version of
+;; The below was synchronized with the latest Sep 12, 2021 version of
 ;; https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
 (setq otf-script-alist
       '((adlm . adlam)
@@ -315,6 +316,7 @@
 	(copt . coptic)
 	(xsux . cuneiform)
 	(cprt . cypriot)
+        (cpmn . cypro-minoan)
 	(cyrl . cyrillic)
 	(dsrt . deseret)
 	(deva . devanagari)
@@ -338,7 +340,7 @@
 	(gur2 . gurmukhi)
 	(hani . han)
 	(hang . hangul)
-	(jamo . hangul)
+	(jamo . hangul) ; Not recommended; use 'hang' instead.
 	(rohg . hanifi-rohingya)
 	(hano . hanunoo)
 	(hatr . hatran)
@@ -388,6 +390,7 @@
 	(musc . musical-symbol)
 	(mym2 . burmese)
 	(mymr . burmese)
+        (nand . nandinagari)
 	(nbat . nabataean)
 	(newa . newa)
 	(nko\  . nko)
@@ -402,6 +405,7 @@
 	(sogo . old-sogdian)
 	(sarb . old-south-arabian)
 	(orkh . old-turkic)
+        (ougr . old-uyghur)
 	(orya . oriya)
 	(ory2 . oriya)
 	(osge . osage)
@@ -438,6 +442,7 @@
 	(takr . takri)
 	(taml . tamil)
 	(tml2 . tamil)
+        (tnsa . tangsa)
 	(tang . tangut)
 	(telu . telugu)
 	(tel2 . telugu)
@@ -446,7 +451,9 @@
 	(tibt . tibetan)
 	(tfng . tifinagh)
 	(tirh . tirhuta)
+        (toto . toto)
 	(ugar . ugaritic)
+        (vith . vithkuqi)
 	(vai\  . vai)
 	(wcho . wancho)
 	(wara . warang-citi)
@@ -779,6 +786,7 @@
 		    counting-rod-numeral
                     toto
 		    adlam
+                    tai-tham
 		    mahjong-tile
 		    domino-tile
                     emoji))
@@ -1133,7 +1141,7 @@ Internal use only.  Should be called at startup time."
 (defconst xlfd-regexp-pointsize-subnum 6)	; POINT_SIZE
 (defconst xlfd-regexp-resx-subnum 7)		; RESOLUTION_X
 (defconst xlfd-regexp-resy-subnum 8)		; RESOLUTION_Y
-(defconst xlfd-regexp-spacing-subnum 8)		; SPACING
+(defconst xlfd-regexp-spacing-subnum 9)		; SPACING
 (defconst xlfd-regexp-avgwidth-subnum 10)	; AVERAGE_WIDTH
 (defconst xlfd-regexp-registry-subnum 11)	; REGISTRY and ENCODING
 

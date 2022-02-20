@@ -581,6 +581,11 @@ x_free_xi_devices (struct x_display_info *dpyinfo)
 /* Setup valuator tracking for XI2 master devices on
    DPYINFO->display.  */
 
+/* This function's name is a misnomer: these days, it keeps a
+   client-side record of all devices, which includes basic information
+   about the device and also touchscreen tracking information, instead
+   of just scroll valuators.  */
+
 static void
 x_init_master_valuators (struct x_display_info *dpyinfo)
 {
@@ -631,16 +636,14 @@ x_init_master_valuators (struct x_display_info *dpyinfo)
 		      (XIScrollClassInfo *) device->classes[c];
 		    struct xi_scroll_valuator_t *valuator;
 
-		    if (xi_device->master_p)
-		      {
-			valuator = &xi_device->valuators[actual_valuator_count++];
-			valuator->horizontal
-			  = (info->scroll_type == XIScrollTypeHorizontal);
-			valuator->invalid_p = true;
-			valuator->emacs_value = DBL_MIN;
-			valuator->increment = info->increment;
-			valuator->number = info->number;
-		      }
+		    valuator = &xi_device->valuators[actual_valuator_count++];
+		    valuator->horizontal
+		      = (info->scroll_type == XIScrollTypeHorizontal);
+		    valuator->invalid_p = true;
+		    valuator->emacs_value = DBL_MIN;
+		    valuator->increment = info->increment;
+		    valuator->number = info->number;
+		    valuator->pending_enter_reset = false;
 
 		    break;
 		  }
@@ -686,7 +689,7 @@ x_get_scroll_valuator_delta (struct x_display_info *dpyinfo, int device_id,
     {
       struct xi_device_t *device = &dpyinfo->devices[i];
 
-      if (device->device_id == device_id && device->master_p)
+      if (device->device_id == device_id)
 	{
 	  for (int j = 0; j < device->scroll_valuator_count; ++j)
 	    {
@@ -794,12 +797,13 @@ xi_find_touch_point (struct xi_device_t *device, int detail)
 #endif /* XI_TouchBegin */
 
 static void
-xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id)
+xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id,
+					 bool pending_only)
 {
   struct xi_device_t *device = xi_device_from_id (dpyinfo, id);
   struct xi_scroll_valuator_t *valuator;
 
-  if (!device || !device->master_p)
+  if (!device)
     return;
 
   if (!device->scroll_valuator_count)
@@ -808,6 +812,11 @@ xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo, int id)
   for (int i = 0; i < device->scroll_valuator_count; ++i)
     {
       valuator = &device->valuators[i];
+
+      if (pending_only && !valuator->pending_enter_reset)
+	continue;
+
+      valuator->pending_enter_reset = false;
       valuator->invalid_p = true;
       valuator->emacs_value = 0.0;
     }
@@ -1390,6 +1399,7 @@ x_fill_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
 #else
 #if defined HAVE_XRENDER && (RENDER_MAJOR > 0 || (RENDER_MINOR >= 2))
   if (respect_alpha_background
+      && f->alpha_background != 1.0
       && FRAME_DISPLAY_INFO (f)->alpha_bits
       && FRAME_CHECK_XR_VERSION (f, 0, 2))
     {
@@ -1399,11 +1409,52 @@ x_fill_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
 	{
 	  XRenderColor xc;
 
+#if RENDER_MAJOR > 0 || (RENDER_MINOR >= 10)
+	  XGCValues xgcv;
+	  XRenderPictureAttributes attrs;
+	  XRenderColor alpha;
+	  Picture stipple, fill;
+#endif
+
 	  x_xr_apply_ext_clip (f, gc);
-	  x_xrender_color_from_gc_foreground (f, gc, &xc, true);
-	  XRenderFillRectangle (FRAME_X_DISPLAY (f),
-				PictOpSrc, FRAME_X_PICTURE (f),
-				&xc, x, y, width, height);
+
+#if RENDER_MAJOR > 0 || (RENDER_MINOR >= 10)
+	  XGetGCValues (FRAME_X_DISPLAY (f),
+			gc, GCFillStyle | GCStipple, &xgcv);
+
+	  if (xgcv.fill_style == FillOpaqueStippled
+	      && FRAME_CHECK_XR_VERSION (f, 0, 10))
+	    {
+	      x_xrender_color_from_gc_background (f, gc, &alpha, true);
+	      x_xrender_color_from_gc_foreground (f, gc, &xc, true);
+	      attrs.repeat = RepeatNormal;
+
+	      stipple = XRenderCreatePicture (FRAME_X_DISPLAY (f),
+					      xgcv.stipple,
+					      XRenderFindStandardFormat (FRAME_X_DISPLAY (f),
+									 PictStandardA1),
+					      CPRepeat, &attrs);
+
+	      XRenderFillRectangle (FRAME_X_DISPLAY (f), PictOpSrc,
+				    FRAME_X_PICTURE (f),
+				    &alpha, x, y, width, height);
+
+	      fill = XRenderCreateSolidFill (FRAME_X_DISPLAY (f), &xc);
+
+	      XRenderComposite (FRAME_X_DISPLAY (f), PictOpOver, fill, stipple,
+				FRAME_X_PICTURE (f), 0, 0, x, y, x, y, width, height);
+
+	      XRenderFreePicture (FRAME_X_DISPLAY (f), stipple);
+	      XRenderFreePicture (FRAME_X_DISPLAY (f), fill);
+	    }
+	  else
+#endif
+	    {
+	      x_xrender_color_from_gc_foreground (f, gc, &xc, true);
+	      XRenderFillRectangle (FRAME_X_DISPLAY (f),
+				    PictOpSrc, FRAME_X_PICTURE (f),
+				    &xc, x, y, width, height);
+	    }
 	  x_xr_reset_ext_clip (f);
 	  x_mark_frame_dirty (f);
 
@@ -1432,6 +1483,7 @@ x_clear_rectangle (struct frame *f, GC gc, int x, int y, int width, int height,
 #else
 #if defined HAVE_XRENDER && (RENDER_MAJOR > 0 || (RENDER_MINOR >= 2))
   if (respect_alpha_background
+      && f->alpha_background != 1.0
       && FRAME_DISPLAY_INFO (f)->alpha_bits
       && FRAME_CHECK_XR_VERSION (f, 0, 2))
     {
@@ -2497,9 +2549,7 @@ x_compute_glyph_string_overhangs (struct glyph_string *s)
 static void
 x_clear_glyph_string_rect (struct glyph_string *s, int x, int y, int w, int h)
 {
-  x_clear_rectangle (s->f, s->gc, x, y, w, h,
-		     (s->first_glyph->type != STRETCH_GLYPH
-		      || s->hl != DRAW_CURSOR));
+  x_clear_rectangle (s->f, s->gc, x, y, w, h, s->hl != DRAW_CURSOR);
 }
 
 
@@ -2528,7 +2578,7 @@ x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
 			    s->y + box_line_width,
 			    s->background_width,
 			    s->height - 2 * box_line_width,
-			    false);
+			    s->hl != DRAW_CURSOR);
 	  XSetFillStyle (display, s->gc, FillSolid);
 	  s->background_filled_p = true;
 	}
@@ -3141,13 +3191,35 @@ static void
 x_query_frame_background_color (struct frame *f, XColor *bgcolor)
 {
   unsigned long background = FRAME_BACKGROUND_PIXEL (f);
+#ifndef USE_CAIRO
+  XColor bg;
+#endif
 
   if (FRAME_DISPLAY_INFO (f)->alpha_bits)
     {
+#ifdef USE_CAIRO
       background = (background & ~FRAME_DISPLAY_INFO (f)->alpha_mask);
       background |= (((unsigned long) (f->alpha_background * 0xffff)
 		      >> (16 - FRAME_DISPLAY_INFO (f)->alpha_bits))
 		     << FRAME_DISPLAY_INFO (f)->alpha_offset);
+#else
+      if (FRAME_DISPLAY_INFO (f)->alpha_bits
+	  && f->alpha_background < 1.0)
+	{
+	  bg.pixel = background;
+	  x_query_colors (f, &bg, 1);
+	  bg.red *= f->alpha_background;
+	  bg.green *= f->alpha_background;
+	  bg.blue *= f->alpha_background;
+
+	  background = x_make_truecolor_pixel (FRAME_DISPLAY_INFO (f),
+					       bg.red, bg.green, bg.blue);
+	  background &= ~FRAME_DISPLAY_INFO (f)->alpha_mask;
+	  background |= (((unsigned long) (f->alpha_background * 0xffff)
+			  >> (16 - FRAME_DISPLAY_INFO (f)->alpha_bits))
+			 << FRAME_DISPLAY_INFO (f)->alpha_offset);
+	}
+#endif
     }
 
   bgcolor->pixel = background;
@@ -4172,7 +4244,7 @@ x_draw_glyph_string_bg_rect (struct glyph_string *s, int x, int y, int w, int h)
 
       /* Fill background with a stipple pattern.  */
       XSetFillStyle (display, s->gc, FillOpaqueStippled);
-      x_fill_rectangle (s->f, s->gc, x, y, w, h, false);
+      x_fill_rectangle (s->f, s->gc, x, y, w, h, true);
       XSetFillStyle (display, s->gc, FillSolid);
     }
   else
@@ -4255,6 +4327,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
 	      XGCValues xgcv;
 #if defined HAVE_XRENDER && (RENDER_MAJOR > 0 || (RENDER_MINOR >= 2))
 	      if (FRAME_DISPLAY_INFO (s->f)->alpha_bits
+		  && s->f->alpha_background != 1.0
 		  && FRAME_CHECK_XR_VERSION (s->f, 0, 2)
 		  && FRAME_X_PICTURE_FORMAT (s->f))
 		{
@@ -4939,6 +5012,7 @@ x_clear_area (struct frame *f, int x, int y, int width, int height)
       x_xr_ensure_picture (f);
       if (FRAME_DISPLAY_INFO (f)->alpha_bits
 	  && FRAME_X_PICTURE (f) != None
+	  && f->alpha_background != 1.0
 	  && FRAME_CHECK_XR_VERSION (f, 0, 2))
 	{
 	  XRenderColor xc;
@@ -5647,6 +5721,13 @@ x_any_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
   if (wdesc == None)
     return NULL;
 
+#ifdef HAVE_XWIDGETS
+  struct xwidget_view *xv = xwidget_view_from_window (wdesc);
+
+  if (xv)
+    return xv->frame;
+#endif
+
   FOR_EACH_FRAME (tail, frame)
     {
       if (found)
@@ -6081,7 +6162,10 @@ x_find_modifier_meanings (struct x_display_info *dpyinfo)
     dpyinfo->hyper_mod_mask &= ~dpyinfo->super_mod_mask;
 
   XFree (syms);
-  XFreeModifiermap (mods);
+
+  if (dpyinfo->modmap)
+    XFreeModifiermap (dpyinfo->modmap);
+  dpyinfo->modmap = mods;
 }
 
 /* Convert between the modifier bits X uses and the modifier bits
@@ -9090,7 +9174,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   int do_help = 0;
   ptrdiff_t nbytes = 0;
   struct frame *any, *f = NULL;
-  struct coding_system coding;
   Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
   /* This holds the state XLookupString needs to implement dead keys
      and other tricks known as "compose processing".  _X Window System_
@@ -9099,8 +9182,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   static XComposeStatus compose_status;
   XEvent configureEvent;
   XEvent next_event;
-
-  USE_SAFE_ALLOCA;
+  Lisp_Object coding;
 
   *finish = X_EVENT_NORMAL;
 
@@ -9753,6 +9835,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     case KeyPress:
       x_display_set_last_user_time (dpyinfo, event->xkey.time);
       ignore_next_mouse_click_timeout = 0;
+      coding = Qlatin_1;
 
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
       /* Dispatch KeyPress events when in menu.  */
@@ -9809,11 +9892,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           unsigned char *copy_bufptr = copy_buffer;
           int copy_bufsiz = sizeof (copy_buffer);
           int modifiers;
-          Lisp_Object coding_system = Qlatin_1;
 	  Lisp_Object c;
 	  /* `xkey' will be modified, but it's not important to modify
 	     `event' itself.  */
 	  XKeyEvent xkey = event->xkey;
+	  int i;
 
 #ifdef USE_GTK
           /* Don't pass keys to GTK.  A Tab will shift focus to the
@@ -9845,16 +9928,37 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           if (modifiers & dpyinfo->meta_mod_mask)
             memset (&compose_status, 0, sizeof (compose_status));
 
+#ifdef HAVE_XKB
+	  if (FRAME_DISPLAY_INFO (f)->xkb_desc)
+	    {
+	      XkbDescRec *rec = FRAME_DISPLAY_INFO (f)->xkb_desc;
+
+	      if (rec->map->modmap && rec->map->modmap[xkey.keycode])
+		goto done_keysym;
+	    }
+	  else
+#endif
+	    {
+	      if (dpyinfo->modmap)
+		{
+		  for (i = 0; i < 8 * dpyinfo->modmap->max_keypermod; i++)
+		    {
+		      if (xkey.keycode == dpyinfo->modmap->modifiermap[i])
+			  goto done_keysym;
+		    }
+		}
+	    }
+
 #ifdef HAVE_X_I18N
           if (FRAME_XIC (f))
             {
               Status status_return;
 
-              coding_system = Vlocale_coding_system;
               nbytes = XmbLookupString (FRAME_XIC (f),
                                         &xkey, (char *) copy_bufptr,
                                         copy_bufsiz, &keysym,
                                         &status_return);
+	      coding = Qnil;
               if (status_return == XBufferOverflow)
                 {
                   copy_bufsiz = nbytes + 1;
@@ -10017,64 +10121,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  {	/* Raw bytes, not keysym.  */
 	    ptrdiff_t i;
-	    int nchars, len;
 
-	    for (i = 0, nchars = 0; i < nbytes; i++)
-	      {
-		if (ASCII_CHAR_P (copy_bufptr[i]))
-		  nchars++;
-		STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
-	      }
+	    for (i = 0; i < nbytes; i++)
+	      STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
 
-	    if (nchars < nbytes)
-	      {
-		/* If we don't bail out here then GTK can crash
-		   from the resulting signal in `setup_coding_system'.  */
-		if (NILP (Fcoding_system_p (coding_system)))
-		  goto done_keysym;
+	    inev.ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
+	    inev.ie.arg = make_unibyte_string ((char *) copy_bufptr, nbytes);
 
-		/* Decode the input data.  */
-
-		/* The input should be decoded with `coding_system'
-		   which depends on which X*LookupString function
-		   we used just above and the locale.  */
-		setup_coding_system (coding_system, &coding);
-		coding.src_multibyte = false;
-		coding.dst_multibyte = true;
-		/* The input is converted to events, thus we can't
-		   handle composition.  Anyway, there's no XIM that
-		   gives us composition information.  */
-		coding.common_flags &= ~CODING_ANNOTATION_MASK;
-
-		SAFE_NALLOCA (coding.destination, MAX_MULTIBYTE_LENGTH,
-			      nbytes);
-		coding.dst_bytes = MAX_MULTIBYTE_LENGTH * nbytes;
-		coding.mode |= CODING_MODE_LAST_BLOCK;
-		decode_coding_c_string (&coding, copy_bufptr, nbytes, Qnil);
-		nbytes = coding.produced;
-		nchars = coding.produced_char;
-		copy_bufptr = coding.destination;
-	      }
-
-	    /* Convert the input data to a sequence of
-	       character events.  */
-	    for (i = 0; i < nbytes; i += len)
-	      {
-		int ch;
-		if (nchars == nbytes)
-		  ch = copy_bufptr[i], len = 1;
-		else
-		  ch = string_char_and_length (copy_bufptr + i, &len);
-		inev.ie.kind = (SINGLE_BYTE_CHAR_P (ch)
-				? ASCII_KEYSTROKE_EVENT
-				: MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-		inev.ie.code = ch;
-		kbd_buffer_store_buffered_event (&inev, hold_quit);
-	      }
-
-	    count += nchars;
-
-	    inev.ie.kind = NO_EVENT;  /* Already stored above.  */
+	    Fput_text_property (make_fixnum (0), make_fixnum (nbytes),
+				Qcoding, coding, inev.ie.arg);
 
 	    if (keysym == NoSymbol)
 	      break;
@@ -10779,6 +10834,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	XIEnterEvent *enter = (XIEnterEvent *) xi_event;
 	XIFocusInEvent *focusin = (XIFocusInEvent *) xi_event;
 	XIFocusOutEvent *focusout = (XIFocusOutEvent *) xi_event;
+	XIDeviceChangedEvent *device_changed = (XIDeviceChangedEvent *) xi_event;
 	XIValuatorState *states;
 	double *values;
 	bool found_valuator = false;
@@ -10851,6 +10907,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    if (!any)
 	      any = x_any_window_to_frame (dpyinfo, enter->event);
 
+	    xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid,
+						     true);
+
 	    {
 #ifdef HAVE_XWIDGETS
 	      struct xwidget_view *xwidget_view = xwidget_view_from_window (enter->event);
@@ -10914,7 +10973,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       moves out of a frame (and not into one of its
 	       children, which we know about).  */
 	    if (leave->detail != XINotifyInferior && any)
-	      xi_reset_scroll_valuators_for_device_id (dpyinfo, enter->deviceid);
+	      xi_reset_scroll_valuators_for_device_id (dpyinfo,
+						       enter->deviceid, false);
 
 #ifdef HAVE_XWIDGETS
 	    {
@@ -10973,18 +11033,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	  case XI_Motion:
 	    {
 	      struct xi_device_t *device;
-	      bool touch_end_event_seen = false;
 
 	      states = &xev->valuators;
 	      values = states->values;
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
-	      if (!device || !device->master_p)
+	      if (!device)
 		goto XI_OTHER;
 
 #ifdef XI_TouchBegin
-	      if (xev->flags & XIPointerEmulated
-		  && dpyinfo->xi2_version >= 2)
+	      if (xev->flags & XIPointerEmulated)
 		goto XI_OTHER;
 #endif
 
@@ -10993,6 +11051,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      double xv_total_x = 0.0;
 	      double xv_total_y = 0.0;
 #endif
+	      double total_x = 0.0;
+	      double total_y = 0.0;
 
 	      for (int i = 0; i < states->mask_len * 8; i++)
 		{
@@ -11009,19 +11069,21 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			 scroll wheel movement is reported on XInput 2.  */
 		      delta = x_get_scroll_valuator_delta (dpyinfo, xev->deviceid,
 							   i, *values, &val);
+		      values++;
 
 		      if (delta != DBL_MAX)
 			{
+			  if (!f)
+			    {
+			      f = x_any_window_to_frame (dpyinfo, xev->event);
+
+			      if (!f)
+				goto XI_OTHER;
+			    }
+
 #ifdef HAVE_XWIDGETS
 			  if (xv)
 			    {
-			      /* FIXME: figure out what in GTK is
-				 causing interval values to jump by
-				 >100 at the end of a touch sequence
-				 when an xwidget gets a scroll event
-				 where is_stop is TRUE.  */
-			      if (fabs (delta) > 100)
-				continue;
 			      if (val->horizontal)
 				xv_total_x += delta;
 			      else
@@ -11031,15 +11093,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      continue;
 			    }
 #endif
-			  if (!f)
-			    {
-			      f = x_any_window_to_frame (dpyinfo, xev->event);
 
-			      if (!f)
-				goto XI_OTHER;
-			    }
-
-			  found_valuator = true;
+			  if (delta == 0.0)
+			    found_valuator = true;
 
 			  if (signbit (delta) != signbit (val->emacs_value))
 			    val->emacs_value = 0;
@@ -11050,26 +11106,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      && (fabs (val->emacs_value) < 1)
 			      && (fabs (delta) > 0))
 			    continue;
-
-			  bool s = signbit (val->emacs_value);
-			  inev.ie.kind = (fabs (delta) > 0
-					  ? (val->horizontal
-					     ? HORIZ_WHEEL_EVENT
-					     : WHEEL_EVENT)
-					  : TOUCH_END_EVENT);
-			  inev.ie.timestamp = xev->time;
-
-			  XSETINT (inev.ie.x, lrint (xev->event_x));
-			  XSETINT (inev.ie.y, lrint (xev->event_y));
-			  XSETFRAME (inev.ie.frame_or_window, f);
-
-			  if (fabs (delta) > 0)
-			    {
-			      inev.ie.modifiers = !s ? up_modifier : down_modifier;
-			      inev.ie.modifiers
-				|= x_x_to_emacs_modifiers (dpyinfo,
-							   xev->mods.effective);
-			    }
 
 			  window = window_from_coordinates (f, xev->event_x,
 							    xev->event_y, NULL,
@@ -11088,41 +11124,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  if (NUMBERP (Vx_scroll_event_delta_factor))
 			    scroll_unit *= XFLOATINT (Vx_scroll_event_delta_factor);
 
-			  if (fabs (delta) > 0)
-			    {
-			      if (val->horizontal)
-				{
-				  inev.ie.arg
-				    = list3 (Qnil,
-					     make_float (val->emacs_value
-							 * scroll_unit),
-					     make_float (0));
-				}
-			      else
-				{
-				  inev.ie.arg = list3 (Qnil, make_float (0),
-						       make_float (val->emacs_value
-								   * scroll_unit));
-				}
-			    }
+			  if (val->horizontal)
+			    total_x += delta * scroll_unit;
 			  else
-			    {
-			      inev.ie.arg = Qnil;
-			    }
+			    total_y += delta * scroll_unit;
 
-			  if (inev.ie.kind != TOUCH_END_EVENT
-			      || !touch_end_event_seen)
-			    {
-			      kbd_buffer_store_event_hold (&inev.ie, hold_quit);
-			      touch_end_event_seen = inev.ie.kind == TOUCH_END_EVENT;
-			    }
-
+			  found_valuator = true;
 			  val->emacs_value = 0;
 			}
-		      values++;
 		    }
-
-		  inev.ie.kind = NO_EVENT;
 		}
 
 #ifdef HAVE_XWIDGETS
@@ -11152,15 +11162,51 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  goto XI_OTHER;
 		}
-#endif
-	      if (found_valuator)
+	      else
 		{
-#ifdef USE_GTK
-		  if (f && xg_event_is_for_scrollbar (f, event))
-		    *finish = X_EVENT_DROP;
 #endif
-		  goto XI_OTHER;
+		  if (found_valuator)
+		    {
+		      if (fabs (total_x) > 0 || fabs (total_y) > 0)
+			{
+			  inev.ie.kind = (fabs (total_y) >= fabs (total_x)
+					  ? WHEEL_EVENT : HORIZ_WHEEL_EVENT);
+			  inev.ie.timestamp = xev->time;
+
+			  XSETINT (inev.ie.x, lrint (xev->event_x));
+			  XSETINT (inev.ie.y, lrint (xev->event_y));
+			  XSETFRAME (inev.ie.frame_or_window, f);
+
+			  inev.ie.modifiers = (signbit (fabs (total_y) >= fabs (total_x)
+							? total_y : total_x)
+					       ? down_modifier : up_modifier);
+			  inev.ie.modifiers
+			    |= x_x_to_emacs_modifiers (dpyinfo,
+						       xev->mods.effective);
+			  inev.ie.arg = list3 (Qnil,
+					       make_float (total_x),
+					       make_float (total_y));
+
+#ifdef USE_GTK
+			  if (f && xg_event_is_for_scrollbar (f, event))
+			    *finish = X_EVENT_DROP;
+#endif
+			}
+		      else
+			{
+			  inev.ie.kind = TOUCH_END_EVENT;
+			  inev.ie.timestamp = xev->time;
+
+			  XSETINT (inev.ie.x, lrint (xev->event_x));
+			  XSETINT (inev.ie.y, lrint (xev->event_y));
+			  XSETFRAME (inev.ie.frame_or_window, f);
+			}
+
+		      goto XI_OTHER;
+		    }
+#ifdef HAVE_XWIDGETS
 		}
+#endif
 
 	      ev.x = lrint (xev->event_x);
 	      ev.y = lrint (xev->event_y);
@@ -11293,7 +11339,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
-	      if (!device || !device->master_p)
+	      if (!device)
 		goto XI_OTHER;
 
 	      bv.button = xev->detail;
@@ -11458,15 +11504,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      KeySym keysym;
 	      char copy_buffer[81];
 	      char *copy_bufptr = copy_buffer;
-	      unsigned char *copy_ubufptr;
 	      int copy_bufsiz = sizeof (copy_buffer);
 	      ptrdiff_t i;
-	      int nchars, len;
 	      struct xi_device_t *device;
+
+	      coding = Qlatin_1;
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
-	      if (!device || !device->master_p)
+	      if (!device)
 		goto XI_OTHER;
 
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
@@ -11523,6 +11569,27 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  goto XI_OTHER;
 		}
 #endif
+
+#ifdef HAVE_XKB
+	      if (FRAME_DISPLAY_INFO (f)->xkb_desc)
+		{
+		  XkbDescRec *rec = FRAME_DISPLAY_INFO (f)->xkb_desc;
+
+		  if (rec->map->modmap && rec->map->modmap[xev->detail])
+		    goto xi_done_keysym;
+		}
+	      else
+#endif
+		{
+		  if (dpyinfo->modmap)
+		    {
+		      for (i = 0; i < 8 * dpyinfo->modmap->max_keypermod; i++)
+			{
+			  if (xkey.keycode == dpyinfo->modmap->modifiermap[xev->detail])
+			    goto xi_done_keysym;
+			}
+		    }
+		}
 
 #ifdef HAVE_XKB
 	      if (dpyinfo->xkb_desc)
@@ -11591,6 +11658,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 						&xkey, (char *) copy_bufptr,
 						copy_bufsiz, &keysym,
 						&status_return);
+		      coding = Qnil;
 
 		      if (status_return == XBufferOverflow)
 			{
@@ -11637,6 +11705,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      if (overflow)
 				nbytes = 0;
 			    }
+
+			  coding = Qnil;
 			}
 		      else
 #endif
@@ -11763,62 +11833,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      goto xi_done_keysym;
 		    }
 
-		  for (i = 0, nchars = 0; i < nbytes; i++)
-		    {
-		      if (ASCII_CHAR_P (copy_bufptr[i]))
-			nchars++;
-		      STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
-		    }
+		  for (i = 0; i < nbytes; i++)
+		    STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
 
-		  if (nchars < nbytes)
-		    {
-		      /* If we don't bail out here then GTK can crash
-			 from the resulting signal in `setup_coding_system'.  */
-		      if (NILP (Fcoding_system_p (Vlocale_coding_system)))
-			goto xi_done_keysym;
+		  inev.ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
+		  inev.ie.arg = make_unibyte_string (copy_bufptr, nbytes);
 
-		      /* Decode the input data.  */
-
-		      setup_coding_system (Vlocale_coding_system, &coding);
-		      coding.src_multibyte = false;
-		      coding.dst_multibyte = true;
-		      /* The input is converted to events, thus we can't
-			 handle composition.  Anyway, there's no XIM that
-			 gives us composition information.  */
-		      coding.common_flags &= ~CODING_ANNOTATION_MASK;
-
-		      SAFE_NALLOCA (coding.destination, MAX_MULTIBYTE_LENGTH,
-				    nbytes);
-		      coding.dst_bytes = MAX_MULTIBYTE_LENGTH * nbytes;
-		      coding.mode |= CODING_MODE_LAST_BLOCK;
-		      decode_coding_c_string (&coding, (unsigned char *) copy_bufptr,
-					      nbytes, Qnil);
-		      nbytes = coding.produced;
-		      nchars = coding.produced_char;
-		      copy_bufptr = (char *) coding.destination;
-		    }
-
-		  copy_ubufptr = (unsigned char *) copy_bufptr;
-
-		  /* Convert the input data to a sequence of
-		     character events.  */
-		  for (i = 0; i < nbytes; i += len)
-		    {
-		      int ch;
-		      if (nchars == nbytes)
-			ch = copy_ubufptr[i], len = 1;
-		      else
-			ch = string_char_and_length (copy_ubufptr + i, &len);
-		      inev.ie.kind = (SINGLE_BYTE_CHAR_P (ch)
-				      ? ASCII_KEYSTROKE_EVENT
-				      : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-		      inev.ie.code = ch;
-		      kbd_buffer_store_buffered_event (&inev, hold_quit);
-		    }
-
-		  inev.ie.kind = NO_EVENT;
+		  Fput_text_property (make_fixnum (0), make_fixnum (nbytes),
+				      Qcoding, coding, inev.ie.arg);
 		  goto xi_done_keysym;
 		}
+
 	      goto XI_OTHER;
 	    }
 
@@ -11857,16 +11882,129 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    goto XI_OTHER;
 
 	  case XI_PropertyEvent:
+	    goto XI_OTHER;
+
 	  case XI_HierarchyChanged:
-	  case XI_DeviceChanged:
-#ifdef XISlaveSwitch
-	    if (xi_event->evtype == XI_DeviceChanged
-		&& (((XIDeviceChangedEvent *) xi_event)->reason
-		    == XISlaveSwitch))
-	      goto XI_OTHER;
-#endif
 	    x_init_master_valuators (dpyinfo);
 	    goto XI_OTHER;
+
+	  case XI_DeviceChanged:
+	    {
+	      struct xi_device_t *device;
+	      struct xi_touch_point_t *tem, *last;
+	      int c, i;
+
+	      device = xi_device_from_id (dpyinfo, device_changed->deviceid);
+
+	      if (!device)
+		{
+		  /* An existing device might have been enabled.  */
+		  x_init_master_valuators (dpyinfo);
+
+		  /* Now try to find the device again, in case it was
+		     just enabled.  */
+		  device = xi_device_from_id (dpyinfo, device_changed->deviceid);
+		}
+
+	      /* If it wasn't enabled, then stop handling this event.  */
+	      if (!device)
+		goto XI_OTHER;
+
+	      /* Free data that we will regenerate from new
+		 information.  */
+	      device->valuators = xrealloc (device->valuators,
+					    (device_changed->num_classes
+					     * sizeof *device->valuators));
+	      device->scroll_valuator_count = 0;
+	      device->direct_p = false;
+
+	      for (c = 0; c < device_changed->num_classes; ++c)
+		{
+		  switch (device_changed->classes[c]->type)
+		    {
+#ifdef XIScrollClass
+		    case XIScrollClass:
+		      {
+			XIScrollClassInfo *info;
+
+			info = (XIScrollClassInfo *) device_changed->classes[c];
+			struct xi_scroll_valuator_t *valuator;
+
+			valuator = &device->valuators[device->scroll_valuator_count++];
+			valuator->horizontal
+			  = (info->scroll_type == XIScrollTypeHorizontal);
+			valuator->invalid_p = true;
+			valuator->emacs_value = DBL_MIN;
+			valuator->increment = info->increment;
+			valuator->number = info->number;
+
+			break;
+		      }
+#endif
+
+#ifdef XITouchClass
+		    case XITouchClass:
+		      {
+			XITouchClassInfo *info;
+
+			info = (XITouchClassInfo *) device_changed->classes[c];
+			device->direct_p = info->mode == XIDirectTouch;
+		      }
+#endif
+		    default:
+		      break;
+		    }
+		}
+
+#ifdef XIScrollClass
+	      for (c = 0; c < device_changed->num_classes; ++c)
+		{
+		  if (device_changed->classes[c]->type == XIValuatorClass)
+		    {
+		      XIValuatorClassInfo *info;
+
+		      info = (XIValuatorClassInfo *) device_changed->classes[c];
+
+		      for (i = 0; i < device->scroll_valuator_count; ++i)
+			{
+			  if (device->valuators[i].number == info->number)
+			    {
+			      device->valuators[i].invalid_p = false;
+			      device->valuators[i].current_value = info->value;
+
+			      /* Make sure that this is reset if the
+				 pointer moves into a window of ours.
+
+				 Otherwise the valuator state could be
+				 left invalid if the DeviceChange
+				 event happened with the pointer
+				 outside any Emacs frame. */
+			      device->valuators[i].pending_enter_reset = true;
+			    }
+			}
+		    }
+		}
+#endif
+
+	      /* The device is no longer a DirectTouch device, so
+		 remove any touchpoints that we might have
+		 recorded.  */
+	      if (!device->direct_p)
+		{
+		  tem = device->touchpoints;
+
+		  while (tem)
+		    {
+		      last = tem;
+		      tem = tem->next;
+		      xfree (last);
+		    }
+
+		  device->touchpoints = NULL;
+		}
+
+	      goto XI_OTHER;
+	    }
 
 #ifdef XI_TouchBegin
 	  case XI_TouchBegin:
@@ -12040,7 +12178,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      XIGesturePinchEvent *pev = (XIGesturePinchEvent *) xi_event;
 	      struct xi_device_t *device = xi_device_from_id (dpyinfo, pev->deviceid);
 
-	      if (!device || !device->master_p)
+	      if (!device)
 		goto XI_OTHER;
 
 #ifdef HAVE_XWIDGETS
@@ -12200,7 +12338,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   /* Sometimes event processing draws to the frame outside redisplay.
      To ensure that these changes become visible, draw them here.  */
   flush_dirty_back_buffers ();
-  SAFE_FREE ();
   return count;
 }
 
@@ -14923,7 +15060,7 @@ x_iconify_frame (struct frame *f)
     msg.xclient.data.l[0] = IconicState;
 
     if (! XSendEvent (FRAME_X_DISPLAY (f),
-		      DefaultRootWindow (FRAME_X_DISPLAY (f)),
+		      FRAME_DISPLAY_INFO (f)->root_window,
 		      False,
 		      SubstructureRedirectMask | SubstructureNotifyMask,
 		      &msg))
@@ -15898,6 +16035,18 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #else
   dpyinfo->display->db = xrdb;
 #endif
+
+#ifdef HAVE_XRENDER
+  int event_base, error_base;
+  dpyinfo->xrender_supported_p
+    = XRenderQueryExtension (dpyinfo->display, &event_base, &error_base);
+
+  if (dpyinfo->xrender_supported_p)
+    dpyinfo->xrender_supported_p
+      = XRenderQueryVersion (dpyinfo->display, &dpyinfo->xrender_major,
+			     &dpyinfo->xrender_minor);
+#endif
+
   /* Put the rdb where we can find it in a way that works on
      all versions.  */
   dpyinfo->rdb = xrdb;
@@ -15913,19 +16062,12 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   reset_mouse_highlight (&dpyinfo->mouse_highlight);
 
 #ifdef HAVE_XRENDER
-  int event_base, error_base;
-  dpyinfo->xrender_supported_p
-    = XRenderQueryExtension (dpyinfo->display, &event_base, &error_base);
-
-  if (dpyinfo->xrender_supported_p)
-    {
-      if (!XRenderQueryVersion (dpyinfo->display, &dpyinfo->xrender_major,
-				&dpyinfo->xrender_minor))
-	dpyinfo->xrender_supported_p = false;
-      else
-	dpyinfo->pict_format = XRenderFindVisualFormat (dpyinfo->display,
-							dpyinfo->visual);
-    }
+  if (dpyinfo->xrender_supported_p
+      /* This could already have been initialized by
+	 `select_visual'.  */
+      && !dpyinfo->pict_format)
+    dpyinfo->pict_format = XRenderFindVisualFormat (dpyinfo->display,
+						    dpyinfo->visual);
 #endif
 
 #ifdef HAVE_XSYNC
@@ -16488,6 +16630,11 @@ x_delete_display (struct x_display_info *dpyinfo)
   xfree (dpyinfo->x_dnd_atoms);
   xfree (dpyinfo->color_cells);
   xfree (dpyinfo);
+
+#ifdef HAVE_XINPUT2
+  if (dpyinfo->supports_xi2)
+    x_free_xi_devices (dpyinfo);
+#endif
 }
 
 #ifdef USE_X_TOOLKIT
@@ -16633,10 +16780,6 @@ x_delete_terminal (struct terminal *terminal)
       if (dpyinfo->xkb_desc)
 	XkbFreeKeyboard (dpyinfo->xkb_desc, XkbAllComponentsMask, True);
 #endif
-#ifdef HAVE_XINPUT2
-      if (dpyinfo->supports_xi2)
-	x_free_xi_devices (dpyinfo);
-#endif
 #ifdef USE_GTK
       xg_display_close (dpyinfo->display);
 #else
@@ -16646,6 +16789,9 @@ x_delete_terminal (struct terminal *terminal)
       XCloseDisplay (dpyinfo->display);
 #endif
 #endif /* ! USE_GTK */
+
+      if (dpyinfo->modmap)
+	XFreeModifiermap (dpyinfo->modmap);
       /* Do not close the connection here because it's already closed
 	 by X(t)CloseDisplay (Bug#18403).  */
       dpyinfo->display = NULL;
@@ -16800,7 +16946,11 @@ init_xterm (void)
   /* Emacs can handle only core input events when built without XI2
      support, so make sure Gtk doesn't use Xinput or Xinput2
      extensions.  */
+#ifndef HAVE_GTK3
   xputenv ("GDK_CORE_DEVICE_EVENTS=1");
+#else
+  gdk_disable_multidevice ();
+#endif
 #endif
 }
 #endif

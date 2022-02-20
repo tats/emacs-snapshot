@@ -444,9 +444,14 @@ is inserted before adjusting the number of empty lines."
 ;;;###autoload
 (defun string-pixel-width (string)
   "Return the width of STRING in pixels."
-  (with-temp-buffer
-    (insert string)
-    (car (buffer-text-pixel-size nil nil t))))
+  (if (zerop (length string))
+      0
+    ;; Keeping a work buffer around is more efficient than creating a
+    ;; new temporary buffer.
+    (with-current-buffer (get-buffer-create " *string-pixel-width*")
+      (delete-region (point-min) (point-max))
+      (insert string)
+      (car (buffer-text-pixel-size nil nil t)))))
 
 ;;;###autoload
 (defun string-glyph-split (string)
