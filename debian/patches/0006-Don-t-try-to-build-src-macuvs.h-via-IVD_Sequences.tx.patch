@@ -9,17 +9,19 @@ over the licensing.
  1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index e75010d..e111cb9 100644
+index 4b3e72f..566f84c 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -43,17 +43,12 @@ unifiles =
+@@ -43,7 +43,7 @@ unifiles =
  
  .PHONY: all
  
 -all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
 +all: ${unifiles} ${unidir}/charscript.el \
-   ${unidir}/charprop.el ${unidir}/emoji-zwj.el ${unidir}/emoji-labels.el
- 
+   ${unidir}/charprop.el ${unidir}/emoji-zwj.el ${unidir}/emoji-labels.el \
+   ${unidir}/uni-scripts.el ${unidir}/uni-confusable.el \
+   ${unidir}/idna-mapping.el
+@@ -51,11 +51,6 @@ all:
  ## Specify .elc as an order-only prereq so as to not needlessly rebuild
  ## target just because the .elc is missing.
  ## Same with charprop.el below.
