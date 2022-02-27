@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
 ;; Version: 0.8.1
-;; Package-Requires: ((emacs "26.1") (xref "1.0.2"))
+;; Package-Requires: ((emacs "26.1") (xref "1.4.0"))
 
 ;; This is a GNU ELPA :core package.  Avoid using functionality that
 ;; not compatible with the version of Emacs recorded above.
@@ -776,7 +776,6 @@ The following commands are available:
   (define-key tab-prefix-map "p" #'project-other-tab-command))
 
 (declare-function grep-read-files "grep")
-(declare-function xref--show-xrefs "xref")
 (declare-function xref--find-ignores-arguments "xref")
 
 ;;;###autoload
@@ -802,7 +801,7 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
               (project--files-in-directory dir
                                            nil
                                            (grep-read-files regexp))))))
-    (xref--show-xrefs
+    (xref-show-xrefs
      (apply-partially #'project--find-regexp-in-files regexp files)
      nil)))
 
@@ -830,7 +829,7 @@ pattern to search for."
           (project-files pr (cons
                              (project-root pr)
                              (project-external-roots pr)))))
-    (xref--show-xrefs
+    (xref-show-xrefs
      (apply-partially #'project--find-regexp-in-files regexp files)
      nil)))
 
@@ -1113,6 +1112,29 @@ If non-nil, it overrides `compilation-buffer-name-function' for
              compilation-buffer-name-function)))
     (call-interactively #'compile)))
 
+(defcustom project-ignore-buffer-conditions nil
+  "List of conditions to filter the buffers to be switched to.
+If any of these conditions are satisfied for a buffer in the
+current project, `project-switch-to-buffer',
+`project-display-buffer' and `project-display-buffer-other-frame'
+ignore it.
+See the doc string of `project-kill-buffer-conditions' for the
+general form of conditions."
+  :type '(repeat (choice regexp function symbol
+                         (cons :tag "Major mode"
+                               (const major-mode) symbol)
+                         (cons :tag "Derived mode"
+                               (const derived-mode) symbol)
+                         (cons :tag "Negation"
+                               (const not) sexp)
+                         (cons :tag "Conjunction"
+                               (const and) sexp)
+                         (cons :tag "Disjunction"
+                               (const or) sexp)))
+  :version "29.1"
+  :group 'project
+  :package-version '(project . "0.8.2"))
+
 (defun project--read-project-buffer ()
   (let* ((pr (project-current t))
          (current-buffer (current-buffer))
@@ -1122,7 +1144,10 @@ If non-nil, it overrides `compilation-buffer-name-function' for
          (predicate
           (lambda (buffer)
             ;; BUFFER is an entry (BUF-NAME . BUF-OBJ) of Vbuffer_alist.
-            (memq (cdr buffer) buffers))))
+            (and (memq (cdr buffer) buffers)
+                 (not
+                  (project--buffer-check
+                   (cdr buffer) project-ignore-buffer-conditions))))))
     (read-buffer
      "Switch to buffer: "
      (when (funcall predicate (cons other-name other-buffer))
@@ -1240,11 +1265,12 @@ Used by `project-kill-buffers'."
         (push buf bufs)))
     (nreverse bufs)))
 
-(defun project--kill-buffer-check (buf conditions)
+(defun project--buffer-check (buf conditions)
   "Check if buffer BUF matches any element of the list CONDITIONS.
-See `project-kill-buffer-conditions' for more details on the form
-of CONDITIONS."
-  (catch 'kill
+See `project-kill-buffer-conditions' or
+`project-ignore-buffer-conditions' for more details on the
+form of CONDITIONS."
+  (catch 'match
     (dolist (c conditions)
       (when (cond
              ((stringp c)
@@ -1259,15 +1285,15 @@ of CONDITIONS."
                (buffer-local-value 'major-mode buf)
                (cdr c)))
              ((eq (car-safe c) 'not)
-              (not (project--kill-buffer-check buf (cdr c))))
+              (not (project--buffer-check buf (cdr c))))
              ((eq (car-safe c) 'or)
-              (project--kill-buffer-check buf (cdr c)))
+              (project--buffer-check buf (cdr c)))
              ((eq (car-safe c) 'and)
               (seq-every-p
-               (apply-partially #'project--kill-buffer-check
+               (apply-partially #'project--buffer-check
                                 buf)
                (mapcar #'list (cdr c)))))
-        (throw 'kill t)))))
+        (throw 'match t)))))
 
 (defun project--buffers-to-kill (pr)
   "Return list of buffers in project PR to kill.
@@ -1275,7 +1301,7 @@ What buffers should or should not be killed is described
 in `project-kill-buffer-conditions'."
   (let (bufs)
     (dolist (buf (project-buffers pr))
-      (when (project--kill-buffer-check buf project-kill-buffer-conditions)
+      (when (project--buffer-check buf project-kill-buffer-conditions)
         (push buf bufs)))
     bufs))
 

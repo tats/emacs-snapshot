@@ -76,6 +76,7 @@ enum haiku_event_type
     ICONIFICATION,
     MOVE_EVENT,
     SCROLL_BAR_VALUE_EVENT,
+    SCROLL_BAR_PART_EVENT,
     SCROLL_BAR_DRAG_EVENT,
     WHEEL_MOVE_EVENT,
     MENU_BAR_RESIZE,
@@ -295,13 +296,28 @@ struct haiku_font_pattern
 struct haiku_scroll_bar_value_event
 {
   void *scroll_bar;
+  void *window;
   int position;
 };
 
 struct haiku_scroll_bar_drag_event
 {
   void *scroll_bar;
+  void *window;
   int dragging_p;
+};
+
+enum haiku_scroll_bar_part
+  {
+    HAIKU_SCROLL_BAR_UP_BUTTON,
+    HAIKU_SCROLL_BAR_DOWN_BUTTON
+  };
+
+struct haiku_scroll_bar_part_event
+{
+  void *scroll_bar;
+  void *window;
+  enum haiku_scroll_bar_part part;
 };
 
 struct haiku_menu_bar_resize_event
@@ -621,7 +637,11 @@ extern "C"
   BView_invalidate (void *view);
 
   extern void
-  BView_draw_lock (void *view);
+  BView_draw_lock (void *view, bool invalidate_region,
+		   int x, int y, int width, int height);
+
+  extern void
+  BView_invalidate_region (void *view, int x, int y, int width, int height);
 
   extern void
   BView_draw_unlock (void *view);
@@ -665,6 +685,9 @@ extern "C"
 
   extern void
   BView_forget_scroll_bar (void *view, int x, int y, int width, int height);
+
+  extern bool
+  BView_inside_scroll_bar (void *view, int x, int y);
 
   extern void
   BView_get_mouse (void *view, int *x, int *y);
@@ -753,6 +776,9 @@ extern "C"
 
   extern void *
   BAlert_add_button (void *alert, const char *text);
+
+  extern void
+  BAlert_set_offset_spacing (void *alert);
 
   extern int32
   BAlert_go (void *alert,

@@ -1,7 +1,7 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
 ;; Copyright (C) 2014-2022 Free Software Foundation, Inc.
-;; Version: 1.3.2
+;; Version: 1.4.0
 ;; Package-Requires: ((emacs "26.1"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -485,13 +485,18 @@ To undo, use \\[xref-go-forward]."
       (set-marker marker nil nil)
       (run-hooks 'xref-after-return-hook))))
 
-(defvar xref--current-item nil)
+(define-obsolete-variable-alias
+  'xref--current-item
+  'xref-current-item
+  "29.1")
+
+(defvar xref-current-item nil)
 
 (defun xref-pulse-momentarily ()
   (pcase-let ((`(,beg . ,end)
                (save-excursion
                  (or
-                  (let ((length (xref-match-length xref--current-item)))
+                  (let ((length (xref-match-length xref-current-item)))
                     (and length (cons (point) (+ (point) length))))
                   (back-to-indentation)
                   (if (eolp)
@@ -548,7 +553,7 @@ If SELECT is non-nil, select the target window."
       (window (pop-to-buffer buf t))
       (frame  (let ((pop-up-frames t)) (pop-to-buffer buf t))))
     (xref--goto-char marker))
-  (let ((xref--current-item item))
+  (let ((xref-current-item item))
     (run-hooks 'xref-after-jump-hook)))
 
 
@@ -656,7 +661,7 @@ SELECT is `quit', also quit the *xref* window."
   "Display the source of xref at point in the appropriate window, if any."
   (interactive)
   (let* ((xref (xref--item-at-point))
-         (xref--current-item xref))
+         (xref-current-item xref))
     (when xref
       (xref--set-arrow)
       (xref--show-location (xref-item-location xref)))))
@@ -715,7 +720,7 @@ quit the *xref* buffer."
   (let* ((buffer (current-buffer))
          (xref (or (xref--item-at-point)
                    (user-error "Choose a reference to visit")))
-         (xref--current-item xref))
+         (xref-current-item xref))
     (xref--set-arrow)
     (xref--show-location (xref-item-location xref) (if quit 'quit t))
     (if (fboundp 'next-error-found)
@@ -945,7 +950,7 @@ beginning of the line."
            (let ((win (get-buffer-window (current-buffer))))
              (and win (set-window-point win (point))))
            (xref--set-arrow)
-           (let ((xref--current-item xref))
+           (let ((xref-current-item xref))
              (xref--show-location (xref-item-location xref) t)))
           (t
            (error "No %s xref" (if backward "previous" "next"))))))
@@ -1102,6 +1107,13 @@ Return an alist of the form ((GROUP . (XREF ...)) ...)."
              (cdr pair)))
      alist)))
 
+(defun xref--ensure-default-directory (dd buffer)
+  ;; We might be in a let-binding which will restore the current value
+  ;; to a previous one (bug#53626).  So do this later.
+  (run-with-timer
+   0 nil
+   (lambda () (with-current-buffer buffer (setq default-directory dd)))))
+
 (defun xref--show-xref-buffer (fetcher alist)
   (cl-assert (functionp fetcher))
   (let* ((xrefs
@@ -1112,7 +1124,7 @@ Return an alist of the form ((GROUP . (XREF ...)) ...)."
          (dd default-directory)
          buf)
     (with-current-buffer (get-buffer-create xref-buffer-name)
-      (setq default-directory dd)
+      (xref--ensure-default-directory dd (current-buffer))
       (xref--xref-buffer-mode)
       (xref--show-common-initialize xref-alist fetcher alist)
       (pop-to-buffer (current-buffer))
@@ -1211,7 +1223,7 @@ local keymap that binds `RET' to `xref-quit-and-goto-xref'."
                             (assoc-default 'display-action alist)))
      (t
       (with-current-buffer (get-buffer-create xref-buffer-name)
-        (setq default-directory dd)
+        (xref--ensure-default-directory dd (current-buffer))
         (xref--transient-buffer-mode)
         (xref--show-common-initialize (xref--analyze xrefs) fetcher alist)
         (pop-to-buffer (current-buffer)
@@ -1334,6 +1346,13 @@ definitions."
 (defvar xref--read-identifier-history nil)
 
 (defvar xref--read-pattern-history nil)
+
+;;;###autoload
+(defun xref-show-xrefs (fetcher display-action)
+  "Display some Xref values produced by FETCHER using DISPLAY-ACTION.
+The meanings of both arguments are the same as documented in
+`xref-show-xrefs-function'."
+  (xref--show-xrefs fetcher display-action))
 
 (defun xref--show-xrefs (fetcher display-action &optional _always-show-list)
   (xref--push-markers)
@@ -1904,21 +1923,22 @@ Such as the current syntax table and the applied syntax properties."
 
 (defvar xref--last-file-buffer nil)
 (defvar xref--temp-buffer-file-name nil)
+(defvar xref--hits-remote-id nil)
 
 (defun xref--convert-hits (hits regexp)
   (let (xref--last-file-buffer
         (tmp-buffer (generate-new-buffer " *xref-temp*"))
-        (remote-id (file-remote-p default-directory))
+        (xref--hits-remote-id (file-remote-p default-directory))
         (syntax-needed (xref--regexp-syntax-dependent-p regexp)))
     (unwind-protect
         (mapcan (lambda (hit)
-                  (xref--collect-matches hit regexp tmp-buffer remote-id syntax-needed))
+                  (xref--collect-matches hit regexp tmp-buffer syntax-needed))
                 hits)
       (kill-buffer tmp-buffer))))
 
-(defun xref--collect-matches (hit regexp tmp-buffer remote-id syntax-needed)
+(defun xref--collect-matches (hit regexp tmp-buffer syntax-needed)
   (pcase-let* ((`(,line ,file ,text) hit)
-               (file (and file (concat remote-id file)))
+               (file (and file (concat xref--hits-remote-id file)))
                (buf (xref--find-file-buffer file))
                (inhibit-modification-hooks t))
     (if buf
@@ -1991,10 +2011,17 @@ Such as the current syntax table and the applied syntax properties."
 
 (defun xref--find-file-buffer (file)
   (unless (equal (car xref--last-file-buffer) file)
-    (setq xref--last-file-buffer
-          ;; `find-buffer-visiting' is considerably slower,
-          ;; especially on remote files.
-          (cons file (get-file-buffer file))))
+    ;; `find-buffer-visiting' is considerably slower,
+    ;; especially on remote files.
+    (let ((buf (get-file-buffer file)))
+      (when (and buf
+                 (or
+                  (buffer-modified-p buf)
+                  (unless xref--hits-remote-id
+                    (not (verify-visited-file-modtime (current-buffer))))))
+        ;; We can't use buffers whose contents diverge from disk (bug#54025).
+        (setq buf nil))
+      (setq xref--last-file-buffer (cons file buf))))
   (cdr xref--last-file-buffer))
 
 (provide 'xref)

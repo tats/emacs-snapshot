@@ -41,7 +41,9 @@
    Similarly for __has_builtin, etc.  */
 #if (defined __has_attribute \
      && (!defined __clang_minor__ \
-         || 3 < __clang_major__ + (5 <= __clang_minor__)))
+         || (defined __apple_build_version__ \
+             ? 6000000 <= __apple_build_version__ \
+             : 3 < __clang_major__ + (5 <= __clang_minor__))))
 # define __glibc_has_attribute(attr) __has_attribute (attr)
 #else
 # define __glibc_has_attribute(attr) 0
@@ -143,7 +145,8 @@
 #define __bos0(ptr) __builtin_object_size (ptr, 0)
 
 /* Use __builtin_dynamic_object_size at _FORTIFY_SOURCE=3 when available.  */
-#if __USE_FORTIFY_LEVEL == 3 && __glibc_clang_prereq (9, 0)
+#if __USE_FORTIFY_LEVEL == 3 && (__glibc_clang_prereq (9, 0)		      \
+				 || __GNUC_PREREQ (12, 0))
 # define __glibc_objsize0(__o) __builtin_dynamic_object_size (__o, 0)
 # define __glibc_objsize(__o) __builtin_dynamic_object_size (__o, 1)
 #else

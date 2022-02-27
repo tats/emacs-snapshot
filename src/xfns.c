@@ -737,6 +737,18 @@ x_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   gui_set_alpha_background (f, arg, oldval);
 
+#ifdef HAVE_XRENDER
+  /* Setting `alpha_background' to something other than opaque on a
+     display that doesn't support the required features leads to
+     confusing results.  */
+  if (f->alpha_background < 1.0
+      && !FRAME_DISPLAY_INFO (f)->alpha_bits
+      && !FRAME_CHECK_XR_VERSION (f, 0, 2))
+    f->alpha_background = 1.0;
+#else
+  f->alpha_background = 1.0;
+#endif
+
 #ifdef USE_GTK
   /* This prevents GTK from painting the window's background, which
      interferes with transparent background in some environments */
@@ -1459,6 +1471,21 @@ x_set_border_pixel (struct frame *f, unsigned long pix)
 {
   unload_color (f, f->output_data.x->border_pixel);
   f->output_data.x->border_pixel = pix;
+
+#ifdef USE_X_TOOLKIT
+  if (f->output_data.x->widget && f->border_width > 0)
+    {
+      block_input ();
+      XtVaSetValues (f->output_data.x->widget, XtNborderColor,
+		     (Pixel) pix, NULL);
+      unblock_input ();
+
+      if (FRAME_VISIBLE_P (f))
+	redraw_frame (f);
+
+      return;
+    }
+#endif
 
   if (FRAME_X_WINDOW (f) != 0 && f->border_width > 0)
     {
@@ -3565,13 +3592,13 @@ setup_xi_event_mask (struct frame *f)
   XISetMask (m, XI_PropertyEvent);
   XISetMask (m, XI_HierarchyChanged);
   XISetMask (m, XI_DeviceChanged);
-#ifdef XI_TouchBegin
+#ifdef HAVE_XINPUT2_2
   if (FRAME_DISPLAY_INFO (f)->xi2_version >= 2)
     {
       XISetMask (m, XI_TouchBegin);
       XISetMask (m, XI_TouchUpdate);
       XISetMask (m, XI_TouchEnd);
-#ifdef XI_GesturePinchBegin
+#ifdef HAVE_XINPUT2_4
       if (FRAME_DISPLAY_INFO (f)->xi2_version >= 4)
 	{
 	  XISetMask (m, XI_GesturePinchBegin);
@@ -8888,6 +8915,7 @@ frame_parm_handler x_frame_parm_handlers[] =
   x_set_override_redirect,
   gui_set_no_special_glyphs,
   x_set_alpha_background,
+  x_set_shaded,
 };
 
 /* Some versions of libX11 don't have symbols for a few functions we

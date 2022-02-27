@@ -1374,7 +1374,7 @@ haiku_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval
     {
       struct face *defface;
 
-      BView_draw_lock (FRAME_HAIKU_VIEW (f));
+      BView_draw_lock (FRAME_HAIKU_VIEW (f), false, 0, 0, 0, 0);
       BView_SetViewColor (FRAME_HAIKU_VIEW (f), color.pixel);
       BView_draw_unlock (FRAME_HAIKU_VIEW (f));
 
@@ -1844,16 +1844,29 @@ DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection,
        doc: /* SKIP: real doc in xfns.c.  */)
      (Lisp_Object display, Lisp_Object resource_string, Lisp_Object must_succeed)
 {
-  struct haiku_display_info *dpy_info;
+  struct haiku_display_info *dpyinfo;
   CHECK_STRING (display);
 
   if (NILP (Fstring_equal (display, build_string ("be"))))
-    !NILP (must_succeed) ? fatal ("Bad display") : error ("Bad display");
-  dpy_info = haiku_term_init ();
+    {
+      if (!NILP (must_succeed))
+	fatal ("Bad display");
+      else
+	error ("Bad display");
+    }
 
-  if (!dpy_info)
-    !NILP (must_succeed) ? fatal ("Display not responding") :
-      error ("Display not responding");
+  if (x_display_list)
+    return Qnil;
+
+  dpyinfo = haiku_term_init ();
+
+  if (!dpyinfo)
+    {
+      if (!NILP (must_succeed))
+	fatal ("Display not responding");
+      else
+	error ("Display not responding");
+    }
 
   return Qnil;
 }

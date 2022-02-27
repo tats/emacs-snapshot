@@ -3437,8 +3437,10 @@ This tests also `access-file', `file-readable-p',
 	      (should
 	       (string-equal
 		(file-attribute-type attr)
-		(tramp-file-name-localname
-		 (tramp-dissect-file-name tmp-name3))))
+		(funcall
+		 (if (tramp--test-sshfs-p) #'file-name-nondirectory #'identity)
+		 (tramp-file-name-localname
+		  (tramp-dissect-file-name tmp-name3)))))
 	      (delete-file tmp-name2))
 
 	    (when test-file-ownership-preserved-p
@@ -3598,7 +3600,9 @@ This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
 	    (should (= (file-modes tmp-name1) #o444))
 	    (should-not (file-executable-p tmp-name1))
 	    ;; A file is always writable for user "root".
-	    (unless (zerop (file-attribute-user-id (file-attributes tmp-name1)))
+	    (unless
+		(or (zerop (file-attribute-user-id (file-attributes tmp-name1)))
+		    (tramp--test-sshfs-p))
 	      (should-not (file-writable-p tmp-name1)))
 	    ;; Check the NOFOLLOW arg.  It exists since Emacs 28.  For
 	    ;; regular files, there shouldn't be a difference.
@@ -6533,8 +6537,8 @@ This requires restrictions of file name syntax."
 			   ;; processes in Emacs.  That doesn't work
 			   ;; for tramp-adb.el.  tramp-sshfs.el times
 			   ;; out for older Emacsen, reason unknown.
-			   (or (not (tramp--test-adb-p))
-			       (not (tramp--test-sshfs-p))
+			   (or (and (not (tramp--test-adb-p))
+				    (not (tramp--test-sshfs-p)))
 			       (tramp--test-emacs27-p)))
 		  (let ((default-directory file1))
 		    (dolist (this-shell-command
