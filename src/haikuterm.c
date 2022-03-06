@@ -44,7 +44,7 @@ struct haiku_display_info *x_display_list = NULL;
 extern frame_parm_handler haiku_frame_parm_handlers[];
 
 static void **fringe_bmps;
-static int fringe_bitmap_fillptr = 0;
+static int max_fringe_bmp = 0;
 
 static Lisp_Object rdb;
 
@@ -101,6 +101,15 @@ haiku_coords_from_parent (struct frame *f, int *x, int *y)
 }
 
 static void
+haiku_toolkit_position (struct frame *f, int x, int y,
+			bool *menu_bar_p, bool *tool_bar_p)
+{
+  if (FRAME_OUTPUT_DATA (f)->menubar)
+    *menu_bar_p = (x >= 0 && x < FRAME_PIXEL_WIDTH (f)
+		   && y >= 0 && y < FRAME_MENU_BAR_HEIGHT (f));
+}
+
+static void
 haiku_delete_terminal (struct terminal *terminal)
 {
   emacs_abort ();
@@ -130,6 +139,9 @@ haiku_update_size_hints (struct frame *f)
 {
   int base_width, base_height;
   eassert (FRAME_HAIKU_P (f) && FRAME_HAIKU_WINDOW (f));
+
+  if (f->tooltip)
+    return;
 
   base_width = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, 0);
   base_height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, 0);
@@ -2317,9 +2329,23 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
       BView_FillRectangle (view, p->bx, p->by, p->nx, p->ny);
     }
 
-  if (p->which && p->which < fringe_bitmap_fillptr)
+  if (p->which
+      && p->which < max_fringe_bmp
+      && p->which < max_used_fringe_bitmap)
     {
       void *bitmap = fringe_bmps[p->which];
+
+      if (!bitmap)
+	{
+	  /* This fringe bitmap is known to fringe.c, but lacks the
+	     BBitmap which shadows that bitmap.  This is typical to
+	     define-fringe-bitmap being called when the selected frame
+	     was not a GUI frame, for example, when packages that
+	     define fringe bitmaps are loaded by a daemon Emacs.
+	     Create the missing pattern now.  */
+	  gui_define_fringe_bitmap (WINDOW_XFRAME (w), p->which);
+	  bitmap = fringe_bmps[p->which];
+	}
 
       uint32_t col;
 
@@ -2348,14 +2374,14 @@ static void
 haiku_define_fringe_bitmap (int which, unsigned short *bits,
 			    int h, int wd)
 {
-  if (which >= fringe_bitmap_fillptr)
+  if (which >= max_fringe_bmp)
     {
-      int i = fringe_bitmap_fillptr;
-      fringe_bitmap_fillptr = which + 20;
-      fringe_bmps = !i ? xmalloc (fringe_bitmap_fillptr * sizeof (void *)) :
-	xrealloc (fringe_bmps, fringe_bitmap_fillptr * sizeof (void *));
+      int i = max_fringe_bmp;
+      max_fringe_bmp = which + 20;
+      fringe_bmps = !i ? xmalloc (max_fringe_bmp * sizeof (void *)) :
+	xrealloc (fringe_bmps, max_fringe_bmp * sizeof (void *));
 
-      while (i < fringe_bitmap_fillptr)
+      while (i < max_fringe_bmp)
 	fringe_bmps[i++] = NULL;
     }
 
@@ -2370,7 +2396,7 @@ haiku_define_fringe_bitmap (int which, unsigned short *bits,
 static void
 haiku_destroy_fringe_bitmap (int which)
 {
-  if (which >= fringe_bitmap_fillptr)
+  if (which >= max_fringe_bmp)
     return;
 
   if (fringe_bmps[which])
@@ -2427,14 +2453,19 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		      enum scroll_bar_part *part, Lisp_Object *x, Lisp_Object *y,
 		      Time *timestamp)
 {
+  Lisp_Object frame, tail;
+  struct frame *f1 = NULL;
+
   if (!fp)
     return;
 
   block_input ();
-  Lisp_Object frame, tail;
-  struct frame *f1 = NULL;
+
   FOR_EACH_FRAME (tail, frame)
-    XFRAME (frame)->mouse_moved = false;
+    {
+      if (FRAME_HAIKU_P (XFRAME (frame)))
+	XFRAME (frame)->mouse_moved = false;
+    }
 
   if (gui_mouse_grabbed (x_display_list) && !EQ (track_mouse, Qdropping))
     f1 = x_display_list->last_mouse_frame;
@@ -2690,6 +2721,10 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 	    if (FRAME_TOOLTIP_P (f))
 	      {
+		if (FRAME_PIXEL_WIDTH (f) != width
+		    || FRAME_PIXEL_HEIGHT (f) != height)
+		  SET_FRAME_GARBAGED (f);
+
 		FRAME_PIXEL_WIDTH (f) = width;
 		FRAME_PIXEL_HEIGHT (f) = height;
 
@@ -2745,8 +2780,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct haiku_key_event *b = buf;
 	    Mouse_HLInfo *hlinfo = &x_display_list->mouse_highlight;
 	    struct frame *f = haiku_window_to_frame (b->window);
-	    if (!f)
-	      continue;
 
 	    /* If mouse-highlight is an integer, input clears out
 	       mouse highlighting.  */
@@ -2759,6 +2792,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		hlinfo->mouse_face_hidden = true;
 		need_flush = 1;
 	      }
+
+	    if (!f)
+	      continue;
 
 	    inev.code = b->keysym ? b->keysym : b->multibyte_char;
 
@@ -3723,6 +3759,7 @@ haiku_create_terminal (struct haiku_display_info *dpyinfo)
   terminal->menu_show_hook = haiku_menu_show;
   terminal->toggle_invisible_pointer_hook = haiku_toggle_invisible_pointer;
   terminal->fullscreen_hook = haiku_fullscreen;
+  terminal->toolkit_position_hook = haiku_toolkit_position;
 
   return terminal;
 }

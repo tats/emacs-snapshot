@@ -34,14 +34,10 @@
 ;;
 ;; "-" is a valid part of a variable name.
 ;;
-;;   $<MYVAR>-TOO
+;;   $\"MYVAR\"-TOO
+;;   $'MYVAR'-TOO
 ;;
 ;; Only "MYVAR" is part of the variable name in this case.
-;;
-;;   $#VARIABLE
-;;
-;; Returns the length of the value of VARIABLE.  This could also be
-;; done using the `length' Lisp function.
 ;;
 ;;   $(lisp)
 ;;
@@ -55,38 +51,40 @@
 ;; Returns the value of an eshell subcommand.  See the note above
 ;; regarding Lisp evaluations.
 ;;
-;;   $ANYVAR[10]
+;;   $<command>
 ;;
-;; Return the 10th element of ANYVAR.  If ANYVAR's value is a string,
-;; it will be split in order to make it a list.  The splitting will
-;; occur at whitespace.
+;; Evaluates an eshell subcommand, redirecting the output to a
+;; temporary file, and returning the file name.
 ;;
-;;   $ANYVAR[: 10]
+;;   $EXPR[10]
 ;;
-;; As above, except that splitting occurs at the colon now.
+;; Return the 10th element of $EXPR, which can be any dollar
+;; expression.  If $EXPR's value is a string, it will be split in
+;; order to make it a list.  The splitting will occur at whitespace.
 ;;
-;;   $ANYVAR[: 10 20]
+;;   $EXPR[10 20]
 ;;
-;; As above, but instead of returning just a string, it now returns a
-;; list of two strings.  If the result is being interpolated into a
-;; larger string, this list will be flattened into one big string,
-;; with each element separated by a space.
+;; As above, but instead of returning a single element, it now returns a
+;; list of two elements.
 ;;
-;;   $ANYVAR["\\\\" 10]
+;;   $EXPR[: 10]
+;;
+;; Like $EXPR[10], except that splitting occurs at the colon now.
+;;
+;;   $EXPR["\\\\" 10]
 ;;
 ;; Separate on backslash characters.  Actually, the first argument --
-;; if it doesn't have the form of a number, or a plain variable name
-;; -- can be any regular expression.  So to split on numbers, use
-;; '$ANYVAR["[0-9]+" 10 20]'.
+;; if it doesn't have the form of a number -- can be any regular
+;; expression.  So to split on numbers, use '$EXPR["[0-9]+" 10 20]'.
 ;;
-;;   $ANYVAR[hello]
+;;   $EXPR[hello]
 ;;
-;; Calls `assoc' on ANYVAR with 'hello', expecting it to be an alist.
+;; Calls `assoc' on $EXPR with 'hello', expecting it to be an alist.
 ;;
-;;   $#ANYVAR[hello]
+;;   $#EXPR
 ;;
-;; Returns the length of the cdr of the element of ANYVAR who car is
-;; equal to "hello".
+;; Returns the length of the value of $EXPR.  This could also be
+;; done using the `length' Lisp function.
 ;;
 ;; There are also a few special variables defined by Eshell.  '$$' is
 ;; the value of the last command (t or nil, in the case of an external
@@ -410,7 +408,7 @@ process any indices that come after the variable reference."
 		       (eshell-parse-indices))
           ;; This is an expression that will be evaluated by `eshell-do-eval',
           ;; which only support let-binding of dynamically-scoped vars
-	  value `(let ((indices ',indices)) ,value))
+	  value `(let ((indices (eshell-eval-indices ',indices))) ,value))
     (if get-len
 	`(length ,value)
       value)))
@@ -423,26 +421,27 @@ variable.
 Possible options are:
 
   NAME          an environment or Lisp variable value
-  <LONG-NAME>   disambiguates the length of the name
+  \"LONG-NAME\"   disambiguates the length of the name
+  'LONG-NAME'   as above
   {COMMAND}     result of command is variable's value
-  (LISP-FORM)   result of Lisp form is variable's value"
+  (LISP-FORM)   result of Lisp form is variable's value
+  <COMMAND>     write the output of command to a temporary file;
+                result is the file name"
   (cond
    ((eq (char-after) ?{)
     (let ((end (eshell-find-delimiter ?\{ ?\})))
       (if (not end)
           (throw 'eshell-incomplete ?\{)
+        (forward-char)
         (prog1
             `(eshell-convert
               (eshell-command-to-value
                (eshell-as-subcommand
-                ,(eshell-parse-command (cons (1+ (point)) end)))))
+                ,(let ((subcmd (or (eshell-parse-inner-double-quote end)
+                                   (cons (point) end)))
+                       (eshell-current-quoted nil))
+                   (eshell-parse-command subcmd)))))
           (goto-char (1+ end))))))
-   ((memq (char-after) '(?\' ?\"))
-    (let ((name (if (eq (char-after) ?\')
-                    (eshell-parse-literal-quote)
-                  (eshell-parse-double-quote))))
-      (if name
-	  `(eshell-get-variable ,(eval name) indices))))
    ((eq (char-after) ?\<)
     (let ((end (eshell-find-delimiter ?\< ?\>)))
       (if (not end)
@@ -454,20 +453,35 @@ Possible options are:
               `(let ((eshell-current-handles
                       (eshell-create-handles ,temp 'overwrite)))
                  (progn
-                   (eshell-as-subcommand ,(eshell-parse-command cmd))
+                   (eshell-as-subcommand
+                    ,(let ((eshell-current-quoted nil))
+                       (eshell-parse-command cmd)))
                    (ignore
                     (nconc eshell-this-command-hook
-                           (list (lambda ()
-                                   (delete-file ,temp)))))
+                           ;; Quote this lambda; it will be evaluated
+                           ;; by `eshell-do-eval', which requires very
+                           ;; particular forms in order to work
+                           ;; properly.  See bug#54190.
+                           (list (function (lambda ()
+                                   (delete-file ,temp))))))
                    (quote ,temp)))
             (goto-char (1+ end)))))))
    ((eq (char-after) ?\()
     (condition-case nil
         `(eshell-command-to-value
           (eshell-lisp-command
-           ',(read (current-buffer))))
+           ',(read (or (eshell-parse-inner-double-quote (point-max))
+                       (current-buffer)))))
       (end-of-file
        (throw 'eshell-incomplete ?\())))
+   ((looking-at (rx (or "'" "\"" "\\\"")))
+    (eshell-with-temp-command (or (eshell-parse-inner-double-quote (point-max))
+                                  (cons (point) (point-max)))
+      (let ((name (if (eq (char-after) ?\')
+                      (eshell-parse-literal-quote)
+                    (eshell-parse-double-quote))))
+        (when name
+	  `(eshell-get-variable ,(eval name) indices)))))
    ((assoc (char-to-string (char-after))
            eshell-variable-aliases-list)
     (forward-char)
@@ -482,18 +496,28 @@ Possible options are:
 (defvar eshell-glob-function)
 
 (defun eshell-parse-indices ()
-  "Parse and return a list of list of indices."
+  "Parse and return a list of index-lists.
+
+For example, \"[0 1][2]\" becomes:
+  ((\"0\" \"1\") (\"2\")."
   (let (indices)
     (while (eq (char-after) ?\[)
       (let ((end (eshell-find-delimiter ?\[ ?\])))
 	(if (not end)
 	    (throw 'eshell-incomplete ?\[)
 	  (forward-char)
-	  (let (eshell-glob-function)
-	    (setq indices (cons (eshell-parse-arguments (point) end)
-				indices)))
+          (eshell-with-temp-command (or (eshell-parse-inner-double-quote end)
+                                        (cons (point) end))
+	    (let (eshell-glob-function (eshell-current-quoted nil))
+	      (setq indices (cons (eshell-parse-arguments
+                                   (point-min) (point-max))
+				  indices))))
 	  (goto-char (1+ end)))))
     (nreverse indices)))
+
+(defun eshell-eval-indices (indices)
+  "Evaluate INDICES, a list of index-lists generated by `eshell-parse-indices'."
+  (mapcar (lambda (i) (mapcar #'eval i)) indices))
 
 (defun eshell-get-variable (name &optional indices)
   "Get the value for the variable NAME."
@@ -541,13 +565,11 @@ For example, to retrieve the second element of a user's record in
   (while indices
     (let ((refs (car indices)))
       (when (stringp value)
-	(let (separator)
-	  (if (not (or (not (stringp (caar indices)))
-		       (string-match
-			(concat "^" eshell-variable-name-regexp "$")
-			(caar indices))))
-	      (setq separator (caar indices)
-		    refs (cdr refs)))
+	(let (separator (index (caar indices)))
+          (when (and (stringp index)
+                     (not (get-text-property 0 'number index)))
+            (setq separator index
+                  refs (cdr refs)))
 	  (setq value
 		(mapcar #'eshell-convert
 			(split-string value separator)))))

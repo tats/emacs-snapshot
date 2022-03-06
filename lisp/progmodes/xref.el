@@ -1,7 +1,7 @@
 ;;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
 ;; Copyright (C) 2014-2022 Free Software Foundation, Inc.
-;; Version: 1.4.0
+;; Version: 1.4.1
 ;; Package-Requires: ((emacs "26.1"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -1714,7 +1714,7 @@ IGNORES is a list of glob patterns for files to ignore."
     (ripgrep
      .
      ;; '!*/' is there to filter out dirs (e.g. submodules).
-     "xargs -0 rg <C> --null -nH --no-messages -g '!*/' -e <R>"
+     "xargs -0 rg <C> --null -nH --no-heading --no-messages -g '!*/' -e <R>"
      ))
   "Associative list mapping program identifiers to command templates.
 

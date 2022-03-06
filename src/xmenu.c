@@ -184,8 +184,8 @@ x_menu_wait_for_event (void *data)
      instead of the small ifdefs below.  */
 
   while (
-#ifdef USE_X_TOOLKIT
-         ! XtAppPending (Xt_app_con)
+#if defined USE_X_TOOLKIT
+         ! (data ? XPending (data) : XtAppPending (Xt_app_con))
 #elif defined USE_GTK
          ! gtk_events_pending ()
 #else
@@ -222,6 +222,64 @@ x_menu_wait_for_event (void *data)
 #endif
     }
 }
+
+#if !defined USE_GTK && !defined USE_X_TOOLKIT && defined HAVE_XINPUT2
+static void
+x_menu_translate_generic_event (XEvent *event)
+{
+  struct x_display_info *dpyinfo;
+  XEvent copy;
+  XIDeviceEvent *xev;
+
+  dpyinfo = x_display_info_for_display (event->xgeneric.display);
+
+  if (event->xgeneric.extension == dpyinfo->xi2_opcode)
+    {
+      eassert (!event->xcookie.data);
+
+      if (XGetEventData (dpyinfo->display, &event->xcookie))
+	{
+	  switch (event->xcookie.evtype)
+	    {
+	    case XI_ButtonPress:
+	    case XI_ButtonRelease:
+	      xev = (XIDeviceEvent *) event->xcookie.data;
+	      copy.xbutton.type = (event->xcookie.evtype == XI_ButtonPress
+				   ? ButtonPress : ButtonRelease);
+	      copy.xbutton.serial = xev->serial;
+	      copy.xbutton.send_event = xev->send_event;
+	      copy.xbutton.display = dpyinfo->display;
+	      copy.xbutton.window = xev->event;
+	      copy.xbutton.root = xev->root;
+	      copy.xbutton.subwindow = xev->child;
+	      copy.xbutton.time = xev->time;
+	      copy.xbutton.x = lrint (xev->event_x);
+	      copy.xbutton.y = lrint (xev->event_y);
+	      copy.xbutton.x_root = lrint (xev->root_x);
+	      copy.xbutton.y_root = lrint (xev->root_y);
+	      copy.xbutton.state = xev->mods.effective;
+	      copy.xbutton.button = xev->detail;
+	      copy.xbutton.same_screen = True;
+
+	      if (xev->buttons.mask_len)
+		{
+		  if (XIMaskIsSet (xev->buttons.mask, 1))
+		    copy.xbutton.state |= Button1Mask;
+		  if (XIMaskIsSet (xev->buttons.mask, 2))
+		    copy.xbutton.state |= Button2Mask;
+		  if (XIMaskIsSet (xev->buttons.mask, 3))
+		    copy.xbutton.state |= Button3Mask;
+		}
+
+	      XPutBackEvent (dpyinfo->display, &copy);
+
+	      break;
+	    }
+	  XFreeEventData (dpyinfo->display, &event->xcookie);
+	}
+    }
+}
+#endif
 #endif /* ! MSDOS */
 
 
@@ -1514,7 +1572,7 @@ pop_down_menu (int id)
   popup_activated_flag = 0;
 }
 
-#ifdef HAVE_XINPUT2
+#if defined HAVE_XINPUT2 && defined USE_MOTIF
 static Bool
 server_timestamp_predicate (Display *display,
 			    XEvent *xevent,
@@ -1546,7 +1604,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   LWLIB_ID menu_id;
   Widget menu;
   Window dummy_window;
-#ifdef HAVE_XINPUT2
+#if defined HAVE_XINPUT2 && defined USE_MOTIF
   XEvent property_dummy;
   Atom property_atom;
 #endif
@@ -1643,6 +1701,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
 #endif
     }
 
+#ifdef USE_MOTIF
   if (dpyinfo->supports_xi2)
     {
       /* Dispatch a PropertyNotify to Xt with the current server time.
@@ -1650,17 +1709,18 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
 	 processed by Xt, but Xt doesn't consider GenericEvents, so the
 	 timestamp is always less than the last grab time.  */
 
-      property_atom = XInternAtom (dpyinfo->display, "EMACS_SERVER_TIME_PROP", False);
+      property_atom = dpyinfo->Xatom_EMACS_SERVER_TIME_PROP;
 
       XChangeProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
 		       property_atom, XA_ATOM, 32,
 		       PropModeReplace, (unsigned char *) &property_atom, 1);
 
       XIfEvent (dpyinfo->display, &property_dummy, server_timestamp_predicate,
-		(XPointer) &(XID[]) {(XID) FRAME_OUTER_WINDOW (f), (XID) property_atom});
+		(XPointer) &(XID[]) {FRAME_OUTER_WINDOW (f), property_atom});
 
       XtDispatchEvent (&property_dummy);
     }
+#endif
 
   if (dpyinfo->supports_xi2)
     XUngrabServer (dpyinfo->display);
@@ -1668,6 +1728,15 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
 
   /* Display the menu.  */
   lw_popup_menu (menu, &dummy);
+
+#if defined HAVE_XINPUT2 && defined USE_MOTIF
+  /* This is needed to prevent XI_Enter events that set an implicit
+     focus from being sent.  */
+  if (dpyinfo->supports_xi2)
+    XSetInputFocus (XtDisplay (menu), XtWindow (menu),
+		    RevertToParent, CurrentTime);
+#endif
+
   popup_activated_flag = 1;
 
 #if defined HAVE_XINPUT2 && !defined USE_MOTIF
@@ -2566,6 +2635,9 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
 
 #ifndef MSDOS
   XMenuActivateSetWaitFunction (x_menu_wait_for_event, FRAME_X_DISPLAY (f));
+#ifdef HAVE_XINPUT2
+  XMenuActivateSetTranslateFunction (x_menu_translate_generic_event);
+#endif
 #endif
 
   record_unwind_protect_ptr (pop_down_menu,

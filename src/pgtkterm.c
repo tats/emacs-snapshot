@@ -105,7 +105,35 @@ static void pgtk_fill_rectangle (struct frame *f, unsigned long color, int x,
 				 bool respect_alpha_background);
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 			      enum glyph_row_area area, cairo_t * cr);
-static struct frame *pgtk_any_window_to_frame (GdkWindow * window);
+static struct frame *pgtk_any_window_to_frame (GdkWindow *window);
+
+static void
+pgtk_toolkit_position (struct frame *f, int x, int y,
+		       bool *menu_bar_p, bool *tool_bar_p)
+{
+  GdkRectangle test_rect;
+  int scale;
+
+  y += (FRAME_MENUBAR_HEIGHT (f)
+	+ FRAME_TOOLBAR_TOP_HEIGHT (f));
+  x += FRAME_TOOLBAR_LEFT_WIDTH (f);
+
+  if (FRAME_EXTERNAL_MENU_BAR (f))
+    *menu_bar_p = (x >= 0 && x < FRAME_PIXEL_WIDTH (f)
+		   && y >= 0 && y < FRAME_MENUBAR_HEIGHT (f));
+
+  if (FRAME_X_OUTPUT (f)->toolbar_widget)
+    {
+      scale = xg_get_scale (f);
+      test_rect.x = x / scale;
+      test_rect.y = y / scale;
+      test_rect.width = 1;
+      test_rect.height = 1;
+
+      *tool_bar_p = gtk_widget_intersect (FRAME_X_OUTPUT (f)->toolbar_widget,
+					  &test_rect, NULL);
+    }
+}
 
 /*
  * This is not a flip context in the same sense as gpu rendering
@@ -2345,29 +2373,15 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
   else if (!s->background_filled_p)
     {
       int background_width = s->background_width;
-      int x = s->x, text_left_x = window_box_left_offset (s->w, TEXT_AREA);
+      int x = s->x, text_left_x = window_box_left (s->w, TEXT_AREA);
 
       /* Don't draw into left fringe or scrollbar area except for
-         header line and mode line.  */
-      if (x < text_left_x && !s->row->mode_line_p)
+	 header line and mode line.  */
+      if (s->area == TEXT_AREA
+	  && x < text_left_x && !s->row->mode_line_p)
 	{
-	  int left_x = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (s->w);
-	  int right_x = text_left_x;
-
-	  if (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (s->w))
-	    left_x += WINDOW_LEFT_FRINGE_WIDTH (s->w);
-	  else
-	    right_x -= WINDOW_LEFT_FRINGE_WIDTH (s->w);
-
-	  /* Adjust X and BACKGROUND_WIDTH to fit inside the space
-	     between LEFT_X and RIGHT_X.  */
-	  if (x < left_x)
-	    {
-	      background_width -= left_x - x;
-	      x = left_x;
-	    }
-	  if (x + background_width > right_x)
-	    background_width = right_x - x;
+	  background_width -= text_left_x - x;
+	  x = text_left_x;
 	}
       if (background_width > 0)
 	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
@@ -3545,9 +3559,22 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 	}
     }
 
-  if (p->which && p->which < max_fringe_bmp)
+  if (p->which
+      && p->which < max_fringe_bmp
+      && p->which < max_used_fringe_bitmap)
     {
       Emacs_GC gcv;
+
+      if (!fringe_bmp[p->which])
+	{
+	  /* This fringe bitmap is known to fringe.c, but lacks the
+	     cairo_pattern_t pattern which shadows that bitmap.  This
+	     is typical to define-fringe-bitmap being called when the
+	     selected frame was not a GUI frame, for example, when
+	     packages that define fringe bitmaps are loaded by a
+	     daemon Emacs.  Create the missing pattern now.  */
+	  gui_define_fringe_bitmap (f, p->which);
+	}
 
       gcv.foreground = (p->cursor_p
 			? (p->overlay_p ? face->background
@@ -4808,6 +4835,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->focus_frame_hook = pgtk_focus_frame;
   terminal->set_frame_offset_hook = x_set_offset;
   terminal->free_pixmap = pgtk_free_pixmap;
+  terminal->toolkit_position_hook = pgtk_toolkit_position;
 
   /* Other hooks are NULL by default.  */
 
@@ -5957,7 +5985,7 @@ motion_notify_event (GtkWidget * widget, GdkEvent * event,
       clear_mouse_face (hlinfo);
     }
 
-  if (f && xg_event_is_for_scrollbar (f, event))
+  if (f && xg_event_is_for_scrollbar (f, event, false))
     f = 0;
   if (f)
     {

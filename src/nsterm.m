@@ -2916,6 +2916,14 @@ ns_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
     }
 
   NSBezierPath *bmp = [fringe_bmp objectForKey:[NSNumber numberWithInt:p->which]];
+
+  if (bmp == nil
+      && p->which < max_used_fringe_bitmap)
+    {
+      gui_define_fringe_bitmap (f, p->which);
+      bmp = [fringe_bmp objectForKey: [NSNumber numberWithInt: p->which]];
+    }
+
   if (bmp)
     {
       NSAffineTransform *transform = [NSAffineTransform transform];
@@ -5830,7 +5838,7 @@ not_in_argv (NSString *arg)
           fd_set fds;
           FD_ZERO (&fds);
           FD_SET (selfds[0], &fds);
-          result = select (selfds[0]+1, &fds, NULL, NULL, NULL);
+          result = pselect (selfds[0]+1, &fds, NULL, NULL, NULL, NULL);
           if (result > 0 && read (selfds[0], &c, 1) == 1 && c == 'g')
 	    waiting = 0;
         }

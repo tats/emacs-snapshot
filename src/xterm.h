@@ -132,6 +132,7 @@ INLINE_HEADER_BEGIN
    | FocusChangeMask		\
    | LeaveWindowMask		\
    | EnterWindowMask		\
+   | PropertyChangeMask		\
    | VisibilityChangeMask)
 
 #ifdef HAVE_X11R6_XIM
@@ -407,7 +408,8 @@ struct x_display_info
   Atom Xatom_CLIPBOARD, Xatom_TIMESTAMP, Xatom_TEXT, Xatom_DELETE,
     Xatom_COMPOUND_TEXT, Xatom_UTF8_STRING,
     Xatom_MULTIPLE, Xatom_INCR, Xatom_EMACS_TMP, Xatom_TARGETS, Xatom_NULL,
-    Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER, Xatom_COUNTER;
+    Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER, Xatom_COUNTER,
+    Xatom_EMACS_SERVER_TIME_PROP;
 
   /* More atoms for font properties.  The last three are private
      properties, see the comments in src/fontset.h.  */
@@ -1078,6 +1080,11 @@ struct scroll_bar
 
   /* The X window representing this scroll bar.  */
   Window x_window;
+
+#if defined HAVE_XDBE && !defined USE_TOOLKIT_SCROLL_BARS
+  /* The X drawable representing this scroll bar.  */
+  Drawable x_drawable;
+#endif
 
   /* The position and size of the scroll bar in pixels, relative to the
      frame.  */
