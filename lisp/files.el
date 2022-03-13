@@ -987,10 +987,7 @@ one or more of those symbols."
 	  (logior (if (memq 'executable predicate) 1 0)
 		  (if (memq 'writable predicate) 2 0)
 		  (if (memq 'readable predicate) 4 0))))
-  (let ((file (locate-file-internal filename path suffixes predicate)))
-    (if (and file (string-match "\\.eln\\'" file))
-        (gethash (file-name-nondirectory file) comp-eln-to-el-h)
-      file)))
+  (locate-file-internal filename path suffixes predicate))
 
 (defun locate-file-completion-table (dirs suffixes string pred action)
   "Do completion for file names passed to `locate-file'."

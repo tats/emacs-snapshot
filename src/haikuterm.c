@@ -40,6 +40,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <cairo.h>
 #endif
 
+/* Minimum and maximum values used for Haiku scroll bars.  */
+#define BE_SB_MAX 12000000
+
 struct haiku_display_info *x_display_list = NULL;
 extern frame_parm_handler haiku_frame_parm_handlers[];
 
@@ -426,6 +429,86 @@ haiku_mouse_or_wdesc_frame (void *window)
 	   here.  */
 	return w_f;
     }
+}
+
+/* Set the thumb size and position of scroll bar BAR.  We are
+   currently displaying PORTION out of a whole WHOLE, and our position
+   POSITION.  */
+
+static void
+haiku_set_scroll_bar_thumb (struct scroll_bar *bar, int portion,
+			    int position, int whole)
+{
+  void *scroll_bar = bar->scroll_bar;
+  double top, shown, size, value;
+
+  if (scroll_bar_adjust_thumb_portion_p)
+    {
+      /* We use an estimate of 30 chars per line rather than the real
+         `portion' value.  This has the disadvantage that the thumb
+         size is not very representative, but it makes our life a lot
+         easier.  Otherwise, we have to constantly adjust the thumb
+         size, which we can't always do quickly enough: while
+         dragging, the size of the thumb might prevent the user from
+         dragging the thumb all the way to the end.  */
+      portion = WINDOW_TOTAL_LINES (XWINDOW (bar->window)) * 30;
+      /* When the thumb is at the bottom, position == whole.  So we
+         need to increase `whole' to make space for the thumb.  */
+      whole += portion;
+
+      if (whole <= 0)
+	top = 0, shown = 1;
+      else
+	{
+	  top = (double) position / whole;
+	  shown = (double) portion / whole;
+	}
+
+      /* Slider size.  Must be in the range [1 .. MAX - MIN] where MAX
+	 is the scroll bar's maximum and MIN is the scroll bar's minimum
+	 value.  */
+      size = clip_to_bounds (1, shown * BE_SB_MAX, BE_SB_MAX);
+
+      /* Position.  Must be in the range [MIN .. MAX - SLIDER_SIZE].  */
+      value = top * BE_SB_MAX;
+      value = min (value, BE_SB_MAX - size);
+
+      if (!bar->dragging)
+	bar->page_size = size;
+    }
+  else
+    {
+      bar->page_size = 0;
+
+      size = (((double) portion / whole) * BE_SB_MAX);
+      value = (((double) position / whole) * BE_SB_MAX);
+    }
+
+  BView_scroll_bar_update (scroll_bar, lrint (size),
+			   BE_SB_MAX, ceil (value),
+			   (scroll_bar_adjust_thumb_portion_p
+			    ? bar->dragging : bar->dragging ? -1 : 0),
+			   !scroll_bar_adjust_thumb_portion_p);
+}
+
+static void
+haiku_set_horizontal_scroll_bar_thumb (struct scroll_bar *bar, int portion,
+				       int position, int whole)
+{
+  void *scroll_bar = bar->scroll_bar;
+  double size, value, shown, top;
+
+  shown = (double) portion / whole;
+  top = (double) position / whole;
+
+  size = shown * BE_SB_MAX;
+  value = top * BE_SB_MAX;
+
+  if (!bar->dragging)
+    bar->page_size = size;
+
+  BView_scroll_bar_update (scroll_bar, lrint (size), BE_SB_MAX,
+			   ceil (value), bar->dragging, false);
 }
 
 static struct scroll_bar *
@@ -1221,7 +1304,7 @@ static void
 haiku_update_end (struct frame *f)
 {
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
-  flush_frame (f);
+  BWindow_Flush (FRAME_HAIKU_WINDOW (f));
 }
 
 static void
@@ -2211,7 +2294,6 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
   if (NILP (w->horizontal_scroll_bar))
     {
       bar = haiku_scroll_bar_create (w, left, top, width, height, true);
-      BView_scroll_bar_update (bar->scroll_bar, portion, whole, position);
       bar->update = position;
       bar->position = position;
       bar->total = whole;
@@ -2234,13 +2316,9 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
 	  bar->width = width;
 	  bar->height = height;
 	}
-
-      if (!bar->dragging)
-	{
-	  BView_scroll_bar_update (bar->scroll_bar, portion, whole, position);
-	  BView_invalidate (bar->scroll_bar);
-	}
     }
+
+  haiku_set_horizontal_scroll_bar_thumb (bar, portion, position, whole);
   bar->position = position;
   bar->total = whole;
   XSETVECTOR (barobj, bar);
@@ -2271,7 +2349,6 @@ haiku_set_vertical_scroll_bar (struct window *w,
   if (NILP (w->vertical_scroll_bar))
     {
       bar = haiku_scroll_bar_create (w, left, top, width, height, false);
-      BView_scroll_bar_update (bar->scroll_bar, portion, whole, position);
       bar->position = position;
       bar->total = whole;
     }
@@ -2287,22 +2364,15 @@ haiku_set_vertical_scroll_bar (struct window *w,
 				   bar->width, bar->height);
 	  BView_move_frame (bar->scroll_bar, left, top,
 			    left + width - 1, top + height - 1);
-	  flush_frame (WINDOW_XFRAME (w));
 	  BView_publish_scroll_bar (view, left, top, width, height);
 	  bar->left = left;
 	  bar->top = top;
 	  bar->width = width;
 	  bar->height = height;
 	}
-
-      if (!bar->dragging)
-	{
-	  BView_scroll_bar_update (bar->scroll_bar, portion, whole, position);
-	  bar->update = position;
-	  BView_invalidate (bar->scroll_bar);
-	}
     }
 
+  haiku_set_scroll_bar_thumb (bar, portion, position, whole);
   bar->position = position;
   bar->total = whole;
 
@@ -2513,7 +2583,12 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 static void
 haiku_flush (struct frame *f)
 {
-  if (FRAME_VISIBLE_P (f))
+  /* This is needed for tooltip frames to work properly with double
+     buffering.  */
+  if (FRAME_DIRTY_P (f) && !buffer_flipping_blocked_p ())
+    haiku_flip_buffers (f);
+
+  if (FRAME_VISIBLE_P (f) && !FRAME_TOOLTIP_P (f))
     BWindow_Flush (FRAME_HAIKU_WINDOW (f));
 }
 
@@ -3187,6 +3262,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct haiku_scroll_bar_value_event *b = buf;
 	    struct scroll_bar *bar
 	      = haiku_scroll_bar_from_widget (b->scroll_bar, b->window);
+	    int portion, whole;
 
 	    if (!bar)
 	      continue;
@@ -3201,13 +3277,29 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 	    if (bar->position != b->position)
 	      {
-		inev.kind = bar->horizontal ? HORIZONTAL_SCROLL_BAR_CLICK_EVENT :
-		  SCROLL_BAR_CLICK_EVENT;
+		inev.kind = (bar->horizontal
+			     ? HORIZONTAL_SCROLL_BAR_CLICK_EVENT :
+			     SCROLL_BAR_CLICK_EVENT);
 		inev.part = bar->horizontal ?
 		  scroll_bar_horizontal_handle : scroll_bar_handle;
 
-		XSETINT (inev.x, b->position);
-		XSETINT (inev.y, bar->total);
+		if (bar->horizontal)
+		  {
+		    portion = bar->total * ((float) b->position
+					    / BE_SB_MAX);
+		    whole = (bar->total
+			     * ((float) (BE_SB_MAX - bar->page_size)
+				/ BE_SB_MAX));
+		    portion = min (portion, whole);
+		  }
+		else
+		  {
+		    whole = BE_SB_MAX - bar->page_size;
+		    portion = min (b->position, whole);
+		  }
+
+		XSETINT (inev.x, portion);
+		XSETINT (inev.y, whole);
 		XSETWINDOW (inev.frame_or_window, w);
 	      }
 	    break;

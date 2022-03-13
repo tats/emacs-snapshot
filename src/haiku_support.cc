@@ -1469,17 +1469,19 @@ public:
     this->GetMouse (&point, &buttons, false);
 
     rq.window = this->Window ();
-    rq.btn_no = 0;
 
-    if (!(previous_buttons & B_PRIMARY_MOUSE_BUTTON) &&
-	(buttons & B_PRIMARY_MOUSE_BUTTON))
+    if (!(previous_buttons & B_PRIMARY_MOUSE_BUTTON)
+	&& (buttons & B_PRIMARY_MOUSE_BUTTON))
       rq.btn_no = 0;
-    else if (!(previous_buttons & B_SECONDARY_MOUSE_BUTTON) &&
-	     (buttons & B_SECONDARY_MOUSE_BUTTON))
+    else if (!(previous_buttons & B_SECONDARY_MOUSE_BUTTON)
+	     && (buttons & B_SECONDARY_MOUSE_BUTTON))
       rq.btn_no = 2;
-    else if (!(previous_buttons & B_TERTIARY_MOUSE_BUTTON) &&
-	     (buttons & B_TERTIARY_MOUSE_BUTTON))
+    else if (!(previous_buttons & B_TERTIARY_MOUSE_BUTTON)
+	     && (buttons & B_TERTIARY_MOUSE_BUTTON))
       rq.btn_no = 1;
+    else
+      return;
+
     previous_buttons = buttons;
 
     rq.x = point.x;
@@ -1515,7 +1517,6 @@ public:
     this->GetMouse (&point, &buttons, false);
 
     rq.window = this->Window ();
-    rq.btn_no = 0;
 
     if ((previous_buttons & B_PRIMARY_MOUSE_BUTTON)
 	&& !(buttons & B_PRIMARY_MOUSE_BUTTON))
@@ -1526,6 +1527,9 @@ public:
     else if ((previous_buttons & B_TERTIARY_MOUSE_BUTTON)
 	     && !(buttons & B_TERTIARY_MOUSE_BUTTON))
       rq.btn_no = 1;
+    else
+      return;
+
     previous_buttons = buttons;
 
     rq.x = point.x;
@@ -1563,6 +1567,15 @@ public:
   float old_value;
   scroll_bar_info info;
 
+  /* True if button events should be passed to the parent.  */
+  bool handle_button = false;
+  bool in_overscroll = false;
+  bool can_overscroll = false;
+  BPoint last_overscroll;
+  int last_reported_overscroll_value;
+  int max_value, real_max_value;
+  int overscroll_start_value;
+
   EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p) :
     BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
 		B_HORIZONTAL : B_VERTICAL)
@@ -1571,16 +1584,66 @@ public:
     vw->SetResizingMode (B_FOLLOW_NONE);
     horizontal = horizontal_p;
     get_scroll_bar_info (&info);
+    SetSteps (5000, 10000);
   }
 
   void
   MessageReceived (BMessage *msg)
   {
+    int32 portion, range, dragging, value;
+    float proportion;
+
     if (msg->what == SCROLL_BAR_UPDATE)
       {
-	old_value = msg->GetInt32 ("emacs:units", 0);
-	this->SetRange (0, msg->GetInt32 ("emacs:range", 0));
-	this->SetValue (msg->GetInt32 ("emacs:units", 0));
+	portion = msg->GetInt32 ("emacs:portion", 0);
+	range = msg->GetInt32 ("emacs:range", 0);
+	dragging = msg->GetInt32 ("emacs:dragging", 0);
+	proportion = ((range <= 0 || portion <= 0)
+		      ? 1.0f : (float) portion / range);
+	value = msg->GetInt32 ("emacs:units", 0);
+	can_overscroll = msg->GetBool ("emacs:overscroll", false);
+
+	if (value < 0)
+	  value = 0;
+
+	if (dragging != 1)
+	  {
+	    if (in_overscroll || dragging != -1)
+	      {
+		/* Set the value to the smallest possible one.
+		   Otherwise, the call to SetRange could lead to
+		   spurious updates.  */
+		old_value = 0;
+		SetValue (0);
+
+		/* Unlike on Motif, PORTION isn't included in the total
+		   range of the scroll bar.  */
+
+		SetRange (0, range - portion);
+		SetProportion (proportion);
+		max_value = range - portion;
+		real_max_value = range;
+
+		if (in_overscroll || value > max_value)
+		  value = max_value;
+
+		old_value = roundf (value);
+		SetValue (old_value);
+	      }
+	    else
+	      {
+		value = Value ();
+
+		old_value = 0;
+		SetValue (0);
+		SetRange (0, range - portion);
+		SetProportion (proportion);
+		old_value = value;
+		SetValue (value);
+		max_value = range - portion;
+		real_max_value = range;
+	      }
+	  }
       }
 
     BScrollBar::MessageReceived (msg);
@@ -1591,6 +1654,8 @@ public:
   {
     struct haiku_scroll_bar_value_event rq;
     struct haiku_scroll_bar_part_event part;
+
+    new_value = Value ();
 
     if (dragging)
       {
@@ -1612,11 +1677,15 @@ public:
 	return;
       }
 
-    rq.scroll_bar = this;
-    rq.window = Window ();
-    rq.position = new_value;
+    if (new_value != old_value)
+      {
+	rq.scroll_bar = this;
+	rq.window = Window ();
+	rq.position = new_value;
+	old_value = new_value;
 
-    haiku_write (SCROLL_BAR_VALUE_EVENT, &rq);
+	haiku_write (SCROLL_BAR_VALUE_EVENT, &rq);
+      }
   }
 
   BRegion
@@ -1685,9 +1754,11 @@ public:
     BRegion r;
     BLooper *looper;
     BMessage *message;
-    int32 buttons;
+    int32 buttons, mods;
+    BView *parent;
 
     looper = Looper ();
+    message = NULL;
 
     if (!looper)
       GetMouse (&pt, (uint32 *) &buttons, false);
@@ -1697,6 +1768,18 @@ public:
 
 	if (!message || message->FindInt32 ("buttons", &buttons) != B_OK)
 	  GetMouse (&pt, (uint32 *) &buttons, false);
+      }
+
+    if (message && (message->FindInt32 ("modifiers", &mods)
+		    == B_OK)
+	&& mods & B_CONTROL_KEY)
+      {
+	/* Allow C-mouse-3 to split the window on a scroll bar.   */
+	handle_button = true;
+	parent = Parent ();
+	parent->MouseDown (ConvertToParent (pt));
+
+	return;
       }
 
     if (buttons == B_PRIMARY_MOUSE_BUTTON)
@@ -1734,6 +1817,9 @@ public:
     rq.window = Window ();
     rq.scroll_bar = this;
 
+    SetMouseEventMask (B_POINTER_EVENTS, (B_SUSPEND_VIEW_FOCUS
+					  | B_LOCK_WINDOW_FOCUS));
+
     haiku_write (SCROLL_BAR_DRAG_EVENT, &rq);
 
   out:
@@ -1744,6 +1830,19 @@ public:
   MouseUp (BPoint pt)
   {
     struct haiku_scroll_bar_drag_event rq;
+    BView *parent;
+
+    in_overscroll = false;
+
+    if (handle_button)
+      {
+	handle_button = false;
+	parent = Parent ();
+	parent->MouseUp (ConvertToParent (pt));
+
+	return;
+      }
+
     rq.dragging_p = 0;
     rq.scroll_bar = this;
     rq.window = Window ();
@@ -1758,7 +1857,13 @@ public:
   MouseMoved (BPoint point, uint32 transit, const BMessage *msg)
   {
     struct haiku_menu_bar_left_event rq;
+    struct haiku_scroll_bar_value_event value_event;
+    int range, diff, value, trough_size;
+    BRect bounds;
     BPoint conv;
+    uint32 buttons;
+
+    GetMouse (NULL, &buttons, false);
 
     if (transit == B_EXITED_VIEW)
       {
@@ -1775,6 +1880,61 @@ public:
 	  }
       }
 
+    if (in_overscroll)
+      {
+	diff = point.y - last_overscroll.y;
+
+	if (diff < 0)
+	  {
+	    in_overscroll = false;
+	    goto allow;
+	  }
+
+	range = real_max_value;
+	bounds = Bounds ();
+	bounds.InsetBy (1.0, 1.0);
+	value = overscroll_start_value;
+	trough_size = BE_RECT_HEIGHT (bounds);
+	trough_size -= BE_RECT_WIDTH (bounds) / 2;
+	if (info.double_arrows)
+	  trough_size -= BE_RECT_WIDTH (bounds) / 2;
+
+	value += ((double) range / trough_size) * diff;
+
+	if (value != last_reported_overscroll_value)
+	  {
+	    last_reported_overscroll_value = value;
+
+	    value_event.scroll_bar = this;
+	    value_event.window = Window ();
+	    value_event.position = value;
+
+	    haiku_write (SCROLL_BAR_VALUE_EVENT, &value_event);
+	    return;
+	  }
+      }
+    else if (can_overscroll && (buttons == B_PRIMARY_MOUSE_BUTTON))
+      {
+	value = Value ();
+
+	if (value >= max_value)
+	  {
+	    BScrollBar::MouseMoved (point, transit, msg);
+
+	    if (value == Value ())
+	      {
+		overscroll_start_value = value;
+		in_overscroll = true;
+		last_overscroll = point;
+		last_reported_overscroll_value = value;
+
+		MouseMoved (point, transit, msg);
+		return;
+	      }
+	  }
+      }
+
+  allow:
     BScrollBar::MouseMoved (point, transit, msg);
   }
 };
@@ -2268,14 +2428,22 @@ BView_move_frame (void *view, int x, int y, int x1, int y1)
   vw->UnlockLooper ();
 }
 
+/* DRAGGING can either be 0 (which means to update everything), 1
+   (which means to update nothing), or -1 (which means to update only
+   the thumb size and range).  */
+
 void
-BView_scroll_bar_update (void *sb, int portion, int whole, int position)
+BView_scroll_bar_update (void *sb, int portion, int whole, int position,
+			 int dragging, bool can_overscroll)
 {
   BScrollBar *bar = (BScrollBar *) sb;
   BMessage msg = BMessage (SCROLL_BAR_UPDATE);
   BMessenger mr = BMessenger (bar);
   msg.AddInt32 ("emacs:range", whole);
   msg.AddInt32 ("emacs:units", position);
+  msg.AddInt32 ("emacs:portion", portion);
+  msg.AddInt32 ("emacs:dragging", dragging);
+  msg.AddBool ("emacs:overscroll", can_overscroll);
 
   mr.SendMessage (&msg);
 }
@@ -2697,7 +2865,7 @@ BMenu_run (void *menu, int x, int y,
 	   void (*run_help_callback) (void *, void *),
 	   void (*block_input_function) (void),
 	   void (*unblock_input_function) (void),
-	   void (*process_pending_signals_function) (void),
+	   struct timespec (*process_pending_signals_function) (void),
 	   void *run_help_callback_data)
 {
   BPopUpMenu *mn = (BPopUpMenu *) menu;
@@ -2705,10 +2873,12 @@ BMenu_run (void *menu, int x, int y,
   void *buf;
   void *ptr = NULL;
   struct be_popup_menu_data data;
-  struct object_wait_info infos[2];
+  struct object_wait_info infos[3];
   struct haiku_menu_bar_help_event *event;
   BMessage *msg;
   ssize_t stat;
+  struct timespec next_time;
+  bigtime_t timeout;
 
   block_input_function ();
   port_popup_menu_to_emacs = create_port (1800, "popup menu port");
@@ -2733,6 +2903,10 @@ BMenu_run (void *menu, int x, int y,
 				  (void *) &data);
   infos[1].type = B_OBJECT_TYPE_THREAD;
   infos[1].events = B_EVENT_INVALID;
+
+  infos[2].object = port_application_to_emacs;
+  infos[2].type = B_OBJECT_TYPE_PORT;
+  infos[2].events = B_EVENT_READ;
   unblock_input_function ();
 
   if (infos[1].object < B_OK)
@@ -2749,12 +2923,19 @@ BMenu_run (void *menu, int x, int y,
 
   while (true)
     {
-      process_pending_signals_function ();
+      next_time = process_pending_signals_function ();
 
-      if ((stat = wait_for_objects_etc ((object_wait_info *) &infos, 2,
-					B_RELATIVE_TIMEOUT, 10000)) < B_OK)
+      if (next_time.tv_nsec < 0)
+	timeout = 10000000000;
+      else
+	timeout = (next_time.tv_sec * 1000000
+		   + next_time.tv_nsec / 1000);
+
+      if ((stat = wait_for_objects_etc ((object_wait_info *) &infos, 3,
+					B_RELATIVE_TIMEOUT, timeout)) < B_OK)
 	{
-	  if (stat == B_INTERRUPTED || stat == B_TIMED_OUT)
+	  if (stat == B_INTERRUPTED || stat == B_TIMED_OUT
+	      || stat == B_WOULD_BLOCK)
 	    continue;
 	  else
 	    gui_abort ("Failed to wait for popup");
@@ -2792,6 +2973,7 @@ BMenu_run (void *menu, int x, int y,
 
       infos[0].events = B_EVENT_READ;
       infos[1].events = B_EVENT_INVALID;
+      infos[2].events = B_EVENT_READ;
     }
 }
 

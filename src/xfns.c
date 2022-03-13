@@ -919,6 +919,9 @@ static void
 x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 {
   struct frame *p = NULL;
+#ifdef HAVE_GTK3
+  GdkWindow *window;
+#endif
 
   if (!NILP (new_value)
       && (!FRAMEP (new_value)
@@ -941,6 +944,14 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
 	gtk_container_set_resize_mode
 	  (GTK_CONTAINER (FRAME_GTK_OUTER_WIDGET (f)),
 	   p ? GTK_RESIZE_IMMEDIATE : GTK_RESIZE_QUEUE);
+#endif
+
+#ifdef HAVE_GTK3
+      if (p)
+	{
+	  window = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
+	  gdk_x11_window_set_frame_sync_enabled (window, false);
+	}
 #endif
       unblock_input ();
 
@@ -1932,6 +1943,10 @@ static void
 x_set_scroll_bar_foreground (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 {
   unsigned long pixel;
+#ifdef HAVE_GTK3
+  XColor color;
+  char css[64];
+#endif
 
   if (STRINGP (value))
     pixel = x_decode_color (f, value, BLACK_PIX_DEFAULT (f));
@@ -1953,6 +1968,28 @@ x_set_scroll_bar_foreground (struct frame *f, Lisp_Object value, Lisp_Object old
       update_face_from_frame_parameter (f, Qscroll_bar_foreground, value);
       redraw_frame (f);
     }
+
+#ifdef HAVE_GTK3
+  if (!FRAME_TOOLTIP_P (f))
+    {
+      if (pixel != -1)
+	{
+	  color.pixel = pixel;
+
+	  XQueryColor (FRAME_X_DISPLAY (f),
+		       FRAME_X_COLORMAP (f),
+		       &color);
+
+	  sprintf (css, "scrollbar slider { background-color: #%02x%02x%02x; }",
+		   color.red >> 8, color.green >> 8, color.blue >> 8);
+	  gtk_css_provider_load_from_data (FRAME_X_OUTPUT (f)->scrollbar_foreground_css_provider,
+					   css, -1, NULL);
+	}
+      else
+	gtk_css_provider_load_from_data (FRAME_X_OUTPUT (f)->scrollbar_foreground_css_provider,
+					 "", -1, NULL);
+    }
+#endif
 }
 
 
@@ -1965,6 +2002,10 @@ static void
 x_set_scroll_bar_background (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 {
   unsigned long pixel;
+#ifdef HAVE_GTK3
+  XColor color;
+  char css[64];
+#endif
 
   if (STRINGP (value))
     pixel = x_decode_color (f, value, WHITE_PIX_DEFAULT (f));
@@ -2000,6 +2041,28 @@ x_set_scroll_bar_background (struct frame *f, Lisp_Object value, Lisp_Object old
       update_face_from_frame_parameter (f, Qscroll_bar_background, value);
       redraw_frame (f);
     }
+
+#ifdef HAVE_GTK3
+    if (!FRAME_TOOLTIP_P (f))
+      {
+	if (pixel != -1)
+	  {
+	    color.pixel = pixel;
+
+	    XQueryColor (FRAME_X_DISPLAY (f),
+			 FRAME_X_COLORMAP (f),
+			 &color);
+
+	    sprintf (css, "scrollbar trough { background-color: #%02x%02x%02x; }",
+		     color.red >> 8, color.green >> 8, color.blue >> 8);
+	    gtk_css_provider_load_from_data (FRAME_X_OUTPUT (f)->scrollbar_background_css_provider,
+					     css, -1, NULL);
+	  }
+	else
+	  gtk_css_provider_load_from_data (FRAME_X_OUTPUT (f)->scrollbar_background_css_provider,
+					   "", -1, NULL);
+      }
+#endif
 }
 
 
@@ -3568,7 +3631,7 @@ setup_xi_event_mask (struct frame *f)
   mask.mask_len = l;
 
   block_input ();
-#ifndef USE_GTK
+#ifndef HAVE_GTK3
   mask.deviceid = XIAllMasterDevices;
 
   XISetMask (m, XI_ButtonPress);
@@ -3576,8 +3639,10 @@ setup_xi_event_mask (struct frame *f)
   XISetMask (m, XI_Motion);
   XISetMask (m, XI_Enter);
   XISetMask (m, XI_Leave);
+#ifndef USE_GTK
   XISetMask (m, XI_FocusIn);
   XISetMask (m, XI_FocusOut);
+#endif
   XISetMask (m, XI_KeyPress);
   XISetMask (m, XI_KeyRelease);
   XISelectEvents (FRAME_X_DISPLAY (f),
@@ -3585,7 +3650,7 @@ setup_xi_event_mask (struct frame *f)
 		  &mask, 1);
 
   memset (m, 0, l);
-#endif /* !USE_GTK */
+#endif /* !HAVE_GTK3 */
 
 #ifdef USE_X_TOOLKIT
   XISetMask (m, XI_KeyPress);
@@ -4700,6 +4765,13 @@ This function is an internal primitive--use `make-frame' instead.  */)
   gui_default_parameter (f, parms, Qno_special_glyphs, Qnil,
                          NULL, NULL, RES_TYPE_BOOLEAN);
 
+#ifdef HAVE_GTK3
+  FRAME_OUTPUT_DATA (f)->scrollbar_background_css_provider
+    = gtk_css_provider_new ();
+  FRAME_OUTPUT_DATA (f)->scrollbar_foreground_css_provider
+    = gtk_css_provider_new ();
+#endif
+
   x_default_scroll_bar_color_parameter (f, parms, Qscroll_bar_foreground,
 					"scrollBarForeground",
 					"ScrollBarForeground", true);
@@ -5028,7 +5100,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
   if (dpyinfo->n_planes <= 2)
     return Qnil;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticColor:
     case PseudoColor:
@@ -5055,7 +5127,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   if (dpyinfo->n_planes <= 1)
     return Qnil;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticColor:
     case PseudoColor:
@@ -5131,14 +5203,17 @@ If omitted or nil, that stands for the selected frame's display.
 {
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
 
-  int nr_planes = DisplayPlanes (dpyinfo->display,
-                                 XScreenNumberOfScreen (dpyinfo->screen));
+  if (dpyinfo->visual_info.class != TrueColor
+      && dpyinfo->visual_info.class != DirectColor)
+    return make_fixnum (dpyinfo->visual_info.colormap_size);
 
-  /* Truncate nr_planes to 24 to avoid integer overflow.
-     Some displays says 32, but only 24 bits are actually significant.
+  int nr_planes = dpyinfo->n_planes;
+
+  /* Truncate nr_planes to 24 to avoid integer overflow.  Some
+     displays says 32, but only 24 bits are actually significant.
      There are only very few and rare video cards that have more than
-     24 significant bits.  Also 24 bits is more than 16 million colors,
-     it "should be enough for everyone".  */
+     24 significant bits.  Also 24 bits is more than 16 million
+     colors, it "should be enough for everyone".  */
   if (nr_planes > 24) nr_planes = 24;
 
   return make_fixnum (1 << nr_planes);
@@ -5332,7 +5407,7 @@ If omitted or nil, that stands for the selected frame's display.
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
   Lisp_Object result;
 
-  switch (dpyinfo->visual->class)
+  switch (dpyinfo->visual_info.class)
     {
     case StaticGray:
       result = intern ("static-gray");
@@ -6605,6 +6680,7 @@ select_visual (struct x_display_info *dpyinfo)
 	       SSDATA (ENCODE_SYSTEM (value)));
 
       dpyinfo->visual = vinfo.visual;
+      dpyinfo->visual_info = vinfo;
     }
   else
     {
@@ -6638,6 +6714,7 @@ select_visual (struct x_display_info *dpyinfo)
 		{
 		  dpyinfo->n_planes = vinfo[i].depth;
 		  dpyinfo->visual = vinfo[i].visual;
+		  dpyinfo->visual_info = vinfo[i];
 		  dpyinfo->pict_format = format;
 
 		  XFree (vinfo);
@@ -6658,7 +6735,7 @@ select_visual (struct x_display_info *dpyinfo)
 			      &vinfo_template, &n_visuals);
       if (n_visuals <= 0)
 	fatal ("Can't get proper X visual info");
-
+      dpyinfo->visual_info = *vinfo;
       dpyinfo->n_planes = vinfo->depth;
       XFree (vinfo);
     }
@@ -7540,8 +7617,8 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
 
     if (FRAME_DISPLAY_INFO (f)->n_planes == 1)
       disptype = Qmono;
-    else if (FRAME_DISPLAY_INFO (f)->visual->class == GrayScale
-             || FRAME_DISPLAY_INFO (f)->visual->class == StaticGray)
+    else if (FRAME_X_VISUAL_INFO (f)->class == GrayScale
+             || FRAME_X_VISUAL_INFO (f)->class == StaticGray)
       disptype = intern ("grayscale");
     else
       disptype = intern ("color");
@@ -9019,7 +9096,15 @@ XkbFreeNames (XkbDescPtr xkb, unsigned int which, Bool free_map)
 int
 XDisplayCells (Display *dpy, int screen_number)
 {
-  return 1677216;
+  struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+
+  if (!dpyinfo)
+    emacs_abort ();
+
+  /* Not strictly correct, since the display could be using a
+     non-default visual, but it satisfies the callers we need to care
+     about.  */
+  return dpyinfo->visual_info.colormap_size;
 }
 #endif
 

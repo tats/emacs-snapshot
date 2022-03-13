@@ -283,6 +283,9 @@ struct x_display_info
   /* The Visual being used for this display.  */
   Visual *visual;
 
+  /* The visual information corresponding to VISUAL.  */
+  XVisualInfo visual_info;
+
 #ifdef HAVE_XRENDER
   /* The picture format for this display.  */
   XRenderPictFormat *pict_format;
@@ -755,6 +758,13 @@ struct x_output
   GtkWindow *ttip_window;
 
   GtkIMContext *im_context;
+
+#ifdef HAVE_GTK3
+  /* The CSS providers used for scroll bar foreground and background
+     colors.  */
+  GtkCssProvider *scrollbar_foreground_css_provider;
+  GtkCssProvider *scrollbar_background_css_provider;
+#endif
 #endif /* USE_GTK */
 
   /* If >=0, a bitmap index.  The indicated bitmap is used for the
@@ -1030,6 +1040,9 @@ extern void x_mark_frame_dirty (struct frame *f);
 
 /* This is the Visual which frame F is on.  */
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO (f)->visual
+
+/* And its corresponding visual info.  */
+#define FRAME_X_VISUAL_INFO(f) (&FRAME_DISPLAY_INFO (f)->visual_info)
 
 #ifdef HAVE_XRENDER
 #define FRAME_X_PICTURE_FORMAT(f) FRAME_DISPLAY_INFO (f)->pict_format
@@ -1314,7 +1327,7 @@ extern void x_clear_area (struct frame *f, int, int, int, int);
 extern void x_mouse_leave (struct x_display_info *);
 #endif
 
-#if defined USE_X_TOOLKIT || defined USE_MOTIF
+#ifndef USE_GTK
 extern int x_dispatch_event (XEvent *, Display *);
 #endif
 extern int x_x_to_emacs_modifiers (struct x_display_info *, int);
@@ -1338,6 +1351,10 @@ extern void x_xrender_color_from_gc_background (struct frame *, GC,
 extern void x_xr_ensure_picture (struct frame *f);
 extern void x_xr_apply_ext_clip (struct frame *f, GC gc);
 extern void x_xr_reset_ext_clip (struct frame *f);
+#endif
+
+#ifdef HAVE_GTK3
+extern void x_scroll_bar_configure (GdkEvent *);
 #endif
 
 extern void x_display_set_last_user_time (struct x_display_info *, Time);
@@ -1375,7 +1392,7 @@ x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)
    also allows us to make other optimizations relating to server-side
    reference counts.  */
 INLINE bool
-x_mutable_colormap (Visual *visual)
+x_mutable_colormap (XVisualInfo *visual)
 {
   int class = visual->class;
   return (class != StaticColor && class != StaticGray && class != TrueColor);

@@ -50,6 +50,9 @@ prompt.  See bug#54136."
   (skip-unless (and (executable-find "sh")
                     (executable-find "echo")
                     (executable-find "sleep")))
+  ;; This test doesn't work on EMBA with AOT nativecomp, but works
+  ;; fine elsewhere.
+  (skip-unless (not (getenv "EMACS_EMBA_CI")))
   (with-temp-eshell
    (eshell-insert-command
     (concat "sh -c 'while true; do echo y; sleep 1; done' | "
@@ -59,7 +62,7 @@ prompt.  See bug#54136."
      (eshell-wait-for-subprocess t)
      (should (string-match-p
               ;; "interrupt\n" is for MS-Windows.
-              (rx (or "interrupt\n" "killed\n"))
+              (rx (or "interrupt\n" "killed\n" "killed: 9\n"))
               (buffer-substring-no-properties
                output-start (eshell-end-of-output)))))))
 
@@ -71,7 +74,7 @@ write the exit status to the pipe.  See bug#54136."
                     (executable-find "sleep")))
   (with-temp-eshell
    (eshell-insert-command
-    (concat "sh -c 'while true; sleep 1; done' | "
+    (concat "sh -c 'while true; do sleep 1; done' | "
             "sh -c 'while read NAME; do echo =${NAME}=; done'"))
    (let ((output-start (eshell-beginning-of-output)))
      (kill-process (eshell-head-process))

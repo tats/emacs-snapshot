@@ -158,6 +158,14 @@ beginning.
 An autoload definition appears just as a '(defun . NAME)' and the
 '(t . NAME)' entries are not generated any more.
 
+---
+** The Tamil input methods no longer insert Tamil digits.
+The input methods 'tamil-itrans' and 'tamil-inscript' no longer insert
+the Tamil digits, as those digit characters are not used nowadays by
+speakers of the Tamil language.  To get back the previous behavior,
+use the new 'tamil-itrans-digits' and 'tamil-inscript-digits' input
+methods instead.
+
 
 * Changes in Emacs 29.1
 
@@ -629,6 +637,22 @@ header before sending a message.
 ---
 *** 'texinfo-mode' now has a specialised 'narrow-to-defun' definition.
 It narrows to the current node.
+
+** EUDC
+
++++
+*** 'eudc-expansion-overwrites-query' to 'eudc-expansion-save-query-as-kill'.
+Rename 'eudc-expansion-overwrites-query' to
+'eudc-expansion-save-query-as-kill' to reflect the actual behaviour of
+the customization variable.
+
++++
+*** New command 'eudc-expand-try-all'.
+This command can be used in place of 'eudc-expand-inline'.  It takes a
+prefix argument that causes 'eudc-expand-try-all' to return matches
+from all servers instead of just the matches from the first server to
+return any.  This is useful for example, if one wants to search LDAP
+for a name that happens to match a contact in one's BBDB.
 
 ** eww/shr
 
@@ -1639,6 +1663,15 @@ when used as part of a property list specification for the
 
 ** 'defalias' records a more precise history of definitions.
 This is recorded in the `function-history` symbol property.
+
+---
+** 'indian-tml-base-table' no longer translates digits.
+Use 'indian-tml-base-digits-table' if you want digits translation.
+
+--
+** 'indian-tml-itrans-v5-hash' no longer translates digits.
+Use 'indian-tml-itrans-digits-v5-hash' if you want digits
+translation.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems

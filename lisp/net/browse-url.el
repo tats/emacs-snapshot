@@ -708,16 +708,29 @@ interactively.  Turn the filename into a URL with function
   (browse-url (browse-url-file-url file))
   (run-hooks 'browse-url-of-file-hook))
 
+(defun browse-url--file-name-coding-system ()
+  (if (equal system-type 'windows-nt)
+      ;; W32 pretends that file names are UTF-8 encoded.
+      'utf-8
+    (or file-name-coding-system default-file-name-coding-system)))
+
 (defun browse-url-file-url (file)
   "Return the URL corresponding to FILE.
 Use variable `browse-url-filename-alist' to map filenames to URLs."
-  (let ((coding (if (equal system-type 'windows-nt)
-		    ;; W32 pretends that file names are UTF-8 encoded.
-		    'utf-8
-		  (and (or file-name-coding-system
-			   default-file-name-coding-system)))))
-    (if coding (setq file (encode-coding-string file coding))))
-  (setq file (browse-url-url-encode-chars file "[*\"()',=;?% ]"))
+  (when-let ((coding (browse-url--file-name-coding-system)))
+    (setq file (encode-coding-string file coding)))
+  (if (and (file-remote-p file)
+           ;; We're applying special rules for FTP URLs for historical
+           ;; reasons.
+           (seq-find (lambda (match)
+                       (and (string-match-p (car match) file)
+                            (not (string-match "\\`file:" (cdr match)))))
+                     browse-url-filename-alist))
+      (setq file (browse-url-url-encode-chars file "[*\"()',=;?% ]"))
+    ;; Encode all other file names properly.
+    (setq file (mapconcat #'url-hexify-string
+                          (file-name-split file)
+                          "/")))
   (dolist (map browse-url-filename-alist)
     (when (and map (string-match (car map) file))
       (setq file (replace-match (cdr map) t nil file))))
@@ -769,7 +782,10 @@ If optional arg TEMP-FILE-NAME is non-nil, delete it instead."
 (defun browse-url-of-dired-file ()
   "In Dired, ask a WWW browser to display the file named on this line."
   (interactive)
-  (let ((tem (dired-get-filename t t)))
+  (let ((tem (dired-get-filename t t))
+        ;; Some URL handlers open files in Emacs.  We want to always
+        ;; open in a browser, so disable those.
+        (browse-url-default-handlers nil))
     (if tem
 	(browse-url-of-file (expand-file-name tem))
       (error "No file on this line"))))
@@ -954,7 +970,13 @@ non-nil, or the same display as Emacs if different from the current
 environment, otherwise just use the current environment."
   (let ((display (or browse-url-browser-display (browse-url-emacs-display))))
     (if display
-	(cons (concat "DISPLAY=" display) process-environment)
+	(cons (concat (if (and (eq window-system 'pgtk)
+                               (equal (pgtk-backend-display-class)
+                                      "GdkWaylandDisplay"))
+                          "WAYLAND_DISPLAY="
+                        "DISPLAY=")
+                      display)
+              process-environment)
       process-environment)))
 
 (defun browse-url-emacs-display ()
@@ -1213,10 +1235,12 @@ currently selected window instead."
   (require 'url-handlers)
   (let ((parsed (url-generic-parse-url url))
         (func (if same-window 'find-file 'find-file-other-window)))
-    (if (and (equal (url-type parsed) "file")
-             (file-directory-p (url-filename parsed)))
-        ;; It's a directory; just open it.
-        (funcall func (url-filename parsed))
+    (if (equal (url-type parsed) "file")
+        ;; It's a file; just open it.
+        (let ((file (url-unhex-string (url-filename parsed))))
+          (when-let ((coding (browse-url--file-name-coding-system)))
+            (setq file (decode-coding-string file 'utf-8)))
+          (funcall func file))
       (let ((file-name-handler-alist
              (cons (cons url-handler-regexp 'url-file-handler)
                    file-name-handler-alist)))
