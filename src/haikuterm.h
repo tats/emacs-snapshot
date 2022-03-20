@@ -165,6 +165,10 @@ struct haiku_output
 
   /* The pending position we're waiting for. */
   int pending_top, pending_left;
+
+  /* Whether or not adjust_frame_size and haiku_set_offset have yet
+     been called by haiku_create_frame.  */
+  bool configury_done;
 };
 
 struct x_output
@@ -255,6 +259,7 @@ extern void haiku_free_frame_resources (struct frame *f);
 extern void haiku_scroll_bar_remove (struct scroll_bar *bar);
 extern void haiku_clear_under_internal_border (struct frame *f);
 extern void haiku_set_name (struct frame *f, Lisp_Object name, bool explicit_p);
+extern Lisp_Object haiku_message_to_lisp (void *);
 
 extern struct haiku_display_info *haiku_term_init (void);
 

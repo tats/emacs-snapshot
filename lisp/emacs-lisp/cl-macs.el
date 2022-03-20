@@ -2901,18 +2901,10 @@ To see the documentation for a defined struct type, use
            (debug
             (&define                    ;Makes top-level form not be wrapped.
              [&or symbolp
-                  (gate
+                  (gate ;; FIXME: Why?
                    symbolp &rest
-                   [&or symbolp
-                        (&or [":conc-name" symbolp]
-                             [":constructor" symbolp &optional cl-lambda-list]
-                             [":copier" symbolp]
-                             [":predicate" symbolp]
-                             [":include" symbolp &rest sexp] ;; Not finished.
-                             [":print-function" sexp]
-                             [":type" symbolp]
-                             [":named"]
-                             [":initial-offset" natnump])])]
+                   [&or (":constructor" &define name &optional cl-lambda-list)
+                        sexp])]
              [&optional stringp]
              ;; All the above is for the following def-form.
              &rest &or symbolp (symbolp &optional def-form &rest sexp))))
@@ -3287,8 +3279,9 @@ the form NAME which is a shorthand for (NAME NAME)."
             (funcall orig pred1
                      (cl--defstruct-predicate t2))))
      (funcall orig pred1 pred2))))
-(advice-add 'pcase--mutually-exclusive-p
-            :around #'cl--pcase-mutually-exclusive-p)
+(when (fboundp 'advice-add)           ;Not available during bootstrap.
+  (advice-add 'pcase--mutually-exclusive-p
+              :around #'cl--pcase-mutually-exclusive-p))
 
 
 (defun cl-struct-sequence-type (struct-type)

@@ -86,7 +86,7 @@ enum haiku_event_type
     FILE_PANEL_EVENT,
     MENU_BAR_HELP_EVENT,
     ZOOM_EVENT,
-    REFS_EVENT,
+    DRAG_AND_DROP_EVENT,
     APP_QUIT_REQUESTED_EVENT,
     DUMMY_EVENT,
     MENU_BAR_LEFT
@@ -113,12 +113,11 @@ struct haiku_expose_event
   int height;
 };
 
-struct haiku_refs_event
+struct haiku_drag_and_drop_event
 {
   void *window;
   int x, y;
-  /* Free this with free! */
-  char *ref;
+  void *message;
 };
 
 struct haiku_app_quit_requested_event
@@ -420,7 +419,7 @@ extern "C"
 
   extern int
   haiku_read_with_timeout (enum haiku_event_type *type, void *buf, ssize_t len,
-			   time_t timeout, bool popup_menu_p);
+			   bigtime_t timeout, bool popup_menu_p);
 
   extern int
   haiku_write (enum haiku_event_type type, void *buf);
@@ -942,6 +941,15 @@ extern "C"
 
   extern void
   BWindow_dimensions (void *window, int *width, int *height);
+
+  extern void
+  BMessage_delete (void *message);
+
+  extern void
+  be_drag_message (void *view, void *message,
+		   void (*block_input_function) (void),
+		   void (*unblock_input_function) (void),
+		   void (*process_pending_signals_function) (void));
 
 #ifdef __cplusplus
   extern void *

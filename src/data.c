@@ -1167,7 +1167,11 @@ The value, if non-nil, is a list of mode name symbols.  */)
 	fun = Fsymbol_function (fun);
     }
 
-  if (COMPILEDP (fun))
+  if (SUBRP (fun))
+    {
+      return XSUBR (fun)->command_modes;
+    }
+  else if (COMPILEDP (fun))
     {
       if (PVSIZE (fun) <= COMPILED_INTERACTIVE)
 	return Qnil;
@@ -2968,6 +2972,29 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
   return val;
 }
 
+/* Render NUMBER in decimal into BUFFER which ends right before END.
+   Return the start of the string; the end is always at END.
+   The string is not null-terminated.  */
+char *
+fixnum_to_string (EMACS_INT number, char *buffer, char *end)
+{
+  EMACS_INT x = number;
+  bool negative = x < 0;
+  if (negative)
+    x = -x;
+  char *p = end;
+  do
+    {
+      eassume (p > buffer && p - 1 < end);
+      *--p = '0' + x % 10;
+      x /= 10;
+    }
+  while (x);
+  if (negative)
+    *--p = '-';
+  return p;
+}
+
 DEFUN ("number-to-string", Fnumber_to_string, Snumber_to_string, 1, 1, 0,
        doc: /* Return the decimal representation of NUMBER as a string.
 Uses a minus sign if negative.
@@ -2975,19 +3002,22 @@ NUMBER may be an integer or a floating point number.  */)
   (Lisp_Object number)
 {
   char buffer[max (FLOAT_TO_STRING_BUFSIZE, INT_BUFSIZE_BOUND (EMACS_INT))];
-  int len;
 
-  CHECK_NUMBER (number);
+  if (FIXNUMP (number))
+    {
+      char *end = buffer + sizeof buffer;
+      char *p = fixnum_to_string (XFIXNUM (number), buffer, end);
+      return make_unibyte_string (p, end - p);
+    }
 
   if (BIGNUMP (number))
     return bignum_to_string (number, 10);
 
   if (FLOATP (number))
-    len = float_to_string (buffer, XFLOAT_DATA (number));
-  else
-    len = sprintf (buffer, "%"pI"d", XFIXNUM (number));
+    return make_unibyte_string (buffer,
+				float_to_string (buffer, XFLOAT_DATA (number)));
 
-  return make_unibyte_string (buffer, len);
+  wrong_type_argument (Qnumberp, number);
 }
 
 DEFUN ("string-to-number", Fstring_to_number, Sstring_to_number, 1, 2, 0,

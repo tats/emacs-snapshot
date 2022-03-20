@@ -140,6 +140,10 @@ extern char etext;
 #include "fingerprint.h"
 #include "epaths.h"
 
+/* Include these only because of INLINE.  */
+#include "comp.h"
+#include "thread.h"
+
 static const char emacs_version[] = PACKAGE_VERSION;
 static const char emacs_copyright[] = COPYRIGHT;
 static const char emacs_bugreport[] = PACKAGE_BUGREPORT;
@@ -2814,9 +2818,6 @@ shut_down_emacs (int sig, Lisp_Object stuff)
   /* Don't update display from now on.  */
   Vinhibit_redisplay = Qt;
 
-#ifdef HAVE_HAIKU
-  be_app_quit ();
-#endif
   /* If we are controlling the terminal, reset terminal modes.  */
 #ifndef DOS_NT
   pid_t tpgrp = tcgetpgrp (STDIN_FILENO);

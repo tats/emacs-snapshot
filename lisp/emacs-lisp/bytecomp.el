@@ -500,8 +500,9 @@ Return the compile-time value of FORM."
                                         byte-compile-new-defuns))
                                    (setf result
                                          (byte-compile-eval
+                                          (byte-run-strip-symbol-positions
                                            (byte-compile-top-level
-                                            (byte-compile-preprocess form)))))))
+                                            (byte-compile-preprocess form))))))))
                               (list 'quote result))))
     (eval-and-compile . ,(lambda (&rest body)
                            (byte-compile-recurse-toplevel
@@ -512,9 +513,10 @@ Return the compile-time value of FORM."
                               ;; or byte-compile-file-form.
                               (let* ((print-symbols-bare t) ; Possibly redundant binding.
                                      (expanded
-                                      (macroexpand--all-toplevel
-                                       form
-                                       macroexpand-all-environment)))
+                                      (byte-run-strip-symbol-positions
+                                       (macroexpand--all-toplevel
+                                        form
+                                        macroexpand-all-environment))))
                                 (eval expanded lexical-binding)
                                 expanded)))))
     (with-suppressed-warnings
@@ -3922,7 +3924,7 @@ discarding."
 		     docstring-exp))	;Otherwise, we don't need a closure.
       (cl-assert (byte-code-function-p fun))
       (byte-compile-form
-       (if (or (not docstring-exp) (stringp docstring-exp))
+       (if (macroexp-const-p docstring-exp)
            ;; Use symbols V0, V1 ... as placeholders for closure variables:
            ;; they should be short (to save space in the .elc file), yet
            ;; distinct when disassembled.
@@ -3938,7 +3940,7 @@ discarding."
                           (vconcat dummy-vars (aref fun 2))
                           (aref fun 3)
                           (if docstring-exp
-                              (cons docstring-exp (cdr opt-args))
+                              (cons (eval docstring-exp t) (cdr opt-args))
                             opt-args))))
              `(make-closure ,proto-fun ,@env))
          ;; Nontrivial doc string expression: create a bytecode object

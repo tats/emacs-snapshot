@@ -386,6 +386,9 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       CHECK_SYMBOL (target_type);
       handler_fn = Fcdr (Fassq (target_type, Vselection_converter_alist));
 
+      if (CONSP (handler_fn))
+	handler_fn = XCDR (handler_fn);
+
       if (!NILP (handler_fn))
 	value = call3 (handler_fn,
 		       selection_symbol, (local_request ? Qnil : target_type),
@@ -2647,6 +2650,25 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
 
 
 
+/* Return the timestamp where ownership of SELECTION was asserted, or
+   nil if no local selection is present.  */
+
+Lisp_Object
+x_timestamp_for_selection (struct x_display_info *dpyinfo,
+			   Lisp_Object selection)
+{
+  Lisp_Object value, local_value;
+
+  local_value = LOCAL_SELECTION (selection, dpyinfo);
+
+  if (NILP (local_value))
+    return Qnil;
+
+  value = XCAR (XCDR (XCDR (local_value)));
+
+  return value;
+}
+
 static void syms_of_xselect_for_pdumper (void);
 
 void
@@ -2671,10 +2693,17 @@ syms_of_xselect (void)
   DEFVAR_LISP ("selection-converter-alist", Vselection_converter_alist,
 	       doc: /* An alist associating X Windows selection-types with functions.
 These functions are called to convert the selection, with three args:
-the name of the selection (typically `PRIMARY', `SECONDARY', or `CLIPBOARD');
-a desired type to which the selection should be converted;
-and the local selection value (whatever was given to
+the name of the selection (typically `PRIMARY', `SECONDARY', or
+`CLIPBOARD'); a desired type to which the selection should be
+converted; and the local selection value (whatever was given to
 `x-own-selection-internal').
+
+On X Windows, the function can also be a cons of (PREDICATE
+. FUNCTION), where PREDICATE determines whether or not the selection
+type will appear in the list of selection types available to other
+programs, and FUNCTION is the function which is actually called.
+PREDICATE is called with the same arguments as FUNCTION, and should
+return a non-nil value if the data type is to appear in that list.
 
 The function should return the value to send to the X server
 \(typically a string).  A return value of nil

@@ -45,6 +45,36 @@
 
 (defvar haiku-initialized)
 
+(defvar haiku-dnd-selection-value nil
+  "The local value of the special `XdndSelection' selection.")
+
+(defvar haiku-dnd-selection-converters '((STRING . haiku-dnd-convert-string)
+                                         (text/uri-list . haiku-dnd-convert-uri-list))
+  "Alist of X selection types to functions that act as selection converters.
+The functions should accept a single argument VALUE, describing
+the value of the drag-and-drop selection, and return a list of
+two elements TYPE and DATA, where TYPE is a string containing the
+MIME type of DATA, and DATA is a unibyte string, or nil if the
+data could not be converted.
+
+DATA can optionally have a text property `type', which specifies
+the type of DATA inside the system message (see the doc string of
+`haiku-drag-message' for more details).")
+
+(defun haiku-dnd-convert-string (value)
+  "Convert VALUE to a UTF-8 string and appropriate MIME type.
+Return a list of the appropriate MIME type, and UTF-8 data of
+VALUE as a unibyte string, or nil if VALUE was not a string."
+  (when (stringp value)
+    (list "text/plain" (string-to-unibyte
+                        (encode-coding-string value 'utf-8)))))
+
+(defun haiku-dnd-convert-uri-list (value)
+  "Convert VALUE to a file system reference if it is a file name."
+  (when (and (stringp value)
+             (file-exists-p value))
+    (list "refs" (propertize (expand-file-name value) 'type 'ref))))
+
 (declare-function x-open-connection "haikufns.c")
 (declare-function x-handle-args "common-win")
 (declare-function haiku-selection-data "haikuselect.c")
@@ -52,6 +82,7 @@
 (declare-function haiku-selection-targets "haikuselect.c")
 (declare-function haiku-selection-owner-p "haikuselect.c")
 (declare-function haiku-put-resource "haikufns.c")
+(declare-function haiku-drag-message "haikuselect.c")
 
 (defun haiku--handle-x-command-line-resources (command-line-resources)
   "Handle command line X resources specified with the option `-xrm'.
@@ -97,11 +128,15 @@ If TYPE is nil, return \"text/plain\"."
   (if (eq data-type 'TARGETS)
       (apply #'vector (mapcar #'intern
                               (haiku-selection-targets type)))
-    (haiku-selection-data type (haiku--selection-type-to-mime data-type))))
+    (if (eq type 'XdndSelection)
+        haiku-dnd-selection-value
+      (haiku-selection-data type (haiku--selection-type-to-mime data-type)))))
 
 (cl-defmethod gui-backend-set-selection (type value
                                               &context (window-system haiku))
-  (haiku-selection-put type "text/plain" value t))
+  (if (eq type 'XdndSelection)
+      (setq haiku-dnd-selection-value value)
+    (haiku-selection-put type "text/plain" value t)))
 
 (cl-defmethod gui-backend-selection-exists-p (selection
                                               &context (window-system haiku))
@@ -130,9 +165,23 @@ If TYPE is nil, return \"text/plain\"."
   (interactive "e")
   (let* ((string (caddr event))
 	 (window (posn-window (event-start event))))
-    (with-selected-window window
-      (raise-frame)
-      (dnd-handle-one-url window 'private (concat "file:" string)))))
+    (cond
+     ((assoc "refs" string)
+      (with-selected-window window
+        (raise-frame)
+        (dolist (filename (cddr (assoc "refs" string)))
+          (dnd-handle-one-url window 'private
+                              (concat "file:" filename)))))
+     ((assoc "text/plain" string)
+      (with-selected-window window
+        (raise-frame)
+        (dolist (text (cddr (assoc "text/plain" string)))
+          (goto-char (posn-point (event-start event)))
+          (dnd-insert-text window 'private
+                           (if (multibyte-string-p text)
+                               text
+                             (decode-coding-string text 'undecided))))))
+     (t (message "Don't know how to drop any of: %s" (mapcar #'car string))))))
 
 (define-key special-event-map [drag-n-drop]
             'haiku-dnd-handle-drag-n-drop-event)
@@ -144,6 +193,35 @@ If TYPE is nil, return \"text/plain\"."
 This is necessary because on Haiku `use-system-tooltip' doesn't
 take effect on menu items until the menu bar is updated again."
   (force-mode-line-update t))
+
+(defun x-begin-drag (targets &optional action frame _return-frame)
+  "SKIP: real doc in xfns.c."
+  (unless haiku-dnd-selection-value
+    (error "No local value for XdndSelection"))
+  (let ((message nil))
+    (dolist (target targets)
+      (let ((selection-converter (cdr (assoc (intern target)
+                                             haiku-dnd-selection-converters))))
+        (when selection-converter
+          (let ((selection-result
+                 (funcall selection-converter
+                          haiku-dnd-selection-value)))
+            (when selection-result
+              (let ((field (cdr (assoc (car selection-result) message))))
+                (unless (cadr field)
+                  ;; Add B_MIME_TYPE to the message if the type was not
+                  ;; previously specified, or the type if it was.
+                  (push (or (get-text-property 0 'type
+                                               (cadr selection-result))
+                            1296649541)
+                        (alist-get (car selection-result) message
+                                   nil nil #'equal))))
+              (push (cadr selection-result)
+                    (cdr (alist-get (car selection-result) message
+                                    nil nil #'equal))))))))
+    (prog1 (or action 'XdndActionCopy)
+      (haiku-drag-message (or frame (selected-frame))
+                          message))))
 
 (add-variable-watcher 'use-system-tooltips #'haiku-use-system-tooltips-watcher)
 

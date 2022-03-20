@@ -2060,8 +2060,10 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  }
 	else
 	  {
-	    int len = sprintf (buf, "%"pI"d", i);
-	    strout (buf, len, len, printcharfun);
+	    char *end = buf + sizeof buf;
+	    char *start = fixnum_to_string (i, buf, end);
+	    ptrdiff_t len = end - start;
+	    strout (start, len, len, printcharfun);
 	  }
       }
       break;
@@ -2171,14 +2173,19 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	Lisp_Object name = SYMBOL_NAME (obj);
 	ptrdiff_t size_byte = SBYTES (name);
 
-	/* Set CONFUSING if NAME looks like a number, calling
-	   string_to_number for non-obvious cases.  */
 	char *p = SSDATA (name);
 	bool signedp = *p == '-' || *p == '+';
 	ptrdiff_t len;
-	bool confusing = ((c_isdigit (p[signedp]) || p[signedp] == '.')
-			  && !NILP (string_to_number (p, 10, &len))
-			  && len == size_byte);
+	bool confusing =
+	  /* Set CONFUSING if NAME looks like a number, calling
+	     string_to_number for non-obvious cases.  */
+	  ((c_isdigit (p[signedp]) || p[signedp] == '.')
+	   && !NILP (string_to_number (p, 10, &len))
+	   && len == size_byte)
+	  /* We don't escape "." or "?" (unless they're the first
+	     character in the symbol name).  */
+	  || *p == '?'
+	  || *p == '.';
 
 	if (! NILP (Vprint_gensym)
 	    && !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj))
@@ -2201,8 +2208,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	      {
 		if (c == '\"' || c == '\\' || c == '\''
 		    || c == ';' || c == '#' || c == '(' || c == ')'
-		    || c == ',' || c == '.' || c == '`'
-		    || c == '[' || c == ']' || c == '?' || c <= 040
+		    || c == ',' || c == '`'
+		    || c == '[' || c == ']' || c <= 040
 		    || c == NO_BREAK_SPACE
 		    || confusing)
 		  {

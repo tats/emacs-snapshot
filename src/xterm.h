@@ -429,6 +429,9 @@ struct x_display_info
   /* Atom used in XEmbed client messages.  */
   Atom Xatom_XEMBED, Xatom_XEMBED_INFO;
 
+  /* Atom used to determine whether or not the screen is composited.  */
+  Atom Xatom_NET_WM_CM_Sn;
+
   /* The frame (if any) which has the X window that has keyboard focus.
      Zero if none.  This is examined by Ffocus_frame in xfns.c.  Note
      that a mere EnterNotify event can set this; if you need to know the
@@ -547,7 +550,7 @@ struct x_display_info
     Xatom_net_workarea, Xatom_net_wm_opaque_region, Xatom_net_wm_ping,
     Xatom_net_wm_sync_request, Xatom_net_wm_sync_request_counter,
     Xatom_net_wm_frame_drawn, Xatom_net_wm_user_time,
-    Xatom_net_wm_user_time_window;
+    Xatom_net_wm_user_time_window, Xatom_net_client_list_stacking;
 
   /* XSettings atoms and windows.  */
   Atom Xatom_xsettings_sel, Xatom_xsettings_prop, Xatom_xsettings_mgr;
@@ -560,6 +563,14 @@ struct x_display_info
 
   /* SM */
   Atom Xatom_SM_CLIENT_ID;
+
+  /* DND source.  */
+  Atom Xatom_XdndAware, Xatom_XdndSelection, Xatom_XdndTypeList,
+    Xatom_XdndActionCopy, Xatom_XdndActionMove, Xatom_XdndActionLink,
+    Xatom_XdndActionAsk, Xatom_XdndActionPrivate, Xatom_XdndActionList,
+    Xatom_XdndActionDescription, Xatom_XdndProxy, Xatom_XdndEnter,
+    Xatom_XdndPosition, Xatom_XdndStatus, Xatom_XdndLeave, Xatom_XdndDrop,
+    Xatom_XdndFinished;
 
 #ifdef HAVE_XKB
   /* Virtual modifiers */
@@ -626,6 +637,12 @@ struct x_display_info
 
 #ifdef HAVE_XINERAMA
   bool xinerama_supported_p;
+#endif
+
+#ifdef HAVE_XCOMPOSITE
+  bool composite_supported_p;
+  int composite_major;
+  int composite_minor;
 #endif
 };
 
@@ -1344,8 +1361,6 @@ extern Lisp_Object x_cr_export_frames (Lisp_Object, cairo_surface_type_t);
 #endif
 
 #ifdef HAVE_XRENDER
-extern void x_xrender_color_from_gc_foreground (struct frame *, GC,
-						XRenderColor *, bool);
 extern void x_xrender_color_from_gc_background (struct frame *, GC,
 						XRenderColor *, bool);
 extern void x_xr_ensure_picture (struct frame *f);
@@ -1357,7 +1372,9 @@ extern void x_xr_reset_ext_clip (struct frame *f);
 extern void x_scroll_bar_configure (GdkEvent *);
 #endif
 
-extern void x_display_set_last_user_time (struct x_display_info *, Time);
+extern Lisp_Object x_dnd_begin_drag_and_drop (struct frame *, Time, Atom,
+					      bool);
+extern void x_set_dnd_targets (Atom *, int);
 
 INLINE int
 x_display_pixel_height (struct x_display_info *dpyinfo)
@@ -1452,6 +1469,9 @@ extern Lisp_Object x_property_data_to_lisp (struct frame *,
                                             unsigned long);
 extern void x_clipboard_manager_save_frame (Lisp_Object);
 extern void x_clipboard_manager_save_all (void);
+
+extern Lisp_Object x_timestamp_for_selection (struct x_display_info *,
+					      Lisp_Object);
 
 #ifdef USE_GTK
 extern bool xg_set_icon (struct frame *, Lisp_Object);

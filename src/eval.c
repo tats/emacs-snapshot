@@ -1233,6 +1233,7 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   eassert (handlerlist == catch);
 
   lisp_eval_depth = catch->f_lisp_eval_depth;
+  set_act_rec (current_thread, catch->act_rec);
 
   sys_longjmp (catch->jmp, 1);
 }
@@ -1500,90 +1501,6 @@ internal_condition_case_2 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object),
     }
 }
 
-/* Like internal_condition_case_1 but call BFUN with ARG1, ARG2, ARG3 as
-   its arguments.  */
-
-Lisp_Object
-internal_condition_case_3 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
-                                                Lisp_Object),
-                           Lisp_Object arg1, Lisp_Object arg2, Lisp_Object arg3,
-                           Lisp_Object handlers,
-                           Lisp_Object (*hfun) (Lisp_Object))
-{
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-}
-
-/* Like internal_condition_case_1 but call BFUN with ARG1, ARG2, ARG3, ARG4 as
-   its arguments.  */
-
-Lisp_Object
-internal_condition_case_4 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
-                                                Lisp_Object, Lisp_Object),
-                           Lisp_Object arg1, Lisp_Object arg2,
-                           Lisp_Object arg3, Lisp_Object arg4,
-                           Lisp_Object handlers,
-                           Lisp_Object (*hfun) (Lisp_Object))
-{
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3, arg4);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-}
-
-/* Like internal_condition_case_1 but call BFUN with ARG1, ARG2, ARG3,
-   ARG4, ARG5 as its arguments.  */
-
-Lisp_Object
-internal_condition_case_5 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
-                                                Lisp_Object, Lisp_Object,
-						Lisp_Object),
-                           Lisp_Object arg1, Lisp_Object arg2,
-                           Lisp_Object arg3, Lisp_Object arg4,
-			   Lisp_Object arg5, Lisp_Object handlers,
-                           Lisp_Object (*hfun) (Lisp_Object))
-{
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3, arg4, arg5);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-}
-
 /* Like internal_condition_case but call BFUN with NARGS as first,
    and ARGS as second argument.  */
 
@@ -1673,6 +1590,7 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   c->next = handlerlist;
   c->f_lisp_eval_depth = lisp_eval_depth;
   c->pdlcount = SPECPDL_INDEX ();
+  c->act_rec = get_act_rec (current_thread);
   c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   handlerlist = c;
@@ -3105,10 +3023,7 @@ fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   if (CONSP (AREF (fun, COMPILED_BYTECODE)))
     Ffetch_bytecode (fun);
 
-  return exec_byte_code (AREF (fun, COMPILED_BYTECODE),
-			 AREF (fun, COMPILED_CONSTANTS),
-			 AREF (fun, COMPILED_STACK_DEPTH),
-			 args_template, nargs, args);
+  return exec_byte_code (fun, args_template, nargs, args);
 }
 
 static Lisp_Object
