@@ -11555,6 +11555,12 @@ non-numeric, there is no explicit limit on the size of images.  */);
 
 #if HAVE_NATIVE_IMAGE_API
   DEFSYM (Qnative_image, "native-image");
+
+# if defined HAVE_NTGUI || defined HAVE_HAIKU
+  DEFSYM (Qbmp, "bmp");
+  add_image_type (Qbmp);
+# endif
+
 # ifdef HAVE_NTGUI
   DEFSYM (Qgdiplus, "gdiplus");
   DEFSYM (Qshlwapi, "shlwapi");

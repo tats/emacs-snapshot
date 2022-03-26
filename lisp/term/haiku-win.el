@@ -79,7 +79,6 @@ VALUE as a unibyte string, or nil if VALUE was not a string."
 (declare-function x-handle-args "common-win")
 (declare-function haiku-selection-data "haikuselect.c")
 (declare-function haiku-selection-put "haikuselect.c")
-(declare-function haiku-selection-targets "haikuselect.c")
 (declare-function haiku-selection-owner-p "haikuselect.c")
 (declare-function haiku-put-resource "haikufns.c")
 (declare-function haiku-drag-message "haikuselect.c")
@@ -122,6 +121,12 @@ If TYPE is nil, return \"text/plain\"."
    ((stringp type) type)
    ((symbolp type) (symbol-name type))
    (t "text/plain")))
+
+(defun haiku-selection-targets (clipboard)
+  "Find the types of data available from CLIPBOARD.
+CLIPBOARD should be the symbol `PRIMARY', `SECONDARY' or
+`CLIPBOARD'.  Return the available types as a list of strings."
+  (mapcar #'car (haiku-selection-data clipboard nil)))
 
 (cl-defmethod gui-backend-get-selection (type data-type
                                               &context (window-system haiku))
@@ -194,7 +199,7 @@ This is necessary because on Haiku `use-system-tooltip' doesn't
 take effect on menu items until the menu bar is updated again."
   (force-mode-line-update t))
 
-(defun x-begin-drag (targets &optional action frame _return-frame)
+(defun x-begin-drag (targets &optional action frame _return-frame allow-current-frame)
   "SKIP: real doc in xfns.c."
   (unless haiku-dnd-selection-value
     (error "No local value for XdndSelection"))
@@ -219,9 +224,11 @@ take effect on menu items until the menu bar is updated again."
               (push (cadr selection-result)
                     (cdr (alist-get (car selection-result) message
                                     nil nil #'equal))))))))
-    (prog1 (or action 'XdndActionCopy)
+    (prog1 (or (and (symbolp action)
+                    action)
+               'XdndActionCopy)
       (haiku-drag-message (or frame (selected-frame))
-                          message))))
+                          message allow-current-frame))))
 
 (add-variable-watcher 'use-system-tooltips #'haiku-use-system-tooltips-watcher)
 

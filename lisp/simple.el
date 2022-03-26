@@ -2840,6 +2840,7 @@ Intended to be added to `minibuffer-setup-hook'."
               #'minibuffer-history-isearch-wrap)
   (setq-local isearch-push-state-function
               #'minibuffer-history-isearch-push-state)
+  (setq-local isearch-lazy-count nil)
   (add-hook 'isearch-mode-end-hook 'minibuffer-history-isearch-end nil t))
 
 (defun minibuffer-history-isearch-end ()
@@ -6482,27 +6483,38 @@ An example is a rectangular region handled as a list of
 separate contiguous regions for each line."
   (cdr (region-bounds)))
 
+(defun redisplay--unhighlight-overlay-function (rol)
+  "If ROL is an overlay, call `delete-overlay'."
+  (when (overlayp rol) (delete-overlay rol)))
+
 (defvar redisplay-unhighlight-region-function
-  (lambda (rol) (when (overlayp rol) (delete-overlay rol))))
+  #'redisplay--unhighlight-overlay-function
+  "Function to remove the region-highlight overlay.")
+
+(defun redisplay--highlight-overlay-function (start end window rol &optional face)
+  "Update the overlay ROL in WINDOW with FACE in range START-END."
+  (unless face (setq face 'region))
+  (if (not (overlayp rol))
+      (let ((nrol (make-overlay start end)))
+        (funcall redisplay-unhighlight-region-function rol)
+        (overlay-put nrol 'window window)
+        (overlay-put nrol 'face face)
+        ;; Normal priority so that a large region doesn't hide all the
+        ;; overlays within it, but high secondary priority so that if it
+        ;; ends/starts in the middle of a small overlay, that small overlay
+        ;; won't hide the region's boundaries.
+        (overlay-put nrol 'priority '(nil . 100))
+        nrol)
+    (unless (eq (overlay-get rol 'face) face)
+      (overlay-put rol 'face face))
+    (unless (and (eq (overlay-buffer rol) (current-buffer))
+                 (eq (overlay-start rol) start)
+                 (eq (overlay-end rol) end))
+      (move-overlay rol start end (current-buffer)))
+    rol))
 
 (defvar redisplay-highlight-region-function
-  (lambda (start end window rol)
-    (if (not (overlayp rol))
-        (let ((nrol (make-overlay start end)))
-          (funcall redisplay-unhighlight-region-function rol)
-          (overlay-put nrol 'window window)
-          (overlay-put nrol 'face 'region)
-          ;; Normal priority so that a large region doesn't hide all the
-          ;; overlays within it, but high secondary priority so that if it
-          ;; ends/starts in the middle of a small overlay, that small overlay
-          ;; won't hide the region's boundaries.
-          (overlay-put nrol 'priority '(nil . 100))
-          nrol)
-      (unless (and (eq (overlay-buffer rol) (current-buffer))
-                   (eq (overlay-start rol) start)
-                   (eq (overlay-end rol) end))
-        (move-overlay rol start end (current-buffer)))
-      rol))
+  #'redisplay--highlight-overlay-function
   "Function to move the region-highlight overlay.
 This function is called with four parameters, START, END, WINDOW
 and OVERLAY.  If OVERLAY is nil, a new overlay is created.  In
@@ -6527,14 +6539,48 @@ The overlay is returned by the function.")
               (funcall redisplay-highlight-region-function
                        start end window rol)))
         (unless (equal new rol)
-          (set-window-parameter window 'internal-region-overlay
-                                new))))))
+          (set-window-parameter window 'internal-region-overlay new))))))
+
+(defcustom cursor-face-highlight-nonselected-window nil
+  "Non-nil means highlight text with `cursor-face' even in nonselected windows.
+This variable is similar to `highlight-nonselected-windows'."
+  :local t
+  :type 'boolean
+  :version "29.1")
+
+(defun redisplay--update-cursor-face-highlight (window)
+  "Highlights the overlay used to highlight text with cursor-face."
+  (let ((rol (window-parameter window 'internal-cursor-face-overlay)))
+    (if-let* (((or cursor-face-highlight-nonselected-window
+                   (eq window (selected-window))
+                   (and (window-minibuffer-p)
+                        (eq window (minibuffer-selected-window)))))
+              (pt (window-point window))
+              (cursor-face (get-text-property pt 'cursor-face)))
+        (let* ((start (previous-single-property-change
+                       (1+ pt) 'cursor-face nil (point-min)))
+               (end (next-single-property-change
+                     pt 'cursor-face nil (point-max)))
+               (new (redisplay--highlight-overlay-function
+                     start end window rol cursor-face)))
+          (unless (equal new rol)
+            (set-window-parameter window 'internal-cursor-face-overlay new)))
+      (redisplay--unhighlight-overlay-function rol))))
 
 (defvar pre-redisplay-functions (list #'redisplay--update-region-highlight)
   "Hook run just before redisplay.
 It is called in each window that is to be redisplayed.  It takes one argument,
 which is the window that will be redisplayed.  When run, the `current-buffer'
 is set to the buffer displayed in that window.")
+
+(define-minor-mode cursor-face-highlight-mode
+  "When enabled, respect the cursor-face property."
+  :global nil
+  (if cursor-face-highlight-mode
+      (add-hook 'pre-redisplay-functions
+                #'redisplay--update-cursor-face-highlight nil t)
+    (remove-hook 'pre-redisplay-functions
+                 #'redisplay--update-cursor-face-highlight t)))
 
 (defun redisplay--pre-redisplay-functions (windows)
   (with-demoted-errors "redisplay--pre-redisplay-functions: %S"
@@ -9098,6 +9144,22 @@ This affects the commands `next-completion' and
   :version "29.1"
   :group 'completion)
 
+(defcustom completion-auto-select nil
+  "Non-nil means to automatically select the *Completions* buffer.
+When the value is t, pressing TAB will switch to the completion list
+buffer when Emacs pops up a window showing that buffer.
+If the value is `second-tab', then the first TAB will pop up the
+window shwoing the completions list buffer, and the next TAB will
+switch to that window.
+See `completion-auto-help' for controlling when the window showing
+the completions is popped up and down."
+  :type '(choice (const :tag "Don't auto-select completions window" nil)
+                 (const :tag "Select completions window on first TAB" t)
+                 (const :tag
+                        "Select completions window on second TAB" second-tab))
+  :version "29.1"
+  :group 'completion)
+
 (defun previous-completion (n)
   "Move to the previous item in the completion list.
 With prefix argument N, move back N items (negative N means move
@@ -9110,6 +9172,13 @@ forward)."
 With prefix argument N, move N items (negative N means move
 backward)."
   (interactive "p")
+  (let ((prev (previous-single-property-change (point) 'mouse-face)))
+    (goto-char (cond
+                ((not prev)
+                 (1- (next-single-property-change (point) 'mouse-face)))
+                ((/= prev (point))
+                 (point))
+                (t prev))))
   (let ((beg (point-min)) (end (point-max)))
     (catch 'bound
       (while (> n 0)
@@ -9127,7 +9196,7 @@ backward)."
         (unless (get-text-property (point) 'mouse-face)
           (goto-char (next-single-property-change (point) 'mouse-face nil end)))
         (setq n (1- n)))
-      (while (< n 0)
+      (while (and (< n 0) (not (bobp)))
         (let ((prop (get-text-property (1- (point)) 'mouse-face)))
           ;; If in a completion, move to the start of it.
           (when (and prop (eq prop (get-text-property (point) 'mouse-face)))
@@ -9319,12 +9388,6 @@ Called from `temp-buffer-show-hook'."
   :version "22.1"
   :group 'completion)
 
-(defcustom completion-auto-select nil
-  "Non-nil means to automatically select the *Completions* buffer."
-  :type 'boolean
-  :version "29.1"
-  :group 'completion)
-
 ;; This function goes in completion-setup-hook, so that it is called
 ;; after the text of the completion list buffer is written.
 (defun completion-setup-function ()
@@ -9354,6 +9417,9 @@ Called from `temp-buffer-show-hook'."
       (if base-dir (setq default-directory base-dir))
       (when completion-tab-width
         (setq tab-width completion-tab-width))
+      ;; Maybe enable cursor completions-highlight.
+      (when completions-highlight-face
+        (cursor-face-highlight-mode 1))
       ;; Maybe insert help string.
       (when completion-show-help
 	(goto-char (point-min))
@@ -9362,7 +9428,7 @@ Called from `temp-buffer-show-hook'."
 	(insert (substitute-command-keys
 		 "In this buffer, type \\[choose-completion] to \
 select the completion near point.\n\n")))))
-  (when completion-auto-select
+  (when (eq completion-auto-select t)
     (switch-to-completions)))
 
 (add-hook 'completion-setup-hook #'completion-setup-function)

@@ -3541,15 +3541,29 @@ special modes that implement their own highlighting.
 
 @item mouse-face
 @kindex mouse-face @r{(text property)}
-This property is used instead of @code{face} when the mouse is on or
-near the character.  For this purpose, ``near'' means that all text
-between the character and where the mouse is have the same
-@code{mouse-face} property value.
+This property is used instead of @code{face} when the mouse pointer
+hovers over the text which has this property.  When this happens, the
+entire stretch of text that has the same @code{mouse-face} property
+value, not just the character under the mouse, is highlighted.
 
 Emacs ignores all face attributes from the @code{mouse-face} property
 that alter the text size (e.g., @code{:height}, @code{:weight}, and
 @code{:slant}).  Those attributes are always the same as for the
 unhighlighted text.
+
+@item cursor-face
+@kindex cursor-face @r{(text property)}
+@findex cursor-face-highlight-mode
+@vindex cursor-face-highlight-nonselected-window
+This property is similar to @code{mouse-face}, but it is used when
+point (not the mouse) is inside text that has this property.  The
+highlighting happens only if the mode
+@code{cursor-face-highlight-mode} is enabled.  When the variable
+@code{cursor-face-highlight-nonselected-window} is non-@code{nil}, the
+text with this face is highlighted even if the window is not selected,
+similarly to what @code{highlight-nonselected-windows} does for the
+region (@pxref{Mark,, The Mark and the Region, emacs, The GNU Emacs
+Manual}).
 
 @item fontified
 @kindex fontified @r{(text property)}
@@ -5393,6 +5407,12 @@ Load the named extension @var{module} into the database @var{db}.
 Extensions are usually shared-library files; on GNU and Unix systems,
 they have the @file{.so} file-name extension.
 @end defun
+
+@findex sqlite-mode-open-file
+If you wish to list the contents of an SQLite file, you can use the
+@code{sqlite-mode-open-file} command.  This will pop to a buffer using
+@code{sqlite-mode}, which allows you to examine (and alter) the
+contents of an SQLite database.
 
 @node Parsing HTML/XML
 @section Parsing HTML and XML

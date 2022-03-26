@@ -107,6 +107,23 @@ struct haiku_display_info
   Time last_mouse_movement_time;
 
   Window root_window;
+
+  Emacs_Cursor text_cursor;
+  Emacs_Cursor nontext_cursor;
+  Emacs_Cursor modeline_cursor;
+  Emacs_Cursor hand_cursor;
+  Emacs_Cursor hourglass_cursor;
+  Emacs_Cursor horizontal_drag_cursor;
+  Emacs_Cursor vertical_drag_cursor;
+  Emacs_Cursor left_edge_cursor;
+  Emacs_Cursor top_left_corner_cursor;
+  Emacs_Cursor top_edge_cursor;
+  Emacs_Cursor top_right_corner_cursor;
+  Emacs_Cursor right_edge_cursor;
+  Emacs_Cursor bottom_right_corner_cursor;
+  Emacs_Cursor bottom_edge_cursor;
+  Emacs_Cursor bottom_left_corner_cursor;
+  Emacs_Cursor no_cursor;
 };
 
 struct haiku_output
@@ -149,11 +166,6 @@ struct haiku_output
 
   int menu_up_to_date_p;
   int zoomed_p;
-
-  int pending_zoom_x;
-  int pending_zoom_y;
-  int pending_zoom_width;
-  int pending_zoom_height;
 
   int menu_bar_open_p;
 

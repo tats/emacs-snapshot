@@ -220,10 +220,8 @@ struct haiku_menu_bar_help_event
 struct haiku_zoom_event
 {
   void *window;
-  int x;
-  int y;
-  int width;
-  int height;
+
+  bool zoomed;
 };
 
 #define FSPEC_FAMILY 1
@@ -945,11 +943,12 @@ extern "C"
   extern void
   BMessage_delete (void *message);
 
-  extern void
-  be_drag_message (void *view, void *message,
+  extern bool
+  be_drag_message (void *view, void *message, bool allow_same_view,
 		   void (*block_input_function) (void),
 		   void (*unblock_input_function) (void),
-		   void (*process_pending_signals_function) (void));
+		   void (*process_pending_signals_function) (void),
+		   bool (*should_quit_function) (void));
 
 #ifdef __cplusplus
   extern void *

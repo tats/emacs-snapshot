@@ -29,6 +29,7 @@ applies, and please also update docstrings as needed.
 This uses the popular sqlite3 library, and can be disabled by using
 the '--without-sqlite3' option to the 'configure' script.
 
++++
 ** Emacs has been ported to the Haiku operating system.
 The configuration process should automatically detect and build for
 Haiku.  There is also an optional window-system port to Haiku, which
@@ -50,6 +51,7 @@ Unlike X, there is no compile-time option to enable or disable
 double-buffering.  If you wish to disable double-buffering, change the
 frame parameter 'inhibit-double-buffering' instead.
 
+---
 ** Emacs now installs the ".pdmp" file using a unique fingerprint in the name.
 The file is typically installed using a file name akin to
 "...dir/libexec/emacs/29.1/x86_64-pc-linux-gnu/emacs-<fingerprint>.pdmp".
@@ -64,6 +66,7 @@ this support.
 The named feature 'xinput2' can be used to test for the presence of
 XInput 2 support from Lisp programs.
 
++++
 ** Emacs now supports being built with pure GTK.
 To use this option, make sure the GTK 3 and Cairo development files
 are installed, and configure Emacs with the option '--with-pgtk'.
@@ -79,6 +82,18 @@ input of sequences such as 'C-;' and 'C-S-u'.
 ** The docstrings of preloaded files are not in "etc/DOC" any more.
 Instead, they're fetched as needed from the corresponding ".elc" file,
 as was already the case for all the non-preloaded files.
+
+** Emacs Sessions (Desktop)
+
++++
+*** New option to load a locked desktop if locking Emacs is not running.
+The option 'desktop-load-locked-desktop' can now be set to the value
+'check-pid', which means to allow loading a locked ".emacs.desktop"
+file if the Emacs process which locked it is no longer running on the
+local machine.  This allows to avoid asking questions about locked
+desktop files when the Emacs session which locked it crashes or was
+otherwise interrupted and didn't exit gracefully.  See the "(emacs)
+Saving Emacs Sessions" node in the Emacs manual for more details.
 
 
 * Startup Changes in Emacs 29.1
@@ -154,6 +169,7 @@ example, if point is before an Emoji sequence, pressing <Delete> will
 delete the entire sequence, not just a single character at its
 beginning.
 
++++
 ** 'load-history' does not treat autoloads specially any more.
 An autoload definition appears just as a '(defun . NAME)' and the
 '(t . NAME)' entries are not generated any more.
@@ -195,6 +211,7 @@ If set to nil, commands like 'find-library' will only include library
 files in the completion candidates.  The default is t, which preserves
 previous behavior, whereby non-library files could also be included.
 
++++
 ** New command 'sqlite-mode-open-file' for examining an sqlite3 file.
 This uses the new 'sqlite-mode' which allows listing the tables in a
 DB file, and examining and modifying the columns and the contents of
@@ -321,6 +338,7 @@ When environment variable 'EMACS_TEST_JUNIT_REPORT' is set, ERT
 generates a JUnit test report under this file name.  This is useful
 for Emacs integration into CI/CD test environments.
 
+---
 *** Unbound test symbols now signal an 'ert-test-unbound' error.
 This affects the 'ert-select-tests' function and its callers.
 
@@ -354,6 +372,7 @@ inserted.
 This command will tell you the name of the Emoji at point.  (This
 command also works for non-Emoji characters.)
 
+---
 *** New input method 'emoji'.
 
 ** Help
@@ -381,6 +400,7 @@ displayed, if any.
 
 ** Outline Mode
 
++++
 *** Support for customizing the default visibility state of headings.
 Customize the user option 'outline-default-state' to define what
 headings will be visible after Outline mode is turned on.  When equal
@@ -418,7 +438,9 @@ For example, a 'display-buffer-alist' entry of
 will make the body of the chosen window 40 columns wide.  For the
 height use 'window-height' in combination with 'body-lines'.
 
-*** 'other-window-scroll-default' can define the other window to scroll.
+---
+*** You can customize which window 'scroll-other-window' operates on.
+This is controlled by the new 'other-window-scroll-default' user option.
 
 ** Frames
 
@@ -440,6 +462,7 @@ the corresponding deleted frame.
 By default, it contains 'C-c <left>' and 'C-c <right>' to browse
 the history of tab window configurations back and forward.
 
+---
 ** Better detection of text suspiciously reordered on display.
 The function 'bidi-find-overridden-directionality' has been extended
 to detect reordering effects produced by embeddings and isolates
@@ -562,10 +585,13 @@ value.
 
 ** Minibuffer and Completions
 
++++
 *** The "*Completions*" buffer can now be automatically selected.
 To enable this behavior, customize the user option
-'completion-auto-select' to t.  Then pressing 'TAB' will switch to the
-"*Completions*" buffer when it pops up that buffer.
+'completion-auto-select' to t, then pressing 'TAB' will switch to the
+"*Completions*" buffer when it pops up that buffer.  If the value is
+'second-tab', then the first tab will display "*Completions*", and the
+second one will switch to the "*Completions*" buffer.
 
 *** New user option 'completion-wrap-movement'.
 When non-nil, the commands 'next-completion' and 'previous-completion'
@@ -576,6 +602,32 @@ the "*Completions*" buffer.
 This option controls the sorting of the completion candidates in
 the "*Completions*" buffer.  Available styles are no sorting,
 alphabetical (the default), or a custom sort function.
+
++++
+*** New values for the 'completion-auto-help' user option.
+There are two new values to control the way the "*Completions*" buffer
+behaves after pressing a 'TAB' if completion is not unique.  The value
+'always' updates or shows the "*Completions*" buffer after any attempt
+to complete.  The value 'visual' is like 'always', but only updates
+the completions if they are already visible.  The default value 't'
+always hides the completion buffer after some completion is made.
+
++++
+*** New user option 'completions-max-height'.
+This option limits the height of the "*Completions*" buffer.
+
++++
+*** New user option 'completions-header-format'.
+This is a string to control the heading line to show in the
+"*Completions*" buffer before the list of completions.
+If it contains "%s", that is replaced with the number of completions.
+If nil, the heading line is not shown.
+
++++
+*** New user option 'completions-highlight-face'.
+When this user option names a face, the current
+candidate in the "*Completions*" buffer is highlighted with that face.
+The nil value disables this highlighting.
 
 ** Isearch and Replace
 
@@ -668,6 +720,26 @@ prefix argument that causes 'eudc-expand-try-all' to return matches
 from all servers instead of just the matches from the first server to
 return any.  This is useful for example, if one wants to search LDAP
 for a name that happens to match a contact in one's BBDB.
+
++++
+*** New behaviour and default for option 'eudc-inline-expansion-format'
+EUDC inline expansion result formatting defaulted to
+
+                 '("%s %s <%s>" firstname name email)
+
+Since email address specifications need to comply with RFC 5322 in
+order to be useful in messages, there was a risk to produce syntax
+which was standard with RFC 822, but is marked as obsolete syntax by
+its successor RFC 5322.  Also, the first and last name part was never
+enclosed in double quotes, potentially producing invalid address
+specifications, which may be rejected by a receiving MTA.  Thus, this
+variable can now additionally be set to nil (the new default), or a
+function.  In both cases, the formatted result will be in compliance
+with RFC 5322.  When set to nil, a default format very similar to the
+old default will be produced.  When set to a function, that function
+is called, and the returned values are used to populate the phrase and
+comment parts (see RFC 5322 for definitions). In both cases, the
+phrase part will be automatically quoted if necessary.
 
 ** eww/shr
 
@@ -1135,6 +1207,7 @@ a weight of 'normal' and the font doesn't have this weight, Emacs
 won't find the font spec.  In these cases, replacing ":weight 'normal"
 with ":weight 'medium" should fix the issue.
 
+---
 ** Keymap descriptions have changed.
 'help--describe-command', 'C-h b' and associated functions that output
 keymap descriptions have changed.  In particular, prefix commands are
@@ -1182,7 +1255,7 @@ like:
 ---
 ** The 'inhibit-changing-match-data' variable is now obsolete.
 Instead, functions like 'string-match' and 'looking-at' now take an
-optional 'inhibit-modify' argument.
+optional INHIBIT-MODIFY argument.
 
 ---
 ** 'gnus-define-keys' is now obsolete.
@@ -1201,6 +1274,7 @@ Use 'exif-parse-file' and 'exif-field' instead.
 ** 'insert-directory' alternatives should not change the free disk space line.
 This change is now applied in 'dired-insert-directory'.
 
+---
 ** Some functions and variables obsolete since Emacs 23 have been removed:
 'find-emacs-lisp-shadows', 'newsticker-cache-filename',
 'unify-8859-on-decoding-mode', 'unify-8859-on-encoding-mode',
@@ -1300,6 +1374,13 @@ property.
 +++
 ** New 'min-width' 'display' property.
 This allows setting a minimum display width for a region of text.
+
++++
+** New 'cursor-face' text property.
+This uses 'cursor-face' instead of the default face when cursor is on or
+near the character and 'cursor-face-highlight-mode' is enabled.  The
+user option 'cursor-face-highlight-nonselected-window' is similar to
+'highlight-nonselected-windows', but for this property.
 
 +++
 ** New event type 'touch-end'.
@@ -1437,6 +1518,12 @@ platforms.
 This command lets you examine all data in the current selection and
 the clipboard, and insert it into the buffer.
 
+---
+** New function 'minibuffer-lazy-highlight-setup'.
+This function is intended to be added to 'minibuffer-setup-hook'.
+It sets up the minibuffer for lazy highlighting of matches
+in the original window.
+
 +++
 ** New text property 'inhibit-isearch'.
 If set, 'isearch' will skip these areas, which can be useful (for
@@ -1504,11 +1591,11 @@ from a specified amount of pixels above or below a position.
 ---
 ** 'eshell-eval-using-options' now follows POSIX/GNU argument syntax conventions.
 Built-in commands in Eshell now accept command-line options with
-values passed as a single token, such as '-oVALUE' or
-'--option=VALUE'.
+values passed as a single token, such as '-oVALUE' or '--option=VALUE'.
 
 ** XDG support
 
+---
 *** New function 'xdg-state-home' returns 'XDG_STATE_HOME' environment variable.
 This new location, introduced in the XDG Base Directory Specification
 version 0.8 (8th May 2021), "contains state data that should persist
@@ -1671,6 +1758,7 @@ that should be displayed, and the xwidget that asked to display it.
 This function is used to control where and if an xwidget stores
 cookies set by web pages on disk.
 
+---
 ** New variable 'help-buffer-under-preparation'.
 This variable is bound to t during the preparation of a "*Help*" buffer.
 
@@ -1703,17 +1791,23 @@ The property ':position' now specifies the position of the underline
 when used as part of a property list specification for the
 ':underline' attribute.
 
++++
 ** 'defalias' records a more precise history of definitions.
-This is recorded in the `function-history` symbol property.
+This is recorded in the 'function-history' symbol property.
 
 ---
 ** 'indian-tml-base-table' no longer translates digits.
 Use 'indian-tml-base-digits-table' if you want digits translation.
 
---
+---
 ** 'indian-tml-itrans-v5-hash' no longer translates digits.
 Use 'indian-tml-itrans-digits-v5-hash' if you want digits
 translation.
+
++++
+** 'shell-quote-argument' has a new optional parameter POSIX.
+This is useful when quoting shell arguments for a remote shell
+invocation.  Such shells are POSIX conform by default.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems
@@ -1726,6 +1820,24 @@ On Windows 10 (version 1809 and higher) and Windows 11, Emacs will now
 follow the system's dark mode: GUI frames use the appropriate light or
 dark title bar and scroll bars, based on the user's Windows-wide color
 settings.
+
+---
+*** Emacs now uses native image APIs to display some image formats.
+On Windows 2000 and later, Emacs now defaults to using the native
+image APIs for displaying the BMP, GIF, JPEG, PNG, and TIFF images.
+This means Emacs on MS-Windows needs no longer use external image
+support libraries to display those images.  Other image types -- XPM,
+SVG, and WEBP -- still need support libraries for Emacs to be able to
+display them.
+
+The use of native image APIs is controlled by the variable
+'w32-use-native-image-API', whose value now defaults to t on systems
+where those APIs are available.
+
++++
+*** Emacs now supports display of BMP images using native image APIs.
+When 'w32-use-native-image-API' is non-nil, Emacs on MS-Windows now
+has built-in support for displaying BMP images.
 
 
 ----------------------------------------------------------------------

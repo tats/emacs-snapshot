@@ -6582,7 +6582,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   return Qnil;
 }
 
-DEFUN ("x-begin-drag", Fx_begin_drag, Sx_begin_drag, 1, 4, 0,
+DEFUN ("x-begin-drag", Fx_begin_drag, Sx_begin_drag, 1, 5, 0,
        doc: /* Begin dragging contents on FRAME, with targets TARGETS.
 TARGETS is a list of strings, which defines the X selection targets
 that will be available to the drop target.  Block until the mouse
@@ -6601,6 +6601,9 @@ can be one of the following:
    `XdndSelection', and to delete whatever was saved into that
    selection afterwards.
 
+`XdndActionPrivate' is also a valid return value, and means that the
+drop target chose to perform an unspecified or unknown action.
+
 There are also some other valid values of ACTION that depend on
 details of both the drop target's implementation details and that of
 Emacs.  For that reason, they are not mentioned here.  Consult
@@ -6609,19 +6612,34 @@ https://freedesktop.org/wiki/Specifications/XDND/.
 
 If RETURN-FRAME is non-nil, this function will return the frame if the
 mouse pointer moves onto an Emacs frame, after first moving out of
-FRAME.
+FRAME.  (This is not guaranteed to work on some systems.)
+
+If ACTION is a list and not nil, its elements are assumed to be a cons
+of (ITEM . STRING), where ITEM is the name of an action, and STRING is
+a string describing ITEM to the user.  The drop target is expected to
+prompt the user to choose between any of the actions in the list.
 
 If ACTION is not specified or nil, `XdndActionCopy' is used
-instead.  */)
+instead.
+
+If ALLOW-CURRENT-FRAME is not specified or nil, then the drop target
+is allowed to be FRAME.  Otherwise, no action will be taken if the
+mouse buttons are released on top of FRAME.  */)
   (Lisp_Object targets, Lisp_Object action, Lisp_Object frame,
-   Lisp_Object return_frame)
+   Lisp_Object return_frame, Lisp_Object allow_current_frame)
 {
   struct frame *f = decode_window_system_frame (frame);
-  int ntargets = 0;
+  int ntargets = 0, nnames = 0;
+  ptrdiff_t len;
   char *target_names[2048];
   Atom *target_atoms;
-  Lisp_Object lval, original;
+  Lisp_Object lval, original, tem, t1, t2;
   Atom xaction;
+  Atom action_list[2048];
+  char *name_list[2048];
+  char *scratch;
+
+  USE_SAFE_ALLOCA;
 
   CHECK_LIST (targets);
   original = targets;
@@ -6629,10 +6647,14 @@ instead.  */)
   for (; CONSP (targets); targets = XCDR (targets))
     {
       CHECK_STRING (XCAR (targets));
+      maybe_quit ();
 
       if (ntargets < 2048)
 	{
-	  target_names[ntargets] = SSDATA (XCAR (targets));
+	  scratch = SSDATA (XCAR (targets));
+	  len = strlen (scratch);
+	  target_names[ntargets] = SAFE_ALLOCA (len + 1);
+	  strncpy (target_names[ntargets], scratch, len + 1);
 	  ntargets++;
 	}
       else
@@ -6647,10 +6669,53 @@ instead.  */)
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionMove;
   else if (EQ (action, QXdndActionLink))
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionLink;
-  else if (EQ (action, QXdndActionAsk))
-    xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
   else if (EQ (action, QXdndActionPrivate))
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionPrivate;
+  else if (EQ (action, QXdndActionAsk))
+    xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
+  else if (CONSP (action))
+    {
+      xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
+      original = action;
+
+      CHECK_LIST (action);
+      for (; CONSP (action); action = XCDR (action))
+	{
+	  maybe_quit ();
+	  tem = XCAR (action);
+	  CHECK_CONS (tem);
+	  t1 = XCAR (tem);
+	  t2 = XCDR (tem);
+	  CHECK_SYMBOL (t1);
+	  CHECK_STRING (t2);
+
+	  if (nnames < 2048)
+	    {
+	      if (EQ (t1, QXdndActionCopy))
+		action_list[nnames] = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionCopy;
+	      else if (EQ (t1, QXdndActionMove))
+		action_list[nnames] = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionMove;
+	      else if (EQ (t1, QXdndActionLink))
+		action_list[nnames] = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionLink;
+	      else if (EQ (t1, QXdndActionAsk))
+		action_list[nnames] = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
+	      else if (EQ (t1, QXdndActionPrivate))
+		action_list[nnames] = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionPrivate;
+	      else
+		signal_error ("Invalid drag-and-drop action", tem);
+
+	      scratch = SSDATA (ENCODE_UTF_8 (t2));
+	      len = strlen (scratch);
+	      name_list[nnames] = SAFE_ALLOCA (len + 1);
+	      strncpy (name_list[nnames], scratch, len + 1);
+
+	      nnames++;
+	    }
+	  else
+	    error ("Too many actions");
+	}
+      CHECK_LIST_END (action, original);
+    }
   else
     signal_error ("Invalid drag-and-drop action", action);
 
@@ -6663,8 +6728,11 @@ instead.  */)
 
   x_set_dnd_targets (target_atoms, ntargets);
   lval = x_dnd_begin_drag_and_drop (f, FRAME_DISPLAY_INFO (f)->last_user_time,
-				    xaction, !NILP (return_frame));
+				    xaction, !NILP (return_frame), action_list,
+				    (const char **) &name_list, nnames,
+				    !NILP (allow_current_frame));
 
+  SAFE_FREE ();
   return lval;
 }
 

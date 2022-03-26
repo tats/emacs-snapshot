@@ -27,87 +27,78 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 
-static Lisp_Object
-haiku_selection_data_1 (Lisp_Object clipboard)
-{
-  Lisp_Object result = Qnil;
-  char *targets[256];
-
-  block_input ();
-  if (EQ (clipboard, QPRIMARY))
-    BClipboard_primary_targets ((char **) &targets, 256);
-  else if (EQ (clipboard, QSECONDARY))
-    BClipboard_secondary_targets ((char **) &targets, 256);
-  else if (EQ (clipboard, QCLIPBOARD))
-    BClipboard_system_targets ((char **) &targets, 256);
-  else
-    {
-      unblock_input ();
-      signal_error ("Bad clipboard", clipboard);
-    }
-
-  for (int i = 0; targets[i]; ++i)
-    {
-      result = Fcons (build_unibyte_string (targets[i]),
-		      result);
-      free (targets[i]);
-    }
-  unblock_input ();
-
-  return result;
-}
-
-DEFUN ("haiku-selection-targets", Fhaiku_selection_targets,
-       Shaiku_selection_targets, 1, 1, 0,
-       doc: /* Find the types of data available from CLIPBOARD.
-CLIPBOARD should be the symbol `PRIMARY', `SECONDARY' or `CLIPBOARD'.
-Return the available types as a list of strings.  */)
-  (Lisp_Object clipboard)
-{
-  return haiku_selection_data_1 (clipboard);
-}
-
 DEFUN ("haiku-selection-data", Fhaiku_selection_data, Shaiku_selection_data,
        2, 2, 0,
        doc: /* Retrieve content typed as NAME from the clipboard
 CLIPBOARD.  CLIPBOARD is the symbol `PRIMARY', `SECONDARY' or
-`CLIPBOARD'.  NAME is a MIME type denoting the type of the data to
-fetch.  */)
+`CLIPBOARD'.  NAME is a string describing the MIME type denoting the
+type of the data to fetch.  If NAME is nil, then the entire contents
+of the clipboard will be returned instead, as a serialized system
+message in the format accepted by `haiku-drag-message', which see.  */)
   (Lisp_Object clipboard, Lisp_Object name)
 {
-  CHECK_SYMBOL (clipboard);
-  CHECK_STRING (name);
   char *dat;
   ssize_t len;
+  Lisp_Object str;
+  void *message;
+  enum haiku_clipboard clipboard_name;
+  int rc;
 
-  block_input ();
-  if (EQ (clipboard, QPRIMARY))
-    dat = BClipboard_find_primary_selection_data (SSDATA (name), &len);
-  else if (EQ (clipboard, QSECONDARY))
-    dat = BClipboard_find_secondary_selection_data (SSDATA (name), &len);
-  else if (EQ (clipboard, QCLIPBOARD))
-    dat = BClipboard_find_system_data (SSDATA (name), &len);
+  CHECK_SYMBOL (clipboard);
+
+  if (!EQ (clipboard, QPRIMARY) && !EQ (clipboard, QSECONDARY)
+      && !EQ (clipboard, QCLIPBOARD))
+    signal_error ("Invalid clipboard", clipboard);
+
+  if (!NILP (name))
+    {
+      CHECK_STRING (name);
+
+      block_input ();
+      if (EQ (clipboard, QPRIMARY))
+	dat = BClipboard_find_primary_selection_data (SSDATA (name), &len);
+      else if (EQ (clipboard, QSECONDARY))
+	dat = BClipboard_find_secondary_selection_data (SSDATA (name), &len);
+      else
+	dat = BClipboard_find_system_data (SSDATA (name), &len);
+      unblock_input ();
+
+      if (!dat)
+	return Qnil;
+
+      str = make_unibyte_string (dat, len);
+
+      /* `foreign-selection' just means that the selection has to be
+	 decoded by `gui-get-selection'.  It has no other meaning,
+	 AFAICT.  */
+      Fput_text_property (make_fixnum (0), make_fixnum (len),
+			  Qforeign_selection, Qt, str);
+
+      block_input ();
+      BClipboard_free_data (dat);
+      unblock_input ();
+    }
   else
     {
+      if (EQ (clipboard, QPRIMARY))
+	clipboard_name = CLIPBOARD_PRIMARY;
+      else if (EQ (clipboard, QSECONDARY))
+	clipboard_name = CLIPBOARD_SECONDARY;
+      else
+	clipboard_name = CLIPBOARD_CLIPBOARD;
+
+      block_input ();
+      rc = be_lock_clipboard_message (clipboard_name, &message);
       unblock_input ();
-      signal_error ("Bad clipboard", clipboard);
+
+      if (rc)
+	signal_error ("Couldn't open clipboard", clipboard);
+
+      block_input ();
+      str = haiku_message_to_lisp (message);
+      be_unlock_clipboard (clipboard_name);
+      unblock_input ();
     }
-  unblock_input ();
-
-  if (!dat)
-    return Qnil;
-
-  Lisp_Object str = make_unibyte_string (dat, len);
-
-  /* `foreign-selection' just means that the selection has to be
-     decoded by `gui-get-selection'.  It has no other meaning,
-     AFAICT.  */
-  Fput_text_property (make_fixnum (0), make_fixnum (len),
-		      Qforeign_selection, Qt, str);
-
-  block_input ();
-  BClipboard_free_data (dat);
-  unblock_input ();
 
   return str;
 }
@@ -194,7 +185,11 @@ same as `SECONDARY'.  */)
    DATA is a 16-bit signed integer.  If TYPE is `long', then DATA is a
    32-bit signed integer.  If TYPE is `llong', then DATA is a 64-bit
    signed integer. If TYPE is `byte' or `char', then DATA is an 8-bit
-   signed integer.  If TYPE is `bool', then DATA is a boolean.  */
+   signed integer.  If TYPE is `bool', then DATA is a boolean.
+
+   If the field name is not a string but the symbol `type', then it
+   associates to a 32-bit unsigned integer describing the type of the
+   system message.  */
 Lisp_Object
 haiku_message_to_lisp (void *message)
 {
@@ -205,6 +200,7 @@ haiku_message_to_lisp (void *message)
   ssize_t buf_size;
   int32 i, j, count, type_code;
   int rc;
+  void *msg;
 
   for (i = 0; !be_enum_message (message, &type_code, i,
 				&count, &name); ++i)
@@ -221,6 +217,15 @@ haiku_message_to_lisp (void *message)
 
 	  switch (type_code)
 	    {
+	    case 'MSGG':
+	      msg = be_get_message_message (message, name, j);
+	      if (!msg)
+		memory_full (SIZE_MAX);
+	      t1 = haiku_message_to_lisp (msg);
+	      BMessage_delete (msg);
+
+	      break;
+
 	    case 'BOOL':
 	      t1 = (*(bool *) buf) ? Qt : Qnil;
 	      break;
@@ -239,7 +244,10 @@ haiku_message_to_lisp (void *message)
 		memory_full (SIZE_MAX);
 
 	      t1 = build_string (pbuf);
+
+	      block_input ();
 	      free (pbuf);
+	      unblock_input ();
 	      break;
 
 	    case 'SHRT':
@@ -301,6 +309,10 @@ haiku_message_to_lisp (void *message)
 	  t2 = Qbool;
 	  break;
 
+	case 'MSGG':
+	  t2 = Qmessage;
+	  break;
+
 	default:
 	  t2 = make_int (type_code);
 	}
@@ -309,7 +321,8 @@ haiku_message_to_lisp (void *message)
       list = Fcons (Fcons (build_string_from_utf8 (name), tem), list);
     }
 
-  return list;
+  tem = Fcons (Qtype, make_uint (be_get_message_type (message)));
+  return Fcons (tem, list);
 }
 
 static int32
@@ -337,6 +350,8 @@ lisp_to_type_code (Lisp_Object obj)
     return 'CHAR';
   else if (EQ (obj, Qbool))
     return 'BOOL';
+  else if (EQ (obj, Qmessage))
+    return 'MSGG';
   else
     return -1;
 }
@@ -350,16 +365,49 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
   int64 llong_data;
   int8 char_data;
   bool bool_data;
+  void *msg_data;
   intmax_t t4;
+  uintmax_t t5;
   int rc;
+  specpdl_ref ref;
 
   CHECK_LIST (obj);
   for (tem = obj; CONSP (tem); tem = XCDR (tem))
     {
+      maybe_quit ();
       t1 = XCAR (tem);
       CHECK_CONS (t1);
 
       name = XCAR (t1);
+
+      if (EQ (name, Qtype))
+	{
+	  t2 = XCDR (t1);
+
+	  if (BIGNUMP (t2))
+	    {
+	      t5 = bignum_to_uintmax (t2);
+
+	      if (!t5 || t5 > TYPE_MAXIMUM (uint32))
+		signal_error ("Value too large", t2);
+
+	      block_input ();
+	      be_set_message_type (message, t5);
+	      unblock_input ();
+	    }
+	  else
+	    {
+	      if (!TYPE_RANGED_FIXNUMP (uint32, t2))
+		signal_error ("Invalid data type", t2);
+
+	      block_input ();
+	      be_set_message_type (message, XFIXNAT (t2));
+	      unblock_input ();
+	    }
+
+	  continue;
+	}
+
       CHECK_STRING (name);
 
       t1 = XCDR (t1);
@@ -374,10 +422,33 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
       CHECK_LIST (t1);
       for (t2 = XCDR (t1); CONSP (t2); t2 = XCDR (t2))
 	{
+	  maybe_quit ();
 	  data = XCAR (t2);
+
+	  if (FIXNUMP (type_sym) || BIGNUMP (type_sym))
+	    goto decode_normally;
 
 	  switch (type_code)
 	    {
+	    case 'MSGG':
+	      ref = SPECPDL_INDEX ();
+
+	      block_input ();
+	      msg_data = be_create_simple_message ();
+	      unblock_input ();
+
+	      record_unwind_protect_ptr (BMessage_delete, msg_data);
+	      haiku_lisp_to_message (data, msg_data);
+
+	      block_input ();
+	      rc = be_add_message_message (message, SSDATA (name), msg_data);
+	      unblock_input ();
+
+	      if (rc)
+		signal_error ("Invalid message", msg_data);
+	      unbind_to (ref, Qnil);
+	      break;
+
 	    case 'RREF':
 	      CHECK_STRING (data);
 
@@ -489,6 +560,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	      break;
 
 	    default:
+	    decode_normally:
 	      CHECK_STRING (data);
 
 	      block_input ();
@@ -506,8 +578,14 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
   CHECK_LIST_END (tem, obj);
 }
 
+static bool
+haiku_should_quit_drag (void)
+{
+  return !NILP (Vquit_flag);
+}
+
 DEFUN ("haiku-drag-message", Fhaiku_drag_message, Shaiku_drag_message,
-       2, 2, 0,
+       2, 3, 0,
        doc: /* Begin dragging MESSAGE from FRAME.
 
 MESSAGE an alist of strings, denoting message field names, to a list
@@ -523,13 +601,21 @@ signed integer.  If TYPE is `llong', then DATA is a 64-bit signed
 integer. If TYPE is `byte' or `char', then DATA is an 8-bit signed
 integer.  If TYPE is `bool', then DATA is a boolean.
 
+If the field name is not a string but the symbol `type', then it
+associates to a 32-bit unsigned integer describing the type of the
+system message.
+
 FRAME is a window system frame that must be visible, from which the
-drag will originate.  */)
-  (Lisp_Object frame, Lisp_Object message)
+drag will originate.
+
+ALLOW-SAME-FRAME, if nil or not specified, means that MESSAGE will be
+ignored if it is dropped on top of FRAME.  */)
+  (Lisp_Object frame, Lisp_Object message, Lisp_Object allow_same_frame)
 {
   specpdl_ref idx;
   void *be_message;
   struct frame *f;
+  bool rc;
 
   idx = SPECPDL_INDEX ();
   f = decode_window_system_frame (frame);
@@ -541,10 +627,15 @@ drag will originate.  */)
 
   record_unwind_protect_ptr (BMessage_delete, be_message);
   haiku_lisp_to_message (message, be_message);
-  be_drag_message (FRAME_HAIKU_VIEW (f), be_message,
-		   block_input, unblock_input,
-		   process_pending_signals);
+  rc = be_drag_message (FRAME_HAIKU_VIEW (f), be_message,
+			!NILP (allow_same_frame),
+			block_input, unblock_input,
+			process_pending_signals,
+			haiku_should_quit_drag);
   FRAME_DISPLAY_INFO (f)->grabbed = 0;
+
+  if (rc)
+    quit ();
 
   return unbind_to (idx, Qnil);
 }
@@ -558,6 +649,7 @@ syms_of_haikuselect (void)
   DEFSYM (QUTF8_STRING, "UTF8_STRING");
   DEFSYM (Qforeign_selection, "foreign-selection");
   DEFSYM (QTARGETS, "TARGETS");
+  DEFSYM (Qmessage, "message");
   DEFSYM (Qstring, "string");
   DEFSYM (Qref, "ref");
   DEFSYM (Qshort, "short");
@@ -566,10 +658,10 @@ syms_of_haikuselect (void)
   DEFSYM (Qbyte, "byte");
   DEFSYM (Qchar, "char");
   DEFSYM (Qbool, "bool");
+  DEFSYM (Qtype, "type");
 
   defsubr (&Shaiku_selection_data);
   defsubr (&Shaiku_selection_put);
-  defsubr (&Shaiku_selection_targets);
   defsubr (&Shaiku_selection_owner_p);
   defsubr (&Shaiku_drag_message);
 }
