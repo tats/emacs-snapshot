@@ -44,6 +44,10 @@
   "Test `eshell-command-result' with an elisp command."
   (should (equal (eshell-test-command-result "(+ 1 2)") 3)))
 
+(ert-deftest eshell-test/lisp-command-with-quote ()
+  "Test `eshell-command-result' with an elisp command containing a quote."
+  (should (equal (eshell-test-command-result "(eq 'foo nil)") nil)))
+
 (ert-deftest eshell-test/for-loop ()
   "Test `eshell-command-result' with a for loop.."
   (let ((process-environment (cons "foo" process-environment)))
@@ -144,9 +148,9 @@ chars"
   "Test that the backslash is not preserved for escaped special
 chars"
   (with-temp-eshell
-   (eshell-command-result-p "echo \"h\\\\i\""
+   (eshell-command-result-p "echo \"\\\"hi\\\\\""
                             ;; Backslashes are doubled for regexp.
-                            "h\\\\i\n")))
+                            "\\\"hi\\\\\n")))
 
 (ert-deftest eshell-test/command-running-p ()
   "Modeline should show no command running"

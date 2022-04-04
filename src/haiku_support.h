@@ -159,6 +159,7 @@ struct haiku_mouse_motion_event
   int x;
   int y;
   bigtime_t time;
+  bool dnd_message;
 };
 
 struct haiku_menu_bar_left_event
@@ -949,6 +950,9 @@ extern "C"
 		   void (*unblock_input_function) (void),
 		   void (*process_pending_signals_function) (void),
 		   bool (*should_quit_function) (void));
+
+  extern bool
+  be_drag_and_drop_in_progress (void);
 
 #ifdef __cplusplus
   extern void *

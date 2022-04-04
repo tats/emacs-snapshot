@@ -58,7 +58,7 @@ struct unhandled_event
   uint8_t buffer[200];
 };
 
-static bool any_help_event_p = false;
+static bool any_help_event_p;
 
 char *
 get_keysym_name (int keysym)
@@ -452,7 +452,8 @@ haiku_mouse_or_wdesc_frame (void *window)
 			? x_display_list->last_mouse_frame
 			: NULL);
 
-  if (lm_f && !EQ (track_mouse, Qdropping))
+  if (lm_f && !EQ (track_mouse, Qdropping)
+      && !EQ (track_mouse, Qdrag_source))
     return lm_f;
   else
     {
@@ -2566,17 +2567,26 @@ haiku_scroll_run (struct window *w, struct run *run)
   unblock_input ();
 }
 
+/* Haiku doesn't provide any way to get the frame actually underneath
+   the pointer, so we typically return dpyinfo->last_mouse_frame if
+   the display is grabbed and `track-mouse' is not `dropping' or
+   `drag-source'; failing that, we return the selected frame, and
+   finally a random window system frame (as long as `track-mouse' is
+   not `drag-source') if that didn't work either.  */
 static void
 haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		      enum scroll_bar_part *part, Lisp_Object *x, Lisp_Object *y,
 		      Time *timestamp)
 {
   Lisp_Object frame, tail;
-  struct frame *f1 = NULL;
+  struct frame *f1;
+  int screen_x, screen_y;
+  void *view;
 
   if (!fp)
     return;
 
+  f1 = NULL;
   block_input ();
 
   FOR_EACH_FRAME (tail, frame)
@@ -2585,15 +2595,14 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	XFRAME (frame)->mouse_moved = false;
     }
 
-  if (gui_mouse_grabbed (x_display_list) && !EQ (track_mouse, Qdropping))
+  if (gui_mouse_grabbed (x_display_list)
+      && !EQ (track_mouse, Qdropping)
+      && !EQ (track_mouse, Qdrag_source))
     f1 = x_display_list->last_mouse_frame;
+  else
+    f1 = x_display_list->last_mouse_motion_frame;
 
-  if (!f1 || FRAME_TOOLTIP_P (f1))
-    f1 = ((EQ (track_mouse, Qdropping) && gui_mouse_grabbed (x_display_list))
-	  ? x_display_list->last_mouse_frame
-	  : NULL);
-
-  if (!f1 && insist > 0)
+  if (!f1 && FRAME_HAIKU_P (SELECTED_FRAME ()))
     f1 = SELECTED_FRAME ();
 
   if (!f1 || (!FRAME_HAIKU_P (f1) && (insist > 0)))
@@ -2602,26 +2611,37 @@ haiku_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	  !FRAME_TOOLTIP_P (XFRAME (frame)))
 	f1 = XFRAME (frame);
 
-  if (FRAME_TOOLTIP_P (f1))
+  if (f1 && FRAME_TOOLTIP_P (f1))
     f1 = NULL;
 
   if (f1 && FRAME_HAIKU_P (f1))
     {
-      int sx, sy;
-      void *view = FRAME_HAIKU_VIEW (f1);
+      view = FRAME_HAIKU_VIEW (f1);
+
       if (view)
 	{
-	  BView_get_mouse (view, &sx, &sy);
-
-	  remember_mouse_glyph (f1, sx, sy, &x_display_list->last_mouse_glyph);
+	  BView_get_mouse (view, &screen_x, &screen_y);
+	  remember_mouse_glyph (f1, screen_x, screen_y,
+				&x_display_list->last_mouse_glyph);
 	  x_display_list->last_mouse_glyph_frame = f1;
 
 	  *bar_window = Qnil;
 	  *part = scroll_bar_above_handle;
-	  *fp = f1;
+
+	  /* If track-mouse is `drag-source' and the mouse pointer is
+	     certain to not be actually under the chosen frame, return
+	     NULL in FP to at least try being consistent with X.  */
+	  if (EQ (track_mouse, Qdrag_source)
+	      && (screen_x < 0 || screen_y < 0
+		  || screen_x >= FRAME_PIXEL_WIDTH (f1)
+		  || screen_y >= FRAME_PIXEL_HEIGHT (f1)))
+	    *fp = NULL;
+	  else
+	    *fp = f1;
+
 	  *timestamp = x_display_list->last_mouse_movement_time;
-	  XSETINT (*x, sx);
-	  XSETINT (*y, sy);
+	  XSETINT (*x, screen_x);
+	  XSETINT (*y, screen_y);
 	}
     }
 
@@ -2970,6 +2990,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    struct haiku_mouse_motion_event *b = buf;
 	    struct frame *f = haiku_mouse_or_wdesc_frame (b->window);
 	    Mouse_HLInfo *hlinfo = &x_display_list->mouse_highlight;
+	    Lisp_Object frame;
 
 	    if (!f)
 	      continue;
@@ -2986,7 +3007,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		break;
 	      }
 
-	    Lisp_Object frame;
 	    XSETFRAME (frame, f);
 
 	    x_display_list->last_mouse_movement_time = b->time / 1000;
@@ -3102,8 +3122,8 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 			&& (!NILP (focus_follows_mouse)
 			    || f == SELECTED_FRAME ()))
 		      {
-			inev.kind = SELECT_WINDOW_EVENT;
-			inev.frame_or_window = window;
+			inev2.kind = SELECT_WINDOW_EVENT;
+			inev2.frame_or_window = window;
 		      }
 
 		    last_mouse_window = window;
@@ -3118,9 +3138,29 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		if (!NILP (help_echo_string)
 		    || !NILP (previous_help_echo_string))
 		  do_help = 1;
+
+		if (b->dnd_message)
+		  {
+		    /* It doesn't make sense to show tooltips when
+		       another program is dragging stuff over us.  */
+
+		    do_help = -1;
+
+		    if (!be_drag_and_drop_in_progress ())
+		      {
+			inev.kind = DRAG_N_DROP_EVENT;
+			inev.arg = Qlambda;
+
+			XSETINT (inev.x, b->x);
+			XSETINT (inev.y, b->y);
+			XSETFRAME (inev.frame_or_window, f);
+		      }
+		    break;
+		  }
 	      }
 
-	    need_flush = FRAME_DIRTY_P (f);
+	    if (FRAME_DIRTY_P (f))
+	      need_flush = 1;
 	    break;
 	  }
 	case BUTTON_UP:

@@ -1987,6 +1987,10 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
       else
 	error ("Attempt to delete the only frame");
     }
+#ifdef HAVE_X_WINDOWS
+  else if (x_dnd_in_progress && f == x_dnd_frame)
+    error ("Attempt to delete the drop source frame");
+#endif
 
   XSETFRAME (frame, f);
 
@@ -2505,9 +2509,12 @@ vertical offset, measured in units of the frame's default character size.
 If Emacs is running on a mouseless terminal or hasn't been programmed
 to read the mouse position, it returns the selected frame for FRAME
 and nil for X and Y.
-If `mouse-position-function' is non-nil, `mouse-position' calls it,
-passing the normal return value to that function as an argument,
-and returns whatever that function returns.  */)
+
+FRAME might be nil if `track-mouse' is set to `drag-source'.  This
+means there is no frame under the mouse.  If `mouse-position-function'
+is non-nil, `mouse-position' calls it, passing the normal return value
+to that function as an argument, and returns whatever that function
+returns.  */)
   (void)
 {
   return mouse_position (true);
@@ -2534,7 +2541,7 @@ mouse_position (bool call_mouse_position_function)
 						  &time_dummy);
     }
 
-  if (! NILP (x))
+  if (! NILP (x) && f)
     {
       int col = XFIXNUM (x);
       int row = XFIXNUM (y);
@@ -2542,7 +2549,10 @@ mouse_position (bool call_mouse_position_function)
       XSETINT (x, col);
       XSETINT (y, row);
     }
-  XSETFRAME (lispy_dummy, f);
+  if (f)
+    XSETFRAME (lispy_dummy, f);
+  else
+    lispy_dummy = Qnil;
   retval = Fcons (lispy_dummy, Fcons (x, y));
   if (call_mouse_position_function && !NILP (Vmouse_position_function))
     retval = call1 (Vmouse_position_function, retval);
@@ -2555,9 +2565,11 @@ DEFUN ("mouse-pixel-position", Fmouse_pixel_position,
 The position is given in pixel units, where (0, 0) is the
 upper-left corner of the frame, X is the horizontal offset, and Y is
 the vertical offset.
-If Emacs is running on a mouseless terminal or hasn't been programmed
-to read the mouse position, it returns the selected frame for FRAME
-and nil for X and Y.  */)
+FRAME might be nil if `track-mouse' is set to `drag-source'.  This
+means there is no frame under the mouse.  If Emacs is running on a
+mouseless terminal or hasn't been programmed to read the mouse
+position, it returns the selected frame for FRAME and nil for X and
+Y.  */)
   (void)
 {
   struct frame *f;
@@ -2578,7 +2590,11 @@ and nil for X and Y.  */)
 						  &time_dummy);
     }
 
-  XSETFRAME (lispy_dummy, f);
+  if (f)
+    XSETFRAME (lispy_dummy, f);
+  else
+    lispy_dummy = Qnil;
+
   retval = Fcons (lispy_dummy, Fcons (x, y));
   if (!NILP (Vmouse_position_function))
     retval = call1 (Vmouse_position_function, retval);

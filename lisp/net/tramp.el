@@ -2756,10 +2756,11 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 ;;;###autoload
 (progn (defun tramp-register-autoload-file-name-handlers ()
   "Add Tramp file name handlers to `file-name-handler-alist' during autoload."
-  (add-to-list 'file-name-handler-alist
-	       (cons tramp-autoload-file-name-regexp
-		     #'tramp-autoload-file-name-handler))
-  (put #'tramp-autoload-file-name-handler 'safe-magic t)))
+  (unless (rassq #'tramp-file-name-handler file-name-handler-alist)
+    (add-to-list 'file-name-handler-alist
+	         (cons tramp-autoload-file-name-regexp
+		       #'tramp-autoload-file-name-handler))
+    (put #'tramp-autoload-file-name-handler 'safe-magic t))))
 
 (put #'tramp-register-autoload-file-name-handlers 'tramp-autoload t)
 ;;;###autoload (tramp-register-autoload-file-name-handlers)
@@ -4315,6 +4316,7 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 		    (get-buffer-create buffer)
 		  ;; BUFFER can be nil.  We use a temporary buffer.
 		  (generate-new-buffer tramp-temp-buffer-name)))
+	       (orig-command command)
 	       (env (mapcar
 		     (lambda (elt)
 		       (when (tramp-compat-string-search "=" elt) elt))
@@ -4390,6 +4392,8 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 	    ;; t.  See Bug#51177.
 	    (when filter
 	      (set-process-filter p filter))
+	    (process-put p 'remote-command orig-command)
+	    (tramp-set-connection-property p "remote-command" orig-command)
 
 	    (tramp-message v 6 "%s" (string-join (process-command p) " "))
 	    p))))))
@@ -5956,6 +5960,45 @@ name of a process or buffer, or nil to default to the current buffer."
  'tramp-unload-hook
  (lambda ()
    (remove-hook 'interrupt-process-functions #'tramp-interrupt-process)))
+
+(defun tramp-signal-process (process sigcode &optional remote)
+  "Send PROCESS the signal with code SIGCODE.
+PROCESS may also be a number specifying the process id of the
+process to signal; in this case, the process need not be a child of
+this Emacs.
+If PROCESS is a process object which contains the property
+`remote-pid', or PROCESS is a number and REMOTE is a remote file name,
+PROCESS is interpreted as process on the respective remote host, which
+will be the process to signal.
+SIGCODE may be an integer, or a symbol whose name is a signal name."
+  (let (pid vec)
+    (cond
+     ((processp process)
+      (setq pid (process-get process 'remote-pid)
+            vec (process-get process 'vector)))
+     ((numberp process)
+      (setq pid process
+            vec (and (stringp remote) (tramp-dissect-file-name remote))))
+     (t (signal 'wrong-type-argument (list #'processp process))))
+    (unless (or (numberp sigcode) (symbolp sigcode))
+      (signal 'wrong-type-argument (list #'numberp sigcode)))
+    ;; If it's a Tramp process, send SIGCODE remotely.
+    (when (and pid vec)
+      (tramp-message
+       vec 5 "Send signal %s to process %s with pid %s" sigcode process pid)
+      ;; This is for tramp-sh.el.  Other backends do not support this (yet).
+      (if (tramp-compat-funcall
+           'tramp-send-command-and-check
+           vec (format "\\kill -%s %d" sigcode pid))
+          0 -1))))
+
+;; `signal-process-functions' exists since Emacs 29.1.
+(when (boundp 'signal-process-functions)
+  (add-hook 'signal-process-functions #'tramp-signal-process)
+  (add-hook
+   'tramp-unload-hook
+   (lambda ()
+     (remove-hook 'signal-process-functions #'tramp-signal-process))))
 
 (defun tramp-get-remote-null-device (vec)
   "Return null device on the remote host identified by VEC.

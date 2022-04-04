@@ -2913,6 +2913,7 @@ Additionally, it declares also the arguments for running remote
 processes, using the @command{ssh} command.  These don't need to be
 changed.
 
+
 @node Android shell setup
 @section Android shell setup hints
 @cindex android shell setup for ssh
@@ -4019,6 +4020,34 @@ using the @code{:connection-type} keyword.  If this keyword is not
 used, the value of @code{process-connection-type} is applied instead.
 
 
+@subsection Process properties of asynchronous remote processes
+@cindex Asynchronous remote processes
+
+When available, @value{tramp} adds process properties to process
+objects of asynchronous properties.  However, it is not guaranteed
+that all these properties are set.
+
+@itemize
+@item @code{remote-tty}
+
+This is the name of the terminal a @var{process} uses on the remote
+host, i.e., it reads and writes on.
+
+@item @code{remote-pid}
+
+The process id of the command executed on the remote host.  This is
+used when sending signals remotely.
+
+@item @code{remote-command}
+
+The remote command which has been invoked via @code{make-process} or
+@code{start-file-process}, a list of strings (program and its
+arguments).  This does not show the additional shell sugar
+@value{tramp} makes around the commands, in order to see this you must
+inspect @value{tramp} @ref{Traces and Profiles, traces}.
+@end itemize
+
+
 @anchor{Improving performance of asynchronous remote processes}
 @subsection Improving performance of asynchronous remote processes
 @cindex Asynchronous remote processes
@@ -4998,6 +5027,26 @@ directory, remote files cannot be restored with the respective tools,
 because those conventions don't specify remote paths.  Such files must
 be restored by moving them manually from
 @file{$@{XDG_DATA_HOME@}/Trash/files/}, if needed.
+
+
+@item
+How to identify temporary files produced by @value{tramp}?
+
+@vindex tramp-temp-name-prefix
+Temporary files are kept in your @code{temporary-file-directory}
+directory, which is often @file{/tmp/}.  By default, they have the
+file name prefix @t{"tramp."}.  If you want to change this prefix, for
+example because you want to identify temporary files produced by
+@code{file-local-copy} in your package, you can bind the variable
+@code{tramp-temp-name-prefix} temporarily:
+
+@example
+@group
+(let ((tramp-temp-name-prefix "my-prefix."))
+  (file-local-copy "@trampfn{ssh,,.emacs}"))
+@result{} "/tmp/my-prefix.HDfgDZ"
+@end group
+@end example
 
 
 @item

@@ -433,6 +433,12 @@ struct x_display_info
   /* Atom used to determine whether or not the screen is composited.  */
   Atom Xatom_NET_WM_CM_Sn;
 
+  Atom Xatom_MOTIF_WM_HINTS, Xatom_MOTIF_DRAG_WINDOW,
+    Xatom_MOTIF_DRAG_TARGETS, Xatom_MOTIF_DRAG_AND_DROP_MESSAGE,
+    Xatom_MOTIF_DRAG_INITIATOR_INFO, Xatom_MOTIF_DRAG_RECEIVER_INFO;
+
+  Atom Xatom_XmTRANSFER_SUCCESS, Xatom_XmTRANSFER_FAILURE;
+
   /* The frame (if any) which has the X window that has keyboard focus.
      Zero if none.  This is examined by Ffocus_frame in xfns.c.  Note
      that a mere EnterNotify event can set this; if you need to know the
@@ -551,7 +557,8 @@ struct x_display_info
     Xatom_net_workarea, Xatom_net_wm_opaque_region, Xatom_net_wm_ping,
     Xatom_net_wm_sync_request, Xatom_net_wm_sync_request_counter,
     Xatom_net_wm_frame_drawn, Xatom_net_wm_user_time,
-    Xatom_net_wm_user_time_window, Xatom_net_client_list_stacking;
+    Xatom_net_wm_user_time_window, Xatom_net_client_list_stacking,
+    Xatom_net_wm_pid;
 
   /* XSettings atoms and windows.  */
   Atom Xatom_xsettings_sel, Xatom_xsettings_prop, Xatom_xsettings_mgr;
@@ -1382,7 +1389,7 @@ extern void x_scroll_bar_configure (GdkEvent *);
 #endif
 
 extern Lisp_Object x_dnd_begin_drag_and_drop (struct frame *, Time, Atom,
-					      bool, Atom *, const char **,
+					      Lisp_Object, Atom *, const char **,
 					      size_t, bool);
 extern void x_set_dnd_targets (Atom *, int);
 
@@ -1540,6 +1547,9 @@ extern void x_session_close (void);
 #ifdef USE_GTK
 extern struct input_event xg_pending_quit_event;
 #endif
+
+extern bool x_dnd_in_progress;
+extern struct frame *x_dnd_frame;
 
 #ifdef HAVE_XINPUT2
 struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
