@@ -1,4 +1,4 @@
-emacs28 (28.1+0.1-0.1) UNRELEASED; urgency=medium
+emacs28 (28.1.50+0.20220403-0.1) UNRELEASED; urgency=medium
 
   [ Dima Kogan ]
   * native-comp can be turned on/off with a build-time var
@@ -22,10 +22,10 @@ emacs28 (28.1+0.1-0.1) UNRELEASED; urgency=medium
   * Switch to libgccjit-11-dev
   * Prefer libgccjit-11-dev over libgccjit-10-dev
   * Update debian/patches/0003*.patch
-  * New upstream version 28.1+0.1
-    - emacs-28 branch, emacs-28.1 on 2022-04-03
+  * New upstream version 28.1.50+0.20220403
+    - emacs-28 branch, emacs-28.1-1-gdd3863d8bcc on 2022-04-03
 
- -- Tatsuya Kinoshita <tats@debian.org>  Wed, 06 Apr 2022 22:02:53 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Thu, 07 Apr 2022 00:08:25 +0900
 
 emacs-snapshot (2:20210405+emacs-27.1-5691-ge0c3925961c-1) unstable; urgency=medium
 
