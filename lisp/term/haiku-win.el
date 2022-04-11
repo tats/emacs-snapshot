@@ -45,6 +45,7 @@
 
 (defvar haiku-initialized)
 (defvar haiku-signal-invalid-refs)
+(defvar haiku-drag-track-function)
 
 (defvar haiku-dnd-selection-value nil
   "The local value of the special `XdndSelection' selection.")
@@ -263,8 +264,11 @@ VALUE will be encoded as UTF-8 and stored under the type
                              (if (multibyte-string-p text)
                                  text
                                (decode-coding-string text 'undecided))))))
-       (t (message "Don't know how to drop any of: %s"
-                   (mapcar #'car string)))))))
+       ((not (eq (cdr (assq 'type string))
+                 3003)) ; Type of the placeholder message Emacs uses
+                        ; to cancel a drop on C-g.
+        (message "Don't know how to drop any of: %s"
+                 (mapcar #'car string)))))))
 
 (define-key special-event-map [drag-n-drop]
             'haiku-drag-and-drop)
@@ -276,6 +280,21 @@ VALUE will be encoded as UTF-8 and stored under the type
 This is necessary because on Haiku `use-system-tooltip' doesn't
 take effect on menu items until the menu bar is updated again."
   (force-mode-line-update t))
+
+;; Note that `mouse-position' can't return the actual frame the mouse
+;; pointer is under, so this only works for the frame where the drop
+;; started.
+(defun haiku-dnd-drag-handler ()
+  "Handle mouse movement during drag-and-drop."
+  (let ((track-mouse 'drag-source)
+        (mouse-position (mouse-pixel-position)))
+    (when (car mouse-position)
+      (dnd-handle-movement (posn-at-x-y (cadr mouse-position)
+                                        (cddr mouse-position)
+                                        (car mouse-position)))
+      (redisplay))))
+
+(setq haiku-drag-track-function #'haiku-dnd-drag-handler)
 
 (defun x-begin-drag (targets &optional action frame _return-frame allow-current-frame)
   "SKIP: real doc in xfns.c."

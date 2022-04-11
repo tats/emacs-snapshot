@@ -965,6 +965,17 @@ AC_DEFUN([gl_GCC_VERSION_IFELSE],
   ]
 )
 
+# clang is unduly picky about some things.
+AC_CACHE_CHECK([whether the compiler is clang], [emacs_cv_clang],
+  [AC_COMPILE_IFELSE(
+     [AC_LANG_PROGRAM([[
+	  #ifndef __clang__
+	    error "not clang";
+	  #endif
+        ]])],
+     [emacs_cv_clang=yes],
+     [emacs_cv_clang=no])])
+
 AC_ARG_ENABLE([gcc-warnings],
   [AS_HELP_STRING([--enable-gcc-warnings@<:@=TYPE@:>@],
                   [control generation of GCC warnings.  The TYPE 'yes'
@@ -984,7 +995,11 @@ AC_ARG_ENABLE([gcc-warnings],
    # just a release imported into Git for patch management.
    gl_gcc_warnings=no
    if test -e "$srcdir"/.git && test ! -f "$srcdir"/.tarball-version; then
-     gl_GCC_VERSION_IFELSE([5], [3], [gl_gcc_warnings=warn-only])
+      # Clang typically identifies itself as GCC 4.2 or something similar
+      # even if it is recent enough to accept the warnings we enable.
+      AS_IF([test "$emacs_cv_clang" = yes],
+         [gl_gcc_warnings=warn-only],
+         [gl_GCC_VERSION_IFELSE([5], [3], [gl_gcc_warnings=warn-only])])
    fi])
 
 AC_ARG_ENABLE([check-lisp-object-type],
@@ -995,17 +1010,6 @@ if test "$enable_check_lisp_object_type" = yes; then
   AC_DEFINE([CHECK_LISP_OBJECT_TYPE], 1,
     [Define to enable compile-time checks for the Lisp_Object data type.])
 fi
-
-# clang is unduly picky about some things.
-AC_CACHE_CHECK([whether the compiler is clang], [emacs_cv_clang],
-  [AC_COMPILE_IFELSE(
-     [AC_LANG_PROGRAM([[
-	  #ifndef __clang__
-	    error "not clang";
-	  #endif
-        ]])],
-     [emacs_cv_clang=yes],
-     [emacs_cv_clang=no])])
 
 WERROR_CFLAGS=
 # When compiling with GCC, prefer -isystem to -I when including system
@@ -2691,6 +2695,9 @@ if test "${with_webp}" != "no"; then
       WEBP_MODULE="libwebp >= $WEBP_REQUIRED"
 
       EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])
+      if test "$HAVE_WEBP" = "yes"; then
+        WEBP_LIBS="-lwebp -lwebpdemux"
+      fi
       AC_SUBST(WEBP_CFLAGS)
       AC_SUBST(WEBP_LIBS)
    fi
@@ -4292,7 +4299,8 @@ if test "${opsys}" = "mingw32"; then
   fi
 elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
         || test "${HAVE_W32}" = "yes" || test "${HAVE_NS}" = "yes" \
-	|| test "${HAVE_BE_APP}" = "yes" || test "$window_system" = "pgtk"; then
+	|| test "${HAVE_BE_APP}" = "yes" || test "$window_system" = "pgtk" \
+	&& test "${with_gif}" != "no"; then
   AC_CHECK_HEADER(gif_lib.h,
 # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
 # Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.

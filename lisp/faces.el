@@ -46,7 +46,8 @@ the terminal-initialization file to be loaded."
     ("vt320" . "vt200")
     ("vt400" . "vt200")
     ("vt420" . "vt200")
-    ("alacritty" . "xterm"))
+    ("alacritty" . "xterm")
+    ("foot" . "xterm"))
   "Alist of terminal type aliases.
 Entries are of the form (TYPE . ALIAS), where both elements are strings.
 This means to treat a terminal of type TYPE as if it were of type ALIAS."
@@ -2656,8 +2657,9 @@ non-nil."
      :background "grey75" :foreground "black")
     (t
      :inverse-video t))
-  "Face for the mode lines (for the selected window) as well as header lines.
-See `mode-line-display' for the face used on mode lines."
+  "Face for the mode lines as well as header lines.
+See `mode-line-active' and `mode-line-inactive' for the faces
+used on mode lines."
   :version "21.1"
   :group 'mode-line-faces
   :group 'basic-faces)

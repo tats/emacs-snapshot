@@ -244,6 +244,8 @@ struct xi_device_t
 #ifdef HAVE_XINPUT2_2
   struct xi_touch_point_t *touchpoints;
 #endif
+
+  Lisp_Object name;
 };
 #endif
 
@@ -613,6 +615,9 @@ struct x_display_info
 
   int num_devices;
   struct xi_device_t *devices;
+
+  Time pending_keystroke_time;
+  int pending_keystroke_source;
 #endif
 
 #ifdef HAVE_XKB
@@ -1391,6 +1396,9 @@ extern void x_scroll_bar_configure (GdkEvent *);
 extern Lisp_Object x_dnd_begin_drag_and_drop (struct frame *, Time, Atom,
 					      Lisp_Object, Atom *, const char **,
 					      size_t, bool);
+extern void x_dnd_do_unsupported_drop (struct x_display_info *, Lisp_Object,
+				       Lisp_Object, Lisp_Object, Window, int,
+				       int, Time);
 extern void x_set_dnd_targets (Atom *, int);
 
 INLINE int
@@ -1489,6 +1497,8 @@ extern void x_clipboard_manager_save_all (void);
 
 extern Lisp_Object x_timestamp_for_selection (struct x_display_info *,
 					      Lisp_Object);
+extern void x_set_pending_dnd_time (Time);
+extern void x_own_selection (Lisp_Object, Lisp_Object, Lisp_Object);
 
 #ifdef USE_GTK
 extern bool xg_set_icon (struct frame *, Lisp_Object);
@@ -1554,6 +1564,8 @@ extern struct frame *x_dnd_frame;
 #ifdef HAVE_XINPUT2
 struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
 #endif
+
+extern void mark_xterm (void);
 
 /* Is the frame embedded into another application? */
 

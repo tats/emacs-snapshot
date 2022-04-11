@@ -1734,12 +1734,25 @@ main (int argc, char **argv)
 	sockfd = SD_LISTEN_FDS_START;
 #endif /* HAVE_LIBSYSTEMD */
 
-#ifdef USE_GTK
+      /* On X, the bug happens because we call abort to avoid GLib
+	 crashes upon a longjmp in our X error handler.
+
+         On PGTK, GTK calls exit in its own error handlers for either
+         X or Wayland.  Display different messages depending on the
+         window system to avoid referring users to the wrong GTK bug
+         report.  */
+#ifdef HAVE_PGTK
+      fputs ("Due to a limitation in GTK 3, Emacs built with PGTK will simply exit when a\n"
+	     "display connection is closed.  The problem is especially difficult to fix,\n"
+	     "such that Emacs on Wayland with multiple displays is unlikely ever to be able\n"
+	     "to survive disconnects.\n",
+	     stderr);
+#elif defined USE_GTK
       fputs ("\nWarning: due to a long standing Gtk+ bug\nhttps://gitlab.gnome.org/GNOME/gtk/issues/221\n\
 Emacs might crash when run in daemon mode and the X11 connection is unexpectedly lost.\n\
 Using an Emacs configured with --with-x-toolkit=lucid does not have this problem.\n",
 	     stderr);
-#endif /* USE_GTK */
+#endif
 
       if (daemon_type == 2)
         {

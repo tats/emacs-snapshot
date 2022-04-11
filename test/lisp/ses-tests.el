@@ -22,12 +22,24 @@
 ;;; Code:
 
 (require 'ert)
+(eval-when-compile (require 'ert-x))
 (require 'ses)
 
 ;; Silence byte-compiler.
-(with-suppressed-warnings ((lexical A2) (lexical A3))
+(with-suppressed-warnings ((lexical ses--cells)
+                           (lexical A2)
+                           (lexical A3)
+                           (lexical ses--foo)
+                           (lexical ses--bar)
+                           (lexical B2)
+                           (lexical ses--toto))
+  (defvar ses--cells)
   (defvar A2)
-  (defvar A3))
+  (defvar A3)
+  (defvar ses--foo)
+  (defvar ses--bar)
+  (defvar B2)
+  (defvar ses--toto))
 
 ;; PLAIN FORMULA TESTS
 ;; ======================================================================
@@ -57,9 +69,6 @@ equal to 2. This is done  using interactive calls."
 
 ;; PLAIN CELL RENAMING TESTS
 ;; ======================================================================
-
-(defvar ses--foo)
-(defvar ses--cells)
 
 (ert-deftest ses-tests-lowlevel-renamed-cell ()
   "Check that renaming A1 to `ses--foo' and setting `ses--foo' to 1 and A2 to (1+ ses--foo), makes A2 value equal to 2.
@@ -154,7 +163,6 @@ to A2 and inserting a row, makes A2 value empty, and A3 equal to
       (should-not (bound-and-true-p A2))
       (should (eq (bound-and-true-p A3) 2)))))
 
-(defvar ses--bar)
 
 (ert-deftest ses-tests-renamed-cells-row-insertion ()
   "Check that setting A1 to 1 and A2 to (1+ A1), and then renaming A1 to `ses--foo' and A2 to `ses--bar' jumping

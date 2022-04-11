@@ -98,15 +98,124 @@ static Time ignore_next_mouse_click_timeout;
 
 static Lisp_Object xg_default_icon_file;
 
-static void pgtk_delete_display (struct pgtk_display_info *dpyinfo);
-static void pgtk_clear_frame_area (struct frame *f, int x, int y, int width,
-				   int height);
-static void pgtk_fill_rectangle (struct frame *f, unsigned long color, int x,
-				 int y, int width, int height,
-				 bool respect_alpha_background);
-static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
-			      enum glyph_row_area area, cairo_t * cr);
-static struct frame *pgtk_any_window_to_frame (GdkWindow *window);
+static void pgtk_delete_display (struct pgtk_display_info *);
+static void pgtk_clear_frame_area (struct frame *, int, int, int, int);
+static void pgtk_fill_rectangle (struct frame *, unsigned long, int, int,
+				 int, int, bool);
+static void pgtk_clip_to_row (struct window *, struct glyph_row *,
+			      enum glyph_row_area, cairo_t *);
+static struct frame *pgtk_any_window_to_frame (GdkWindow *);
+static void pgtk_regenerate_devices (struct pgtk_display_info *);
+
+static void
+pgtk_device_added_or_removal_cb (GdkSeat *seat, GdkDevice *device,
+				 gpointer user_data)
+{
+  pgtk_regenerate_devices (user_data);
+}
+
+static void
+pgtk_seat_added_cb (GdkDisplay *dpy, GdkSeat *seat,
+		    gpointer user_data)
+{
+  pgtk_regenerate_devices (user_data);
+
+  g_signal_connect (G_OBJECT (seat), "device-added",
+		    G_CALLBACK (pgtk_device_added_or_removal_cb),
+		    user_data);
+  g_signal_connect (G_OBJECT (seat), "device-removed",
+		    G_CALLBACK (pgtk_device_added_or_removal_cb),
+		    user_data);
+}
+
+static void
+pgtk_seat_removed_cb (GdkDisplay *dpy, GdkSeat *seat,
+		      gpointer user_data)
+{
+  pgtk_regenerate_devices (user_data);
+
+  g_signal_handlers_disconnect_by_func (G_OBJECT (seat),
+					G_CALLBACK (pgtk_device_added_or_removal_cb),
+					user_data);
+}
+
+static void
+pgtk_enumerate_devices (struct pgtk_display_info *dpyinfo,
+			bool initial_p)
+{
+  struct pgtk_device_t *rec;
+  GList *all_seats, *devices_on_seat, *tem, *t1;
+  GdkSeat *seat;
+  char printbuf[1026]; /* Believe it or not, some device names are
+			  actually almost this long.  */
+
+  block_input ();
+  all_seats = gdk_display_list_seats (dpyinfo->gdpy);
+
+  for (tem = all_seats; tem; tem = tem->next)
+    {
+      seat = GDK_SEAT (tem->data);
+
+      if (initial_p)
+	{
+	  g_signal_connect (G_OBJECT (seat), "device-added",
+			    G_CALLBACK (pgtk_device_added_or_removal_cb),
+			    dpyinfo);
+	  g_signal_connect (G_OBJECT (seat), "device-removed",
+			    G_CALLBACK (pgtk_device_added_or_removal_cb),
+			    dpyinfo);
+	}
+
+      /* We only want slaves, not master devices.  */
+      devices_on_seat = gdk_seat_get_slaves (seat,
+					     GDK_SEAT_CAPABILITY_ALL);
+
+      for (t1 = devices_on_seat; t1; t1 = t1->next)
+	{
+	  rec = xmalloc (sizeof *rec);
+	  rec->seat = g_object_ref (seat);
+	  rec->device = GDK_DEVICE (t1->data);
+
+	  snprintf (printbuf, 1026, "%u:%s",
+		    gdk_device_get_source (rec->device),
+		    gdk_device_get_name (rec->device));
+
+	  rec->name = build_string (printbuf);
+	  rec->next = dpyinfo->devices;
+	  dpyinfo->devices = rec;
+	}
+
+      g_list_free (devices_on_seat);
+    }
+
+  g_list_free (all_seats);
+  unblock_input ();
+}
+
+static void
+pgtk_free_devices (struct pgtk_display_info *dpyinfo)
+{
+  struct pgtk_device_t *last, *tem;
+
+  tem = dpyinfo->devices;
+  while (tem)
+    {
+      last = tem;
+      tem = tem->next;
+
+      g_object_unref (last->seat);
+      xfree (last);
+    }
+
+  dpyinfo->devices = NULL;
+}
+
+static void
+pgtk_regenerate_devices (struct pgtk_display_info *dpyinfo)
+{
+  pgtk_free_devices (dpyinfo);
+  pgtk_enumerate_devices (dpyinfo, false);
+}
 
 static void
 pgtk_toolkit_position (struct frame *f, int x, int y,
@@ -136,12 +245,31 @@ pgtk_toolkit_position (struct frame *f, int x, int y,
     }
 }
 
-/*
- * This is not a flip context in the same sense as gpu rendering
- * scences, it only occurs when a new context was required due to a
- * resize or other fundamental change.  This is called when that
- * context's surface has completed drawing
- */
+static Lisp_Object
+pgtk_get_device_for_event (struct pgtk_display_info *dpyinfo,
+			   GdkEvent *event)
+{
+  struct pgtk_device_t *tem;
+  GdkDevice *device;
+
+  device = gdk_event_get_source_device (event);
+
+  if (!device)
+    return Qt;
+
+  for (tem = dpyinfo->devices; tem; tem = tem->next)
+    {
+      if (tem->device == device)
+	return tem->name;
+    }
+
+  return Qt;
+}
+
+/* This is not a flip context in the same sense as gpu rendering
+   scenes, it only occurs when a new context was required due to a
+   resize or other fundamental change.  This is called when that
+   context's surface has completed drawing.  */
 
 static void
 flip_cr_context (struct frame *f)
@@ -207,8 +335,11 @@ evq_flush (struct input_event *hold_quit)
 void
 mark_pgtkterm (void)
 {
+  struct pgtk_display_info *dpyinfo;
+  struct pgtk_device_t *device;
   struct event_queue_t *evq = &event_q;
   int i, n = evq->nr;
+
   for (i = 0; i < n; i++)
     {
       union buffered_input_event *ev = &evq->q[i];
@@ -216,19 +347,22 @@ mark_pgtkterm (void)
       mark_object (ev->ie.y);
       mark_object (ev->ie.frame_or_window);
       mark_object (ev->ie.arg);
+      mark_object (ev->ie.device);
+    }
+
+  for (dpyinfo = x_display_list; dpyinfo;
+       dpyinfo = dpyinfo->next)
+    {
+      for (device = dpyinfo->devices; device;
+	   device = device->next)
+	mark_object (device->name);
     }
 }
 
 char *
 get_keysym_name (int keysym)
-/* --------------------------------------------------------------------------
-    Called by keyboard.c.  Not sure if the return val is important, except
-    that it be unique.
-   -------------------------------------------------------------------------- */
 {
-  static char value[16];
-  sprintf (value, "%d", keysym);
-  return value;
+  return gdk_keyval_name (keysym);
 }
 
 void
@@ -531,31 +665,8 @@ pgtk_set_window_size (struct frame *f, bool change_gravity,
   gtk_widget_get_size_request (FRAME_GTK_WIDGET (f), &pixelwidth,
 			       &pixelheight);
 
-#if 0
-  if (pixelwise)
-    {
-      pixelwidth = FRAME_TEXT_TO_PIXEL_WIDTH (f, width);
-      pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
-    }
-  else
-    {
-      pixelwidth = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, width);
-      pixelheight = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, height);
-    }
-#else
   pixelwidth = width;
   pixelheight = height;
-#endif
-
-#if 0
-  frame_size_history_add
-    (f, Qx_set_window_size_1, width, height,
-     list5 (Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
-	    Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
-	    make_fixnum (f->border_width),
-	    make_fixnum (FRAME_PGTK_TITLEBAR_HEIGHT (f)),
-	    make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
-#endif
 
   for (GtkWidget * w = FRAME_GTK_WIDGET (f); w != NULL;
        w = gtk_widget_get_parent (w))
@@ -3921,28 +4032,21 @@ xg_scroll_callback (GtkRange * range,
   switch (scroll)
     {
     case GTK_SCROLL_JUMP:
-#if 0
-      /* Buttons 1 2 or 3 must be grabbed.  */
-      if (FRAME_DISPLAY_INFO (f)->grabbed != 0
-          && FRAME_DISPLAY_INFO (f)->grabbed < (1 << 4))
-#endif
-        {
-	  if (bar->horizontal)
-	    {
-	      part = scroll_bar_horizontal_handle;
-	      whole = (int) (gtk_adjustment_get_upper (adj) -
-			     gtk_adjustment_get_page_size (adj));
-	      portion = min ((int) value, whole);
-	      bar->dragging = portion;
-	    }
-	  else
-	    {
-	      part = scroll_bar_handle;
-	      whole = gtk_adjustment_get_upper (adj) -
-		gtk_adjustment_get_page_size (adj);
-	      portion = min ((int) value, whole);
-	      bar->dragging = portion;
-	    }
+      if (bar->horizontal)
+	{
+	  part = scroll_bar_horizontal_handle;
+	  whole = (int) (gtk_adjustment_get_upper (adj) -
+			 gtk_adjustment_get_page_size (adj));
+	  portion = min ((int) value, whole);
+	  bar->dragging = portion;
+	}
+      else
+	{
+	  part = scroll_bar_handle;
+	  whole = gtk_adjustment_get_upper (adj) -
+	    gtk_adjustment_get_page_size (adj);
+	  portion = min ((int) value, whole);
+	  bar->dragging = portion;
 	}
       break;
     case GTK_SCROLL_STEP_BACKWARD:
@@ -4498,15 +4602,22 @@ pgtk_delete_terminal (struct terminal *terminal)
       g_clear_object (&dpyinfo->vertical_scroll_bar_cursor);
       g_clear_object (&dpyinfo->horizontal_scroll_bar_cursor);
       g_clear_object (&dpyinfo->invisible_cursor);
-      if (dpyinfo->last_click_event != NULL) {
-	gdk_event_free (dpyinfo->last_click_event);
-	dpyinfo->last_click_event = NULL;
-      }
+      if (dpyinfo->last_click_event != NULL)
+	{
+	  gdk_event_free (dpyinfo->last_click_event);
+	  dpyinfo->last_click_event = NULL;
+	}
 
+      /* Disconnect these handlers before the display closes so
+	 useless removal signals don't fire.  */
+      g_signal_handlers_disconnect_by_func (G_OBJECT (dpyinfo->gdpy),
+					    G_CALLBACK (pgtk_seat_added_cb),
+					    dpyinfo);
+      g_signal_handlers_disconnect_by_func (G_OBJECT (dpyinfo->gdpy),
+					    G_CALLBACK (pgtk_seat_removed_cb),
+					    dpyinfo);
       xg_display_close (dpyinfo->gdpy);
 
-      /* Do not close the connection here because it's already closed
-         by X(t)CloseDisplay (Bug#18403).  */
       dpyinfo->gdpy = NULL;
     }
 
@@ -4929,6 +5040,8 @@ pgtk_handle_event (GtkWidget *widget, GdkEvent *event, gpointer *data)
 			       make_float (event->touchpad_pinch.angle_delta));
 	  inev.ie.modifiers = pgtk_gtk_to_emacs_modifiers (FRAME_DISPLAY_INFO (f),
 							   event->touchpad_pinch.state);
+	  inev.ie.device
+	    = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	  evq_enqueue (&inev);
 	}
 
@@ -5267,7 +5380,7 @@ pgtk_enqueue_preedit (struct frame *f, Lisp_Object preedit)
 }
 
 static gboolean
-key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
+key_press_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   struct coding_system coding;
   union buffered_input_event inev;
@@ -5277,8 +5390,6 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
   USE_SAFE_ALLOCA;
 
   EVENT_INIT (inev.ie);
-  inev.ie.kind = NO_EVENT;
-  inev.ie.arg = Qnil;
 
   struct frame *f = pgtk_any_window_to_frame (gtk_widget_get_window (widget));
   hlinfo = MOUSE_HL_INFO (f);
@@ -5361,6 +5472,9 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 	{
 	  inev.ie.kind = ASCII_KEYSTROKE_EVENT;
 	  inev.ie.code = keysym;
+
+	  inev.ie.device
+	    = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	  goto done;
 	}
 
@@ -5372,6 +5486,9 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 	  else
 	    inev.ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
 	  inev.ie.code = keysym & 0xFFFFFF;
+
+	  inev.ie.device
+	    = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	  goto done;
 	}
 
@@ -5384,6 +5501,9 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 			  ? ASCII_KEYSTROKE_EVENT
 			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
 	  inev.ie.code = XFIXNAT (c);
+
+	  inev.ie.device
+	    = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	  goto done;
 	}
 
@@ -5467,6 +5587,9 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 	     key.  */
 	  inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
 	  inev.ie.code = keysym;
+
+	  inev.ie.device
+	    = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	  goto done;
 	}
 
@@ -5518,6 +5641,8 @@ key_press_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 			    ? ASCII_KEYSTROKE_EVENT
 			    : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
 	    inev.ie.code = ch;
+	    inev.ie.device
+	      = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
 	    evq_enqueue (&inev);
 	  }
 
@@ -5899,7 +6024,8 @@ focus_out_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
    another motion event, so we can check again the next time it moves.  */
 
 static bool
-note_mouse_movement (struct frame *frame, const GdkEventMotion * event)
+note_mouse_movement (struct frame *frame,
+		     const GdkEventMotion *event)
 {
   XRectangle *r;
   struct pgtk_display_info *dpyinfo;
@@ -5919,6 +6045,9 @@ note_mouse_movement (struct frame *frame, const GdkEventMotion * event)
       dpyinfo->last_mouse_scroll_bar = NULL;
       note_mouse_highlight (frame, -1, -1);
       dpyinfo->last_mouse_glyph_frame = NULL;
+      frame->last_mouse_device
+	= pgtk_get_device_for_event (FRAME_DISPLAY_INFO (frame),
+				     (GdkEvent *) event);
       return true;
     }
 
@@ -5935,6 +6064,9 @@ note_mouse_movement (struct frame *frame, const GdkEventMotion * event)
       /* Remember which glyph we're now on.  */
       remember_mouse_glyph (frame, event->x, event->y, r);
       dpyinfo->last_mouse_glyph_frame = frame;
+      frame->last_mouse_device
+	= pgtk_get_device_for_event (FRAME_DISPLAY_INFO (frame),
+				     (GdkEvent *) event);
       return true;
     }
 
@@ -6050,26 +6182,6 @@ motion_notify_event (GtkWidget * widget, GdkEvent * event,
   return TRUE;
 }
 
-/* Mouse clicks and mouse movement.  Rah.
-
-   Formerly, we used PointerMotionHintMask (in standard_event_mask)
-   so that we would have to call XQueryPointer after each MotionNotify
-   event to ask for another such event.  However, this made mouse tracking
-   slow, and there was a bug that made it eventually stop.
-
-   Simply asking for MotionNotify all the time seems to work better.
-
-   In order to avoid asking for motion events and then throwing most
-   of them away or busy-polling the server for mouse positions, we ask
-   the server for pointer motion hints.  This means that we get only
-   one event per group of mouse movements.  "Groups" are delimited by
-   other kinds of events (focus changes and button clicks, for
-   example), or by XQueryPointer calls; when one of these happens, we
-   get another MotionNotify event the next time the mouse moves.  This
-   is at least as efficient as getting motion events when mouse
-   tracking is on, and I suspect only negligibly worse when tracking
-   is off.  */
-
 /* Prepare a mouse-event in *RESULT for placement in the input queue.
 
    If the event is a button press, then note that we have grabbed
@@ -6077,7 +6189,8 @@ motion_notify_event (GtkWidget * widget, GdkEvent * event,
 
 static Lisp_Object
 construct_mouse_click (struct input_event *result,
-		       const GdkEventButton * event, struct frame *f)
+		       const GdkEventButton *event,
+		       struct frame *f)
 {
   /* Make the event type NO_EVENT; we'll change that when we decide
      otherwise.  */
@@ -6092,11 +6205,15 @@ construct_mouse_click (struct input_event *result,
   XSETINT (result->y, event->y);
   XSETFRAME (result->frame_or_window, f);
   result->arg = Qnil;
+  result->device = pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f),
+					      (GdkEvent *) event);
   return Qnil;
 }
 
 static gboolean
-button_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
+button_event (GtkWidget *widget,
+	      GdkEvent *event,
+	      gpointer *user_data)
 {
   union buffered_input_event inev;
   struct frame *f, *frame;
@@ -6215,7 +6332,7 @@ button_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
 }
 
 static gboolean
-scroll_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
+scroll_event (GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   union buffered_input_event inev;
   struct frame *f, *frame;
@@ -6247,6 +6364,8 @@ scroll_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
   if (gdk_event_is_scroll_stop_event (event))
     {
       inev.ie.kind = TOUCH_END_EVENT;
+      inev.ie.device
+	= pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
       evq_enqueue (&inev);
       return TRUE;
     }
@@ -6340,14 +6459,17 @@ scroll_event (GtkWidget * widget, GdkEvent * event, gpointer * user_data)
     }
 
   if (inev.ie.kind != NO_EVENT)
-    evq_enqueue (&inev);
+    {
+      inev.ie.device
+	= pgtk_get_device_for_event (FRAME_DISPLAY_INFO (f), event);
+      evq_enqueue (&inev);
+    }
   return TRUE;
 }
 
 static void
-drag_data_received (GtkWidget * widget, GdkDragContext * context,
-		    gint x, gint y,
-		    GtkSelectionData * data,
+drag_data_received (GtkWidget *widget, GdkDragContext *context,
+		    gint x, gint y, GtkSelectionData *data,
 		    guint info, guint time, gpointer user_data)
 {
   struct frame *f = pgtk_any_window_to_frame (gtk_widget_get_window (widget));
@@ -6756,6 +6878,12 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   pgtk_im_init (dpyinfo);
 
+  g_signal_connect (G_OBJECT (dpyinfo->gdpy), "seat-added",
+		    G_CALLBACK (pgtk_seat_added_cb), dpyinfo);
+  g_signal_connect (G_OBJECT (dpyinfo->gdpy), "seat-removed",
+		    G_CALLBACK (pgtk_seat_removed_cb), dpyinfo);
+  pgtk_enumerate_devices (dpyinfo, true);
+
   unblock_input ();
 
   return dpyinfo;
@@ -6789,6 +6917,7 @@ pgtk_delete_display (struct pgtk_display_info *dpyinfo)
 	  tail->next = tail->next->next;
     }
 
+  pgtk_free_devices (dpyinfo);
   xfree (dpyinfo);
 }
 
@@ -7077,8 +7206,11 @@ pgtk_set_cr_source_with_color (struct frame *f, unsigned long color,
   pgtk_query_color (f, &col);
 
   if (!respects_alpha_background)
-    cairo_set_source_rgb (FRAME_CR_CONTEXT (f), col.red / 65535.0,
-			  col.green / 65535.0, col.blue / 65535.0);
+    {
+      cairo_set_source_rgb (FRAME_CR_CONTEXT (f), col.red / 65535.0,
+			    col.green / 65535.0, col.blue / 65535.0);
+      cairo_set_operator (FRAME_CR_CONTEXT (f), CAIRO_OPERATOR_OVER);
+    }
   else
     {
       cairo_set_source_rgba (FRAME_CR_CONTEXT (f), col.red / 65535.0,

@@ -2044,7 +2044,8 @@ Runs of equal candidate strings are eliminated.  GROUP-FUN is a
               (when title
                 (insert (format completions-group-format title) "\n")))))
         (completion--insert str group-fun)
-        (insert "\n")))))
+        (insert "\n")))
+    (delete-char -1)))
 
 (defun completion--insert (str group-fun)
   (if (not (consp str))
@@ -2283,6 +2284,9 @@ variables.")
       (let* ((last (last completions))
              (base-size (or (cdr last) 0))
              (prefix (unless (zerop base-size) (substring string 0 base-size)))
+             (base-prefix (buffer-substring (minibuffer--completion-prompt-end)
+                                            (+ start base-size)))
+             (base-suffix (buffer-substring (point) (point-max)))
              (all-md (completion--metadata (buffer-substring-no-properties
                                             start (point))
                                            base-size md
@@ -2374,20 +2378,28 @@ variables.")
                                    ;; completion-all-completions does not give us the
                                    ;; necessary information.
                                    end))
+                        (setq-local completion-base-affixes
+                                    (list base-prefix base-suffix))
                         (setq-local completion-list-insert-choice-function
                              (let ((ctable minibuffer-completion-table)
                                    (cpred minibuffer-completion-predicate)
                                    (cprops completion-extra-properties))
                                (lambda (start end choice)
-                                 (unless (or (zerop (length prefix))
-                                             (equal prefix
-                                                    (buffer-substring-no-properties
-                                                     (max (point-min)
-                                                          (- start (length prefix)))
-                                                     start)))
-                                   (message "*Completions* out of date"))
-                                 ;; FIXME: Use `md' to do quoting&terminator here.
-                                 (completion--replace start end choice)
+                                 (if (and (stringp start) (stringp end))
+                                     (progn
+                                       (delete-minibuffer-contents)
+                                       (insert start choice)
+                                       ;; Keep point after completion before suffix
+                                       (save-excursion (insert end)))
+                                   (unless (or (zerop (length prefix))
+                                               (equal prefix
+                                                      (buffer-substring-no-properties
+                                                       (max (point-min)
+                                                            (- start (length prefix)))
+                                                       start)))
+                                     (message "*Completions* out of date"))
+                                   ;; FIXME: Use `md' to do quoting&terminator here.
+                                   (completion--replace start end choice))
                                  (let* ((minibuffer-completion-table ctable)
                                         (minibuffer-completion-predicate cpred)
                                         (completion-extra-properties cprops)
@@ -2736,7 +2748,10 @@ The completion method is determined by `completion-at-point-functions'."
   "?"         #'minibuffer-completion-help
   "<prior>"   #'switch-to-completions
   "M-v"       #'switch-to-completions
-  "M-g M-c"   #'switch-to-completions)
+  "M-g M-c"   #'switch-to-completions
+  "M-<up>"    #'minibuffer-previous-completion
+  "M-<down>"  #'minibuffer-next-completion
+  "M-RET"     #'minibuffer-choose-completion)
 
 (defvar-keymap minibuffer-local-must-match-map
   :doc "Local keymap for minibuffer input with completion, for exact match."
@@ -4325,6 +4340,66 @@ the minibuffer was activated, and execute the forms."
   (interactive "^P")
   (with-minibuffer-selected-window
     (scroll-other-window-down arg)))
+
+(defmacro with-minibuffer-completions-window (&rest body)
+  "Execute the forms in BODY from the minibuffer in its completions window.
+When used in a minibuffer window, select the window with completions,
+and execute the forms."
+  (declare (indent 0) (debug t))
+  `(let ((window (or (get-buffer-window "*Completions*" 0)
+                     ;; Make sure we have a completions window.
+                     (progn (minibuffer-completion-help)
+                            (get-buffer-window "*Completions*" 0)))))
+     (when window
+       (with-selected-window window
+         ,@body))))
+
+(defcustom minibuffer-completion-auto-choose t
+  "Non-nil means to automatically insert completions to the minibuffer.
+When non-nil, then `minibuffer-next-completion' and
+`minibuffer-previous-completion' will insert the completion
+selected by these commands to the minibuffer."
+  :type 'boolean
+  :version "29.1")
+
+(defun minibuffer-next-completion (&optional n)
+  "Run `next-completion' from the minibuffer in its completions window.
+When `minibuffer-completion-auto-choose' is non-nil, then also
+insert the selected completion to the minibuffer."
+  (interactive "p")
+  (with-minibuffer-completions-window
+    (when completions-highlight-face
+      (setq-local cursor-face-highlight-nonselected-window t))
+    (next-completion (or n 1))
+    (when minibuffer-completion-auto-choose
+      (let ((completion-use-base-affixes t))
+        (choose-completion nil t t)))))
+
+(defun minibuffer-previous-completion (&optional n)
+  "Run `previous-completion' from the minibuffer in its completions window.
+When `minibuffer-completion-auto-choose' is non-nil, then also
+insert the selected completion to the minibuffer."
+  (interactive "p")
+  (with-minibuffer-completions-window
+    (when completions-highlight-face
+      (setq-local cursor-face-highlight-nonselected-window t))
+    (previous-completion (or n 1))
+    (when minibuffer-completion-auto-choose
+      (let ((completion-use-base-affixes t))
+        (choose-completion nil t t)))))
+
+(defun minibuffer-choose-completion (&optional no-exit no-quit)
+  "Run `choose-completion' from the minibuffer in its completions window.
+With prefix argument NO-EXIT, insert the completion at point to the
+minibuffer, but don't exit the minibuffer.  When the prefix argument
+is not provided, then whether to exit the minibuffer depends on the value
+of `completion-no-auto-exit'.
+If NO-QUIT is non-nil, insert the completion at point to the
+minibuffer, but don't quit the completions window."
+  (interactive "P")
+  (with-minibuffer-completions-window
+    (let ((completion-use-base-affixes t))
+      (choose-completion nil no-exit no-quit))))
 
 (defcustom minibuffer-default-prompt-format " (default %s)"
   "Format string used to output \"default\" values.

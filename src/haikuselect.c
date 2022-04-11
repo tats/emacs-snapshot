@@ -27,6 +27,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <stdlib.h>
 
+/* The frame that is currently the source of a drag-and-drop
+   operation, or NULL if none is in progress.  The reason for this
+   variable is to prevent it from being deleted, which really breaks
+   the nested event loop inside be_drag_message.  */
+struct frame *haiku_dnd_frame;
+
 static void haiku_lisp_to_message (Lisp_Object, void *);
 
 DEFUN ("haiku-selection-data", Fhaiku_selection_data, Shaiku_selection_data,
@@ -726,6 +732,7 @@ haiku_should_quit_drag (void)
 static void
 haiku_unwind_drag_message (void *message)
 {
+  haiku_dnd_frame = NULL;
   BMessage_delete (message);
 }
 
@@ -774,6 +781,7 @@ ignored if it is dropped on top of FRAME.  */)
   if (!FRAME_VISIBLE_P (f))
     error ("Frame is invisible");
 
+  haiku_dnd_frame = f;
   be_message = be_create_simple_message ();
 
   record_unwind_protect_ptr (haiku_unwind_drag_message, be_message);
@@ -791,6 +799,28 @@ ignored if it is dropped on top of FRAME.  */)
   return unbind_to (idx, Qnil);
 }
 
+static Lisp_Object
+haiku_note_drag_motion_1 (void *data)
+{
+  if (!NILP (Vhaiku_drag_track_function))
+    return call0 (Vhaiku_drag_track_function);
+
+  return Qnil;
+}
+
+static Lisp_Object
+haiku_note_drag_motion_2 (enum nonlocal_exit exit, Lisp_Object error)
+{
+  return Qnil;
+}
+
+void
+haiku_note_drag_motion (void)
+{
+  internal_catch_all (haiku_note_drag_motion_1, NULL,
+		      haiku_note_drag_motion_2);
+}
+
 void
 syms_of_haikuselect (void)
 {
@@ -799,6 +829,12 @@ syms_of_haikuselect (void)
 Otherwise, an error will be signalled if adding a file reference to a
 system message failed.  */);
   haiku_signal_invalid_refs = true;
+
+  DEFVAR_LISP ("haiku-drag-track-function", Vhaiku_drag_track_function,
+     doc: /* If non-nil, a function to call upon mouse movement while dragging a message.
+The function is called without any arguments.  `mouse-position' can be
+used to retrieve the current position of the mouse.  */);
+  Vhaiku_drag_track_function = Qnil;
 
   DEFSYM (QSECONDARY, "SECONDARY");
   DEFSYM (QCLIPBOARD, "CLIPBOARD");
@@ -824,4 +860,6 @@ system message failed.  */);
   defsubr (&Shaiku_selection_put);
   defsubr (&Shaiku_selection_owner_p);
   defsubr (&Shaiku_drag_message);
+
+  haiku_dnd_frame = NULL;
 }

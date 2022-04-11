@@ -2357,6 +2357,38 @@ maps."
   (with-suppressed-warnings ((interactive-only execute-extended-command))
     (execute-extended-command prefixarg command-name typed)))
 
+(cl-defgeneric function-documentation (function)
+  "Extract the raw docstring info from FUNCTION.
+FUNCTION is expected to be a function value rather than, say, a mere symbol.
+This is intended to be specialized via `cl-defmethod' but not called directly:
+if you need a function's documentation use `documentation' which will call this
+function as needed."
+  (let ((docstring-p (lambda (doc)
+                       ;; A docstring can be either a string or a reference
+                       ;; into either the `etc/DOC' or a `.elc' file.
+                       (or (stringp doc)
+                           (fixnump doc) (fixnump (cdr-safe doc))))))
+    (pcase function
+      ((pred byte-code-function-p)
+       (when (> (length function) 4)
+         (let ((doc (aref function 4)))
+           (when (funcall docstring-p doc) doc))))
+      ((or (pred stringp) (pred vectorp)) "Keyboard macro.")
+      (`(keymap . ,_)
+       "Prefix command (definition is a keymap associating keystrokes with commands).")
+      ((or `(lambda ,_args . ,body) `(closure ,_env ,_args . ,body)
+           `(autoload ,_file . ,body))
+       (let ((doc (car body)))
+	 (when (and (funcall docstring-p doc)
+	            ;; Handle a doc reference--but these never come last
+	            ;; in the function body, so reject them if they are last.
+	            (or (cdr body) (eq 'autoload (car-safe function))))
+           doc)))
+      (_ (signal 'invalid-function (list function))))))
+
+(cl-defmethod function-documentation ((function accessor))
+  (oclosure--accessor-docstring function)) ;; FIXME: η-reduce!
+
 (defun command-execute (cmd &optional record-flag keys special)
   ;; BEWARE: Called directly from the C code.
   "Execute CMD as an editor command.
@@ -3891,7 +3923,10 @@ to the end of the list of defaults just after the default value."
 (defvar minibuffer-local-shell-command-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (define-key map "\t" 'completion-at-point)
+    (define-key map "\t"       #'completion-at-point)
+    (define-key map [M-up]     #'minibuffer-previous-completion)
+    (define-key map [M-down]   #'minibuffer-next-completion)
+    (define-key map [?\M-\r]   #'minibuffer-choose-completion)
     map)
   "Keymap used for completing shell commands in minibuffer.")
 
@@ -9119,6 +9154,16 @@ Its value is a list of the form (START END) where START is the place
 where the completion should be inserted and END (if non-nil) is the end
 of the text to replace.  If END is nil, point is used instead.")
 
+(defvar completion-base-affixes nil
+  "Base context of the text corresponding to the shown completions.
+This variable is used in the *Completions* buffer.
+Its value is a list of the form (PREFIX SUFFIX) where PREFIX is the text
+before the place where completion should be inserted, and SUFFIX is the text
+after the completion.")
+
+(defvar completion-use-base-affixes nil
+  "Non-nil means to restore original prefix and suffix in the minibuffer.")
+
 (defvar completion-list-insert-choice-function #'completion--replace
   "Function to use to insert the text chosen in *Completions*.
 Called with three arguments (BEG END TEXT), it should replace the text
@@ -9179,60 +9224,75 @@ backward)."
                 ((/= prev (point))
                  (point))
                 (t prev))))
-  (let ((beg (point-min)) (end (point-max)))
+
+  (let ((beg (point-min))
+        (end (point-max))
+        (tabcommand (member (this-command-keys) '("\t" [backtab])))
+        prop)
     (catch 'bound
       (while (> n 0)
         ;; If in a completion, move to the end of it.
         (when (get-text-property (point) 'mouse-face)
           (goto-char (next-single-property-change (point) 'mouse-face nil end)))
         ;; If at the last completion option, wrap or skip to the
-        ;; minibuffer, if requested.
-        (when (and completion-wrap-movement (eobp))
-          (if (and (member (this-command-keys) '("\t" [backtab]))
-                   completion-auto-select)
+        ;; minibuffer, if requested. We can't use (eobp) because some
+        ;; extra text may be after the last candidate: ex: when
+        ;; completion-detailed
+        (setq prop (next-single-property-change (point) 'mouse-face nil end))
+        (when (and completion-wrap-movement (eq end prop))
+          (if (and completion-auto-select tabcommand)
               (throw 'bound nil)
             (goto-char (point-min))))
         ;; Move to start of next one.
         (unless (get-text-property (point) 'mouse-face)
           (goto-char (next-single-property-change (point) 'mouse-face nil end)))
         (setq n (1- n)))
+
       (while (and (< n 0) (not (bobp)))
-        (let ((prop (get-text-property (1- (point)) 'mouse-face)))
-          ;; If in a completion, move to the start of it.
-          (when (and prop (eq prop (get-text-property (point) 'mouse-face)))
-            (goto-char (previous-single-property-change
-                        (point) 'mouse-face nil beg)))
-          ;; Move to end of the previous completion.
-          (unless (or (bobp) (get-text-property (1- (point)) 'mouse-face))
-            (goto-char (previous-single-property-change
-                        (point) 'mouse-face nil beg)))
-          ;; If at the first completion option, wrap or skip to the
-          ;; minibuffer, if requested.
-          (when (and completion-wrap-movement (bobp))
-            (if (and (member (this-command-keys) '("\t" [backtab]))
-                     completion-auto-select)
-                (progn
-                  (goto-char (next-single-property-change (point) 'mouse-face nil end))
-                  (throw 'bound nil))
-              (goto-char (point-max))))
-          ;; Move to the start of that one.
+        (setq prop (get-text-property (1- (point)) 'mouse-face))
+        ;; If in a completion, move to the start of it.
+        (when (and prop (eq prop (get-text-property (point) 'mouse-face)))
           (goto-char (previous-single-property-change
-                      (point) 'mouse-face nil beg))
-          (setq n (1+ n)))))
+                      (point) 'mouse-face nil beg)))
+        ;; Move to end of the previous completion.
+        (unless (or (bobp) (get-text-property (1- (point)) 'mouse-face))
+          (goto-char (previous-single-property-change
+                      (point) 'mouse-face nil beg)))
+        ;; If at the first completion option, wrap or skip to the
+        ;; minibuffer, if requested.
+        (setq prop (previous-single-property-change (point) 'mouse-face nil beg))
+        (when (and completion-wrap-movement (eq beg prop))
+          (if (and completion-auto-select tabcommand)
+              (progn
+                (goto-char (next-single-property-change (point) 'mouse-face nil end))
+                (throw 'bound nil))
+            (goto-char (point-max))))
+        ;; Move to the start of that one.
+        (goto-char (previous-single-property-change
+                    (point) 'mouse-face nil beg))
+        (setq n (1+ n))))
     (when (/= 0 n)
       (switch-to-minibuffer))))
 
-(defun choose-completion (&optional event)
+(defun choose-completion (&optional event no-exit no-quit)
   "Choose the completion at point.
-If EVENT, use EVENT's position to determine the starting position."
-  (interactive (list last-nonmenu-event))
+If EVENT, use EVENT's position to determine the starting position.
+With prefix argument NO-EXIT, insert the completion at point to the
+minibuffer, but don't exit the minibuffer.  When the prefix argument
+is not provided, then whether to exit the minibuffer depends on the value
+of `completion-no-auto-exit'.
+If NO-QUIT is non-nil, insert the completion at point to the
+minibuffer, but don't quit the completions window."
+  (interactive (list last-nonmenu-event current-prefix-arg))
   ;; In case this is run via the mouse, give temporary modes such as
   ;; isearch a chance to turn off.
   (run-hooks 'mouse-leave-buffer-hook)
   (with-current-buffer (window-buffer (posn-window (event-start event)))
     (let ((buffer completion-reference-buffer)
           (base-position completion-base-position)
+          (base-affixes completion-base-affixes)
           (insert-function completion-list-insert-choice-function)
+          (completion-no-auto-exit (if no-exit t completion-no-auto-exit))
           (choice
            (save-excursion
              (goto-char (posn-point (event-start event)))
@@ -9250,12 +9310,14 @@ If EVENT, use EVENT's position to determine the starting position."
 
       (unless (buffer-live-p buffer)
         (error "Destination buffer is dead"))
-      (quit-window nil (posn-window (event-start event)))
+      (unless no-quit
+        (quit-window nil (posn-window (event-start event))))
 
       (with-current-buffer buffer
         (choose-completion-string
          choice buffer
-         (or base-position
+         (or (and completion-use-base-affixes base-affixes)
+             base-position
              ;; If all else fails, just guess.
              (list (choose-completion-guess-base-position choice)))
          insert-function)))))
@@ -9409,9 +9471,11 @@ Called from `temp-buffer-show-hook'."
                 (buffer-substring (minibuffer-prompt-end) (point)))))))
     (with-current-buffer standard-output
       (let ((base-position completion-base-position)
+            (base-affixes completion-base-affixes)
             (insert-fun completion-list-insert-choice-function))
         (completion-list-mode)
         (setq-local completion-base-position base-position)
+        (setq-local completion-base-affixes base-affixes)
         (setq-local completion-list-insert-choice-function insert-fun))
       (setq-local completion-reference-buffer mainbuf)
       (if base-dir (setq default-directory base-dir))
@@ -9436,22 +9500,18 @@ select the completion near point.\n\n")))))
 (defun switch-to-completions ()
   "Select the completion list window."
   (interactive)
-  (let ((window (or (get-buffer-window "*Completions*" 0)
-		    ;; Make sure we have a completions window.
-                    (progn (minibuffer-completion-help)
-                           (get-buffer-window "*Completions*" 0)))))
-    (when window
-      (select-window window)
+  (when-let ((window (or (get-buffer-window "*Completions*" 0)
+		         ;; Make sure we have a completions window.
+                         (progn (minibuffer-completion-help)
+                                (get-buffer-window "*Completions*" 0)))))
+    (select-window window)
+    (when (bobp)
       (cond
        ((and (memq this-command '(completion-at-point minibuffer-complete))
-             (equal (this-command-keys) [backtab])
-             (bobp))
+             (equal (this-command-keys) [backtab]))
         (goto-char (point-max))
         (previous-completion 1))
-       ;; In the new buffer, go to the first completion.
-       ;; FIXME: Perhaps this should be done in `minibuffer-completion-help'.
-       ((bobp)
-        (next-completion 1))))))
+       (t (next-completion 1))))))
 
 (defun read-expression-switch-to-completions ()
   "Select the completion list window while reading an expression."
@@ -9977,7 +10037,7 @@ warning using STRING as the message.")
         (and list
              (boundp symbol)
              (or (eq symbol t)
-                 (and (stringp (setq symbol (eval symbol)))
+                 (and (stringp (setq symbol (symbol-value symbol)))
                       (string-match-p (nth 2 list) symbol)))
              (display-warning package (nth 3 list) :warning)))
     (error nil)))

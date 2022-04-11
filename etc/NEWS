@@ -601,6 +601,18 @@ value.
 
 ** Minibuffer and Completions
 
+*** New commands for navigating completions from the minibuffer.
+When the minibuffer is the current buffer, typing 'M-<up>' or
+'M-<down>' selects a previous/next completion candidate from the
+"*Completions*" buffer and inserts it to the minibuffer.
+When the variable 'minibuffer-completion-auto-choose' is nil,
+'M-<up>' and 'M-<down>' do the same, but without inserting
+a completion candidate to the minibuffer, then 'M-RET' can be used
+to choose the currently active candidate from the "*Completions*"
+buffer and exit the minibuffer.  With a prefix argument, 'C-u M-RET'
+inserts the currently active candidate to the minibuffer, but doesn't
+exit the minibuffer.
+
 +++
 *** The "*Completions*" buffer can now be automatically selected.
 To enable this behavior, customize the user option
@@ -644,6 +656,11 @@ If nil, the heading line is not shown.
 When this user option names a face, the current
 candidate in the "*Completions*" buffer is highlighted with that face.
 The nil value disables this highlighting.
+
+*** Choosing a completion with a prefix argument doesn't exit the minibuffer.
+This means that typing 'C-u RET' on a completion candidate in the
+"*Completions*" buffer inserts the completion to the minibuffer,
+bot doesn't exit the minibuffer.
 
 ** Isearch and Replace
 
@@ -801,6 +818,11 @@ displayed as emojis.  Default nil.
 *** New command 'gnus-article-emojize-symbols'.
 This is bound to 'W D e' and will display symbols that have emoji
 representation as emojis.
+
++++
+*** New mu backend for gnus-search.
+Configuration is very similar to the notmuch and namazu backends.  It
+supports the unified search syntax.
 
 ** EIEIO
 
@@ -1175,11 +1197,12 @@ modes to emulate the behavior of the historical editor Twenex Emacs.
 It is believed to no longer be useful.
 
 ---
-** proced.el supports sending signals to local processes with root permissions.
-When typing 'C-u k' or 'C-u r', sending a signal to or renicing of a
-local process will use alternative credentials.  The credentials to be
-used can be customised by the user option 'proced-remote-directory',
-which defaults to "/sudo::".  'proced-signal-function' has been marked obsolete.
+** proced.el shows system processes of remote hosts.
+When 'default-directory' is remote, and 'proced' is invoked with a
+negative argument like 'C-u - proced', the system processes of that
+remote host are shown.  Alternatively, the user option
+'proced-show-remote-processes' can be set to non-nil.
+'proced-signal-function' has been marked obsolete.
 
 
 * New Modes and Packages in Emacs 29.1
@@ -1314,6 +1337,12 @@ This change is now applied in 'dired-insert-directory'.
 'vc-arch-command'.
 
 +++
+** New generic function 'function-doumentation'.
+Can dynamically generate a raw docstring depending on the type of
+a function.
+Used mainly for docstrings of OClosures.
+
++++
 ** Base64 encoding no longer tolerates latin-1 input.
 The functions 'base64-encode-string', 'base64url-encode-string',
 'base64-encode-region' and 'base64url-encode-region' no longer accept
@@ -1330,6 +1359,12 @@ functions.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** New variable 'last-event-device' and new function 'device-class'.
+On X Windows, 'last-event-device' specifies the input extension device
+from which the last input event originated, and 'device-class' can be
+used to determine the type of an input device.
 
 +++
 ** 'track-mouse' can be a new value 'drag-source'.
@@ -1559,9 +1594,8 @@ the clipboard, and insert it into the buffer.
 
 ---
 ** New function 'minibuffer-lazy-highlight-setup'.
-This function is intended to be added to 'minibuffer-setup-hook'.
-It sets up the minibuffer for lazy highlighting of matches
-in the original window.
+This function allows setting up the minibuffer so that lazy
+highlighting of its content is applied in the original window.
 
 +++
 ** New text property 'inhibit-isearch'.
@@ -1854,6 +1888,24 @@ This is to determine which function has to be called in order to
 deliver the signal.  This allows Tramp to send the signal to remote
 asynchronous processes.  The hitherto existing implementation has been
 moved to 'signal-default-interrupt-process'.
+
++++
+** 'list-system-processes' returns remote process IDs now.
+This happens, when the current buffer's 'default-directory' is
+remote.  In order to preserve the old behavior, apply
+
+    (let ((default-directory temporary-file-directory))
+      (list-system-processes))
+
++++
+** 'process-attributes' expects a remote process ID now.
+When current buffer's 'default-directory' is remote, the PID argument
+of 'process-attributes' is regarded as a remote process ID.  In order
+to preserve the old behavior, apply
+
+    (let ((default-directory temporary-file-directory))
+      (process-attributes pid))
+
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems

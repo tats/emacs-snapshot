@@ -6274,6 +6274,10 @@ xg_im_context_commit (GtkIMContext *imc, gchar *str,
 {
   struct frame *f = user_data;
   struct input_event ie;
+#ifdef HAVE_XINPUT2
+  struct xi_device_t *source;
+  struct x_display_info *dpyinfo;
+#endif
 
   EVENT_INIT (ie);
   /* This used to use g_utf8_to_ucs4_fast, which led to bad results
@@ -6291,6 +6295,22 @@ xg_im_context_commit (GtkIMContext *imc, gchar *str,
   Fput_text_property (make_fixnum (0),
 		      make_fixnum (SCHARS (ie.arg)),
 		      Qcoding, Qt, ie.arg);
+
+#ifdef HAVE_XINPUT2
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  /* There is no timestamp associated with commit events, so use the
+     device that sent the last event to be filtered.  */
+  if (dpyinfo->pending_keystroke_time)
+    {
+      dpyinfo->pending_keystroke_time = 0;
+      source = xi_device_from_id (dpyinfo,
+				  dpyinfo->pending_keystroke_source);
+
+      if (source)
+	ie.device = source->name;
+    }
+#endif
 
   XSETFRAME (ie.frame_or_window, f);
   ie.modifiers = 0;
@@ -6347,6 +6367,10 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
   guint keysym = event->key.keyval;
   unsigned int xstate;
   gunichar uc;
+#ifdef HAVE_XINPUT2
+  Time pending_keystroke_time;
+  struct xi_device_t *source;
+#endif
 
   FOR_EACH_FRAME (tail, tem)
     {
@@ -6361,6 +6385,14 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
   if (!f)
     return true;
 
+#ifdef HAVE_XINPUT2
+  pending_keystroke_time
+    = FRAME_DISPLAY_INFO (f)->pending_keystroke_time;
+
+  if (event->key.time >= pending_keystroke_time)
+    FRAME_DISPLAY_INFO (f)->pending_keystroke_time = 0;
+#endif
+
   if (!x_gtk_use_native_input
       && !FRAME_DISPLAY_INFO (f)->prefer_native_input)
     return true;
@@ -6374,6 +6406,17 @@ xg_widget_key_press_event_cb (GtkWidget *widget, GdkEvent *event,
   inev.ie.modifiers
     |= x_x_to_emacs_modifiers (FRAME_DISPLAY_INFO (f), xstate);
   inev.ie.timestamp = event->key.time;
+
+#ifdef HAVE_XINPUT2
+  if (event->key.time == pending_keystroke_time)
+    {
+      source = xi_device_from_id (FRAME_DISPLAY_INFO (f),
+				  FRAME_DISPLAY_INFO (f)->pending_keystroke_source);
+
+      if (source)
+	inev.ie.device = source->name;
+    }
+#endif
 
   if (event->key.is_modifier)
     goto done;
