@@ -7440,9 +7440,9 @@ Its value takes effect before processing the ACTION argument of
 If non-nil, this is an alist of elements (CONDITION . ACTION),
 where:
 
- CONDITION is either a regexp matching buffer names, or a
-  function that takes two arguments - a buffer name and the
-  ACTION argument of `display-buffer' - and returns a boolean.
+ CONDITION is passed to `buffer-match-p', along with the buffer
+  that is to be displayed and the ACTION argument of
+  `display-buffer', to check if ACTION should be used.
 
  ACTION is a cons cell (FUNCTIONS . ALIST), where FUNCTIONS is an
   action function or a list of action functions and ALIST is an
@@ -7495,22 +7495,16 @@ all fail.  It should never be set by programs or users.  See
 `display-buffer'.")
 (put 'display-buffer-fallback-action 'risky-local-variable t)
 
-(defun display-buffer-assq-regexp (buffer-name alist action)
-  "Retrieve ALIST entry corresponding to BUFFER-NAME.
-This returns the cdr of the alist entry ALIST if either its key
-is a string that matches BUFFER-NAME, as reported by
-`string-match-p'; or if the key is a function that returns
-non-nil when called with three arguments: the ALIST key,
-BUFFER-NAME and ACTION.  ACTION should have the form of the
-action argument passed to `display-buffer'."
+(defun display-buffer-assq-regexp (buffer-or-name alist action)
+  "Retrieve ALIST entry corresponding to buffer specified by BUFFER-OR-NAME.
+This returns the cdr of the alist entry ALIST if the entry's
+key (its car) and BUFFER-OR-NAME satisfy `buffer-match-p', using
+the key as CONDITION argument of `buffer-match-p'.  ACTION should
+have the form of the action argument passed to `display-buffer'."
   (catch 'match
     (dolist (entry alist)
-      (let ((key (car entry)))
-	(when (or (and (stringp key)
-		       (string-match-p key buffer-name))
-		  (and (functionp key)
-		       (funcall key buffer-name action)))
-	  (throw 'match (cdr entry)))))))
+      (when (buffer-match-p (car entry) buffer-or-name action)
+        (throw 'match (cdr entry))))))
 
 (defvar display-buffer--same-window-action
   '(display-buffer-same-window
@@ -7679,7 +7673,7 @@ specified by the ACTION argument."
       ;; Otherwise, use the defined actions.
       (let* ((user-action
 	      (display-buffer-assq-regexp
-	       (buffer-name buffer) display-buffer-alist action))
+	       buffer display-buffer-alist action))
              (special-action (display-buffer--special-action buffer))
 	     ;; Extra actions from the arguments to this function:
 	     (extra-action

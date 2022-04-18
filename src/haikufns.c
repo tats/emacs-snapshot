@@ -64,11 +64,8 @@ static Lisp_Object tip_last_frame;
 /* PARMS argument of last `x-show-tip' call.  */
 static Lisp_Object tip_last_parms;
 
-static void
-haiku_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval);
-static void
-haiku_set_title (struct frame *f, Lisp_Object name, Lisp_Object old_name);
-
+static void haiku_explicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
+static void haiku_set_title (struct frame *, Lisp_Object, Lisp_Object);
 static ptrdiff_t image_cache_refcount;
 
 static Lisp_Object
@@ -255,7 +252,8 @@ int
 haiku_get_color (const char *name, Emacs_Color *color)
 {
   unsigned short r16, g16, b16;
-  Lisp_Object tem;
+  Lisp_Object tem, col;
+  int32 clr;
 
   if (parse_color_spec (name, &r16, &g16, &b16))
     {
@@ -272,10 +270,11 @@ haiku_get_color (const char *name, Emacs_Color *color)
       tem = x_display_list->color_map;
       for (; CONSP (tem); tem = XCDR (tem))
 	{
-	  Lisp_Object col = XCAR (tem);
+	  col = XCAR (tem);
+
 	  if (CONSP (col) && !xstrcasecmp (SSDATA (XCAR (col)), name))
 	    {
-	      int32_t clr = XFIXNUM (XCDR (col));
+	      clr = XFIXNUM (XCDR (col));
 	      color->pixel = clr;
 	      color->red = RED_FROM_ULONG (clr) * 257;
 	      color->green = GREEN_FROM_ULONG (clr) * 257;
@@ -301,10 +300,10 @@ haiku_display_info_for_name (Lisp_Object name)
       if (!x_display_list)
 	return x_display_list;
 
-      error ("Be windowing not initialized");
+      error ("Haiku windowing not initialized");
     }
 
-  error ("Be displays can only be named \"be\"");
+  error ("Haiku displays can only be named \"be\"");
 }
 
 static struct haiku_display_info *
@@ -321,14 +320,14 @@ check_haiku_display_info (Lisp_Object object)
       else if (x_display_list)
 	dpyinfo = x_display_list;
       else
-	error ("Be windowing not present");
+	error ("Haiku windowing not present");
     }
   else if (TERMINALP (object))
     {
       struct terminal *t = decode_live_terminal (object);
 
       if (t->type != output_haiku)
-	error ("Terminal %d is not a Be display", t->id);
+	error ("Terminal %d is not a Haiku display", t->id);
 
       dpyinfo = t->display_info.haiku;
     }
@@ -636,6 +635,7 @@ haiku_create_frame (Lisp_Object parms)
 
   f->output_method = output_haiku;
   f->output_data.haiku = xzalloc (sizeof *f->output_data.haiku);
+  f->output_data.haiku->wait_for_event_type = -1;
 
   fset_icon_name (f, gui_display_get_arg (dpyinfo, parms, Qicon_name,
                                           "iconName", "Title",
@@ -647,9 +647,6 @@ haiku_create_frame (Lisp_Object parms)
 
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
   record_unwind_protect (unwind_create_frame, frame);
-
-  FRAME_OUTPUT_DATA (f)->parent_desc = NULL;
-  FRAME_OUTPUT_DATA (f)->explicit_parent = 0;
 
   /* Set the name; the functions to which we pass f expect the name to
      be set.  */
@@ -803,8 +800,6 @@ haiku_create_frame (Lisp_Object parms)
     initialize_frame_menubar (f);
   unblock_input ();
 
-  FRAME_OUTPUT_DATA (f)->window_desc = FRAME_OUTPUT_DATA (f)->window;
-
   Vframe_list = Fcons (frame, Vframe_list);
 
   Lisp_Object parent_frame = gui_display_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
@@ -860,22 +855,19 @@ haiku_create_frame (Lisp_Object parms)
   adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f),
 		     0, true, Qx_create_frame_2);
 
-  if (!FRAME_OUTPUT_DATA (f)->explicit_parent)
-    {
-      Lisp_Object visibility;
+  Lisp_Object visibility;
 
-      visibility = gui_display_get_arg (dpyinfo, parms, Qvisibility, 0, 0,
-                                        RES_TYPE_SYMBOL);
-      if (EQ (visibility, Qunbound))
-	visibility = Qt;
-      if (EQ (visibility, Qicon))
-	haiku_iconify_frame (f);
-      else if (!NILP (visibility))
-	haiku_visualize_frame (f);
-      else /* Qnil */
-	{
-	  f->was_invisible = true;
-	}
+  visibility = gui_display_get_arg (dpyinfo, parms, Qvisibility, 0, 0,
+				    RES_TYPE_SYMBOL);
+  if (EQ (visibility, Qunbound))
+    visibility = Qt;
+  if (EQ (visibility, Qicon))
+    haiku_iconify_frame (f);
+  else if (!NILP (visibility))
+    haiku_visualize_frame (f);
+  else /* Qnil */
+    {
+      f->was_invisible = true;
     }
 
   if (FRAME_HAS_MINIBUF_P (f)
@@ -955,13 +947,13 @@ haiku_create_tip_frame (Lisp_Object parms)
      counts etc.  */
   f->output_method = output_haiku;
   f->output_data.haiku = xzalloc (sizeof *f->output_data.haiku);
+  f->output_data.haiku->wait_for_event_type = -1;
 
   f->tooltip = true;
   fset_icon_name (f, Qnil);
   FRAME_DISPLAY_INFO (f) = dpyinfo;
 
   FRAME_OUTPUT_DATA (f)->parent_desc = NULL;
-  FRAME_OUTPUT_DATA (f)->explicit_parent = 0;
 
   /* Set the name; the functions to which we pass f expect the name to
      be set.  */
@@ -1053,7 +1045,6 @@ haiku_create_tip_frame (Lisp_Object parms)
     if (!window)
       emacs_abort ();
 
-    FRAME_OUTPUT_DATA (f)->window_desc = window;
     BWindow_set_tooltip_decoration (window);
     unblock_input ();
   }
@@ -1275,9 +1266,11 @@ haiku_set_override_redirect (struct frame *f, Lisp_Object new_value,
 static void
 haiku_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 {
+  int nlines;
+
   if (FRAME_TOOLTIP_P (f))
     return;
-  int nlines;
+
   if (TYPE_RANGED_FIXNUMP (int, value))
     nlines = XFIXNUM (value);
   else
@@ -1554,6 +1547,9 @@ haiku_free_frame_resources (struct frame *f)
 
   if (window)
     BWindow_quit (window);
+
+  if (FRAME_OUTPUT_DATA (f)->saved_menu_event)
+    xfree (FRAME_OUTPUT_DATA (f)->saved_menu_event);
 
   xfree (FRAME_OUTPUT_DATA (f));
   FRAME_OUTPUT_DATA (f) = NULL;
@@ -2422,7 +2418,7 @@ Optional arg SAVE_TEXT, if non-nil, specifies some text to show in the entry fie
    Lisp_Object dir_only_p, Lisp_Object save_text)
 {
   if (!x_display_list)
-    error ("Be windowing not initialized");
+    error ("Haiku windowing not initialized");
 
   if (!NILP (dir))
     CHECK_STRING (dir);
@@ -2523,13 +2519,15 @@ DEFUN ("x-display-save-under", Fx_display_save_under,
        doc: /* SKIP: real doc in xfns.c.  */)
   (Lisp_Object terminal)
 {
+  struct frame *f;
   check_haiku_display_info (terminal);
 
   if (FRAMEP (terminal))
     {
-      struct frame *f = decode_window_system_frame (terminal);
-      return FRAME_HAIKU_VIEW (f) && EmacsView_double_buffered_p (FRAME_HAIKU_VIEW (f)) ?
-	Qt : Qnil;
+      f = decode_window_system_frame (terminal);
+      return ((FRAME_HAIKU_VIEW (f)
+	       && EmacsView_double_buffered_p (FRAME_HAIKU_VIEW (f)))
+	      ? Qt : Qnil);
     }
 
   return Qnil;
@@ -2546,11 +2544,8 @@ frames overlap, FRAME1 (partially) obscures FRAME2.
 Some window managers may refuse to restack windows.  */)
      (Lisp_Object frame1, Lisp_Object frame2, Lisp_Object above)
 {
-  struct frame *f1 = decode_live_frame (frame1);
-  struct frame *f2 = decode_live_frame (frame2);
-
-  check_window_system (f1);
-  check_window_system (f2);
+  struct frame *f1 = decode_window_system_frame (frame1);
+  struct frame *f2 = decode_window_system_frame (frame2);
 
   block_input ();
 

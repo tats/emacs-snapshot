@@ -2847,7 +2847,7 @@ anim_create_cache (Lisp_Object spec)
   cache->handle = NULL;
   cache->temp = NULL;
 
-  cache->index = 0;
+  cache->index = -1;
   cache->next = NULL;
   cache->spec = spec;
   return cache;
@@ -8814,26 +8814,23 @@ gif_load (struct frame *f, struct image *img)
   EMACS_INT idx = -1;
   int gif_err;
   struct anim_cache* cache = NULL;
-
   /* Which sub-image are we to display?  */
-  {
-    Lisp_Object image_number = image_spec_value (img->spec, QCindex, NULL);
-    idx = FIXNUMP (image_number) ? XFIXNAT (image_number) : 0;
-  }
+  Lisp_Object image_number = image_spec_value (img->spec, QCindex, NULL);
 
-  if (idx != -1)
+  idx = FIXNUMP (image_number) ? XFIXNAT (image_number) : 0;
+
+  if (!NILP (image_number))
     {
       /* If this is an animated image, create a cache for it.  */
       cache = anim_get_animation_cache (img->spec);
+      /* We have an old cache entry, so use it.  */
       if (cache->handle)
 	{
-	  /* We have an old cache entry, and it looks correct, so use
-	     it.  */
-	  if (cache->index == idx - 1)
-	    {
-	      gif = cache->handle;
-	      pixmap = cache->temp;
-	    }
+	  gif = cache->handle;
+	  pixmap = cache->temp;
+	  /* We're out of sync, so start from the beginning.  */
+	  if (cache->index != idx - 1)
+	    cache->index = -1;
 	}
     }
 
@@ -8940,16 +8937,19 @@ gif_load (struct frame *f, struct image *img)
 
       /* Check that the selected subimages fit.  It's not clear whether
 	 the GIF spec requires this, but Emacs can crash if they don't fit.  */
-      for (j = 0; j <= idx; ++j)
+      for (j = 0; j < gif->ImageCount; ++j)
 	{
 	  struct SavedImage *subimage = gif->SavedImages + j;
 	  int subimg_width = subimage->ImageDesc.Width;
 	  int subimg_height = subimage->ImageDesc.Height;
 	  int subimg_top = subimage->ImageDesc.Top;
 	  int subimg_left = subimage->ImageDesc.Left;
-	  if (! (subimg_width >= 0 && subimg_height >= 0
-		 && 0 <= subimg_top && subimg_top <= height - subimg_height
-		 && 0 <= subimg_left && subimg_left <= width - subimg_width))
+	  if (subimg_width < 0
+	      || subimg_height < 0
+	      || subimg_top < 0
+	      || subimg_left < 0
+	      || subimg_top + subimg_height > height
+	      || subimg_left + subimg_width > width)
 	    {
 	      image_error ("Subimage does not fit in image");
 	      goto gif_error;
@@ -9115,6 +9115,14 @@ gif_load (struct frame *f, struct image *img)
       if (disposal == DISPOSAL_UNSPECIFIED)
 	disposal = DISPOSE_DO_NOT;
 
+      /* This is not quite correct -- the specification is unclear,
+	 but I think we're supposed to restore to the frame before the
+	 previous frame?  And we don't have that data at this point.
+	 But DISPOSE_DO_NOT is less wrong than substituting the
+	 background, so do that for now.  */
+      if (disposal == DISPOSE_PREVIOUS)
+	disposal = DISPOSE_DO_NOT;
+
       gif_color_map = subimage->ImageDesc.ColorMap;
       if (!gif_color_map)
 	gif_color_map = gif->SColorMap;
@@ -9209,11 +9217,11 @@ gif_load (struct frame *f, struct image *img)
 	    }
 	}
       img->lisp_data = list2 (Qextension_data, img->lisp_data);
-      if (delay)
-	img->lisp_data
-	  = Fcons (Qdelay,
-		   Fcons (make_float (delay / 100.0),
-			  img->lisp_data));
+      img->lisp_data
+	= Fcons (Qdelay,
+		 /* Default GIF delay is 1/15th of a second.  */
+		 Fcons (make_float (delay? delay / 100.0: 1.0 / 15),
+			img->lisp_data));
     }
 
   if (gif->ImageCount > 1)
@@ -9250,11 +9258,13 @@ gif_load (struct frame *f, struct image *img)
   return true;
 
  gif_error:
-  if (!cache)
+  if (pixmap)
+    xfree (pixmap);
+  gif_close (gif, NULL);
+  if (cache)
     {
-      if (pixmap)
-	xfree (pixmap);
-      gif_close (gif, NULL);
+      cache->handle = NULL;
+      cache->temp = NULL;
     }
   return false;
 }
@@ -9502,9 +9512,6 @@ webp_load (struct frame *f, struct image *img)
   if (features.has_animation)
     {
       /* Animated image.  */
-      WebPData webp_data;
-      webp_data.bytes = contents;
-      webp_data.size = size;
       int timestamp;
 
       struct anim_cache* cache = anim_get_animation_cache (img->spec);
@@ -9524,6 +9531,22 @@ webp_load (struct frame *f, struct image *img)
 	  /* Start a new cache entry.  */
 	  if (cache->handle)
 	    WebPAnimDecoderDelete (cache->handle);
+
+	  WebPData webp_data;
+	  if (NILP (specified_data))
+	    /* If we got the data from a file, then we don't need to
+	       copy the data. */
+	    webp_data.bytes = cache->temp = contents;
+	  else
+	    /* We got the data from a string, so copy it over so that
+	       it doesn't get garbage-collected.  */
+	    {
+	      webp_data.bytes = xmalloc (size);
+	      memcpy ((void*) webp_data.bytes, contents, size);
+	    }
+	  /* In any case, we release the allocated memory when we
+	     purge the anim cache.  */
+	  webp_data.size = size;
 
 	  /* Get the width/height of the total image.  */
 	  WebPDemuxer* demux = WebPDemux (&webp_data);
@@ -9659,7 +9682,7 @@ webp_load (struct frame *f, struct image *img)
   /* Clean up.  */
   if (!anim)
     WebPFree (decoded);
-  if (NILP (specified_data))
+  if (NILP (specified_data) && !anim)
     xfree (contents);
   return true;
 
@@ -11293,7 +11316,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 #endif
   /* FIXME: Use error->message so the user knows what is the actual
      problem with the image.  */
-  image_error ("Error parsing SVG image `%s'", img->spec);
+  image_error ("Error parsing SVG image");
   g_clear_error (&err);
   return 0;
 }

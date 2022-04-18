@@ -232,8 +232,7 @@ struct xi_device_t
 #ifdef HAVE_XINPUT2_1
   int scroll_valuator_count;
 #endif
-  int grab;
-  bool master_p;
+  int grab, use;
 #ifdef HAVE_XINPUT2_2
   bool direct_p;
 #endif
@@ -414,7 +413,7 @@ struct x_display_info
   Atom Xatom_CLIPBOARD, Xatom_TIMESTAMP, Xatom_TEXT, Xatom_DELETE,
     Xatom_COMPOUND_TEXT, Xatom_UTF8_STRING,
     Xatom_MULTIPLE, Xatom_INCR, Xatom_EMACS_TMP, Xatom_TARGETS, Xatom_NULL,
-    Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER, Xatom_COUNTER,
+    Xatom_ATOM, Xatom_ATOM_PAIR, Xatom_CLIPBOARD_MANAGER,
     Xatom_EMACS_SERVER_TIME_PROP;
 
   /* More atoms for font properties.  The last three are private
@@ -618,6 +617,14 @@ struct x_display_info
 
   Time pending_keystroke_time;
   int pending_keystroke_source;
+
+#if defined USE_GTK && !defined HAVE_GTK3
+  /* This means the two variables above shouldn't be reset the first
+     time a KeyPress event arrives, since they were set from a raw key
+     press event that was sent before the first (real, not sent by an
+     input method) core key event.  */
+  bool pending_keystroke_time_special_p;
+#endif
 #endif
 
 #ifdef HAVE_XKB
@@ -664,6 +671,12 @@ struct x_display_info
   int xshape_minor;
   int xshape_event_base;
   int xshape_error_base;
+#endif
+
+#ifdef USE_TOOLKIT_SCROLL_BARS
+  Lisp_Object *protected_windows;
+  int n_protected_windows;
+  int protected_windows_max;
 #endif
 };
 
@@ -968,6 +981,11 @@ struct x_output
   char *preedit_chars;
   bool preedit_active;
   int preedit_caret;
+#endif
+
+#ifdef HAVE_XINPUT2
+  XIEventMask *xi_masks;
+  int num_xi_masks;
 #endif
 };
 
@@ -1562,7 +1580,8 @@ extern bool x_dnd_in_progress;
 extern struct frame *x_dnd_frame;
 
 #ifdef HAVE_XINPUT2
-struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
+extern struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
+extern bool xi_frame_selected_for (struct frame *, unsigned long);
 #endif
 
 extern void mark_xterm (void);

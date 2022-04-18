@@ -4640,6 +4640,9 @@ sys_open (const char * path, int oflag, int mode)
   return res;
 }
 
+/* This is not currently used, but might be needed again at some
+   point; DO NOT DELETE!  */
+#if 0
 int
 openat (int fd, const char * path, int oflag, int mode)
 {
@@ -4660,6 +4663,7 @@ openat (int fd, const char * path, int oflag, int mode)
 
   return sys_open (path, oflag, mode);
 }
+#endif
 
 int
 fchmod (int fd, mode_t mode)
@@ -10612,6 +10616,65 @@ realpath (const char *file_name, char *resolved_name)
   if (resolved_name)
     return strcpy (resolved_name, tgt);
   return xstrdup (tgt);
+}
+
+/* A replacement for Posix execvp, used to restart Emacs.  This is
+   needed because the low-level Windows API to start processes accepts
+   the command-line arguments as a single string, so we cannot safely
+   use the MSVCRT execvp emulation, because elements of argv[] that
+   have embedded blanks and tabs will not be passed correctly to the
+   restarted Emacs.  */
+int
+w32_reexec_emacs (char *cmd_line, const char *wdir)
+{
+  STARTUPINFO si;
+  SECURITY_ATTRIBUTES sec_attrs;
+  BOOL status;
+  PROCESS_INFORMATION proc_info;
+
+  GetStartupInfo (&si);		/* Use the same startup info as the caller.  */
+  sec_attrs.nLength = sizeof (sec_attrs);
+  sec_attrs.lpSecurityDescriptor = NULL;
+  sec_attrs.bInheritHandle = FALSE;
+
+  /* Make sure we are in the original directory, in case the command
+     line specifies the program as a relative file name.  */
+  chdir (wdir);
+
+  /* This is a kludge: it causes the restarted "emacs -nw" to have a
+     new console window created for it, and that new window might have
+     different (default) properties, not the ones of the parent
+     process's console window.  But without this, restarting Emacs in
+     the -nw mode simply doesn't work.  FIXME!  */
+  if (inhibit_window_system)
+    {
+      if (!FreeConsole ())
+	{
+	  errno = ENOEXEC;
+	  return -1;
+	}
+    }
+
+  status = CreateProcess (NULL,		/* program */
+			  cmd_line,	/* command line */
+			  &sec_attrs,	/* process attributes */
+			  NULL,		/* thread attributes */
+			  TRUE,		/* inherit handles? */
+			  inhibit_window_system
+			  ? 0		/* inherit parent's console */
+			  : NORMAL_PRIORITY_CLASS,
+			  NULL,		/* environment */
+			  wdir,		/* initial directory */
+			  &si,		/* startup info */
+			  &proc_info);
+  if (status)
+    {
+      CloseHandle (proc_info.hThread);
+      CloseHandle (proc_info.hProcess);
+      exit (0);
+    }
+  errno = ENOEXEC;
+  return -1;
 }
 
 /*

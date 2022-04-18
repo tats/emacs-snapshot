@@ -1034,8 +1034,11 @@ If a directory or nothing is found at point, return nil."
 ;;;###autoload
 (defun dired (dirname &optional switches)
   "\"Edit\" directory DIRNAME--delete, rename, print, etc. some files in it.
-Optional second argument SWITCHES specifies the `ls' options used.
-\(Interactively, use a prefix argument to be able to specify SWITCHES.)
+Optional second argument SWITCHES specifies the options to be used
+when invoking `insert-directory-program', usually `ls', which produces
+the listing of the directory files and their attributes.
+Interactively, a prefix argument will cause the command to prompt
+for SWITCHES.
 
 If DIRNAME is a string, Dired displays a list of files in DIRNAME (which
 may also have shell wildcards appended to select certain files).
@@ -1726,37 +1729,50 @@ when Emacs exits or the user drags another file.")
     (with-selected-window (posn-window (event-end event))
       (goto-char (posn-point (event-end event))))
     (track-mouse
-      (let ((new-event (read-event)))
-        (if (not (eq (event-basic-type new-event) 'mouse-movement))
-            (when (eq (event-basic-type new-event) 'mouse-1)
-              (push new-event unread-command-events))
-          ;; We can get an error if there's by some chance no file
-          ;; name at point.
-          (condition-case nil
-              (let ((filename (with-selected-window (posn-window
-                                                     (event-end event))
-                                (dired-file-name-at-point))))
-                (when filename
-                  ;; In theory x-dnd-username combined with a proper
-                  ;; file URI containing the hostname of the remote
-                  ;; server could be used here instead of creating a
-                  ;; local copy of the remote file, but no program
-                  ;; actually implements file DND according to the
-                  ;; spec.
-                  (when (file-remote-p filename)
-                    (setq filename (file-local-copy filename))
-                    (setq dired-last-dragged-remote-file filename)
-                    (add-hook 'kill-emacs-hook
-                              #'dired-remove-last-dragged-local-file))
-                  (gui-backend-set-selection 'XdndSelection filename)
-                  (x-begin-drag '("text/uri-list" "text/x-dnd-username"
-                                  "FILE_NAME" "FILE" "HOST_NAME")
-                                (if (eq 'dired-mouse-drag-files 'link)
-                                    'XdndActionLink
-                                  'XdndActionCopy)
-                                nil nil t)))
-            (error (when (eq (event-basic-type new-event) 'mouse-1)
-                     (push new-event unread-command-events)))))))))
+      (let ((beginning-position (mouse-pixel-position))
+            new-event)
+        (catch 'track-again
+          (setq new-event (read-event))
+          (if (not (eq (event-basic-type new-event) 'mouse-movement))
+              (when (eq (event-basic-type new-event) 'mouse-1)
+                (push new-event unread-command-events))
+            (let ((current-position (mouse-pixel-position)))
+              ;; If the mouse didn't move far enough, don't
+              ;; inadvertently trigger a drag.
+              (when (and (eq (car current-position) (car beginning-position))
+                         (ignore-errors
+                           (and (> 3 (abs (- (cadr beginning-position)
+                                             (cadr current-position))))
+                                (> 3 (abs (- (caddr beginning-position)
+                                             (caddr current-position)))))))
+                (throw 'track-again nil)))
+            ;; We can get an error if there's by some chance no file
+            ;; name at point.
+            (condition-case nil
+                (let ((filename (with-selected-window (posn-window
+                                                       (event-end event))
+                                  (dired-file-name-at-point))))
+                  (when filename
+                    ;; In theory x-dnd-username combined with a proper
+                    ;; file URI containing the hostname of the remote
+                    ;; server could be used here instead of creating a
+                    ;; local copy of the remote file, but no program
+                    ;; actually implements file DND according to the
+                    ;; spec.
+                    (when (file-remote-p filename)
+                      (setq filename (file-local-copy filename))
+                      (setq dired-last-dragged-remote-file filename)
+                      (add-hook 'kill-emacs-hook
+                                #'dired-remove-last-dragged-local-file))
+                    (gui-backend-set-selection 'XdndSelection filename)
+                    (x-begin-drag '("text/uri-list" "text/x-dnd-username"
+                                    "FILE_NAME" "FILE" "HOST_NAME")
+                                  (if (eq 'dired-mouse-drag-files 'link)
+                                      'XdndActionLink
+                                    'XdndActionCopy)
+                                  nil nil t)))
+              (error (when (eq (event-basic-type new-event) 'mouse-1)
+                       (push new-event unread-command-events))))))))))
 
 (defvar dired-mouse-drag-files-map (let ((keymap (make-sparse-keymap)))
                                      (define-key keymap [down-mouse-1] #'dired-mouse-drag)
@@ -3050,12 +3066,10 @@ You can then feed the file name(s) to other commands with \\[yank]."
 
 ;;; Keeping Dired buffers in sync with the filesystem and with each other
 
-(defun dired-buffers-for-dir (dir &optional file subdirs)
+(defun dired-buffers-for-dir (dir &optional file)
   "Return a list of buffers for DIR (top level or in-situ subdir).
 If FILE is non-nil, include only those whose wildcard pattern (if any)
 matches FILE.
-If SUBDIRS is non-nil, also include the dired buffers of
-directories below DIR.
 The list is in reverse order of buffer creation, most recent last.
 As a side effect, killed dired buffers for DIR are removed from
 `dired-buffers'."
@@ -3067,20 +3081,35 @@ As a side effect, killed dired buffers for DIR are removed from
        ((null (buffer-name buf))
 	;; Buffer is killed - clean up:
 	(setq dired-buffers (delq elt dired-buffers)))
-       ((dired-in-this-tree-p (car elt) dir)
+       ((dired-in-this-tree-p dir (car elt))
 	(with-current-buffer buf
-          (when (and (or subdirs
-                         (assoc dir dired-subdir-alist))
-	             (or (null file)
-		         (if (stringp dired-directory)
-		             (let ((wildcards (file-name-nondirectory
-					       dired-directory)))
-			       (or (zerop (length wildcards))
-			           (string-match-p (dired-glob-regexp wildcards)
-                                                   file)))
-		           (member (expand-file-name file dir)
-			           (cdr dired-directory)))))
-            (setq result (cons buf result)))))))
+          (and (assoc dir dired-subdir-alist)
+	       (or (null file)
+		   (if (stringp dired-directory)
+		       (let ((wildcards (file-name-nondirectory
+					 dired-directory)))
+			 (or (zerop (length wildcards))
+			     (string-match-p (dired-glob-regexp wildcards)
+                                             file)))
+		     (member (expand-file-name file dir)
+			     (cdr dired-directory))))
+               (setq result (cons buf result)))))))
+    result))
+
+(defun dired-buffers-for-dir-or-subdir (dir)
+  "Return a list of buffers for DIR or a subdirectory thereof.
+As a side effect, killed dired buffers for DIR are removed from
+`dired-buffers'."
+  (setq dir (file-name-as-directory dir))
+  (let (result buf)
+    (dolist (elt dired-buffers)
+      (setq buf (cdr elt))
+      (cond
+       ((null (buffer-name buf))
+	;; Buffer is killed - clean up:
+	(setq dired-buffers (delq elt dired-buffers)))
+       ((dired-in-this-tree-p (car elt) dir)
+        (setq result (cons buf result)))))
     result))
 
 (defun dired-glob-regexp (pattern)
@@ -3659,14 +3688,16 @@ confirmation.  To disable the confirmation, see
                                      (file-name-nondirectory fn))))
                (not dired-clean-confirm-killing-deleted-buffers))
            (kill-buffer buf)))
-    (let ((buf-list (dired-buffers-for-dir fn nil 'subdirs)))
+    (let ((buf-list (dired-buffers-for-dir-or-subdir
+                     (expand-file-name fn))))
       (and buf-list
            (or (and dired-clean-confirm-killing-deleted-buffers
                     (y-or-n-p
                      (format
-                      (ngettext "Kill Dired buffer of %s, too? "
-                                "Kill Dired buffers of %s, too? "
-                                (length buf-list))
+                      (ngettext
+                       "Kill Dired buffer of %s, too? "
+                       "Kill Dired buffers of %s and its sub-directories, too? "
+                       (length buf-list))
                       (file-name-nondirectory
                        ;; FN may end in a / if `dired-listing-switches'
                        ;; contains -p, so we need to strip that

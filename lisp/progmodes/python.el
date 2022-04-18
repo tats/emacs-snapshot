@@ -706,7 +706,8 @@ avoid '==' being treated as an assignment."
     ;;   [a] = 5
     ;;   [*a] = 5, 6
     (,(python-font-lock-assignment-matcher
-       (python-rx (or "[" "(") (* space)
+       (python-rx (or line-start ?\;) (* space)
+                  (or "[" "(") (* space)
                   grouped-assignment-target (* space)
                   (or ")" "]") (* space)
                   assignment-operator))
@@ -1628,23 +1629,20 @@ of the statement."
                        ;; are somehow out of whack.  This has been
                        ;; observed when using `syntax-ppss' during
                        ;; narrowing.
-                       (cl-assert (>= string-start last-string-end)
-                                  :show-args
-                                  "\
-Overlapping strings detected (start=%d, last-end=%d)")
-                       (goto-char string-start)
-                       (if (python-syntax-context 'paren)
-                           ;; Ended up inside a paren, roll again.
-                           (python-nav-end-of-statement t)
-                         ;; This is not inside a paren, move to the
-                         ;; end of this string.
-                         (goto-char (+ (point)
-                                       (python-syntax-count-quotes
-                                        (char-after (point)) (point))))
-                         (setq last-string-end
-                               (or (re-search-forward
-                                    (rx (syntax string-delimiter)) nil t)
-                                   (goto-char (point-max))))))
+                       (when (>= string-start last-string-end)
+                         (goto-char string-start)
+                         (if (python-syntax-context 'paren)
+                             ;; Ended up inside a paren, roll again.
+                             (python-nav-end-of-statement t)
+                           ;; This is not inside a paren, move to the
+                           ;; end of this string.
+                           (goto-char (+ (point)
+                                         (python-syntax-count-quotes
+                                          (char-after (point)) (point))))
+                           (setq last-string-end
+                                 (or (re-search-forward
+                                      (rx (syntax string-delimiter)) nil t)
+                                     (goto-char (point-max)))))))
                       ((python-syntax-context 'paren)
                        ;; The statement won't end before we've escaped
                        ;; at least one level of parenthesis.

@@ -58,6 +58,7 @@ The file is typically installed using a file name akin to
 If a constant file name is required, the file can be renamed to
 "emacs.pdmp", and Emacs will find it during startup anyway.
 
+---
 ** Emacs now supports use of XInput 2 for input events.
 If your X server has support and you have the XInput 2 development headers
 installed, you can configure Emacs with the option '--with-xinput2' to enable
@@ -68,15 +69,16 @@ XInput 2 support from Lisp programs.
 
 +++
 ** Emacs now supports being built with pure GTK.
-To use this option, make sure the GTK 3 and Cairo development files
-are installed, and configure Emacs with the option '--with-pgtk'.
-Unlike the default X and GTK build, the resulting Emacs binary will
-work on any underlying window system supported by GDK, such as Wayland
-and Broadway.  We do not recommend that you use this configuration,
-unless you are running a window system that's supported by GDK other
-than X.  Running this configuration on X is known to have problems,
-such as undesirable frame positioning and various issues with keyboard
-input of sequences such as 'C-;' and 'C-S-u'.
+To use this option, make sure the GTK 3 (version 3.20 or later) and
+Cairo development files are installed, and configure Emacs with the
+option '--with-pgtk'.  Unlike the default X and GTK build, the
+resulting Emacs binary will work on any underlying window system
+supported by GDK, such as Wayland and Broadway.  We do not recommend
+that you use this configuration, unless you are running a window
+system that's supported by GDK other than X.  Running this
+configuration on X is known to have problems, such as undesirable
+frame positioning and various issues with keyboard input of sequences
+such as 'C-;' and 'C-S-u'.
 
 ---
 ** The docstrings of preloaded files are not in "etc/DOC" any more.
@@ -97,6 +99,17 @@ Saving Emacs Sessions" node in the Emacs manual for more details.
 
 
 * Startup Changes in Emacs 29.1
+
++++
+** Emacs can now be used more easily in an executable script.
+If you start an executable script with
+
+    #!/usr/bin/emacs -x
+
+Emac will start without reading any init files (like with --quick),
+and then execute the rest of the script file as Emacs Lisp.  When it
+reaches the end of the script, Emacs will exit with an exit code from
+the value of the final form.
 
 +++
 ** Emacs now supports setting 'user-emacs-directory' via '--init-directory'.
@@ -121,6 +134,13 @@ of 'user-emacs-directory'.
 
 
 * Incompatible changes in Emacs 29.1
+
+---
+** 'TAB' and '<backtab>' is now bound in 'button-map'.
+This means that if you're standing on a button, 'TAB' will take you to
+the next button, even if the mode has bound it to something else.
+This also means that 'TAB' on a button in an 'outline-minor-mode'
+heading will move point instead of collapsing the outline.
 
 ---
 ** 'Info-default-directory-list' is no longer populated at Emacs startup.
@@ -184,6 +204,15 @@ methods instead.
 
 
 * Changes in Emacs 29.1
+
++++
+** New command 'restart-emacs'.
+This is like 'save-buffers-kill-emacs', but instead of just killing
+the current Emacs process at the end, it starts a new Emacs process
+(using the same command line arguments as the running Emacs process).
+'kill-emacs' and 'save-buffers-kill-emacs' have also gained new
+optional parameters to restart instead of just killing the current
+process.
 
 +++
 ** New user option 'mouse-drag-and-drop-region-cross-program'.
@@ -388,6 +417,12 @@ command also works for non-Emoji characters.)
 ** Help
 
 ---
+*** New user option 'help-enable-variable-value-editing'.
+If enabled, 'e' on a value in *Help* will pop you to a new buffer
+where you can edit the value.  This is not enabled by default, because
+it's easy to make an edit that yields an invalid result.
+
+---
 *** 'C-h b' uses outlining by default.
 Set 'describe-bindings-outline' to nil to get the old behavior.
 
@@ -407,6 +442,11 @@ These will take you (respectively) to the next and previous "page".
 *** New key binding in "*Help*" buffer: 'I'.
 This will take you to the Emacs Lisp manual entry for the item
 displayed, if any.
+
+---
+*** The 'C-h m' ('describe-mode') *Help* buffer has been reformatted.
+It now only includes local minor modes at the start, and the global
+minor modes are listed after the major mode.
 
 ** Outline Mode
 
@@ -434,8 +474,9 @@ This is a list of pairs of open/close strings used to display buttons.
 +++
 ** Support for the WebP image format.
 This support is built by default when the libwebp library is
-available.  To disable it, use the '--without-webp' configure flag.
-Image specifiers can now use ':type webp'.
+available.  (This also includes support for animated WebP images.)  To
+disable WebP support, use the '--without-webp' configure flag.  Image
+specifiers can now use ':type webp'.
 
 ** Windows
 
@@ -499,6 +540,12 @@ are met.  The conditions are given by the argument, which can be
 +++
 *** New command 'rcirc-when'.
 
++++
+*** New user option 'rcirc-cycle-completion-flag'.
+Rcirc will use the default 'completion-at-point' mechanism.  The
+conventional IRC behaviour of completing by cycling through the
+available options can be restored by enabling this option.
+
 * Editing Changes in Emacs 29.1
 
 ---
@@ -537,6 +584,7 @@ effectively dragged.
 Customize this option to limit the number of entries in the menu
 "Edit->Paste from Kill Menu".  The default is 60.
 
++++
 ** Performing a pinch gesture on a touchpad now increases the text scale.
 
 ** show-paren-mode
@@ -564,10 +612,10 @@ change the terminal used on a remote host.
 
 ---
 *** New user options for alternate wheel events.
-The options 'mouse-wheel-down-alternate-event', 'mouse-wheel-up-alternate-event',
-'mouse-wheel-left-alternate-event', and 'mouse-wheel-right-alternate-event' have
-been added to better support systems where two kinds of wheel events can be
-received.
+The options 'mouse-wheel-down-alternate-event',
+'mouse-wheel-up-alternate-event', 'mouse-wheel-left-alternate-event',
+and 'mouse-wheel-right-alternate-event' have been added to better
+support systems where two kinds of wheel events can be received.
 
 ** Editing complex text layout (CTL) scripts
 
@@ -583,8 +631,18 @@ to edit such sequences by allowing point to "enter" the sequence.
 *** New language environment "Northern Thai".
 This uses the Tai Tham script, whose support has been enhanced.
 
+*** New language environment "Brahmi".
+This language environment supports Brahmi, which is a historical
+script that was used in ancient South Asia.  A new input method,
+'brahmi', is provided to type text in this script.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+---
+** New mode, 'emacs-news-mode', for editing the NEWS file.
+This mode adds some highlighting, fixes the 'M-q' command, and has
+commands for doing maintenance.
 
 ---
 ** kmacro
@@ -601,6 +659,7 @@ value.
 
 ** Minibuffer and Completions
 
++++
 *** New commands for navigating completions from the minibuffer.
 When the minibuffer is the current buffer, typing 'M-<up>' or
 'M-<down>' selects a previous/next completion candidate from the
@@ -621,11 +680,13 @@ To enable this behavior, customize the user option
 'second-tab', then the first 'TAB' will display "*Completions*", and
 the second one will switch to the "*Completions*" buffer.
 
+---
 *** New user option 'completion-wrap-movement'.
 When non-nil, the commands 'next-completion' and 'previous-completion'
 automatically wrap around on reaching the beginning or the end of
 the "*Completions*" buffer.
 
++++
 *** New user option 'completions-sort'.
 This option controls the sorting of the completion candidates in
 the "*Completions*" buffer.  Available styles are no sorting,
@@ -657,6 +718,7 @@ When this user option names a face, the current
 candidate in the "*Completions*" buffer is highlighted with that face.
 The nil value disables this highlighting.
 
+---
 *** Choosing a completion with a prefix argument doesn't exit the minibuffer.
 This means that typing 'C-u RET' on a completion candidate in the
 "*Completions*" buffer inserts the completion to the minibuffer,
@@ -665,7 +727,9 @@ bot doesn't exit the minibuffer.
 ** Isearch and Replace
 
 +++
-*** New user option 'char-fold-override' disables default character equivalences.
+*** New user option 'char-fold-override'.
+Non-nil means that the default definitions of equivalent characters
+are overridden.
 
 +++
 *** New command 'isearch-emoji-by-name'.
@@ -674,6 +738,7 @@ command accepts the Unicode name of an Emoji (for example, "smiling
 face" or "heart with arrow"), like 'C-x 8 e e', with minibuffer
 completion, and adds the Emoji into the search string.
 
++++
 ** New minor mode 'glyphless-display-mode'.
 This allows an easy way to toggle seeing all glyphless characters in
 the current buffer.
@@ -777,6 +842,14 @@ phrase part will be automatically quoted if necessary.
 ** eww/shr
 
 +++
+*** New user option to automatically rename EWW buffers.
+The 'eww-auto-rename-buffer' user option can be configured to rename
+rendered web pages by using their title, URL, or a user-defined
+function which returns a string.  For the first two cases, the length
+of the resulting name is controlled by 'eww-buffer-name-length'.  By
+default, no automatic renaming is performed.
+
++++
 *** New user option 'shr-allowed-images'.
 This complements 'shr-blocked-images', but allows specifying just the
 allowed images.
@@ -838,18 +911,14 @@ M-x align' for it to work.  This has now been changed.  The default
 regexp for 'C-u M-x align-regexp' has also been changed to be easier
 for inexperienced users to use.
 
-** eww
-
-+++
-*** New user option to automatically rename EWW buffers.
-The 'eww-auto-rename-buffer' user option can be configured to rename
-rendered web pages by using their title, URL, or a user-defined
-function which returns a string.  For the first two cases, the length
-of the resulting name is controlled by 'eww-buffer-name-length'.  By
-default, no automatic renaming is performed.
-
 ** Help
 
+---
+*** New mode, 'emacs-news-view-mode', for viewing the NEWS file.
+This mode is used by the 'C-h N' command, and adds buttons to manual
+entries and symbol references.
+
+---
 *** New user option 'help-link-key-to-documentation'.
 When this option is non-nil (which is the default), key bindings
 displayed in the "*Help*" buffer will be linked to the documentation
@@ -886,9 +955,11 @@ it with new 'term-{faint,italic,slow-blink,fast-blink}' faces.
 
 ** Xref
 
++++
 *** 'project-find-file' and 'project-or-external-find-file' now accept
 a prefix argument which is interpreted to mean "include all files".
 
++++
 *** 'project-kill-buffers' can display the list of buffers to kill.
 Customize the user option 'project-kill-buffers-display-buffer-list'
 to enable the display of the buffer list.
@@ -898,14 +969,19 @@ to enable the display of the buffer list.
 It is bound to 'C-M-,' and jumps to the location where 'xref-go-back'
 ('M-,', also known as 'xref-pop-marker-stack') was invoked previously.
 
-*** 'xref-query-replace-in-results' does not prompt for FROM when
-called without prefix argument, to make the most common case faster:
-replacing entire matches.
++++
+*** 'xref-query-replace-in-results' prompting change.
+This command no longer prompts for FROM when called without prefix
+argument.  This makes the most common case faster: replacing entire
+matches.
 
++++
 *** New command 'xref-find-references-and-replace' to rename one identifier.
 
+---
 *** New variable 'xref-current-item' (renamed from a private version).
 
+---
 *** New function 'xref-show-xrefs'.
 
 ** File notifications
@@ -939,6 +1015,7 @@ The keybinding for 'image-transform-fit-to-width' is now 's i'.
 *** User option 'image-auto-resize' can now be set to 'fit-window'.
 This works like 'image-transform-fit-to-window'.
 
+---
 *** New user option 'image-auto-resize-max-scale-percent'.
 The new 'fit-window' option will never scale an image more than this
 much (in percent).  It is nil by default, which means no limit.
@@ -1058,6 +1135,7 @@ If non-nil, dragging file names with the mouse in a Dired buffer will
 initiate a drag-and-drop session allowing them to be opened in other
 programs.
 
++++
 *** New user option 'dired-free-space'.
 Dired will now, by default, include the free space in the first line
 instead of having it on a separate line.  To get the previous behavior
@@ -1073,6 +1151,7 @@ the buffer will take you to that directory.
 
 ** Exif
 
+---
 *** New function 'exif-field'.
 This is a convenience function to extract the field data from
 'exif-parse-file' and 'exif-parse-buffer'.
@@ -1152,6 +1231,7 @@ the Galeon web browser was released in September, 2008.
 
 ** Ruby Mode
 
+---
 *** New user option 'ruby-toggle-block-space-before-parameters'.
 
 ** Eshell
@@ -1247,6 +1327,7 @@ they will still be escaped, so the '.foo' symbol is still printed as
 and remapping parent of basic faces does not work reliably.
 Instead of remapping 'mode-line', you have to remap 'mode-line-active'.
 
+---
 ** User option 'mail-source-ignore-errors' is now obsolete.
 The whole mechanism for prompting users to continue in case of
 mail-source errors has been removed, so this option is no longer
@@ -1361,6 +1442,22 @@ functions.
 * Lisp Changes in Emacs 29.1
 
 +++
+** New function 'flush-standard-output'.
+This enables you do display incomplete lines from batch-based Emacs
+scripts.
+
++++
+** New convenience function 'buttonize-region'.
+This works like 'buttonize', but for a region instead of a string.
+
++++
+** 'macroexp-let2*' can omit 'test' arg and use single-var bindings.
+
++++
+** New macro-writing macros, 'cl-with-gensyms' and 'cl-once-only'.
+See the '(cl) Macro-Writing Macros' manual section for descriptions.
+
++++
 ** New variable 'last-event-device' and new function 'device-class'.
 On X Windows, 'last-event-device' specifies the input extension device
 from which the last input event originated, and 'device-class' can be
@@ -1385,8 +1482,9 @@ compliant.
 
 +++
 ** New macro 'setopt'.
-This is like 'setq', but uses 'customize-set-variable' to set the
-variable(s).
+This is like 'setq', but is meant to be used for user options instead
+of plain variables, and
+uses 'custom-set'/'set-default' to set them.
 
 +++
 ** New utility predicate 'mode-line-window-selected-p'.
@@ -1471,6 +1569,17 @@ them towards or away from each other.
 ** New hook 'x-pre-popup-menu-hook'.
 This hook is run before 'x-popup-menu' is about to display a
 deck-of-cards menu on screen.
+
+** New function 'buffer-match-p'
+Check if a buffer satisfies some condition.  Some examples for
+conditions can be regular expressions that match a buffer name, a
+cons-cell like (major-mode . shell-mode) that matches any buffer where
+major-mode is shell-mode or a combined with a condition like (and
+"\\`\\*.+\\*\\'" (major-mode . special-mode)).
+
+** New function 'match-buffers'
+Use 'buffer-match-p' to gather a list of buffers that match a
+condition.
 
 ** Text security and suspiciousness
 
@@ -1662,7 +1771,7 @@ Specifying a cons as the FROM argument allows to start measuring text
 from a specified amount of pixels above or below a position.
 
 ---
-** 'eshell-eval-using-options' now follows POSIX/GNU argument syntax conventions.
+** 'eshell-eval-using-options' now follows argument syntax conventions.
 Built-in commands in Eshell now accept command-line options with
 values passed as a single token, such as '-oVALUE' or '--option=VALUE'.
 
@@ -1847,6 +1956,11 @@ month, day, or time.  For example, (date-to-time "2021-12-04") now
 assumes a time of 00:00 instead of signaling an error.
 
 +++
+** 'format-seconds' now allows suppressing zero-value trailing elements.
+The new "%x" non-printing control character will suppress zero-value
+elements that appear after "%x".
+
++++
 ** New events for taking advantage of touchscreen devices.
 The events 'touchscreen-begin, 'touchscreen-update', and
 'touchscreen-end' have been added to take better advantage of
@@ -1957,6 +2071,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 Local variables:
 coding: utf-8
-mode: outline
+mode: emacs-news
 paragraph-separate: "[ 	]*$"
 end:

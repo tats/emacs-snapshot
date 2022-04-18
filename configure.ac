@@ -1105,6 +1105,8 @@ AS_IF([test $gl_gcc_warnings = no],
   if test "$emacs_cv_clang" = yes; then
     gl_WARN_ADD([-Wno-missing-braces])
     gl_WARN_ADD([-Wno-null-pointer-arithmetic])
+    gl_WARN_ADD([-Wno-implicit-const-int-float-conversion])
+    gl_WARN_ADD([-Wno-int-in-bool-context])
   fi
 
   # This causes too much noise in the MinGW build
@@ -2797,7 +2799,11 @@ gtk3_pkg_errors=
 if test "${opsys}" != "mingw32"; then
   if test "${with_gtk3}" = "yes" || test "${with_gtk}" = "yes" || test "$USE_X_TOOLKIT" = "maybe"; then
     GLIB_REQUIRED=2.37.5
-    GTK_REQUIRED=3.10
+    if test "${window_system}" = "x11"; then
+      GTK_REQUIRED=3.10
+    else
+      GTK_REQUIRED=3.20
+    fi
     GTK_MODULES="gtk+-3.0 >= $GTK_REQUIRED glib-2.0 >= $GLIB_REQUIRED"
 
     dnl Checks for libraries.

@@ -81,12 +81,45 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "haiku_support.h"
 
+/* Some messages that Emacs sends to itself.  */
 enum
   {
     SCROLL_BAR_UPDATE	= 3000,
     WAIT_FOR_RELEASE	= 3001,
     RELEASE_NOW		= 3002,
     CANCEL_DROP		= 3003,
+    SHOW_MENU_BAR	= 3004,
+    BE_MENU_BAR_OPEN	= 3005,
+    QUIT_APPLICATION	= 3006,
+    REPLAY_MENU_BAR	= 3007,
+  };
+
+/* X11 keysyms that we use.  */
+enum
+  {
+    KEY_BACKSPACE	  = 0xff08,
+    KEY_TAB		  = 0xff09,
+    KEY_RETURN		  = 0xff0d,
+    KEY_PAUSE		  = 0xff13,
+    KEY_ESCAPE		  = 0xff1b,
+    KEY_DELETE		  = 0xffff,
+    KEY_HOME		  = 0xff50,
+    KEY_LEFT_ARROW	  = 0xff51,
+    KEY_UP_ARROW	  = 0xff52,
+    KEY_RIGHT_ARROW	  = 0xff53,
+    KEY_DOWN_ARROW	  = 0xff54,
+    KEY_PAGE_UP		  = 0xff55,
+    KEY_PAGE_DOWN	  = 0xff56,
+    KEY_END		  = 0xff57,
+    KEY_PRINT		  = 0xff61,
+    KEY_INSERT		  = 0xff63,
+    /* This is used to indicate the first function key.  */
+    KEY_F1		  = 0xffbe,
+    /* These are found on some multilingual keyboards.  */
+    KEY_HANGUL		  = 0xff31,
+    KEY_HANGUL_HANJA	  = 0xff34,
+    KEY_HIRIGANA_KATAGANA = 0xff27,
+    KEY_ZENKAKU_HANKAKU	  = 0xff2a,
   };
 
 static color_space dpy_color_space = B_NO_COLOR_SPACE;
@@ -128,6 +161,29 @@ static int current_window_id;
 static void *grab_view = NULL;
 static BLocker grab_view_locker;
 static bool drag_and_drop_in_progress;
+
+/* Many places require us to lock the child frame data, and then lock
+   the locker of some random window.  Unfortunately, locking such a
+   window might be delayed due to an arriving message, which then
+   calls a callback inside that window that tries to lock the child
+   frame data but doesn't finish since the child frame lock is already
+   held, not letting the code that held the child frame lock proceed,
+   thereby causing a deadlock.
+
+   Rectifying that problem is simple: all code in a looper callback
+   must lock the child frame data with this macro instead.
+
+   IOW, If some other code is already running with the child frame
+   lock held, don't interfere: wait until it's finished before
+   continuing.  */
+#define CHILD_FRAME_LOCK_INSIDE_LOOPER_CALLBACK		\
+  if (child_frame_lock.LockWithTimeout (200) != B_OK)	\
+    {							\
+      /* The Haiku equivalent of XPutBackEvent.  */	\
+      if (CurrentMessage ())				\
+	PostMessage (CurrentMessage ());		\
+    }							\
+  else
 
 /* This could be a private API, but it's used by (at least) the Qt
    port, so it's probably here to stay.  */
@@ -193,63 +249,76 @@ keysym_from_raw_char (int32 raw, int32 key, unsigned *code)
   switch (raw)
     {
     case B_BACKSPACE:
-      *code = XK_BackSpace;
+      *code = KEY_BACKSPACE;
       break;
     case B_RETURN:
-      *code = XK_Return;
+      *code = KEY_RETURN;
       break;
     case B_TAB:
-      *code = XK_Tab;
+      *code = KEY_TAB;
       break;
     case B_ESCAPE:
-      *code = XK_Escape;
+      *code = KEY_ESCAPE;
       break;
     case B_LEFT_ARROW:
-      *code = XK_Left;
+      *code = KEY_LEFT_ARROW;
       break;
     case B_RIGHT_ARROW:
-      *code = XK_Right;
+      *code = KEY_RIGHT_ARROW;
       break;
     case B_UP_ARROW:
-      *code = XK_Up;
+      *code = KEY_UP_ARROW;
       break;
     case B_DOWN_ARROW:
-      *code = XK_Down;
+      *code = KEY_DOWN_ARROW;
       break;
     case B_INSERT:
-      *code = XK_Insert;
+      *code = KEY_INSERT;
       break;
     case B_DELETE:
-      *code = XK_Delete;
+      *code = KEY_DELETE;
       break;
     case B_HOME:
-      *code = XK_Home;
+      *code = KEY_HOME;
       break;
     case B_END:
-      *code = XK_End;
+      *code = KEY_END;
       break;
     case B_PAGE_UP:
-      *code = XK_Page_Up;
+      *code = KEY_PAGE_UP;
       break;
     case B_PAGE_DOWN:
-      *code = XK_Page_Down;
+      *code = KEY_PAGE_DOWN;
       break;
 
     case B_FUNCTION_KEY:
-      *code = XK_F1 + key - 2;
+      *code = KEY_F1 + key - 2;
 
-      if (*code - XK_F1 == 12)
-	*code = XK_Print;
-      else if (*code - XK_F1 == 13)
+      if (*code - KEY_F1 == 12)
+	*code = KEY_PRINT;
+      else if (*code - KEY_F1 == 13)
 	/* Okay, Scroll Lock is a bit too much: keyboard.c doesn't
 	   know about it yet, and it shouldn't, since that's a
 	   modifier key.
 
-	   *code = XK_Scroll_Lock; */
+	   *code = KEY_SCROLL_LOCK; */
 	return -1;
-      else if (*code - XK_F1 == 14)
-	*code = XK_Pause;
+      else if (*code - KEY_F1 == 14)
+	*code = KEY_PAUSE;
 
+      break;
+
+    case B_HANGUL:
+      *code = KEY_HANGUL;
+      break;
+    case B_HANGUL_HANJA:
+      *code = KEY_HANGUL_HANJA;
+      break;
+    case B_KATAKANA_HIRAGANA:
+      *code = KEY_HIRIGANA_KATAGANA;
+      break;
+    case B_HANKAKU_ZENKAKU:
+      *code = KEY_ZENKAKU_HANKAKU;
       break;
 
     default:
@@ -393,6 +462,15 @@ public:
     haiku_write (APP_QUIT_REQUESTED_EVENT, &rq);
     return 0;
   }
+
+  void
+  MessageReceived (BMessage *msg)
+  {
+    if (msg->what == QUIT_APPLICATION)
+      Quit ();
+    else
+      BApplication::MessageReceived (msg);
+  }
 };
 
 class EmacsWindow : public BWindow
@@ -419,10 +497,8 @@ public:
   window_look pre_override_redirect_look;
   window_feel pre_override_redirect_feel;
   uint32 pre_override_redirect_workspaces;
-  pthread_mutex_t menu_update_mutex = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t menu_update_cv = PTHREAD_COND_INITIALIZER;
-  bool menu_updated_p = false;
   int window_id;
+  bool *menus_begun = NULL;
 
   EmacsWindow () : BWindow (BRect (0, 0, 0, 0), "", B_TITLED_WINDOW_LOOK,
 			    B_NORMAL_WINDOW_FEEL, B_NO_SERVER_SIDE_WINDOW_MODIFIERS)
@@ -452,9 +528,6 @@ public:
     if (this->parent)
       UnparentAndUnlink ();
     child_frame_lock.Unlock ();
-
-    pthread_cond_destroy (&menu_update_cv);
-    pthread_mutex_destroy (&menu_update_mutex);
   }
 
   BRect
@@ -474,8 +547,7 @@ public:
     screen_frame = frame = screen.Frame ();
     deskbar_frame = deskbar.Frame ();
 
-    if (!(modifiers () & B_SHIFT_KEY)
-	&& !deskbar.IsAutoHide ())
+    if (!(modifiers () & B_SHIFT_KEY) && !deskbar.IsAutoHide ())
       {
 	switch (deskbar.Location ())
 	  {
@@ -486,13 +558,14 @@ public:
 	  case B_DESKBAR_BOTTOM:
 	  case B_DESKBAR_LEFT_BOTTOM:
 	  case B_DESKBAR_RIGHT_BOTTOM:
-	    frame.bottom = deskbar_frame.bottom - 2;
+	    frame.bottom = deskbar_frame.top - 2;
 	    break;
 
 	  case B_DESKBAR_LEFT_TOP:
-	    if (deskbar.IsExpanded ())
+	    if (!deskbar.IsExpanded ())
 	      frame.top = deskbar_frame.bottom + 2;
-	    else
+	    else if (!deskbar.IsAlwaysOnTop ()
+		     && !deskbar.IsAutoRaise ())
 	      frame.left = deskbar_frame.right + 2;
 	    break;
 
@@ -522,7 +595,7 @@ public:
 	frame.left = screen_frame.left + (window_frame.left
 					  - decorator_frame.left);
 	frame.right = screen_frame.right - (decorator_frame.right
-					    - window_frame.left);
+					    - window_frame.right);
       }
 
     return frame;
@@ -899,39 +972,16 @@ public:
   }
 
   void
-  MenusBeginning ()
+  MenusBeginning (void)
   {
     struct haiku_menu_bar_state_event rq;
-    int lock_count = 0;
-    thread_id current_thread = find_thread (NULL);
-    thread_id window_thread = Thread ();
+
     rq.window = this;
-    rq.no_lock = false;
+    if (!menus_begun)
+      haiku_write (MENU_BAR_OPEN, &rq);
+    else
+      *menus_begun = true;
 
-    if (window_thread != current_thread)
-      rq.no_lock = true;
-
-    haiku_write (MENU_BAR_OPEN, &rq);
-
-    if (!rq.no_lock)
-      {
-	while (IsLocked ())
-	  {
-	    ++lock_count;
-	    UnlockLooper ();
-	  }
-	pthread_mutex_lock (&menu_update_mutex);
-	while (!menu_updated_p)
-	  pthread_cond_wait (&menu_update_cv,
-			     &menu_update_mutex);
-	menu_updated_p = false;
-	pthread_mutex_unlock (&menu_update_mutex);
-	for (; lock_count; --lock_count)
-	  {
-	    if (!LockLooper ())
-	      gui_abort ("Failed to lock after cv signal denoting menu update");
-	  }
-      }
     menu_bar_active_p = true;
   }
 
@@ -967,25 +1017,28 @@ public:
 
     haiku_write (MOVE_EVENT, &rq);
 
-    if (!child_frame_lock.Lock ())
-      gui_abort ("Failed to lock child frame state lock");
-    for (struct child_frame *f = subset_windows;
-	 f; f = f->next)
-      DoMove (f);
-    child_frame_lock.Unlock ();
+    CHILD_FRAME_LOCK_INSIDE_LOOPER_CALLBACK
+      {
+	for (struct child_frame *f = subset_windows;
+	     f; f = f->next)
+	  DoMove (f);
+	child_frame_lock.Unlock ();
 
-    BWindow::FrameMoved (newPosition);
+	BWindow::FrameMoved (newPosition);
+      }
   }
 
   void
   WorkspacesChanged (uint32_t old, uint32_t n)
   {
-    if (!child_frame_lock.Lock ())
-      gui_abort ("Failed to lock child frames for changing workspaces");
-    for (struct child_frame *f = subset_windows;
-	 f; f = f->next)
-      DoUpdateWorkspace (f);
-    child_frame_lock.Unlock ();
+    CHILD_FRAME_LOCK_INSIDE_LOOPER_CALLBACK
+      {
+	for (struct child_frame *f = subset_windows;
+	     f; f = f->next)
+	  DoUpdateWorkspace (f);
+
+	child_frame_lock.Unlock ();
+      }
   }
 
   void
@@ -1199,6 +1252,8 @@ public:
 
 class EmacsMenuBar : public BMenuBar
 {
+  bool tracking_p;
+
 public:
   EmacsMenuBar () : BMenuBar (BRect (0, 0, 0, 0), NULL)
   {
@@ -1225,6 +1280,22 @@ public:
   }
 
   void
+  MouseDown (BPoint point)
+  {
+    struct haiku_menu_bar_click_event rq;
+    EmacsWindow *ew = (EmacsWindow *) Window ();
+
+    rq.window = ew;
+    rq.x = std::lrint (point.x);
+    rq.y = std::lrint (point.y);
+
+    if (!ew->menu_bar_active_p)
+      haiku_write (MENU_BAR_CLICK, &rq);
+    else
+      BMenuBar::MouseDown (point);
+  }
+
+  void
   MouseMoved (BPoint point, uint32 transit, const BMessage *msg)
   {
     struct haiku_menu_bar_left_event rq;
@@ -1243,6 +1314,53 @@ public:
       }
 
     BMenuBar::MouseMoved (point, transit, msg);
+  }
+
+  void
+  MessageReceived (BMessage *msg)
+  {
+    BRect frame;
+    BPoint pt, l;
+    EmacsWindow *window;
+    bool menus_begun;
+
+    if (msg->what == SHOW_MENU_BAR)
+      {
+	window = (EmacsWindow *) Window ();
+	frame = Frame ();
+	pt = frame.LeftTop ();
+	l = pt;
+	menus_begun = false;
+	Parent ()->ConvertToScreen (&pt);
+
+	window->menus_begun = &menus_begun;
+	set_mouse_position (pt.x, pt.y);
+	BMenuBar::MouseDown (l);
+	window->menus_begun = NULL;
+
+	if (!menus_begun)
+	  msg->SendReply (msg);
+	else
+	  msg->SendReply (BE_MENU_BAR_OPEN);
+      }
+    else if (msg->what == REPLAY_MENU_BAR)
+      {
+	window = (EmacsWindow *) Window ();
+	menus_begun = false;
+	window->menus_begun = &menus_begun;
+
+	if (msg->FindPoint ("emacs:point", &pt) == B_OK)
+	  BMenuBar::MouseDown (pt);
+
+	window->menus_begun = NULL;
+
+	if (!menus_begun)
+	  msg->SendReply (msg);
+	else
+	  msg->SendReply (BE_MENU_BAR_OPEN);
+      }
+    else
+      BMenuBar::MessageReceived (msg);
   }
 };
 
@@ -1719,6 +1837,7 @@ public:
   int last_reported_overscroll_value;
   int max_value, real_max_value;
   int overscroll_start_value;
+  bigtime_t repeater_start;
 
   EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p) :
     BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
@@ -1806,14 +1925,17 @@ public:
 	return;
       }
 
-    GetMouse (&point, &buttons, false);
-
-    if (ButtonRegionFor (current_part).Contains (point))
+    if (repeater_start < system_time ())
       {
-	rq.scroll_bar = this;
-	rq.window = Window ();
-	rq.part = current_part;
-	haiku_write (SCROLL_BAR_PART_EVENT, &rq);
+	GetMouse (&point, &buttons, false);
+
+	if (ButtonRegionFor (current_part).Contains (point))
+	  {
+	    rq.scroll_bar = this;
+	    rq.window = Window ();
+	    rq.part = current_part;
+	    haiku_write (SCROLL_BAR_PART_EVENT, &rq);
+	  }
       }
 
     BScrollBar::Pulse ();
@@ -1946,6 +2068,8 @@ public:
 
 	return;
       }
+
+    repeater_start = system_time () + 300000;
 
     if (buttons == B_PRIMARY_MOUSE_BUTTON)
       {
@@ -2270,13 +2394,15 @@ public:
 static int32
 start_running_application (void *data)
 {
+  Emacs *app = (Emacs *) data;
+
   haiku_io_init_in_app_thread ();
 
-  if (!((Emacs *) data)->Lock ())
+  if (!app->Lock ())
     gui_abort ("Failed to lock application");
 
-  ((Emacs *) data)->Run ();
-  ((Emacs *) data)->Unlock ();
+  app->Run ();
+  app->Unlock ();
   return 0;
 }
 
@@ -2346,44 +2472,58 @@ BBitmap_dimensions (void *bitmap, int *left, int *top,
   *mono_p = (((BBitmap *) bitmap)->ColorSpace () == B_GRAY1);
 }
 
+static void
+wait_for_exit_of_app_thread (void)
+{
+  status_t ret;
+
+  be_app->PostMessage (QUIT_APPLICATION);
+  wait_for_thread (app_thread, &ret);
+}
+
 /* Set up an application and return it.  If starting the application
    thread fails, abort Emacs.  */
 void *
 BApplication_setup (void)
 {
-  if (be_app)
-    return be_app;
   thread_id id;
   Emacs *app;
 
+  if (be_app)
+    return be_app;
+
   app = new Emacs;
   app->Unlock ();
+
   if ((id = spawn_thread (start_running_application, "Emacs app thread",
 			  B_DEFAULT_MEDIA_PRIORITY, app)) < 0)
     gui_abort ("spawn_thread failed");
 
   resume_thread (id);
-
   app_thread = id;
+
+  atexit (wait_for_exit_of_app_thread);
   return app;
 }
 
 /* Set up and return a window with its view put in VIEW.  */
 void *
-BWindow_new (void *_view)
+BWindow_new (void **view)
 {
-  BWindow *window = new (std::nothrow) EmacsWindow;
-  BView **v = (BView **) _view;
+  BWindow *window;
+  BView *vw;
+
+  window = new (std::nothrow) EmacsWindow;
   if (!window)
     {
-      *v = NULL;
+      *view = NULL;
       return window;
     }
 
-  BView *vw = new (std::nothrow) EmacsView;
+  vw = new (std::nothrow) EmacsView;
   if (!vw)
     {
-      *v = NULL;
+      *view = NULL;
       window->LockLooper ();
       window->Quit ();
       return NULL;
@@ -2397,15 +2537,17 @@ BWindow_new (void *_view)
      the first time.  */
   window->UnlockLooper ();
   window->AddChild (vw);
-  *v = vw;
+  *view = vw;
   return window;
 }
 
 void
 BWindow_quit (void *window)
 {
-  ((BWindow *) window)->LockLooper ();
-  ((BWindow *) window)->Quit ();
+  BWindow *w = (BWindow *) window;
+
+  w->LockLooper ();
+  w->Quit ();
 }
 
 /* Set WINDOW's offset to X, Y.  */
@@ -2724,42 +2866,6 @@ BWindow_center_on_screen (void *window)
 {
   BWindow *w = (BWindow *) window;
   w->CenterOnScreen ();
-}
-
-/* Tell VIEW it has been clicked at X by Y.  */
-void
-BView_mouse_down (void *view, int x, int y)
-{
-  BView *vw = (BView *) view;
-  if (vw->LockLooper ())
-    {
-      vw->MouseDown (BPoint (x, y));
-      vw->UnlockLooper ();
-    }
-}
-
-/* Tell VIEW the mouse has been released at X by Y.  */
-void
-BView_mouse_up (void *view, int x, int y)
-{
-  BView *vw = (BView *) view;
-  if (vw->LockLooper ())
-    {
-      vw->MouseUp (BPoint (x, y));
-      vw->UnlockLooper ();
-    }
-}
-
-/* Tell VIEW that the mouse has moved to Y by Y.  */
-void
-BView_mouse_moved (void *view, int x, int y, uint32_t transit)
-{
-  BView *vw = (BView *) view;
-  if (vw->LockLooper ())
-    {
-      vw->MouseMoved (BPoint (x, y), transit, NULL);
-      vw->UnlockLooper ();
-    }
 }
 
 /* Import fringe bitmap (short array, low bit rightmost) BITS into
@@ -3627,44 +3733,45 @@ struct popup_file_dialog_data
 static void
 unwind_popup_file_dialog (void *ptr)
 {
-  struct popup_file_dialog_data *data =
-    (struct popup_file_dialog_data *) ptr;
+  struct popup_file_dialog_data *data
+    = (struct popup_file_dialog_data *) ptr;
   BFilePanel *panel = data->panel;
+
   delete panel;
   delete data->entry;
   delete data->msg;
 }
 
-static void
-be_popup_file_dialog_safe_set_target (BFilePanel *dialog, BWindow *window)
-{
-  dialog->SetTarget (BMessenger (window));
-}
-
 /* Popup a file dialog.  */
 char *
-be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int dir_only_p,
-		      void *window, const char *save_text, const char *prompt,
-		      void (*block_input_function) (void),
+be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p,
+		      int dir_only_p, void *window, const char *save_text,
+		      const char *prompt, void (*block_input_function) (void),
 		      void (*unblock_input_function) (void),
 		      void (*maybe_quit_function) (void))
 {
   specpdl_ref idx = c_specpdl_idx_from_cxx ();
   /* setjmp/longjmp is UB with automatic objects. */
-  block_input_function ();
   BWindow *w = (BWindow *) window;
-  uint32_t mode = dir_only_p ? B_DIRECTORY_NODE : B_FILE_NODE | B_DIRECTORY_NODE;
+  uint32_t mode = (dir_only_p
+		   ? B_DIRECTORY_NODE
+		   : B_FILE_NODE | B_DIRECTORY_NODE);
   BEntry *path = new BEntry;
   BMessage *msg = new BMessage ('FPSE');
   BFilePanel *panel = new BFilePanel (open_p ? B_OPEN_PANEL : B_SAVE_PANEL,
 				      NULL, NULL, mode);
-
+  void *buf;
+  enum haiku_event_type type;
+  char *ptr;
   struct popup_file_dialog_data dat;
+  ssize_t b_s;
+
   dat.entry = path;
   dat.msg = msg;
   dat.panel = panel;
 
   record_c_unwind_protect_from_cxx (unwind_popup_file_dialog, &dat);
+
   if (default_dir)
     {
       if (path->SetTo (default_dir, 0) != B_OK)
@@ -3672,22 +3779,21 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
     }
 
   panel->SetMessage (msg);
+
   if (default_dir)
     panel->SetPanelDirectory (path);
   if (save_text)
     panel->SetSaveText (save_text);
+
   panel->SetHideWhenDone (0);
   panel->Window ()->SetTitle (prompt);
-  be_popup_file_dialog_safe_set_target (panel, w);
-
+  panel->SetTarget (BMessenger (w));
   panel->Show ();
-  unblock_input_function ();
 
-  void *buf = alloca (200);
+  buf = alloca (200);
   while (1)
     {
-      enum haiku_event_type type;
-      char *ptr = NULL;
+      ptr = NULL;
 
       if (!haiku_read_with_timeout (&type, buf, 200, 1000000, false))
 	{
@@ -3701,7 +3807,6 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
 	  maybe_quit_function ();
 	}
 
-      ssize_t b_s;
       block_input_function ();
       haiku_read_size (&b_s, false);
       if (!b_s || ptr || panel->Window ()->IsHidden ())
@@ -3711,16 +3816,6 @@ be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p, int
 	  return ptr;
 	}
       unblock_input_function ();
-    }
-}
-
-void
-be_app_quit (void)
-{
-  if (be_app)
-    {
-      while (!be_app->Lock ());
-      be_app->Quit ();
     }
 }
 
@@ -3748,20 +3843,18 @@ EmacsWindow_unzoom (void *window)
   w->UnZoom ();
 }
 
-/* Move the pointer into MBAR and start tracking.  */
-void
+/* Move the pointer into MBAR and start tracking.  Return whether the
+   menu bar was opened correctly.  */
+bool
 BMenuBar_start_tracking (void *mbar)
 {
   EmacsMenuBar *mb = (EmacsMenuBar *) mbar;
-  if (!mb->LockLooper ())
-    gui_abort ("Couldn't lock menubar");
-  BRect frame = mb->Frame ();
-  BPoint pt = frame.LeftTop ();
-  BPoint l = pt;
-  mb->Parent ()->ConvertToScreen (&pt);
-  set_mouse_position (pt.x, pt.y);
-  mb->MouseDown (l);
-  mb->UnlockLooper ();
+  BMessenger messenger (mb);
+  BMessage reply;
+
+  messenger.SendMessage (SHOW_MENU_BAR, &reply);
+
+  return reply.what == BE_MENU_BAR_OPEN;
 }
 
 #ifdef HAVE_NATIVE_IMAGE_API
@@ -4063,17 +4156,6 @@ be_find_setting (const char *name)
 }
 
 void
-EmacsWindow_signal_menu_update_complete (void *window)
-{
-  EmacsWindow *w = (EmacsWindow *) window;
-
-  pthread_mutex_lock (&w->menu_update_mutex);
-  w->menu_updated_p = true;
-  pthread_cond_signal (&w->menu_update_cv);
-  pthread_mutex_unlock (&w->menu_update_mutex);
-}
-
-void
 BMessage_delete (void *message)
 {
   delete (BMessage *) message;
@@ -4188,4 +4270,19 @@ bool
 be_drag_and_drop_in_progress (void)
 {
   return drag_and_drop_in_progress;
+}
+
+/* Replay the menu bar click event EVENT.  Return whether or not the
+   menu bar actually opened.  */
+bool
+be_replay_menu_bar_event (void *menu_bar,
+			  struct haiku_menu_bar_click_event *event)
+{
+  BMenuBar *m = (BMenuBar *) menu_bar;
+  BMessenger messenger (m);
+  BMessage reply, msg (REPLAY_MENU_BAR);
+
+  msg.AddPoint ("emacs:point", BPoint (event->x, event->y));
+  messenger.SendMessage (&msg, &reply);
+  return reply.what == BE_MENU_BAR_OPEN;
 }

@@ -1219,16 +1219,16 @@ time_cmp (Lisp_Object a, Lisp_Object b)
       return da < db ? -1 : da != db;
     }
 
-  struct lisp_time ta = lisp_time_struct (a, 0);
-
   /* Compare nil to nil correctly, and handle other eq values quicker
      while we're at it.  Compare here rather than earlier, to handle
-     NaNs and check formats.  */
+     NaNs.  This means (time-equal-p X X) does not signal an error if
+     X is not a valid time value, but that's OK.  */
   if (EQ (a, b))
     return 0;
 
   /* Compare (ATICKS . AZ) to (BTICKS . BHZ) by comparing
      ATICKS * BHZ to BTICKS * AHZ.  */
+  struct lisp_time ta = lisp_time_struct (a, 0);
   struct lisp_time tb = lisp_time_struct (b, 0);
   mpz_t const *za = bignum_integer (&mpz[0], ta.ticks);
   mpz_t const *zb = bignum_integer (&mpz[1], tb.ticks);
@@ -1609,11 +1609,11 @@ check_tm_member (Lisp_Object obj, int offset)
 DEFUN ("encode-time", Fencode_time, Sencode_time, 1, MANY, 0,
        doc: /* Convert TIME to a timestamp.
 
-TIME is a list (SECOND MINUTE HOUR DAY MONTH YEAR IGNORED DST ZONE).
+TIME is a list (SECOND MINUTE HOUR DAY MONTH YEAR IGNORED DST ZONE)
 in the style of `decode-time', so that (encode-time (decode-time ...)) works.
 In this list, ZONE can be nil for Emacs local time, t for Universal
 Time, `wall' for system wall clock time, or a string as in the TZ
-environment variable.  It can also be a list (as from
+environment variable.  ZONE can also be a list (as from
 `current-time-zone') or an integer (as from `decode-time') applied
 without consideration for daylight saving time.  If ZONE specifies a
 time zone with daylight-saving transitions, DST is t for daylight
@@ -1626,10 +1626,12 @@ DAY, MONTH, and YEAR, and specify the components of a decoded time.
 If there are more than 6 arguments the *last* argument is used as ZONE
 and any other extra arguments are ignored, so that (apply
 #\\='encode-time (decode-time ...)) works.  In this obsolescent
-convention, DST and ZONE default to -1 and nil respectively.
+convention, DST is -1 and ZONE defaults to nil.
 
-Years before 1970 are not guaranteed to work.  On some systems,
-year values as low as 1901 do work.
+The range of supported years is at least 1970 to the near future.
+Out-of-range values for SECOND through MONTH are brought into range
+via date arithmetic.  This can be tricky especially when combined with
+DST; see Info node `(elisp)Time Conversion' for details and caveats.
 
 usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)

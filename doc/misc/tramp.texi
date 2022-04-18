@@ -2649,6 +2649,41 @@ The most common @value{tramp} connection family is based on either
 configuration recommendations are given.
 
 
+@subsection Using ssh config include for host name completion
+
+@vindex Include@r{, ssh option}
+@findex tramp-set-completion-function
+@findex tramp-get-completion-function
+OpenSSH configuration files can use an @option{Include} option for
+further configuration files.  Default @value{tramp} host name
+completion ignores this option.  However, you can configure this
+yourself.
+
+Given, your @file{~/.ssh/config} file contains the following option:
+
+@example
+Include ~/.ssh/conf.d/*
+@end example
+
+The following code snippet in your @file{.emacs} uses all files in
+that directory for host name completion:
+
+@lisp
+@group
+(tramp-set-completion-function
+ "ssh" (append (tramp-get-completion-function "ssh")
+               (mapcar (lambda (file) `(tramp-parse-sconfig ,file))
+                       (directory-files
+                        "~/.ssh/conf.d/"
+                        'full directory-files-no-dot-files-regexp))))
+@end group
+@end lisp
+
+This code snippet does it for the @option{ssh} method.  If you replace
+@t{"ssh"} by @t{"scp"}, it does it also for that method (or any other
+method you like).
+
+
 @subsection Detection of session hangouts
 
 @vindex ServerAliveInterval@r{, ssh option}
@@ -4041,9 +4076,9 @@ inspect @value{tramp} @ref{Traces and Profiles, traces}.
 @findex list-system-processes
 @findex process-attributes
 The functions @code{list-system-processes} and
-@code{process-attributes} return information about processes on the
-respective remote host.  In order to retrieve this information, they
-use the command @command{ps}, driven by the following constants:
+@code{process-attributes} return information about system processes on
+the respective remote host.  In order to retrieve this information,
+they use the command @command{ps}, driven by the following constants:
 
 @defvr Constant tramp-process-attributes-ps-args
 This is a list of arguments (strings) @command{ps} is called with.
@@ -4097,6 +4132,8 @@ The corresponding @code{tramp-process-attributes-ps-format} has the value
 @vindex tramp-connection-local-bsd-ps-variables
 @vindex tramp-connection-local-busybox-ps-profile
 @vindex tramp-connection-local-busybox-ps-variables
+@vindex tramp-connection-local-darwin-ps-profile
+@vindex tramp-connection-local-darwin-ps-variables
 The default values for @code{tramp-process-attributes-ps-args} and
 @code{tramp-process-attributes-ps-format} can be overwritten by
 connection-local variables.
@@ -4107,14 +4144,11 @@ This is already done by @value{tramp} for the @option{adb} method, see
 @code{tramp-adb-connection-local-default-ps-profile} and
 @code{tramp-adb-connection-local-default-ps-variables}.
 
-There are two further predefined sets of connection-local variables
-for remote BSD systems, and for a remote @command{ps} command
-implemented with @command{busybox}.  These are called
-@code{tramp-connection-local-bsd-ps-profile},
-@code{tramp-connection-local-bsd-ps-variables},
-@code{tramp-connection-local-busybox-ps-profile}, and
-@code{tramp-connection-local-busybox-ps-variables}.  Use them
-like
+There are three further predefined sets of connection-local variables
+for remote BSD systems, for remote macOS systems, and for a remote
+@command{ps} command implemented with @command{busybox}.  These are
+called @code{tramp-connection-local-*-ps-profile} and
+@code{tramp-connection-local-*-ps-variables}.  Use them like
 
 @lisp
 @group

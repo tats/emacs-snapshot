@@ -222,7 +222,7 @@ rejected, and the function returns nil."
 
 (defcustom next-error-find-buffer-function #'ignore
   "Function called to find a `next-error' capable buffer.
-This functions takes the same three arguments as the function
+This function takes the same three arguments as the function
 `next-error-find-buffer', and should return the buffer to be
 used by the subsequent invocation of the command `next-error'
 and `previous-error'.
@@ -5289,7 +5289,7 @@ If `kill-append-merge-undo' is non-nil, remove the last undo
 boundary in the current buffer."
   (let ((cur (car kill-ring)))
     (kill-new (if before-p (concat string cur) (concat cur string))
-              (or (string= cur "")
+              (or (= (length cur) 0)
                   (null (get-text-property 0 'yank-handler cur)))))
   (when (and kill-append-merge-undo (not buffer-read-only))
     (let ((prev buffer-undo-list)
@@ -9208,14 +9208,18 @@ the completions is popped up and down."
 (defun previous-completion (n)
   "Move to the previous item in the completion list.
 With prefix argument N, move back N items (negative N means move
-forward)."
+forward).
+
+Also see the `completion-wrap-movement' variable."
   (interactive "p")
   (next-completion (- n)))
 
 (defun next-completion (n)
   "Move to the next item in the completion list.
 With prefix argument N, move N items (negative N means move
-backward)."
+backward).
+
+Also see the `completion-wrap-movement' variable."
   (interactive "p")
   (let ((prev (previous-single-property-change (point) 'mouse-face)))
     (goto-char (cond
