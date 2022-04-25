@@ -3008,12 +3008,12 @@ the minibuffer contents."
 
 (defconst undo-equiv-table (make-hash-table :test 'eq :weakness t)
   "Table mapping redo records to the corresponding undo one.
-A redo record for an undo in region maps to 'undo-in-region.
+A redo record for an undo in region maps to `undo-in-region'.
 A redo record for ordinary undo maps to the following (earlier) undo.
 A redo record that undoes to the beginning of the undo list maps to t.
 In the rare case where there are (erroneously) consecutive nil's in
 `buffer-undo-list', `undo' maps the previous valid undo record to
-'empty, if the previous record is a redo record, `undo' doesn't change
+`empty', if the previous record is a redo record, `undo' doesn't change
 its mapping.
 
 To be clear, a redo record is just an undo record, the only difference
@@ -4296,25 +4296,21 @@ impose the use of a shell (with its need to quote arguments)."
 		  (cond
 		   ((eq async-shell-command-buffer 'confirm-kill-process)
 		    ;; If will kill a process, query first.
-		    (if (yes-or-no-p "A command is running in the default buffer.  Kill it? ")
-			(kill-process proc)
-		      (user-error "Shell command in progress")))
+                    (shell-command--same-buffer-confirm "Kill it")
+		    (kill-process proc))
 		   ((eq async-shell-command-buffer 'confirm-new-buffer)
 		    ;; If will create a new buffer, query first.
-		    (if (yes-or-no-p "A command is running in the default buffer.  Use a new buffer? ")
-                        (setq buffer (generate-new-buffer bname))
-		      (user-error "Shell command in progress")))
+                    (shell-command--same-buffer-confirm "Use a new buffer")
+                    (setq buffer (generate-new-buffer bname)))
 		   ((eq async-shell-command-buffer 'new-buffer)
 		    ;; It will create a new buffer.
                     (setq buffer (generate-new-buffer bname)))
 		   ((eq async-shell-command-buffer 'confirm-rename-buffer)
 		    ;; If will rename the buffer, query first.
-		    (if (yes-or-no-p "A command is running in the default buffer.  Rename it? ")
-			(progn
-			  (with-current-buffer buffer
-			    (rename-uniquely))
-                          (setq buffer (get-buffer-create bname)))
-		      (user-error "Shell command in progress")))
+                    (shell-command--same-buffer-confirm "Rename it")
+		    (with-current-buffer buffer
+		      (rename-uniquely))
+                    (setq buffer (get-buffer-create bname)))
 		   ((eq async-shell-command-buffer 'rename-buffer)
 		    ;; It will rename the buffer.
 		    (with-current-buffer buffer
@@ -4361,6 +4357,24 @@ impose the use of a shell (with its need to quote arguments)."
 	    ;; Otherwise, command is executed synchronously.
 	    (shell-command-on-region (point) (point) command
 				     output-buffer nil error-buffer)))))))
+
+(defun shell-command--same-buffer-confirm (action)
+  (let ((help-form
+         (format
+          "There's a command already running in the default buffer,
+so we can't start a new one in the same one.
+
+Answering \"yes\" will %s.
+
+Answering \"no\" will exit without doing anything, and won't
+start the new command.
+
+Also see the `async-shell-command-buffer' variable."
+          (downcase action))))
+    (unless (yes-or-no-p
+             (format "A command is running in the default buffer.  %s? "
+                     action))
+      (user-error "Shell command in progress"))))
 
 (defun max-mini-window-lines (&optional frame)
   "Compute maximum number of lines for echo area in FRAME.
@@ -5457,7 +5471,7 @@ This command's old key binding has been given to `kill-ring-save'."
   (let ((str (if region
                  (funcall region-extract-function nil)
                (filter-buffer-substring beg end))))
-  (if (eq last-command 'kill-region)
+    (if (eq last-command 'kill-region)
         (kill-append str (< end beg))
       (kill-new str)))
   (setq deactivate-mark t)

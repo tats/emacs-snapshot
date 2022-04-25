@@ -864,7 +864,11 @@ Intended to be called via `clear-message-function'."
       (setq minibuffer-message-timer nil))
     (when (overlayp minibuffer-message-overlay)
       (delete-overlay minibuffer-message-overlay)
-      (setq minibuffer-message-overlay nil))))
+      (setq minibuffer-message-overlay nil)))
+
+  ;; Return nil telling the caller that the message
+  ;; should be also handled by the caller.
+  nil)
 
 (setq clear-message-function 'clear-minibuffer-message)
 
@@ -4101,7 +4105,7 @@ This turns
 into
     (prefix \"f\" any \"o\" any \"o\" any point)
 which is at the core of flex logic.  The extra
-'any' is optimized away later on."
+`any' is optimized away later on."
   (mapcan (lambda (elem)
             (if (stringp elem)
                 (mapcan (lambda (char)
@@ -4245,6 +4249,7 @@ See `completing-read' for the meaning of the arguments."
                     ;; override bindings in base-keymap.
                     base-keymap)))
          (buffer (current-buffer))
+         (c-i-c completion-ignore-case)
          (result
           (minibuffer-with-setup-hook
               (lambda ()
@@ -4254,7 +4259,9 @@ See `completing-read' for the meaning of the arguments."
                 (setq-local minibuffer-completion-confirm
                             (unless (eq require-match t) require-match))
                 (setq-local minibuffer--require-match require-match)
-                (setq-local minibuffer--original-buffer buffer))
+                (setq-local minibuffer--original-buffer buffer)
+                ;; Copy the value from original buffer to the minibuffer.
+                (setq-local completion-ignore-case c-i-c))
             (read-from-minibuffer prompt initial-input keymap
                                   nil hist def inherit-input-method))))
     (when (and (equal result "") def)

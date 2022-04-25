@@ -46,6 +46,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 struct haiku_display_info *x_display_list = NULL;
 extern frame_parm_handler haiku_frame_parm_handlers[];
 
+/* This is used to determine when to evict the font lookup cache,
+   which we do every 50 updates.  */
+static int up_to_date_count;
+
 static void **fringe_bmps;
 static int max_fringe_bmp = 0;
 
@@ -231,6 +235,13 @@ haiku_frame_up_to_date (struct frame *f)
   FRAME_MOUSE_UPDATE (f);
   if (FRAME_DIRTY_P (f) && !buffer_flipping_blocked_p ())
     haiku_flip_buffers (f);
+
+  up_to_date_count++;
+  if (up_to_date_count == 50)
+    {
+      be_evict_font_cache ();
+      up_to_date_count = 0;
+    }
   unblock_input ();
 }
 
@@ -610,18 +621,17 @@ haiku_calculate_relief_colors (struct glyph_string *s, uint32_t *rgbout_w,
 			       uint32_t *rgbout_b)
 {
   struct face *face = s->face;
+  double h, cs, l;
+  uint32_t rgbin;
 
   prepare_face_for_display (s->f, s->face);
-
-  uint32_t rgbin = face->use_box_color_for_shadows_p
-    ?  face->box_color : face->background;
+  rgbin = (face->use_box_color_for_shadows_p
+	   ? face->box_color : face->background);
 
   if (s->hl == DRAW_CURSOR)
     rgbin = FRAME_CURSOR_COLOR (s->f).pixel;
 
-  double h, cs, l;
   rgb_color_hsl (rgbin, &h, &cs, &l);
-
   hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 0.6), rgbout_b);
   hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 1.2), rgbout_w);
 }
@@ -629,16 +639,16 @@ haiku_calculate_relief_colors (struct glyph_string *s, uint32_t *rgbout_w,
 static void
 haiku_draw_relief_rect (struct glyph_string *s,
 			int left_x, int top_y, int right_x, int bottom_y,
-			int hwidth, int vwidth, bool raised_p, bool top_p, bool bot_p,
-			bool left_p, bool right_p,
+			int hwidth, int vwidth, bool raised_p, bool top_p,
+			bool bot_p, bool left_p, bool right_p,
 			struct haiku_rect *clip_rect, bool fancy_p)
 {
-  uint32_t color_white;
-  uint32_t color_black;
+  uint32_t color_white, color_black;
+  void *view;
 
   haiku_calculate_relief_colors (s, &color_white, &color_black);
 
-  void *view = FRAME_HAIKU_VIEW (s->f);
+  view = FRAME_HAIKU_VIEW (s->f);
   BView_SetHighColor (view, raised_p ? color_white : color_black);
   if (clip_rect)
     {
@@ -715,14 +725,13 @@ haiku_draw_underwave (struct glyph_string *s, int width, int x)
 {
   int wave_height = 3, wave_length = 2;
   int y, dx, dy, odd, xmax;
+  float ax, ay, bx, by;
+  void *view = FRAME_HAIKU_VIEW (s->f);
+
   dx = wave_length;
   dy = wave_height - 1;
   y = s->ybase - wave_height + 3;
-
-  float ax, ay, bx, by;
   xmax = x + width;
-
-  void *view = FRAME_HAIKU_VIEW (s->f);
 
   BView_StartClip (view);
   haiku_clip_to_string (s);
@@ -1059,6 +1068,8 @@ haiku_draw_glyph_string_foreground (struct glyph_string *s)
       for (i = 0; i < s->nchars; ++i)
 	{
 	  struct glyph *g = s->first_glyph + i;
+
+	  BView_SetPenSize (view, 1);
 	  BView_StrokeRectangle (view, x, s->y, g->pixel_width,
 				 s->height);
 	  x += g->pixel_width;
@@ -1090,6 +1101,7 @@ haiku_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
   unsigned char2b[8];
   int x, i, j;
   struct face *face = s->face;
+  unsigned long color;
 
   /* If first glyph of S has a left box line, start drawing the text
      of S to the right of that box line.  */
@@ -1153,11 +1165,21 @@ haiku_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 				 s->ybase + glyph->slice.glyphless.lower_yoff,
 				 false);
 	}
+
       if (glyph->u.glyphless.method != GLYPHLESS_DISPLAY_THIN_SPACE)
-	BView_FillRectangle (FRAME_HAIKU_VIEW (s->f),
-			     x, s->ybase - glyph->ascent,
-			     glyph->pixel_width - 1,
-			     glyph->ascent + glyph->descent - 1);
+	{
+	  if (s->hl == DRAW_CURSOR)
+	    haiku_merge_cursor_foreground (s, NULL, &color);
+	  else
+	    color = s->face->foreground;
+
+	  BView_SetHighColor (FRAME_HAIKU_VIEW (s->f), color);
+	  BView_SetPenSize (FRAME_HAIKU_VIEW (s->f), 1);
+	  BView_StrokeRectangle (FRAME_HAIKU_VIEW (s->f),
+				 x, s->ybase - glyph->ascent,
+				 glyph->pixel_width - 1,
+				 glyph->ascent + glyph->descent - 1);
+	}
       x += glyph->pixel_width;
    }
 }
@@ -3097,7 +3119,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    || b->y < r.y || b->y >= r.y + r.height)
 		  {
 		    f->mouse_moved = true;
-		    dpyinfo->last_mouse_scroll_bar = NULL;
 		    note_mouse_highlight (f, b->x, b->y);
 		    remember_mouse_glyph (f, b->x, b->y,
 					  &FRAME_DISPLAY_INFO (f)->last_mouse_glyph);
@@ -3141,7 +3162,8 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    /* It doesn't make sense to show tooltips when
 		       another program is dragging stuff over us.  */
 
-		    do_help = -1;
+		    if (any_help_event_p || do_help)
+		      do_help = -1;
 
 		    if (!be_drag_and_drop_in_progress ())
 		      {
@@ -3501,11 +3523,11 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
 	    int old_height = FRAME_MENU_BAR_HEIGHT (f);
 
-	    FRAME_MENU_BAR_HEIGHT (f) = b->height + 1;
+	    FRAME_MENU_BAR_HEIGHT (f) = b->height;
 	    FRAME_MENU_BAR_LINES (f)
 	      = (b->height + FRAME_LINE_HEIGHT (f)) / FRAME_LINE_HEIGHT (f);
 
-	    if (old_height != b->height + 1)
+	    if (old_height != b->height)
 	      {
 		adjust_frame_size (f, -1, -1, 3, true, Qmenu_bar_lines);
 		haiku_clear_under_internal_border (f);
@@ -3924,8 +3946,9 @@ haiku_term_init (void)
 {
   struct haiku_display_info *dpyinfo;
   struct terminal *terminal;
-
-  Lisp_Object color_file, color_map;
+  Lisp_Object color_file, color_map, system_name;
+  ptrdiff_t nbytes;
+  void *name_buffer;
 
   block_input ();
   Fset_input_interrupt_mode (Qt);
@@ -3941,20 +3964,18 @@ haiku_term_init (void)
 
   color_file = Fexpand_file_name (build_string ("rgb.txt"),
 				  Fsymbol_value (intern ("data-directory")));
-
   color_map = Fx_load_color_file (color_file);
+
   if (NILP (color_map))
     fatal ("Could not read %s.\n", SDATA (color_file));
 
   dpyinfo->color_map = color_map;
-
   dpyinfo->display = BApplication_setup ();
-
-  BScreen_res (&dpyinfo->resx, &dpyinfo->resy);
-
   dpyinfo->next = x_display_list;
   dpyinfo->n_planes = be_get_display_planes ();
   x_display_list = dpyinfo;
+
+  BScreen_res (&dpyinfo->resx, &dpyinfo->resy);
 
   terminal = haiku_create_terminal (dpyinfo);
   if (current_kboard == initial_kboard)
@@ -4001,6 +4022,23 @@ haiku_term_init (void)
   ASSIGN_CURSOR (no_cursor,
 		 BCursor_from_id (CURSOR_ID_NO_CURSOR));
 #undef ASSIGN_CURSOR
+
+  system_name = Fsystem_name ();
+
+  if (STRINGP (system_name))
+    {
+      nbytes = sizeof "GNU Emacs" + sizeof " at ";
+
+      if (INT_ADD_WRAPV (nbytes, SBYTES (system_name), &nbytes))
+	memory_full (SIZE_MAX);
+
+      name_buffer = alloca (nbytes);
+      sprintf (name_buffer, "%s%s%s", "GNU Emacs",
+	       " at ", SDATA (system_name));
+      dpyinfo->default_name = build_string (name_buffer);
+    }
+  else
+    dpyinfo->default_name = build_string ("GNU Emacs");
 
   unblock_input ();
 
@@ -4069,7 +4107,10 @@ void
 mark_haiku_display (void)
 {
   if (x_display_list)
-    mark_object (x_display_list->color_map);
+    {
+      mark_object (x_display_list->color_map);
+      mark_object (x_display_list->default_name);
+    }
 }
 
 void

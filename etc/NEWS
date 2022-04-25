@@ -106,7 +106,7 @@ If you start an executable script with
 
     #!/usr/bin/emacs -x
 
-Emac will start without reading any init files (like with --quick),
+Emacs will start without reading any init files (like with '--quick'),
 and then execute the rest of the script file as Emacs Lisp.  When it
 reaches the end of the script, Emacs will exit with an exit code from
 the value of the final form.
@@ -136,7 +136,7 @@ of 'user-emacs-directory'.
 * Incompatible changes in Emacs 29.1
 
 ---
-** 'TAB' and '<backtab>' is now bound in 'button-map'.
+** 'TAB' and '<backtab>' are now bound in 'button-map'.
 This means that if you're standing on a button, 'TAB' will take you to
 the next button, even if the mode has bound it to something else.
 This also means that 'TAB' on a button in an 'outline-minor-mode'
@@ -416,6 +416,13 @@ command also works for non-Emoji characters.)
 
 ** Help
 
++++
+*** The 'C-h .' command now accepts a prefix argument.
+'C-u C-h .' would previously inhibit displaying a warning message if
+there's no local help at point.  This has been changed to call
+'button-describe'/'widget-describe' and display button/widget help
+instead.
+
 ---
 *** New user option 'help-enable-variable-value-editing'.
 If enabled, 'e' on a value in *Help* will pop you to a new buffer
@@ -444,7 +451,7 @@ This will take you to the Emacs Lisp manual entry for the item
 displayed, if any.
 
 ---
-*** The 'C-h m' ('describe-mode') *Help* buffer has been reformatted.
+*** The 'C-h m' ('describe-mode') "*Help*" buffer has been reformatted.
 It now only includes local minor modes at the start, and the global
 minor modes are listed after the major mode.
 
@@ -546,6 +553,9 @@ Rcirc will use the default 'completion-at-point' mechanism.  The
 conventional IRC behaviour of completing by cycling through the
 available options can be restored by enabling this option.
 
++++
+** 'imenu' is now bound to 'M-g i' globally.
+
 * Editing Changes in Emacs 29.1
 
 ---
@@ -639,6 +649,11 @@ script that was used in ancient South Asia.  A new input method,
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
++++
+** New minor mode 'word-wrap-whitespace-mode' for extending 'word-wrap'.
+This mode switches 'word-wrap' on, and breaks on all the whitespace
+characters instead of just SPC and TAB.
+
 ---
 ** New mode, 'emacs-news-mode', for editing the NEWS file.
 This mode adds some highlighting, fixes the 'M-q' command, and has
@@ -664,7 +679,7 @@ value.
 When the minibuffer is the current buffer, typing 'M-<up>' or
 'M-<down>' selects a previous/next completion candidate from the
 "*Completions*" buffer and inserts it to the minibuffer.
-When the variable 'minibuffer-completion-auto-choose' is nil,
+When the user option 'minibuffer-completion-auto-choose' is nil,
 'M-<up>' and 'M-<down>' do the same, but without inserting
 a completion candidate to the minibuffer, then 'M-RET' can be used
 to choose the currently active candidate from the "*Completions*"
@@ -722,7 +737,7 @@ The nil value disables this highlighting.
 *** Choosing a completion with a prefix argument doesn't exit the minibuffer.
 This means that typing 'C-u RET' on a completion candidate in the
 "*Completions*" buffer inserts the completion to the minibuffer,
-bot doesn't exit the minibuffer.
+but doesn't exit the minibuffer.
 
 ** Isearch and Replace
 
@@ -762,6 +777,9 @@ For instance, to enable jumping to the "*Messages*" buffer with
 This fills the region to be no wider than a specified pixel width.
 
 ** Info
+
++++
+*** 'M-x info-apropos' now takes a prefix argument to search for regexps.
 
 ---
 *** New command 'Info-goto-node-web' and key binding 'G'.
@@ -1245,6 +1263,16 @@ support for pipelines which will move a lot of data.  See section
 "Running Shell Pipelines Natively" in the Eshell manual, node
 "(eshell) Input/Output".
 
++++
+*** New module to help supplying absolute file names to remote commands.
+After enabling the new 'eshell-elecslash' module, typing a forward
+slash as the first character of a command line argument will
+automatically insert the Tramp prefix.  The automatic insertion
+applies only when 'default-directory' is remote and the command is a
+Lisp function.  This frees you from having to keep track of whether
+commands are Lisp function or external when supplying absolute file
+name arguments.  See "Electric forward slash" in the Eshell manual.
+
 ** Miscellaneous
 
 +++
@@ -1256,7 +1284,7 @@ keyword-driven fontifications.
 *** New package vtable.el for formatting tabular data.
 This package allows formatting data using variable-pitch fonts.
 The resulting tables can display text in variable pitch fonts, text
-using fonts of different sizes, and images.  See the '(vtable)Top'
+using fonts of different sizes, and images.  See the "(vtable) Top"
 manual for more details.
 
 ---
@@ -1441,6 +1469,27 @@ functions.
 
 * Lisp Changes in Emacs 29.1
 
+---
+** New function 'string-edit'.
+This is meant to be used when the user has to edit a (potentially)
+long string.  It pops you to a new buffer where you can edit the
+string, and a callback is called when the user types 'C-c C-c'.
+
++++
+** New function 'read-string-from-buffer'.
+This is a modal version of 'string-edit', and can be used as an
+alternative to 'read-string'.
+
++++
+** The return value of 'clear-message-function' is not ignored anymore.
+If the function returns 'dont-clear-message', then the message is not
+cleared, with the assumption that the function cleared it itself.
+
++++
+** The local variable section now supports defining fallback modes.
+This was previously only available when using a property line (i.e.,
+putting the modes on the first line of a file).
+
 +++
 ** New function 'flush-standard-output'.
 This enables you do display incomplete lines from batch-based Emacs
@@ -1451,11 +1500,11 @@ scripts.
 This works like 'buttonize', but for a region instead of a string.
 
 +++
-** 'macroexp-let2*' can omit 'test' arg and use single-var bindings.
+** 'macroexp-let2*' can omit TEST arg and use single-var bindings.
 
 +++
 ** New macro-writing macros, 'cl-with-gensyms' and 'cl-once-only'.
-See the '(cl) Macro-Writing Macros' manual section for descriptions.
+See the "(cl) Macro-Writing Macros" manual section for descriptions.
 
 +++
 ** New variable 'last-event-device' and new function 'device-class'.
@@ -1570,14 +1619,14 @@ them towards or away from each other.
 This hook is run before 'x-popup-menu' is about to display a
 deck-of-cards menu on screen.
 
-** New function 'buffer-match-p'
+** New function 'buffer-match-p'.
 Check if a buffer satisfies some condition.  Some examples for
 conditions can be regular expressions that match a buffer name, a
-cons-cell like (major-mode . shell-mode) that matches any buffer where
-major-mode is shell-mode or a combined with a condition like (and
-"\\`\\*.+\\*\\'" (major-mode . special-mode)).
+cons-cell like '(major-mode . shell-mode)' that matches any buffer
+where 'major-mode' is 'shell-mode' or a combined with a condition like
+'(and "\\`\\*.+\\*\\'" (major-mode . special-mode))'.
 
-** New function 'match-buffers'
+** New function 'match-buffers'.
 Use 'buffer-match-p' to gather a list of buffers that match a
 condition.
 
@@ -2071,6 +2120,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 Local variables:
 coding: utf-8
+mode: outline
 mode: emacs-news
 paragraph-separate: "[ 	]*$"
 end:

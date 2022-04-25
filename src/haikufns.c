@@ -253,7 +253,10 @@ haiku_get_color (const char *name, Emacs_Color *color)
 {
   unsigned short r16, g16, b16;
   Lisp_Object tem, col;
-  int32 clr;
+  int32 clr, rc;
+  uint32_t ui_color;
+  ptrdiff_t size, i;
+  Lisp_Object string;
 
   if (parse_color_spec (name, &r16, &g16, &b16))
     {
@@ -283,11 +286,34 @@ haiku_get_color (const char *name, Emacs_Color *color)
 	      return 0;
 	  }
 	}
-
       unblock_input ();
     }
 
-  return 1;
+  rc = 1;
+  if (VECTORP (Vhaiku_allowed_ui_colors))
+    {
+      size = ASIZE (Vhaiku_allowed_ui_colors);
+
+      for (i = 0; i < size; ++i)
+	{
+	  string = AREF (Vhaiku_allowed_ui_colors, i);
+
+	  block_input ();
+	  if (STRINGP (string) && !strcmp (SSDATA (string), name))
+	    rc = be_get_ui_color (name, &ui_color);
+	  unblock_input ();
+	}
+    }
+
+  if (!rc)
+    {
+      color->pixel = ui_color;
+      color->red = RED_FROM_ULONG (ui_color) * 257;
+      color->green = GREEN_FROM_ULONG (ui_color) * 257;
+      color->blue = BLUE_FROM_ULONG (ui_color) * 257;
+    }
+
+  return rc;
 }
 
 static struct haiku_display_info *
@@ -395,8 +421,8 @@ haiku_set_child_frame_border_width (struct frame *f,
 }
 
 static void
-haiku_set_parent_frame (struct frame *f,
-			Lisp_Object new_value, Lisp_Object old_value)
+haiku_set_parent_frame (struct frame *f, Lisp_Object new_value,
+			Lisp_Object old_value)
 {
   struct frame *p = NULL;
   block_input ();
@@ -421,6 +447,7 @@ haiku_set_parent_frame (struct frame *f,
       EmacsWindow_unparent (FRAME_HAIKU_WINDOW (f));
       FRAME_OUTPUT_DATA (f)->parent_desc = NULL;
     }
+
   if (!NILP (new_value))
     {
       EmacsWindow_parent_to (FRAME_HAIKU_WINDOW (f),
@@ -434,6 +461,43 @@ haiku_set_parent_frame (struct frame *f,
     }
   fset_parent_frame (f, new_value);
   unblock_input ();
+}
+
+static void
+haiku_set_z_group (struct frame *f, Lisp_Object new_value,
+		   Lisp_Object old_value)
+{
+  int rc;
+
+  /* Tooltip frames can't have Z groups, since the window feel is
+     overridden during frame creation.  */
+  if (FRAME_TOOLTIP_P (f))
+    return;
+
+  rc = 1;
+  block_input ();
+
+  if (NILP (new_value))
+    {
+      BWindow_set_z_group (FRAME_HAIKU_WINDOW (f), Z_GROUP_NONE);
+      FRAME_Z_GROUP (f) = z_group_none;
+    }
+  else if (EQ (new_value, Qabove))
+    {
+      BWindow_set_z_group (FRAME_HAIKU_WINDOW (f), Z_GROUP_ABOVE);
+      FRAME_Z_GROUP (f) = z_group_above;
+    }
+  else if (EQ (new_value, Qbelow))
+    {
+      BWindow_set_z_group (FRAME_HAIKU_WINDOW (f), Z_GROUP_BELOW);
+      FRAME_Z_GROUP (f) = z_group_below;
+    }
+  else
+    rc = 0;
+
+  unblock_input ();
+  if (!rc)
+    error ("Invalid z-group specification");
 }
 
 static void
@@ -726,11 +790,11 @@ haiku_create_frame (Lisp_Object parms)
                              RES_TYPE_NUMBER);
   if (FIXNUMP (tem))
     store_frame_param (f, Qmin_height, tem);
+
   adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
 		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, 1,
 		     Qx_create_frame_1);
 
-  gui_default_parameter (f, parms, Qz_group, Qnil, NULL, NULL, RES_TYPE_SYMBOL);
   gui_default_parameter (f, parms, Qno_focus_on_map, Qnil,
 			 NULL, NULL, RES_TYPE_BOOLEAN);
   gui_default_parameter (f, parms, Qno_accept_focus, Qnil,
@@ -874,6 +938,9 @@ haiku_create_frame (Lisp_Object parms)
       && (!FRAMEP (KVAR (kb, Vdefault_minibuffer_frame))
 	  || !FRAME_LIVE_P (XFRAME (KVAR (kb, Vdefault_minibuffer_frame)))))
     kset_default_minibuffer_frame (kb, frame);
+
+  gui_default_parameter (f, parms, Qz_group, Qnil,
+			 NULL, NULL, RES_TYPE_SYMBOL);
 
   for (tem = parms; CONSP (tem); tem = XCDR (tem))
     if (CONSP (XCAR (tem)) && !NILP (XCAR (XCAR (tem))))
@@ -1278,9 +1345,6 @@ haiku_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval
 
   fset_redisplay (f);
 
-  FRAME_MENU_BAR_LINES (f) = 0;
-  FRAME_MENU_BAR_HEIGHT (f) = 0;
-
   if (nlines)
     {
       FRAME_EXTERNAL_MENU_BAR (f) = 1;
@@ -1289,11 +1353,14 @@ haiku_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval
     }
   else
     {
+      FRAME_MENU_BAR_LINES (f) = 0;
+      FRAME_MENU_BAR_HEIGHT (f) = 0;
+
       if (FRAME_EXTERNAL_MENU_BAR (f))
 	free_frame_menubar (f);
+
       FRAME_EXTERNAL_MENU_BAR (f) = 0;
-      if (FRAME_HAIKU_P (f))
-	FRAME_HAIKU_MENU_BAR (f) = 0;
+      FRAME_HAIKU_MENU_BAR (f) = 0;
     }
 
   adjust_frame_glyphs (f);
@@ -1353,11 +1420,12 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 void
 haiku_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
+  Emacs_Color color;
+  struct face *defface;
+
   CHECK_STRING (arg);
 
   block_input ();
-  Emacs_Color color;
-
   if (haiku_get_color (SSDATA (arg), &color))
     {
       store_frame_param (f, Qbackground_color, oldval);
@@ -1370,8 +1438,6 @@ haiku_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval
 
   if (FRAME_HAIKU_VIEW (f))
     {
-      struct face *defface;
-
       BView_draw_lock (FRAME_HAIKU_VIEW (f), false, 0, 0, 0, 0);
       BView_SetViewColor (FRAME_HAIKU_VIEW (f), color.pixel);
       BView_draw_unlock (FRAME_HAIKU_VIEW (f));
@@ -1393,10 +1459,10 @@ haiku_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval
 void
 haiku_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  CHECK_STRING (arg);
-
-  block_input ();
   Emacs_Color color, fore_pixel;
+
+  CHECK_STRING (arg);
+  block_input ();
 
   if (haiku_get_color (SSDATA (arg), &color))
     {
@@ -1437,11 +1503,7 @@ haiku_get_pixel (haiku bitmap, int x, int y)
 {
   unsigned char *data;
   int32_t bytes_per_row;
-  int mono_p;
-  int left;
-  int right;
-  int top;
-  int bottom;
+  int mono_p, left, right, top, bottom, byte;
 
   data = BBitmap_data (bitmap);
   BBitmap_dimensions (bitmap, &left, &top, &right, &bottom,
@@ -1453,20 +1515,17 @@ haiku_get_pixel (haiku bitmap, int x, int y)
   if (!mono_p)
     return ((uint32_t *) (data + (bytes_per_row * y)))[x];
 
-  int byte = y * bytes_per_row + x / 8;
+  byte = y * bytes_per_row + x / 8;
   return data[byte] & (1 << (x % 8));
 }
 
 void
 haiku_put_pixel (haiku bitmap, int x, int y, unsigned long pixel)
 {
-  unsigned char *data;
+  unsigned char *data, *byte;
   int32_t bytes_per_row;
-  int mono_p;
-  int left;
-  int right;
-  int top;
-  int bottom;
+  int mono_p, left, right, top, bottom;
+  ptrdiff_t off, bit, xoff;
 
   data = BBitmap_data (bitmap);
   BBitmap_dimensions (bitmap, &left, &top, &right, &bottom,
@@ -1477,11 +1536,11 @@ haiku_put_pixel (haiku bitmap, int x, int y, unsigned long pixel)
 
   if (mono_p)
     {
-      ptrdiff_t off = y * bytes_per_row;
-      ptrdiff_t bit = x % 8;
-      ptrdiff_t xoff = x / 8;
+      off = y * bytes_per_row;
+      bit = x % 8;
+      xoff = x / 8;
 
-      unsigned char *byte = data + off + xoff;
+      byte = data + off + xoff;
       if (!pixel)
 	*byte &= ~(1 << bit);
       else
@@ -1611,7 +1670,8 @@ haiku_unvisualize_frame (struct frame *f)
 }
 
 void
-haiku_set_internal_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
+haiku_set_internal_border_width (struct frame *f, Lisp_Object arg,
+				 Lisp_Object oldval)
 {
   int old_width = FRAME_INTERNAL_BORDER_WIDTH (f);
   int new_width = check_int_nonnegative (arg);
@@ -1666,28 +1726,33 @@ check_x_display_info (Lisp_Object object)
   return check_haiku_display_info (object);
 }
 
-/* Rename frame F to NAME.  If NAME is nil, set F's name to "GNU
-   Emacs".  If EXPLICIT_P is non-zero, that indicates Lisp code is
-   setting the name, not redisplay; in that case, set F's name to NAME
-   and set F->explicit_name; if NAME is nil, clear F->explicit_name.
+/* Rename frame F to NAME.  If NAME is nil, set F's name to the
+   default name.  If EXPLICIT_P is non-zero, that indicates Lisp code
+   is setting the name, not redisplay; in that case, set F's name to
+   NAME and set F->explicit_name; if NAME is nil, clear
+   F->explicit_name.
 
    If EXPLICIT_P is zero, it means redisplay is setting the name; the
    name provided will be ignored if explicit_name is set.  */
 void
 haiku_set_name (struct frame *f, Lisp_Object name, bool explicit_p)
 {
+  struct haiku_display_info *dpyinfo;
+
   if (explicit_p)
     {
       if (f->explicit_name && NILP (name))
-	update_mode_lines = 24;
+	update_mode_lines = 37;
 
       f->explicit_name = !NILP (name);
     }
   else if (f->explicit_name)
     return;
 
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
   if (NILP (name))
-    name = build_unibyte_string ("GNU Emacs");
+    name = dpyinfo->default_name;
 
   if (!NILP (Fstring_equal (name, f->name)))
     return;
@@ -1710,19 +1775,14 @@ haiku_set_inhibit_double_buffering (struct frame *f,
     {
 #ifndef USE_BE_CAIRO
       if (NILP (new_value))
-	{
 #endif
-	  EmacsView_set_up_double_buffering (FRAME_HAIKU_VIEW (f));
-	  if (!NILP (old_value))
-	    {
-	      SET_FRAME_GARBAGED (f);
-	      expose_frame (f, 0, 0, 0, 0);
-	    }
+	EmacsView_set_up_double_buffering (FRAME_HAIKU_VIEW (f));
 #ifndef USE_BE_CAIRO
-	}
       else
 	EmacsView_disable_double_buffering (FRAME_HAIKU_VIEW (f));
 #endif
+
+      SET_FRAME_GARBAGED (f);
     }
   unblock_input ();
 }
@@ -1757,19 +1817,15 @@ the mouse cursor position in pixels relative to a position (0, 0) of the
 selected frame's display.  */)
   (void)
 {
-  if (!x_display_list)
-    return Qnil;
-
   struct frame *f = SELECTED_FRAME ();
+  void *view;
+  int x, y;
 
-  if (FRAME_INITIAL_P (f) || !FRAME_HAIKU_P (f)
-      || !FRAME_HAIKU_VIEW (f))
+  if (FRAME_INITIAL_P (f) || !FRAME_HAIKU_P (f))
     return Qnil;
 
   block_input ();
-  void *view = FRAME_HAIKU_VIEW (f);
-
-  int x, y;
+  view = FRAME_HAIKU_VIEW (f);
   BView_get_mouse (view, &x, &y);
   BView_convert_to_screen (view, &x, &y);
   unblock_input ();
@@ -1789,6 +1845,7 @@ DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
   (Lisp_Object color, Lisp_Object frame)
 {
   Emacs_Color col;
+
   CHECK_STRING (color);
   decode_window_system_frame (frame);
 
@@ -1800,6 +1857,7 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
      (Lisp_Object color, Lisp_Object frame)
 {
   Emacs_Color col;
+
   CHECK_STRING (color);
   decode_window_system_frame (frame);
 
@@ -1810,7 +1868,9 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
       return Qnil;
     }
   unblock_input ();
-  return list3i (lrint (col.red), lrint (col.green), lrint (col.blue));
+
+  return list3i (lrint (col.red), lrint (col.green),
+		 lrint (col.blue));
 }
 
 DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p,
@@ -2305,8 +2365,7 @@ DEFUN ("x-double-buffered-p", Fx_double_buffered_p, Sx_double_buffered_p,
        doc: /* SKIP: real doc in xfns.c.  */)
   (Lisp_Object frame)
 {
-  struct frame *f = decode_live_frame (frame);
-  check_window_system (f);
+  struct frame *f = decode_window_system_frame (frame);
 
   return EmacsView_double_buffered_p (FRAME_HAIKU_VIEW (f)) ? Qt : Qnil;
 }
@@ -2316,13 +2375,14 @@ DEFUN ("x-display-backing-store", Fx_display_backing_store, Sx_display_backing_s
        doc: /* SKIP: real doc in xfns.c.  */)
   (Lisp_Object terminal)
 {
+  struct frame *f;
+
   if (FRAMEP (terminal))
     {
-      CHECK_LIVE_FRAME (terminal);
-      struct frame *f = decode_window_system_frame (terminal);
+      f = decode_window_system_frame (terminal);
 
-      if (FRAME_HAIKU_VIEW (f) &&
-	  EmacsView_double_buffered_p (FRAME_HAIKU_VIEW (f)))
+      if (FRAME_HAIKU_VIEW (f)
+	  && EmacsView_double_buffered_p (FRAME_HAIKU_VIEW (f)))
 	return FRAME_PARENT_FRAME (f) ? Qwhen_mapped : Qalways;
       else
 	return Qnot_useful;
@@ -2638,7 +2698,7 @@ frame_parm_handler haiku_frame_parm_handlers[] =
     NULL, /* set skip taskbar */
     haiku_set_no_focus_on_map,
     haiku_set_no_accept_focus,
-    NULL, /* set z group */
+    haiku_set_z_group,
     haiku_set_override_redirect,
     gui_set_no_special_glyphs,
     gui_set_alpha_background,
@@ -2707,6 +2767,12 @@ syms_of_haikufns (void)
   DEFVAR_LISP ("x-cursor-fore-pixel", Vx_cursor_fore_pixel,
 	       doc: /* SKIP: real doc in xfns.c.  */);
   Vx_cursor_fore_pixel = Qnil;
+
+  DEFVAR_LISP ("haiku-allowed-ui-colors", Vhaiku_allowed_ui_colors,
+	       doc: /* Vector of UI colors that Emacs can look up from the system.
+If this is set up incorrectly, Emacs can crash when encoutering an
+invalid color.  */);
+  Vhaiku_allowed_ui_colors = Qnil;
 
 #ifdef USE_BE_CAIRO
   DEFVAR_LISP ("cairo-version-string", Vcairo_version_string,

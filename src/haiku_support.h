@@ -38,19 +38,26 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 enum haiku_cursor
   {
-    CURSOR_ID_NO_CURSOR = 12,
-    CURSOR_ID_RESIZE_NORTH = 15,
-    CURSOR_ID_RESIZE_EAST = 16,
-    CURSOR_ID_RESIZE_SOUTH = 17,
-    CURSOR_ID_RESIZE_WEST = 18,
-    CURSOR_ID_RESIZE_NORTH_EAST = 19,
-    CURSOR_ID_RESIZE_NORTH_WEST = 20,
-    CURSOR_ID_RESIZE_SOUTH_EAST = 21,
-    CURSOR_ID_RESIZE_SOUTH_WEST = 22,
-    CURSOR_ID_RESIZE_NORTH_SOUTH = 23,
-    CURSOR_ID_RESIZE_EAST_WEST = 24,
+    CURSOR_ID_NO_CURSOR			   = 12,
+    CURSOR_ID_RESIZE_NORTH		   = 15,
+    CURSOR_ID_RESIZE_EAST		   = 16,
+    CURSOR_ID_RESIZE_SOUTH		   = 17,
+    CURSOR_ID_RESIZE_WEST		   = 18,
+    CURSOR_ID_RESIZE_NORTH_EAST		   = 19,
+    CURSOR_ID_RESIZE_NORTH_WEST		   = 20,
+    CURSOR_ID_RESIZE_SOUTH_EAST		   = 21,
+    CURSOR_ID_RESIZE_SOUTH_WEST		   = 22,
+    CURSOR_ID_RESIZE_NORTH_SOUTH	   = 23,
+    CURSOR_ID_RESIZE_EAST_WEST		   = 24,
     CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST = 25,
     CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST = 26
+  };
+
+enum haiku_z_group
+  {
+    Z_GROUP_ABOVE,
+    Z_GROUP_NONE,
+    Z_GROUP_BELOW,
   };
 
 enum haiku_alert_type
@@ -131,10 +138,13 @@ struct haiku_dummy_event
   char dummy;
 };
 
-#define HAIKU_MODIFIER_ALT (1)
-#define HAIKU_MODIFIER_CTRL (1 << 1)
-#define HAIKU_MODIFIER_SHIFT (1 << 2)
-#define HAIKU_MODIFIER_SUPER (1 << 3)
+enum haiku_modifier_specification
+  {
+    HAIKU_MODIFIER_ALT	 = 1,
+    HAIKU_MODIFIER_CTRL	 = (1 << 1),
+    HAIKU_MODIFIER_SHIFT = (1 << 2),
+    HAIKU_MODIFIER_SUPER = (1 << 3),
+  };
 
 struct haiku_key_event
 {
@@ -294,8 +304,8 @@ struct haiku_font_pattern
   enum haiku_font_slant slant;
   enum haiku_font_width width;
   enum haiku_font_language language;
-  uint32_t *wanted_chars;
-  uint32_t *need_one_of;
+  int *wanted_chars;
+  int *need_one_of;
 
   int oblique_seen_p;
 };
@@ -447,7 +457,6 @@ extern void BWindow_center_on_screen (void *);
 extern void BWindow_change_decoration (void *, int);
 extern void BWindow_set_tooltip_decoration (void *);
 extern void BWindow_set_avoid_focus (void *, int);
-extern uint32_t BWindow_workspaces (void *);
 extern void BWindow_zoom (void *);
 extern void BWindow_set_min_size (void *, int, int);
 extern void BWindow_set_size_alignment (void *, int, int);
@@ -456,11 +465,12 @@ extern void BWindow_send_behind (void *, void *);
 extern bool BWindow_is_active (void *);
 extern void BWindow_set_override_redirect (void *, bool);
 extern void BWindow_dimensions (void *, int *, int *);
+extern void BWindow_set_z_group (void *, enum haiku_z_group);
 extern void BWindow_Flush (void *);
 
 extern void BFont_close (void *);
-extern void BFont_dat (void *, int *, int *, int *, int *,
-		       int *, int *, int *, int *, int *, int *);
+extern void BFont_metrics (void *, int *, int *, int *, int *,
+			   int *, int *, int *, int *, int *, int *);
 extern int BFont_have_char_p (void *, int32_t);
 extern int BFont_have_char_block (void *, int32_t, int32_t);
 extern void BFont_char_bounds (void *, const char *, int *, int *, int *);
@@ -468,11 +478,9 @@ extern void BFont_nchar_bounds (void *, const char *, int *, int *,
 				int *, int32_t);
 extern struct haiku_font_pattern *BFont_find (struct haiku_font_pattern *);
 
-
 extern void BView_StartClip (void *);
 extern void BView_EndClip (void *);
 extern void BView_SetHighColor (void *, uint32_t);
-extern void BView_SetHighColorForVisibleBell (void *, uint32_t);
 extern void BView_SetLowColor (void *, uint32_t);
 extern void BView_SetPenSize (void *, int);
 extern void BView_SetFont (void *, void *);
@@ -541,7 +549,6 @@ extern void BView_convert_to_screen (void *, int *, int *);
 extern void BView_convert_from_screen (void *, int *, int *);
 
 extern void BView_emacs_delete (void *);
-extern uint32_t haiku_current_workspace (void);
 
 extern void *BPopUpMenu_new (const char *);
 
@@ -624,10 +631,13 @@ extern void BMenu_add_title (void *, const char *);
 
 extern int be_plain_font_height (void);
 extern int be_string_width_with_plain_font (const char *);
+extern void be_init_font_data (void);
+extern void be_evict_font_cache (void);
 extern int be_get_display_screens (void);
 extern bool be_use_subpixel_antialiasing (void);
 extern const char *be_find_setting (const char *);
 extern haiku_font_family_or_style *be_list_font_families (size_t *);
+extern int be_get_ui_color (const char *, uint32_t *);
 
 extern void BMessage_delete (void *);
 
@@ -637,12 +647,11 @@ extern bool be_drag_message (void *, void *, bool, void (*) (void),
 extern bool be_drag_and_drop_in_progress (void);
 
 extern bool be_replay_menu_bar_event (void *, struct haiku_menu_bar_click_event *);
-
 #ifdef __cplusplus
-extern void *find_appropriate_view_for_draw (void *);
 }
 
 extern _Noreturn void gui_abort (const char *);
+extern void *find_appropriate_view_for_draw (void *);
 #endif /* _cplusplus */
 
 #endif /* _HAIKU_SUPPORT_H_ */

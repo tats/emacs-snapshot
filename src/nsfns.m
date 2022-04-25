@@ -891,7 +891,10 @@ static Lisp_Object
 ns_appkit_version_str (void)
 {
   NSString *tmp;
+  Lisp_Object string;
+  NSAutoreleasePool *autorelease;
 
+  autorelease = [[NSAutoreleasePool alloc] init];
 #ifdef NS_IMPL_GNUSTEP
   tmp = [NSString stringWithFormat:@"gnustep-gui-%s", Xstr(GNUSTEP_GUI_VERSION)];
 #elif defined (NS_IMPL_COCOA)
@@ -901,7 +904,10 @@ ns_appkit_version_str (void)
 #else
   tmp = [NSString initWithUTF8String:@"ns-unknown"];
 #endif
-  return [tmp lispString];
+  string = [tmp lispString];
+  [autorelease release];
+
+  return string;
 }
 
 
@@ -2103,6 +2109,7 @@ The optional argument FRAME is currently ignored.  */)
   Lisp_Object list = Qnil;
   NSEnumerator *colorlists;
   NSColorList *clist;
+  NSAutoreleasePool *pool;
 
   if (!NILP (frame))
     {
@@ -2112,7 +2119,9 @@ The optional argument FRAME is currently ignored.  */)
     }
 
   block_input ();
-
+  /* This can be called during dumping, so we need to set up a
+     temporary autorelease pool.  */
+  pool = [[NSAutoreleasePool alloc] init];
   colorlists = [[NSColorList availableColorLists] objectEnumerator];
   while ((clist = [colorlists nextObject]))
     {
@@ -2123,12 +2132,9 @@ The optional argument FRAME is currently ignored.  */)
           NSString *cname;
           while ((cname = [cnames nextObject]))
             list = Fcons ([cname lispString], list);
-/*           for (i = [[clist allKeys] count] - 1; i >= 0; i--)
-               list = Fcons (build_string ([[[clist allKeys] objectAtIndex: i]
-                                             UTF8String]), list); */
         }
     }
-
+  [pool release];
   unblock_input ();
 
   return list;

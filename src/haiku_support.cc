@@ -173,7 +173,7 @@ static bool drag_and_drop_in_progress;
    Rectifying that problem is simple: all code in a looper callback
    must lock the child frame data with this macro instead.
 
-   IOW, If some other code is already running with the child frame
+   IOW, if some other code is already running with the child frame
    lock held, don't interfere: wait until it's finished before
    continuing.  */
 #define CHILD_FRAME_LOCK_INSIDE_LOOPER_CALLBACK		\
@@ -189,13 +189,7 @@ static bool drag_and_drop_in_progress;
    port, so it's probably here to stay.  */
 extern status_t get_subpixel_antialiasing (bool *);
 
-extern "C"
-{
-  extern _Noreturn void emacs_abort (void);
-  /* Also defined in haikuterm.h.  */
-  extern void be_app_quit (void);
-}
-
+/* The ID of the thread the BApplication is running in.  */
 static thread_id app_thread;
 
 _Noreturn void
@@ -205,7 +199,7 @@ gui_abort (const char *msg)
   fprintf (stderr, "Under Haiku, Emacs cannot recover from errors in GUI code\n");
   fprintf (stderr, "App Server disconnects usually manifest as bitmap "
 	   "initialization failures or lock failures.");
-  emacs_abort ();
+  abort ();
 }
 
 struct be_popup_menu_data
@@ -499,11 +493,14 @@ public:
   uint32 pre_override_redirect_workspaces;
   int window_id;
   bool *menus_begun = NULL;
+  enum haiku_z_group z_group;
+  bool tooltip_p = false;
 
   EmacsWindow () : BWindow (BRect (0, 0, 0, 0), "", B_TITLED_WINDOW_LOOK,
 			    B_NORMAL_WINDOW_FEEL, B_NO_SERVER_SIDE_WINDOW_MODIFIERS)
   {
     window_id = current_window_id++;
+    z_group = Z_GROUP_NONE;
 
     /* This pulse rate is used by scroll bars for repeating a button
        action while a button is held down.  */
@@ -528,6 +525,19 @@ public:
     if (this->parent)
       UnparentAndUnlink ();
     child_frame_lock.Unlock ();
+  }
+
+  void
+  RecomputeFeel (void)
+  {
+    if (override_redirect_p || tooltip_p)
+      SetFeel (kMenuWindowFeel);
+    else if (parent)
+      SetFeel (B_FLOATING_SUBSET_WINDOW_FEEL);
+    else if (z_group == Z_GROUP_ABOVE)
+      SetFeel (B_FLOATING_ALL_WINDOW_FEEL);
+    else
+      SetFeel (B_NORMAL_WINDOW_FEEL);
   }
 
   BRect
@@ -648,12 +658,17 @@ public:
   void
   Unparent (void)
   {
+    EmacsWindow *parent;
+
     if (!child_frame_lock.Lock ())
       gui_abort ("Failed to lock child frame state lock");
-    this->SetFeel (B_NORMAL_WINDOW_FEEL);
+
+    parent = this->parent;
+    this->parent = NULL;
+    RecomputeFeel ();
     UpwardsUnSubsetChildren (parent);
     this->RemoveFromSubset (this);
-    this->parent = NULL;
+
     if (fullscreen_p)
       {
 	fullscreen_p = 0;
@@ -704,7 +719,7 @@ public:
       UnparentAndUnlink ();
 
     this->parent = window;
-    this->SetFeel (B_FLOATING_SUBSET_WINDOW_FEEL);
+    RecomputeFeel ();
     this->AddToSubset (this);
     if (!IsHidden () && this->parent)
       UpwardsSubsetChildren (parent);
@@ -1272,8 +1287,8 @@ public:
   {
     struct haiku_menu_bar_resize_event rq;
     rq.window = this->Window ();
-    rq.height = std::lrint (newHeight);
-    rq.width = std::lrint (newWidth);
+    rq.height = std::lrint (newHeight + 1);
+    rq.width = std::lrint (newWidth + 1);
 
     haiku_write (MENU_BAR_RESIZE, &rq);
     BMenuBar::FrameResized (newWidth, newHeight);
@@ -2263,7 +2278,7 @@ public:
 
     menu->PushState ();
     menu->SetFont (be_bold_font);
-    BView_SetHighColorForVisibleBell (menu, 0);
+    menu->SetHighColor (ui_color (B_CONTROL_TEXT_COLOR));
     BMenuItem::DrawContent ();
     menu->PopState ();
   }
@@ -3017,11 +3032,12 @@ BWindow_change_decoration (void *window, int decorate_p)
 void
 BWindow_set_tooltip_decoration (void *window)
 {
-  BWindow *w = (BWindow *) window;
+  EmacsWindow *w = (EmacsWindow *) window;
   if (!w->LockLooper ())
     gui_abort ("Failed to lock window while setting ttip decoration");
+  w->tooltip_p = true;
+  w->RecomputeFeel ();
   w->SetLook (B_BORDERED_WINDOW_LOOK);
-  w->SetFeel (kMenuWindowFeel);
   w->SetFlags (B_NOT_ZOOMABLE
 	       | B_NOT_MINIMIZABLE
 	       | B_AVOID_FRONT
@@ -3053,20 +3069,6 @@ BView_emacs_delete (void *view)
     gui_abort ("Failed to lock view while deleting it");
   vw->RemoveSelf ();
   delete vw;
-}
-
-/* Return the current workspace.  */
-uint32_t
-haiku_current_workspace (void)
-{
-  return current_workspace ();
-}
-
-/* Return a bitmask consisting of workspaces WINDOW is on.  */
-uint32_t
-BWindow_workspaces (void *window)
-{
-  return ((BWindow *) window)->Workspaces ();
 }
 
 /* Create a popup menu.  */
@@ -4116,9 +4118,8 @@ BWindow_set_override_redirect (void *window, bool override_redirect_p)
       if (override_redirect_p && !w->override_redirect_p)
 	{
 	  w->override_redirect_p = true;
-	  w->pre_override_redirect_feel = w->Feel ();
 	  w->pre_override_redirect_look = w->Look ();
-	  w->SetFeel (kMenuWindowFeel);
+	  w->RecomputeFeel ();
 	  w->SetLook (B_NO_BORDER_WINDOW_LOOK);
 	  w->pre_override_redirect_workspaces = w->Workspaces ();
 	  w->SetWorkspaces (B_ALL_WORKSPACES);
@@ -4126,8 +4127,8 @@ BWindow_set_override_redirect (void *window, bool override_redirect_p)
       else if (w->override_redirect_p)
 	{
 	  w->override_redirect_p = false;
-	  w->SetFeel (w->pre_override_redirect_feel);
 	  w->SetLook (w->pre_override_redirect_look);
+	  w->RecomputeFeel ();
 	  w->SetWorkspaces (w->pre_override_redirect_workspaces);
 	}
 
@@ -4285,4 +4286,44 @@ be_replay_menu_bar_event (void *menu_bar,
   msg.AddPoint ("emacs:point", BPoint (event->x, event->y));
   messenger.SendMessage (&msg, &reply);
   return reply.what == BE_MENU_BAR_OPEN;
+}
+
+void
+BWindow_set_z_group (void *window, enum haiku_z_group z_group)
+{
+  EmacsWindow *w = (EmacsWindow *) window;
+
+  if (w->LockLooper ())
+    {
+      if (w->z_group != z_group)
+	{
+	  w->z_group = z_group;
+	  w->RecomputeFeel ();
+
+	  if (w->z_group == Z_GROUP_BELOW)
+	    w->SetFlags (w->Flags () | B_AVOID_FRONT);
+	  else
+	    w->SetFlags (w->Flags () & ~B_AVOID_FRONT);
+	}
+
+      w->UnlockLooper ();
+    }
+}
+
+int
+be_get_ui_color (const char *name, uint32_t *color)
+{
+  color_which which;
+  rgb_color rgb;
+
+  which = which_ui_color (name);
+
+  if (which == B_NO_COLOR)
+    return 1;
+
+  rgb = ui_color (which);
+  *color = (rgb.blue | rgb.green << 8
+	    | rgb.red << 16 | 255 << 24);
+
+  return 0;
 }

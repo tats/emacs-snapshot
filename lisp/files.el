@@ -3900,7 +3900,7 @@ inhibited."
 	;; Note this is a no-op if enable-local-variables is nil.
 	(hack-dir-local-variables))
       (let ((result (append (hack-local-variables--find-variables handle-mode)
-                            (hack-local-variables-prop-line))))
+                            (hack-local-variables-prop-line handle-mode))))
         (if (and enable-local-variables
                  (not (inhibit-local-variables-p)))
             (progn
@@ -3978,8 +3978,7 @@ major-mode."
 	        (forward-line 1))
 	      (goto-char (point-min))
 
-	      (while (not (or (eobp)
-                              (and (eq handle-mode t) result)))
+	      (while (not (eobp))
 	        ;; Find the variable name;
 	        (unless (looking-at hack-local-variable-regexp)
                   (user-error "Malformed local variable line: %S"
@@ -4005,7 +4004,8 @@ major-mode."
 			   (not (string-match
 			         "-minor\\'"
 			         (setq val2 (downcase (symbol-name val)))))
-			   (setq result (intern (concat val2 "-mode"))))
+                           ;; Allow several mode: elements.
+                           (push (intern (concat val2 "-mode")) result))
 		    (cond ((eq var 'coding))
 			  ((eq var 'lexical-binding)
 			   (unless hack-local-variables--warned-lexical
@@ -4029,7 +4029,10 @@ major-mode."
 				         val)
                                    result))))))
 	        (forward-line 1)))))))
-    result))
+    (if (eq handle-mode t)
+        ;; Return the final mode: setting that's defined.
+        (car (seq-filter #'fboundp result))
+      result)))
 
 (defun hack-local-variables-apply ()
   "Apply the elements of `file-local-variables-alist'.

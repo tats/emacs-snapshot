@@ -617,6 +617,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <errno.h>
 #include <sys/stat.h>
 #include <flexmember.h>
+#include <c-ctype.h>
+
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
@@ -755,6 +757,10 @@ static bool toolkit_scroll_bar_interaction;
    events resulting from clicking on a frame to select it).  */
 
 static Time ignore_next_mouse_click_timeout;
+
+/* The display that ignore_next_mouse_click_timeout applies to.  */
+
+static struct x_display_info *mouse_click_timeout_display;
 
 /* Used locally within XTread_socket.  */
 
@@ -1366,17 +1372,23 @@ xm_write_drag_initiator_info (Display *dpy, Window wdesc,
 		   PropModeReplace, (unsigned char *) buf, 8);
 }
 
+static int
+xm_drag_window_error_handler (Display *display, XErrorEvent *event)
+{
+  return 0;
+}
+
 static Window
 xm_get_drag_window (struct x_display_info *dpyinfo)
 {
-  Atom actual_type;
+  Atom actual_type, _MOTIF_DRAG_WINDOW;
   int rc, actual_format;
   unsigned long nitems, bytes_remaining;
   unsigned char *tmp_data = NULL;
   Window drag_window;
   XSetWindowAttributes attrs;
-  XWindowAttributes wattrs;
   Display *temp_display;
+  void *old_handler;
 
   drag_window = None;
   rc = XGetWindowProperty (dpyinfo->display, dpyinfo->root_window,
@@ -1392,8 +1404,10 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 	{
 	  drag_window = *(Window *) tmp_data;
 	  x_catch_errors (dpyinfo->display);
-	  XGetWindowAttributes (dpyinfo->display,
-				drag_window, &wattrs);
+	  /* We use ButtonPressMask since it's one of the events an
+	     input-only window can never get.  */
+	  XSelectInput (dpyinfo->display, drag_window,
+			ButtonPressMask);
 	  rc = !x_had_errors_p (dpyinfo->display);
 	  x_uncatch_errors_after_check ();
 
@@ -1420,23 +1434,53 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 
       XGrabServer (temp_display);
       XSetCloseDownMode (temp_display, RetainPermanent);
-      attrs.override_redirect = True;
-      drag_window = XCreateWindow (temp_display, DefaultRootWindow (temp_display),
-				   -1, -1, 1, 1, 0, CopyFromParent, InputOnly,
-				   CopyFromParent, CWOverrideRedirect, &attrs);
-      XChangeProperty (temp_display, DefaultRootWindow (temp_display),
-		       XInternAtom (temp_display,
-				    "_MOTIF_DRAG_WINDOW", False),
-		       XA_WINDOW, 32, PropModeReplace,
-		       (unsigned char *) &drag_window, 1);
+
+      /* We can't use XErrorHandler since it's not in the Xlib
+	 specification, and Emacs tries to be portable.  */
+      old_handler = (void *) XSetErrorHandler (xm_drag_window_error_handler);
+
+      _MOTIF_DRAG_WINDOW = XInternAtom (temp_display,
+					"_MOTIF_DRAG_WINDOW", False);
+
+      /* Some other program might've created a drag window between now
+	 and when we first looked.  Use that if it exists.  */
+
+      tmp_data = NULL;
+      rc = XGetWindowProperty (temp_display, DefaultRootWindow (temp_display),
+			       _MOTIF_DRAG_WINDOW, 0, 1, False, XA_WINDOW,
+			       &actual_type, &actual_format, &nitems,
+			       &bytes_remaining, &tmp_data) == Success;
+
+      if (rc && actual_type == XA_WINDOW
+	  && actual_format == 32 && nitems == 1
+	  && tmp_data)
+	drag_window = *(Window *) tmp_data;
+
+      if (tmp_data)
+	XFree (tmp_data);
+
+      if (drag_window == None)
+	{
+	  attrs.override_redirect = True;
+	  drag_window = XCreateWindow (temp_display, DefaultRootWindow (temp_display),
+				       -1, -1, 1, 1, 0, CopyFromParent, InputOnly,
+				       CopyFromParent, CWOverrideRedirect, &attrs);
+	  XChangeProperty (temp_display, DefaultRootWindow (temp_display),
+			   _MOTIF_DRAG_WINDOW, XA_WINDOW, 32, PropModeReplace,
+			   (unsigned char *) &drag_window, 1);
+	}
+
       XCloseDisplay (temp_display);
+      XSetErrorHandler (old_handler);
 
       /* Make sure the drag window created is actually valid for the
 	 current display, and the XOpenDisplay above didn't
 	 accidentally connect to some other display.  */
       x_catch_errors (dpyinfo->display);
-      XGetWindowAttributes (dpyinfo->display,
-			    drag_window, &wattrs);
+      /* We use ButtonPressMask since it's one of the events an
+	 input-only window can never get.  */
+      XSelectInput (dpyinfo->display, drag_window,
+		    ButtonPressMask);
       rc = !x_had_errors_p (dpyinfo->display);
       x_uncatch_errors_after_check ();
       unblock_input ();
@@ -1449,7 +1493,6 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   return drag_window;
 }
 
-/* TODO: overflow checks when inserting targets.  */
 static int
 xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 		      Atom *targets, int ntargets)
@@ -1464,6 +1507,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   xm_byte_order byteorder;
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
+  uint32_t size, target_count;
 
   drag_window = xm_get_drag_window (dpyinfo);
 
@@ -1570,26 +1614,70 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 
       if (idx == -1)
 	{
-	  header.target_list_count++;
-	  header.total_data_size += 2 + ntargets * 4;
-
-	  recs[header.target_list_count - 1]
-	    = xmalloc (FLEXSIZEOF (struct xm_targets_table_rec,
-				   targets, ntargets * 4));
-	  recs[header.target_list_count - 1]->n_targets = ntargets;
-
-	  for (i = 0; i < ntargets; ++i)
-	    recs[header.target_list_count - 1]->targets[i] = targets_sorted[i];
-
-	  idx = header.target_list_count - 1;
+	  target_count = header.target_list_count;
 	  rc = false;
+
+	  if (INT_ADD_WRAPV (header.target_list_count, 1,
+			     &header.target_list_count)
+	      || INT_MULTIPLY_WRAPV (ntargets, 4, &size)
+	      || INT_ADD_WRAPV (header.total_data_size, size,
+				&header.total_data_size)
+	      || INT_ADD_WRAPV (header.total_data_size, 2,
+				&header.total_data_size))
+	    {
+	      /* Overflow, remove every entry from the targets table
+		 and add one for our current targets list.  This
+		 confuses real Motif but not GTK 2.x, and there is no
+		 other choice.  */
+
+	      for (i = 0; i < target_count; ++i)
+		xfree (recs[i]);
+
+	      xfree (recs);
+
+	      header.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+	      header.protocol = 0;
+	      header.target_list_count = 1;
+	      header.total_data_size = 8 + 2 + ntargets * 4;
+
+	      recs = xmalloc (sizeof *recs);
+	      recs[0] = xmalloc (FLEXSIZEOF (struct xm_targets_table_rec,
+					     targets, ntargets * 4));
+
+	      recs[0]->n_targets = ntargets;
+
+	      for (i = 0; i < ntargets; ++i)
+		recs[0]->targets[i] = targets_sorted[i];
+
+	      idx = 0;
+	    }
+	  else
+	    {
+	      recs[header.target_list_count - 1]
+		= xmalloc (FLEXSIZEOF (struct xm_targets_table_rec,
+				       targets, ntargets * 4));
+	      recs[header.target_list_count - 1]->n_targets = ntargets;
+
+	      for (i = 0; i < ntargets; ++i)
+		recs[header.target_list_count - 1]->targets[i] = targets_sorted[i];
+
+	      idx = header.target_list_count - 1;
+	    }
 	}
     }
 
   if (!rc)
-    xm_write_targets_table (dpyinfo->display, drag_window,
-			    dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
-			    &header, recs);
+    {
+      /* Some implementations of Motif DND set the protocol version of
+	 just the targets table to 1 without actually changing the
+	 data format.  To avoid confusing Motif when that happens, set
+	 it back to 0.  There will probably be no more updates to the
+	 protocol either.  */
+      header.protocol = 0;
+      xm_write_targets_table (dpyinfo->display, drag_window,
+			      dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
+			      &header, recs);
+    }
 
   XUngrabServer (dpyinfo->display);
 
@@ -3624,6 +3712,11 @@ x_dnd_cleanup_drag_and_drop (void *frame)
     XkbSelectEvents (FRAME_X_DISPLAY (f), XkbUseCoreKbd,
 		     XkbStateNotifyMask, 0);
 #endif
+
+  /* Delete the Motif drag initiator info if it was set up.  */
+  if (x_dnd_motif_setup_p)
+    XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
   unblock_input ();
 
   x_dnd_frame = NULL;
@@ -3783,7 +3876,6 @@ x_toolkit_position (struct frame *f, int x, int y,
 static void
 x_update_opaque_region (struct frame *f, XEvent *configure)
 {
-#ifndef HAVE_GTK3
   unsigned long opaque_region[] = {0, 0,
 				   (configure
 				    ? configure->xconfigure.width
@@ -3791,6 +3883,9 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 				   (configure
 				    ? configure->xconfigure.height
 				    : FRAME_PIXEL_HEIGHT (f))};
+#ifdef HAVE_GTK3
+  GObjectClass *object_class;
+  GtkWidgetClass *class;
 #endif
 
   if (!FRAME_DISPLAY_INFO (f)->alpha_bits)
@@ -3810,6 +3905,21 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
 		     XA_CARDINAL, 32, PropModeReplace,
 		     (unsigned char *) &opaque_region, 4);
+#else
+  else if (FRAME_TOOLTIP_P (f))
+    XChangeProperty (FRAME_X_DISPLAY (f),
+		     FRAME_X_WINDOW (f),
+		     FRAME_DISPLAY_INFO (f)->Xatom_net_wm_opaque_region,
+		     XA_CARDINAL, 32, PropModeReplace,
+		     (unsigned char *) &opaque_region, 4);
+  else
+    {
+      object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
+      class = GTK_WIDGET_CLASS (object_class);
+
+      if (class->style_updated)
+	class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+    }
 #endif
   unblock_input ();
 }
@@ -6721,6 +6831,21 @@ x_query_frame_background_color (struct frame *f, XColor *bgcolor)
   x_query_colors (f, bgcolor, 1);
 }
 
+static unsigned int
+x_hash_string_ignore_case (const char *string)
+{
+  unsigned int i;
+
+  i = 3323198485ul;
+  for (; *string; ++string)
+    {
+      i ^= c_tolower (*string);
+      i *= 0x5bd1e995;
+      i ^= i >> 15;
+    }
+  return i;
+}
+
 /* On frame F, translate the color name to RGB values.  Use cached
    information, if possible.
 
@@ -6733,12 +6858,18 @@ Status
 x_parse_color (struct frame *f, const char *color_name,
 	       XColor *color)
 {
+  unsigned short r, g, b;
+  Display *dpy = FRAME_X_DISPLAY (f);
+  Colormap cmap = FRAME_X_COLORMAP (f);
+  struct x_display_info *dpyinfo;
+  struct color_name_cache_entry *cache_entry;
+  unsigned int hash, idx;
+
   /* Don't pass #RGB strings directly to XParseColor, because that
      follows the X convention of zero-extending each channel
      value: #f00 means #f00000.  We want the convention of scaling
      channel values, so #f00 means #ff0000, just as it does for
      HTML, SVG, and CSS.  */
-  unsigned short r, g, b;
   if (parse_color_spec (color_name, &r, &g, &b))
     {
       color->red = r;
@@ -6747,13 +6878,14 @@ x_parse_color (struct frame *f, const char *color_name,
       return 1;
     }
 
-  Display *dpy = FRAME_X_DISPLAY (f);
-  Colormap cmap = FRAME_X_COLORMAP (f);
-  struct color_name_cache_entry *cache_entry;
-  for (cache_entry = FRAME_DISPLAY_INFO (f)->color_names; cache_entry;
-       cache_entry = cache_entry->next)
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+  hash = x_hash_string_ignore_case (color_name);
+  idx = hash % dpyinfo->color_names_size;
+
+  for (cache_entry = FRAME_DISPLAY_INFO (f)->color_names[idx];
+       cache_entry; cache_entry = cache_entry->next)
     {
-      if (!xstrcasecmp(cache_entry->name, color_name))
+      if (!xstrcasecmp (cache_entry->name, color_name))
 	{
 	  *color = cache_entry->rgb;
 	  return 1;
@@ -6771,8 +6903,8 @@ x_parse_color (struct frame *f, const char *color_name,
   cache_entry = xzalloc (sizeof *cache_entry);
   cache_entry->rgb = *color;
   cache_entry->name = xstrdup (color_name);
-  cache_entry->next = FRAME_DISPLAY_INFO (f)->color_names;
-  FRAME_DISPLAY_INFO (f)->color_names = cache_entry;
+  cache_entry->next = FRAME_DISPLAY_INFO (f)->color_names[idx];
+  FRAME_DISPLAY_INFO (f)->color_names[idx] = cache_entry;
   return 1;
 }
 
@@ -9791,6 +9923,10 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	    XkbSelectEvents (FRAME_X_DISPLAY (f), XkbUseCoreKbd,
 			     XkbStateNotifyMask, 0);
 #endif
+	  /* Delete the Motif drag initiator info if it was set up.  */
+	  if (x_dnd_motif_setup_p)
+	    XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+			     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
 	  quit ();
 	}
     }
@@ -9813,6 +9949,10 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
     XkbSelectEvents (FRAME_X_DISPLAY (f), XkbUseCoreKbd,
 		     XkbStateNotifyMask, 0);
 #endif
+  /* Delete the Motif drag initiator info if it was set up.  */
+  if (x_dnd_motif_setup_p)
+    XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
   unblock_input ();
 
   if (x_dnd_return_frame == 3
@@ -10576,6 +10716,16 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	      f1 = NULL;
 #endif /* USE_X_TOOLKIT */
 	  }
+
+	/* Set last user time to avoid confusing some window managers
+	   about the tooltip displayed during drag-and-drop.  */
+
+	if ((EQ (track_mouse, Qdrag_source)
+	     || EQ (track_mouse, Qdropping))
+	    && (dpyinfo->last_user_time
+		< dpyinfo->last_mouse_movement_time))
+	  x_display_set_last_user_time (dpyinfo,
+					dpyinfo->last_mouse_movement_time);
 
 	if ((!f1 || FRAME_TOOLTIP_P (f1))
 	    && (EQ (track_mouse, Qdropping)
@@ -13717,10 +13867,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   XEvent configureEvent;
   XEvent next_event;
   Lisp_Object coding;
-#if defined USE_MOTIF && defined HAVE_XINPUT2
-  /* Some XInput 2 events are important for Motif menu bars to work
-     correctly, so they must be translated into core events before
-     being passed to XtDispatchEvent.  */
+#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2
+  /* Some XInput 2 events are important for Motif and Lucid menu bars
+     to work correctly, so they must be translated into core events
+     before being passed to XtDispatchEvent.  */
   bool use_copy = false;
   XEvent copy;
 #elif defined USE_GTK && !defined HAVE_GTK3 && defined HAVE_XINPUT2
@@ -15117,7 +15267,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       f = any;
 
       if (f && x_mouse_click_focus_ignore_position)
-	ignore_next_mouse_click_timeout = event->xmotion.time + 200;
+	{
+	  ignore_next_mouse_click_timeout = event->xmotion.time + 200;
+	  mouse_click_timeout_display = dpyinfo;
+	}
 
       /* EnterNotify counts as mouse movement,
 	 so update things that depend on mouse position.  */
@@ -15853,103 +16006,106 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		goto OTHER;
 	      }
 
-	    for (int i = 1; i < 8; ++i)
+	    if (event->xbutton.type == ButtonRelease)
 	      {
-		if (i != event->xbutton.button
-		    && event->xbutton.state & (Button1Mask << (i - 1)))
-		  dnd_grab = true;
-	      }
-
-	    if (!dnd_grab && event->xbutton.type == ButtonRelease)
-	      {
-		x_dnd_end_window = x_dnd_last_seen_window;
-		x_dnd_in_progress = false;
-
-		if (x_dnd_last_seen_window != None
-		    && x_dnd_last_protocol_version != -1)
+		for (int i = 1; i < 8; ++i)
 		  {
-		    x_dnd_pending_finish_target = x_dnd_last_seen_window;
-		    x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
-
-		    x_dnd_waiting_for_finish
-		      = x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
-					 x_dnd_selection_timestamp,
-					 x_dnd_last_protocol_version);
+		    if (i != event->xbutton.button
+			&& event->xbutton.state & (Button1Mask << (i - 1)))
+		      dnd_grab = true;
 		  }
-		else if (x_dnd_last_seen_window != None)
+
+		if (!dnd_grab)
 		  {
-		    xm_drop_start_message dmsg;
-		    xm_drag_receiver_info drag_receiver_info;
+		    x_dnd_end_window = x_dnd_last_seen_window;
+		    x_dnd_in_progress = false;
 
-		    if (!xm_read_drag_receiver_info (dpyinfo, x_dnd_last_seen_window,
-						     &drag_receiver_info)
-			&& drag_receiver_info.protocol_style != XM_DRAG_STYLE_NONE
-			&& (x_dnd_allow_current_frame
-			    || x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame)))
+		    if (x_dnd_last_seen_window != None
+			&& x_dnd_last_protocol_version != -1)
 		      {
-			if (!x_dnd_motif_setup_p)
-			  xm_setup_drag_info (dpyinfo, x_dnd_frame);
+			x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
-			if (x_dnd_motif_setup_p)
+			x_dnd_waiting_for_finish
+			  = x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
+					     x_dnd_selection_timestamp,
+					     x_dnd_last_protocol_version);
+		      }
+		    else if (x_dnd_last_seen_window != None)
+		      {
+			xm_drop_start_message dmsg;
+			xm_drag_receiver_info drag_receiver_info;
+
+			if (!xm_read_drag_receiver_info (dpyinfo, x_dnd_last_seen_window,
+							 &drag_receiver_info)
+			    && drag_receiver_info.protocol_style != XM_DRAG_STYLE_NONE
+			    && (x_dnd_allow_current_frame
+				|| x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame)))
 			  {
-			    memset (&dmsg, 0, sizeof dmsg);
+			    if (!x_dnd_motif_setup_p)
+			      xm_setup_drag_info (dpyinfo, x_dnd_frame);
 
-			    dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
-							  XM_DRAG_REASON_DROP_START);
-			    dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-			    dmsg.side_effects
-			      = XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (dpyinfo,
-										 x_dnd_wanted_action),
-						     XM_DROP_SITE_VALID,
-						     xm_side_effect_from_action (dpyinfo,
-										 x_dnd_wanted_action),
-						     (!x_dnd_xm_use_help
-						      ? XM_DROP_ACTION_DROP
-						      : XM_DROP_ACTION_DROP_HELP));
-			    dmsg.timestamp = event->xbutton.time;
-			    dmsg.x = event->xbutton.x_root;
-			    dmsg.y = event->xbutton.y_root;
-			    dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
-			    dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
+			    if (x_dnd_motif_setup_p)
+			      {
+				memset (&dmsg, 0, sizeof dmsg);
 
-			    if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
-			      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (x_dnd_frame),
-							    x_dnd_frame, x_dnd_last_seen_window,
-							    event->xbutton.time);
+				dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
+							      XM_DRAG_REASON_DROP_START);
+				dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+				dmsg.side_effects
+				  = XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (dpyinfo,
+										     x_dnd_wanted_action),
+							 XM_DROP_SITE_VALID,
+							 xm_side_effect_from_action (dpyinfo,
+										     x_dnd_wanted_action),
+							 (!x_dnd_xm_use_help
+							  ? XM_DROP_ACTION_DROP
+							  : XM_DROP_ACTION_DROP_HELP));
+				dmsg.timestamp = event->xbutton.time;
+				dmsg.x = event->xbutton.x_root;
+				dmsg.y = event->xbutton.y_root;
+				dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
+				dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
-			    xm_send_drop_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
-						  x_dnd_last_seen_window, &dmsg);
+				if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
+				  x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (x_dnd_frame),
+								x_dnd_frame, x_dnd_last_seen_window,
+								event->xbutton.time);
 
-			    x_dnd_waiting_for_finish = true;
-			    x_dnd_waiting_for_motif_finish = 1;
+				xm_send_drop_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
+						      x_dnd_last_seen_window, &dmsg);
+
+				x_dnd_waiting_for_finish = true;
+				x_dnd_waiting_for_motif_finish = 1;
+			      }
+			  }
+			else
+			  {
+			    x_set_pending_dnd_time (event->xbutton.time);
+			    x_dnd_send_unsupported_drop (dpyinfo, (x_dnd_last_seen_toplevel != None
+								   ? x_dnd_last_seen_toplevel
+								   : x_dnd_last_seen_window),
+							 event->xbutton.x_root, event->xbutton.y_root,
+							 event->xbutton.time);
 			  }
 		      }
-		    else
+		    else if (x_dnd_last_seen_toplevel != None)
 		      {
 			x_set_pending_dnd_time (event->xbutton.time);
-			x_dnd_send_unsupported_drop (dpyinfo, (x_dnd_last_seen_toplevel != None
-							       ? x_dnd_last_seen_toplevel
-							       : x_dnd_last_seen_window),
-						     event->xbutton.x_root, event->xbutton.y_root,
+			x_dnd_send_unsupported_drop (dpyinfo, x_dnd_last_seen_toplevel,
+						     event->xbutton.x_root,
+						     event->xbutton.y_root,
 						     event->xbutton.time);
 		      }
-		  }
-		else if (x_dnd_last_seen_toplevel != None)
-		  {
-		    x_set_pending_dnd_time (event->xbutton.time);
-		    x_dnd_send_unsupported_drop (dpyinfo, x_dnd_last_seen_toplevel,
-						 event->xbutton.x_root,
-						 event->xbutton.y_root,
-						 event->xbutton.time);
-		  }
 
 
-		x_dnd_last_protocol_version = -1;
-		x_dnd_last_motif_style = XM_DRAG_STYLE_NONE;
-		x_dnd_last_seen_window = None;
-		x_dnd_last_seen_toplevel = None;
-		x_dnd_frame = NULL;
-		x_set_dnd_targets (NULL, 0);
+		    x_dnd_last_protocol_version = -1;
+		    x_dnd_last_motif_style = XM_DRAG_STYLE_NONE;
+		    x_dnd_last_seen_window = None;
+		    x_dnd_last_seen_toplevel = None;
+		    x_dnd_frame = NULL;
+		    x_set_dnd_targets (NULL, 0);
+		  }
 	      }
 
 	    goto OTHER;
@@ -15994,7 +16150,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		&& event->xbutton.button < 9
 		&& f)
 	      {
-		if (ignore_next_mouse_click_timeout)
+		if (ignore_next_mouse_click_timeout
+		    && dpyinfo == mouse_click_timeout_display)
 		  {
 		    if (event->type == ButtonPress
 			&& event->xbutton.time > ignore_next_mouse_click_timeout)
@@ -16063,7 +16220,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
               if (! popup_activated ())
 #endif
                 {
-                  if (ignore_next_mouse_click_timeout)
+                  if (ignore_next_mouse_click_timeout
+		      && dpyinfo == mouse_click_timeout_display)
                     {
                       if (event->type == ButtonPress
                           && event->xbutton.time > ignore_next_mouse_click_timeout)
@@ -16360,7 +16518,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      f = any;
 
 	      if (f && x_mouse_click_focus_ignore_position)
-		ignore_next_mouse_click_timeout = xi_event->time + 200;
+		{
+		  ignore_next_mouse_click_timeout = xev->time + 200;
+		  mouse_click_timeout_display = dpyinfo;
+		}
 
 	      /* EnterNotify counts as mouse movement,
 		 so update things that depend on mouse position.  */
@@ -17110,111 +17271,114 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      goto XI_OTHER;
 		    }
 
-		  for (int i = 0; i < xev->buttons.mask_len * 8; ++i)
+		  if (xev->evtype == XI_ButtonRelease)
 		    {
-		      if (i != xev->detail && XIMaskIsSet (xev->buttons.mask, i))
-			dnd_grab = true;
-		    }
-
-		  if (!dnd_grab && xev->evtype == XI_ButtonRelease)
-		    {
-		      x_dnd_end_window = x_dnd_last_seen_window;
-		      x_dnd_in_progress = false;
-
-		      if (x_dnd_last_seen_window != None
-			  && x_dnd_last_protocol_version != -1)
+		      for (int i = 0; i < xev->buttons.mask_len * 8; ++i)
 			{
-			  x_dnd_pending_finish_target = x_dnd_last_seen_window;
-			  x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
-
-			  x_dnd_waiting_for_finish
-			    = x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
-					       x_dnd_selection_timestamp,
-					       x_dnd_last_protocol_version);
+			  if (i != xev->detail && XIMaskIsSet (xev->buttons.mask, i))
+			    dnd_grab = true;
 			}
-		      else if (x_dnd_last_seen_window != None)
+
+		      if (!dnd_grab)
 			{
-			  xm_drop_start_message dmsg;
-			  xm_drag_receiver_info drag_receiver_info;
+			  x_dnd_end_window = x_dnd_last_seen_window;
+			  x_dnd_in_progress = false;
 
-			  if (!xm_read_drag_receiver_info (dpyinfo, x_dnd_last_seen_window,
-							   &drag_receiver_info)
-			      && drag_receiver_info.protocol_style != XM_DRAG_STYLE_NONE
-			      && (x_dnd_allow_current_frame
-				  || x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame)))
+			  if (x_dnd_last_seen_window != None
+			      && x_dnd_last_protocol_version != -1)
 			    {
-			      if (!x_dnd_motif_setup_p)
-				xm_setup_drag_info (dpyinfo, x_dnd_frame);
+			      x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			      x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
-			      if (x_dnd_motif_setup_p)
+			      x_dnd_waiting_for_finish
+				= x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
+						   x_dnd_selection_timestamp,
+						   x_dnd_last_protocol_version);
+			    }
+			  else if (x_dnd_last_seen_window != None)
+			    {
+			      xm_drop_start_message dmsg;
+			      xm_drag_receiver_info drag_receiver_info;
+
+			      if (!xm_read_drag_receiver_info (dpyinfo, x_dnd_last_seen_window,
+							       &drag_receiver_info)
+				  && drag_receiver_info.protocol_style != XM_DRAG_STYLE_NONE
+				  && (x_dnd_allow_current_frame
+				      || x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame)))
 				{
-				  memset (&dmsg, 0, sizeof dmsg);
+				  if (!x_dnd_motif_setup_p)
+				    xm_setup_drag_info (dpyinfo, x_dnd_frame);
 
-				  dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
-								XM_DRAG_REASON_DROP_START);
-				  dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-				  dmsg.side_effects
-				    = XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (dpyinfo,
-										       x_dnd_wanted_action),
-							   XM_DROP_SITE_VALID,
-							   xm_side_effect_from_action (dpyinfo,
-										       x_dnd_wanted_action),
-							   (!x_dnd_xm_use_help
-							    ? XM_DROP_ACTION_DROP
-							    : XM_DROP_ACTION_DROP_HELP));
-				  dmsg.timestamp = xev->time;
-				  dmsg.x = lrint (xev->root_x);
-				  dmsg.y = lrint (xev->root_y);
-				  /* This atom technically has to be
-				     unique to each drag-and-drop
-				     operation, but that isn't easy to
-				     accomplish, since we cannot
-				     randomly move data around between
-				     selections.  Let's hope no two
-				     instances of Emacs try to drag
-				     into the same window at the same
-				     time.  */
-				  dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
-				  dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
+				  if (x_dnd_motif_setup_p)
+				    {
+				      memset (&dmsg, 0, sizeof dmsg);
 
-				  if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
-				    x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (x_dnd_frame),
-								  x_dnd_frame, x_dnd_last_seen_window,
-								  xev->time);
+				      dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
+								    XM_DRAG_REASON_DROP_START);
+				      dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+				      dmsg.side_effects
+					= XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (dpyinfo,
+											   x_dnd_wanted_action),
+							       XM_DROP_SITE_VALID,
+							       xm_side_effect_from_action (dpyinfo,
+											   x_dnd_wanted_action),
+							       (!x_dnd_xm_use_help
+								? XM_DROP_ACTION_DROP
+								: XM_DROP_ACTION_DROP_HELP));
+				      dmsg.timestamp = xev->time;
+				      dmsg.x = lrint (xev->root_x);
+				      dmsg.y = lrint (xev->root_y);
+				      /* This atom technically has to be
+					 unique to each drag-and-drop
+					 operation, but that isn't easy to
+					 accomplish, since we cannot
+					 randomly move data around between
+					 selections.  Let's hope no two
+					 instances of Emacs try to drag
+					 into the same window at the same
+					 time.  */
+				      dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
+				      dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
-				  xm_send_drop_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
-							x_dnd_last_seen_window, &dmsg);
+				      if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
+					x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (x_dnd_frame),
+								      x_dnd_frame, x_dnd_last_seen_window,
+								      xev->time);
 
-				  x_dnd_waiting_for_finish = true;
-				  x_dnd_waiting_for_motif_finish = 1;
+				      xm_send_drop_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
+							    x_dnd_last_seen_window, &dmsg);
+
+				      x_dnd_waiting_for_finish = true;
+				      x_dnd_waiting_for_motif_finish = 1;
+				    }
+				}
+			      else
+				{
+				  x_set_pending_dnd_time (xev->time);
+				  x_dnd_send_unsupported_drop (dpyinfo, (x_dnd_last_seen_toplevel != None
+									 ? x_dnd_last_seen_toplevel
+									 : x_dnd_last_seen_window),
+							       xev->root_x, xev->root_y, xev->time);
 				}
 			    }
-			  else
+			  else if (x_dnd_last_seen_toplevel != None)
 			    {
 			      x_set_pending_dnd_time (xev->time);
-			      x_dnd_send_unsupported_drop (dpyinfo, (x_dnd_last_seen_toplevel != None
-								     ? x_dnd_last_seen_toplevel
-								     : x_dnd_last_seen_window),
-							   xev->root_x, xev->root_y, xev->time);
+			      x_dnd_send_unsupported_drop (dpyinfo,
+							   x_dnd_last_seen_toplevel,
+							   xev->root_x, xev->root_y,
+							   xev->time);
 			    }
-			}
-		      else if (x_dnd_last_seen_toplevel != None)
-			{
-			  x_set_pending_dnd_time (xev->time);
-			  x_dnd_send_unsupported_drop (dpyinfo,
-						       x_dnd_last_seen_toplevel,
-						       xev->root_x, xev->root_y,
-						       xev->time);
-			}
 
-		      x_dnd_last_protocol_version = -1;
-		      x_dnd_last_motif_style = XM_DRAG_STYLE_NONE;
-		      x_dnd_last_seen_window = None;
-		      x_dnd_last_seen_toplevel = None;
-		      x_dnd_frame = NULL;
-		      x_set_dnd_targets (NULL, 0);
+			  x_dnd_last_protocol_version = -1;
+			  x_dnd_last_motif_style = XM_DRAG_STYLE_NONE;
+			  x_dnd_last_seen_window = None;
+			  x_dnd_last_seen_toplevel = None;
+			  x_dnd_frame = NULL;
+			  x_set_dnd_targets (NULL, 0);
 
-		      goto XI_OTHER;
+			  goto XI_OTHER;
+			}
 		    }
 		}
 
@@ -17616,7 +17780,41 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
 	      /* Dispatch XI_KeyPress events when in menu.  */
 	      if (popup_activated ())
-		goto XI_OTHER;
+		{
+#ifdef USE_LUCID
+		  /* This makes key navigation work inside menus.  */
+		  use_copy = true;
+		  copy.xkey.type = KeyPress;
+		  copy.xkey.serial = xev->serial;
+		  copy.xkey.send_event = xev->send_event;
+		  copy.xkey.display = dpyinfo->display;
+		  copy.xkey.window = xev->event;
+		  copy.xkey.root = xev->root;
+		  copy.xkey.subwindow = xev->child;
+		  copy.xkey.time = xev->time;
+		  copy.xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
+				     | (xev->group.effective << 13));
+
+		  copy.xkey.x = lrint (xev->event_x);
+		  copy.xkey.y = lrint (xev->event_y);
+		  copy.xkey.x_root = lrint (xev->root_x);
+		  copy.xkey.y_root = lrint (xev->root_y);
+
+		  if (xev->buttons.mask_len)
+		    {
+		      if (XIMaskIsSet (xev->buttons.mask, 1))
+			copy.xkey.state |= Button1Mask;
+		      if (XIMaskIsSet (xev->buttons.mask, 2))
+			copy.xkey.state |= Button2Mask;
+		      if (XIMaskIsSet (xev->buttons.mask, 3))
+			copy.xkey.state |= Button3Mask;
+		    }
+
+		  copy.xkey.keycode = xev->detail;
+		  copy.xkey.same_screen = True;
+#endif
+		  goto XI_OTHER;
+		}
 #endif
 
 	      x_display_set_last_user_time (dpyinfo, xev->time);
@@ -18063,7 +18261,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 	  case XI_KeyRelease:
-#if defined HAVE_X_I18N || defined USE_GTK
+#if defined HAVE_X_I18N || defined USE_GTK || defined USE_LUCID
 	    {
 	      XKeyPressedEvent xkey;
 
@@ -18099,14 +18297,31 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      xkey.keycode = xev->detail;
 	      xkey.same_screen = True;
 
+#ifdef USE_LUCID
+	      if (!popup_activated ())
+		{
+#endif
 #ifdef HAVE_X_I18N
-	      if (x_filter_event (dpyinfo, (XEvent *) &xkey))
-		*finish = X_EVENT_DROP;
-#else
-	      f = x_any_window_to_frame (xkey->event);
+		  if (x_filter_event (dpyinfo, (XEvent *) &xkey))
+		    *finish = X_EVENT_DROP;
+#elif defined USE_GTK
+		  f = x_any_window_to_frame (xkey->event);
 
-	      if (f && xg_filter_key (f, event))
-		*finish = X_EVENT_DROP;
+		  if (f && xg_filter_key (f, event))
+		    *finish = X_EVENT_DROP;
+#endif
+#ifdef USE_LUCID
+		}
+	      else
+		{
+		  /* FIXME: the Lucid menu bar pops down upon any key
+		     release event, so we don't dispatch these events
+		     at all, which doesn't seem to be the right
+		     solution.
+
+		     use_copy = true;
+		     copy.xkey = xkey; */
+		}
 #endif
 	    }
 #endif
@@ -18879,12 +19094,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	{
 	  /* Ignore some obviously bogus ConfigureNotify events that
 	     other clients have been known to send Emacs.
-	     (bug#54051)*/
+	     (bug#54051) */
 	  if (event->type != ConfigureNotify
 	      || (event->xconfigure.width != 0
 		  && event->xconfigure.height != 0))
 	    {
-#if defined USE_MOTIF && defined HAVE_XINPUT2
+#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2
 	      XtDispatchEvent (use_copy ? &copy : (XEvent *) event);
 #else
 	      XtDispatchEvent ((XEvent *) event);
@@ -22755,6 +22970,10 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   dpyinfo->smallest_font_height = 1;
   dpyinfo->smallest_char_width = 1;
 
+  dpyinfo->color_names_size = 256;
+  dpyinfo->color_names = xzalloc (dpyinfo->color_names_size
+				  * sizeof *dpyinfo->color_names);
+
   /* Set the name of the terminal. */
   terminal->name = xlispstrdup (display_name);
 
@@ -22888,9 +23107,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 						  SynchronizeResize,
 						  Qnil, Qnil);
 
-    if (STRINGP (value) &&
-	(!strcmp (SSDATA (value), "false")
-	 || !strcmp (SSDATA (value), "off")))
+    if (STRINGP (value)
+	&& (!strcmp (SSDATA (value), "false")
+	    || !strcmp (SSDATA (value), "off")))
       dpyinfo->xsync_supported_p = false;
   }
 #endif
@@ -23015,6 +23234,23 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   int major = 2;
   int xi_first_event, xi_first_error;
 
+#ifndef HAVE_GTK3
+  {
+    AUTO_STRING (disableInputExtension, "disableInputExtension");
+    AUTO_STRING (DisableInputExtension, "DisableInputExtension");
+
+    Lisp_Object value = gui_display_get_resource (dpyinfo,
+						  disableInputExtension,
+						  DisableInputExtension,
+						  Qnil, Qnil);
+
+    if (STRINGP (value)
+	&& (!strcmp (SSDATA (value), "on")
+	    || !strcmp (SSDATA (value), "true")))
+      goto skip_xi_setup;
+  }
+#endif
+
 #ifdef HAVE_XINPUT2_4
   int minor = 4;
 #elif defined HAVE_XINPUT2_3 /* XInput 2.3 */
@@ -23110,6 +23346,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     }
 
   dpyinfo->xi2_version = minor;
+#ifndef HAVE_GTK3
+ skip_xi_setup:
+#endif
 #endif
 
 #ifdef HAVE_XRANDR
@@ -23508,6 +23747,7 @@ x_delete_display (struct x_display_info *dpyinfo)
 {
   struct terminal *t;
   struct color_name_cache_entry *color_entry, *next_color_entry;
+  int i;
 
   /* Close all frames and delete the generic struct terminal for this
      X display.  */
@@ -23526,6 +23766,9 @@ x_delete_display (struct x_display_info *dpyinfo)
   if (next_noop_dpyinfo == dpyinfo)
     next_noop_dpyinfo = dpyinfo->next;
 
+  if (mouse_click_timeout_display == dpyinfo)
+    mouse_click_timeout_display = NULL;
+
   if (x_display_list == dpyinfo)
     x_display_list = dpyinfo->next;
   else
@@ -23537,15 +23780,19 @@ x_delete_display (struct x_display_info *dpyinfo)
 	  tail->next = tail->next->next;
     }
 
-  for (color_entry = dpyinfo->color_names;
-       color_entry;
-       color_entry = next_color_entry)
+  for (i = 0; i < dpyinfo->color_names_size; ++i)
     {
-      next_color_entry = color_entry->next;
-      xfree (color_entry->name);
-      xfree (color_entry);
+      for (color_entry = dpyinfo->color_names[i];
+	   color_entry; color_entry = next_color_entry)
+	{
+	  next_color_entry = color_entry->next;
+
+	  xfree (color_entry->name);
+	  xfree (color_entry);
+	}
     }
 
+  xfree (dpyinfo->color_names);
   xfree (dpyinfo->x_id_name);
   xfree (dpyinfo->x_dnd_atoms);
   xfree (dpyinfo->color_cells);
@@ -23813,6 +24060,7 @@ x_initialize (void)
   x_noop_count = 0;
   any_help_event_p = false;
   ignore_next_mouse_click_timeout = 0;
+  mouse_click_timeout_display = NULL;
 
 #ifdef USE_GTK
   current_count = -1;

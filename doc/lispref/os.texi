@@ -1345,11 +1345,7 @@ A pair of integers @code{(@var{ticks} . @var{hz})}, where @var{hz} is
 positive.  This represents @var{ticks}/@var{hz} seconds, which is the
 same time as plain @var{ticks} if @var{hz} is 1.  A common value for
 @var{hz} is 1000000000, for a nanosecond-resolution
-clock.@footnote{Currently @var{hz} should be at least 65536 to avoid
-compatibility warnings when the timestamp is passed to standard
-functions, as previous versions of Emacs would interpret such a
-timestamps differently due to backward-compatibility concerns.  These
-warnings are intended to be removed in a future Emacs version.}
+clock.
 
 @item
 A list of four integers @code{(@var{high} @var{low} @var{micro}
@@ -1532,7 +1528,7 @@ integer, it specifies a clock frequency and this function returns an
 integer-pair timestamp @code{(@var{ticks} . @var{form})}.  If @var{form} is
 @code{t}, this function treats it as a positive integer suitable for
 representing the timestamp; for example, it is treated as 1000000000
-if @var{time} is nil and the platform timestamp has nanosecond
+if @var{time} is @code{nil} and the platform timestamp has nanosecond
 resolution.  If @var{form} is @code{list}, this function returns an
 integer list @code{(@var{high} @var{low} @var{micro} @var{pico})}.
 Although an omitted or @code{nil} @var{form} currently acts like
@@ -1674,7 +1670,7 @@ any other extra arguments are ignored, so that @code{(apply
 convention, @var{dst} is @minus{}1 and @var{zone} defaults to the
 current time zone rule (@pxref{Time Zone Rules}).
 When modernizing an obsolescent caller, ensure that the more-modern
-list equivalent contains 9 elements with a a @code{dst} element that
+list equivalent contains 9 elements with a @code{dst} element that
 is @minus{}1, not @code{nil}.
 
 Year numbers less than 100 are not treated specially.  If you want them
@@ -1699,22 +1695,28 @@ Take care when doing so, as it is common for this to fail in some cases.
 For example:
 
 @lisp
-;; Try to compute the time four years from now.
+;; Try to compute the time one month from now.
 ;; Watch out; this might not work as expected.
 (let ((time (decode-time)))
-  (setf (decoded-time-year time)
-        (+ (decoded-time-year time) 4))
+  (setf (decoded-time-month time)
+        (+ (decoded-time-month time) 1))
   time)
 @end lisp
 
 @noindent
 Unfortunately, this code might not work as expected if the resulting
-time is invalid due to daylight saving transitions, time zone changes,
+time is invalid due to month length differences,
+daylight saving transitions, time zone changes,
 or missing leap days or leap seconds.  For example, if executed on
-February 29, 2096 this code yields a nonexistent date because 2100 is
-not a leap year.  To avoid some (though not all) of the problem, you
+January 30 this code yields a nonexistent date February 30,
+which @code{encode-time} would adjust to early March.
+Similarly, adding four years to February 29, 2096 would yield the
+nonexistent date February 29, 2100; and adding one hour to 01:30 on
+March 13, 2022 in New York would yield a timestamp 02:30 that does not
+exist because clocks sprang forward from 02:00 to 03:00 that day.
+To avoid some (though not all) of the problem, you
 can base calculations on the middle of the affected unit, e.g., start
-at July 1 when adding years.  Alternatively, you can use the
+at the 15th of the month when adding months.  Alternatively, you can use the
 @file{calendar} and @file{time-date} libraries.
 @end defun
 
@@ -3111,21 +3113,21 @@ This function removes the tray notification given by its unique
 @cindex watch, for filesystem events
 
 Several operating systems support watching of filesystems for changes
-of files.  If configured properly, Emacs links a respective library
-like @file{inotify}, @file{kqueue}, @file{gfilenotify}, or
-@file{w32notify} statically.  These libraries enable watching of
-filesystems on the local machine.
+to files or their attributes.  If configured properly, Emacs links a
+respective library like @file{inotify}, @file{kqueue},
+@file{gfilenotify}, or @file{w32notify} statically.  These libraries
+enable watching of filesystems on the local machine.
 
 It is also possible to watch filesystems on remote machines,
-@pxref{Remote Files,, Remote Files, emacs, The GNU Emacs Manual}
+@pxref{Remote Files,, Remote Files, emacs, The GNU Emacs Manual}.
 This does not depend on one of the libraries linked to Emacs.
 
-Since all these libraries emit different events on notified file
-changes, there is the Emacs library @code{filenotify} which provides a
-unified interface.  Lisp programs that want to receive file
-notifications should always use this library in preference to the
-native ones.
-
+Since all these libraries emit different events upon notified file
+changes, Emacs provides a special library @code{filenotify} which
+presents a unified interface to applications.  Lisp programs that want
+to receive file notifications should always use this library in
+preference to the native ones.  This section documents the
+@code{filenotify} library functions and variables.
 
 @defun file-notify-add-watch file flags callback
 Add a watch for filesystem events pertaining to @var{file}.  This
@@ -3133,31 +3135,33 @@ arranges for filesystem events pertaining to @var{file} to be reported
 to Emacs.
 
 The returned value is a descriptor for the added watch.  Its type
-depends on the underlying library, it cannot be assumed to be an
-integer as in the example below.  It should be used for comparison by
-@code{equal} only.
+depends on the underlying library, and in general cannot be assumed to
+be an integer as in the example below.  It should be used for
+comparison by @code{equal} only.
 
 If the @var{file} cannot be watched for some reason, this function
 signals a @code{file-notify-error} error.
 
 Sometimes, mounted filesystems cannot be watched for file changes.
-This is not detected by this function, a non-@code{nil} return value
-does not guarantee that changes on @var{file} will be notified.
+This is not detected by this function, and so a non-@code{nil} return
+value does not guarantee that changes on @var{file} will be actually
+notified.
 
 @var{flags} is a list of conditions to set what will be watched for.
 It can include the following symbols:
 
 @table @code
 @item change
-watch for file changes
+watch for changes in file's contents
 @item attribute-change
-watch for file attribute changes, like permissions or modification
+watch for changes in file attributes, like permissions or modification
 time
 @end table
 
 If @var{file} is a directory, @code{change} watches for file creation
-or deletion in that directory.  Some of the file notification backends
-report also file changes.  This does not work recursively.
+and deletion in that directory.  Some of the native file notification
+libraries also report file changes in that case.  This does not work
+recursively.
 
 When any event happens, Emacs will call the @var{callback} function
 passing it a single argument @var{event}, which is of the form
@@ -3183,19 +3187,20 @@ reports attribute changes as well
 @item attribute-changed
 a @var{file} attribute was changed
 @item stopped
-watching @var{file} has been stopped
+watching @var{file} has stopped
 @end table
 
 Note that the @file{w32notify} library does not report
 @code{attribute-changed} events.  When some file's attribute, like
 permissions or modification time, has changed, this library reports a
 @code{changed} event.  Likewise, the @file{kqueue} library does not
-report reliably file attribute changes when watching a directory.
+reliably report file attribute changes when watching a directory.
 
-The @code{stopped} event reports, that watching the file has been
-stopped.  This could be because @code{file-notify-rm-watch} was called
-(see below), or because the file being watched was deleted, or due to
-another error reported from the underlying library.
+The @code{stopped} event means that watching the file has been
+discontinued.  This could be because @code{file-notify-rm-watch} was
+called (see below), or because the file being watched was deleted, or
+due to another error reported from the underlying library which makes
+further watching impossible.
 
 @var{file} and @var{file1} are the name of the file(s) whose event is
 being reported.  For example:
@@ -3239,7 +3244,7 @@ being reported.  For example:
 @end group
 @end example
 
-Whether the action @code{renamed} is returned, depends on the used
+Whether the action @code{renamed} is returned depends on the used
 watch library.  Otherwise, the actions @code{deleted} and
 @code{created} could be returned in a random order.
 
