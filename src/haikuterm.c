@@ -144,23 +144,15 @@ get_string_resource (void *ignored, const char *name, const char *class)
 static void
 haiku_update_size_hints (struct frame *f)
 {
-  int base_width, base_height;
-  eassert (FRAME_HAIKU_P (f) && FRAME_HAIKU_WINDOW (f));
-
   if (f->tooltip)
     return;
 
-  base_width = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, 0);
-  base_height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, 0);
-
   block_input ();
   BWindow_set_size_alignment (FRAME_HAIKU_WINDOW (f),
-			      frame_resize_pixelwise ? 1 : FRAME_COLUMN_WIDTH (f),
-			      frame_resize_pixelwise ? 1 : FRAME_LINE_HEIGHT (f));
-  BWindow_set_min_size (FRAME_HAIKU_WINDOW (f), base_width,
-			base_height
-			+ FRAME_TOOL_BAR_HEIGHT (f)
-			+ FRAME_MENU_BAR_HEIGHT (f));
+			      (frame_resize_pixelwise
+			       ? 1 : FRAME_COLUMN_WIDTH (f)),
+			      (frame_resize_pixelwise
+			       ? 1 : FRAME_LINE_HEIGHT (f)));
   unblock_input ();
 }
 
@@ -623,17 +615,28 @@ haiku_calculate_relief_colors (struct glyph_string *s, uint32_t *rgbout_w,
   struct face *face = s->face;
   double h, cs, l;
   uint32_t rgbin;
+  struct haiku_output *di;
 
-  prepare_face_for_display (s->f, s->face);
   rgbin = (face->use_box_color_for_shadows_p
 	   ? face->box_color : face->background);
+  di = FRAME_OUTPUT_DATA (s->f);
 
   if (s->hl == DRAW_CURSOR)
     rgbin = FRAME_CURSOR_COLOR (s->f).pixel;
 
-  rgb_color_hsl (rgbin, &h, &cs, &l);
-  hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 0.6), rgbout_b);
-  hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 1.2), rgbout_w);
+  if (di->relief_background != rgbin)
+    {
+      di->relief_background = rgbin & 0xffffffff;
+
+      rgb_color_hsl (rgbin, &h, &cs, &l);
+      hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 0.6),
+		     &di->black_relief_pixel);
+      hsl_color_rgb (h, cs, fmin (1.0, fmax (0.2, l) * 1.2),
+		     &di->white_relief_pixel);
+    }
+
+  *rgbout_w = di->white_relief_pixel;
+  *rgbout_b = di->black_relief_pixel;
 }
 
 static void
@@ -1994,7 +1997,8 @@ haiku_draw_window_cursor (struct window *w,
 static void
 haiku_show_hourglass (struct frame *f)
 {
-  if (FRAME_OUTPUT_DATA (f)->hourglass_p)
+  if (FRAME_TOOLTIP_P (f)
+      || FRAME_OUTPUT_DATA (f)->hourglass_p)
     return;
 
   block_input ();
@@ -2009,7 +2013,8 @@ haiku_show_hourglass (struct frame *f)
 static void
 haiku_hide_hourglass (struct frame *f)
 {
-  if (!FRAME_OUTPUT_DATA (f)->hourglass_p)
+  if (FRAME_TOOLTIP_P (f)
+      || !FRAME_OUTPUT_DATA (f)->hourglass_p)
     return;
 
   block_input ();
@@ -2648,8 +2653,9 @@ haiku_flush (struct frame *f)
 static void
 haiku_define_frame_cursor (struct frame *f, Emacs_Cursor cursor)
 {
-  if (f->tooltip)
+  if (FRAME_TOOLTIP_P (f))
     return;
+
   block_input ();
   if (!f->pointer_invisible && FRAME_HAIKU_VIEW (f)
       && !FRAME_OUTPUT_DATA (f)->hourglass_p)
@@ -2770,22 +2776,12 @@ haiku_make_fullscreen_consistent (struct frame *f)
 }
 
 static void
-flush_dirty_back_buffers (void)
+haiku_flush_dirty_back_buffer_on (struct frame *f)
 {
-  block_input ();
-  Lisp_Object tail, frame;
-  FOR_EACH_FRAME (tail, frame)
-    {
-      struct frame *f = XFRAME (frame);
-      if (FRAME_LIVE_P (f) &&
-          FRAME_HAIKU_P (f) &&
-          FRAME_HAIKU_WINDOW (f) &&
-          !FRAME_GARBAGED_P (f) &&
-          !buffer_flipping_blocked_p () &&
-          FRAME_DIRTY_P (f))
-        haiku_flip_buffers (f);
-    }
-  unblock_input ();
+  if (!FRAME_GARBAGED_P (f)
+      && !buffer_flipping_blocked_p ()
+      && FRAME_DIRTY_P (f))
+    haiku_flip_buffers (f);
 }
 
 /* N.B. that support for TYPE must be explictly added to
@@ -2829,12 +2825,11 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   static void *buf;
   ssize_t b_size;
   struct unhandled_event *unhandled_events = NULL;
-  int button_or_motion_p, need_flush, do_help;
+  int button_or_motion_p, do_help;
   enum haiku_event_type type;
   struct input_event inev, inev2;
 
   message_count = 0;
-  need_flush = 0;
   button_or_motion_p = 0;
   do_help = 0;
   buf = NULL;
@@ -2943,7 +2938,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      {
 		clear_mouse_face (hlinfo);
 		hlinfo->mouse_face_hidden = true;
-		need_flush = 1;
+		haiku_flush_dirty_back_buffer_on (f);
 	      }
 
 	    inev.code = b->keysym ? b->keysym : b->multibyte_char;
@@ -3035,7 +3030,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      {
 		hlinfo->mouse_face_hidden = false;
 		clear_mouse_face (hlinfo);
-		need_flush = 1;
+		haiku_flush_dirty_back_buffer_on (f);
 	      }
 
 	    if (b->just_exited_p)
@@ -3048,7 +3043,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		    clear_mouse_face (hlinfo);
 		    hlinfo->mouse_face_mouse_frame = 0;
 
-		    need_flush = 1;
+		    haiku_flush_dirty_back_buffer_on (f);
 		  }
 
 		if (f->auto_lower && !popup_activated_p
@@ -3182,7 +3177,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	      }
 
 	    if (FRAME_DIRTY_P (f))
-	      need_flush = 1;
+	      haiku_flush_dirty_back_buffer_on (f);
 	    break;
 	  }
 	case BUTTON_UP:
@@ -3220,7 +3215,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		  {
 		    tab_bar_arg = handle_tab_bar_click
 		      (f, x, y, type == BUTTON_DOWN, inev.modifiers);
-		    need_flush = 1;
+		    haiku_flush_dirty_back_buffer_on (f);
 		  }
 	      }
 
@@ -3240,7 +3235,7 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		  {
 		    handle_tool_bar_click
 		      (f, x, y, type == BUTTON_DOWN, inev.modifiers);
-		    need_flush = 1;
+		    haiku_flush_dirty_back_buffer_on (f);
 		  }
 	      }
 
@@ -3651,6 +3646,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    break;
 	  }
 	case APP_QUIT_REQUESTED_EVENT:
+	  inev.kind = SAVE_SESSION_EVENT;
+	  inev.arg = Qt;
+	  break;
 	case KEY_UP:
 	case DUMMY_EVENT:
 	default:
@@ -3709,9 +3707,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	  gen_help_event (Qnil, help_frame, Qnil, Qnil, 0);
 	}
     }
-
-  if (need_flush)
-    flush_dirty_back_buffers ();
 
   unblock_input ();
 
@@ -3852,12 +3847,12 @@ haiku_toggle_invisible_pointer (struct frame *f, bool invisible_p)
 {
   void *view = FRAME_HAIKU_VIEW (f);
 
-  if (view)
+  if (view && !FRAME_TOOLTIP_P (f))
     {
       block_input ();
-      BView_set_view_cursor (view, invisible_p ?
-			     FRAME_OUTPUT_DATA (f)->no_cursor :
-			     FRAME_OUTPUT_DATA (f)->current_cursor);
+      BView_set_view_cursor (view, (invisible_p
+				    ? FRAME_OUTPUT_DATA (f)->no_cursor
+				    : FRAME_OUTPUT_DATA (f)->current_cursor));
       f->pointer_invisible = invisible_p;
       unblock_input ();
     }
@@ -3951,15 +3946,14 @@ haiku_term_init (void)
   void *name_buffer;
 
   block_input ();
+
   Fset_input_interrupt_mode (Qt);
-
   baud_rate = 19200;
-
   dpyinfo = xzalloc (sizeof *dpyinfo);
-
   haiku_io_init ();
 
-  if (port_application_to_emacs < B_OK)
+  if (port_application_to_emacs < B_OK
+      || port_emacs_to_session_manager < B_OK)
     emacs_abort ();
 
   color_file = Fexpand_file_name (build_string ("rgb.txt"),

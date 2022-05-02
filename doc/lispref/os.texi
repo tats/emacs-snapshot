@@ -1359,7 +1359,8 @@ This represents the number of seconds using the formula:
 @tex
 $high \times 2^{16} + low + micro \times 10^{-6} + pico \times 10^{-12}$.
 @end tex
-In some cases, functions may default to returning two- or
+If @code{current-time-list} is @code{t},
+some functions may default to returning two- or
 three-element lists, with omitted @var{micro} and @var{pico}
 components defaulting to zero.
 On all current machines @var{pico} is a multiple of 1000, but this
@@ -1413,13 +1414,28 @@ The operating system limits the range of time and zone values.
 @end example
 @end defun
 
+@defvar current-time-list
+This boolean variable is a transition aid.  If @code{t},
+@code{current-time} and related functions return timestamps in list
+form, typically @code{(@var{high} @var{low} @var{micro} @var{pico})};
+otherwise, they use @code{(@var{ticks} . @var{hz})} form.  Currently
+this variable defaults to @code{t}, for behavior compatible with
+previous Emacs versions.  Developers are encouraged to test
+timestamp-related code with this variable set to @code{nil}, as it
+will default to @code{nil} in a future Emacs version, and will be
+removed in some version after that.
+@end defvar
+
 @defun current-time
 This function returns the current time as a Lisp timestamp.
-Although the timestamp takes the form @code{(@var{high} @var{low}
-@var{micro} @var{pico})} in the current Emacs release, this is
-planned to change in a future Emacs version.  You can use the
-@code{time-convert} function to convert a timestamp to some other
-form.  @xref{Time Conversion}.
+If @code{current-time-list} is @code{nil},
+the timestamp has the form @code{(@var{ticks} . @var{hz})} where
+@var{ticks} counts clock ticks and @var{hz} is the clock ticks per second.
+Otherwise, the timestamp has the list form
+@code{(@var{high} @var{low} @var{usec} @var{psec})}.
+You can use @code{(time-convert nil t)} or @code{(time-convert nil 'list)}
+to obtain a particular form regardless of the value of
+@code{current-time-list}.  @xref{Time Conversion}.
 @end defun
 
 @defun float-time &optional time
@@ -1433,6 +1449,13 @@ For example, on typical systems @code{(float-time '(1 . 10))} displays
 as @samp{0.1} but is slightly greater than 1/10.
 
 @code{time-to-seconds} is an alias for this function.
+@end defun
+
+@defun current-cpu-time
+Return the current @acronym{CPU} time along with its resolution.  The
+return value is a pair @code{(CPU-TICKS . TICKS-PER-SEC)}.  The
+@var{CPU-TICKS} counter can wrap around, so values cannot be
+meaningfully compared if too much time has passed between them.
 @end defun
 
 @node Time Zone Rules
@@ -1659,6 +1682,11 @@ standard-time timestamps 2020-12-27 01:30 when @var{zone} is
 standard time from 4 to 3 hours east of Greenwich; if you need to
 handle situations like this you can use a numeric @var{zone} to
 disambiguate instead.
+
+The first argument can also be a list @code{(@var{second} @var{minute}
+@var{hour} @var{day} @var{month} @var{year})}, which is treated like
+the list @code{(@var{second} @var{minute} @var{hour} @var{day}
+@var{month} @var{year} nil -1 nil)}.
 
 As an obsolescent calling convention, this function can be given six
 or more arguments.  The first six arguments @var{second},

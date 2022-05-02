@@ -286,6 +286,24 @@ enum haiku_font_language
     MAX_LANGUAGE /* This isn't a language. */
   };
 
+enum haiku_font_weight
+  {
+    NO_WEIGHT	      = -1,
+    HAIKU_THIN	      = 0,
+    HAIKU_EXTRALIGHT  = 40,
+    HAIKU_LIGHT	      = 50,
+    HAIKU_SEMI_LIGHT  = 75,
+    HAIKU_REGULAR     = 100,
+    HAIKU_SEMI_BOLD   = 180,
+    HAIKU_BOLD	      = 200,
+    HAIKU_EXTRA_BOLD  = 205,
+    HAIKU_BOOK	      = 400,
+    HAIKU_HEAVY	      = 800,
+    HAIKU_ULTRA_HEAVY = 900,
+    HAIKU_BLACK	      = 1000,
+    HAIKU_MEDIUM      = 2000,
+  };
+
 struct haiku_font_pattern
 {
   int specified;
@@ -297,13 +315,13 @@ struct haiku_font_pattern
   struct haiku_font_pattern *next_family;
   haiku_font_family_or_style family;
   haiku_font_family_or_style style;
-  int weight;
   int mono_spacing_p;
   int want_chars_len;
   int need_one_of_len;
   enum haiku_font_slant slant;
   enum haiku_font_width width;
   enum haiku_font_language language;
+  enum haiku_font_weight weight;
   int *wanted_chars;
   int *need_one_of;
 
@@ -349,21 +367,10 @@ struct haiku_menu_bar_state_event
   void *window;
 };
 
-#define HAIKU_THIN 0
-#define HAIKU_ULTRALIGHT 20
-#define HAIKU_EXTRALIGHT 40
-#define HAIKU_LIGHT 50
-#define HAIKU_SEMI_LIGHT 75
-#define HAIKU_REGULAR 100
-#define HAIKU_SEMI_BOLD 180
-#define HAIKU_BOLD 200
-#define HAIKU_EXTRA_BOLD 205
-#define HAIKU_ULTRA_BOLD 210
-#define HAIKU_BOOK 400
-#define HAIKU_HEAVY 800
-#define HAIKU_ULTRA_HEAVY 900
-#define HAIKU_BLACK 1000
-#define HAIKU_MEDIUM 2000
+struct haiku_session_manager_reply
+{
+  bool quit_reply;
+};
 
 #ifdef __cplusplus
 /* Haiku's built in Height and Width functions for calculating
@@ -420,6 +427,7 @@ extern unsigned long haiku_get_pixel (haiku, int, int);
 
 extern port_id port_application_to_emacs;
 extern port_id port_popup_menu_to_emacs;
+extern port_id port_emacs_to_session_manager;
 
 extern void haiku_io_init (void);
 extern void haiku_io_init_in_app_thread (void);
@@ -458,7 +466,6 @@ extern void BWindow_change_decoration (void *, int);
 extern void BWindow_set_tooltip_decoration (void *);
 extern void BWindow_set_avoid_focus (void *, int);
 extern void BWindow_zoom (void *);
-extern void BWindow_set_min_size (void *, int, int);
 extern void BWindow_set_size_alignment (void *, int, int);
 extern void BWindow_sync (void *);
 extern void BWindow_send_behind (void *, void *);
@@ -595,6 +602,7 @@ extern void EmacsWindow_unzoom (void *);
 extern void be_get_version_string (char *, int);
 extern int be_get_display_planes (void);
 extern int be_get_display_color_cells (void);
+extern bool be_is_display_grayscale (void);
 extern void be_warp_pointer (int, int);
 
 extern void EmacsView_set_up_double_buffering (void *);
@@ -637,6 +645,7 @@ extern int be_get_display_screens (void);
 extern bool be_use_subpixel_antialiasing (void);
 extern const char *be_find_setting (const char *);
 extern haiku_font_family_or_style *be_list_font_families (size_t *);
+extern void be_font_style_to_flags (char *, struct haiku_font_pattern *);
 extern int be_get_ui_color (const char *, uint32_t *);
 
 extern void BMessage_delete (void *);
@@ -647,6 +656,12 @@ extern bool be_drag_message (void *, void *, bool, void (*) (void),
 extern bool be_drag_and_drop_in_progress (void);
 
 extern bool be_replay_menu_bar_event (void *, struct haiku_menu_bar_click_event *);
+extern bool be_select_font (void (*) (void), bool (*) (void),
+			    haiku_font_family_or_style *,
+			    haiku_font_family_or_style *,
+			    int *, bool, int, int);
+
+extern int be_find_font_indices (struct haiku_font_pattern *, int *, int *);
 #ifdef __cplusplus
 }
 

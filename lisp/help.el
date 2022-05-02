@@ -867,7 +867,7 @@ with `mouse-movement' events."
                   (memq 'down last-modifiers)
                   ;; After a click, see if a double click is on the way.
                   (and (memq 'click last-modifiers)
-                       (not (sit-for (/ double-click-time 1000.0) t))))
+                       (not (sit-for (/ (mouse-double-click-time) 1000.0) t))))
             (let* ((seq (read-key-sequence "\
 Describe the following key, mouse click, or menu item: "
                                            nil nil 'can-return-switch-frame))
@@ -1802,12 +1802,24 @@ the help window appears on another frame, it may get selected and
 its frame get input focus even if this option is nil.
 
 This option has effect if and only if the help window was created
-by `with-help-window'."
+by `with-help-window'.
+
+Also see `help-window-keep-selected'."
   :type '(choice (const :tag "never (nil)" nil)
 		 (const :tag "other" other)
 		 (const :tag "always (t)" t))
   :group 'help
   :version "23.1")
+
+(defcustom help-window-keep-selected nil
+  "If non-nil, navigation commands in the *Help* buffer will reuse the window.
+If nil, many commands in the *Help* buffer, like \\<help-mode-map>\\[help-view-source] and \\[help-goto-info], will
+pop to a different window to display the results.
+
+Also see `help-window-select'."
+  :type 'boolean
+  :group 'help
+  :version "29.1")
 
 (define-obsolete-variable-alias 'help-enable-auto-load
   'help-enable-autoload "27.1")
@@ -2039,7 +2051,7 @@ the same names as used in the original source code, when possible."
   (if (and (symbolp def) (fboundp def)) (setq def (indirect-function def)))
   ;; Advice wrappers have "catch all" args, so fetch the actual underlying
   ;; function to find the real arguments.
-  (while (advice--p def) (setq def (advice--cdr def)))
+  (setq def (advice--cd*r def))
   ;; If definition is a macro, find the function inside it.
   (if (eq (car-safe def) 'macro) (setq def (cdr def)))
   (cond

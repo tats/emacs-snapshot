@@ -66,6 +66,8 @@ static Lisp_Object tip_last_parms;
 
 static void haiku_explicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
 static void haiku_set_title (struct frame *, Lisp_Object, Lisp_Object);
+
+/* The number of references to an image cache.  */
 static ptrdiff_t image_cache_refcount;
 
 static Lisp_Object
@@ -509,15 +511,13 @@ haiku_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 haiku_set_no_accept_focus (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 {
-  block_input ();
   if (!EQ (new_value, old_value))
     FRAME_NO_ACCEPT_FOCUS (f) = !NILP (new_value);
 
+  block_input ();
   if (FRAME_HAIKU_WINDOW (f))
-    {
-      BWindow_set_avoid_focus (FRAME_HAIKU_WINDOW (f),
-			       FRAME_NO_ACCEPT_FOCUS (f));
-    }
+    BWindow_set_avoid_focus (FRAME_HAIKU_WINDOW (f),
+			     FRAME_NO_ACCEPT_FOCUS (f));
   unblock_input ();
 }
 
@@ -700,6 +700,7 @@ haiku_create_frame (Lisp_Object parms)
   f->output_method = output_haiku;
   f->output_data.haiku = xzalloc (sizeof *f->output_data.haiku);
   f->output_data.haiku->wait_for_event_type = -1;
+  f->output_data.haiku->relief_background = -1;
 
   fset_icon_name (f, gui_display_get_arg (dpyinfo, parms, Qicon_name,
                                           "iconName", "Title",
@@ -1015,6 +1016,7 @@ haiku_create_tip_frame (Lisp_Object parms)
   f->output_method = output_haiku;
   f->output_data.haiku = xzalloc (sizeof *f->output_data.haiku);
   f->output_data.haiku->wait_for_event_type = -1;
+  f->output_data.haiku->relief_background = -1;
 
   f->tooltip = true;
   fset_icon_name (f, Qnil);
@@ -1622,13 +1624,11 @@ haiku_iconify_frame (struct frame *frame)
   if (FRAME_ICONIFIED_P (frame))
     return;
 
-  block_input ();
-
   SET_FRAME_VISIBLE (frame, false);
   SET_FRAME_ICONIFIED (frame, true);
 
+  block_input ();
   BWindow_iconify (FRAME_HAIKU_WINDOW (frame));
-
   unblock_input ();
 }
 
@@ -1837,7 +1837,9 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
        doc: /* SKIP: real doc in xfns.c.  */)
      (Lisp_Object terminal)
 {
-  return Qt;
+  check_haiku_display_info (terminal);
+
+  return be_is_display_grayscale () ? Qnil : Qt;
 }
 
 DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
@@ -1857,20 +1859,19 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
      (Lisp_Object color, Lisp_Object frame)
 {
   Emacs_Color col;
+  int rc;
 
   CHECK_STRING (color);
   decode_window_system_frame (frame);
 
   block_input ();
-  if (haiku_get_color (SSDATA (color), &col))
-    {
-      unblock_input ();
-      return Qnil;
-    }
+  rc = haiku_get_color (SSDATA (color), &col);
   unblock_input ();
 
-  return list3i (lrint (col.red), lrint (col.green),
-		 lrint (col.blue));
+  if (rc)
+    return Qnil;
+
+  return list3i (col.red, col.green, col.blue);
 }
 
 DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p,
@@ -1878,7 +1879,9 @@ DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p,
        doc: /* SKIP: real doc in xfns.c.  */)
   (Lisp_Object terminal)
 {
-  return Qnil;
+  check_haiku_display_info (terminal);
+
+  return be_is_display_grayscale () ? Qt : Qnil;
 }
 
 DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection,
@@ -1919,9 +1922,9 @@ DEFUN ("x-display-pixel-width", Fx_display_pixel_width, Sx_display_pixel_width,
   (Lisp_Object terminal)
 
 {
+  int width, height;
   check_haiku_display_info (terminal);
 
-  int width, height;
   BScreen_px_dim (&width, &height);
   return make_fixnum (width);
 }
@@ -1932,9 +1935,9 @@ DEFUN ("x-display-pixel-height", Fx_display_pixel_height, Sx_display_pixel_heigh
   (Lisp_Object terminal)
 
 {
+  int width, height;
   check_haiku_display_info (terminal);
 
-  int width, height;
   BScreen_px_dim (&width, &height);
   return make_fixnum (width);
 }
@@ -1944,10 +1947,9 @@ DEFUN ("x-display-mm-height", Fx_display_mm_height, Sx_display_mm_height, 0, 1, 
   (Lisp_Object terminal)
 {
   struct haiku_display_info *dpyinfo = check_haiku_display_info (terminal);
-
   int width, height;
-  BScreen_px_dim (&width, &height);
 
+  BScreen_px_dim (&width, &height);
   return make_fixnum (height / (dpyinfo->resy / 25.4));
 }
 
@@ -1957,10 +1959,9 @@ DEFUN ("x-display-mm-width", Fx_display_mm_width, Sx_display_mm_width, 0, 1, 0,
   (Lisp_Object terminal)
 {
   struct haiku_display_info *dpyinfo = check_haiku_display_info (terminal);
-
   int width, height;
-  BScreen_px_dim (&width, &height);
 
+  BScreen_px_dim (&width, &height);
   return make_fixnum (width / (dpyinfo->resx / 25.4));
 }
 
@@ -1977,14 +1978,20 @@ DEFUN ("x-display-visual-class", Fx_display_visual_class,
        doc: /* SKIP: real doc in xfns.c.  */)
   (Lisp_Object terminal)
 {
+  int planes;
+  bool grayscale_p;
+
   check_haiku_display_info (terminal);
 
-  int planes = be_get_display_planes ();
+  grayscale_p = be_is_display_grayscale ();
+  if (grayscale_p)
+    return Qstatic_gray;
 
+  planes = be_get_display_planes ();
   if (planes == 8)
-    return intern ("static-color");
+    return Qstatic_color;
 
-  return intern ("true-color");
+  return Qtrue_color;
 }
 
 DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
@@ -2014,9 +2021,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   f = decode_window_system_frame (frame);
 
   if (NILP (timeout))
-    timeout = make_fixnum (5);
-  else
-    CHECK_FIXNAT (timeout);
+    timeout = Vx_show_tooltip_timeout;
+  CHECK_FIXNAT (timeout);
 
   if (NILP (dx))
     dx = make_fixnum (5);
@@ -2602,7 +2608,7 @@ means that if both frames are visible and the display areas of these
 frames overlap, FRAME1 (partially) obscures FRAME2.
 
 Some window managers may refuse to restack windows.  */)
-     (Lisp_Object frame1, Lisp_Object frame2, Lisp_Object above)
+  (Lisp_Object frame1, Lisp_Object frame2, Lisp_Object above)
 {
   struct frame *f1 = decode_window_system_frame (frame1);
   struct frame *f2 = decode_window_system_frame (frame2);
@@ -2646,6 +2652,30 @@ Some window managers may refuse to restack windows.  */)
   BWindow_sync (FRAME_HAIKU_WINDOW (f1));
   BWindow_sync (FRAME_HAIKU_WINDOW (f2));
 
+  unblock_input ();
+
+  return Qnil;
+}
+
+DEFUN ("haiku-save-session-reply", Fhaiku_save_session_reply,
+       Shaiku_save_session_reply, 1, 1, 0,
+       doc: /* Reply to a `save-session' event.
+QUIT-REPLY means whether or not all files were saved and program
+termination should proceed.
+
+Calls to this function must be balanced by the amount of
+`save-session' events received.  This is done automatically, so do not
+call this function yourself.  */)
+  (Lisp_Object quit_reply)
+{
+  struct haiku_session_manager_reply reply;
+  reply.quit_reply = !NILP (quit_reply);
+
+  block_input ();
+  unrequest_sigio ();
+  write_port (port_emacs_to_session_manager, 0, &reply,
+	      sizeof reply);
+  request_sigio ();
   unblock_input ();
 
   return Qnil;
@@ -2716,6 +2746,10 @@ syms_of_haikufns (void)
   DEFSYM (Qwhen_mapped, "when-mapped");
   DEFSYM (Qtooltip_reuse_hidden_frame, "tooltip-reuse-hidden-frame");
 
+  DEFSYM (Qstatic_color, "static-color");
+  DEFSYM (Qstatic_gray, "static-gray");
+  DEFSYM (Qtrue_color, "true-color");
+
   defsubr (&Sx_hide_tip);
   defsubr (&Sxw_display_color_p);
   defsubr (&Sx_display_grayscale_p);
@@ -2748,6 +2782,7 @@ syms_of_haikufns (void)
   defsubr (&Shaiku_frame_list_z_order);
   defsubr (&Sx_display_save_under);
   defsubr (&Shaiku_frame_restack);
+  defsubr (&Shaiku_save_session_reply);
 
   tip_timer = Qnil;
   staticpro (&tip_timer);

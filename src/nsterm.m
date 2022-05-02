@@ -163,7 +163,7 @@ char const * nstrace_fullscreen_type_name (int fs_type)
       && NSAppKitVersionNumber >= NSAppKitVersionNumber10_7)
     return [self colorUsingColorSpace: [NSColorSpace sRGBColorSpace]];
 #endif
-  return [self colorUsingColorSpace: [NSColorSpace deviceRGBColorSpace]];
+  return [self colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
 }
 
 + (NSColor *)colorWithUnsignedLong:(unsigned long)c
@@ -751,7 +751,18 @@ ns_parent_window_rect (struct frame *f)
       EmacsView *parentView = FRAME_NS_VIEW (FRAME_PARENT_FRAME (f));
       parentRect = [parentView convertRect:[parentView frame]
                                     toView:nil];
+
+#if defined (NS_IMPL_COCOA) && !defined (MAC_OS_X_VERSION_10_7)
+      parentRect.origin = [[parentView window] convertBaseToScreen:parentRect.origin];
+#elif defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MIN_REQUIRED < 1070
+      if ([[parentView window]
+             respondsToSelector:@selector(convertRectToScreen:)])
+        parentRect = [[parentView window] convertRectToScreen:parentRect];
+      else
+        parentRect.origin = [[parentView window] convertBaseToScreen:parentRect.origin];
+#else
       parentRect = [[parentView window] convertRectToScreen:parentRect];
+#endif
     }
   else
     parentRect = [[[NSScreen screens] objectAtIndex:0] frame];
@@ -788,10 +799,16 @@ ns_row_rect (struct window *w, struct glyph_row *row,
 double
 ns_frame_scale_factor (struct frame *f)
 {
-#if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED > 1060
-  return [[FRAME_NS_VIEW (f) window] backingScaleFactor];
-#else
+#if defined (NS_IMPL_GNUSTEP) || !defined (MAC_OS_X_VERSION_10_7)
   return [[FRAME_NS_VIEW (f) window] userSpaceScaleFactor];
+#elif MAC_OS_X_VERSION_MIN_REQUIRED < 1070
+  if ([[FRAME_NS_VIEW (f) window]
+            respondsToSelector:@selector(backingScaleFactor:)])
+    return [[FRAME_NS_VIEW (f) window] backingScaleFactor];
+  else
+    return [[FRAME_NS_VIEW (f) window] userSpaceScaleFactor];
+#else
+  return [[FRAME_NS_VIEW (f) window] backingScaleFactor];
 #endif
 }
 
@@ -4425,10 +4442,10 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 }
 
 
-int
-ns_select (int nfds, fd_set *readfds, fd_set *writefds,
-	   fd_set *exceptfds, struct timespec *timeout,
-	   sigset_t *sigmask)
+static int
+ns_select_1 (int nfds, fd_set *readfds, fd_set *writefds,
+	     fd_set *exceptfds, struct timespec *timeout,
+	     sigset_t *sigmask, BOOL run_loop_only)
 /* --------------------------------------------------------------------------
      Replacement for select, checking for events
    -------------------------------------------------------------------------- */
@@ -4444,7 +4461,7 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
   check_native_fs ();
 #endif
 
-  if (hold_event_q.nr > 0)
+  if (hold_event_q.nr > 0 && !run_loop_only)
     {
       /* We already have events pending.  */
       raise (SIGIO);
@@ -4462,12 +4479,12 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
   if (NSApp == nil
       || ![NSThread isMainThread]
       || (timeout && timeout->tv_sec == 0 && timeout->tv_nsec == 0))
-    return thread_select(pselect, nfds, readfds, writefds,
-                         exceptfds, timeout, sigmask);
+    return thread_select (pselect, nfds, readfds, writefds,
+			  exceptfds, timeout, sigmask);
   else
     {
       struct timespec t = {0, 0};
-      thread_select(pselect, 0, NULL, NULL, NULL, &t, sigmask);
+      thread_select (pselect, 0, NULL, NULL, NULL, &t, sigmask);
     }
 
   /* FIXME: This draining of outerpool causes a crash when a buffer
@@ -4583,6 +4600,15 @@ ns_select (int nfds, fd_set *readfds, fd_set *writefds,
     }
 
   return result;
+}
+
+int
+ns_select (int nfds, fd_set *readfds, fd_set *writefds,
+	   fd_set *exceptfds, struct timespec *timeout,
+	   sigset_t *sigmask)
+{
+  return ns_select_1 (nfds, readfds, writefds, exceptfds,
+		      timeout, sigmask, NO);
 }
 
 #ifdef HAVE_PTHREAD
@@ -6029,6 +6055,63 @@ not_in_argv (NSString *arg)
 
 @end  /* EmacsApp */
 
+static Lisp_Object
+ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
+{
+  NSFontSymbolicTraits traits = [desc symbolicTraits];
+  NSDictionary *dict = [desc objectForKey: NSFontTraitsAttribute];
+  NSString *family = [font familyName];
+  Lisp_Object lwidth, lslant, lweight, lheight;
+  NSNumber *tem;
+
+  lwidth = Qnil;
+  lslant = Qnil;
+  lweight = Qnil;
+  lheight = Qnil;
+
+  if (traits & NSFontBoldTrait)
+    lweight = Qbold;
+
+  if (traits & NSFontItalicTrait)
+    lslant = Qitalic;
+
+  if (traits & NSFontCondensedTrait)
+    lwidth = Qcondensed;
+  else if (traits & NSFontExpandedTrait)
+    lwidth = Qexpanded;
+
+  if (dict != nil)
+    {
+      tem = [dict objectForKey: NSFontSlantTrait];
+
+      if (tem != nil)
+	lslant = ([tem floatValue] > 0
+		  ? Qitalic : ([tem floatValue] < 0
+			       ? Qreverse_italic
+			       : Qnormal));
+
+      tem = [dict objectForKey: NSFontWeightTrait];
+
+      if (tem != nil)
+	lweight = ([tem floatValue] > 0
+		   ? Qbold : ([tem floatValue] < -0.4f
+			      ? Qlight : Qnormal));
+
+      tem = [dict objectForKey: NSFontWidthTrait];
+
+      if (tem != nil)
+	lwidth = ([tem floatValue] > 0
+		  ? Qexpanded : ([tem floatValue] < 0
+				 ? Qnormal : Qcondensed));
+    }
+
+  lheight = make_float ([font pointSize]);
+
+  return CALLN (Ffont_spec,
+		QCwidth, lwidth, QCslant, lslant,
+		QCweight, lweight, QCsize, lheight,
+		QCfamily, [family lispString]);
+}
 
 /* ==========================================================================
 
@@ -6065,47 +6148,117 @@ not_in_argv (NSString *arg)
 
 
 /* Called on font panel selection.  */
-- (void)changeFont: (id)sender
+- (void) changeFont: (id) sender
 {
-  struct face *face = FACE_FROM_ID (emacsframe, DEFAULT_FACE_ID);
-  struct font *font = face->font;
-  id newFont;
-  CGFloat size;
+  struct font *font = FRAME_OUTPUT_DATA (emacsframe)->font;
   NSFont *nsfont;
-  struct input_event ie;
-
-  NSTRACE ("[EmacsView changeFont:]");
-  EVENT_INIT (ie);
 
 #ifdef NS_IMPL_GNUSTEP
-  nsfont = ((struct nsfont_info *)font)->nsfont;
-#endif
-#ifdef NS_IMPL_COCOA
+  nsfont = ((struct nsfont_info *) font)->nsfont;
+#else
   nsfont = (NSFont *) macfont_get_nsctfont (font);
 #endif
 
-  if ((newFont = [sender convertFont: nsfont]))
-    {
-      ie.kind = NS_NONKEY_EVENT;
-      ie.modifiers = 0;
-      ie.code = KEY_NS_CHANGE_FONT;
-      XSETFRAME (ie.frame_or_window, emacsframe);
+  if (!font_panel_active)
+    return;
 
-      size = [newFont pointSize];
-      ns_input_fontsize = make_fixnum (lrint (size));
-      ns_input_font = [[newFont familyName] lispString];
+  if (font_panel_result)
+    [font_panel_result release];
 
-      kbd_buffer_store_event (&ie);
-    }
+  font_panel_result = (NSFont *) [sender convertFont: nsfont];
+
+  if (font_panel_result)
+    [font_panel_result retain];
+
+#ifndef NS_IMPL_COCOA
+  font_panel_active = NO;
+  [NSApp stop: self];
+#endif
 }
 
+#ifdef NS_IMPL_COCOA
+- (void) noteUserSelectedFont
+{
+  font_panel_active = NO;
+  [NSApp stop: self];
+}
+#endif
+
+- (Lisp_Object) showFontPanel
+{
+  id fm = [NSFontManager sharedFontManager];
+  struct font *font = FRAME_OUTPUT_DATA (emacsframe)->font;
+  NSFont *nsfont, *result;
+  struct timespec timeout;
+#ifdef NS_IMPL_COCOA
+  NSButton *button;
+  BOOL canceled;
+#endif
+
+#ifdef NS_IMPL_GNUSTEP
+  nsfont = ((struct nsfont_info *) font)->nsfont;
+#else
+  nsfont = (NSFont *) macfont_get_nsctfont (font);
+#endif
+
+#ifdef NS_IMPL_COCOA
+  /* FIXME: this button could be made a lot prettier, but I don't know
+     how.  */
+  button = [[NSButton alloc] initWithFrame: NSMakeRect (0, 0, 192, 40)];
+  [button setTitle: @"OK"];
+  [button setTarget: self];
+  [button setAction: @selector (noteUserSelectedFont)];
+  [button setButtonType: NSButtonTypeMomentaryPushIn];
+  [button setHidden: NO];
+
+  [[fm fontPanel: YES] setAccessoryView: button];
+  [button release];
+  [[fm fontPanel: YES] setDefaultButtonCell: [button cell]];
+#endif
+
+  [fm setSelectedFont: nsfont isMultiple: NO];
+  [fm orderFrontFontPanel: NSApp];
+
+  font_panel_active = YES;
+  timeout = make_timespec (0, 100000000);
+
+  block_input ();
+  while (font_panel_active
+#ifdef NS_IMPL_COCOA
+	 && (canceled = [[fm fontPanel: YES] isVisible])
+#else
+	 && [[fm fontPanel: YES] isVisible]
+#endif
+	 )
+    ns_select_1 (0, NULL, NULL, NULL, &timeout, NULL, YES);
+  unblock_input ();
+
+  if (font_panel_result)
+    [font_panel_result autorelease];
+
+#ifdef NS_IMPL_COCOA
+  if (!canceled)
+    font_panel_result = nil;
+#endif
+
+  result = font_panel_result;
+  font_panel_result = nil;
+
+  [[fm fontPanel: YES] setIsVisible: NO];
+  font_panel_active = NO;
+
+  if (result)
+    return ns_font_desc_to_font_spec ([result fontDescriptor],
+				      result);
+
+  return Qnil;
+}
 
 - (BOOL)acceptsFirstResponder
 {
   NSTRACE ("[EmacsView acceptsFirstResponder]");
   return YES;
 }
-
 
 - (void)resetCursorRects
 {
@@ -6943,7 +7096,7 @@ not_in_argv (NSString *arg)
   [self mouseMoved: e];
 }
 
-#ifdef NS_IMPL_COCOA
+#if defined NS_IMPL_COCOA && defined MAC_OS_X_VERSION_10_7
 - (void) magnifyWithEvent: (NSEvent *) event
 {
   NSPoint pt = [self convertPoint: [event locationInWindow] fromView: nil];
@@ -8526,7 +8679,7 @@ not_in_argv (NSString *arg)
      expected later.  */
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 101000
-  if ([child respondsToSelector:@selector(setAccessibilitySubrole:)])
+  if ([self respondsToSelector:@selector(setAccessibilitySubrole:)])
 #endif
     /* Set the accessibility subroles.  */
     if (parentFrame)
@@ -8558,7 +8711,7 @@ not_in_argv (NSString *arg)
 
 #ifdef NS_IMPL_COCOA
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 1070
-      if ([ourView respondsToSelector:@selector (toggleFullScreen)]
+      if ([ourView respondsToSelector:@selector (toggleFullScreen)])
 #endif
           /* If we are the descendent of a fullscreen window and we
              have no new parent, go fullscreen.  */
@@ -8583,11 +8736,11 @@ not_in_argv (NSString *arg)
 
 #ifdef NS_IMPL_COCOA
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 1070
-      if ([ourView respondsToSelector:@selector (toggleFullScreen)]
+      if ([ourView respondsToSelector:@selector (toggleFullScreen)])
 #endif
-          /* Child frames must not be fullscreen.  */
-          if ([ourView fsIsNative] && [ourView isFullscreen])
-            [ourView toggleFullScreen:self];
+	/* Child frames must not be fullscreen.  */
+	if ([ourView fsIsNative] && [ourView isFullscreen])
+	  [ourView toggleFullScreen:self];
 #endif
 
       [parentWindow addChildWindow:self
@@ -10146,6 +10299,9 @@ This variable is ignored on macOS < 10.7 and GNUstep.  Default is t.  */);
   DEFSYM (QCordinary, ":ordinary");
   DEFSYM (QCfunction, ":function");
   DEFSYM (QCmouse, ":mouse");
+  DEFSYM (Qcondensed, "condensed");
+  DEFSYM (Qreverse_italic, "reverse-italic");
+  DEFSYM (Qexpanded, "reverse-italic");
 
 #ifdef NS_IMPL_COCOA
   Fprovide (Qcocoa, Qnil);

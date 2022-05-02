@@ -37,6 +37,7 @@
 (declare-function org-mode "org" ())
 (declare-function org-show-context "org" (&optional key))
 (declare-function org-string-collate-lessp "org-compat" (s1 s2 &optional locale ignore-case))
+(declare-function org-time-convert-to-integer "org-compat" (time))
 
 (defvar org-ts-regexp0)
 (defvar ffap-url-regexp)
@@ -257,15 +258,16 @@ ignored in this case."
 
 (defun org-file-newer-than-p (file time)
   "Non-nil if FILE is newer than TIME.
-FILE is a filename, as a string, TIME is a list of integers, as
+FILE is a filename, as a string, TIME is a Lisp time value, as
 returned by, e.g., `current-time'."
   (and (file-exists-p file)
        ;; Only compare times up to whole seconds as some file-systems
        ;; (e.g. HFS+) do not retain any finer granularity.  As
        ;; a consequence, make sure we return non-nil when the two
        ;; times are equal.
-       (not (time-less-p (cl-subseq (nth 5 (file-attributes file)) 0 2)
-			 (cl-subseq time 0 2)))))
+       (not (time-less-p (org-time-convert-to-integer
+			  (nth 5 (file-attributes file)))
+			 (org-time-convert-to-integer time)))))
 
 (defun org-compile-file (source process ext &optional err-msg log-buf spec)
   "Compile a SOURCE file using PROCESS.

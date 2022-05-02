@@ -42,7 +42,9 @@
   :group 'editing)
 
 (defcustom mouse-yank-at-point nil
-  "If non-nil, mouse yank commands yank at point instead of at click."
+  "If non-nil, mouse yank commands yank at point instead of at click.
+This also allows yanking text into an isearch without moving the
+mouse cursor to the echo area."
   :type 'boolean)
 
 (defcustom mouse-drag-copy-region nil
@@ -164,6 +166,17 @@ Expects to be bound to `(double-)mouse-1' in `key-translation-map'."
   #'mouse--click-1-maybe-follows-link)
 (define-key key-translation-map [double-mouse-1]
   #'mouse--click-1-maybe-follows-link)
+
+(defun mouse-double-click-time ()
+  "Return a number for `double-click-time'.
+In contrast to using the `double-click-time' variable directly,
+which could be set to nil or t, this function is guaranteed to
+always return a positive integer or zero."
+  (let ((ct double-click-time))
+   (cond ((eq ct t) 10000) ; arbitrary number useful for sit-for
+         ((eq ct nil) 0)
+         ((and (numberp ct) (> ct 0)) ct)
+         (t 0))))
 
 
 ;; Provide a mode-specific menu on a mouse button.

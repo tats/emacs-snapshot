@@ -7307,8 +7307,13 @@ process sentinels.  They shall not disturb each other."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-mock-p))
+  ;; Not all read commands understand argument "-s" or "-p".
+  (skip-unless
+   (string-empty-p
+    (let ((shell-file-name "sh"))
+      (shell-command-to-string "read -s -p Password: pass"))))
 
-  (let ((pass "aaaa")
+  (let ((pass "secret")
 	(mock-entry (copy-sequence (assoc "mock" tramp-methods)))
 	mocked-input tramp-methods)
     ;; We must mock `read-string', in order to avoid interactive

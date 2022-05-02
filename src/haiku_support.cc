@@ -38,6 +38,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <interface/Button.h>
 #include <interface/ControlLook.h>
 #include <interface/Deskbar.h>
+#include <interface/ListView.h>
+#include <interface/StringItem.h>
+#include <interface/SplitView.h>
+#include <interface/ScrollView.h>
+#include <interface/TextControl.h>
 
 #include <locale/UnicodeChar.h>
 
@@ -54,6 +59,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <support/Beep.h>
 #include <support/DataIO.h>
 #include <support/Locker.h>
+#include <support/ObjectList.h>
 
 #include <translation/TranslatorRoster.h>
 #include <translation/TranslationDefs.h>
@@ -84,14 +90,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Some messages that Emacs sends to itself.  */
 enum
   {
-    SCROLL_BAR_UPDATE	= 3000,
-    WAIT_FOR_RELEASE	= 3001,
-    RELEASE_NOW		= 3002,
-    CANCEL_DROP		= 3003,
-    SHOW_MENU_BAR	= 3004,
-    BE_MENU_BAR_OPEN	= 3005,
-    QUIT_APPLICATION	= 3006,
-    REPLAY_MENU_BAR	= 3007,
+    SCROLL_BAR_UPDATE	 = 3000,
+    WAIT_FOR_RELEASE	 = 3001,
+    RELEASE_NOW		 = 3002,
+    CANCEL_DROP		 = 3003,
+    SHOW_MENU_BAR	 = 3004,
+    BE_MENU_BAR_OPEN	 = 3005,
+    QUIT_APPLICATION	 = 3006,
+    REPLAY_MENU_BAR	 = 3007,
+    FONT_FAMILY_SELECTED = 3008,
+    FONT_STYLE_SELECTED	 = 3009,
   };
 
 /* X11 keysyms that we use.  */
@@ -121,6 +129,24 @@ enum
     KEY_HIRIGANA_KATAGANA = 0xff27,
     KEY_ZENKAKU_HANKAKU	  = 0xff2a,
   };
+
+struct font_selection_dialog_message
+{
+  /* Whether or not font selection was cancelled.  */
+  bool_bf cancel : 1;
+
+  /* Whether or not a size was explictly specified.  */
+  bool_bf size_specified : 1;
+
+  /* The index of the selected font family.  */
+  int family_idx;
+
+  /* The index of the selected font style.  */
+  int style_idx;
+
+  /* The selected font size.  */
+  int size;
+};
 
 static color_space dpy_color_space = B_NO_COLOR_SPACE;
 static key_map *key_map = NULL;
@@ -453,8 +479,18 @@ public:
   QuitRequested (void)
   {
     struct haiku_app_quit_requested_event rq;
+    struct haiku_session_manager_reply reply;
+    int32 reply_type;
+
     haiku_write (APP_QUIT_REQUESTED_EVENT, &rq);
-    return 0;
+
+    if (read_port (port_emacs_to_session_manager,
+		   &reply_type, &reply, sizeof reply) < B_OK)
+      /* Return true so the system kills us, since there's no real
+	 alternative if this read fails.  */
+      return true;
+
+    return reply.quit_reply;
   }
 
   void
@@ -1400,8 +1436,6 @@ public:
   BPoint tt_absl_pos;
   BMessage *wait_for_release_message = NULL;
 
-  color_space cspace;
-
   EmacsView () : BView (BRect (0, 0, 0, 0), "Emacs", B_FOLLOW_NONE, B_WILL_DRAW)
   {
 
@@ -1422,12 +1456,6 @@ public:
     if (grab_view == this)
       grab_view = NULL;
     grab_view_locker.Unlock ();
-  }
-
-  void
-  AttachedToWindow (void)
-  {
-    cspace = B_RGBA32;
   }
 
   void
@@ -1541,7 +1569,7 @@ public:
 #endif
 	offscreen_draw_view->RemoveSelf ();
 	delete offscreen_draw_bitmap_1;
-	offscreen_draw_bitmap_1 = new BBitmap (Frame (), cspace, 1);
+	offscreen_draw_bitmap_1 = new BBitmap (Frame (), B_RGBA32, 1);
 	if (offscreen_draw_bitmap_1->InitCheck () != B_OK)
 	  gui_abort ("Offscreen draw bitmap initialization failed");
 
@@ -1649,7 +1677,7 @@ public:
     if (offscreen_draw_view)
       gui_abort ("Failed to lock offscreen view setting up double buffering");
 
-    offscreen_draw_bitmap_1 = new BBitmap (Frame (), cspace, 1);
+    offscreen_draw_bitmap_1 = new BBitmap (Frame (), B_RGBA32, 1);
     if (offscreen_draw_bitmap_1->InitCheck () != B_OK)
       gui_abort ("Failed to init offscreen bitmap");
 #ifdef USE_BE_CAIRO
@@ -2403,6 +2431,333 @@ public:
   {
     Invalidate ();
     BPopUpMenu::FrameResized (w, h);
+  }
+};
+
+class EmacsFontSelectionDialog : public BWindow
+{
+  BView basic_view;
+  BSplitView split_view;
+  BListView font_family_pane;
+  BListView font_style_pane;
+  BScrollView font_family_scroller;
+  BScrollView font_style_scroller;
+  BObjectList<BStringItem> all_families;
+  BObjectList<BStringItem> all_styles;
+  BButton cancel_button, ok_button;
+  BTextControl size_entry;
+  port_id comm_port;
+  bool allow_monospace_only;
+  int pending_selection_idx;
+
+  void
+  UpdateStylesForIndex (int idx)
+  {
+    int n, i;
+    uint32 flags;
+    font_family family;
+    font_style style;
+    BStringItem *item;
+
+    n = all_styles.CountItems ();
+
+    font_style_pane.MakeEmpty ();
+    all_styles.MakeEmpty ();
+
+    if (get_font_family (idx, &family, &flags) == B_OK)
+      {
+	n = count_font_styles (family);
+
+	for (i = 0; i < n; ++i)
+	  {
+	    if (get_font_style (family, i, &style, &flags) == B_OK)
+	      item = new BStringItem (style);
+	    else
+	      item = new BStringItem ("<error>");
+
+	    font_style_pane.AddItem (item);
+	    all_styles.AddItem (item);
+	  }
+      }
+
+    if (pending_selection_idx >= 0)
+      {
+	font_style_pane.Select (pending_selection_idx);
+	font_style_pane.ScrollToSelection ();
+      }
+
+    pending_selection_idx = -1;
+    UpdateForSelectedStyle ();
+  }
+
+  bool
+  QuitRequested (void)
+  {
+    struct font_selection_dialog_message rq;
+
+    rq.cancel = true;
+    write_port (comm_port, 0, &rq, sizeof rq);
+
+    return false;
+  }
+
+  void
+  UpdateForSelectedStyle (void)
+  {
+    if (font_style_pane.CurrentSelection () < 0)
+      ok_button.SetEnabled (false);
+    else
+      ok_button.SetEnabled (true);
+  }
+
+  void
+  MessageReceived (BMessage *msg)
+  {
+    const char *text;
+    int idx;
+    struct font_selection_dialog_message rq;
+
+    if (msg->what == FONT_FAMILY_SELECTED)
+      {
+	idx = font_family_pane.CurrentSelection ();
+	UpdateStylesForIndex (idx);
+      }
+    else if (msg->what == FONT_STYLE_SELECTED)
+      UpdateForSelectedStyle ();
+    else if (msg->what == B_OK
+	     && font_style_pane.CurrentSelection () >= 0)
+      {
+	text = size_entry.Text ();
+
+	rq.cancel = false;
+	rq.family_idx = font_family_pane.CurrentSelection ();
+	rq.style_idx = font_style_pane.CurrentSelection ();
+	rq.size = atoi (text);
+	rq.size_specified = rq.size > 0 || strlen (text);
+
+	write_port (comm_port, 0, &rq, sizeof rq);
+      }
+    else if (msg->what == B_CANCEL)
+      {
+	rq.cancel = true;
+
+	write_port (comm_port, 0, &rq, sizeof rq);
+      }
+
+    BWindow::MessageReceived (msg);
+  }
+
+public:
+
+  ~EmacsFontSelectionDialog (void)
+  {
+    font_family_pane.MakeEmpty ();
+    font_style_pane.MakeEmpty ();
+
+    font_family_pane.RemoveSelf ();
+    font_style_pane.RemoveSelf ();
+    font_family_scroller.RemoveSelf ();
+    font_style_scroller.RemoveSelf ();
+    cancel_button.RemoveSelf ();
+    ok_button.RemoveSelf ();
+    size_entry.RemoveSelf ();
+    basic_view.RemoveSelf ();
+
+    if (comm_port >= B_OK)
+      delete_port (comm_port);
+  }
+
+  EmacsFontSelectionDialog (bool monospace_only,
+			    int initial_family_idx,
+			    int initial_style_idx)
+    : BWindow (BRect (0, 0, 500, 500),
+	       "Select font from list",
+	       B_TITLED_WINDOW_LOOK,
+	       B_MODAL_APP_WINDOW_FEEL, 0),
+      basic_view (NULL, 0),
+      font_family_pane (BRect (0, 0, 10, 10), NULL,
+			B_SINGLE_SELECTION_LIST,
+			B_FOLLOW_ALL_SIDES),
+      font_style_pane (BRect (0, 0, 10, 10), NULL,
+		       B_SINGLE_SELECTION_LIST,
+		       B_FOLLOW_ALL_SIDES),
+      font_family_scroller (NULL, &font_family_pane,
+			    B_FOLLOW_LEFT | B_FOLLOW_TOP,
+			    0, false, true),
+      font_style_scroller (NULL, &font_style_pane,
+			   B_FOLLOW_LEFT | B_FOLLOW_TOP,
+			   0, false, true),
+      all_families (20, true),
+      all_styles (20, true),
+      cancel_button ("Cancel", "Cancel",
+		     new BMessage (B_CANCEL)),
+      ok_button ("OK", "OK", new BMessage (B_OK)),
+      size_entry (NULL, "Size:", NULL, NULL),
+      allow_monospace_only (monospace_only),
+      pending_selection_idx (initial_style_idx)
+  {
+    BStringItem *family_item;
+    int i, n_families;
+    font_family name;
+    uint32 flags, c;
+    BMessage *selection;
+    BTextView *size_text;
+
+    AddChild (&basic_view);
+
+    basic_view.AddChild (&split_view);
+    basic_view.AddChild (&cancel_button);
+    basic_view.AddChild (&ok_button);
+    basic_view.AddChild (&size_entry);
+    split_view.AddChild (&font_family_scroller, 0.7);
+    split_view.AddChild (&font_style_scroller, 0.3);
+
+    basic_view.SetViewUIColor (B_PANEL_BACKGROUND_COLOR);
+
+    FrameResized (801, 801);
+    UpdateForSelectedStyle ();
+
+    selection = new BMessage (FONT_FAMILY_SELECTED);
+    font_family_pane.SetSelectionMessage (selection);
+    selection = new BMessage (FONT_STYLE_SELECTED);
+    font_style_pane.SetSelectionMessage (selection);
+    selection = new BMessage (B_OK);
+    font_style_pane.SetInvocationMessage (selection);
+
+    comm_port = create_port (1, "font dialog port");
+
+    n_families = count_font_families ();
+
+    for (i = 0; i < n_families; ++i)
+      {
+	if (get_font_family (i, &name, &flags) == B_OK)
+	  {
+	    family_item = new BStringItem (name);
+
+	    all_families.AddItem (family_item);
+	    font_family_pane.AddItem (family_item);
+
+	    family_item->SetEnabled (!allow_monospace_only
+				     || flags & B_IS_FIXED);
+	  }
+	else
+	  {
+	    family_item = new BStringItem ("<error>");
+
+	    all_families.AddItem (family_item);
+	    font_family_pane.AddItem (family_item);
+	  }
+      }
+
+    if (initial_family_idx >= 0)
+      {
+	font_family_pane.Select (initial_family_idx);
+	font_family_pane.ScrollToSelection ();
+      }
+
+    size_text = size_entry.TextView ();
+
+    for (c = 0; c <= 47; ++c)
+      size_text->DisallowChar (c);
+
+    for (c = 58; c <= 127; ++c)
+      size_text->DisallowChar (c);
+  }
+
+  void
+  FrameResized (float new_width, float new_height)
+  {
+    BRect frame;
+    float ok_height, ok_width;
+    float cancel_height, cancel_width;
+    float size_width, size_height;
+    float bone;
+    int max_height;
+
+    ok_button.GetPreferredSize (&ok_width, &ok_height);
+    cancel_button.GetPreferredSize (&cancel_width,
+				    &cancel_height);
+    size_entry.GetPreferredSize (&size_width, &size_height);
+
+    max_height = std::max (std::max (ok_height, cancel_height),
+			   size_height);
+
+    SetSizeLimits (cancel_width + ok_width + size_width + 6,
+		   65535, max_height + 64, 65535);
+    frame = Frame ();
+
+    basic_view.ResizeTo (BE_RECT_WIDTH (frame), BE_RECT_HEIGHT (frame));
+    split_view.ResizeTo (BE_RECT_WIDTH (frame),
+			 BE_RECT_HEIGHT (frame) - 4 - max_height);
+
+    bone = BE_RECT_HEIGHT (frame) - 2 - max_height / 2;
+
+    ok_button.MoveTo ((BE_RECT_WIDTH (frame)
+		       - 4 - cancel_width - ok_width),
+		      bone - ok_height / 2);
+    cancel_button.MoveTo (BE_RECT_WIDTH (frame) - 2 - cancel_width,
+			  bone - cancel_height / 2);
+    size_entry.MoveTo (2, bone - size_height / 2);
+
+    ok_button.ResizeTo (ok_width, ok_height);
+    cancel_button.ResizeTo (cancel_width, cancel_height);
+    size_entry.ResizeTo (std::max (size_width,
+				   BE_RECT_WIDTH (frame) / 4),
+			 size_height);
+  }
+
+  void
+  WaitForChoice (struct font_selection_dialog_message *msg,
+		 void (*process_pending_signals_function) (void),
+		 bool (*should_quit_function) (void))
+  {
+    int32 reply_type;
+    struct object_wait_info infos[2];
+    ssize_t status;
+
+    infos[0].object = port_application_to_emacs;
+    infos[0].type = B_OBJECT_TYPE_PORT;
+    infos[0].events = B_EVENT_READ;
+
+    infos[1].object = comm_port;
+    infos[1].type = B_OBJECT_TYPE_PORT;
+    infos[1].events = B_EVENT_READ;
+
+    while (true)
+      {
+	status = wait_for_objects (infos, 2);
+
+	if (status < B_OK)
+	  continue;
+
+	if (infos[1].events & B_EVENT_READ)
+	  {
+	    if (read_port (comm_port, &reply_type,
+			   msg, sizeof *msg) >= B_OK)
+	      return;
+
+	    goto cancel;
+	  }
+
+	if (infos[0].events & B_EVENT_READ)
+	  process_pending_signals_function ();
+
+	if (should_quit_function ())
+	  goto cancel;
+
+	infos[0].events = B_EVENT_READ;
+	infos[1].events = B_EVENT_READ;
+      }
+
+  cancel:
+    msg->cancel = true;
+    return;
+  }
+
+  status_t
+  InitCheck (void)
+  {
+    return comm_port >= B_OK ? B_OK : comm_port;
   }
 };
 
@@ -3585,24 +3940,35 @@ int
 be_get_display_planes (void)
 {
   color_space space = dpy_color_space;
+  BScreen screen;
+
   if (space == B_NO_COLOR_SPACE)
     {
-      BScreen screen; /* This is actually a very slow operation.  */
       if (!screen.IsValid ())
 	gui_abort ("Invalid screen");
+
       space = dpy_color_space = screen.ColorSpace ();
     }
 
-  if (space == B_RGB32 || space == B_RGB24)
-    return 24;
-  if (space == B_RGB16)
-    return 16;
-  if (space == B_RGB15)
-    return 15;
-  if (space == B_CMAP8)
-    return 8;
+  switch (space)
+    {
+    case B_RGB32:
+    case B_RGB24:
+      return 24;
+    case B_RGB16:
+      return 16;
+    case B_RGB15:
+      return 15;
+    case B_CMAP8:
+    case B_GRAY8:
+      return 8;
+    case B_GRAY1:
+      return 1;
 
-  gui_abort ("Bad colorspace for screen");
+    default:
+      gui_abort ("Bad colorspace for screen");
+    }
+
   /* https://www.haiku-os.org/docs/api/classBScreen.html
      says a valid screen can't be anything else.  */
   return -1;
@@ -3612,26 +3978,56 @@ be_get_display_planes (void)
 int
 be_get_display_color_cells (void)
 {
+  BScreen screen;
   color_space space = dpy_color_space;
+
   if (space == B_NO_COLOR_SPACE)
     {
-      BScreen screen;
       if (!screen.IsValid ())
 	gui_abort ("Invalid screen");
+
       space = dpy_color_space = screen.ColorSpace ();
     }
 
-  if (space == B_RGB32 || space == B_RGB24)
-    return 1677216;
-  if (space == B_RGB16)
-    return 65536;
-  if (space == B_RGB15)
-    return 32768;
-  if (space == B_CMAP8)
-    return 256;
+  switch (space)
+    {
+    case B_RGB32:
+    case B_RGB24:
+      return 16777216;
+    case B_RGB16:
+      return 65536;
+    case B_RGB15:
+      return 32768;
+    case B_CMAP8:
+    case B_GRAY8:
+      return 256;
+    case B_GRAY1:
+      return 2;
 
-  gui_abort ("Bad colorspace for screen");
+    default:
+      gui_abort ("Bad colorspace for screen");
+    }
+
   return -1;
+}
+
+/* Return whether or not the current display is only capable of
+   producing grayscale colors.  */
+bool
+be_is_display_grayscale (void)
+{
+  BScreen screen;
+  color_space space = dpy_color_space;
+
+  if (space == B_NO_COLOR_SPACE)
+    {
+      if (!screen.IsValid ())
+	gui_abort ("Invalid screen");
+
+      space = dpy_color_space = screen.ColorSpace ();
+    }
+
+  return space == B_GRAY8 || space == B_GRAY1;
 }
 
 /* Warp the pointer to X by Y.  */
@@ -4038,17 +4434,6 @@ be_get_display_screens (void)
 }
 
 /* Set the minimum width the user can resize WINDOW to.  */
-void
-BWindow_set_min_size (void *window, int width, int height)
-{
-  BWindow *w = (BWindow *) window;
-
-  if (!w->LockLooper ())
-    gui_abort ("Failed to lock window looper setting min size");
-  w->SetSizeLimits (width, -1, height, -1);
-  w->UnlockLooper ();
-}
-
 /* Synchronize WINDOW's connection to the App Server.  */
 void
 BWindow_sync (void *window)
@@ -4326,4 +4711,52 @@ be_get_ui_color (const char *name, uint32_t *color)
 	    | rgb.red << 16 | 255 << 24);
 
   return 0;
+}
+
+bool
+be_select_font (void (*process_pending_signals_function) (void),
+		bool (*should_quit_function) (void),
+		haiku_font_family_or_style *family,
+		haiku_font_family_or_style *style,
+		int *size, bool allow_monospace_only,
+		int initial_family, int initial_style)
+{
+  EmacsFontSelectionDialog *dialog;
+  struct font_selection_dialog_message msg;
+  uint32 flags;
+  font_family family_buffer;
+  font_style style_buffer;
+
+  dialog = new EmacsFontSelectionDialog (allow_monospace_only,
+					 initial_family, initial_style);
+  dialog->CenterOnScreen ();
+
+  if (dialog->InitCheck () < B_OK)
+    {
+      dialog->Quit ();
+      return false;
+    }
+
+  dialog->Show ();
+  dialog->WaitForChoice (&msg, process_pending_signals_function,
+			 should_quit_function);
+
+  if (!dialog->LockLooper ())
+    gui_abort ("Failed to lock font selection dialog looper");
+  dialog->Quit ();
+
+  if (msg.cancel)
+    return false;
+
+  if (get_font_family (msg.family_idx,
+		       &family_buffer, &flags) != B_OK
+      || get_font_style (family_buffer, msg.style_idx,
+			 &style_buffer, &flags) != B_OK)
+    return false;
+
+  memcpy (family, family_buffer, sizeof *family);
+  memcpy (style, style_buffer, sizeof *style);
+  *size = msg.size_specified ? msg.size : -1;
+
+  return true;
 }

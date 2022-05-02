@@ -292,18 +292,21 @@ font_style_to_flags (char *st, struct haiku_font_pattern *pattern)
 {
   char *style = strdup (st);
   char *token;
-  pattern->weight = -1;
+  int tok = 0;
+
+  if (!style)
+    return;
+
+  pattern->weight = NO_WEIGHT;
   pattern->width = NO_WIDTH;
   pattern->slant = NO_SLANT;
-  int tok = 0;
 
   while ((token = std::strtok (!tok ? style : NULL, " ")) && tok < 3)
     {
       if (token && !strcmp (token, "Thin"))
 	pattern->weight = HAIKU_THIN;
-      else if (token && !strcmp (token, "UltraLight"))
-	pattern->weight = HAIKU_ULTRALIGHT;
-      else if (token && !strcmp (token, "ExtraLight"))
+      else if (token && (!strcmp (token, "UltraLight")
+			 || !strcmp (token, "ExtraLight")))
 	pattern->weight = HAIKU_EXTRALIGHT;
       else if (token && !strcmp (token, "Light"))
 	pattern->weight = HAIKU_LIGHT;
@@ -317,7 +320,7 @@ font_style_to_flags (char *st, struct haiku_font_pattern *pattern)
 	  if (pattern->width == NO_WIDTH)
 	    pattern->width = NORMAL_WIDTH;
 
-	  if (pattern->weight == -1)
+	  if (pattern->weight == NO_WEIGHT)
 	    pattern->weight = HAIKU_REGULAR;
 	}
       else if (token && (!strcmp (token, "SemiBold")
@@ -326,12 +329,11 @@ font_style_to_flags (char *st, struct haiku_font_pattern *pattern)
 	pattern->weight = HAIKU_SEMI_BOLD;
       else if (token && !strcmp (token, "Bold"))
 	pattern->weight = HAIKU_BOLD;
-      else if (token && (!strcmp (token, "ExtraBold") ||
+      else if (token && (!strcmp (token, "ExtraBold")
 			 /* This has actually been seen in the wild.  */
-			 !strcmp (token, "Extrabold")))
+			 || !strcmp (token, "Extrabold")
+			 || !strcmp (token, "UltraBold")))
 	pattern->weight = HAIKU_EXTRA_BOLD;
-      else if (token && !strcmp (token, "UltraBold"))
-	pattern->weight = HAIKU_ULTRA_BOLD;
       else if (token && !strcmp (token, "Book"))
 	pattern->weight = HAIKU_BOOK;
       else if (token && !strcmp (token, "Heavy"))
@@ -370,7 +372,7 @@ font_style_to_flags (char *st, struct haiku_font_pattern *pattern)
       tok++;
     }
 
-  if (pattern->weight != -1)
+  if (pattern->weight != NO_WEIGHT)
     pattern->specified |= FSPEC_WEIGHT;
   if (pattern->slant != NO_SLANT)
     pattern->specified |= FSPEC_SLANT;
@@ -492,8 +494,8 @@ font_family_style_matches_p (font_family family, char *style, uint32_t flags,
       strcmp ((char *) &pattern->family, family))
     return false;
 
-  if (!ignore_flags_p && (pattern->specified & FSPEC_SPACING) &&
-      !(pattern->mono_spacing_p) != !(flags & B_IS_FIXED))
+  if (!ignore_flags_p && (pattern->specified & FSPEC_SPACING)
+      && !(pattern->mono_spacing_p) != !(flags & B_IS_FIXED))
     return false;
 
   if (pattern->specified & FSPEC_STYLE)
@@ -506,7 +508,8 @@ font_family_style_matches_p (font_family family, char *style, uint32_t flags,
 
   if ((pattern->specified & FSPEC_SLANT)
       && (pattern->slant
-	  != ((m.specified & FSPEC_SLANT) ? m.slant : SLANT_REGULAR)))
+	  != (m.specified & FSPEC_SLANT
+	      ? m.slant : SLANT_REGULAR)))
     return false;
 
   if ((pattern->specified & FSPEC_WANTED)
@@ -514,8 +517,9 @@ font_family_style_matches_p (font_family family, char *style, uint32_t flags,
     return false;
 
   if ((pattern->specified & FSPEC_WIDTH)
-      && (pattern->width !=
-	  ((m.specified & FSPEC_WIDTH) ? m.width : NORMAL_WIDTH)))
+      && (pattern->width
+	  != (m.specified & FSPEC_WIDTH
+	      ? m.width : NORMAL_WIDTH)))
     return false;
 
   if ((pattern->specified & FSPEC_NEED_ONE_OF)
@@ -802,4 +806,47 @@ be_evict_font_cache (void)
 
       font_object_cache[i] = NULL;
     }
+}
+
+void
+be_font_style_to_flags (char *style, struct haiku_font_pattern *pattern)
+{
+  pattern->specified = 0;
+
+  font_style_to_flags (style, pattern);
+}
+
+int
+be_find_font_indices (struct haiku_font_pattern *pattern,
+		      int *family_index, int *style_index)
+{
+  int32 i, j, n_families, n_styles;
+  font_family family;
+  font_style style;
+  uint32 flags;
+
+  n_families = count_font_families ();
+
+  for (i = 0; i < n_families; ++i)
+    {
+      if (get_font_family (i, &family, &flags) == B_OK)
+	{
+	  n_styles = count_font_styles (family);
+
+	  for (j = 0; j < n_styles; ++j)
+	    {
+	      if (get_font_style (family, j, &style, &flags) == B_OK
+		  && font_family_style_matches_p (family, style,
+						  flags, pattern))
+		{
+		  *family_index = i;
+		  *style_index = j;
+
+		  return 0;
+		}
+	    }
+	}
+    }
+
+  return 1;
 }

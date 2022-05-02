@@ -4633,6 +4633,8 @@ timer_check (void)
 
   Lisp_Object tem = Vinhibit_quit;
   Vinhibit_quit = Qt;
+  block_input ();
+  turn_on_atimers (false);
 
   /* We use copies of the timers' lists to allow a timer to add itself
      again, without locking up Emacs if the newly added timer is
@@ -4646,6 +4648,8 @@ timer_check (void)
   else
     idle_timers = Qnil;
 
+  turn_on_atimers (true);
+  unblock_input ();
   Vinhibit_quit = tem;
 
   do
@@ -12430,7 +12434,10 @@ Polling is automatically disabled in all other cases.  */);
 	       doc: /* Maximum time between mouse clicks to make a double-click.
 Measured in milliseconds.  The value nil means disable double-click
 recognition; t means double-clicks have no time limit and are detected
-by position only.  */);
+by position only.
+
+In Lisp, you might want to use `mouse-double-click-time' instead of
+reading the value of this variable directly.  */);
   Vdouble_click_time = make_fixnum (500);
 
   DEFVAR_INT ("double-click-fuzz", double_click_fuzz,

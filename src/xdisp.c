@@ -770,7 +770,7 @@ static bool message_buf_print;
 static bool message_cleared_p;
 
 /* A scratch glyph row with contents used for generating truncation
-   glyphs.  Also used in direct_output_for_insert.  */
+   glyphs and overlay-arrow glyphs.  */
 
 #define MAX_SCRATCH_GLYPHS 100
 static struct glyph_row scratch_glyph_row;
@@ -13250,6 +13250,20 @@ gui_consider_frame_title (Lisp_Object frame)
    && (update_mode_lines == 0				\
        || update_mode_lines == REDISPLAY_SOME))
 
+static bool
+needs_no_redisplay (struct window *w)
+{
+  struct buffer *buffer = XBUFFER (w->contents);
+  struct frame *f = XFRAME (w->frame);
+  return (REDISPLAY_SOME_P ()
+          && !w->redisplay
+          && !w->update_mode_line
+          && !f->face_change
+          && !f->redisplay
+          && !buffer->text->redisplay
+          && window_point (w) == w->last_point);
+}
+
 /* Prepare for redisplay by updating menu-bar item lists when
    appropriate.  This can call eval.  */
 
@@ -13271,13 +13285,8 @@ prepare_menu_bars (void)
 	      struct window *w = XWINDOW (this);
 	      /* Cf. conditions for redisplaying a window at the
 		 beginning of redisplay_window.  */
-	      if (w->redisplay
-		  || XFRAME (w->frame)->redisplay
-		  || XBUFFER (w->contents)->text->redisplay
-		  || BUF_PT (XBUFFER (w->contents)) != w->last_point)
-		{
-		  windows = Fcons (this, windows);
-		}
+	      if (!needs_no_redisplay (w))
+		windows = Fcons (this, windows);
 	    }
 	}
       safe__call1 (true, Vpre_redisplay_function, windows);
@@ -18946,14 +18955,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   *w->desired_matrix->method = 0;
 #endif
 
-  if (!just_this_one_p
-      && REDISPLAY_SOME_P ()
-      && !w->redisplay
-      && !w->update_mode_line
-      && !f->face_change
-      && !f->redisplay
-      && !buffer->text->redisplay
-      && BUF_PT (buffer) == w->last_point)
+  if (!just_this_one_p && needs_no_redisplay (w))
     return;
 
   /* Make sure that both W's markers are valid.  */
@@ -22142,7 +22144,7 @@ get_overlay_arrow_glyph_row (struct window *w, Lisp_Object overlay_arrow_string)
   struct buffer *buffer = XBUFFER (w->contents);
   struct buffer *old = current_buffer;
   const unsigned char *arrow_string = SDATA (overlay_arrow_string);
-  ptrdiff_t arrow_len = SCHARS (overlay_arrow_string);
+  ptrdiff_t arrow_len = SBYTES (overlay_arrow_string), char_num = 0;
   const unsigned char *arrow_end = arrow_string + arrow_len;
   const unsigned char *p;
   struct it it;
@@ -22173,7 +22175,7 @@ get_overlay_arrow_glyph_row (struct window *w, Lisp_Object overlay_arrow_string)
       p += it.len;
 
       /* Get its face.  */
-      ilisp = make_fixnum (p - arrow_string);
+      ilisp = make_fixnum (char_num++);
       face = Fget_text_property (ilisp, Qface, overlay_arrow_string);
       it.face_id = compute_char_face (f, it.char_to_display, face);
 

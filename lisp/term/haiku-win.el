@@ -65,7 +65,8 @@ the type of DATA inside the system message (see the doc string of
 `haiku-drag-message' for more details).")
 
 (defvar haiku-normal-selection-encoders '(haiku-select-encode-xstring
-                                          haiku-select-encode-utf-8-string)
+                                          haiku-select-encode-utf-8-string
+                                          haiku-select-encode-file-name)
   "List of functions which act as selection encoders.
 These functions accept two arguments SELECTION and VALUE, and
 return an association appropriate for a serialized system
@@ -226,6 +227,13 @@ VALUE will be encoded as UTF-8 and stored under the type
     (list "text/plain" 1296649541
           (encode-coding-string value 'utf-8-unix))))
 
+(defun haiku-select-encode-file-name (_selection value)
+  "Convert VALUE to a system message association.
+This takes the file name of VALUE's buffer (if it is an overlay
+or a pair of markers) and turns it into a file system reference."
+  (when (setq value (xselect--selection-bounds value))
+    (list "refs" 'ref (buffer-file-name (nth 2 value)))))
+
 (cl-defmethod gui-backend-get-selection (type data-type
                                               &context (window-system haiku))
   (if (eq data-type 'TARGETS)
@@ -297,8 +305,7 @@ VALUE will be encoded as UTF-8 and stored under the type
         (message "Don't know how to drop any of: %s"
                  (mapcar #'car string)))))))
 
-(define-key special-event-map [drag-n-drop]
-            'haiku-drag-and-drop)
+(define-key special-event-map [drag-n-drop] 'haiku-drag-and-drop)
 
 (defvaralias 'haiku-use-system-tooltips 'use-system-tooltips)
 
@@ -357,6 +364,31 @@ take effect on menu items until the menu bar is updated again."
                           message allow-current-frame))))
 
 (add-variable-watcher 'use-system-tooltips #'haiku-use-system-tooltips-watcher)
+
+
+;;;; Session management.
+
+(declare-function haiku-save-session-reply "haikufns.c")
+
+(defun emacs-session-save ()
+  "SKIP: real doc in x-win.el."
+  (with-temp-buffer ; Saving sessions is not yet supported.
+    (condition-case nil
+	;; A return of t means cancel the shutdown.
+	(run-hook-with-args-until-success
+	 'emacs-save-session-functions)
+      (error t))))
+
+(defun handle-save-session (_event)
+  "SKIP: real doc in xsmfns.c."
+  (interactive "e")
+  (let ((cancel-shutdown t))
+    (unwind-protect
+        (setq cancel-shutdown (emacs-session-save))
+      (haiku-save-session-reply (not cancel-shutdown)))
+    ;; The App Server will kill Emacs after receiving the reply, but
+    ;; the Deskbar will not, so kill ourself here.
+    (unless cancel-shutdown (kill-emacs))))
 
 (provide 'haiku-win)
 (provide 'term/haiku-win)

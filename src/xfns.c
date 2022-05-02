@@ -8243,29 +8243,6 @@ x_hide_tip (bool delete)
 	      else
 		x_make_frame_invisible (XFRAME (tip_frame));
 
-#ifdef USE_LUCID
-	      /* Bloodcurdling hack alert: The Lucid menu bar widget's
-		 redisplay procedure is not called when a tip frame over
-		 menu items is unmapped.  Redisplay the menu manually...  */
-	      {
-		Widget w;
-		struct frame *f = SELECTED_FRAME ();
-
-		if (FRAME_X_P (f) && FRAME_LIVE_P (f))
-		  {
-		    w = f->output_data.x->menubar_widget;
-
-		    if (!DoesSaveUnders (FRAME_DISPLAY_INFO (f)->screen)
-			&& w != NULL)
-		      {
-			block_input ();
-			xlwmenu_redisplay (w);
-			unblock_input ();
-		      }
-		  }
-	      }
-#endif /* USE_LUCID */
-
 	      was_open = Qt;
 	    }
 	  else
@@ -8292,7 +8269,8 @@ PARMS is an optional list of frame parameters which can be used to
 change the tooltip's appearance.
 
 Automatically hide the tooltip after TIMEOUT seconds.  TIMEOUT nil
-means use the default timeout of 5 seconds.
+means use the default timeout from the `x-show-tooltip-timeout'
+variable.
 
 If the list of frame parameters PARMS contains a `left' parameter,
 display the tooltip at that x-position.  If the list of frame parameters
@@ -8338,9 +8316,8 @@ Text larger than the specified size is clipped.  */)
   f = decode_window_system_frame (frame);
 
   if (NILP (timeout))
-    timeout = make_fixnum (5);
-  else
-    CHECK_FIXNAT (timeout);
+    timeout = Vx_show_tooltip_timeout;
+  CHECK_FIXNAT (timeout);
 
   if (NILP (dx))
     dx = make_fixnum (5);
@@ -8810,25 +8787,11 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
   while (result == 0)
     {
       XEvent event, copy;
-#ifdef HAVE_XINPUT2
-      x_menu_wait_for_event (FRAME_X_DISPLAY (f));
-#else
       x_menu_wait_for_event (0);
-#endif
 
-      if (
-#ifndef HAVE_XINPUT2
-	  XtAppPending (Xt_app_con)
-#else
-	  XPending (FRAME_X_DISPLAY (f))
-#endif
-	  )
+      if (XtAppPending (Xt_app_con))
 	{
-#ifndef HAVE_XINPUT2
 	  XtAppNextEvent (Xt_app_con, &event);
-#else
-	  XNextEvent (FRAME_X_DISPLAY (f), &event);
-#endif
 
 	  copy = event;
 	  if (event.type == KeyPress

@@ -875,6 +875,10 @@ struct frame *x_dnd_frame;
    important information.  */
 static bool x_dnd_waiting_for_finish;
 
+/* The display the drop target that is supposed to send information is
+   on.  */
+static Display *x_dnd_finish_display;
+
 /* State of the Motif drop operation.
 
    0 means nothing has happened, i.e. the event loop should not wait
@@ -885,6 +889,10 @@ static bool x_dnd_waiting_for_finish;
    drop target to convert one of the special selections
    XmTRANSFER_SUCCESS or XmTRANSFER_FAILURE.  */
 static int x_dnd_waiting_for_motif_finish;
+
+/* The display the Motif drag receiver will send response data
+   from.  */
+struct x_display_info *x_dnd_waiting_for_motif_finish_display;
 
 /* Whether or not F1 was pressed during the drag-and-drop operation.
 
@@ -996,6 +1004,10 @@ static int x_dnd_movement_x, x_dnd_movement_y;
 /* The keyboard state during the drag-and-drop operation.  */
 static unsigned int x_dnd_keyboard_state;
 #endif
+
+/* jmp_buf that gets us out of the IO error handler if an error occurs
+   terminating DND as part of the display disconnect handler.  */
+static jmp_buf x_dnd_disconnect_handler;
 
 struct x_client_list_window
 {
@@ -1378,6 +1390,14 @@ xm_drag_window_error_handler (Display *display, XErrorEvent *event)
   return 0;
 }
 
+static _Noreturn int
+xm_drag_window_io_error_handler (Display *dpy)
+{
+  /* DPY isn't created through GDK, so it doesn't matter if we don't
+     crash here.  */
+  longjmp (x_dnd_disconnect_handler, 1);
+}
+
 static Window
 xm_get_drag_window (struct x_display_info *dpyinfo)
 {
@@ -1388,7 +1408,7 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   Window drag_window;
   XSetWindowAttributes attrs;
   Display *temp_display;
-  void *old_handler;
+  void *old_handler, *old_io_handler;
 
   drag_window = None;
   rc = XGetWindowProperty (dpyinfo->display, dpyinfo->root_window,
@@ -1422,13 +1442,25 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   if (drag_window == None)
     {
       block_input ();
+      old_io_handler = XSetIOErrorHandler (xm_drag_window_io_error_handler);
+
+      if (sigsetjmp (x_dnd_disconnect_handler, 1))
+	{
+	  XSetIOErrorHandler (old_io_handler);
+	  unblock_input ();
+
+	  return None;
+	}
+
       unrequest_sigio ();
       temp_display = XOpenDisplay (XDisplayString (dpyinfo->display));
       request_sigio ();
 
       if (!temp_display)
 	{
+	  XSetIOErrorHandler (old_io_handler);
 	  unblock_input ();
+
 	  return None;
 	}
 
@@ -1472,6 +1504,7 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 
       XCloseDisplay (temp_display);
       XSetErrorHandler (old_handler);
+      XSetIOErrorHandler (old_io_handler);
 
       /* Make sure the drag window created is actually valid for the
 	 current display, and the XOpenDisplay above didn't
@@ -2563,8 +2596,17 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
   return 0;
 }
 
-#define X_DND_SUPPORTED_VERSION 5
+static _Noreturn int
+x_dnd_io_error_handler (Display *display)
+{
+#ifdef USE_GTK
+  emacs_abort ();
+#else
+  longjmp (x_dnd_disconnect_handler, 1);
+#endif
+}
 
+#define X_DND_SUPPORTED_VERSION 5
 
 static int x_dnd_get_window_proto (struct x_display_info *, Window);
 static Window x_dnd_get_window_proxy (struct x_display_info *, Window);
@@ -5447,7 +5489,7 @@ x_flip_and_flush (struct frame *f)
 {
   block_input ();
   if (FRAME_X_NEED_BUFFER_FLIP (f))
-      show_back_buffer (f);
+    show_back_buffer (f);
   x_flush (f);
   unblock_input ();
 }
@@ -7158,7 +7200,7 @@ x_alloc_lighter_color (struct frame *f, Display *display, Colormap cmap,
        that scaling by FACTOR alone isn't enough.  */
     {
       /* How far below the limit this color is (0 - 1, 1 being darker).  */
-      double dimness = 1 - (double)bright / HIGHLIGHT_COLOR_DARK_BOOST_LIMIT;
+      double dimness = 1 - (double) bright / HIGHLIGHT_COLOR_DARK_BOOST_LIMIT;
       /* The additive adjustment.  */
       int min_delta = delta * dimness * factor / 2;
 
@@ -8179,7 +8221,7 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 }
 
 static void
-x_get_scale_factor(Display *disp, int *scale_x, int *scale_y)
+x_get_scale_factor (Display *disp, int *scale_x, int *scale_y)
 {
   const int base_res = 96;
   struct x_display_info * dpyinfo = x_display_info_for_display (disp);
@@ -8840,7 +8882,7 @@ XTflash (struct frame *f)
   GC gc;
   XGCValues values;
   fd_set fds;
-  int fd;
+  int fd, rc;
 
   block_input ();
 
@@ -8913,10 +8955,10 @@ XTflash (struct frame *f)
       FD_SET (fd, &fds);
 
       /* Try to wait that long--but we might wake up sooner.  */
-      pselect (fd + 1, &fds, NULL, NULL, &timeout, NULL);
+      rc = pselect (fd + 1, &fds, NULL, NULL, &timeout, NULL);
 
       /* Some input is available, exit the visible bell.  */
-      if (FD_ISSET (fd, &fds))
+      if (rc >= 0 && FD_ISSET (fd, &fds))
 	break;
     }
 
@@ -8946,16 +8988,6 @@ XTflash (struct frame *f)
 
   unblock_input ();
 }
-
-
-static void
-XTtoggle_invisible_pointer (struct frame *f, bool invisible)
-{
-  block_input ();
-  FRAME_DISPLAY_INFO (f)->toggle_visible_pointer (f, invisible);
-  unblock_input ();
-}
-
 
 /* Make audible bell.  */
 
@@ -9128,11 +9160,13 @@ x_scroll_run (struct window *w, struct run *run)
     }
 #endif
 
+#ifdef USE_CAIRO_XCB_SURFACE
   /* Some of the following code depends on `normal_gc' being
      up-to-date on the X server, but doesn't call a routine that will
      flush it first.  So do this ourselves instead.  */
   XFlushGC (FRAME_X_DISPLAY (f),
 	    f->output_data.x->normal_gc);
+#endif
 
 #ifdef USE_CAIRO
   if (FRAME_CR_CONTEXT (f))
@@ -9296,6 +9330,105 @@ x_new_focus_frame (struct x_display_info *dpyinfo, struct frame *frame)
     }
 
   x_frame_rehighlight (dpyinfo);
+}
+
+/* True if the display in DPYINFO supports a version of Xfixes
+   sufficient for pointer blanking.  */
+#ifdef HAVE_XFIXES
+static bool
+x_probe_xfixes_extension (struct x_display_info *dpyinfo)
+{
+  return (dpyinfo->xfixes_supported_p
+	  && dpyinfo->xfixes_major >= 4);
+}
+#endif /* HAVE_XFIXES */
+
+/* Toggle mouse pointer visibility on frame F using the XFixes
+   extension.  */
+#ifdef HAVE_XFIXES
+static void
+xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
+
+{
+  if (invisible)
+    XFixesHideCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
+  else
+    XFixesShowCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
+  f->pointer_invisible = invisible;
+}
+#endif /* HAVE_XFIXES */
+
+/* Create invisible cursor on the X display referred by DPYINFO.  */
+static Cursor
+make_invisible_cursor (struct x_display_info *dpyinfo)
+{
+  Display *dpy = dpyinfo->display;
+  static char const no_data[] = { 0 };
+  Pixmap pix;
+  XColor col;
+  Cursor c;
+
+  c = None;
+
+  x_catch_errors (dpy);
+  pix = XCreateBitmapFromData (dpy, dpyinfo->root_window, no_data, 1, 1);
+  if (!x_had_errors_p (dpy) && pix != None)
+    {
+      Cursor pixc;
+      col.pixel = 0;
+      col.red = col.green = col.blue = 0;
+      col.flags = DoRed | DoGreen | DoBlue;
+      pixc = XCreatePixmapCursor (dpy, pix, pix, &col, &col, 0, 0);
+      if (! x_had_errors_p (dpy) && pixc != None)
+        c = pixc;
+      XFreePixmap (dpy, pix);
+    }
+
+  x_uncatch_errors ();
+
+  return c;
+}
+
+/* Toggle mouse pointer visibility on frame F by using an invisible
+   cursor.  */
+static void
+x_toggle_visible_pointer (struct frame *f, bool invisible)
+{
+  struct x_display_info *dpyinfo;
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  /* We could have gotten a BadAlloc error while creating the
+     invisible cursor.  Try to create it again, but if that fails,
+     just give up.  */
+  if (dpyinfo->invisible_cursor == None)
+    dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
+
+  if (dpyinfo->invisible_cursor == None)
+    invisible = false;
+
+  if (invisible)
+    XDefineCursor (dpyinfo->display, FRAME_X_WINDOW (f),
+		   dpyinfo->invisible_cursor);
+  else
+    XDefineCursor (dpyinfo->display, FRAME_X_WINDOW (f),
+		   f->output_data.x->current_cursor);
+
+  f->pointer_invisible = invisible;
+}
+
+static void
+XTtoggle_invisible_pointer (struct frame *f, bool invisible)
+{
+  block_input ();
+#ifdef HAVE_XFIXES
+  if (FRAME_DISPLAY_INFO (f)->fixes_pointer_blanking
+      && x_probe_xfixes_extension (FRAME_DISPLAY_INFO (f)))
+    xfixes_toggle_visible_pointer (f, invisible);
+  else
+#endif
+    x_toggle_visible_pointer (f, invisible);
+  unblock_input ();
 }
 
 /* Handle FocusIn and FocusOut state changes for FRAME.
@@ -9570,6 +9703,45 @@ x_top_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
   return x_window_to_frame (dpyinfo, wdesc);
 }
 
+static void
+x_next_event_from_any_display (XEvent *event)
+{
+  struct x_display_info *dpyinfo;
+  fd_set fds;
+  int fd, maxfd;
+
+  while (true)
+    {
+      FD_ZERO (&fds);
+      maxfd = -1;
+
+      for (dpyinfo = x_display_list; dpyinfo;
+	   dpyinfo = dpyinfo->next)
+	{
+	  if (XPending (dpyinfo->display))
+	    {
+	      XNextEvent (dpyinfo->display, event);
+	      return;
+	    }
+
+	  fd = XConnectionNumber (dpyinfo->display);
+
+	  if (fd > maxfd)
+	    maxfd = fd;
+
+	  eassert (fd < FD_SETSIZE);
+	  FD_SET (XConnectionNumber (dpyinfo->display), &fds);
+	}
+
+      eassert (maxfd >= 0);
+
+      /* We don't have to check the return of pselect, because if an
+	 error occurs XPending will call the IO error handler, which
+	 then brings us out of this loop.  */
+      pselect (maxfd, &fds, NULL, NULL, NULL, NULL);
+    }
+}
+
 #endif /* USE_X_TOOLKIT || USE_GTK */
 
 static void
@@ -9605,6 +9777,9 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   bool signals_were_pending;
 #ifdef HAVE_XKB
   XkbStateRec keyboard_state;
+#endif
+#ifndef USE_GTK
+  struct x_display_info *event_display;
 #endif
 
   if (!FRAME_VISIBLE_P (f))
@@ -9783,35 +9958,42 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       block_input ();
 #ifdef USE_GTK
       gtk_main_iteration ();
-#else
-#ifdef USE_X_TOOLKIT
+#elif defined USE_X_TOOLKIT
       XtAppNextEvent (Xt_app_con, &next_event);
 #else
-      XNextEvent (FRAME_X_DISPLAY (f), &next_event);
+      x_next_event_from_any_display (&next_event);
 #endif
 
+#ifndef USE_GTK
+      event_display
+	= x_display_info_for_display (next_event.xany.display);
+
+      if (event_display)
+	{
 #ifdef HAVE_X_I18N
 #ifdef HAVE_XINPUT2
-      if (next_event.type != GenericEvent
-	  || !FRAME_DISPLAY_INFO (f)->supports_xi2
-	  || (next_event.xgeneric.extension
-	      != FRAME_DISPLAY_INFO (f)->xi2_opcode))
-	{
+	  if (next_event.type != GenericEvent
+	      || !event_display->supports_xi2
+	      || (next_event.xgeneric.extension
+		  != event_display->xi2_opcode))
+	    {
 #endif
-	  if (!x_filter_event (FRAME_DISPLAY_INFO (f), &next_event))
-	    handle_one_xevent (FRAME_DISPLAY_INFO (f),
-			       &next_event, &finish, &hold_quit);
+	      if (!x_filter_event (event_display, &next_event))
+		handle_one_xevent (event_display,
+				   &next_event, &finish, &hold_quit);
 #ifdef HAVE_XINPUT2
-	}
-      else
-	handle_one_xevent (FRAME_DISPLAY_INFO (f),
-			   &next_event, &finish, &hold_quit);
+	    }
+	  else
+	    handle_one_xevent (event_display,
+			       &next_event, &finish, &hold_quit);
 #endif
 #else
-      handle_one_xevent (FRAME_DISPLAY_INFO (f),
-			 &next_event, &finish, &hold_quit);
+	  handle_one_xevent (event_display,
+			     &next_event, &finish, &hold_quit);
 #endif
+	}
 #endif
+
       /* The unblock_input below might try to read input, but
 	 XTread_socket does nothing inside a drag-and-drop event
 	 loop, so don't let it clear the pending_signals flag.  */
@@ -13561,12 +13743,9 @@ static void
 flush_dirty_back_buffer_on (struct frame *f)
 {
   block_input ();
-  if (FRAME_LIVE_P (f) &&
-      FRAME_X_P (f) &&
-      FRAME_X_WINDOW (f) &&
-      !FRAME_GARBAGED_P (f) &&
-      !buffer_flipping_blocked_p () &&
-      FRAME_X_NEED_BUFFER_FLIP (f))
+  if (!FRAME_GARBAGED_P (f)
+      && !buffer_flipping_blocked_p ()
+      && FRAME_X_NEED_BUFFER_FLIP (f))
     show_back_buffer (f);
   unblock_input ();
 }
@@ -13947,6 +14126,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if (event->xclient.message_type == dpyinfo->Xatom_XdndFinished
 	    && (x_dnd_waiting_for_finish && !x_dnd_waiting_for_motif_finish)
+	    /* Also check that the display is correct, since
+	       `x_dnd_pending_finish_target' could still be valid on
+	       another X server.  */
+	    && dpyinfo->display == x_dnd_finish_display
 	    && event->xclient.data.l[0] == x_dnd_pending_finish_target)
 	  {
 	    x_dnd_waiting_for_finish = false;
@@ -13963,12 +14146,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if ((event->xclient.message_type
 	     == dpyinfo->Xatom_MOTIF_DRAG_AND_DROP_MESSAGE)
-	    /* FIXME: There should probably be a check that the event
-	       comes from the same display where the drop event was
-	       sent, but there's no way to get that information here
-	       safely.  */
 	    && x_dnd_waiting_for_finish
-	    && x_dnd_waiting_for_motif_finish == 1)
+	    && x_dnd_waiting_for_motif_finish == 1
+	    && dpyinfo == x_dnd_waiting_for_motif_finish_display)
 	  {
 	    xm_drop_start_reply reply;
 	    uint16_t operation, status, action;
@@ -14211,9 +14391,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           {
 	    f = any;
 	    if (f)
-              _XEditResCheckMessages (f->output_data.x->widget,
-				      NULL, (XEvent *) event, NULL);
-	    goto done;
+	      {
+		_XEditResCheckMessages (f->output_data.x->widget,
+					NULL, (XEvent *) event, NULL);
+		goto done;
+	      }
+
+	    goto OTHER;
           }
 #endif /* X_TOOLKIT_EDITRES */
 
@@ -14326,6 +14510,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if (x_dnd_waiting_for_finish
 	    && x_dnd_waiting_for_motif_finish == 2
+	    && dpyinfo == x_dnd_waiting_for_motif_finish_display
 	    && eventp->selection == dpyinfo->Xatom_XdndSelection
 	    && (eventp->target == dpyinfo->Xatom_XmTRANSFER_SUCCESS
 		|| eventp->target == dpyinfo->Xatom_XmTRANSFER_FAILURE))
@@ -14548,6 +14733,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
           if (!FRAME_GARBAGED_P (f))
             {
+#ifdef USE_X_TOOLKIT
+	      if (f->output_data.x->edit_widget)
+		/* The widget's expose proc will be run in this
+		   case.  */
+		goto OTHER;
+#endif
 #ifdef USE_GTK
               /* This seems to be needed for GTK 2.6 and later, see
                  https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
@@ -14654,6 +14845,34 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                            the frame was deleted.  */
         {
 	  bool visible = FRAME_VISIBLE_P (f);
+
+#ifdef USE_LUCID
+	  /* Bloodcurdling hack alert: The Lucid menu bar widget's
+	     redisplay procedure is not called when a tip frame over
+	     menu items is unmapped.  Redisplay the menu manually...  */
+	  if (FRAME_TOOLTIP_P (f) && popup_activated ())
+	    {
+	      Widget w;
+	      Lisp_Object tail, frame;
+	      struct frame *f1;
+
+	      FOR_EACH_FRAME (tail, frame)
+		{
+		  if (!FRAME_X_P (XFRAME (frame)))
+		    continue;
+
+		  f1 = XFRAME (frame);
+
+		  if (FRAME_LIVE_P (f1))
+		    {
+		      w = FRAME_X_OUTPUT (f1)->menubar_widget;
+
+		      if (w && !DoesSaveUnders (FRAME_DISPLAY_INFO (f1)->screen))
+			xlwmenu_redisplay (w);
+		    }
+		}
+	    }
+#endif /* USE_LUCID */
 
 	  /* While a frame is unmapped, display generation is
              disabled; you don't want to spend time updating a
@@ -15345,10 +15564,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #else
       f = x_top_window_to_frame (dpyinfo, event->xcrossing.window);
 #endif
-#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2
+#if defined USE_X_TOOLKIT && defined HAVE_XINPUT2 && !defined USE_MOTIF
       /* The XI2 event mask is set on the frame widget, so this event
 	 likely originates from the shell widget, which we aren't
-	 interested in.  */
+	 interested in.  (But don't ignore this on Motif, since we
+	 want to clear the mouse face when a popup is active.)  */
       if (dpyinfo->supports_xi2)
 	f = NULL;
 #endif
@@ -16030,6 +16250,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  = x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
 					     x_dnd_selection_timestamp,
 					     x_dnd_last_protocol_version);
+			x_dnd_finish_display = dpyinfo->display;
 		      }
 		    else if (x_dnd_last_seen_window != None)
 		      {
@@ -16076,7 +16297,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 						      x_dnd_last_seen_window, &dmsg);
 
 				x_dnd_waiting_for_finish = true;
+				x_dnd_waiting_for_motif_finish_display = dpyinfo;
 				x_dnd_waiting_for_motif_finish = 1;
+				x_dnd_finish_display = dpyinfo->display;
 			      }
 			  }
 			else
@@ -16717,6 +16940,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      double delta, scroll_unit;
 		      int scroll_height;
 		      Lisp_Object window;
+		      struct scroll_bar *bar;
+
+		      bar = NULL;
 
 		      /* See the comment on top of
 			 x_init_master_valuators for more details on how
@@ -16734,9 +16960,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      if (!f)
 				{
 #if defined USE_MOTIF || !defined USE_TOOLKIT_SCROLL_BARS
-				  struct scroll_bar *bar
-				    = x_window_to_scroll_bar (xi_event->display,
-							      xev->event, 2);
+				  bar = x_window_to_scroll_bar (dpyinfo->display,
+								xev->event, 2);
 
 				  if (bar)
 				    f = WINDOW_XFRAME (XWINDOW (bar->window));
@@ -16753,11 +16978,26 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 			  if (FRAME_X_WINDOW (f) != xev->event)
-			    XTranslateCoordinates (dpyinfo->display,
-						   xev->event, FRAME_X_WINDOW (f),
-						   lrint (xev->event_x),
-						   lrint (xev->event_y),
-						   &real_x, &real_y, &dummy);
+			    {
+			      if (!bar)
+				bar = x_window_to_scroll_bar (dpyinfo->display, xev->event, 2);
+
+			      /* If this is a scroll bar, compute the
+				 actual position directly to avoid an
+				 extra roundtrip.  */
+
+			      if (bar)
+				{
+				  real_x = lrint (xev->event_x + bar->left);
+				  real_y = lrint (xev->event_y + bar->top);
+				}
+			      else
+				XTranslateCoordinates (dpyinfo->display,
+						       xev->event, FRAME_X_WINDOW (f),
+						       lrint (xev->event_x),
+						       lrint (xev->event_y),
+						       &real_x, &real_y, &dummy);
+			    }
 			  else
 			    {
 			      real_x = lrint (xev->event_x);
@@ -17294,6 +17534,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				= x_dnd_send_drop (x_dnd_frame, x_dnd_last_seen_window,
 						   x_dnd_selection_timestamp,
 						   x_dnd_last_protocol_version);
+			      x_dnd_finish_display = dpyinfo->display;
 			    }
 			  else if (x_dnd_last_seen_window != None)
 			    {
@@ -17349,7 +17590,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							    x_dnd_last_seen_window, &dmsg);
 
 				      x_dnd_waiting_for_finish = true;
+				      x_dnd_waiting_for_motif_finish_display = dpyinfo;
 				      x_dnd_waiting_for_motif_finish = 1;
+				      x_dnd_finish_display = dpyinfo->display;
 				    }
 				}
 			      else
@@ -18348,6 +18591,48 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		{
 		  if (hev->info[i].flags & XIDeviceEnabled)
 		    {
+		      /* Handle all disabled devices now, to prevent
+			 things happening out-of-order later.  */
+		      if (n_disabled)
+			{
+			  ndevices = 0;
+			  devices = xmalloc (sizeof *devices * dpyinfo->num_devices);
+
+			  for (i = 0; i < dpyinfo->num_devices; ++i)
+			    {
+			      for (j = 0; j < n_disabled; ++j)
+				{
+				  if (disabled[j] == dpyinfo->devices[i].device_id)
+				    {
+#ifdef HAVE_XINPUT2_1
+				      xfree (dpyinfo->devices[i].valuators);
+#endif
+#ifdef HAVE_XINPUT2_2
+				      tem = dpyinfo->devices[i].touchpoints;
+				      while (tem)
+					{
+					  last = tem;
+					  tem = tem->next;
+					  xfree (last);
+					}
+#endif
+				      goto continue_detachment;
+				    }
+				}
+
+			      devices[ndevices++] = dpyinfo->devices[i];
+
+			    continue_detachment:
+			      continue;
+			    }
+
+			  xfree (dpyinfo->devices);
+			  dpyinfo->devices = devices;
+			  dpyinfo->num_devices = ndevices;
+
+			  n_disabled = 0;
+			}
+
 		      x_catch_errors (dpyinfo->display);
 		      info = XIQueryDevice (dpyinfo->display, hev->info[i].deviceid,
 					    &ndevices);
@@ -18411,13 +18696,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				  xfree (last);
 				}
 #endif
-			      goto continue_detachment;
+			      goto break_detachment;
 			    }
 			}
 
 		      devices[ndevices++] = dpyinfo->devices[i];
 
-		    continue_detachment:
+		    break_detachment:
 		      continue;
 		    }
 
@@ -19921,15 +20206,89 @@ static char *error_msg;
 static AVOID
 x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 {
-  struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+  struct x_display_info *dpyinfo;
   Lisp_Object frame, tail;
   specpdl_ref idx = SPECPDL_INDEX ();
+  void *io_error_handler;
+  xm_drop_start_message dmsg;
+  struct frame *f;
 
+  dpyinfo = x_display_info_for_display (dpy);
   error_msg = alloca (strlen (error_message) + 1);
   strcpy (error_msg, error_message);
 
   /* Inhibit redisplay while frames are being deleted. */
   specbind (Qinhibit_redisplay, Qt);
+
+  /* If drag-and-drop is in progress, cancel drag-and-drop.  If DND
+     frame's display is DPY, don't reset event masks or try to send
+     responses to other programs because the display is going
+     away.  */
+
+  if (x_dnd_in_progress || x_dnd_waiting_for_finish)
+    {
+      /* Handle display disconnect errors here because this function
+	 is not reentrant at this particular spot.  */
+      io_error_handler = XSetIOErrorHandler (x_dnd_io_error_handler);
+
+      if (!sigsetjmp (x_dnd_disconnect_handler, 1)
+	  && x_dnd_in_progress
+	  && dpy != (x_dnd_waiting_for_finish
+		     ? x_dnd_finish_display
+		     : FRAME_X_DISPLAY (x_dnd_frame)))
+	{
+	  /* Clean up drag and drop if the drag frame's display isn't
+	     the one being disconnected.  */
+	  f = x_dnd_frame;
+
+	  if (x_dnd_last_seen_window != None
+	      && x_dnd_last_protocol_version != -1)
+	    x_dnd_send_leave (x_dnd_frame,
+			      x_dnd_last_seen_window);
+	  else if (x_dnd_last_seen_window != None
+		   && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
+		   && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
+		   && x_dnd_motif_setup_p)
+	    {
+	      dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
+					    XM_DRAG_REASON_DROP_START);
+	      dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+	      dmsg.timestamp = FRAME_DISPLAY_INFO (f)->last_user_time;
+	      dmsg.side_effects
+		= XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
+								   x_dnd_wanted_action),
+				       XM_DROP_SITE_VALID,
+				       xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
+								   x_dnd_wanted_action),
+				       XM_DROP_ACTION_DROP_CANCEL);
+	      dmsg.x = 0;
+	      dmsg.y = 0;
+	      dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+	      dmsg.source_window = FRAME_X_WINDOW (f);
+
+	      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
+					    x_dnd_last_seen_window, 0);
+	      xm_send_drop_message (FRAME_DISPLAY_INFO (f), FRAME_X_WINDOW (f),
+				    x_dnd_last_seen_window, &dmsg);
+	    }
+	}
+
+      XSetIOErrorHandler (io_error_handler);
+      dpyinfo = x_display_info_for_display (dpy);
+
+      x_dnd_last_seen_window = None;
+      x_dnd_last_seen_toplevel = None;
+      x_dnd_in_progress = false;
+      x_set_dnd_targets (NULL, 0);
+      x_dnd_waiting_for_finish = false;
+
+      if (x_dnd_use_toplevels)
+	x_dnd_free_toplevels ();
+
+      x_dnd_return_frame_object = NULL;
+      x_dnd_movement_frame = NULL;
+      x_dnd_frame = NULL;
+    }
 
   if (dpyinfo)
     {
@@ -20107,6 +20466,7 @@ x_io_error_quitter (Display *display)
 	    DisplayString (display));
   x_connection_closed (display, buf, true);
 }
+
 
 /* Changing the font of the frame.  */
 
@@ -21466,20 +21826,32 @@ xembed_request_focus (struct frame *f)
 static void
 x_ewmh_activate_frame (struct frame *f)
 {
-  /* See Window Manager Specification/Extended Window Manager Hints at
-     https://freedesktop.org/wiki/Specifications/wm-spec/  */
+  XEvent msg;
+  struct x_display_info *dpyinfo;
 
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
 
-  if (FRAME_VISIBLE_P (f) && x_wm_supports (f, dpyinfo->Xatom_net_active_window))
+  if (FRAME_VISIBLE_P (f)
+      && x_wm_supports (f, dpyinfo->Xatom_net_active_window))
     {
-      Lisp_Object frame;
-      XSETFRAME (frame, f);
-      x_send_client_event (frame, make_fixnum (0), frame,
-			   dpyinfo->Xatom_net_active_window,
-			   make_fixnum (32),
-			   list2 (make_fixnum (1),
-				  INT_TO_INTEGER (dpyinfo->last_user_time)));
+      /* See the documentation at
+	 https://specifications.freedesktop.org/wm-spec/wm-spec-latest.html
+	 for more details on the format of this message.  */
+      msg.xclient.type = ClientMessage;
+      msg.xclient.window = FRAME_OUTER_WINDOW (f);
+      msg.xclient.message_type = dpyinfo->Xatom_net_active_window;
+      msg.xclient.format = 32;
+      msg.xclient.data.l[0] = 1;
+      msg.xclient.data.l[1] = dpyinfo->last_user_time;
+      msg.xclient.data.l[2] = (!dpyinfo->x_focus_frame
+			       ? None
+			       : FRAME_OUTER_WINDOW (dpyinfo->x_focus_frame));
+      msg.xclient.data.l[3] = 0;
+      msg.xclient.data.l[4] = 0;
+
+      XSendEvent (dpyinfo->display, dpyinfo->root_window,
+		  False, (SubstructureRedirectMask
+			  | SubstructureNotifyMask), &msg);
     }
 }
 
@@ -22018,7 +22390,7 @@ x_free_frame_resources (struct frame *f)
       /* Always exit with visible pointer to avoid weird issue
 	 with Xfixes (Bug#17609).  */
       if (f->pointer_invisible)
-	FRAME_DISPLAY_INFO (f)->toggle_visible_pointer (f, 0);
+	XTtoggle_invisible_pointer (f, 0);
 
       /* We must free faces before destroying windows because some
 	 font-driver (e.g. xft) access a window while finishing a
@@ -22638,100 +23010,6 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 }
 #endif
 
-/* Create invisible cursor on X display referred by DPYINFO.  */
-
-static Cursor
-make_invisible_cursor (struct x_display_info *dpyinfo)
-{
-  Display *dpy = dpyinfo->display;
-  static char const no_data[] = { 0 };
-  Pixmap pix;
-  XColor col;
-  Cursor c = 0;
-
-  x_catch_errors (dpy);
-  pix = XCreateBitmapFromData (dpy, dpyinfo->root_window, no_data, 1, 1);
-  if (! x_had_errors_p (dpy) && pix != None)
-    {
-      Cursor pixc;
-      col.pixel = 0;
-      col.red = col.green = col.blue = 0;
-      col.flags = DoRed | DoGreen | DoBlue;
-      pixc = XCreatePixmapCursor (dpy, pix, pix, &col, &col, 0, 0);
-      if (! x_had_errors_p (dpy) && pixc != None)
-        c = pixc;
-      XFreePixmap (dpy, pix);
-    }
-
-  x_uncatch_errors ();
-
-  return c;
-}
-
-/* True if DPY supports Xfixes extension >= 4.  */
-
-static bool
-x_probe_xfixes_extension (Display *dpy)
-{
-#ifdef HAVE_XFIXES
-  struct x_display_info *info
-    = x_display_info_for_display (dpy);
-
-  return (info
-	  && info->xfixes_supported_p
-	  && info->xfixes_major >= 4);
-#else
-  return false;
-#endif /* HAVE_XFIXES */
-}
-
-/* Toggle mouse pointer visibility on frame F by using Xfixes functions.  */
-
-static void
-xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
-{
-#ifdef HAVE_XFIXES
-  if (invisible)
-    XFixesHideCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
-  else
-    XFixesShowCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
-  f->pointer_invisible = invisible;
-#else
-  emacs_abort ();
-#endif /* HAVE_XFIXES */
-}
-
-/* Toggle mouse pointer visibility on frame F by using invisible cursor.  */
-
-static void
-x_toggle_visible_pointer (struct frame *f, bool invisible)
-{
-  eassert (FRAME_DISPLAY_INFO (f)->invisible_cursor != 0);
-  if (invisible)
-    XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		   FRAME_DISPLAY_INFO (f)->invisible_cursor);
-  else
-    XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		   f->output_data.x->current_cursor);
-  f->pointer_invisible = invisible;
-}
-
-/* Setup pointer blanking, prefer Xfixes if available.  */
-
-static void
-x_setup_pointer_blanking (struct x_display_info *dpyinfo)
-{
-  /* FIXME: the brave tester should set EMACS_XFIXES because we're suspecting
-     X server bug, see https://debbugs.gnu.org/cgi/bugreport.cgi?bug=17609.  */
-  if (egetenv ("EMACS_XFIXES") && x_probe_xfixes_extension (dpyinfo->display))
-    dpyinfo->toggle_visible_pointer = xfixes_toggle_visible_pointer;
-  else
-    {
-      dpyinfo->toggle_visible_pointer = x_toggle_visible_pointer;
-      dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
-    }
-}
-
 /* Current X display connection identifier.  Incremented for each next
    connection established.  */
 static unsigned x_display_id;
@@ -23349,6 +23627,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #ifndef HAVE_GTK3
  skip_xi_setup:
 #endif
+  ;
 #endif
 
 #ifdef HAVE_XRANDR
@@ -23616,7 +23895,10 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 				   gray_bits, gray_width, gray_height,
 				   1, 0, 1);
 
-  x_setup_pointer_blanking (dpyinfo);
+  dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
+#ifdef HAVE_XFIXES
+  dpyinfo->fixes_pointer_blanking = egetenv ("EMACS_XFIXES");
+#endif
 
 #ifdef HAVE_X_I18N
   xim_initialize (dpyinfo, resource_name);
@@ -23918,6 +24200,27 @@ x_delete_terminal (struct terminal *terminal)
     {
       image_destroy_all_bitmaps (dpyinfo);
       XSetCloseDownMode (dpyinfo->display, DestroyAll);
+
+      /* Get rid of any drag-and-drop operation that might be in
+	 progress as well.  */
+      if ((x_dnd_in_progress || x_dnd_waiting_for_finish)
+	  && dpyinfo->display == (x_dnd_waiting_for_finish
+				  ? x_dnd_finish_display
+				  : FRAME_X_DISPLAY (x_dnd_frame)))
+	{
+	  x_dnd_last_seen_window = None;
+	  x_dnd_last_seen_toplevel = None;
+	  x_dnd_in_progress = false;
+	  x_set_dnd_targets (NULL, 0);
+	  x_dnd_waiting_for_finish = false;
+
+	  if (x_dnd_use_toplevels)
+	    x_dnd_free_toplevels ();
+
+	  x_dnd_return_frame_object = NULL;
+	  x_dnd_movement_frame = NULL;
+	  x_dnd_frame = NULL;
+	}
 
       /* Whether or not XCloseDisplay destroys the associated resource
 	 database depends on the version of libX11.  To avoid both

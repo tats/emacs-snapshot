@@ -2939,6 +2939,8 @@ fi
 AC_SUBST(PGTK_OBJ)
 AC_SUBST(PGTK_LIBS)
 
+AC_CHECK_FUNCS(malloc_trim)
+
 dnl D-Bus has been tested under GNU/Linux only.  Must be adapted for
 dnl other platforms.
 HAVE_DBUS=no
@@ -4126,7 +4128,7 @@ if test "${with_native_compilation}" != "no"; then
           MAC_CFLAGS="-I$(dirname $($BREW ls -v libgccjit | \
                                                 grep libgccjit.h))"
           MAC_LIBS="-L$(dirname $($BREW ls -v libgccjit| \
-                                            grep libgccjit.so\$))"
+                                            grep -E 'libgccjit\.(so|dylib)$'))"
         fi
       fi
 

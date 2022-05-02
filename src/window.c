@@ -1079,7 +1079,9 @@ means that if a column at the right of the text area is only partially
 visible, that column is not counted.
 
 Note that the returned value includes the column reserved for the
-continuation glyph.  */)
+continuation glyph.
+
+Also see `window-max-characters-per-line'.  */)
   (Lisp_Object window, Lisp_Object pixelwise)
 {
   return make_fixnum (window_body_width (decode_live_window (window),
@@ -1692,6 +1694,14 @@ column 0.  */)
 				  0, false, false);
 }
 
+ptrdiff_t
+window_point (struct window *w)
+{
+  return (w == XWINDOW (selected_window)
+          ? BUF_PT (XBUFFER (w->contents))
+          : XMARKER (w->pointm)->charpos);
+}
+
 DEFUN ("window-point", Fwindow_point, Swindow_point, 0, 1, 0,
        doc: /* Return current value of point in WINDOW.
 WINDOW must be a live window and defaults to the selected one.
@@ -1705,12 +1715,7 @@ correct to return the top-level value of `point', outside of any
 `save-excursion' forms.  But that is hard to define.  */)
   (Lisp_Object window)
 {
-  register struct window *w = decode_live_window (window);
-
-  if (w == XWINDOW (selected_window))
-    return make_fixnum (BUF_PT (XBUFFER (w->contents)));
-  else
-    return Fmarker_position (w->pointm);
+  return make_fixnum (window_point (decode_live_window (window)));
 }
 
 DEFUN ("window-old-point", Fwindow_old_point, Swindow_old_point, 0, 1, 0,
@@ -6329,36 +6334,6 @@ followed by all visible frames on the current terminal.  */)
   return window;
 }
 
-DEFUN ("scroll-other-window", Fscroll_other_window, Sscroll_other_window, 0, 1, "P",
-       doc: /* Scroll next window upward ARG lines; or near full screen if no ARG.
-A near full screen is `next-screen-context-lines' less than a full screen.
-Negative ARG means scroll downward.  If ARG is the atom `-', scroll
-downward by nearly full screen.  When calling from a program, supply
-as argument a number, nil, or `-'.
-
-The next window is usually the one below the current one;
-or the one at the top if the current one is at the bottom.
-It is determined by the function `other-window-for-scrolling',
-which see.
-
-Also see the `other-window-scroll-default' variable.  */)
-  (Lisp_Object arg)
-{
-  specpdl_ref count = SPECPDL_INDEX ();
-  scroll_command (Fother_window_for_scrolling (), arg, 1);
-  return unbind_to (count, Qnil);
-}
-
-DEFUN ("scroll-other-window-down", Fscroll_other_window_down,
-       Sscroll_other_window_down, 0, 1, "P",
-       doc: /* Scroll next window downward ARG lines; or near full screen if no ARG.
-For more details, see the documentation for `scroll-other-window'.  */)
-  (Lisp_Object arg)
-{
-  specpdl_ref count = SPECPDL_INDEX ();
-  scroll_command (Fother_window_for_scrolling (), arg, -1);
-  return unbind_to (count, Qnil);
-}
 
 DEFUN ("scroll-left", Fscroll_left, Sscroll_left, 0, 2, "^P\np",
        doc: /* Scroll selected window display ARG columns left.
@@ -8338,7 +8313,10 @@ In this case the window is passed as argument.
 Functions specified by the default value are called for each frame if
 at least one window on that frame has been added or changed its buffer
 or its total or body size since the last redisplay.  In this case the
-frame is passed as argument.  */);
+frame is passed as argument.
+
+For instance, to hide the title bar when the frame is maximized, you
+can add `frame-hide-title-bar-when-maximized' to this variable.  */);
   Vwindow_size_change_functions = Qnil;
 
   DEFVAR_LISP ("window-selection-change-functions", Vwindow_selection_change_functions,
@@ -8600,8 +8578,6 @@ displayed after a scrolling operation to be somewhat inaccurate.  */);
   defsubr (&Sscroll_left);
   defsubr (&Sscroll_right);
   defsubr (&Sother_window_for_scrolling);
-  defsubr (&Sscroll_other_window);
-  defsubr (&Sscroll_other_window_down);
   defsubr (&Sminibuffer_selected_window);
   defsubr (&Srecenter);
   defsubr (&Swindow_text_width);

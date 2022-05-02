@@ -5007,7 +5007,11 @@ minibuffer window or is dedicated to its buffer."
 BUFFER-OR-NAME may be a buffer or the name of an existing buffer
 and defaults to the current buffer.
 
-Interactively, prompt for the buffer.
+Interactively, this command will prompt for the buffer name.  A
+prefix argument of 0 (zero) means that only windows in the
+current terminal's frames will be deleted.  Any other prefix
+argument means that only windows in the current frame will be
+deleted.
 
 The following non-nil values of the optional argument FRAME
 have special meanings:
@@ -5044,7 +5048,21 @@ If the buffer specified by BUFFER-OR-NAME is shown in a
 minibuffer window, do nothing for that window.  For any window
 that does not show that buffer, remove the buffer from that
 window's lists of previous and next buffers."
-  (interactive "bDelete windows on (buffer):\nP")
+  (interactive
+   (let ((frame (cond
+                 ((and (numberp current-prefix-arg)
+                       (zerop current-prefix-arg))
+                  0)
+                 (current-prefix-arg t))))
+     (list (read-buffer "Delete windows on (buffer): "
+                        nil nil
+                        (lambda (buf)
+                          (get-buffer-window
+                           (if (consp buf) (car buf) buf)
+                           (cond
+                            ((null frame) t)
+                            ((numberp frame) frame)))))
+           frame)))
   (let ((buffer (window-normalize-buffer buffer-or-name))
 	;; Handle the "inverted" meaning of the FRAME argument wrt other
 	;; `window-list-1' based function.
@@ -10075,6 +10093,24 @@ If ARG is the atom `-', scroll upward by nearly full screen."
 
 (put 'scroll-down-command 'scroll-command t)
 
+(defun scroll-other-window (&optional lines)
+  "Scroll next window upward LINES lines; or near full screen if no ARG.
+See `scroll-up-command' for details."
+  (interactive "P")
+  (with-selected-window (other-window-for-scrolling)
+    (funcall (or (command-remapping #'scroll-up-command)
+                 #'scroll-up-command)
+             lines)))
+
+(defun scroll-other-window-down (&optional lines)
+  "Scroll next window downward LINES lines; or near full screen if no ARG.
+See `scroll-down-command' for details."
+  (interactive "P")
+  (with-selected-window (other-window-for-scrolling)
+    (funcall (or (command-remapping #'scroll-down-command)
+                 #'scroll-down-command)
+             lines)))
+
 ;;; Scrolling commands which scroll a line instead of full screen.
 
 (defun scroll-up-line (&optional arg)
@@ -10461,6 +10497,55 @@ displaying that processes's buffer."
 (put 'enlarge-window-horizontally 'repeat-map 'resize-window-repeat-map)
 (put 'shrink-window-horizontally 'repeat-map 'resize-window-repeat-map)
 (put 'shrink-window 'repeat-map 'resize-window-repeat-map)
+
+(defun window-char-pixel-width (&optional window face)
+  "Return average character width for the font of FACE used in WINDOW.
+WINDOW must be a live window and defaults to the selected one.
+
+If FACE is nil or omitted, the default face is used.  If FACE is
+remapped (see `face-remapping-alist'), the function returns the
+information for the remapped face."
+  (with-selected-window (window-normalize-window window t)
+    (let* ((info (font-info (face-font (or face 'default))))
+	   (width (aref info 11)))
+      (if (> width 0)
+	  width
+	(aref info 10)))))
+
+(defun window-char-pixel-height (&optional window face)
+  "Return character height for the font of FACE used in WINDOW.
+WINDOW must be a live window and defaults to the selected one.
+
+If FACE is nil or omitted, the default face is used.  If FACE is
+remapped (see `face-remapping-alist'), the function returns the
+information for the remapped face."
+  (with-selected-window (window-normalize-window window t)
+    (aref (font-info (face-font (or face 'default))) 3)))
+
+(defun window-max-characters-per-line (&optional window face)
+  "Return the number of characters that can be displayed on one line in WINDOW.
+WINDOW must be a live window and defaults to the selected one.
+
+The character width of FACE is used for the calculation.  If FACE
+is nil or omitted, the default face is used.  If FACE is
+remapped (see `face-remapping-alist'), the function uses the
+remapped face.
+
+This function is different from `window-body-width' in two
+ways.  First, it accounts for the portions of the line reserved
+for the continuation glyph.  Second, it accounts for the size of
+the font, which may have been adjusted, e.g., using
+`text-scale-increase')."
+  (with-selected-window (window-normalize-window window t)
+    (let* ((window-width (window-body-width window t))
+           (font-width (window-char-pixel-width window face))
+           (ncols (/ window-width font-width)))
+      (if (and (display-graphic-p)
+               overflow-newline-into-fringe
+               (/= (frame-parameter nil 'left-fringe) 0)
+               (/= (frame-parameter nil 'right-fringe) 0))
+          ncols
+        (1- ncols)))))
 
 (provide 'window)
 

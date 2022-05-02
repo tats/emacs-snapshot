@@ -2969,6 +2969,12 @@ character after position @var{pos} in @var{object} (a buffer or
 string).  The argument @var{object} is optional and defaults to the
 current buffer.
 
+If @var{position} is at the end of @var{object}, the value is
+@code{nil}, but note that buffer narrowing does not affect the value.
+That is, if @var{object} is a buffer or @code{nil}, and the buffer is
+narrowed and @var{position} is at the end of the narrowed buffer, the
+result may be non-@code{nil}.
+
 If there is no @var{prop} property strictly speaking, but the character
 has a property category that is a symbol, then @code{get-text-property} returns
 the @var{prop} property of that symbol.
@@ -3021,6 +3027,12 @@ properties take precedence over this variable.
 This function returns the entire property list of the character at
 @var{position} in the string or buffer @var{object}.  If @var{object} is
 @code{nil}, it defaults to the current buffer.
+
+If @var{position} is at the end of @var{object}, the value is
+@code{nil}, but note that buffer narrowing does not affect the value.
+That is, if @var{object} is a buffer or @code{nil}, and the buffer is
+narrowed and @var{position} is at the end of the narrowed buffer, the
+result may be non-@code{nil}.
 @end defun
 
 @defvar default-text-properties
@@ -5297,6 +5309,24 @@ interpolation).
 @code{sqlite-execute} returns the number of affected rows.  For
 instance, an @samp{insert} statement will return @samp{1}, whereas an
 @samp{update} statement may return zero or a higher number.
+
+Strings in SQLite are, by default, stored as @code{utf-8}, and
+selecting a text column will decode the string using that charset.
+Selecting a blob column will return the raw data without any decoding
+(i.e., it will return a unibyte string containing the bytes as stored
+in the database).  Inserting binary data into blob columns, however,
+requires some care, as @code{sqlite-execute} will, by default,
+interpret all strings as @code{utf-8}.
+
+So if you have, for instance, @acronym{GIF} data in a unibyte string
+called @var{gif}, you have to mark it specially to let
+@code{sqlite-execute} know this:
+
+@lisp
+(put-text-property 0 1 'coding-system 'binary gif)
+(sqlite-execute db "insert into foo values (?, ?)" (list gif 2))
+@end lisp
+
 @end defun
 
 @defun sqlite-select db query &optional values result-type

@@ -136,6 +136,11 @@ of 'user-emacs-directory'.
 * Incompatible changes in Emacs 29.1
 
 ---
+** 'string-lines' handles trailing newlines differently.
+It no longer returns an empty final string if the string ends with a
+newline.
+
+---
 ** 'TAB' and '<backtab>' are now bound in 'button-map'.
 This means that if you're standing on a button, 'TAB' will take you to
 the next button, even if the mode has bound it to something else.
@@ -174,10 +179,21 @@ files that were compiled with an old EIEIO (Emacs<25).
 ** 'C-x 8 .' has been moved to 'C-x 8 . .'.
 This is to open up the 'C-x 8 .' map to bind further characters there.
 
+** Eshell
+
 ---
-** 'source' and '.' in Eshell no longer accept the '--help' option.
+*** 'source' and '.' no longer accept the '--help' option.
 This is for compatibility with the shell versions of these commands,
 which don't handle options like '--help' in any special way.
+
++++
+*** String delimiters in argument predicates/modifiers are more restricted.
+Previously, some argument predicates/modifiers allowed arbitrary
+characters as string delimiters.  To provide more unified behavior
+across all predicates/modifiers, the list of allowed delimiters has
+been restricted to "...", '...', /.../, |...|, (...), [...], <...>,
+and {...}.  See the "(eshell) Argument Predication and Modification"
+node in the Eshell manual for more details.
 
 ---
 ** The 'delete-forward-char' command now deletes by grapheme clusters.
@@ -201,6 +217,17 @@ the Tamil digits, as those digit characters are not used nowadays by
 speakers of the Tamil language.  To get back the previous behavior,
 use the new 'tamil-itrans-digits' and 'tamil-inscript-digits' input
 methods instead.
+
++++
+** New variable current-time-list governing default timestamp form.
+Functions like current-time now yield (TICKS . HZ) timestamps if this
+new variable is nil.  The variable defaults to t, which means these
+functions default to timestamps of the forms (HI LO US PS), (HI LO US)
+or (HI LO), which are less regular and less efficient.  This is part
+of a long-planned change first documented in Emacs 27.  Developers are
+encouraged to test timestamp-related code with this variable set to
+nil, as it will default to nil in a future Emacs version and will be
+removed some time after that.
 
 
 * Changes in Emacs 29.1
@@ -417,6 +444,23 @@ command also works for non-Emoji characters.)
 ** Help
 
 +++
+*** New user option 'help-window-keep-selected'.
+If non-nil, commands to show the info manual and the source will reuse
+the same window the *Help* buffer is shown in.
+
+---
+*** Commands like 'C-h f' have changed how they describe menu bindings.
+For instance, previously a command might be described as having the
+following bindings:
+
+  It is bound to <open>, C-x C-f, <menu-bar> <file> <new-file>.
+
+This has been changed to:
+
+  It is bound to <open> and C-x C-f.
+  It can also be invoked from the menu: File → Visit New File...
+
++++
 *** The 'C-h .' command now accepts a prefix argument.
 'C-u C-h .' would previously inhibit displaying a warning message if
 there's no local help at point.  This has been changed to call
@@ -454,6 +498,11 @@ displayed, if any.
 *** The 'C-h m' ('describe-mode') "*Help*" buffer has been reformatted.
 It now only includes local minor modes at the start, and the global
 minor modes are listed after the major mode.
+
++++
+*** The user option 'help-window-select' now affects apropos commands.
+The apropos commands will now select the apropos window if
+'help-window-select' is non-nil.
 
 ** Outline Mode
 
@@ -559,6 +608,15 @@ available options can be restored by enabling this option.
 * Editing Changes in Emacs 29.1
 
 ---
+** 'scroll-other-window' and 'scroll-other-window-down' now respects remapping.
+These commands (bound to 'C-M-v' and 'C-M-V') used to scroll the other
+windows without looking a customizations in that other window.  These
+functions now check whether they have been rebound in the buffer in
+that other window, and then call the remapped function instead.  In
+addition, these commands now also respect the
+'scroll-error-top-bottom' user option.
+
+---
 ** Indentation of 'cl-flet' and 'cl-labels' has changed.
 These forms now indent like this:
 
@@ -648,6 +706,34 @@ script that was used in ancient South Asia.  A new input method,
 
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** Miscellaneous
+
++++
+*** New command 'scratch-buffer'.
+This switches to the *scratch* buffer.  If it doesn't exist, create it
+first.
+
+** Debugging
+
+*** New user option 'debug-allow-recursive-debug'.
+This user option controls whether the 'e' (in a *Backtrace*
+buffer or while edebugging) and 'C-x C-e' (while edebugging) commands
+lead to a (further) backtrace.  By default, this variable is nil,
+which is a change in behaviour from previous Emacs versions.
+
+** Compile
+
++++
+*** New user option 'compilation-max-output-line-length'.
+Lines longer than this will have the ends hidden, with a button to
+reveal the hidden text.  This speeds up operations like grepping on
+files that have few newlines.
+
+** Flymake
+
++++
+*** New user option 'flymake-mode-line-lighter'.
 
 +++
 ** New minor mode 'word-wrap-whitespace-mode' for extending 'word-wrap'.
@@ -740,6 +826,13 @@ This means that typing 'C-u RET' on a completion candidate in the
 but doesn't exit the minibuffer.
 
 ** Isearch and Replace
+
++++
+*** Changes in how Isearch responds to 'mouse-yank-at-point'.
+If a user does 'C-s' and then uses '<mouse-2>' ('mouse-yank-primary')
+outside the echo area, Emacs will, by default, end the Isearch and
+yank the text at mouse cursor.  But if 'mouse-yank-at-point' is
+non-nil, the text will now be added to the Isearch instead.
 
 +++
 *** New user option 'char-fold-override'.
@@ -886,6 +979,16 @@ the common "utm_" trackers from URLs.
 
 ** Gnus
 
++++
+*** Tool bar changes in Gnus/Message.
+There were previously two styles of tool bars available in Gnus and
+Message, referred to as 'gnus-summary-tool-bar-retro',
+'gnus-group-tool-bar-retro' and 'message-tool-bar-retro', and
+'gnus-summary-tool-bar-gnome', 'gnus-group-tool-bar-gnome' and
+'message-tool-bar-gnome'.  The "retro" tool bars have been removed (as
+well as the icons used), and the "Gnome" tool bars are now the only
+pre-defined toolbars.
+
 ---
 *** Gnus now uses a variable-pitch font in the headers by default.
 To get the monospace font back, you can put something like the
@@ -914,6 +1017,12 @@ representation as emojis.
 *** New mu backend for gnus-search.
 Configuration is very similar to the notmuch and namazu backends.  It
 supports the unified search syntax.
+
+---
+*** gnus-html-image-cache-ttl is now a seconds count.
+Formerly it was a pair of numbers (A B) that represented 65536*A + B,
+to cater to older Emacs implementations that lacked bignums.
+The older form still works but is undocumented.
 
 ** EIEIO
 
@@ -1273,6 +1382,20 @@ Lisp function.  This frees you from having to keep track of whether
 commands are Lisp function or external when supplying absolute file
 name arguments.  See "Electric forward slash" in the Eshell manual.
 
+---
+*** Built-in Eshell commands now follow POSIX/GNU argument syntax conventions.
+Built-in commands in Eshell now accept command-line options with
+values passed as a single token, such as '-oVALUE' or
+'--option=VALUE'.  New commands can take advantage of this with the
+'eshell-eval-using-options' macro.  See "Defining new built-in
+commands" in the "(eshell) Built-ins" node of the Eshell manual.
+
+** Calc
+
++++
+*** New user option 'calc-kill-line-numbering'.
+This can be set to nil to exclude line numbering from kills and copies.
+
 ** Miscellaneous
 
 +++
@@ -1319,6 +1442,11 @@ remote host are shown.  Alternatively, the user option
 ** New package 'oclosure'.
 Allows the creation of "functions with slots" or "function objects"
 via the macros 'oclosure-define' and 'oclosure-lambda'.
+
+*** New generic function 'oclosure-interactive-form'.
+Used by 'interactive-form' when called on an OClosure.
+This allows specific OClosure types to compute their interactive specs
+on demand rather than precompute them when created.
 
 ---
 ** New theme 'leuven-dark'.
@@ -1468,6 +1596,32 @@ functions.
 
 
 * Lisp Changes in Emacs 29.1
+
+---
+** New function 'malloc-trim'.
+This function allows returning unused memory back to the operating
+system, and is mainly meant as a debugging tool.  It is currently
+available only when Emacs was built with glibc as the C library.
+
+---
+** 'x-show-tip' no longer hard-codes a timeout default.
+The new 'x-show-tooltip-timeout' variable allows the user to alter
+this for packages that don't use 'tooltip-show', but instead calls the
+lower level function directly.
+
++++
+** New function 'window-max-characters-per-line'.
+
++++
+** New function 'window-char-pixel-width'.
+
++++
+** New function 'window-char-pixel-width'.
+
+---
+** New function 'current-cpu-time'.
+It gives access to the CPU time used by the Emacs process, for
+example for benchmarking purposes.
 
 ---
 ** New function 'string-edit'.
@@ -1819,11 +1973,6 @@ dimensions.
 Specifying a cons as the FROM argument allows to start measuring text
 from a specified amount of pixels above or below a position.
 
----
-** 'eshell-eval-using-options' now follows argument syntax conventions.
-Built-in commands in Eshell now accept command-line options with
-values passed as a single token, such as '-oVALUE' or '--option=VALUE'.
-
 ** XDG support
 
 ---
@@ -2000,6 +2149,11 @@ For example, '(time-add nil '(1 . 1000))' no longer warns that the
 temporary transition aid for Emacs 27, has served its purpose.
 
 +++
+** 'encode-time' now also accepts a 6-element list with just time and date.
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR)) is now short for
+(encode-time (list SECOND MINUTE HOUR DAY MONTH YEAR nil -1 nil)).
+
++++
 ** 'date-to-time' now assumes earliest values if its argument lacks
 month, day, or time.  For example, (date-to-time "2021-12-04") now
 assumes a time of 00:00 instead of signaling an error.
@@ -2075,6 +2229,21 @@ to preserve the old behavior, apply
 
 ** MS-Windows
 
+---
+*** Emacs now supports double-buffering on MS-Windows to reduce display flicker.
+(This was supported on Free systems since Emacs 26.1.)
+
+To disable double-buffering (e.g., if it causes display problems), set
+the frame parameter 'inhibit-double-buffering' to a non-nil value.
+You can do that either by adding
+
+   '(inhibit-double-buffering . t)
+
+to 'default-frame-alist', or by modifying the frame parameters of the
+selected frame by evaluating
+
+   (modify-frame-parameters nil '((inhibit-double-buffering . t)))
+
 +++
 *** Emacs now supports system dark mode.
 On Windows 10 (version 1809 and higher) and Windows 11, Emacs will now
@@ -2099,6 +2268,11 @@ where those APIs are available.
 *** Emacs now supports display of BMP images using native image APIs.
 When 'w32-use-native-image-API' is non-nil, Emacs on MS-Windows now
 has built-in support for displaying BMP images.
+
+** Cygwin
+
+---
+*** 'process-attributes' is now implemented.
 
 
 ----------------------------------------------------------------------
