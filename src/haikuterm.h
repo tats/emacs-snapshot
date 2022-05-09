@@ -52,6 +52,10 @@ struct haiku_bitmap_record
   char *file;
   int refcount;
   int height, width, depth;
+
+  uint32_t stipple_foreground;
+  uint32_t stipple_background;
+  void *stipple_bits;
 };
 
 struct haiku_display_info
@@ -205,6 +209,8 @@ extern struct font_driver const haikufont_driver;
 extern Lisp_Object tip_frame;
 extern struct frame *haiku_dnd_frame;
 
+extern frame_parm_handler haiku_frame_parm_handlers[];
+
 struct scroll_bar
 {
   /* These fields are shared by all vectors.  */
@@ -322,6 +328,9 @@ extern int haiku_load_image (struct frame *, struct image *,
 			     Lisp_Object, Lisp_Object);
 extern void syms_of_haikuimage (void);
 #endif
+
+extern void haiku_draw_background_rect (struct glyph_string *, struct face *,
+					int, int, int, int);
 
 #ifdef USE_BE_CAIRO
 extern cairo_t *haiku_begin_cr_clip (struct frame *, struct glyph_string *);

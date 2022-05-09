@@ -617,14 +617,6 @@ haiku_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval
     }
 }
 
-static void
-unwind_popup (void)
-{
-  if (!popup_activated_p)
-    emacs_abort ();
-  --popup_activated_p;
-}
-
 static Lisp_Object
 haiku_create_frame (Lisp_Object parms)
 {
@@ -751,7 +743,7 @@ haiku_create_frame (Lisp_Object parms)
 
   gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
                          "borderwidth", "BorderWidth", RES_TYPE_NUMBER);
-  gui_default_parameter (f, parms, Qinternal_border_width, make_fixnum (2),
+  gui_default_parameter (f, parms, Qinternal_border_width, make_fixnum (0),
                          "internalBorderWidth", "InternalBorderWidth",
                          RES_TYPE_NUMBER);
   gui_default_parameter (f, parms, Qchild_frame_border_width, Qnil,
@@ -1211,7 +1203,11 @@ compute_tip_xy (struct frame *f,
       /* Default min and max values.  */
       min_x = 0;
       min_y = 0;
-      BScreen_px_dim (&max_x, &max_y);
+
+      be_get_screen_dimensions (&max_x, &max_y);
+
+      max_x = max_x - 1;
+      max_y = max_y - 1;
 
       block_input ();
       BView_get_mouse (FRAME_HAIKU_VIEW (f), &x, &y);
@@ -1787,6 +1783,15 @@ haiku_set_inhibit_double_buffering (struct frame *f,
   unblock_input ();
 }
 
+static void
+haiku_set_sticky (struct frame *f, Lisp_Object new_value,
+		  Lisp_Object old_value)
+{
+  block_input ();
+  BWindow_set_sticky (FRAME_HAIKU_WINDOW (f), !NILP (new_value));
+  unblock_input ();
+}
+
 
 
 DEFUN ("haiku-set-mouse-absolute-pixel-position",
@@ -1925,7 +1930,7 @@ DEFUN ("x-display-pixel-width", Fx_display_pixel_width, Sx_display_pixel_width,
   int width, height;
   check_haiku_display_info (terminal);
 
-  BScreen_px_dim (&width, &height);
+  be_get_screen_dimensions (&width, &height);
   return make_fixnum (width);
 }
 
@@ -1938,7 +1943,7 @@ DEFUN ("x-display-pixel-height", Fx_display_pixel_height, Sx_display_pixel_heigh
   int width, height;
   check_haiku_display_info (terminal);
 
-  BScreen_px_dim (&width, &height);
+  be_get_screen_dimensions (&width, &height);
   return make_fixnum (width);
 }
 
@@ -1949,7 +1954,7 @@ DEFUN ("x-display-mm-height", Fx_display_mm_height, Sx_display_mm_height, 0, 1, 
   struct haiku_display_info *dpyinfo = check_haiku_display_info (terminal);
   int width, height;
 
-  BScreen_px_dim (&width, &height);
+  be_get_screen_dimensions (&width, &height);
   return make_fixnum (height / (dpyinfo->resy / 25.4));
 }
 
@@ -1961,7 +1966,7 @@ DEFUN ("x-display-mm-width", Fx_display_mm_width, Sx_display_mm_width, 0, 1, 0,
   struct haiku_display_info *dpyinfo = check_haiku_display_info (terminal);
   int width, height;
 
-  BScreen_px_dim (&width, &height);
+  be_get_screen_dimensions (&width, &height);
   return make_fixnum (width / (dpyinfo->resx / 25.4));
 }
 
@@ -2479,15 +2484,21 @@ Optional arg MUSTMATCH, if non-nil, means the returned file or
 directory must exist.
 Optional arg DIR_ONLY_P, if non-nil, means choose only directories.
 Optional arg SAVE_TEXT, if non-nil, specifies some text to show in the entry field.  */)
-  (Lisp_Object prompt, Lisp_Object frame,
-   Lisp_Object dir, Lisp_Object mustmatch,
-   Lisp_Object dir_only_p, Lisp_Object save_text)
+  (Lisp_Object prompt, Lisp_Object frame, Lisp_Object dir,
+   Lisp_Object mustmatch, Lisp_Object dir_only_p, Lisp_Object save_text)
 {
-  if (!x_display_list)
-    error ("Haiku windowing not initialized");
+  struct frame *f;
+  char *file_name;
+  Lisp_Object value;
+
+  if (popup_activated_p)
+    error ("Trying to use a menu from within a menu-entry");
 
   if (!NILP (dir))
-    CHECK_STRING (dir);
+    {
+      CHECK_STRING (dir);
+      dir = ENCODE_FILE (dir);
+    }
 
   if (!NILP (save_text))
     CHECK_STRING (save_text);
@@ -2497,37 +2508,28 @@ Optional arg SAVE_TEXT, if non-nil, specifies some text to show in the entry fie
 
   CHECK_STRING (prompt);
 
-  CHECK_LIVE_FRAME (frame);
-  check_window_system (XFRAME (frame));
-
-  specpdl_ref idx = SPECPDL_INDEX ();
-  record_unwind_protect_void (unwind_popup);
-
-  struct frame *f = XFRAME (frame);
-
-  FRAME_DISPLAY_INFO (f)->focus_event_frame = f;
+  f = decode_window_system_frame (frame);
 
   ++popup_activated_p;
-  char *fn = be_popup_file_dialog (!NILP (mustmatch) || !NILP (dir_only_p),
-				   !NILP (dir) ? SSDATA (ENCODE_UTF_8 (dir)) : NULL,
-				   !NILP (mustmatch), !NILP (dir_only_p),
-				   FRAME_HAIKU_WINDOW (f),
-				   !NILP (save_text) ? SSDATA (ENCODE_UTF_8 (save_text)) : NULL,
-				   SSDATA (ENCODE_UTF_8 (prompt)),
-				   block_input, unblock_input, maybe_quit);
+  unrequest_sigio ();
+  file_name = be_popup_file_dialog (!NILP (mustmatch) || !NILP (dir_only_p),
+				    !NILP (dir) ? SSDATA (dir) : NULL,
+				    !NILP (mustmatch), !NILP (dir_only_p),
+				    FRAME_HAIKU_WINDOW (f),
+				    (!NILP (save_text)
+				     ? SSDATA (ENCODE_UTF_8 (save_text)) : NULL),
+				    SSDATA (ENCODE_UTF_8 (prompt)),
+				    process_pending_signals);
+  request_sigio ();
+  --popup_activated_p;
 
-  unbind_to (idx, Qnil);
+  if (!file_name)
+    quit ();
 
-  block_input ();
-  BWindow_activate (FRAME_HAIKU_WINDOW (f));
-  unblock_input ();
+  value = build_string (file_name);
+  free (file_name);
 
-  if (!fn)
-    return Qnil;
-
-  Lisp_Object p = build_string_from_utf8 (fn);
-  free (fn);
-  return p;
+  return DECODE_FILE (value);
 }
 
 DEFUN ("haiku-put-resource", Fhaiku_put_resource, Shaiku_put_resource,
@@ -2720,7 +2722,7 @@ frame_parm_handler haiku_frame_parm_handlers[] =
     gui_set_fullscreen,
     gui_set_font_backend,
     gui_set_alpha,
-    NULL, /* set sticky */
+    haiku_set_sticky,
     NULL, /* set tool bar pos */
     haiku_set_inhibit_double_buffering,
     haiku_set_undecorated,

@@ -825,7 +825,6 @@ Interactively, COUNT is the prefix numeric argument, and defaults to 1."
            ,@body))
        (put ',prev-sym 'definition-name ',base))))
 
-
 (provide 'easy-mmode)
 
 ;;; easy-mmode.el ends here

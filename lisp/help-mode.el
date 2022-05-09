@@ -296,7 +296,10 @@ The format is (FUNCTION ARGS...).")
 		   (setq file (locate-library file t))
 		   (if (and file (file-readable-p file))
 		       (progn
-			 (pop-to-buffer (find-file-noselect file))
+                         (if help-window-keep-selected
+			     (pop-to-buffer-same-window
+                              (find-file-noselect file))
+                           (pop-to-buffer (find-file-noselect file)))
                          (widen)
 			 (goto-char (point-min))
 			 (if (re-search-forward
@@ -315,7 +318,9 @@ The format is (FUNCTION ARGS...).")
 		     (setq file (help-C-file-name var 'var)))
 		   (let* ((location (find-variable-noselect var file))
                           (position (cdr location)))
-		     (pop-to-buffer (car location))
+                     (if help-window-keep-selected
+		         (pop-to-buffer-same-window (car location))
+                       (pop-to-buffer (car location)))
 		     (run-hooks 'find-function-after-hook)
                      (if position
                            (progn
@@ -336,7 +341,9 @@ The format is (FUNCTION ARGS...).")
 		   (let* ((location
 			  (find-function-search-for-symbol fun 'defface file))
                          (position (cdr location)))
-		     (pop-to-buffer (car location))
+                     (if help-window-keep-selected
+                         (pop-to-buffer-same-window (car location))
+		       (pop-to-buffer (car location)))
                      (if position
                            (progn
                              ;; Widen the buffer if necessary to go to this position.
@@ -378,7 +385,9 @@ The format is (FUNCTION ARGS...).")
   :supertype 'help-xref
   'help-function
   (lambda (file pos)
-    (view-buffer-other-window (find-file-noselect file))
+    (if help-window-keep-selected
+        (view-buffer (find-file-noselect file))
+      (view-buffer-other-window (find-file-noselect file)))
     (goto-char pos))
   'help-echo (purecopy "mouse-2, RET: show corresponding NEWS announcement"))
 
@@ -406,7 +415,9 @@ Commands:
               help-mode-tool-bar-map)
   (setq-local help-mode--current-data nil)
   (setq-local bookmark-make-record-function
-              #'help-bookmark-make-record))
+              #'help-bookmark-make-record)
+  (unless search-default-mode
+    (isearch-fold-quotes-mode)))
 
 ;;;###autoload
 (defun help-mode-setup ()
@@ -441,6 +452,7 @@ Commands:
  		    "\\(symbol\\|program\\|property\\)\\|" ; Don't link
 		    "\\(source \\(?:code \\)?\\(?:of\\|for\\)\\)\\)"
 		    "[ \t\n]+\\)?"
+                    "\\(\\\\\\+\\)?"
                     "['`‘]\\(\\(?:\\sw\\|\\s_\\)+\\|`\\)['’]"))
   "Regexp matching doc string references to symbols.
 
@@ -617,27 +629,28 @@ that."
                 ;; Quoted symbols
                 (save-excursion
                   (while (re-search-forward help-xref-symbol-regexp nil t)
-                    (let* ((data (match-string 8))
-                           (sym (intern-soft data)))
-                      (if sym
-                          (cond
-                           ((match-string 3) ; `variable' &c
-                            (and (or (boundp sym) ; `variable' doesn't ensure
+                    (when-let ((sym (intern-soft (match-string 9))))
+                      (if (match-string 8)
+                          (delete-region (match-beginning 8)
+                                         (match-end 8))
+                        (cond
+                         ((match-string 3)        ; `variable' &c
+                          (and (or (boundp sym) ; `variable' doesn't ensure
                                         ; it's actually bound
-                                     (get sym 'variable-documentation))
-                                 (help-xref-button 8 'help-variable sym)))
-                           ((match-string 4) ; `function' &c
-                            (and (fboundp sym) ; similarly
-                                 (help-xref-button 8 'help-function sym)))
-                           ((match-string 5) ; `face'
-                            (and (facep sym)
-                                 (help-xref-button 8 'help-face sym)))
-                           ((match-string 6)) ; nothing for `symbol'
-                           ((match-string 7)
-                            (help-xref-button 8 'help-function-def sym))
-                           ((cl-some (lambda (x) (funcall (nth 1 x) sym))
-                                     describe-symbol-backends)
-                            (help-xref-button 8 'help-symbol sym)))))))
+                                   (get sym 'variable-documentation))
+                               (help-xref-button 9 'help-variable sym)))
+                         ((match-string 4)     ; `function' &c
+                          (and (fboundp sym)   ; similarly
+                               (help-xref-button 9 'help-function sym)))
+                         ((match-string 5) ; `face'
+                          (and (facep sym)
+                               (help-xref-button 9 'help-face sym)))
+                         ((match-string 6)) ; nothing for `symbol'
+                         ((match-string 7)
+                          (help-xref-button 9 'help-function-def sym))
+                         ((cl-some (lambda (x) (funcall (nth 1 x) sym))
+                                   describe-symbol-backends)
+                          (help-xref-button 9 'help-symbol sym)))))))
                 ;; An obvious case of a key substitution:
                 (save-excursion
                   (while (re-search-forward

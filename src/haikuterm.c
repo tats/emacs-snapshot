@@ -43,25 +43,24 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Minimum and maximum values used for Haiku scroll bars.  */
 #define BE_SB_MAX 12000000
 
-struct haiku_display_info *x_display_list = NULL;
-extern frame_parm_handler haiku_frame_parm_handlers[];
+/* The single Haiku display (if any).  */
+struct haiku_display_info *x_display_list;
 
 /* This is used to determine when to evict the font lookup cache,
    which we do every 50 updates.  */
 static int up_to_date_count;
 
+/* List of defined fringe bitmaps.  */
 static void **fringe_bmps;
-static int max_fringe_bmp = 0;
 
+/* The amount of fringe bitmaps in that list.  */
+static int max_fringe_bmp;
+
+/* Alist of resources to their values.  */
 static Lisp_Object rdb;
 
-struct unhandled_event
-{
-  struct unhandled_event *next;
-  enum haiku_event_type type;
-  uint8_t buffer[200];
-};
-
+/* Non-zero means that a HELP_EVENT has been generated since Emacs
+   start.  */
 static bool any_help_event_p;
 
 char *
@@ -123,7 +122,8 @@ haiku_delete_terminal (struct terminal *terminal)
 }
 
 static const char *
-get_string_resource (void *ignored, const char *name, const char *class)
+haiku_get_string_resource (void *ignored, const char *name,
+			   const char *class)
 {
   const char *native;
 
@@ -724,21 +724,40 @@ haiku_draw_relief_rect (struct glyph_string *s,
 }
 
 static void
+haiku_get_scale_factor (int *scale_x, int *scale_y)
+{
+  struct haiku_display_info *dpyinfo = x_display_list;
+
+  if (dpyinfo->resx > 96)
+    *scale_x = floor (dpyinfo->resx / 96);
+  if (dpyinfo->resy > 96)
+    *scale_y = floor (dpyinfo->resy / 96);
+}
+
+static void
 haiku_draw_underwave (struct glyph_string *s, int width, int x)
 {
-  int wave_height = 3, wave_length = 2;
-  int y, dx, dy, odd, xmax;
+  int wave_height, wave_length;
+  int y, dx, dy, odd, xmax, scale_x, scale_y;
   float ax, ay, bx, by;
-  void *view = FRAME_HAIKU_VIEW (s->f);
+  void *view;
+
+  scale_x = 1;
+  scale_y = 1;
+  haiku_get_scale_factor (&scale_x, &scale_y);
+  wave_height = 3 * scale_y;
+  wave_length = 2 * scale_x;
 
   dx = wave_length;
   dy = wave_height - 1;
   y = s->ybase - wave_height + 3;
   xmax = x + width;
+  view = FRAME_HAIKU_VIEW (s->f);
 
   BView_StartClip (view);
   haiku_clip_to_string (s);
   BView_ClipToRect (view, x, y, width, wave_height);
+
   ax = x - ((int) (x) % dx) + (float) 0.5;
   bx = ax + dx;
   odd = (int) (ax / dx) % 2;
@@ -749,6 +768,8 @@ haiku_draw_underwave (struct glyph_string *s, int width, int x)
   else
     by += dy;
 
+  BView_SetPenSize (view, scale_y);
+
   while (ax <= xmax)
     {
       BView_StrokeLine (view, ax, ay, bx, by);
@@ -756,6 +777,8 @@ haiku_draw_underwave (struct glyph_string *s, int width, int x)
       bx += dx, by = y + 0.5 + odd * dy;
       odd = !odd;
     }
+
+  BView_SetPenSize (view, 1);
   BView_EndClip (view);
 }
 
@@ -971,10 +994,11 @@ haiku_draw_string_box (struct glyph_string *s)
 
 static void
 haiku_draw_plain_background (struct glyph_string *s, struct face *face,
-			     int box_line_hwidth, int box_line_vwidth)
+			     int x, int y, int width, int height)
 {
   void *view = FRAME_HAIKU_VIEW (s->f);
   unsigned long cursor_color;
+
   if (s->hl == DRAW_CURSOR)
     {
       haiku_merge_cursor_foreground (s, NULL, &cursor_color);
@@ -983,18 +1007,93 @@ haiku_draw_plain_background (struct glyph_string *s, struct face *face,
   else
     BView_SetHighColor (view, face->background_defaulted_p ?
 			FRAME_BACKGROUND_PIXEL (s->f) :
-		      face->background);
+			face->background);
 
-  BView_FillRectangle (view, s->x,
-		       s->y + box_line_hwidth,
-		       s->background_width,
-		       s->height - 2 * box_line_hwidth);
+  BView_FillRectangle (view, x, y, width, height);
+}
+
+static struct haiku_bitmap_record *
+haiku_get_bitmap_rec (struct frame *f, ptrdiff_t id)
+{
+  return &FRAME_DISPLAY_INFO (f)->bitmaps[id - 1];
+}
+
+static void
+haiku_update_bitmap_rec (struct haiku_bitmap_record *rec,
+			 uint32_t new_foreground,
+			 uint32_t new_background)
+{
+  char *bits;
+  int x, y, bytes_per_line;
+
+  if (new_foreground == rec->stipple_foreground
+      && new_background == rec->stipple_background)
+    return;
+
+  bits = rec->stipple_bits;
+  bytes_per_line = (rec->width + 7) / 8;
+
+  for (y = 0; y < rec->height; y++)
+    {
+      for (x = 0; x < rec->width; x++)
+	haiku_put_pixel (rec->img, x, y,
+			 ((bits[x / 8] >> (x % 8)) & 1
+			  ? new_foreground : new_background));
+
+      bits += bytes_per_line;
+    }
+
+  rec->stipple_foreground = new_foreground;
+  rec->stipple_background = new_background;
 }
 
 static void
 haiku_draw_stipple_background (struct glyph_string *s, struct face *face,
-			       int box_line_hwidth, int box_line_vwidth)
+			       int x, int y, int width, int height,
+			       bool explicit_colors_p,
+			       uint32 explicit_background,
+			       uint32 explicit_foreground)
 {
+  struct haiku_bitmap_record *rec;
+  unsigned long foreground, background;
+  void *view;
+
+  view = FRAME_HAIKU_VIEW (s->f);
+  rec = haiku_get_bitmap_rec (s->f, s->face->stipple);
+
+  if (explicit_colors_p)
+    {
+      background = explicit_background;
+      foreground = explicit_foreground;
+    }
+  else if (s->hl == DRAW_CURSOR)
+    haiku_merge_cursor_foreground (s, &foreground, &background);
+  else
+    {
+      foreground = s->face->foreground;
+      background = s->face->background;
+    }
+
+  haiku_update_bitmap_rec (rec, foreground, background);
+
+  BView_StartClip (view);
+  haiku_clip_to_string (s);
+  BView_ClipToRect (view, x, y, width, height);
+  BView_DrawBitmapTiled (view, rec->img, 0, 0, -1, -1,
+			 0, 0, FRAME_PIXEL_WIDTH (s->f),
+			 FRAME_PIXEL_HEIGHT (s->f));
+  BView_EndClip (view);
+}
+
+void
+haiku_draw_background_rect (struct glyph_string *s, struct face *face,
+			    int x, int y, int width, int height)
+{
+  if (!s->stippled_p)
+    haiku_draw_plain_background (s, face, x, y, width, height);
+  else
+    haiku_draw_stipple_background (s, face, x, y, width, height,
+				   false, 0, 0);
 }
 
 static void
@@ -1010,12 +1109,10 @@ haiku_maybe_draw_background (struct glyph_string *s, int force_p)
 	  || FONT_TOO_HIGH (s->font)
           || s->font_not_found_p || s->extends_to_end_of_line_p || force_p)
 	{
-	  if (!face->stipple)
-	    haiku_draw_plain_background (s, face, box_line_width,
-					 box_vline_width);
-	  else
-	    haiku_draw_stipple_background (s, face, box_line_width,
-					   box_vline_width);
+	  haiku_draw_background_rect (s, s->face, s->x, s->y + box_line_width,
+				      s->background_width,
+				      s->height - 2 * box_line_width);
+
 	  s->background_filled_p = 1;
 	}
     }
@@ -1180,8 +1277,8 @@ haiku_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 	  BView_SetPenSize (FRAME_HAIKU_VIEW (s->f), 1);
 	  BView_StrokeRectangle (FRAME_HAIKU_VIEW (s->f),
 				 x, s->ybase - glyph->ascent,
-				 glyph->pixel_width - 1,
-				 glyph->ascent + glyph->descent - 1);
+				 glyph->pixel_width,
+				 glyph->ascent + glyph->descent);
 	}
       x += glyph->pixel_width;
    }
@@ -1190,9 +1287,8 @@ haiku_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 static void
 haiku_draw_stretch_glyph_string (struct glyph_string *s)
 {
-  eassert (s->first_glyph->type == STRETCH_GLYPH);
-
   struct face *face = s->face;
+  uint32_t bkg;
 
   if (s->hl == DRAW_CURSOR && !x_stretch_cursor_p)
     {
@@ -1240,9 +1336,11 @@ haiku_draw_stretch_glyph_string (struct glyph_string *s)
 	  int y = s->y;
 	  int w = background_width - width, h = s->height;
 
+	  /* Draw stipples manually because we want the background
+	     part of a stretch glyph to have a stipple even if the
+	     cursor is visible on top.  */
 	  if (!face->stipple)
 	    {
-	      uint32_t bkg;
 	      if (s->row->mouse_face_p && cursor_in_mouse_face_p (s->w))
 		haiku_mouse_face_colors (s, NULL, &bkg);
 	      else
@@ -1250,6 +1348,16 @@ haiku_draw_stretch_glyph_string (struct glyph_string *s)
 
 	      BView_SetHighColor (view, bkg);
 	      BView_FillRectangle (view, x, y, w, h);
+	    }
+	  else
+	    {
+	      if (s->row->mouse_face_p && cursor_in_mouse_face_p (s->w))
+		haiku_mouse_face_colors (s, NULL, &bkg);
+	      else
+		bkg = face->background;
+
+	      haiku_draw_stipple_background (s, s->face, x, y, w, h,
+					     true, bkg, face->foreground);
 	    }
 	}
     }
@@ -1268,17 +1376,8 @@ haiku_draw_stretch_glyph_string (struct glyph_string *s)
 	}
 
       if (background_width > 0)
-	{
-	  void *view = FRAME_HAIKU_VIEW (s->f);
-	  unsigned long bkg;
-	  if (s->hl == DRAW_CURSOR)
-	    haiku_merge_cursor_foreground (s, NULL, &bkg);
-	  else
-	    bkg = s->face->background;
-
-	  BView_SetHighColor (view, bkg);
-	  BView_FillRectangle (view, x, s->y, background_width, s->height);
-	}
+	haiku_draw_background_rect (s, s->face, s->x, s->y,
+				    background_width, s->height);
     }
   s->background_filled_p = 1;
 }
@@ -1351,14 +1450,16 @@ haiku_draw_composite_glyph_string_foreground (struct glyph_string *s)
 
   /* Draw a rectangle for the composition if the font for the very
      first character of the composition could not be loaded.  */
-
   if (s->font_not_found_p && !s->cmp_from)
     {
       if (s->hl == DRAW_CURSOR)
 	BView_SetHighColor (view, FRAME_OUTPUT_DATA (s->f)->cursor_fg);
       else
 	BView_SetHighColor (view, s->face->foreground);
-      BView_StrokeRectangle (view, s->x, s->y, s->width - 1, s->height - 1);
+
+      BView_SetPenSize (view, 1);
+      BView_StrokeRectangle (view, s->x, s->y,
+			     s->width, s->height);
     }
   else if (!s->first_glyph->u.cmp.automatic)
     {
@@ -1546,6 +1647,7 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
   void *view = FRAME_HAIKU_VIEW (s->f);
   void *bitmap = s->img->pixmap;
 
+  /* TODO: implement stipples for images with masks.  */
   s->stippled_p = face->stipple != 0;
 
   BView_SetHighColor (view, face->background);
@@ -1628,16 +1730,14 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
 static void
 haiku_draw_glyph_string (struct glyph_string *s)
 {
-  void *view;
+  void *view = FRAME_HAIKU_VIEW (s->f);;
+  struct face *face = s->face;
 
   block_input ();
-  view = FRAME_HAIKU_VIEW (s->f);
   BView_draw_lock (view, false, 0, 0, 0, 0);
   prepare_face_for_display (s->f, s->face);
 
-  struct face *face = s->face;
-  if (face != s->face)
-    prepare_face_for_display (s->f, face);
+  s->stippled_p = s->hl != DRAW_CURSOR && face->stipple;
 
   if (s->next && s->right_overhang && !s->for_overlaps)
     {
@@ -1649,13 +1749,16 @@ haiku_draw_glyph_string (struct glyph_string *s)
 	   width += next->width, next = next->next)
 	if (next->first_glyph->type != IMAGE_GLYPH)
           {
-	    prepare_face_for_display (s->f, s->next->face);
-	    haiku_start_clip (s->next);
-	    haiku_clip_to_string (s->next);
+	    prepare_face_for_display (s->f, next->face);
+	    next->stippled_p
+	      = next->hl != DRAW_CURSOR && next->face->stipple;
+
+	    haiku_start_clip (next);
+	    haiku_clip_to_string (next);
             if (next->first_glyph->type != STRETCH_GLYPH)
-	      haiku_maybe_draw_background (s->next, 1);
+	      haiku_maybe_draw_background (next, true);
             else
-	      haiku_draw_stretch_glyph_string (s->next);
+	      haiku_draw_stretch_glyph_string (next);
 	    haiku_end_clip (s);
           }
     }
@@ -1780,8 +1883,21 @@ haiku_draw_glyph_string (struct glyph_string *s)
 	      }
 	}
     }
+
   haiku_end_clip (s);
   BView_draw_unlock (view);
+
+  /* Set the stipple_p flag indicating whether or not a stipple was
+     drawn in s->row.  That is the case either when s is a stretch
+     glyph string and s->face->stipple is not NULL, or when
+     s->face->stipple exists and s->hl is not DRAW_CURSOR, and s is
+     not an image.  This is different from X.  */
+  if (s->first_glyph->type != IMAGE_GLYPH
+      && s->face->stipple
+      && (s->first_glyph->type == STRETCH_GLYPH
+	  || s->hl != DRAW_CURSOR))
+    s->row->stipple_p = true;
+
   unblock_input ();
 }
 
@@ -1817,8 +1933,9 @@ haiku_after_update_window_line (struct window *w,
 	  void *view = FRAME_HAIKU_VIEW (f);
 	  BView_draw_lock (view, false, 0, 0, 0, 0);
 	  BView_StartClip (view);
-	  BView_SetHighColor (view, face->background_defaulted_p ?
-			      FRAME_BACKGROUND_PIXEL (f) : face->background);
+	  BView_SetHighColor (view, (face->background_defaulted_p
+				     ? FRAME_BACKGROUND_PIXEL (f)
+				     : face->background));
 	  BView_FillRectangle (view, 0, y, width, height);
 	  BView_FillRectangle (view, FRAME_PIXEL_WIDTH (f) - width,
 			       y, width, height);
@@ -2078,19 +2195,25 @@ haiku_draw_vertical_window_border (struct window *w,
 static void
 haiku_set_scroll_bar_default_width (struct frame *f)
 {
-  int unit = FRAME_COLUMN_WIDTH (f);
-  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = BScrollBar_default_size (0) + 1;
-  FRAME_CONFIG_SCROLL_BAR_COLS (f) =
-    (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) + unit - 1) / unit;
+  int unit, size;
+
+  unit = FRAME_COLUMN_WIDTH (f);
+  size = BScrollBar_default_size (0) + 1;
+
+  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = size;
+  FRAME_CONFIG_SCROLL_BAR_COLS (f) = (size + unit - 1) / unit;
 }
 
 static void
 haiku_set_scroll_bar_default_height (struct frame *f)
 {
-  int height = FRAME_LINE_HEIGHT (f);
-  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = BScrollBar_default_size (1) + 1;
-  FRAME_CONFIG_SCROLL_BAR_LINES (f) =
-    (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) + height - 1) / height;
+  int height, size;
+
+  height = FRAME_LINE_HEIGHT (f);
+  size = BScrollBar_default_size (true) + 1;
+
+  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = size;
+  FRAME_CONFIG_SCROLL_BAR_LINES (f) = (size + height - 1) / height;
 }
 
 static void
@@ -2272,15 +2395,17 @@ static struct scroll_bar *
 haiku_scroll_bar_create (struct window *w, int left, int top,
 			 int width, int height, bool horizontal_p)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct frame *f;
   Lisp_Object barobj;
+  struct scroll_bar *bar;
+  void *scroll_bar;
+  void *view;
 
-  void *sb = NULL;
-  void *vw = FRAME_HAIKU_VIEW (f);
+  f = XFRAME (WINDOW_FRAME (w));
+  view = FRAME_HAIKU_VIEW (f);
 
   block_input ();
-  struct scroll_bar *bar
-    = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, prev, PVEC_OTHER);
+  bar = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, prev, PVEC_OTHER);
 
   XSETWINDOW (bar->window, w);
   bar->top = top;
@@ -2293,15 +2418,14 @@ haiku_scroll_bar_create (struct window *w, int left, int top,
   bar->update = -1;
   bar->horizontal = horizontal_p;
 
-  sb = BScrollBar_make_for_view (vw, horizontal_p,
-				 left, top, left + width - 1,
-				 top + height - 1, bar);
-
-  BView_publish_scroll_bar (vw, left, top, width, height);
+  scroll_bar = BScrollBar_make_for_view (view, horizontal_p,
+					 left, top, left + width - 1,
+					 top + height - 1, bar);
+  BView_publish_scroll_bar (view, left, top, width, height);
 
   bar->next = FRAME_SCROLL_BARS (f);
   bar->prev = Qnil;
-  bar->scroll_bar = sb;
+  bar->scroll_bar = scroll_bar;
   XSETVECTOR (barobj, bar);
   fset_scroll_bars (f, barobj);
 
@@ -2315,18 +2439,20 @@ haiku_scroll_bar_create (struct window *w, int left, int top,
 static void
 haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int position)
 {
-  eassert (WINDOW_HAS_HORIZONTAL_SCROLL_BAR (w));
   Lisp_Object barobj;
   struct scroll_bar *bar;
   int top, height, left, width;
   int window_x, window_width;
+  void *view;
 
+  eassert (WINDOW_HAS_HORIZONTAL_SCROLL_BAR (w));
   /* Get window dimensions.  */
   window_box (w, ANY_AREA, &window_x, 0, &window_width, 0);
   left = window_x;
   width = window_width;
   top = WINDOW_SCROLL_BAR_AREA_Y (w);
   height = WINDOW_CONFIG_SCROLL_BAR_HEIGHT (w);
+  view = FRAME_HAIKU_VIEW (WINDOW_XFRAME (w));
 
   block_input ();
 
@@ -2341,15 +2467,15 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
     {
       bar = XSCROLL_BAR (w->horizontal_scroll_bar);
 
-      if (bar->left != left || bar->top != top ||
-	  bar->width != width || bar->height != height)
+      if (bar->left != left || bar->top != top
+	  || bar->width != width || bar->height != height)
 	{
-	  void *view = FRAME_HAIKU_VIEW (WINDOW_XFRAME (w));
 	  BView_forget_scroll_bar (view, bar->left, bar->top,
 				   bar->width, bar->height);
 	  BView_move_frame (bar->scroll_bar, left, top,
 			    left + width - 1, top + height - 1);
 	  BView_publish_scroll_bar (view, left, top, width, height);
+
 	  bar->left = left;
 	  bar->top = top;
 	  bar->width = width;
@@ -2366,14 +2492,15 @@ haiku_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int p
 }
 
 static void
-haiku_set_vertical_scroll_bar (struct window *w,
-			       int portion, int whole, int position)
+haiku_set_vertical_scroll_bar (struct window *w, int portion, int whole, int position)
 {
-  eassert (WINDOW_HAS_VERTICAL_SCROLL_BAR (w));
   Lisp_Object barobj;
   struct scroll_bar *bar;
   int top, height, left, width;
   int window_y, window_height;
+  void *view;
+
+  eassert (WINDOW_HAS_VERTICAL_SCROLL_BAR (w));
 
   /* Get window dimensions.  */
   window_box (w, ANY_AREA, 0, &window_y, 0, &window_height);
@@ -2383,8 +2510,10 @@ haiku_set_vertical_scroll_bar (struct window *w,
   /* Compute the left edge and the width of the scroll bar area.  */
   left = WINDOW_SCROLL_BAR_AREA_X (w);
   width = WINDOW_SCROLL_BAR_AREA_WIDTH (w);
-  block_input ();
 
+  view = FRAME_HAIKU_VIEW (WINDOW_XFRAME (w));
+
+  block_input ();
   if (NILP (w->vertical_scroll_bar))
     {
       bar = haiku_scroll_bar_create (w, left, top, width, height, false);
@@ -2395,15 +2524,15 @@ haiku_set_vertical_scroll_bar (struct window *w,
     {
       bar = XSCROLL_BAR (w->vertical_scroll_bar);
 
-      if (bar->left != left || bar->top != top ||
-	  bar->width != width || bar->height != height)
+      if (bar->left != left || bar->top != top
+	  || bar->width != width || bar->height != height)
 	{
-	  void *view = FRAME_HAIKU_VIEW (WINDOW_XFRAME (w));
 	  BView_forget_scroll_bar (view, bar->left, bar->top,
 				   bar->width, bar->height);
 	  BView_move_frame (bar->scroll_bar, left, top,
 			    left + width - 1, top + height - 1);
 	  BView_publish_scroll_bar (view, left, top, width, height);
+
 	  bar->left = left;
 	  bar->top = top;
 	  bar->width = width;
@@ -2424,25 +2553,52 @@ static void
 haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 			  struct draw_fringe_bitmap_params *p)
 {
-  void *view = FRAME_HAIKU_VIEW (XFRAME (WINDOW_FRAME (w)));
-  struct face *face = p->face;
+  struct face *face;
+  struct frame *f;
+  struct haiku_bitmap_record *rec;
+  void *view, *bitmap;
+  uint32 col;
+
+  f = XFRAME (WINDOW_FRAME (w));
+  view = FRAME_HAIKU_VIEW (f);
+  face = p->face;
 
   block_input ();
   BView_draw_lock (view, true, p->x, p->y, p->wd, p->h);
   BView_StartClip (view);
 
   haiku_clip_to_row (w, row, ANY_AREA);
+
   if (p->bx >= 0 && !p->overlay_p)
     {
-      BView_SetHighColor (view, face->background);
-      BView_FillRectangle (view, p->bx, p->by, p->nx, p->ny);
+      if (!face->stipple)
+	{
+	  BView_SetHighColor (view, face->background);
+	  BView_FillRectangle (view, p->bx, p->by, p->nx, p->ny);
+	}
+      else
+	{
+	  rec = haiku_get_bitmap_rec (f, face->stipple);
+	  haiku_update_bitmap_rec (rec, face->foreground,
+				   face->background);
+
+	  BView_StartClip (view);
+	  haiku_clip_to_row (w, row, ANY_AREA);
+	  BView_ClipToRect (view, p->bx, p->by, p->nx, p->ny);
+	  BView_DrawBitmapTiled (view, rec->img, 0, 0, -1, -1,
+				 0, 0, FRAME_PIXEL_WIDTH (f),
+				 FRAME_PIXEL_HEIGHT (f));
+	  BView_EndClip (view);
+
+	  row->stipple_p = true;
+	}
     }
 
   if (p->which
       && p->which < max_fringe_bmp
       && p->which < max_used_fringe_bitmap)
     {
-      void *bitmap = fringe_bmps[p->which];
+      bitmap = fringe_bmps[p->which];
 
       if (!bitmap)
 	{
@@ -2455,8 +2611,6 @@ haiku_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 	  gui_define_fringe_bitmap (WINDOW_XFRAME (w), p->which);
 	  bitmap = fringe_bmps[p->which];
 	}
-
-      uint32_t col;
 
       if (!p->cursor_p)
 	col = face->foreground;
@@ -2824,7 +2978,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   int message_count;
   static void *buf;
   ssize_t b_size;
-  struct unhandled_event *unhandled_events = NULL;
   int button_or_motion_p, do_help;
   enum haiku_event_type type;
   struct input_event inev, inev2;
@@ -3583,19 +3736,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 					  f->menu_bar_vector, b->ptr);
 	    break;
 	  }
-	case FILE_PANEL_EVENT:
-	  {
-	    if (!popup_activated_p)
-	      continue;
-
-	    struct unhandled_event *ev = xmalloc (sizeof *ev);
-	    ev->next = unhandled_events;
-	    ev->type = type;
-	    memcpy (&ev->buffer, buf, 200);
-
-	    unhandled_events = ev;
-	    break;
-	  }
 	case MENU_BAR_HELP_EVENT:
 	  {
 	    struct haiku_menu_bar_help_event *b = buf;
@@ -3676,14 +3816,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	  kbd_buffer_store_event_hold (&inev2, hold_quit);
 	  ++message_count;
 	}
-    }
-
-  for (struct unhandled_event *ev = unhandled_events; ev;)
-    {
-      haiku_write_without_signal (ev->type, &ev->buffer, false);
-      struct unhandled_event *old = ev;
-      ev = old->next;
-      xfree (old);
     }
 
   if (do_help && !(hold_quit && hold_quit->kind != NO_EVENT))
@@ -3901,7 +4033,7 @@ haiku_create_terminal (struct haiku_display_info *dpyinfo)
   terminal->frame_visible_invisible_hook = haiku_set_frame_visible_invisible;
   terminal->set_frame_offset_hook = haiku_set_offset;
   terminal->delete_terminal_hook = haiku_delete_terminal;
-  terminal->get_string_resource_hook = get_string_resource;
+  terminal->get_string_resource_hook = haiku_get_string_resource;
   terminal->set_new_font_hook = haiku_new_font;
   terminal->defined_color_hook = haiku_defined_color;
   terminal->set_window_size_hook = haiku_set_window_size;
@@ -3967,9 +4099,9 @@ haiku_term_init (void)
   dpyinfo->display = BApplication_setup ();
   dpyinfo->next = x_display_list;
   dpyinfo->n_planes = be_get_display_planes ();
-  x_display_list = dpyinfo;
+  be_get_display_resolution (&dpyinfo->resx, &dpyinfo->resy);
 
-  BScreen_res (&dpyinfo->resx, &dpyinfo->resy);
+  x_display_list = dpyinfo;
 
   terminal = haiku_create_terminal (dpyinfo);
   if (current_kboard == initial_kboard)
@@ -4110,9 +4242,15 @@ mark_haiku_display (void)
 void
 haiku_scroll_bar_remove (struct scroll_bar *bar)
 {
+  void *view;
+  struct frame *f;
+
+  f = WINDOW_XFRAME (XWINDOW (bar->window));
+  view = FRAME_HAIKU_VIEW (f);
+
   block_input ();
-  void *view = FRAME_HAIKU_VIEW (WINDOW_XFRAME (XWINDOW (bar->window)));
-  BView_forget_scroll_bar (view, bar->left, bar->top, bar->width, bar->height);
+  BView_forget_scroll_bar (view, bar->left, bar->top,
+			   bar->width, bar->height);
   BScrollBar_delete (bar->scroll_bar);
   expose_frame (WINDOW_XFRAME (XWINDOW (bar->window)),
 		bar->left, bar->top, bar->width, bar->height);
@@ -4121,7 +4259,6 @@ haiku_scroll_bar_remove (struct scroll_bar *bar)
     wset_horizontal_scroll_bar (XWINDOW (bar->window), Qnil);
   else
     wset_vertical_scroll_bar (XWINDOW (bar->window), Qnil);
-
   unblock_input ();
 };
 

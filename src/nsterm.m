@@ -3079,7 +3079,9 @@ ns_draw_window_cursor (struct window *w, struct glyph_row *glyph_row,
       break;
     case HOLLOW_BOX_CURSOR:
       draw_phys_cursor_glyph (w, glyph_row, DRAW_NORMAL_TEXT);
-      [NSBezierPath strokeRect: r];
+
+      /* This works like it does in PostScript, not X Windows.  */
+      [NSBezierPath strokeRect: NSInsetRect (r, 0.5, 0.5)];
       break;
     case HBAR_CURSOR:
       NSRectFill (r);
@@ -6092,17 +6094,33 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
 
       tem = [dict objectForKey: NSFontWeightTrait];
 
+#ifdef NS_IMPL_GNUSTEP
       if (tem != nil)
 	lweight = ([tem floatValue] > 0
 		   ? Qbold : ([tem floatValue] < -0.4f
 			      ? Qlight : Qnormal));
+#else
+      if (tem != nil)
+	{
+	  if ([tem floatValue] >= 0.4)
+	    lweight = Qbold;
+	  else if ([tem floatValue] >= 0.24)
+	    lweight = Qmedium;
+	  else if ([tem floatValue] >= 0)
+	    lweight = Qnormal;
+	  else if ([tem floatValue] >= -0.24)
+	    lweight = Qsemi_light;
+	  else
+	    lweight = Qlight;
+	}
+#endif
 
       tem = [dict objectForKey: NSFontWidthTrait];
 
       if (tem != nil)
 	lwidth = ([tem floatValue] > 0
 		  ? Qexpanded : ([tem floatValue] < 0
-				 ? Qnormal : Qcondensed));
+				 ? Qcondensed : Qnormal));
     }
 
   lheight = make_float ([font pointSize]);
@@ -6110,8 +6128,52 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
   return CALLN (Ffont_spec,
 		QCwidth, lwidth, QCslant, lslant,
 		QCweight, lweight, QCsize, lheight,
-		QCfamily, [family lispString]);
+		QCfamily, (family
+			   ? [family lispString]
+			   : Qnil));
 }
+
+#ifdef NS_IMPL_COCOA
+static NSView *
+ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
+{
+  NSMatrix *matrix;
+  NSButtonCell *prototype;
+  NSSize cell_size;
+  NSRect frame;
+  NSButtonCell *cancel, *ok;
+
+  prototype = [[NSButtonCell alloc] init];
+  [prototype setBezelStyle: NSBezelStyleRounded];
+  [prototype setTitle: @"Cancel"];
+  cell_size = [prototype cellSize];
+  frame = NSMakeRect (0, 0, cell_size.width * 2,
+		      cell_size.height);
+  matrix = [[NSMatrix alloc] initWithFrame: frame
+				      mode: NSTrackModeMatrix
+				 prototype: prototype
+			      numberOfRows: 1
+			   numberOfColumns: 2];
+  [prototype release];
+
+  ok = (NSButtonCell *) [matrix cellAtRow: 0 column: 0];
+  cancel = (NSButtonCell *) [matrix cellAtRow: 0 column: 1];
+
+  [ok setTitle: @"OK"];
+  [ok setTarget: target];
+  [ok setAction: select];
+  [ok setButtonType: NSButtonTypeMomentaryPushIn];
+
+  [cancel setTitle: @"Cancel"];
+  [cancel setTarget: target];
+  [cancel setAction: cancel_action];
+  [cancel setButtonType: NSButtonTypeMomentaryPushIn];
+
+  [matrix selectCell: ok];
+
+  return matrix;
+}
+#endif
 
 /* ==========================================================================
 
@@ -6180,6 +6242,30 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
 - (void) noteUserSelectedFont
 {
   font_panel_active = NO;
+
+  /* If no font was previously selected, use the currently selected
+     font.  */
+
+  if (!font_panel_result && FRAME_FONT (emacsframe))
+    {
+      font_panel_result
+	= macfont_get_nsctfont (FRAME_FONT (emacsframe));
+
+      if (font_panel_result)
+	[font_panel_result retain];
+    }
+
+  [NSApp stop: self];
+}
+
+- (void) noteUserCancelledSelection
+{
+  font_panel_active = NO;
+
+  if (font_panel_result)
+    [font_panel_result release];
+  font_panel_result = nil;
+
   [NSApp stop: self];
 }
 #endif
@@ -6191,7 +6277,7 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
   NSFont *nsfont, *result;
   struct timespec timeout;
 #ifdef NS_IMPL_COCOA
-  NSButton *button;
+  NSView *buttons;
   BOOL canceled;
 #endif
 
@@ -6202,18 +6288,12 @@ ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
 #endif
 
 #ifdef NS_IMPL_COCOA
-  /* FIXME: this button could be made a lot prettier, but I don't know
-     how.  */
-  button = [[NSButton alloc] initWithFrame: NSMakeRect (0, 0, 192, 40)];
-  [button setTitle: @"OK"];
-  [button setTarget: self];
-  [button setAction: @selector (noteUserSelectedFont)];
-  [button setButtonType: NSButtonTypeMomentaryPushIn];
-  [button setHidden: NO];
-
-  [[fm fontPanel: YES] setAccessoryView: button];
-  [button release];
-  [[fm fontPanel: YES] setDefaultButtonCell: [button cell]];
+  buttons
+    = ns_create_font_panel_buttons (self,
+				    @selector (noteUserSelectedFont),
+				    @selector (noteUserCancelledSelection));
+  [[fm fontPanel: YES] setAccessoryView: buttons];
+  [buttons release];
 #endif
 
   [fm setSelectedFont: nsfont isMultiple: NO];
@@ -10301,7 +10381,7 @@ This variable is ignored on macOS < 10.7 and GNUstep.  Default is t.  */);
   DEFSYM (QCmouse, ":mouse");
   DEFSYM (Qcondensed, "condensed");
   DEFSYM (Qreverse_italic, "reverse-italic");
-  DEFSYM (Qexpanded, "reverse-italic");
+  DEFSYM (Qexpanded, "expanded");
 
 #ifdef NS_IMPL_COCOA
   Fprovide (Qcocoa, Qnil);

@@ -136,6 +136,28 @@ South Indian language Malayalam is supported in this language environment."))
 The ancient Brahmi script is supported in this language environment."))
  '("Indian"))                           ; Should we have an "Old" category?
 
+(set-language-info-alist
+ "Kaithi" '((charset unicode)
+            (coding-system utf-8)
+            (coding-priority utf-8)
+            (input-method . "kaithi")
+            (sample-text . "Kaithi (𑂍𑂶𑂟𑂲)        𑂩𑂰𑂧𑂩𑂰𑂧")
+            (documentation . "\
+Languages such as Awadhi, Bhojpuri, Magahi and Maithili
+which used the Kaithi script are supported in this language environment."))
+ '("Indian"))
+
+(set-language-info-alist
+ "Tirhuta" '((charset unicode)
+             (coding-system utf-8)
+             (coding-priority utf-8)
+             (input-method . "tirhuta")
+             (sample-text . "Tirhuta (𑒞𑒱𑒩𑒯𑒳𑒞𑒰)        𑒣𑓂𑒩𑒢𑒰𑒧")
+             (documentation . "\
+Maithili language and its script Tirhuta is supported in this
+language environment."))
+ '("Indian"))
+
 
 ;; Replace mnemonic characters in REGEXP according to TABLE.  TABLE is
 ;; an alist of (MNEMONIC-STRING . REPLACEMENT-STRING).
@@ -158,6 +180,8 @@ The ancient Brahmi script is supported in this language environment."))
 	   ("H" . "\u094D")		; HALANT
 	   ("s" . "[\u0951\u0952]")	; stress sign
 	   ("t" . "[\u0953\u0954]")	; accent
+           ("1" . "\u0967")             ; numeral 1
+           ("3" . "\u0969")             ; numeral 3
 	   ("N" . "\u200C")		; ZWNJ
 	   ("J" . "\u200D")		; ZWJ
 	   ("X" . "[\u0900-\u097F]"))))	; all coverage
@@ -169,6 +193,8 @@ The ancient Brahmi script is supported in this language environment."))
       "Cn?\\(?:J?HJ?Cn?\\)*\\(?:H[NJ]?\\|v*n?a?s?t?A?\\)\\|"
       ;; special consonant form, or
       "JHR\\|"
+      ;; vedic accents with numerals, or
+      "1ss?\\|3ss\\|s3ss\\|"
       ;; any other singleton characters
       "X")
      table))
@@ -179,14 +205,15 @@ The ancient Brahmi script is supported in this language environment."))
 	 '(("a" . "\u0981")		; SIGN CANDRABINDU
 	   ("A" . "[\u0982\u0983]")	; SIGN ANUSVARA .. VISARGA
 	   ("V" . "[\u0985-\u0994\u09E0\u09E1]") ; independent vowel
-	   ("C" . "[\u0995-\u09B9\u09DC-\u09DF\u09F1]") ; consonant
+	   ("C" . "[\u0995-\u09B9\u09DC-\u09DF\u09F0\u09F1]") ; consonant
 	   ("B" . "[\u09AC\u09AF\u09B0\u09F0]")		; BA, YA, RA
 	   ("R" . "[\u09B0\u09F0]")		; RA
 	   ("n" . "\u09BC")		; NUKTA
 	   ("v" . "[\u09BE-\u09CC\u09D7\u09E2\u09E3]") ; vowel sign
 	   ("H" . "\u09CD")		; HALANT
 	   ("T" . "\u09CE")		; KHANDA TA
-	   ("N" . "\u200C")		; ZWNJ
+           ("S" . "\u09FE")             ; SANDHI MARK
+           ("N" . "\u200C")		; ZWNJ
 	   ("J" . "\u200D")		; ZWJ
 	   ("X" . "[\u0980-\u09FF]"))))	; all coverage
     (indian-compose-regexp
@@ -194,7 +221,7 @@ The ancient Brahmi script is supported in this language environment."))
       ;; syllables with an independent vowel, or
       "\\(?:RH\\)?Vn?\\(?:J?HB\\)?v*n?a?A?\\|"
       ;; consonant-based syllables, or
-      "Cn?\\(?:J?HJ?Cn?\\)*\\(?:H[NJ]?\\|v*[NJ]?v?a?A?\\)\\|"
+      "Cn?\\(?:J?HJ?Cn?\\)*\\(?:H[NJ]?\\|v*[NJ]?v?a?A?S?\\)\\|"
       ;; another syllables with an independent vowel, or
       "\\(?:RH\\)?T\\|"
       ;; special consonant form, or
@@ -421,6 +448,46 @@ The ancient Brahmi script is supported in this language environment."))
                                (concat multiplier number-joiner numeral)
                                1 'font-shape-gstring))))
 
+;; Kaithi composition rules
+(let ((consonant            "[\x1108D-\x110AF]")
+      (nukta                "\x110BA")
+      (vowel                "[\x1108D-\x110C2]")
+      (anusvara-candrabindu "[\x11080\x11081]")
+      (virama               "\x110B9")
+      (number-sign          "\x110BD")
+      (number-sign-above    "\x110CD")
+      (numerals             "[\x966-\x96F]+")
+      (zwj                  "\x200D"))
+  (set-char-table-range composition-function-table
+                        '(#x110B0 . #x110BA)
+                        (list (vector
+                               (concat consonant nukta "?\\(?:" virama zwj "?" consonant nukta "?\\)*\\(?:"
+                                       virama zwj "?\\|" vowel "*" nukta "?" anusvara-candrabindu "?\\)")
+                               1 'font-shape-gstring)))
+  (set-char-table-range composition-function-table
+                        '(#x110BD . #x110BD)
+                        (list (vector
+                               (concat number-sign numerals)
+                               0 'font-shape-gstring)))
+  (set-char-table-range composition-function-table
+                        '(#x110CD . #x110CD)
+                        (list (vector
+                               (concat number-sign-above numerals)
+                               0 'font-shape-gstring))))
+
 (provide 'indian)
+
+;; Tirhuta composition rules
+(let ((consonant            "[\x1148F-\x114AF]")
+      (nukta                "\x114C3")
+      (vowel                "[\x114B0-\x114BE]")
+      (anusvara-candrabindu "[\x114BF\x114C0]")
+      (virama               "\x114C2"))
+  (set-char-table-range composition-function-table
+                        '(#x114B0 . #x114C3)
+                        (list (vector
+                               (concat consonant nukta "?\\(?:" virama consonant nukta "?\\)*\\(?:"
+                                       virama "\\|" vowel "*" nukta "?" anusvara-candrabindu "?\\)")
+                               1 'font-shape-gstring))))
 
 ;;; indian.el ends here

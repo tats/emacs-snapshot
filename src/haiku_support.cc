@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <app/Application.h>
 #include <app/Cursor.h>
 #include <app/Messenger.h>
+#include <app/Roster.h>
 
 #include <interface/GraphicsDefs.h>
 #include <interface/InterfaceDefs.h>
@@ -42,7 +43,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <interface/StringItem.h>
 #include <interface/SplitView.h>
 #include <interface/ScrollView.h>
+#include <interface/StringView.h>
 #include <interface/TextControl.h>
+#include <interface/CheckBox.h>
 
 #include <locale/UnicodeChar.h>
 
@@ -90,16 +93,21 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Some messages that Emacs sends to itself.  */
 enum
   {
-    SCROLL_BAR_UPDATE	 = 3000,
-    WAIT_FOR_RELEASE	 = 3001,
-    RELEASE_NOW		 = 3002,
-    CANCEL_DROP		 = 3003,
-    SHOW_MENU_BAR	 = 3004,
-    BE_MENU_BAR_OPEN	 = 3005,
-    QUIT_APPLICATION	 = 3006,
-    REPLAY_MENU_BAR	 = 3007,
-    FONT_FAMILY_SELECTED = 3008,
-    FONT_STYLE_SELECTED	 = 3009,
+    SCROLL_BAR_UPDATE	  = 3000,
+    WAIT_FOR_RELEASE	  = 3001,
+    RELEASE_NOW		  = 3002,
+    CANCEL_DROP		  = 3003,
+    SHOW_MENU_BAR	  = 3004,
+    BE_MENU_BAR_OPEN	  = 3005,
+    QUIT_APPLICATION	  = 3006,
+    REPLAY_MENU_BAR	  = 3007,
+    FONT_FAMILY_SELECTED  = 3008,
+    FONT_STYLE_SELECTED	  = 3009,
+    FILE_PANEL_SELECTION  = 3010,
+    QUIT_PREVIEW_DIALOG	  = 3011,
+    SET_FONT_INDICES	  = 3012,
+    SET_PREVIEW_DIALOG	  = 3013,
+    UPDATE_PREVIEW_DIALOG = 3014,
   };
 
 /* X11 keysyms that we use.  */
@@ -842,8 +850,6 @@ public:
   void
   MessageReceived (BMessage *msg)
   {
-    int32 old_what = 0;
-
     if (msg->WasDropped ())
       {
 	BPoint whereto;
@@ -874,47 +880,6 @@ public:
 	rq.ptr = (void *) msg->GetPointer ("menuptr");
 
 	haiku_write (MENU_BAR_SELECT_EVENT, &rq);
-      }
-    else if (msg->what == 'FPSE'
-	     || ((msg->FindInt32 ("old_what", &old_what) == B_OK
-		  && old_what == 'FPSE')))
-      {
-	struct haiku_file_panel_event rq;
-	BEntry entry;
-	BPath path;
-	entry_ref ref;
-
-	rq.ptr = NULL;
-
-	if (msg->FindRef ("refs", &ref) == B_OK &&
-	    entry.SetTo (&ref, 0) == B_OK &&
-	    entry.GetPath (&path) == B_OK)
-	  {
-	    const char *str_path = path.Path ();
-	    if (str_path)
-	      rq.ptr = strdup (str_path);
-	  }
-
-	if (msg->FindRef ("directory", &ref),
-	    entry.SetTo (&ref, 0) == B_OK &&
-	    entry.GetPath (&path) == B_OK)
-	  {
-	    const char *name = msg->GetString ("name");
-	    const char *str_path = path.Path ();
-
-	    if (name)
-	      {
-		char str_buf[std::strlen (str_path)
-			     + std::strlen (name) + 2];
-		snprintf ((char *) &str_buf,
-			  std::strlen (str_path)
-			  + std::strlen (name) + 2, "%s/%s",
-			  str_path, name);
-		rq.ptr = strdup (str_buf);
-	      }
-	  }
-
-	haiku_write (FILE_PANEL_EVENT, &rq);
       }
     else
       BWindow::MessageReceived (msg);
@@ -1117,12 +1082,13 @@ public:
   void
   Minimize (bool minimized_p)
   {
-    BWindow::Minimize (minimized_p);
     struct haiku_iconification_event rq;
+
     rq.window = this;
     rq.iconified_p = !parent && minimized_p;
-
     haiku_write (ICONIFICATION, &rq);
+
+    BWindow::Minimize (minimized_p);
   }
 
   void
@@ -2306,7 +2272,7 @@ public:
 
     menu->PushState ();
     menu->SetFont (be_bold_font);
-    menu->SetHighColor (ui_color (B_CONTROL_TEXT_COLOR));
+    menu->SetHighColor (ui_color (B_MENU_ITEM_TEXT_COLOR));
     BMenuItem::DrawContent ();
     menu->PopState ();
   }
@@ -2434,14 +2400,166 @@ public:
   }
 };
 
+class EmacsFontPreviewDialog : public BWindow
+{
+  BStringView text_view;
+  BMessenger preview_source;
+  BFont *current_font;
+  bool is_visible;
+
+  void
+  DoLayout (void)
+  {
+    float width, height;
+
+    text_view.GetPreferredSize (&width, &height);
+    text_view.ResizeTo (width - 1, height - 1);
+
+    SetSizeLimits (width, width, height, height);
+    ResizeTo (width - 1, height - 1);
+  }
+
+  bool
+  QuitRequested (void)
+  {
+    preview_source.SendMessage (QUIT_PREVIEW_DIALOG);
+
+    return false;
+  }
+
+  void
+  MessageReceived (BMessage *message)
+  {
+    int32 family, style;
+    uint32 flags;
+    font_family name;
+    font_style sname;
+    status_t rc;
+    const char *size_name;
+    int size;
+
+    if (message->what == SET_FONT_INDICES)
+      {
+	size_name = message->FindString ("emacs:size");
+
+	if (message->FindInt32 ("emacs:family", &family) != B_OK
+	    || message->FindInt32 ("emacs:style", &style) != B_OK)
+	  return;
+
+	rc = get_font_family (family, &name, &flags);
+
+	if (rc != B_OK)
+	  return;
+
+	rc = get_font_style (name, style, &sname, &flags);
+
+	if (rc != B_OK)
+	  return;
+
+	if (current_font)
+	  delete current_font;
+
+	current_font = new BFont;
+	current_font->SetFamilyAndStyle (name, sname);
+
+	if (size_name && strlen (size_name))
+	  {
+	    size = atoi (size_name);
+	    current_font->SetSize (size);
+	  }
+
+	text_view.SetFont (current_font);
+	DoLayout ();
+	return;
+      }
+
+    BWindow::MessageReceived (message);
+  }
+
+public:
+
+  EmacsFontPreviewDialog (BWindow *target)
+    : BWindow (BRect (45, 45, 500, 300),
+	       "Preview font",
+	       B_FLOATING_WINDOW_LOOK,
+	       B_MODAL_APP_WINDOW_FEEL,
+	       B_NOT_ZOOMABLE | B_NOT_RESIZABLE),
+      text_view (BRect (0, 0, 0, 0),
+		 NULL, "The quick brown fox "
+		 "jumped over the lazy dog"),
+      preview_source (target),
+      current_font (NULL)
+  {
+    AddChild (&text_view);
+    DoLayout ();
+  }
+
+  ~EmacsFontPreviewDialog (void)
+  {
+    text_view.RemoveSelf ();
+
+    if (current_font)
+      delete current_font;
+  }
+};
+
+class DualLayoutView : public BView
+{
+  BScrollView *view_1;
+  BView *view_2;
+
+  void
+  FrameResized (float new_width, float new_height)
+  {
+    BRect frame;
+    float width, height;
+
+    frame = Frame ();
+
+    view_2->GetPreferredSize (&width, &height);
+
+    view_1->MoveTo (0, 0);
+    view_1->ResizeTo (BE_RECT_WIDTH (frame),
+		      BE_RECT_HEIGHT (frame) - height);
+    view_2->MoveTo (2, BE_RECT_HEIGHT (frame) - height);
+    view_2->ResizeTo (BE_RECT_WIDTH (frame) - 4, height);
+
+    BView::FrameResized (new_width, new_height);
+  }
+
+  /* This is called by the BSplitView.  */
+  BSize
+  MinSize (void)
+  {
+    float width, height;
+    BSize size_1;
+
+    size_1 = view_1->MinSize ();
+    view_2->GetPreferredSize (&width, &height);
+
+    return BSize (std::max (size_1.width, width),
+		  std::max (size_1.height, height));
+  }
+
+public:
+  DualLayoutView (BScrollView *first, BView *second) : BView (NULL, B_FRAME_EVENTS),
+						       view_1 (first),
+						       view_2 (second)
+  {
+    FrameResized (801, 801);
+  }
+};
+
 class EmacsFontSelectionDialog : public BWindow
 {
   BView basic_view;
+  BCheckBox preview_checkbox;
   BSplitView split_view;
   BListView font_family_pane;
   BListView font_style_pane;
   BScrollView font_family_scroller;
   BScrollView font_style_scroller;
+  DualLayoutView style_view;
   BObjectList<BStringItem> all_families;
   BObjectList<BStringItem> all_styles;
   BButton cancel_button, ok_button;
@@ -2449,6 +2567,54 @@ class EmacsFontSelectionDialog : public BWindow
   port_id comm_port;
   bool allow_monospace_only;
   int pending_selection_idx;
+  EmacsFontPreviewDialog *preview;
+
+  void
+  ShowPreview (void)
+  {
+    if (!preview)
+      {
+	preview = new EmacsFontPreviewDialog (this);
+	preview->Show ();
+
+	UpdatePreview ();
+      }
+  }
+
+  void
+  UpdatePreview (void)
+  {
+    int family, style;
+    BMessage message;
+    BMessenger messenger (preview);
+
+    family = font_family_pane.CurrentSelection ();
+    style = font_style_pane.CurrentSelection ();
+
+    message.what = SET_FONT_INDICES;
+    message.AddInt32 ("emacs:family", family);
+    message.AddInt32 ("emacs:style", style);
+
+    message.AddString ("emacs:size",
+		       size_entry.Text ());
+
+    messenger.SendMessage (&message);
+  }
+
+  void
+  HidePreview (void)
+  {
+    if (preview)
+      {
+	if (preview->LockLooper ())
+	  preview->Quit ();
+	/* I hope this works.  */
+	else
+	  delete preview;
+
+	preview = NULL;
+      }
+  }
 
   void
   UpdateStylesForIndex (int idx)
@@ -2504,10 +2670,15 @@ class EmacsFontSelectionDialog : public BWindow
   void
   UpdateForSelectedStyle (void)
   {
-    if (font_style_pane.CurrentSelection () < 0)
+    int style = font_style_pane.CurrentSelection ();
+
+    if (style < 0)
       ok_button.SetEnabled (false);
     else
       ok_button.SetEnabled (true);
+
+    if (style >= 0 && preview)
+      UpdatePreview ();
   }
 
   void
@@ -2543,6 +2714,23 @@ class EmacsFontSelectionDialog : public BWindow
 
 	write_port (comm_port, 0, &rq, sizeof rq);
       }
+    else if (msg->what == SET_PREVIEW_DIALOG)
+      {
+	if (preview_checkbox.Value () == B_CONTROL_OFF)
+	  HidePreview ();
+	else
+	  ShowPreview ();
+      }
+    else if (msg->what == QUIT_PREVIEW_DIALOG)
+      {
+	preview_checkbox.SetValue (B_CONTROL_OFF);
+	HidePreview ();
+      }
+    else if (msg->what == UPDATE_PREVIEW_DIALOG)
+      {
+	if (preview)
+	  UpdatePreview ();
+      }
 
     BWindow::MessageReceived (msg);
   }
@@ -2551,11 +2739,22 @@ public:
 
   ~EmacsFontSelectionDialog (void)
   {
+    if (preview)
+      {
+	if (preview->LockLooper ())
+	  preview->Quit ();
+	/* I hope this works.  */
+	else
+	  delete preview;
+      }
+
     font_family_pane.MakeEmpty ();
     font_style_pane.MakeEmpty ();
 
     font_family_pane.RemoveSelf ();
     font_style_pane.RemoveSelf ();
+    preview_checkbox.RemoveSelf ();
+    style_view.RemoveSelf ();
     font_family_scroller.RemoveSelf ();
     font_style_scroller.RemoveSelf ();
     cancel_button.RemoveSelf ();
@@ -2569,32 +2768,38 @@ public:
 
   EmacsFontSelectionDialog (bool monospace_only,
 			    int initial_family_idx,
-			    int initial_style_idx)
+			    int initial_style_idx,
+			    int initial_size)
     : BWindow (BRect (0, 0, 500, 500),
 	       "Select font from list",
 	       B_TITLED_WINDOW_LOOK,
 	       B_MODAL_APP_WINDOW_FEEL, 0),
       basic_view (NULL, 0),
-      font_family_pane (BRect (0, 0, 10, 10), NULL,
+      preview_checkbox ("Show preview", "Show preview",
+			new BMessage (SET_PREVIEW_DIALOG)),
+      font_family_pane (BRect (0, 0, 0, 0), NULL,
 			B_SINGLE_SELECTION_LIST,
 			B_FOLLOW_ALL_SIDES),
-      font_style_pane (BRect (0, 0, 10, 10), NULL,
+      font_style_pane (BRect (0, 0, 0, 0), NULL,
 		       B_SINGLE_SELECTION_LIST,
 		       B_FOLLOW_ALL_SIDES),
       font_family_scroller (NULL, &font_family_pane,
 			    B_FOLLOW_LEFT | B_FOLLOW_TOP,
 			    0, false, true),
       font_style_scroller (NULL, &font_style_pane,
-			   B_FOLLOW_LEFT | B_FOLLOW_TOP,
-			   0, false, true),
+			   B_FOLLOW_ALL_SIDES,
+			   B_SUPPORTS_LAYOUT, false, true),
+      style_view (&font_style_scroller, &preview_checkbox),
       all_families (20, true),
       all_styles (20, true),
       cancel_button ("Cancel", "Cancel",
 		     new BMessage (B_CANCEL)),
       ok_button ("OK", "OK", new BMessage (B_OK)),
-      size_entry (NULL, "Size:", NULL, NULL),
+      size_entry (NULL, "Size:", NULL,
+		  new BMessage (UPDATE_PREVIEW_DIALOG)),
       allow_monospace_only (monospace_only),
-      pending_selection_idx (initial_style_idx)
+      pending_selection_idx (initial_style_idx),
+      preview (NULL)
   {
     BStringItem *family_item;
     int i, n_families;
@@ -2602,6 +2807,7 @@ public:
     uint32 flags, c;
     BMessage *selection;
     BTextView *size_text;
+    char format_buffer[4];
 
     AddChild (&basic_view);
 
@@ -2610,9 +2816,12 @@ public:
     basic_view.AddChild (&ok_button);
     basic_view.AddChild (&size_entry);
     split_view.AddChild (&font_family_scroller, 0.7);
-    split_view.AddChild (&font_style_scroller, 0.3);
+    split_view.AddChild (&style_view, 0.3);
+    style_view.AddChild (&font_style_scroller);
+    style_view.AddChild (&preview_checkbox);
 
     basic_view.SetViewUIColor (B_PANEL_BACKGROUND_COLOR);
+    style_view.SetViewUIColor (B_PANEL_BACKGROUND_COLOR);
 
     FrameResized (801, 801);
     UpdateForSelectedStyle ();
@@ -2623,6 +2832,8 @@ public:
     font_style_pane.SetSelectionMessage (selection);
     selection = new BMessage (B_OK);
     font_style_pane.SetInvocationMessage (selection);
+    selection = new BMessage (UPDATE_PREVIEW_DIALOG);
+    size_entry.SetModificationMessage (selection);
 
     comm_port = create_port (1, "font dialog port");
 
@@ -2662,6 +2873,12 @@ public:
 
     for (c = 58; c <= 127; ++c)
       size_text->DisallowChar (c);
+
+    if (initial_size > 0 && initial_size < 1000)
+      {
+	sprintf (format_buffer, "%d", initial_size);
+	size_entry.SetText (format_buffer);
+      }
   }
 
   void
@@ -2687,7 +2904,7 @@ public:
     frame = Frame ();
 
     basic_view.ResizeTo (BE_RECT_WIDTH (frame), BE_RECT_HEIGHT (frame));
-    split_view.ResizeTo (BE_RECT_WIDTH (frame),
+    split_view.ResizeTo (BE_RECT_WIDTH (frame) - 1,
 			 BE_RECT_HEIGHT (frame) - 4 - max_height);
 
     bone = BE_RECT_HEIGHT (frame) - 2 - max_height / 2;
@@ -2752,6 +2969,125 @@ public:
   cancel:
     msg->cancel = true;
     return;
+  }
+
+  status_t
+  InitCheck (void)
+  {
+    return comm_port >= B_OK ? B_OK : comm_port;
+  }
+};
+
+class EmacsFilePanelCallbackLooper : public BLooper
+{
+  port_id comm_port;
+
+  void
+  MessageReceived (BMessage *msg)
+  {
+    const char *str_path, *name;
+    char *file_name, *str_buf;
+    BEntry entry;
+    BPath path;
+    entry_ref ref;
+    int32 old_what;
+
+    if (msg->what == FILE_PANEL_SELECTION
+	|| ((msg->FindInt32 ("old_what", &old_what) == B_OK
+	     && old_what == FILE_PANEL_SELECTION)))
+      {
+	file_name = NULL;
+
+	if (msg->FindRef ("refs", &ref) == B_OK
+	    && entry.SetTo (&ref, 0) == B_OK
+	    && entry.GetPath (&path) == B_OK)
+	  {
+	    str_path = path.Path ();
+
+	    if (str_path)
+	      file_name = strdup (str_path);
+	  }
+	else if (msg->FindRef ("directory", &ref) == B_OK
+		 && entry.SetTo (&ref, 0) == B_OK
+		 && entry.GetPath (&path) == B_OK)
+	  {
+	    name = msg->GetString ("name");
+	    str_path = path.Path ();
+
+	    if (name)
+	      {
+		str_buf = (char *) alloca (std::strlen (str_path)
+					   + std::strlen (name) + 2);
+		snprintf (str_buf, std::strlen (str_path)
+			  + std::strlen (name) + 2, "%s/%s",
+			  str_path, name);
+		file_name = strdup (str_buf);
+	      }
+	  }
+
+	write_port (comm_port, 0, &file_name, sizeof file_name);
+      }
+
+    BLooper::MessageReceived (msg);
+  }
+
+public:
+  EmacsFilePanelCallbackLooper (void) : BLooper ()
+  {
+    comm_port = create_port (1, "file panel port");
+  }
+
+  ~EmacsFilePanelCallbackLooper (void)
+  {
+    delete_port (comm_port);
+  }
+
+  char *
+  ReadFileName (void (*process_pending_signals_function) (void))
+  {
+    object_wait_info infos[2];
+    ssize_t status;
+    int32 reply_type;
+    char *file_name;
+
+    file_name = NULL;
+
+    infos[0].object = port_application_to_emacs;
+    infos[0].type = B_OBJECT_TYPE_PORT;
+    infos[0].events = B_EVENT_READ;
+
+    infos[1].object = comm_port;
+    infos[1].type = B_OBJECT_TYPE_PORT;
+    infos[1].events = B_EVENT_READ;
+
+    while (true)
+      {
+	status = wait_for_objects (infos, 2);
+
+	if (status == B_INTERRUPTED || status == B_WOULD_BLOCK)
+	  continue;
+
+	if (infos[0].events & B_EVENT_READ)
+	  process_pending_signals_function ();
+
+	if (infos[1].events & B_EVENT_READ)
+	  {
+	    status = read_port (comm_port,
+				&reply_type, &file_name,
+				sizeof file_name);
+
+	    if (status < B_OK)
+	      file_name = NULL;
+
+	    goto out;
+	  }
+
+	infos[0].events = B_EVENT_READ;
+	infos[1].events = B_EVENT_READ;
+      }
+
+  out:
+    return file_name;
   }
 
   status_t
@@ -3000,15 +3336,18 @@ BWindow_activate (void *window)
 /* Return the pixel dimensions of the main screen in WIDTH and
    HEIGHT.  */
 void
-BScreen_px_dim (int *width, int *height)
+be_get_screen_dimensions (int *width, int *height)
 {
   BScreen screen;
+  BRect frame;
+
   if (!screen.IsValid ())
     gui_abort ("Invalid screen");
-  BRect frame = screen.Frame ();
 
-  *width = frame.right - frame.left;
-  *height = frame.bottom - frame.top;
+  frame = screen.Frame ();
+
+  *width = 1 + frame.right - frame.left;
+  *height = 1 + frame.bottom - frame.top;
 }
 
 /* Resize VIEW to WIDTH, HEIGHT.  */
@@ -3259,17 +3598,6 @@ BBitmap_import_fringe_bitmap (void *bitmap, unsigned short *bits, int wd, int h)
 
       data += bmp->BytesPerRow ();
     }
-}
-
-void
-BBitmap_import_mono_bits (void *bitmap, void *bits, int wd, int h)
-{
-  BBitmap *bmp = (BBitmap *) bitmap;
-
-  if (wd % 8)
-    wd += 8 - (wd % 8);
-
-  bmp->ImportBits (bits, wd / 8 * h, wd / 8, 0, B_GRAY1);
 }
 
 /* Make a scrollbar at X, Y known to the view VIEW.  */
@@ -3864,25 +4192,32 @@ BAlert_delete (void *alert)
   delete (BAlert *) alert;
 }
 
-/* Place the resolution of the monitor in DPI in RSSX and RSSY.  */
+/* Place the resolution of the monitor in DPI in X_OUT and Y_OUT.  */
 void
-BScreen_res (double *rrsx, double *rrsy)
+be_get_display_resolution (double *x_out, double *y_out)
 {
   BScreen s (B_MAIN_SCREEN_ID);
+  monitor_info i;
+  double x_inches, y_inches;
+  BRect frame;
+
   if (!s.IsValid ())
     gui_abort ("Invalid screen for resolution checks");
-  monitor_info i;
 
   if (s.GetMonitorInfo (&i) == B_OK)
     {
-      *rrsx = (double) i.width / (double) 2.54;
-      *rrsy = (double) i.height / (double) 2.54;
+      frame = s.Frame ();
+
+      x_inches = (double) i.width * 25.4;
+      y_inches = (double) i.height * 25.4;
+
+      *x_out = (double) BE_RECT_WIDTH (frame) / x_inches;
+      *y_out = (double) BE_RECT_HEIGHT (frame) / y_inches;
+      return;
     }
-  else
-    {
-      *rrsx = 72.27;
-      *rrsy = 72.27;
-    }
+
+  *x_out = 72.0;
+  *y_out = 72.0;
 }
 
 /* Add WINDOW to OTHER_WINDOW's subset and parent it to
@@ -4121,100 +4456,60 @@ EmacsView_double_buffered_p (void *vw)
   return db_p;
 }
 
-struct popup_file_dialog_data
-{
-  BMessage *msg;
-  BFilePanel *panel;
-  BEntry *entry;
-};
-
-static void
-unwind_popup_file_dialog (void *ptr)
-{
-  struct popup_file_dialog_data *data
-    = (struct popup_file_dialog_data *) ptr;
-  BFilePanel *panel = data->panel;
-
-  delete panel;
-  delete data->entry;
-  delete data->msg;
-}
-
 /* Popup a file dialog.  */
 char *
 be_popup_file_dialog (int open_p, const char *default_dir, int must_match_p,
 		      int dir_only_p, void *window, const char *save_text,
-		      const char *prompt, void (*block_input_function) (void),
-		      void (*unblock_input_function) (void),
-		      void (*maybe_quit_function) (void))
+		      const char *prompt,
+		      void (*process_pending_signals_function) (void))
 {
-  specpdl_ref idx = c_specpdl_idx_from_cxx ();
-  /* setjmp/longjmp is UB with automatic objects. */
-  BWindow *w = (BWindow *) window;
-  uint32_t mode = (dir_only_p
-		   ? B_DIRECTORY_NODE
-		   : B_FILE_NODE | B_DIRECTORY_NODE);
-  BEntry *path = new BEntry;
-  BMessage *msg = new BMessage ('FPSE');
-  BFilePanel *panel = new BFilePanel (open_p ? B_OPEN_PANEL : B_SAVE_PANEL,
-				      NULL, NULL, mode);
-  void *buf;
-  enum haiku_event_type type;
-  char *ptr;
-  struct popup_file_dialog_data dat;
-  ssize_t b_s;
+  BWindow *panel_window;
+  BEntry path;
+  BMessage msg (FILE_PANEL_SELECTION);
+  BFilePanel panel (open_p ? B_OPEN_PANEL : B_SAVE_PANEL,
+		    NULL, NULL, (dir_only_p
+				 ? B_DIRECTORY_NODE
+				 : B_FILE_NODE | B_DIRECTORY_NODE));
+  char *file_name;
+  EmacsFilePanelCallbackLooper *looper;
 
-  dat.entry = path;
-  dat.msg = msg;
-  dat.panel = panel;
+  looper = new EmacsFilePanelCallbackLooper;
 
-  record_c_unwind_protect_from_cxx (unwind_popup_file_dialog, &dat);
+  if (looper->InitCheck () < B_OK)
+    {
+      delete looper;
+      return NULL;
+    }
 
   if (default_dir)
     {
-      if (path->SetTo (default_dir, 0) != B_OK)
+      if (path.SetTo (default_dir, 0) != B_OK)
 	default_dir = NULL;
     }
 
-  panel->SetMessage (msg);
+  panel_window = panel.Window ();
 
   if (default_dir)
-    panel->SetPanelDirectory (path);
+    panel.SetPanelDirectory (&path);
+
   if (save_text)
-    panel->SetSaveText (save_text);
+    panel.SetSaveText (save_text);
 
-  panel->SetHideWhenDone (0);
-  panel->Window ()->SetTitle (prompt);
-  panel->SetTarget (BMessenger (w));
-  panel->Show ();
+  panel_window->SetTitle (prompt);
+  panel_window->SetFeel (B_MODAL_APP_WINDOW_FEEL);
 
-  buf = alloca (200);
-  while (1)
-    {
-      ptr = NULL;
+  panel.SetHideWhenDone (false);
+  panel.SetTarget (BMessenger (looper));
+  panel.SetMessage (&msg);
+  panel.Show ();
 
-      if (!haiku_read_with_timeout (&type, buf, 200, 1000000, false))
-	{
-	  block_input_function ();
-	  if (type != FILE_PANEL_EVENT)
-	    haiku_write (type, buf);
-	  else if (!ptr)
-	    ptr = (char *) ((struct haiku_file_panel_event *) buf)->ptr;
-	  unblock_input_function ();
+  looper->Run ();
+  file_name = looper->ReadFileName (process_pending_signals_function);
 
-	  maybe_quit_function ();
-	}
+  if (looper->Lock ())
+    looper->Quit ();
 
-      block_input_function ();
-      haiku_read_size (&b_s, false);
-      if (!b_s || ptr || panel->Window ()->IsHidden ())
-	{
-	  c_unbind_to_nil_from_cxx (idx);
-	  unblock_input_function ();
-	  return ptr;
-	}
-      unblock_input_function ();
-    }
+  return file_name;
 }
 
 /* Zoom WINDOW.  */
@@ -4719,7 +5014,8 @@ be_select_font (void (*process_pending_signals_function) (void),
 		haiku_font_family_or_style *family,
 		haiku_font_family_or_style *style,
 		int *size, bool allow_monospace_only,
-		int initial_family, int initial_style)
+		int initial_family, int initial_style,
+		int initial_size)
 {
   EmacsFontSelectionDialog *dialog;
   struct font_selection_dialog_message msg;
@@ -4728,7 +5024,8 @@ be_select_font (void (*process_pending_signals_function) (void),
   font_style style_buffer;
 
   dialog = new EmacsFontSelectionDialog (allow_monospace_only,
-					 initial_family, initial_style);
+					 initial_family, initial_style,
+					 initial_size);
   dialog->CenterOnScreen ();
 
   if (dialog->InitCheck () < B_OK)
@@ -4759,4 +5056,52 @@ be_select_font (void (*process_pending_signals_function) (void),
   *size = msg.size_specified ? msg.size : -1;
 
   return true;
+}
+
+void
+BWindow_set_sticky (void *window, bool sticky)
+{
+  BWindow *w = (BWindow *) window;
+
+  if (w->LockLooper ())
+    {
+      w->SetFlags (sticky ? (w->Flags ()
+			     | B_SAME_POSITION_IN_ALL_WORKSPACES)
+		   : w->Flags () & ~B_SAME_POSITION_IN_ALL_WORKSPACES);
+
+      w->UnlockLooper ();
+    }
+}
+
+status_t
+be_roster_launch (const char *type, const char *file, char **cargs,
+		  ptrdiff_t nargs, void *message, team_id *team_id)
+{
+  BEntry entry;
+  entry_ref ref;
+
+  if (type)
+    {
+      if (message)
+	return be_roster->Launch (type, (BMessage *) message,
+				  team_id);
+
+      return be_roster->Launch (type, (nargs > INT_MAX
+				       ? INT_MAX : nargs),
+				cargs, team_id);
+    }
+
+  if (entry.SetTo (file) != B_OK)
+    return B_ERROR;
+
+  if (entry.GetRef (&ref) != B_OK)
+    return B_ERROR;
+
+  if (message)
+    return be_roster->Launch (&ref, (BMessage *) message,
+			      team_id);
+
+  return be_roster->Launch (&ref, (nargs > INT_MAX
+				   ? INT_MAX : nargs),
+			    cargs, team_id);
 }

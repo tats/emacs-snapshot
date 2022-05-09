@@ -2599,7 +2599,8 @@ new buffer."
 	 (if (eq alt-default t) (setq alt-default str))
 	 ;; Don't add this string if it's a duplicate.
 	 (or (assoc-string str completions t)
-	     (push str completions))))
+	     (push str completions)))
+       (setq completions (nreverse completions)))
      ;; If no good default was found, try an alternate.
      (or default
 	 (setq default alt-default))
@@ -4285,7 +4286,8 @@ If FORK is non-nil, it is passed to `Info-goto-node'."
 				  (substring str (match-end 0))))
 		(setq i (1+ i)))
 	      (setq items
-		    (cons str items))))
+		    (cons str items)))
+            (setq items (nreverse items)))
 	  (while (and items (< number 9))
 	    (setq current (car items)
 		  items (cdr items)
@@ -4488,7 +4490,9 @@ Advanced commands:
   (setq-local revert-buffer-function #'Info-revert-buffer-function)
   (setq-local font-lock-defaults '(Info-mode-font-lock-keywords t t))
   (Info-set-mode-line)
-  (setq-local bookmark-make-record-function #'Info-bookmark-make-record))
+  (setq-local bookmark-make-record-function #'Info-bookmark-make-record)
+  (unless search-default-mode
+    (isearch-fold-quotes-mode)))
 
 ;; When an Info buffer is killed, make sure the associated tags buffer
 ;; is killed too.

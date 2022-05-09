@@ -381,7 +381,9 @@ haikufont_maybe_handle_special_family (Lisp_Object family,
 static Lisp_Object
 haikufont_pattern_to_entity (struct haiku_font_pattern *ptn)
 {
-  Lisp_Object ent = font_make_entity ();
+  Lisp_Object ent;
+
+  ent = font_make_entity ();
   ASET (ent, FONT_TYPE_INDEX, Qhaiku);
   ASET (ent, FONT_FOUNDRY_INDEX, Qhaiku);
   ASET (ent, FONT_FAMILY_INDEX, Qdefault);
@@ -390,6 +392,14 @@ haikufont_pattern_to_entity (struct haiku_font_pattern *ptn)
   ASET (ent, FONT_SIZE_INDEX, make_fixnum (0));
   ASET (ent, FONT_AVGWIDTH_INDEX, make_fixnum (0));
   ASET (ent, FONT_SPACING_INDEX, make_fixnum (FONT_SPACING_MONO));
+
+  /* FONT_EXTRA_INDEX in a font entity can be a cons of two numbers
+     (STYLE . IDX) that tell Emacs how to open a font.  */
+  if (ptn->specified & FSPEC_INDICES)
+    ASET (ent, FONT_EXTRA_INDEX,
+	  Fcons (make_fixnum (ptn->family_index),
+		 make_fixnum (ptn->style_index)));
+
   FONT_SET_STYLE (ent, FONT_WIDTH_INDEX, Qnormal);
   FONT_SET_STYLE (ent, FONT_WEIGHT_INDEX, Qnormal);
   FONT_SET_STYLE (ent, FONT_SLANT_INDEX, Qnormal);
@@ -722,10 +732,11 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int x)
   struct haiku_font_pattern ptn;
   struct font *font;
   void *be_font;
-  Lisp_Object font_object;
-  Lisp_Object tem;
+  Lisp_Object font_object, tem, extra;
+  int px_size, min_width, max_width,
+    avg_width, height, space_width, ascent,
+    descent, underline_pos, underline_thickness;
 
-  block_input ();
   if (x <= 0)
     {
       /* Get pixel size from frame instead.  */
@@ -733,19 +744,47 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int x)
       x = NILP (tem) ? 0 : XFIXNAT (tem);
     }
 
-  haikufont_spec_or_entity_to_pattern (font_entity, 1, &ptn);
+  extra = AREF (font_entity, FONT_EXTRA_INDEX);
 
-  if (BFont_open_pattern (&ptn, &be_font, x))
+  /* If the font's indices is already available, open the font using
+     those instead.  */
+
+  if (CONSP (extra) && FIXNUMP (XCAR (extra))
+      && FIXNUMP (XCDR (extra)))
     {
+      block_input ();
+      be_font = be_open_font_at_index (XFIXNUM (XCAR (extra)),
+				       XFIXNUM (XCDR (extra)), x);
+      unblock_input ();
+
+      if (!be_font)
+	return Qnil;
+    }
+  else
+    {
+      block_input ();
+      haikufont_spec_or_entity_to_pattern (font_entity, 1, &ptn);
+
+      if (BFont_open_pattern (&ptn, &be_font, x))
+	{
+	  haikufont_done_with_query_pattern (&ptn);
+	  unblock_input ();
+	  return Qnil;
+	}
+
       haikufont_done_with_query_pattern (&ptn);
       unblock_input ();
-      return Qnil;
     }
 
-  haikufont_done_with_query_pattern (&ptn);
+  block_input ();
 
+  /* `font_make_object' tries to treat the extra data as an alist.
+     There is never any real data here, so clear that field.  */
+
+  ASET (font_entity, FONT_EXTRA_INDEX, Qnil);
   font_object = font_make_object (VECSIZE (struct haikufont_info),
 				  font_entity, x);
+  ASET (font_entity, FONT_EXTRA_INDEX, extra);
 
   ASET (font_object, FONT_TYPE_INDEX, Qhaiku);
   font_info = (struct haikufont_info *) XFONT_OBJECT (font_object);
@@ -771,10 +810,6 @@ haikufont_open (struct frame *f, Lisp_Object font_entity, int x)
 
   font_info->metrics = NULL;
   font_info->metrics_nrows = 0;
-
-  int px_size, min_width, max_width,
-    avg_width, height, space_width, ascent,
-    descent, underline_pos, underline_thickness;
 
   BFont_metrics (be_font, &px_size, &min_width,
 		 &max_width, &avg_width, &height,
@@ -1049,8 +1084,8 @@ haikufont_draw (struct glyph_string *s, int from, int to,
 	  s->first_glyph->slice.glyphless.lower_yoff
 	  - s->first_glyph->slice.glyphless.upper_yoff;
 
-      BView_SetHighColor (view, background);
-      BView_FillRectangle (view, x, y - ascent, s->width, height);
+      haiku_draw_background_rect (s, s->face, x, y - ascent,
+				  s->width, height);
       s->background_filled_p = 1;
     }
 
@@ -1151,7 +1186,7 @@ in the font selection dialog.  */)
   struct font *font;
   Lisp_Object font_object;
   haiku_font_family_or_style family, style;
-  int rc, size, initial_family, initial_style;
+  int rc, size, initial_family, initial_style, initial_size;
   struct haiku_font_pattern pattern;
   Lisp_Object lfamily, lweight, lslant, lwidth, ladstyle, lsize;
 
@@ -1162,6 +1197,7 @@ in the font selection dialog.  */)
 
   initial_style = -1;
   initial_family = -1;
+  initial_size = -1;
 
   font = FRAME_FONT (f);
 
@@ -1173,6 +1209,8 @@ in the font selection dialog.  */)
       be_find_font_indices (&pattern, &initial_family,
 			    &initial_style);
       haikufont_done_with_query_pattern (&pattern);
+
+      initial_size = font->pixel_size;
     }
 
   popup_activated_p++;
@@ -1181,7 +1219,8 @@ in the font selection dialog.  */)
 		       haikufont_should_quit_popup,
 		       &family, &style, &size,
 		       !NILP (exclude_proportional),
-		       initial_family, initial_style);
+		       initial_family, initial_style,
+		       initial_size);
   request_sigio ();
   popup_activated_p--;
 
@@ -1192,14 +1231,11 @@ in the font selection dialog.  */)
 
   lfamily = build_string_from_utf8 (family);
   lweight = (pattern.specified & FSPEC_WEIGHT
-	     ? haikufont_weight_to_lisp (pattern.weight)
-	     : Qunspecified);
+	     ? haikufont_weight_to_lisp (pattern.weight) : Qnil);
   lslant = (pattern.specified & FSPEC_SLANT
-	    ? haikufont_slant_to_lisp (pattern.slant)
-	    : Qunspecified);
+	    ? haikufont_slant_to_lisp (pattern.slant) : Qnil);
   lwidth = (pattern.specified & FSPEC_WIDTH
-	    ? haikufont_width_to_lisp (pattern.width)
-	    : Qunspecified);
+	    ? haikufont_width_to_lisp (pattern.width) : Qnil);
   ladstyle = (pattern.specified & FSPEC_STYLE
 	     ? intern (pattern.style) : Qnil);
   lsize = (size >= 0 ? make_fixnum (size) : Qnil);

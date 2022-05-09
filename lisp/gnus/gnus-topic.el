@@ -678,7 +678,7 @@ articles in the topic and its subtopics."
 
 (defun gnus-topic-update-topics-containing-group (group)
   "Update all topics that have GROUP as a member."
-  (when (and (eq major-mode 'gnus-topic-mode)
+  (when (and (derived-mode-p 'gnus-group-mode)
 	     gnus-topic-mode)
     (save-excursion
       (let ((alist gnus-topic-alist))
@@ -694,7 +694,7 @@ articles in the topic and its subtopics."
 
 (defun gnus-topic-update-topic ()
   "Update all parent topics to the current group."
-  (when (and (eq major-mode 'gnus-topic-mode)
+  (when (and (derived-mode-p 'gnus-group-mode)
 	     gnus-topic-mode)
     (let ((group (gnus-group-group-name))
 	  (m (point-marker))
@@ -748,8 +748,8 @@ articles in the topic and its subtopics."
 		   (car type) (car gnus-group-list-mode)
 		   (cdr gnus-group-list-mode)))
 	 (all-groups (gnus-topic-find-groups
-		   (car type) (car gnus-group-list-mode)
-		   (cdr gnus-group-list-mode) nil t))
+		      (car type) (car gnus-group-list-mode)
+		      (cdr gnus-group-list-mode) nil t))
 	entry)
     (while children
       (cl-incf unread (gnus-topic-unread (caar (pop children)))))
@@ -788,8 +788,8 @@ articles in the topic and its subtopics."
 		   (car type) (car gnus-group-list-mode)
 		   (cdr gnus-group-list-mode)))
 	 (all-groups (gnus-topic-find-groups
-		   (car type) (car gnus-group-list-mode)
-		   (cdr gnus-group-list-mode) t))
+		      (car type) (car gnus-group-list-mode)
+		      (cdr gnus-group-list-mode) nil t))
 	 (parent (gnus-topic-parent-topic topic-name))
 	 (all-entries entries)
 	 (unread 0)

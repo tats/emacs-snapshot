@@ -618,6 +618,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <flexmember.h>
 #include <c-ctype.h>
+#include <byteswap.h>
 
 #include "character.h"
 #include "coding.h"
@@ -664,6 +665,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef USE_MOTIF
 #include <Xm/Xm.h>
+#include <Xm/CascadeB.h>
 #endif
 
 #ifdef USE_X_TOOLKIT
@@ -866,6 +868,10 @@ static int x_filter_event (struct x_display_info *, XEvent *);
 /* Flag that indicates if a drag-and-drop operation is in progress.  */
 bool x_dnd_in_progress;
 
+/* Number that indicates the last "generation" of
+   UNSUPPORTED_DROP_EVENTs handled.  */
+unsigned x_dnd_unsupported_event_level;
+
 /* The frame where the drag-and-drop operation originated.  */
 struct frame *x_dnd_frame;
 
@@ -1054,6 +1060,8 @@ typedef enum xm_byte_order
 #endif
   } xm_byte_order;
 
+#ifdef ENABLE_CHECKING
+
 #define SWAPCARD32(l)				\
   {						\
     struct { unsigned t : 32; } bit32;		\
@@ -1072,6 +1080,11 @@ typedef enum xm_byte_order
     n = tp[0]; tp[0] = tp[1]; tp[1] = n;	\
     s = bit16.t;				\
   }
+
+#else
+#define SWAPCARD32(l)	bswap_32 (l)
+#define SWAPCARD16(l)	bswap_16 (l)
+#endif
 
 typedef struct xm_targets_table_header
 {
@@ -3061,6 +3074,7 @@ x_dnd_send_unsupported_drop (struct x_display_info *dpyinfo, Window target_windo
 
   ie.kind = UNSUPPORTED_DROP_EVENT;
   ie.code = (unsigned) target_window;
+  ie.modifiers = x_dnd_unsupported_event_level;
   ie.arg = list3 (assq_no_quit (QXdndSelection,
 				dpyinfo->terminal->Vselection_alist),
 		  targets, arg);
@@ -3780,6 +3794,7 @@ x_flush (struct frame *f)
   unblock_input ();
 }
 
+#ifdef HAVE_XDBE
 static void
 x_drop_xrender_surfaces (struct frame *f)
 {
@@ -3795,6 +3810,7 @@ x_drop_xrender_surfaces (struct frame *f)
     }
 #endif
 }
+#endif
 
 #ifdef HAVE_XRENDER
 void
@@ -5127,9 +5143,14 @@ x_clear_window (struct frame *f)
   x_end_cr_clip (f);
 #else
 #ifndef USE_GTK
-  if (FRAME_X_DOUBLE_BUFFERED_P (f) || (f->alpha_background != 1.0))
+  if (f->alpha_background != 1.0
+#ifdef HAVE_XDBE
+      || FRAME_X_DOUBLE_BUFFERED_P (f)
 #endif
-    x_clear_area (f, 0, 0, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
+      )
+#endif
+    x_clear_area (f, 0, 0, FRAME_PIXEL_WIDTH (f),
+		  FRAME_PIXEL_HEIGHT (f));
 #ifndef USE_GTK
   else
     XClearWindow (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
@@ -5456,13 +5477,15 @@ x_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
 /* Show the frame back buffer.  If frame is double-buffered,
    atomically publish to the user's screen graphics updates made since
    the last call to show_back_buffer.  */
+
+#ifdef HAVE_XDBE
 static void
 show_back_buffer (struct frame *f)
 {
   block_input ();
+
   if (FRAME_X_DOUBLE_BUFFERED_P (f))
     {
-#ifdef HAVE_XDBE
 #ifdef USE_CAIRO
       cairo_t *cr = FRAME_CR_CONTEXT (f);
       if (cr)
@@ -5473,13 +5496,12 @@ show_back_buffer (struct frame *f)
       swap_info.swap_window = FRAME_X_WINDOW (f);
       swap_info.swap_action = XdbeCopied;
       XdbeSwapBuffers (FRAME_X_DISPLAY (f), &swap_info, 1);
-#else
-      eassert (!"should have back-buffer only with XDBE");
-#endif
     }
   FRAME_X_NEED_BUFFER_FLIP (f) = false;
+
   unblock_input ();
 }
+#endif
 
 /* Updates back buffer and flushes changes to display.  Called from
    minibuf read code.  Note that we display the back buffer even if
@@ -5488,8 +5510,10 @@ static void
 x_flip_and_flush (struct frame *f)
 {
   block_input ();
+#ifdef HAVE_XDBE
   if (FRAME_X_NEED_BUFFER_FLIP (f))
     show_back_buffer (f);
+#endif
   x_flush (f);
   unblock_input ();
 }
@@ -5538,8 +5562,12 @@ XTframe_up_to_date (struct frame *f)
   eassert (FRAME_X_P (f));
   block_input ();
   FRAME_MOUSE_UPDATE (f);
-  if (!buffer_flipping_blocked_p () && FRAME_X_NEED_BUFFER_FLIP (f))
+
+#ifdef HAVE_XDBE
+  if (!buffer_flipping_blocked_p ()
+      && FRAME_X_NEED_BUFFER_FLIP (f))
     show_back_buffer (f);
+#endif
 
 #ifdef HAVE_XSYNC
 #ifndef HAVE_GTK3
@@ -5592,12 +5620,14 @@ XTframe_up_to_date (struct frame *f)
   unblock_input ();
 }
 
+#ifdef HAVE_XDBE
 static void
 XTbuffer_flipping_unblocked_hook (struct frame *f)
 {
   if (FRAME_X_NEED_BUFFER_FLIP (f))
     show_back_buffer (f);
 }
+#endif
 
 /**
  * x_clear_under_internal_border:
@@ -5720,7 +5750,8 @@ x_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 }
 
 static void
-x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
+x_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
+		      struct draw_fringe_bitmap_params *p)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   Display *display = FRAME_X_DISPLAY (f);
@@ -5737,15 +5768,21 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
 	 mono-displays, the fill style may have been changed to
 	 FillSolid in x_draw_glyph_string_background.  */
       if (face->stipple)
-	XSetFillStyle (display, face->gc, FillOpaqueStippled);
+	{
+	  XSetFillStyle (display, face->gc, FillOpaqueStippled);
+	  x_fill_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
+			    true);
+	  XSetFillStyle (display, face->gc, FillSolid);
+
+	  row->stipple_p = true;
+	}
       else
-	XSetBackground (display, face->gc, face->background);
-
-      x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
-			 true);
-
-      if (!face->stipple)
-	XSetForeground (display, face->gc, face->foreground);
+	{
+	  XSetBackground (display, face->gc, face->background);
+	  x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
+			   true);
+	  XSetForeground (display, face->gc, face->foreground);
+	}
     }
 
 #ifdef USE_CAIRO
@@ -6020,7 +6057,10 @@ x_set_cursor_gc (struct glyph_string *s)
 
       IF_DEBUG (x_check_font (s->f, s->font));
       xgcv.graphics_exposures = False;
-      mask = GCForeground | GCBackground | GCGraphicsExposures;
+      xgcv.line_width = 1;
+      mask = (GCForeground | GCBackground
+	      | GCGraphicsExposures
+	      | GCLineWidth);
 
       if (FRAME_DISPLAY_INFO (s->f)->scratch_cursor_gc)
 	XChangeGC (display, FRAME_DISPLAY_INFO (s->f)->scratch_cursor_gc,
@@ -6052,7 +6092,11 @@ x_set_mouse_face_gc (struct glyph_string *s)
       xgcv.background = s->face->background;
       xgcv.foreground = s->face->foreground;
       xgcv.graphics_exposures = False;
-      mask = GCForeground | GCBackground | GCGraphicsExposures;
+      xgcv.line_width = 1;
+
+      mask = (GCForeground | GCBackground
+	      | GCGraphicsExposures
+	      | GCLineWidth);
 
       if (FRAME_DISPLAY_INFO (s->f)->scratch_cursor_gc)
 	XChangeGC (display, FRAME_DISPLAY_INFO (s->f)->scratch_cursor_gc,
@@ -6901,11 +6945,12 @@ x_parse_color (struct frame *f, const char *color_name,
 	       XColor *color)
 {
   unsigned short r, g, b;
-  Display *dpy = FRAME_X_DISPLAY (f);
-  Colormap cmap = FRAME_X_COLORMAP (f);
+  Display *dpy;
+  Colormap cmap;
   struct x_display_info *dpyinfo;
   struct color_name_cache_entry *cache_entry;
   unsigned int hash, idx;
+  int rc;
 
   /* Don't pass #RGB strings directly to XParseColor, because that
      follows the X convention of zero-extending each channel
@@ -6917,37 +6962,49 @@ x_parse_color (struct frame *f, const char *color_name,
       color->red = r;
       color->green = g;
       color->blue = b;
+
       return 1;
-    }
-
-  dpyinfo = FRAME_DISPLAY_INFO (f);
-  hash = x_hash_string_ignore_case (color_name);
-  idx = hash % dpyinfo->color_names_size;
-
-  for (cache_entry = FRAME_DISPLAY_INFO (f)->color_names[idx];
-       cache_entry; cache_entry = cache_entry->next)
-    {
-      if (!xstrcasecmp (cache_entry->name, color_name))
-	{
-	  *color = cache_entry->rgb;
-	  return 1;
-	}
     }
 
   /* Some X servers send BadValue on empty color names.  */
   if (!strlen (color_name))
     return 0;
 
-  if (XParseColor (dpy, cmap, color_name, color) == 0)
-    /* No caching of negative results, currently.  */
-    return 0;
+  cmap = FRAME_X_COLORMAP (f);
+  dpy = FRAME_X_DISPLAY (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  hash = x_hash_string_ignore_case (color_name);
+  idx = hash % dpyinfo->color_names_size;
+
+  for (cache_entry = dpyinfo->color_names[idx];
+       cache_entry; cache_entry = cache_entry->next)
+    {
+      if (!xstrcasecmp (cache_entry->name, color_name))
+	{
+	  if (cache_entry->valid)
+	    *color = cache_entry->rgb;
+
+	  return cache_entry->valid;
+	}
+    }
+
+  block_input ();
+  rc = XParseColor (dpy, cmap, color_name, color);
+  unblock_input ();
 
   cache_entry = xzalloc (sizeof *cache_entry);
-  cache_entry->rgb = *color;
+
+  if (rc)
+    cache_entry->rgb = *color;
+
+  cache_entry->valid = rc;
   cache_entry->name = xstrdup (color_name);
-  cache_entry->next = FRAME_DISPLAY_INFO (f)->color_names[idx];
-  FRAME_DISPLAY_INFO (f)->color_names[idx] = cache_entry;
-  return 1;
+  cache_entry->next = dpyinfo->color_names[idx];
+
+  dpyinfo->color_names[idx] = cache_entry;
+
+  return rc;
 }
 
 
@@ -8007,6 +8064,9 @@ x_draw_image_glyph_string (struct glyph_string *s)
       || s->img->pixmap == 0
       || s->width != s->background_width)
     {
+      if (s->stippled_p)
+	s->row->stipple_p = true;
+
 #ifndef USE_CAIRO
       if (s->img->mask)
 	{
@@ -8187,6 +8247,8 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	      XSetFillStyle (display, gc, FillOpaqueStippled);
 	      x_fill_rectangle (s->f, gc, x, y, w, h, true);
 	      XSetFillStyle (display, gc, FillSolid);
+
+	      s->row->stipple_p = true;
 	    }
 	  else
 	    {
@@ -8213,8 +8275,13 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	  background_width -= text_left_x - x;
 	  x = text_left_x;
 	}
+
+      if (!s->row->stipple_p)
+	s->row->stipple_p = s->stippled_p;
+
       if (background_width > 0)
-	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
+	x_draw_glyph_string_bg_rect (s, x, s->y,
+				     background_width, s->height);
     }
 
   s->background_filled_p = true;
@@ -8663,6 +8730,14 @@ x_draw_glyph_string (struct glyph_string *s)
   /* Reset clipping.  */
   x_reset_clip_rectangles (s->f, s->gc);
   s->num_clips = 0;
+
+  /* Set the stippled flag that tells redisplay whether or not a
+     stipple was actually draw.  */
+
+  if (s->first_glyph->type != STRETCH_GLYPH
+      && s->first_glyph->type != IMAGE_GLYPH
+      && !s->row->stipple_p)
+    s->row->stipple_p = s->stippled_p;
 }
 
 /* Shift display to make room for inserted glyphs.   */
@@ -8716,8 +8791,11 @@ x_clear_area (struct frame *f, int x, int y, int width, int height)
   x_end_cr_clip (f);
 #else
 #ifndef USE_GTK
-  if (FRAME_X_DOUBLE_BUFFERED_P (f)
-      || f->alpha_background != 1.0)
+  if (f->alpha_background != 1.0
+#ifdef HAVE_XDBE
+      || FRAME_X_DOUBLE_BUFFERED_P (f)
+#endif
+      )
 #endif
     {
 #if defined HAVE_XRENDER && \
@@ -9404,8 +9482,24 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
   if (dpyinfo->invisible_cursor == None)
     dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
 
+#ifndef HAVE_XFIXES
   if (dpyinfo->invisible_cursor == None)
     invisible = false;
+#else
+  /* But if Xfixes is available, try using it instead.  */
+  if (dpyinfo->invisible_cursor == None)
+    {
+      if (x_probe_xfixes_extension (dpyinfo))
+	{
+	  dpyinfo->fixes_pointer_blanking = true;
+	  xfixes_toggle_visible_pointer (f, invisible);
+
+	  return;
+	}
+      else
+	invisible = false;
+    }
+#endif
 
   if (invisible)
     XDefineCursor (dpyinfo->display, FRAME_X_WINDOW (f),
@@ -9781,6 +9875,64 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 #ifndef USE_GTK
   struct x_display_info *event_display;
 #endif
+  union buffered_input_event *events, *event;
+  int n_events;
+  struct frame *event_frame;
+
+  /* Before starting drag-and-drop, walk through the keyboard buffer
+     to see if there are any UNSUPPORTED_DROP_EVENTs, and run them now
+     if they exist, to prevent race conditions from happening due to
+     multiple unsupported drops running at once.  */
+
+  block_input ();
+  events = alloca (sizeof *events * KBD_BUFFER_SIZE);
+  n_events = 0;
+  event = kbd_fetch_ptr;
+
+  while (event != kbd_store_ptr)
+    {
+      if (event->ie.kind == UNSUPPORTED_DROP_EVENT
+	  && event->ie.modifiers < x_dnd_unsupported_event_level)
+	events[n_events++] = *event;
+
+      event = (event == kbd_buffer + KBD_BUFFER_SIZE - 1
+	       ? kbd_buffer : event + 1);
+    }
+
+  x_dnd_unsupported_event_level += 1;
+  unblock_input ();
+
+  for (i = 0; i < n_events; ++i)
+    {
+      maybe_quit ();
+
+      event = &events[i];
+      event_frame = XFRAME (event->ie.frame_or_window);
+
+      if (!FRAME_LIVE_P (event_frame))
+	continue;
+
+      if (!NILP (Vx_dnd_unsupported_drop_function))
+	{
+	  if (!NILP (call7 (Vx_dnd_unsupported_drop_function,
+			    XCAR (XCDR (event->ie.arg)), event->ie.x,
+			    event->ie.y, XCAR (XCDR (XCDR (event->ie.arg))),
+			    make_uint (event->ie.code),
+			    event->ie.frame_or_window,
+			    make_int (event->ie.timestamp))))
+	    continue;
+	}
+
+      x_dnd_do_unsupported_drop (FRAME_DISPLAY_INFO (event_frame),
+				 event->ie.frame_or_window,
+				 XCAR (event->ie.arg),
+				 XCAR (XCDR (event->ie.arg)),
+				 (Window) event->ie.code,
+				 XFIXNUM (event->ie.x),
+				 XFIXNUM (event->ie.y),
+				 event->ie.timestamp);
+      break;
+    }
 
   if (!FRAME_VISIBLE_P (f))
     {
@@ -10001,116 +10153,133 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       unblock_input ();
       pending_signals = signals_were_pending;
 
-      if (x_dnd_movement_frame)
+      /* Ignore mouse movement from displays that aren't the DND
+	 display.  */
+#ifndef USE_GTK
+      if (event_display == FRAME_DISPLAY_INFO (f))
 	{
-	  XSETFRAME (frame_object, x_dnd_movement_frame);
-	  XSETINT (x, x_dnd_movement_x);
-	  XSETINT (y, x_dnd_movement_y);
-	  x_dnd_movement_frame = NULL;
-
-	  if (!NILP (Vx_dnd_movement_function)
-	      && !FRAME_TOOLTIP_P (XFRAME (frame_object))
-	      && x_dnd_movement_x >= 0
-	      && x_dnd_movement_y >= 0
-	      && x_dnd_frame
-	      && (XFRAME (frame_object) != x_dnd_frame
-		  || x_dnd_allow_current_frame))
+#endif
+	  if (x_dnd_movement_frame)
 	    {
-	      x_dnd_old_window_attrs = root_window_attrs;
-	      x_dnd_unwind_flag = true;
+	      XSETFRAME (frame_object, x_dnd_movement_frame);
+	      XSETINT (x, x_dnd_movement_x);
+	      XSETINT (y, x_dnd_movement_y);
+	      x_dnd_movement_frame = NULL;
 
-	      ref = SPECPDL_INDEX ();
-	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
-	      call2 (Vx_dnd_movement_function, frame_object,
-		     Fposn_at_x_y (x, y, frame_object, Qnil));
-	      x_dnd_unwind_flag = false;
-	      unbind_to (ref, Qnil);
-	    }
-	}
-
-      if (hold_quit.kind != NO_EVENT)
-	{
-	  if (hold_quit.kind == SELECTION_REQUEST_EVENT)
-	    {
-	      x_dnd_old_window_attrs = root_window_attrs;
-	      x_dnd_unwind_flag = true;
-
-	      ref = SPECPDL_INDEX ();
-	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
-	      x_handle_selection_event ((struct selection_input_event *) &hold_quit);
-	      x_dnd_unwind_flag = false;
-	      unbind_to (ref, Qnil);
-	      continue;
-	    }
-
-	  if (x_dnd_in_progress)
-	    {
-	      if (x_dnd_last_seen_window != None
-		  && x_dnd_last_protocol_version != -1)
-		x_dnd_send_leave (f, x_dnd_last_seen_window);
-	      else if (x_dnd_last_seen_window != None
-		       && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
-		       && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
-		       && x_dnd_motif_setup_p)
+	      if (!NILP (Vx_dnd_movement_function)
+		  && !FRAME_TOOLTIP_P (XFRAME (frame_object))
+		  && x_dnd_movement_x >= 0
+		  && x_dnd_movement_y >= 0
+		  && x_dnd_frame
+		  && (XFRAME (frame_object) != x_dnd_frame
+		      || x_dnd_allow_current_frame))
 		{
-		  dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
-						XM_DRAG_REASON_DROP_START);
-		  dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-		  dmsg.timestamp = hold_quit.timestamp;
-		  dmsg.side_effects
-		    = XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
-								       x_dnd_wanted_action),
-					   XM_DROP_SITE_VALID,
-					   xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
-								       x_dnd_wanted_action),
-					   XM_DROP_ACTION_DROP_CANCEL);
-		  dmsg.x = 0;
-		  dmsg.y = 0;
-		  dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
-		  dmsg.source_window = FRAME_X_WINDOW (f);
+		  x_dnd_old_window_attrs = root_window_attrs;
+		  x_dnd_unwind_flag = true;
 
-		  x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
-						x_dnd_last_seen_window,
-						hold_quit.timestamp);
-		  xm_send_drop_message (FRAME_DISPLAY_INFO (f), FRAME_X_WINDOW (f),
-					x_dnd_last_seen_window, &dmsg);
+		  ref = SPECPDL_INDEX ();
+		  record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
+		  call2 (Vx_dnd_movement_function, frame_object,
+			 Fposn_at_x_y (x, y, frame_object, Qnil));
+		  x_dnd_unwind_flag = false;
+		  unbind_to (ref, Qnil);
+		}
+	    }
+
+	  if (hold_quit.kind != NO_EVENT)
+	    {
+	      if (hold_quit.kind == SELECTION_REQUEST_EVENT)
+		{
+		  x_dnd_old_window_attrs = root_window_attrs;
+		  x_dnd_unwind_flag = true;
+
+		  ref = SPECPDL_INDEX ();
+		  record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
+		  x_handle_selection_event ((struct selection_input_event *) &hold_quit);
+		  x_dnd_unwind_flag = false;
+		  unbind_to (ref, Qnil);
+		  continue;
 		}
 
-	      x_dnd_end_window = x_dnd_last_seen_window;
-	      x_dnd_last_seen_window = None;
-	      x_dnd_last_seen_toplevel = None;
-	      x_dnd_in_progress = false;
-	      x_dnd_frame = NULL;
-	    }
+	      if (x_dnd_in_progress)
+		{
+		  if (x_dnd_last_seen_window != None
+		      && x_dnd_last_protocol_version != -1)
+		    x_dnd_send_leave (f, x_dnd_last_seen_window);
+		  else if (x_dnd_last_seen_window != None
+			   && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
+			   && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
+			   && x_dnd_motif_setup_p)
+		    {
+		      dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
+						    XM_DRAG_REASON_DROP_START);
+		      dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+		      dmsg.timestamp = hold_quit.timestamp;
+		      dmsg.side_effects
+			= XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
+									   x_dnd_wanted_action),
+					       XM_DROP_SITE_VALID,
+					       xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
+									   x_dnd_wanted_action),
+					       XM_DROP_ACTION_DROP_CANCEL);
+		      dmsg.x = 0;
+		      dmsg.y = 0;
+		      dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+		      dmsg.source_window = FRAME_X_WINDOW (f);
 
-	  x_set_dnd_targets (NULL, 0);
-	  x_dnd_waiting_for_finish = false;
+		      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
+						    x_dnd_last_seen_window,
+						    hold_quit.timestamp);
+		      xm_send_drop_message (FRAME_DISPLAY_INFO (f), FRAME_X_WINDOW (f),
+					    x_dnd_last_seen_window, &dmsg);
+		    }
 
-	  if (x_dnd_use_toplevels)
-	    x_dnd_free_toplevels ();
+		  x_dnd_end_window = x_dnd_last_seen_window;
+		  x_dnd_last_seen_window = None;
+		  x_dnd_last_seen_toplevel = None;
+		  x_dnd_in_progress = false;
+		  x_dnd_frame = NULL;
+		}
 
-	  x_dnd_return_frame_object = NULL;
-	  x_dnd_movement_frame = NULL;
+	      x_set_dnd_targets (NULL, 0);
+	      x_dnd_waiting_for_finish = false;
 
-	  FRAME_DISPLAY_INFO (f)->grabbed = 0;
+	      if (x_dnd_use_toplevels)
+		x_dnd_free_toplevels ();
+
+	      x_dnd_return_frame_object = NULL;
+	      x_dnd_movement_frame = NULL;
+
+	      FRAME_DISPLAY_INFO (f)->grabbed = 0;
 #ifdef USE_GTK
-	  current_hold_quit = NULL;
+	      current_hold_quit = NULL;
 #endif
-	  /* Restore the old event mask.  */
-	  XSelectInput (FRAME_X_DISPLAY (f),
-			FRAME_DISPLAY_INFO (f)->root_window,
-			root_window_attrs.your_event_mask);
+	      /* Restore the old event mask.  */
+	      XSelectInput (FRAME_X_DISPLAY (f),
+			    FRAME_DISPLAY_INFO (f)->root_window,
+			    root_window_attrs.your_event_mask);
 #ifdef HAVE_XKB
-	  if (FRAME_DISPLAY_INFO (f)->supports_xkb)
-	    XkbSelectEvents (FRAME_X_DISPLAY (f), XkbUseCoreKbd,
-			     XkbStateNotifyMask, 0);
+	      if (FRAME_DISPLAY_INFO (f)->supports_xkb)
+		XkbSelectEvents (FRAME_X_DISPLAY (f), XkbUseCoreKbd,
+				 XkbStateNotifyMask, 0);
 #endif
-	  /* Delete the Motif drag initiator info if it was set up.  */
-	  if (x_dnd_motif_setup_p)
-	    XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-			     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
-	  quit ();
+	      /* Delete the Motif drag initiator info if it was set up.  */
+	      if (x_dnd_motif_setup_p)
+		XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+				 FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
+	      quit ();
+	    }
+#ifndef USE_GTK
 	}
+      else
+	{
+	  if (x_dnd_movement_frame)
+	    x_dnd_movement_frame = NULL;
+
+	  if (hold_quit.kind != NO_EVENT)
+	    EVENT_INIT (hold_quit);
+	}
+#endif
     }
 
   x_set_dnd_targets (NULL, 0);
@@ -10282,12 +10451,21 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
 }
 
 
-#if !defined USE_X_TOOLKIT && !defined USE_GTK
+#if (defined USE_LUCID && defined HAVE_XINPUT2) \
+  || (!defined USE_X_TOOLKIT && !defined USE_GTK)
 /* Handle an event saying the mouse has moved out of an Emacs frame.  */
 
 void
 x_mouse_leave (struct x_display_info *dpyinfo)
 {
+  Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
+
+  if (hlinfo->mouse_face_mouse_frame)
+    {
+      clear_mouse_face (hlinfo);
+      hlinfo->mouse_face_mouse_frame = NULL;
+    }
+
   x_new_focus_frame (dpyinfo, dpyinfo->x_focus_event_frame);
 }
 #endif
@@ -13124,6 +13302,22 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 #else
   Drawable w = bar->x_drawable;
 #endif
+  int x, y, width, height;
+
+  if (event->type == Expose)
+    {
+      x = event->xexpose.x;
+      y = event->xexpose.y;
+      width = event->xexpose.width;
+      height = event->xexpose.height;
+    }
+  else
+    {
+      x = event->xgraphicsexpose.x;
+      y = event->xgraphicsexpose.y;
+      width = event->xgraphicsexpose.width;
+      height = event->xgraphicsexpose.height;
+    }
 
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
   GC gc = f->output_data.x->normal_gc;
@@ -13142,10 +13336,7 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 
       XFillRectangle (FRAME_X_DISPLAY (f),
 		      bar->x_drawable,
-		      gc, event->xexpose.x,
-		      event->xexpose.y,
-		      event->xexpose.width,
-		      event->xexpose.height);
+		      gc, x, y, width, height);
 
       XSetForeground (FRAME_X_DISPLAY (f), gc,
 		      FRAME_FOREGROUND_PIXEL (f));
@@ -13164,8 +13355,11 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 		  /* x, y, width, height */
 		  0, 0, bar->width - 1, bar->height - 1);
 
-  XDrawPoint (FRAME_X_DISPLAY (f), w, gc,
-	      bar->width - 1, bar->height - 1);
+  /* XDrawPoint (FRAME_X_DISPLAY (f), w, gc,
+		 bar->width - 1, bar->height - 1);
+
+     This code is no longer required since the normal GC now uses the
+     regular line width.  */
 
   /* Restore the foreground color of the GC if we changed it above.  */
   if (f->output_data.x->scroll_bar_foreground_pixel != -1)
@@ -13191,8 +13385,14 @@ x_scroll_bar_expose (struct scroll_bar *bar, const XEvent *event)
 static void
 x_scroll_bar_handle_click (struct scroll_bar *bar,
 			   const XEvent *event,
-			   struct input_event *emacs_event)
+			   struct input_event *emacs_event,
+			   Lisp_Object device)
 {
+  int left_range, x, top_range, y;
+#ifndef USE_TOOLKIT_SCROLL_BARS
+  int new_start, new_end;
+#endif
+
   if (! WINDOWP (bar->window))
     emacs_abort ();
 
@@ -13210,11 +13410,15 @@ x_scroll_bar_handle_click (struct scroll_bar *bar,
   emacs_event->frame_or_window = bar->window;
   emacs_event->arg = Qnil;
   emacs_event->timestamp = event->xbutton.time;
+
+  if (!NILP (device))
+    emacs_event->device = device;
+
   if (bar->horizontal)
     {
-      int left_range
-	= HORIZONTAL_SCROLL_BAR_LEFT_RANGE (f, bar->width);
-      int x = event->xbutton.x - HORIZONTAL_SCROLL_BAR_LEFT_BORDER;
+
+      left_range = HORIZONTAL_SCROLL_BAR_LEFT_RANGE (f, bar->width);
+      x = event->xbutton.x - HORIZONTAL_SCROLL_BAR_LEFT_BORDER;
 
       if (x < 0) x = 0;
       if (x > left_range) x = left_range;
@@ -13230,8 +13434,8 @@ x_scroll_bar_handle_click (struct scroll_bar *bar,
       /* If the user has released the handle, set it to its final position.  */
       if (event->type == ButtonRelease && bar->dragging != -1)
 	{
-	  int new_start = - bar->dragging;
-	  int new_end = new_start + bar->end - bar->start;
+	  new_start = - bar->dragging;
+	  new_end = new_start + bar->end - bar->start;
 
 	  x_scroll_bar_set_handle (bar, new_start, new_end, false);
 	  bar->dragging = -1;
@@ -13243,9 +13447,9 @@ x_scroll_bar_handle_click (struct scroll_bar *bar,
     }
   else
     {
-      int top_range
+      top_range
 	= VERTICAL_SCROLL_BAR_TOP_RANGE (f, bar->height);
-      int y = event->xbutton.y - VERTICAL_SCROLL_BAR_TOP_BORDER;
+      y = event->xbutton.y - VERTICAL_SCROLL_BAR_TOP_BORDER;
 
       if (y < 0) y = 0;
       if (y > top_range) y = top_range;
@@ -13261,8 +13465,8 @@ x_scroll_bar_handle_click (struct scroll_bar *bar,
       /* If the user has released the handle, set it to its final position.  */
       if (event->type == ButtonRelease && bar->dragging != -1)
 	{
-	  int new_start = y - bar->dragging;
-	  int new_end = new_start + bar->end - bar->start;
+	  new_start = y - bar->dragging;
+	  new_end = new_start + bar->end - bar->start;
 
 	  x_scroll_bar_set_handle (bar, new_start, new_end, false);
 	  bar->dragging = -1;
@@ -13738,7 +13942,9 @@ x_net_wm_state (struct frame *f, Window window)
   store_frame_param (f, Qshaded, shaded ? Qt : Qnil);
 }
 
-/* Flip back buffers on FRAME if it has undrawn content.  */
+/* Flip back buffers on F if it has undrawn content.  */
+
+#ifdef HAVE_XDBE
 static void
 flush_dirty_back_buffer_on (struct frame *f)
 {
@@ -13749,6 +13955,7 @@ flush_dirty_back_buffer_on (struct frame *f)
     show_back_buffer (f);
   unblock_input ();
 }
+#endif
 
 #ifdef HAVE_GTK3
 void
@@ -13849,6 +14056,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 		x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 	      else if (x_dnd_last_seen_window != None
 		       && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+		       && !x_dnd_disable_motif_drag
 		       && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 		{
 		  if (!x_dnd_motif_setup_p)
@@ -13888,6 +14096,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 	  else if (x_dnd_last_seen_window != None
 		   && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+		   && !x_dnd_disable_motif_drag
 		   && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 	    {
 	      if (!x_dnd_motif_setup_p)
@@ -13913,7 +14122,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	  if (target != None && x_dnd_last_protocol_version != -1)
 	    x_dnd_send_enter (x_dnd_frame, target,
 			      x_dnd_last_protocol_version);
-	  else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style))
+	  else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+		   && !x_dnd_disable_motif_drag)
 	    {
 	      if (!x_dnd_motif_setup_p)
 		xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -13944,7 +14154,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 			     0
 #endif
 			     );
-      else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None)
+      else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None
+	       && !x_dnd_disable_motif_drag)
 	{
 	  if (!x_dnd_motif_setup_p)
 	    xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -14707,8 +14918,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  SET_FRAME_ICONIFIED (f, false);
 		}
 
+#ifdef HAVE_XDBE
 	      if (FRAME_X_DOUBLE_BUFFERED_P (f))
                 x_drop_xrender_surfaces (f);
+#endif
               f->output_data.x->has_been_visible = true;
               SET_FRAME_GARBAGED (f);
               unblock_input ();
@@ -14753,8 +14966,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
             }
 
+#ifdef HAVE_XDBE
           if (!FRAME_GARBAGED_P (f))
             show_back_buffer (f);
+#endif
         }
       else
         {
@@ -14802,8 +15017,20 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef USE_GTK
 	  x_clear_under_internal_border (f);
 #endif
+#ifdef HAVE_XDBE
 	  show_back_buffer (f);
+#endif
         }
+#ifndef USE_TOOLKIT_SCROLL_BARS
+      struct scroll_bar *bar
+	= x_window_to_scroll_bar (dpyinfo->display,
+				  /* Hopefully this is just a window,
+				     not the back buffer.  */
+				  event->xgraphicsexpose.drawable, 2);
+
+      if (bar)
+	x_scroll_bar_expose (bar, event);
+#endif
 #ifdef USE_X_TOOLKIT
       else
         goto OTHER;
@@ -14906,7 +15133,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	popup_activated_flag = 1;
 #endif
 
-      if (x_dnd_in_progress)
+      if (x_dnd_in_progress
+	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	x_dnd_update_state (dpyinfo, dpyinfo->last_user_time);
 
       if (x_dnd_in_progress && x_dnd_use_toplevels
@@ -15654,6 +15882,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 		    else if (x_dnd_last_seen_window != None
 			     && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+			     && !x_dnd_disable_motif_drag
 			     && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 		      {
 			if (!x_dnd_motif_setup_p)
@@ -15693,6 +15922,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 		else if (x_dnd_last_seen_window != None
 			 && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+			 && x_dnd_disable_motif_drag
 			 && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 		  {
 		    if (!x_dnd_motif_setup_p)
@@ -15739,7 +15969,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		if (target != None && x_dnd_last_protocol_version != -1)
 		  x_dnd_send_enter (x_dnd_frame, target,
 				    x_dnd_last_protocol_version);
-		else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style))
+		else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+			 && !x_dnd_disable_motif_drag)
 		  {
 		    if (!x_dnd_motif_setup_p)
 		      xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -15766,7 +15997,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				   x_dnd_selection_timestamp,
 				   x_dnd_wanted_action, 0,
 				   event->xmotion.state);
-	    else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None)
+	    else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None
+		     && !x_dnd_disable_motif_drag)
 	      {
 		if (!x_dnd_motif_setup_p)
 		  xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -16016,8 +16248,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
          for size changes: that's not sufficient.  We miss some
          surface invalidations and flicker.  */
       block_input ();
+#ifdef HAVE_XDBE
       if (f && FRAME_X_DOUBLE_BUFFERED_P (f))
         x_drop_xrender_surfaces (f);
+#endif
       unblock_input ();
 #if defined USE_CAIRO && !defined USE_GTK
       if (f)
@@ -16169,7 +16403,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	}
 
-      if (x_dnd_in_progress)
+      if (x_dnd_in_progress
+	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	x_dnd_update_state (dpyinfo, dpyinfo->last_user_time);
       goto OTHER;
 
@@ -16476,12 +16711,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                scroll bars.  */
             if (bar && event->xbutton.state & ControlMask)
               {
-                x_scroll_bar_handle_click (bar, event, &inev.ie);
+                x_scroll_bar_handle_click (bar, event, &inev.ie, Qnil);
                 *finish = X_EVENT_DROP;
               }
 #else /* not USE_TOOLKIT_SCROLL_BARS */
             if (bar)
-              x_scroll_bar_handle_click (bar, event, &inev.ie);
+              x_scroll_bar_handle_click (bar, event, &inev.ie, Qnil);
 #endif /* not USE_TOOLKIT_SCROLL_BARS */
           }
 
@@ -16526,14 +16761,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
             && event->xbutton.same_screen)
           {
 #ifdef USE_MOTIF
-	    unsigned char column_type;
 	    Widget widget;
 
 	    widget = XtWindowToWidget (dpyinfo->display,
 				       event->xbutton.window);
-	    XtVaGetValues (widget, XmNrowColumnType, &column_type, NULL);
 
-	    if (column_type != XmMENU_BAR)
+	    if (widget && XmIsCascadeButton (widget)
+		&& XtIsSensitive (widget))
 	      {
 #endif
 		if (!f->output_data.x->saved_menu_event)
@@ -16553,7 +16787,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       break;
 
     case CirculateNotify:
-      if (x_dnd_in_progress)
+      if (x_dnd_in_progress
+	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	x_dnd_update_state (dpyinfo, dpyinfo->last_user_time);
       goto OTHER;
 
@@ -16684,7 +16919,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      ev.window = enter->event;
 	      ev.time = enter->time;
 
-	      x_display_set_last_user_time (dpyinfo, xi_event->time);
+	      x_display_set_last_user_time (dpyinfo, enter->time);
 
 #ifdef USE_MOTIF
 	      use_copy = true;
@@ -16786,7 +17021,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifdef USE_X_TOOLKIT
 	      if (popup_activated ()
-		  && leave->mode == XINotifyPassiveUngrab)
+		  && (leave->mode == XINotifyPassiveUngrab
+		      || leave->mode == XINotifyUngrab))
 		any = x_any_window_to_frame (dpyinfo, leave->event);
 #endif
 
@@ -16831,7 +17067,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							 leave->deviceid, false);
 #endif
 
-	      x_display_set_last_user_time (dpyinfo, xi_event->time);
+	      x_display_set_last_user_time (dpyinfo, leave->time);
 
 #ifdef HAVE_XWIDGETS
 	      {
@@ -17136,7 +17372,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  XSETFRAME (inev.ie.frame_or_window, f);
 			}
 
-		      if (source && source->name)
+		      if (source && !NILP (source->name))
 			inev.ie.device = source->name;
 
 		      goto XI_OTHER;
@@ -17229,6 +17465,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 			  else if (x_dnd_last_seen_window != None
 				   && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+				   && !x_dnd_disable_motif_drag
 				   && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 			    {
 			      if (!x_dnd_motif_setup_p)
@@ -17268,6 +17505,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			x_dnd_send_leave (x_dnd_frame, x_dnd_last_seen_window);
 		      else if (x_dnd_last_seen_window != None
 			       && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+			       && !x_dnd_disable_motif_drag
 			       && x_dnd_last_seen_window != FRAME_OUTER_WINDOW (x_dnd_frame))
 			{
 			  if (!x_dnd_motif_setup_p)
@@ -17316,7 +17554,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      if (target != None && x_dnd_last_protocol_version != -1)
 			x_dnd_send_enter (x_dnd_frame, target,
 					  x_dnd_last_protocol_version);
-		      else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style))
+		      else if (target != None && XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style)
+			       && !x_dnd_disable_motif_drag)
 			{
 			  if (!x_dnd_motif_setup_p)
 			    xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -17356,7 +17595,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					   x_dnd_wanted_action, 0,
 					   dnd_state);
 		    }
-		  else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None)
+		  else if (XM_DRAG_STYLE_IS_DYNAMIC (x_dnd_last_motif_style) && target != None
+			   && !x_dnd_disable_motif_drag)
 		    {
 		      if (!x_dnd_motif_setup_p)
 			xm_setup_drag_info (dpyinfo, x_dnd_frame);
@@ -17448,7 +17688,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		{
 #ifndef USE_TOOLKIT_SCROLL_BARS
 		  struct scroll_bar *bar
-		    = x_window_to_scroll_bar (xi_event->display, xev->event, 2);
+		    = x_window_to_scroll_bar (dpyinfo->display, xev->event, 2);
 
 		  if (bar)
 		    x_scroll_bar_note_movement (bar, &ev);
@@ -17937,13 +18177,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifndef USE_TOOLKIT_SCROLL_BARS
 		  if (bar)
-		    x_scroll_bar_handle_click (bar, (XEvent *) &bv, &inev.ie);
+		    x_scroll_bar_handle_click (bar, (XEvent *) &bv, &inev.ie,
+					       source ? source->name : Qnil);
 #else
 		  /* Make the "Ctrl-Mouse-2 splits window" work for toolkit
 		     scroll bars.  */
 		  if (bar && xev->mods.effective & ControlMask)
 		    {
-		      x_scroll_bar_handle_click (bar, (XEvent *) &bv, &inev.ie);
+		      x_scroll_bar_handle_click (bar, (XEvent *) &bv, &inev.ie,
+						 source ? source->name : Qnil);
 		      *finish = X_EVENT_DROP;
 		    }
 #endif
@@ -19023,7 +19265,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, pev->deviceid);
 	      source = xi_device_from_id (dpyinfo, pev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xi_event->time);
+	      x_display_set_last_user_time (dpyinfo, pev->time);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -19447,11 +19689,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
      redisplay.  To ensure that these changes become visible, draw
      them here.  */
 
+#ifdef HAVE_XDBE
   if (f)
     flush_dirty_back_buffer_on (f);
 
   if (any && any != f)
     flush_dirty_back_buffer_on (any);
+#endif
   return count;
 }
 
@@ -19754,6 +19998,9 @@ x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text
       else
 	xgcv.background = xgcv.foreground = f->output_data.x->cursor_pixel;
       xgcv.graphics_exposures = False;
+      xgcv.line_width = 1;
+
+      mask |= GCLineWidth;
 
       if (gc)
 	XChangeGC (dpy, gc, mask, &xgcv);
@@ -21013,19 +21260,26 @@ x_wm_supports (struct frame *f, Atom want_atom)
 static void
 set_wm_state (Lisp_Object frame, bool add, Atom atom, Atom value)
 {
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (XFRAME (frame));
+  struct x_display_info *dpyinfo;
+  XEvent msg;
 
-  x_send_client_event (frame, make_fixnum (0), frame,
-                       dpyinfo->Xatom_net_wm_state,
-                       make_fixnum (32),
-                       /* 1 = add, 0 = remove */
-                       Fcons
-                       (make_fixnum (add),
-                        Fcons
-                        (INT_TO_INTEGER (atom),
-                         (value != 0
-			  ? list1 (INT_TO_INTEGER (value))
-			  : Qnil))));
+  dpyinfo = FRAME_DISPLAY_INFO (XFRAME (frame));
+  msg.xclient.type = ClientMessage;
+  msg.xclient.window = FRAME_OUTER_WINDOW (XFRAME (frame));
+  msg.xclient.message_type = dpyinfo->Xatom_net_wm_state;
+  msg.xclient.format = 32;
+
+  msg.xclient.data.l[0] = add ? 1 : 0;
+  msg.xclient.data.l[1] = atom;
+  msg.xclient.data.l[2] = value;
+  msg.xclient.data.l[3] = 1; /* Source indication.  */
+  msg.xclient.data.l[4] = 0;
+
+  block_input ();
+  XSendEvent (dpyinfo->display, dpyinfo->root_window,
+	      False, (SubstructureRedirectMask
+		      | SubstructureNotifyMask), &msg);
+  unblock_input ();
 }
 
 void
@@ -24309,7 +24563,9 @@ x_create_terminal (struct x_display_info *dpyinfo)
   terminal->update_end_hook = x_update_end;
   terminal->read_socket_hook = XTread_socket;
   terminal->frame_up_to_date_hook = XTframe_up_to_date;
+#ifdef HAVE_XDBE
   terminal->buffer_flipping_unblocked_hook = XTbuffer_flipping_unblocked_hook;
+#endif
   terminal->defined_color_hook = x_defined_color;
   terminal->query_frame_background_color = x_query_frame_background_color;
   terminal->query_colors = x_query_colors;
@@ -24665,6 +24921,13 @@ during a drag-and-drop session, to work around broken implementations
 of Motif.  */);
   x_dnd_fix_motif_leave = true;
 
+  DEFVAR_BOOL ("x-dnd-disable-motif-drag", x_dnd_disable_motif_drag,
+	       doc: /* Disable the Motif drag protocol during DND.
+This reduces network usage, but also means you can no longer scroll
+around inside the Motif window underneath the cursor during
+drag-and-drop.  */);
+  x_dnd_disable_motif_drag = false;
+
   DEFVAR_LISP ("x-dnd-movement-function", Vx_dnd_movement_function,
     doc: /* Function called upon mouse movement on a frame during drag-and-drop.
 It should either be nil, or accept two arguments FRAME and POSITION,
@@ -24674,16 +24937,16 @@ mouse position list.  */);
 
   DEFVAR_LISP ("x-dnd-unsupported-drop-function", Vx_dnd_unsupported_drop_function,
     doc: /* Function called when trying to drop on an unsupported window.
-This function is called whenever the user tries to drop
-something on a window that does not support either the XDND or
-Motif protocols for drag-and-drop.  It should return a non-nil
-value if the drop was handled by the function, and nil if it was
-not.  It should accept several arguments TARGETS, X, Y, ACTION,
-WINDOW-ID and FRAME, where TARGETS is the list of targets that
-was passed to `x-begin-drag', WINDOW-ID is the numeric XID of
-the window that is being dropped on, X and Y are the root
-window-relative coordinates where the drop happened, ACTION
-is the action that was passed to `x-begin-drag', and FRAME is
-the frame which initiated the drag-and-drop operation.  */);
+This function is called whenever the user tries to drop something on a
+window that does not support either the XDND or Motif protocols for
+drag-and-drop.  It should return a non-nil value if the drop was
+handled by the function, and nil if it was not.  It should accept
+several arguments TARGETS, X, Y, ACTION, WINDOW-ID, FRAME and TIME,
+where TARGETS is the list of targets that was passed to
+`x-begin-drag', WINDOW-ID is the numeric XID of the window that is
+being dropped on, X and Y are the root window-relative coordinates
+where the drop happened, ACTION is the action that was passed to
+`x-begin-drag', FRAME is the frame which initiated the drag-and-drop
+operation, and TIME is the X server time when the drop happened.  */);
   Vx_dnd_unsupported_drop_function = Qnil;
 }

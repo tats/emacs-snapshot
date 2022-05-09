@@ -40,13 +40,13 @@ the option '--with-be-app', the resulting Emacs will only run in
 text-mode terminals.
 
 +++
-*** Cairo drawing support has been enabled for Haiku builds.
+** Cairo drawing support has been enabled for Haiku builds.
 To enable Cairo support, ensure that the Cairo and FreeType
 development files are present on your system, and configure Emacs with
 '--with-be-cairo'.
 
 ---
-*** Double buffering is now enabled on the Haiku operating system.
+** Double buffering is now enabled on the Haiku operating system.
 Unlike X, there is no compile-time option to enable or disable
 double-buffering.  If you wish to disable double-buffering, change the
 frame parameter 'inhibit-double-buffering' instead.
@@ -59,13 +59,14 @@ If a constant file name is required, the file can be renamed to
 "emacs.pdmp", and Emacs will find it during startup anyway.
 
 ---
-** Emacs now supports use of XInput 2 for input events.
-If your X server has support and you have the XInput 2 development headers
-installed, you can configure Emacs with the option '--with-xinput2' to enable
-this support.
+** Emacs now uses of XInput 2 for input events.
+If your X server has support and you have the XInput 2 development
+headers installed, Emacs will use the X Input Extension for handling
+input.  If this causes problems, you can configure Emacs with the
+option '--without-xinput2' to disable this support.
 
-The named feature 'xinput2' can be used to test for the presence of
-XInput 2 support from Lisp programs.
+(featurep 'xinput2) can be used to test for the presence of XInput 2
+support from Lisp programs.
 
 +++
 ** Emacs now supports being built with pure GTK.
@@ -92,10 +93,10 @@ as was already the case for all the non-preloaded files.
 The option 'desktop-load-locked-desktop' can now be set to the value
 'check-pid', which means to allow loading a locked ".emacs.desktop"
 file if the Emacs process which locked it is no longer running on the
-local machine.  This allows to avoid asking questions about locked
-desktop files when the Emacs session which locked it crashes or was
-otherwise interrupted and didn't exit gracefully.  See the "(emacs)
-Saving Emacs Sessions" node in the Emacs manual for more details.
+local machine.  This allows avoiding questions about locked desktop
+files when the Emacs session which locked it crashes, or was otherwise
+interrupted, and didn't exit gracefully.  See the "(emacs) Saving
+Emacs Sessions" node in the Emacs manual for more details.
 
 
 * Startup Changes in Emacs 29.1
@@ -136,13 +137,28 @@ of 'user-emacs-directory'.
 * Incompatible changes in Emacs 29.1
 
 ---
+** Isearch in *Help* and *info* now char-folds quote characters by default.
+This means that you can say 'C-s `foo' (GRAVE ACCENT) if the buffer
+contains "‘foo" (LEFT SINGLE QUOTATION MARK) and the like.  These
+quotation characters look somewhat similar in some fonts.  To switch
+this off, disable the new 'isearch-fold-quotes-mode' minor mode.
+
+---
+** Sorting commands no longer necessarily change modification status.
+In earlier Emacs versions, commands like 'M-x sort-lines' would always
+change buffer modification status to "modified", whether they changed
+something in the buffer or not.  This has been changed: The buffer is
+marked as modified only if the sorting ended up changing the contents
+of the buffer.
+
+---
 ** 'string-lines' handles trailing newlines differently.
 It no longer returns an empty final string if the string ends with a
 newline.
 
 ---
 ** 'TAB' and '<backtab>' are now bound in 'button-map'.
-This means that if you're standing on a button, 'TAB' will take you to
+This means that if your cursor is on a button, 'TAB' will take you to
 the next button, even if the mode has bound it to something else.
 This also means that 'TAB' on a button in an 'outline-minor-mode'
 heading will move point instead of collapsing the outline.
@@ -231,6 +247,13 @@ removed some time after that.
 
 
 * Changes in Emacs 29.1
+
+---
+** 'delete-process' is now a command.
+When called interactively, it will kill the process running in the
+current buffer (if any).  This can be useful if you have runaway
+output in the current buffer (from a process or a network connection),
+and want to stop it.
 
 +++
 ** New command 'restart-emacs'.
@@ -440,8 +463,19 @@ command also works for non-Emoji characters.)
 
 ---
 *** New input method 'emoji'.
+This allows you to enter emoji using short strings, eg :face_palm: or
+:scream:.
 
 ** Help
+
++++
+*** New doc string syntax to indicate that symbols shouldn't be links.
+When displaying doc strings in *Help* buffers, strings that are
+"`like-this'" are made into links (if they point to a bound
+function/variable).  This can lead to false positives when talking
+about values that are symbols that happen to have the same names as
+functions/variables.  To inhibit this buttonification, the new
+"\\+`like-this'" syntax can be used.
 
 +++
 *** New user option 'help-window-keep-selected'.
@@ -685,7 +719,7 @@ The options 'mouse-wheel-down-alternate-event',
 and 'mouse-wheel-right-alternate-event' have been added to better
 support systems where two kinds of wheel events can be received.
 
-** Editing complex text layout (CTL) scripts
+** Internationalization changes
 
 *** The <Delete> function key now allows deleting the entire composed sequence.
 For the details, see the item about the 'delete-forward-char' command
@@ -704,15 +738,54 @@ This language environment supports Brahmi, which is a historical
 script that was used in ancient South Asia.  A new input method,
 'brahmi', is provided to type text in this script.
 
+*** New language environment "Kaithi".
+This language environment supports Kaithi or Kayasthi, which was
+an important writing system of the past mainly used for administrative
+purposes.  A new input method, 'kaithi', is provided to type text in
+this script.
+
+*** New language environment "Tirhuta".
+This language environment supports Tirhuta or Mithilaakshar, which is
+used to write the Maithili language.  A new input method, 'tirhuta',
+is provided to type text in this script.
+
+---
+*** New Greek translation of the Emacs tutorial.
+Type 'C-u C-h t' to select it in case your language setup does not do
+so automatically.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** dabbrev
+
+---
+*** New function 'dabbrev-capf' for use on 'completion-at-point-functions'
+
++++
+*** New user option 'dabbrev-ignored-buffer-modes'.
+Buffers with major modes in this list will be ignored.  By default,
+this includes "binary" buffers like 'archive-mode' and 'image-mode'.
+
+** Package
+
++++
+*** New command 'package-update'.
+This command allows you to upgrade packages without using 'M-x
+list-packages'.
+
++++
+*** New DWIM action on 'x'.
+If no packages are marked, 'x' will install the package under point if
+it isn't already, and remove it if it is installed.
 
 ** Miscellaneous
 
 +++
 *** New command 'scratch-buffer'.
-This switches to the *scratch* buffer.  If it doesn't exist, create it
-first.
+This command switches to the *scratch* buffer.  If *scratch* doesn't
+exist, the command creates it first.  You can use this command if you
+inadvertently delete the *scratch* buffer.
 
 ** Debugging
 
@@ -819,7 +892,7 @@ When this user option names a face, the current
 candidate in the "*Completions*" buffer is highlighted with that face.
 The nil value disables this highlighting.
 
----
++++
 *** Choosing a completion with a prefix argument doesn't exit the minibuffer.
 This means that typing 'C-u RET' on a completion candidate in the
 "*Completions*" buffer inserts the completion to the minibuffer,
@@ -1075,6 +1148,11 @@ filters and displayed with the specified color.
 ** term-mode
 
 ---
+*** New user option 'term-bind-function-keys'.
+If non-nil, 'term-mode' will pass the function keys on to the
+underlying shell instead of using the normal Emacs bindings.
+
+---
 *** Support for ANSI 256-color and 24-bit colors, italic and other fonts.
 Term-mode can now display 256-color and 24-bit color codes.  It can
 also handle ANSI codes for faint, italic and blinking text, displaying
@@ -1174,8 +1252,8 @@ user options that are no longer needed are now obsolete:
 *** Navigation and marking commands now work in image display buffer.
 The following new bindings have been added:
 
-  n / SPC   image-dired-display-next-thumbnail-original
-  p / DEL   image-dired-display-previous-thumbnail-original
+  n or SPC  image-dired-display-next-thumbnail-original
+  p or DEL  image-dired-display-previous-thumbnail-original
   m         image-dired-mark-thumb-original-file
   d         image-dired-flag-thumb-original-file
   u         image-dired-unmark-thumb-original-file
@@ -1334,7 +1412,7 @@ will abbreviate the user's home directory, for example by abbreviating
 +++
 *** New user option 'tramp-use-scp-direct-remote-copying'.
 When set to non-nil, Tramp does not copy files between two remote
-hosts via a local copy in its temporary directory, but let the 'scp'
+hosts via a local copy in its temporary directory, but lets the 'scp'
 command do this job.
 
 +++
@@ -1381,6 +1459,26 @@ applies only when 'default-directory' is remote and the command is a
 Lisp function.  This frees you from having to keep track of whether
 commands are Lisp function or external when supplying absolute file
 name arguments.  See "Electric forward slash" in the Eshell manual.
+
++++
+*** Double-quoting an Eshell expansion now treats the result as a single string.
+If an Eshell expansion like '$FOO' is surrounded by double quotes, the
+result will always be a single string, no matter the type that would
+otherwise be returned.
+
++++
+*** Concatenating Eshell expansions now works more similarly to other shells.
+When concatenating an Eshell expansion that returns a list, "adjacent"
+elements of each operand are now concatenated together,
+e.g. '$list("a" "b")c' returns '("a" "bc")'.  See the "(eshell)
+Expansion" node in the Eshell manual for more details.
+
++++
+*** Eshell subcommands with multiline numeric output return lists of numbers.
+If every line of the output of an Eshell subcommand like '${COMMAND}'
+is numeric, the result will be a list of numbers (or a single number
+if only one line of output).  Previously, this only converted numbers
+when there was a single line of output.
 
 ---
 *** Built-in Eshell commands now follow POSIX/GNU argument syntax conventions.
@@ -1460,6 +1558,15 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
+---
+** 'with-silent-modifications' also restores buffer modification ticks.
+'with-silent-modifications' is a macro meant to be used by the font
+locking machinery to allow applying text properties without changing
+the modification status of the buffer.  However, it didn't restore the
+buffer modification ticks, so applying font locking to a modified
+buffer that had already been auto-saved would trigger another
+auto-saving.  This is no longer the case.
 
 ---
 ** 'prin1' doesn't always escape "." and "?" in symbols any more.
@@ -1596,6 +1703,24 @@ functions.
 
 
 * Lisp Changes in Emacs 29.1
+
+---
+*** New minor mode 'isearch-fold-quotes-mode'.
+This sets up 'search-default-mode' so that quote characters are
+char-folded into each other.  It is used, by default, in *Help* and
+*info* buffers.
+
++++
+** New macro 'buffer-local-set-state'.
+This is a helper macro to be used by minor modes that wish to restore
+buffer-local variables back to their original states when the mode is
+switched off.
+
+---
+** New macro 'with-buffer-unmodified-if-unchanged'.
+If the buffer is marked as unmodified, and code does modifications
+that, in total, means that the buffer is identical to the buffer
+before, mark the buffer as unmodified again.
 
 ---
 ** New function 'malloc-trim'.
@@ -1921,8 +2046,10 @@ It marks the image with the 'inhibit-isearch' text property, which
 inhibits 'isearch' matching the STRING parameter.
 
 ---
-** New function 'replace-regexp-function'.
-It can be used to implement own regexp syntax for search/replace.
+** New variable 'replace-regexp-function'.
+Function to call to convert the entered FROM string to an Emacs
+regexp in 'query-replace' and similar commands.  It can be used to
+implement a different regexp syntax for search/replace.
 
 ---
 ** New variables to customize defaults of FROM for 'query-replace*' commands.
@@ -1973,6 +2100,11 @@ dimensions.
 Specifying a cons as the FROM argument allows to start measuring text
 from a specified amount of pixels above or below a position.
 
++++
+** 'set-window-vscroll' now accepts a new argument PRESERVE-VSCROLL-P.
+This means the vscroll will not be reset when set on a window that is
+"frozen" due to a mini-window being resized.
+
 ** XDG support
 
 ---
@@ -2002,6 +2134,12 @@ This holds the value of the previous call to 'set-locale-environment'.
 *** New macro 'with-locale-environment'.
 This macro can be used to change the locale temporarily while
 executing code.
+
+** table.el
+
+---
+*** New user option 'table-latex-environment'.
+This allows switching between "table" and "tabular".
 
 ** Tabulated List Mode
 
@@ -2197,7 +2335,7 @@ translation.
 +++
 ** 'shell-quote-argument' has a new optional parameter POSIX.
 This is useful when quoting shell arguments for a remote shell
-invocation.  Such shells are POSIX conform by default.
+invocation.  Such shells are POSIX conformant by default.
 
 +++
 ** 'signal-process' now consults the list 'signal-process-functions'.
@@ -2207,8 +2345,8 @@ asynchronous processes.  The hitherto existing implementation has been
 moved to 'signal-default-interrupt-process'.
 
 +++
-** 'list-system-processes' returns remote process IDs now.
-This happens, when the current buffer's 'default-directory' is
+** 'list-system-processes' now returns remote process IDs.
+This happens only when the current buffer's 'default-directory' is
 remote.  In order to preserve the old behavior, apply
 
     (let ((default-directory temporary-file-directory))

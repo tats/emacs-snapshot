@@ -207,6 +207,39 @@ Also see `local-variable-p'."
     (:success t)
     (void-variable nil)))
 
+(defmacro buffer-local-set-state (&rest pairs)
+  "Like `setq-local', but allow restoring the previous state of locals later.
+This macro returns an object that can be passed to `buffer-local-restore-state'
+in order to restore the state of the local variables set via this macro.
+
+\(fn [VARIABLE VALUE]...)"
+  (declare (debug setq))
+  (unless (zerop (mod (length pairs) 2))
+    (error "PAIRS must have an even number of variable/value members"))
+  `(prog1
+       (buffer-local-set-state--get ',pairs)
+     (setq-local ,@pairs)))
+
+(defun buffer-local-set-state--get (pairs)
+  (let ((states nil))
+    (while pairs
+      (push (list (car pairs)
+                  (and (boundp (car pairs))
+                       (local-variable-p (car pairs)))
+                  (and (boundp (car pairs))
+                       (symbol-value (car pairs))))
+            states)
+      (setq pairs (cddr pairs)))
+    (nreverse states)))
+
+(defun buffer-local-restore-state (states)
+  "Restore values of buffer-local variables recorded in STATES.
+STATES should be an object returned by `buffer-local-set-state'."
+  (pcase-dolist (`(,variable ,local ,value) states)
+    (if local
+        (set variable value)
+      (kill-local-variable variable))))
+
 (defmacro push (newelt place)
   "Add NEWELT to the list stored in the generalized variable PLACE.
 This is morally equivalent to (setf PLACE (cons NEWELT PLACE)),
@@ -941,6 +974,20 @@ Here's some example key sequences:
 For an approximate inverse of this, see `key-description'."
   (declare (pure t) (side-effect-free t))
   (let ((res (key-parse keys)))
+    ;; For historical reasons, parse "C-x ( C-d C-x )" as "C-d", since
+    ;; `kbd' used to be a wrapper around `read-kbd-macro'.
+    (when (and (>= (length res) 4)
+               (eq (aref res 0) ?\C-x)
+               (eq (aref res 1) ?\()
+               (eq (aref res (- (length res) 2)) ?\C-x)
+               (eq (aref res (- (length res) 1)) ?\)))
+      (setq res (apply #'vector (let ((lres (append res nil)))
+                                  ;; Remove the first and last two elements.
+                                  (setq lres (cddr lres))
+                                  (setq lres (nreverse lres))
+                                  (setq lres (cddr lres))
+                                  (nreverse lres)))))
+
     (if (not (memq nil (mapcar (lambda (ch)
                                  (and (numberp ch)
                                       (<= 0 ch 127)))
@@ -4547,14 +4594,19 @@ like `buffer-modified-p', checking whether the file is locked by
 someone else, running buffer modification hooks, and other things
 of that nature."
   (declare (debug t) (indent 0))
-  (let ((modified (make-symbol "modified")))
+  (let ((modified (make-symbol "modified"))
+        (tick (make-symbol "tick")))
     `(let* ((,modified (buffer-modified-p))
+            (,tick (buffer-modified-tick))
             (buffer-undo-list t)
             (inhibit-read-only t)
             (inhibit-modification-hooks t))
        (unwind-protect
            (progn
              ,@body)
+         ;; We restore the buffer tick count, too, because otherwise
+         ;; we'll trigger a new auto-save.
+         (internal--set-buffer-modified-tick ,tick)
          (unless ,modified
            (restore-buffer-modified-p nil))))))
 

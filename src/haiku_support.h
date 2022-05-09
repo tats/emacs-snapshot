@@ -91,7 +91,6 @@ enum haiku_event_type
     MENU_BAR_OPEN,
     MENU_BAR_SELECT_EVENT,
     MENU_BAR_CLOSE,
-    FILE_PANEL_EVENT,
     MENU_BAR_HELP_EVENT,
     ZOOM_EVENT,
     DRAG_AND_DROP_EVENT,
@@ -222,11 +221,6 @@ struct haiku_menu_bar_select_event
   void *ptr;
 };
 
-struct haiku_file_panel_event
-{
-  void *ptr;
-};
-
 struct haiku_menu_bar_help_event
 {
   void *window;
@@ -252,6 +246,7 @@ enum haiku_font_specification
     FSPEC_NEED_ONE_OF = 1 << 6,
     FSPEC_WIDTH	      = 1 << 7,
     FSPEC_LANGUAGE    = 1 << 8,
+    FSPEC_INDICES     = 1 << 9,
   };
 
 typedef char haiku_font_family_or_style[64];
@@ -306,25 +301,61 @@ enum haiku_font_weight
 
 struct haiku_font_pattern
 {
+  /* Bitmask indicating which fields are set.  */
   int specified;
+
+  /* The next font in this list.  */
   struct haiku_font_pattern *next;
-  /* The next two fields are only temporarily used during the font
-     discovery process! Do not rely on them being correct outside
-     BFont_find.  */
+
+  /* The last font in the list during font lookup.  */
   struct haiku_font_pattern *last;
+
+  /* The next font in the list whose family differs from this one.
+     Only valid during font lookup.  */
   struct haiku_font_pattern *next_family;
+
+  /* The family of the font.  */
   haiku_font_family_or_style family;
+
+  /* The style of the font.  */
   haiku_font_family_or_style style;
+
+  /* Whether or the font is monospace.  */
   int mono_spacing_p;
-  int want_chars_len;
-  int need_one_of_len;
+
+  /* The slant of the font.  */
   enum haiku_font_slant slant;
+
+  /* The width of the font.  */
   enum haiku_font_width width;
+
+  /* The language of the font.  Used during font lookup.  */
   enum haiku_font_language language;
+
+  /* The weight of the font.  */
   enum haiku_font_weight weight;
+
+  /* List of characters that must be present in the font for the match
+     to succeed.  */
   int *wanted_chars;
+
+  /* The number of characters in `wanted_chars'.  */
+  int want_chars_len;
+
+  /* List of characters.  The font must fullfill at least one of
+     them for the match to succeed.  */
   int *need_one_of;
 
+  /* The number of characters in `need_one_of'.  */
+  int need_one_of_len;
+
+  /* The index of the family of the font this pattern represents.  */
+  int family_index;
+
+  /* The index of the style of the font this pattern represents.  */
+  int style_index;
+
+  /* Temporary field used during font enumeration.  */
   int oblique_seen_p;
 };
 
@@ -473,6 +504,7 @@ extern bool BWindow_is_active (void *);
 extern void BWindow_set_override_redirect (void *, bool);
 extern void BWindow_dimensions (void *, int *, int *);
 extern void BWindow_set_z_group (void *, enum haiku_z_group);
+extern void BWindow_set_sticky (void *, bool);
 extern void BWindow_Flush (void *);
 
 extern void BFont_close (void *);
@@ -509,6 +541,8 @@ extern void BView_DrawBitmap (void *, void *, int, int, int, int, int, int,
 extern void BView_DrawBitmapWithEraseOp (void *, void *, int, int, int, int);
 extern void BView_DrawMask (void *, void *, int, int, int, int,	int, int,
 			    int, int, uint32_t);
+extern void BView_DrawBitmapTiled (void *, void *, int, int,
+				   int, int, int, int, int, int);
 
 extern void BView_resize_to (void *, int, int);
 extern void BView_set_view_cursor (void *, void *);
@@ -518,8 +552,8 @@ extern void BView_scroll_bar_update (void *, int, int, int, int, bool);
 extern void *BBitmap_transform_bitmap (void *, void *, uint32_t, double,
 				       int, int);
 
-extern void BScreen_px_dim (int *, int *);
-extern void BScreen_res (double *, double *);
+extern void be_get_display_resolution (double *, double *);
+extern void be_get_screen_dimensions (int *, int *);
 
 /* Functions for creating and freeing cursors.  */
 extern void *BCursor_create_default (void);
@@ -538,9 +572,7 @@ extern void BView_invalidate (void *);
 extern void BView_draw_lock (void *, bool, int, int, int, int);
 extern void BView_invalidate_region (void *, int, int, int, int);
 extern void BView_draw_unlock (void *);
-
 extern void BBitmap_import_fringe_bitmap (void *, unsigned short *, int, int);
-extern void BBitmap_import_mono_bits (void *, void *, int, int);
 
 extern void haiku_font_pattern_free (struct haiku_font_pattern *);
 
@@ -612,12 +644,7 @@ extern int EmacsView_double_buffered_p (void *);
 
 extern char *be_popup_file_dialog (int, const char *, int,
 				   int, void *, const char *,
-				   const char *, void (*) (void),
-				   void (*) (void), void (*) (void));
-
-extern void record_c_unwind_protect_from_cxx (void (*) (void *), void *);
-extern specpdl_ref c_specpdl_idx_from_cxx (void);
-extern void c_unbind_to_nil_from_cxx (specpdl_ref);
+				   const char *, void (*) (void));
 
 #ifdef HAVE_NATIVE_IMAGE_API
 extern int be_can_translate_type_to_bitmap_p (const char *);
@@ -646,6 +673,7 @@ extern bool be_use_subpixel_antialiasing (void);
 extern const char *be_find_setting (const char *);
 extern haiku_font_family_or_style *be_list_font_families (size_t *);
 extern void be_font_style_to_flags (char *, struct haiku_font_pattern *);
+extern void *be_open_font_at_index (int, int, float);
 extern int be_get_ui_color (const char *, uint32_t *);
 
 extern void BMessage_delete (void *);
@@ -659,9 +687,11 @@ extern bool be_replay_menu_bar_event (void *, struct haiku_menu_bar_click_event 
 extern bool be_select_font (void (*) (void), bool (*) (void),
 			    haiku_font_family_or_style *,
 			    haiku_font_family_or_style *,
-			    int *, bool, int, int);
+			    int *, bool, int, int, int);
 
 extern int be_find_font_indices (struct haiku_font_pattern *, int *, int *);
+extern status_t be_roster_launch (const char *, const char *, char **,
+				  ptrdiff_t, void *, team_id *);
 #ifdef __cplusplus
 }
 
