@@ -52,6 +52,10 @@ EmacsMenu *svcsMenu;
 /* Nonzero means a menu is currently active.  */
 static int popup_activated_flag;
 
+/* The last frame whose menubar was updated.  (This is the frame whose
+   menu bar is currently being displayed.)  */
+static struct frame *last_menubar_frame;
+
 /* NOTE: toolbar implementation is at end,
    following complete menu implementation.  */
 
@@ -71,6 +75,12 @@ void
 free_frame_menubar (struct frame *f)
 {
   id menu = [NSApp mainMenu];
+
+  if (f != last_menubar_frame)
+    return;
+
+  last_menubar_frame = NULL;
+
   for (int i = [menu numberOfItems] - 1 ; i >= 0; i--)
     {
       NSMenuItem *item = (NSMenuItem *)[menu itemAtIndex:i];
@@ -135,9 +145,9 @@ ns_update_menubar (struct frame *f, bool deep_p)
 #endif
       return;
     }
-  XSETFRAME (Vmenu_updating_frame, f);
-/*fprintf (stderr, "ns_update_menubar: frame: %p\tdeep: %d\tsub: %p\n", f, deep_p, submenu); */
 
+  XSETFRAME (Vmenu_updating_frame, f);
+  last_menubar_frame = f;
   block_input ();
 
   /* Menu may have been created automatically; if so, discard it.  */
@@ -155,7 +165,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
 #if NSMENUPROFILE
   ftime (&tb);
-  t = -(1000*tb.time+tb.millitm);
+  t = -(1000 * tb.time + tb.millitm);
 #endif
 
   if (deep_p)
@@ -413,7 +423,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
 #if NSMENUPROFILE
   ftime (&tb);
-  t += 1000*tb.time+tb.millitm;
+  t += 1000 * tb.time + tb.millitm;
   fprintf (stderr, "Menu update took %ld msec.\n", t);
 #endif
 
@@ -765,17 +775,33 @@ prettify_key (const char *key)
   NSInteger idx = [item tag];
   struct frame *f = SELECTED_FRAME ();
   Lisp_Object vec = f->menu_bar_vector;
-  Lisp_Object help, frame;
-
-  /* This isn't a menubar, ignore.  */
-  if (context_menu_value == -1)
-    return;
-
-  if (idx >= ASIZE (vec))
-    return;
+  Lisp_Object help, frame, *client_data;
 
   XSETFRAME (frame, f);
-  help = AREF (vec, idx + MENU_ITEMS_ITEM_HELP);
+
+  /* This menu isn't a menubar, so use the pointer to the popup menu
+     data.  */
+  if (context_menu_value != 0)
+    {
+      client_data = (Lisp_Object *) idx;
+
+      if (client_data)
+	help = client_data[MENU_ITEMS_ITEM_HELP];
+      else
+	help = Qnil;
+    }
+  /* Just dismiss any help-echo that might already be in progress if
+     no menu item will be highlighted.  */
+  else if (item == nil || idx <= 0)
+    help = Qnil;
+  else
+    {
+      if (idx >= ASIZE (vec))
+	return;
+
+      /* Otherwise, get the help data from the menu bar vector.  */
+      help = AREF (vec, idx + MENU_ITEMS_ITEM_HELP);
+    }
 
   popup_activated_flag++;
   if (STRINGP (help) || NILP (help))
@@ -1512,31 +1538,38 @@ pop_down_menu (void *arg)
 
   if (popup_activated_flag)
     {
-      block_input ();
       popup_activated_flag = 0;
       [panel close];
+      /* For some reason this is required on macOS, or the selected
+	 frame gets the keyboard focus but doesn't become
+	 highlighted.  */
+#ifdef NS_IMPL_COCOA
       [[FRAME_NS_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
-      unblock_input ();
+#endif
+      discard_menu_items ();
     }
 }
-
 
 Lisp_Object
 ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 {
-  id dialog;
+  EmacsDialogPanel *dialog;
   Lisp_Object tem, title;
   NSPoint p;
-  BOOL isQ;
+  BOOL is_question;
+  const char *error_name;
+  specpdl_ref specpdl_count;
 
   NSTRACE ("ns_popup_dialog");
+  specpdl_count = SPECPDL_INDEX ();
 
-  isQ = NILP (header);
-
+  is_question = NILP (header);
   check_window_system (f);
 
-  p.x = (int)f->left_pos + ((int)FRAME_COLUMN_WIDTH (f) * f->text_cols)/2;
-  p.y = (int)f->top_pos + (FRAME_LINE_HEIGHT (f) * f->text_lines)/2;
+  p.x = ((int) f->left_pos
+	 + ((int) FRAME_COLUMN_WIDTH (f) * f->text_cols) / 2);
+  p.y = ((int) f->top_pos
+	 + (FRAME_LINE_HEIGHT (f) * f->text_lines) / 2);
 
   title = Fcar (contents);
   CHECK_STRING (title);
@@ -1546,21 +1579,30 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
        the dialog.  */
     contents = list2 (title, Fcons (build_string ("Ok"), Qt));
 
+  record_unwind_protect_void (unuse_menu_items);
+  list_of_panes (list1 (contents));
+
   block_input ();
-  dialog = [[EmacsDialogPanel alloc] initFromContents: contents
-                                           isQuestion: isQ];
+  dialog = [[EmacsDialogPanel alloc] initWithTitle: SSDATA (title)
+					isQuestion: is_question];
 
-  {
-    specpdl_ref specpdl_count = SPECPDL_INDEX ();
-
-    record_unwind_protect_ptr (pop_down_menu, dialog);
-    popup_activated_flag = 1;
-    tem = [dialog runDialogAt: p];
-    unbind_to (specpdl_count, Qnil);  /* calls pop_down_menu */
-  }
-
+  [dialog processMenuItems: menu_items
+		      used: menu_items_used
+	   withErrorOutput: &error_name];
+  [dialog resizeBoundsPriorToDisplay];
   unblock_input ();
 
+  if (error_name)
+    {
+      discard_menu_items ();
+      [dialog close];
+      error ("%s", error_name);
+    }
+
+  record_unwind_protect_ptr (pop_down_menu, dialog);
+  popup_activated_flag = 1;
+  tem = [dialog runDialogAt: p];
+  unbind_to (specpdl_count, Qnil);
   return tem;
 }
 
@@ -1601,7 +1643,6 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   NSImage *img;
 
   dialog_return   = Qundefined;
-  button_values   = NULL;
   area.origin.x   = 3*SPACER;
   area.origin.y   = 2*SPACER;
   area.size.width = ICONSIZE;
@@ -1685,58 +1726,65 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 }
 
 
-- (BOOL)windowShouldClose: (id)sender
+- (BOOL)windowShouldClose: (id) sender
 {
   window_closed = YES;
-  [NSApp stop:self];
+  [NSApp stop: self];
   return NO;
 }
 
-- (void)dealloc
+- (void) dealloc
 {
-  xfree (button_values);
   [super dealloc];
 }
 
-- (void)process_dialog: (Lisp_Object) list
+- (void) processMenuItems: (Lisp_Object) menu_items
+		     used: (ptrdiff_t) menu_items_used
+	  withErrorOutput: (const char **) error_name
 {
-  Lisp_Object item, lst = list;
-  int row = 0;
-  int buttons = 0, btnnr = 0;
+  int i, nb_buttons = 0, row = 0;
+  Lisp_Object item_name, enable;
 
-  for (; CONSP (lst); lst = XCDR (lst))
+  i = MENU_ITEMS_PANE_LENGTH;
+  *error_name = NULL;
+
+  /* Loop over all panes and items, filling in the tree.  */
+  while (i < menu_items_used)
     {
-      item = XCAR (list);
-      if (CONSP (item))
-        ++buttons;
-    }
+      item_name = AREF (menu_items, i + MENU_ITEMS_ITEM_NAME);
+      enable = AREF (menu_items, i + MENU_ITEMS_ITEM_ENABLE);
 
-  if (buttons > 0)
-    button_values = xmalloc (buttons * sizeof *button_values);
+      if (NILP (item_name))
+	{
+	  *error_name = "Submenu in dialog items";
+	  return;
+	}
 
-  for (; CONSP (list); list = XCDR (list))
-    {
-      item = XCAR (list);
-      if (STRINGP (item))
-        {
-          [self addString: SSDATA (item) row: row++];
-        }
-      else if (CONSP (item))
-        {
-          button_values[btnnr] = XCDR (item);
-          [self addButton: SSDATA (XCAR (item)) value: btnnr row: row++];
-          ++btnnr;
-        }
-      else if (NILP (item))
-        {
-          [self addSplit];
-          row = 0;
-        }
+      if (EQ (item_name, Qquote))
+	/* This is the boundary between elements on the left and those
+	   on the right, but that boundary is currently not handled on
+	   NS.  */
+	continue;
+
+      if (nb_buttons > 9)
+	{
+	  *error_name = "Too many dialog items";
+	  return;
+	}
+
+      [self addButton: SSDATA (item_name)
+		value: (NSInteger) aref_addr (menu_items, i)
+		  row: row++
+	       enable: !NILP (enable)];
+
+      i += MENU_ITEMS_ITEM_LENGTH;
+      nb_buttons++;
     }
 }
 
 
-- (void)addButton: (char *)str value: (int)tag row: (int)row
+- (void) addButton: (char *) str value: (NSInteger) tag
+	       row: (int) row enable: (BOOL) enable
 {
   id cell;
 
@@ -1745,7 +1793,8 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
       [matrix addRow];
       rows++;
     }
-  cell = [matrix cellAtRow: row column: cols-1];
+
+  cell = [matrix cellAtRow: row column: cols - 1];
   [cell setTarget: self];
   [cell setAction: @selector (clicked: )];
   [cell setTitle: [NSString stringWithUTF8String: str]];
@@ -1755,7 +1804,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 }
 
 
-- (void)addString: (char *)str row: (int)row
+- (void)addString: (char *) str row: (int) row
 {
   id cell;
 
@@ -1778,96 +1827,95 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
 }
 
 
-- (void)clicked: sender
+- (void) clicked: sender
 {
   NSArray *sellist = nil;
-  EMACS_INT seltag;
+  NSUInteger seltag;
+  Lisp_Object *selarray;
 
   sellist = [sender selectedCells];
+
   if ([sellist count] < 1)
     return;
 
   seltag = [[sellist objectAtIndex: 0] tag];
-  dialog_return = button_values[seltag];
-  [NSApp stop:self];
+  selarray = (void *) seltag;
+  dialog_return = selarray[MENU_ITEMS_ITEM_VALUE];
+  [NSApp stop: self];
 }
 
 
-- (instancetype)initFromContents: (Lisp_Object)contents isQuestion: (BOOL)isQ
+- (instancetype) initWithTitle: (char *) title_string
+		    isQuestion: (BOOL) is_question
 {
-  Lisp_Object head;
   [super init];
 
-  if (CONSP (contents))
-    {
-      head = Fcar (contents);
-      [self process_dialog: Fcdr (contents)];
-    }
+  if (title_string)
+    [title setStringValue:
+	     [NSString stringWithUTF8String: title_string]];
+
+  if (is_question)
+    [command setStringValue: @"Question"];
   else
-    head = contents;
-
-  if (STRINGP (head))
-      [title setStringValue:
-                 [NSString stringWithUTF8String: SSDATA (head)]];
-  else if (isQ == YES)
-      [title setStringValue: @"Question"];
-  else
-      [title setStringValue: @"Information"];
-
-  {
-    int i;
-    NSRect r, s, t;
-
-    if (cols == 1 && rows > 1)	/* Never told where to split.  */
-      {
-        [matrix addColumn];
-        for (i = 0; i < rows/2; i++)
-          {
-            [matrix putCell: [matrix cellAtRow: (rows+1)/2 column: 0]
-                      atRow: i column: 1];
-            [matrix removeRow: (rows+1)/2];
-          }
-      }
-
-    [matrix sizeToFit];
-    {
-      NSSize csize = [matrix cellSize];
-      if (csize.width < MINCELLWIDTH)
-        {
-          csize.width = MINCELLWIDTH;
-          [matrix setCellSize: csize];
-          [matrix sizeToCells];
-        }
-    }
-
-    [title sizeToFit];
-    [command sizeToFit];
-
-    t = [matrix frame];
-    r = [title frame];
-    if (r.size.width+r.origin.x > t.size.width+t.origin.x)
-      {
-        t.origin.x   = r.origin.x;
-        t.size.width = r.size.width;
-      }
-    r = [command frame];
-    if (r.size.width+r.origin.x > t.size.width+t.origin.x)
-      {
-        t.origin.x   = r.origin.x;
-        t.size.width = r.size.width;
-      }
-
-    r = [self frame];
-    s = [(NSView *)[self contentView] frame];
-    r.size.width  += t.origin.x+t.size.width +2*SPACER-s.size.width;
-    r.size.height += t.origin.y+t.size.height+SPACER-s.size.height;
-    [self setFrame: r display: NO];
-  }
+    [command setStringValue: @"Information"];
 
   return self;
 }
 
+- (void) resizeBoundsPriorToDisplay
+{
+  int i;
+  NSRect r, s, t;
+  NSSize csize;
 
+  if (cols == 1 && rows > 1)
+    {
+      [matrix addColumn];
+      for (i = 0; i < rows / 2; i++)
+	{
+	  [matrix putCell: [matrix cellAtRow: (rows + 1) /2
+				      column: 0]
+		    atRow: i column: 1];
+	  [matrix removeRow: (rows + 1) / 2];
+	}
+    }
+
+  [matrix sizeToFit];
+
+  csize = [matrix cellSize];
+  if (csize.width < MINCELLWIDTH)
+    {
+      csize.width = MINCELLWIDTH;
+      [matrix setCellSize: csize];
+      [matrix sizeToCells];
+    }
+
+  [title sizeToFit];
+  [command sizeToFit];
+
+  t = [matrix frame];
+  r = [title frame];
+  if (r.size.width + r.origin.x > t.size.width + t.origin.x)
+    {
+      t.origin.x = r.origin.x;
+      t.size.width = r.size.width;
+    }
+
+  r = [command frame];
+  if (r.size.width + r.origin.x > t.size.width + t.origin.x)
+    {
+      t.origin.x = r.origin.x;
+      t.size.width = r.size.width;
+    }
+
+  r = [self frame];
+  s = [(NSView *) [self contentView] frame];
+  r.size.width += (t.origin.x + t.size.width
+		   + 2 * SPACER - s.size.width);
+  r.size.height += (t.origin.y + t.size.height
+		    + SPACER - s.size.height);
+  [self setFrame: r display: NO];
+}
 
 - (void)timeout_handler: (NSTimer *)timedEntry
 {
@@ -1885,11 +1933,11 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   /* We use stop because stopModal/abortModal out of the main loop
      does not seem to work in 10.6.  But as we use stop we must send a
      real event so the stop is seen and acted upon.  */
-  [NSApp stop:self];
+  [NSApp stop: self];
   [NSApp postEvent: nxev atStart: NO];
 }
 
-- (Lisp_Object)runDialogAt: (NSPoint)p
+- (Lisp_Object) runDialogAt: (NSPoint) p
 {
   Lisp_Object ret = Qundefined;
 
@@ -1909,13 +1957,17 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
           [[NSRunLoop currentRunLoop] addTimer: tmo
                                        forMode: NSModalPanelRunLoopMode];
         }
+
       timer_fired = NO;
       dialog_return = Qundefined;
       [NSApp runModalForWindow: self];
       ret = dialog_return;
-      if (! timer_fired)
+
+      if (!timer_fired)
         {
-          if (tmo != nil) [tmo invalidate]; /* Cancels timer.  */
+          if (tmo != nil)
+	    [tmo invalidate]; /* Cancels timer.  */
+
           break;
         }
     }

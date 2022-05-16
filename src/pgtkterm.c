@@ -2551,7 +2551,7 @@ pgtk_draw_glyph_string (struct glyph_string *s)
 		    }
 
 		  /* Ignore minimum_offset if the amount of pixels was
-		     explictly specified.  */
+		     explicitly specified.  */
 		  if (!s->face->underline_pixels_above_descent_line)
 		    position = max (position, underline_minimum_offset);
 		}
@@ -6281,26 +6281,6 @@ same_x_server (const char *name1, const char *name2)
 	  && (*name2 == '.' || *name2 == '\0'));
 }
 
-#define GNOME_INTERFACE_SCHEMA "org.gnome.desktop.interface"
-
-static gdouble pgtk_text_scaling_factor (void)
-{
-  GSettingsSchemaSource *schema_source = g_settings_schema_source_get_default ();
-  if (schema_source != NULL)
-    {
-      GSettingsSchema *schema = g_settings_schema_source_lookup (schema_source,
-         GNOME_INTERFACE_SCHEMA, true);
-      if (schema != NULL)
-        {
-	  g_settings_schema_unref (schema);
-	  GSettings *set = g_settings_new (GNOME_INTERFACE_SCHEMA);
-	  return g_settings_get_double (set, "text-scaling-factor");
-	}
-    }
-  return 1;
-}
-
-
 /* Open a connection to X display DISPLAY_NAME, and return
    the structure that describes the open display.
    If we cannot contact the display, return null.  */
@@ -6317,6 +6297,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   char *dpy_name;
   static void *handle = NULL;
   Lisp_Object lisp_dpy_name = Qnil;
+  GdkScreen *gscr;
+  gdouble dpi;
 
   block_input ();
 
@@ -6467,21 +6449,18 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   reset_mouse_highlight (&dpyinfo->mouse_highlight);
 
-  {
-    GdkScreen *gscr = gdk_display_get_default_screen (dpyinfo->gdpy);
+  gscr = gdk_display_get_default_screen (dpyinfo->gdpy);
+  dpi = gdk_screen_get_resolution (gscr);
 
-    gdouble dpi = gdk_screen_get_resolution (gscr);
-    if (dpi < 0)
-	dpi = 96.0;
+  if (dpi < 0)
+    dpi = 96.0;
 
-    dpi *= pgtk_text_scaling_factor ();
-    dpyinfo->resx = dpi;
-    dpyinfo->resy = dpi;
-  }
+  dpyinfo->resx = dpi;
+  dpyinfo->resy = dpi;
 
-  /* smooth scroll setting */
-  dpyinfo->scroll.x_per_char = 2;
-  dpyinfo->scroll.y_per_line = 2;
+  /* Set up scrolling increments.  */
+  dpyinfo->scroll.x_per_char = 1;
+  dpyinfo->scroll.y_per_line = 1;
 
   dpyinfo->connection = -1;
 

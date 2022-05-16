@@ -2709,6 +2709,12 @@ The optional argument NEW-WINDOW is not used.
 
 \(fn URL &optional NEW-WINDOW)" t nil)
 
+(autoload 'browse-url-default-haiku-browser "browse-url" "\
+Browse URL with the system default browser.
+Default to the URL around or before point.
+
+\(fn URL &optional NEW-WINDOW)" t nil)
+
 (autoload 'browse-url-emacs "browse-url" "\
 Ask Emacs to load URL into a buffer and show it in another window.
 Optional argument SAME-WINDOW non-nil means show the URL in the
@@ -5975,6 +5981,7 @@ If FIX is non-nil, run `copyright-fix-years' instead.
 (put 'cperl-continued-statement-offset 'safe-local-variable 'integerp)
 (put 'cperl-extra-newline-before-brace 'safe-local-variable 'booleanp)
 (put 'cperl-merge-trailing-else 'safe-local-variable 'booleanp)
+(put 'cperl-file-style 'safe-local-variable 'stringp)
 
 (autoload 'cperl-mode "cperl-mode" "\
 Major mode for editing Perl code.
@@ -6126,9 +6133,11 @@ Settings for classic indent-styles: K&R BSD=C++ GNU PBP PerlStyle=Whitesmith
   `cperl-continued-statement-offset'  5   4       2   4   4
 
 CPerl knows several indentation styles, and may bulk set the
-corresponding variables.  Use \\[cperl-set-style] to do this.  Use
-\\[cperl-set-style-back] to restore the memorized preexisting values
-\(both available from menu).  See examples in `cperl-style-examples'.
+corresponding variables.  Use \\[cperl-set-style] to do this or
+set the `cperl-file-style' user option.  Use
+\\[cperl-set-style-back] to restore the memorized preexisting
+values (both available from menu).  See examples in
+`cperl-style-examples'.
 
 Part of the indentation style is how different parts of if/elsif/else
 statements are broken into lines; in CPerl, this is reflected on how
@@ -8469,7 +8478,46 @@ Display-Line-Numbers mode.
 
 \(fn &optional ARG)" t nil)
 
-(register-definition-prefixes "display-line-numbers" '("display-line-numbers-"))
+(defvar header-line-indent "" "\
+String to indent at the start if the header line.
+This is used in `header-line-indent-mode', and buffers that have
+this switched on should have a `header-line-format' that look like:
+
+  (\"\" header-line-indent THE-REST...)")
+
+(defvar header-line-indent-width 0 "\
+The width of the current line numbers displayed.")
+
+(autoload 'header-line-indent-mode "display-line-numbers" "\
+Mode to indent the header line in `display-line-numbers-mode' buffers.
+
+This means that the header line will be kept indented so that it
+has blank space that's as wide as the displayed line numbers in
+the buffer.
+
+Buffers that have this switched on should have a
+`header-line-format' that look like:
+
+  (\"\" header-line-indent THE-REST...)
+
+This is a minor mode.  If called interactively, toggle the
+`Header-Line-Indent mode' mode.  If the prefix argument is
+positive, enable the mode, and if it is zero or negative, disable
+the mode.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
+the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.
+
+To check whether the minor mode is enabled in the current buffer,
+evaluate `header-line-indent-mode'.
+
+The mode's hook is called both when the mode is enabled and when
+it is disabled.
+
+\(fn &optional ARG)" t nil)
+
+(register-definition-prefixes "display-line-numbers" '("display-line-numbers-" "header-line-indent--"))
 
 ;;;***
 
@@ -10207,7 +10255,7 @@ It creates an autoload function for CNAME's constructor.
 
 ;;;### (autoloads nil "eldoc" "emacs-lisp/eldoc.el" (0 0 0 0))
 ;;; Generated autoloads from emacs-lisp/eldoc.el
-(push (purecopy '(eldoc 1 11 1)) package--builtin-versions)
+(push (purecopy '(eldoc 1 12 0)) package--builtin-versions)
 
 ;;;***
 
@@ -11960,6 +12008,37 @@ Display a button for the JPEG DATA.
 \(fn DATA)" nil nil)
 
 (register-definition-prefixes "eudc-bob" '("eudc-bob-"))
+
+;;;***
+
+;;;### (autoloads nil "eudc-capf" "net/eudc-capf.el" (0 0 0 0))
+;;; Generated autoloads from net/eudc-capf.el
+
+(autoload 'eudc-capf-complete "eudc-capf" "\
+Email address completion function for `completion-at-point-functions'.
+
+This function checks whether the current major mode is one of the
+modes listed in `eudc-capf-modes', and whether point is on a line
+with a message header listing email recipients, that is, a line
+whose beginning matches `message-email-recipient-header-regexp',
+and, if the check succeeds, searches for records matching the
+words before point.
+
+The return value is either nil when no match is found, or a
+completion table as required for functions listed in
+`completion-at-point-functions'." nil nil)
+
+(autoload 'eudc-capf-message-expand-name "eudc-capf" "\
+Email address completion function for `message-completion-alist'.
+
+When this function is added to `message-completion-alist',
+replacing any existing entry for `message-expand-name' there,
+with an appropriate regular expression such as for example
+`message-email-recipient-header-regexp', then EUDC will be
+queried for email addresses, and the results delivered to
+`completion-at-point'." nil nil)
+
+(register-definition-prefixes "eudc-capf" '("eudc-capf-modes"))
 
 ;;;***
 
@@ -16431,8 +16510,12 @@ Commands:
 (autoload 'help-mode-setup "help-mode" "\
 Enter Help mode in the current buffer." nil nil)
 
+(make-obsolete 'help-mode-setup 'nil '"29.1")
+
 (autoload 'help-mode-finish "help-mode" "\
 Finalize Help mode setup in current buffer." nil nil)
+
+(make-obsolete 'help-mode-finish 'nil '"29.1")
 
 (autoload 'help-setup-xref "help-mode" "\
 Invoked from commands using the \"*Help*\" buffer to install some xref info.
@@ -18702,12 +18785,14 @@ With prefix argument ARG, display image in its original size.
 Add comment to current or marked files in Dired." t nil)
 
 (autoload 'image-dired-mark-tagged-files "image-dired" "\
-Use regexp to mark files with matching tag.
+Use REGEXP to mark files with matching tag.
 A `tag' is a keyword, a piece of meta data, associated with an
 image file and stored in image-dired's database file.  This command
 lets you input a regexp and this will be matched against all tags
 on all image files in the database file.  The files that have a
-matching tag will be marked in the Dired buffer." t nil)
+matching tag will be marked in the Dired buffer.
+
+\(fn REGEXP)" t nil)
 
 (autoload 'image-dired-dired-edit-comment-and-tags "image-dired" "\
 Edit comment and tags of current or marked image files.
@@ -19728,6 +19813,8 @@ By just answering RET you can find out what the current dictionary is.
 
 (autoload 'ispell-region "ispell" "\
 Interactively check a region for spelling errors.
+Leave the mark at the last misspelled word that the user was queried about.
+
 Return nil if spell session was terminated, otherwise returns shift offset
 amount for last line processed.
 
@@ -19746,7 +19833,8 @@ to limit the check.
 Check the comment or string containing point for spelling errors." t nil)
 
 (autoload 'ispell-buffer "ispell" "\
-Check the current buffer for spelling errors interactively." t nil)
+Check the current buffer for spelling errors interactively.
+Leave the mark at the last misspelled word that the user was queried about." t nil)
 
 (autoload 'ispell-buffer-with-debug "ispell" "\
 `ispell-buffer' with some output sent to `ispell-debug-buffer'.
@@ -31248,8 +31336,9 @@ Make the shell buffer the current buffer, and return it.
 (autoload 'shortdoc-display-group "shortdoc" "\
 Pop to a buffer with short documentation summary for functions in GROUP.
 If FUNCTION is non-nil, place point on the entry for FUNCTION (if any).
+If SAME-WINDOW, don't pop to a new window.
 
-\(fn GROUP &optional FUNCTION)" t nil)
+\(fn GROUP &optional FUNCTION SAME-WINDOW)" t nil)
 
 (defalias 'shortdoc #'shortdoc-display-group)
 

@@ -1376,12 +1376,23 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
 
 DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
        0, 1, 0,
-       doc: /* Return t if BUFFER was modified since its file was last read or saved.
-No argument or nil as argument means use current buffer as BUFFER.  */)
+       doc: /* Return non-nil if BUFFER was modified since its file was last read or saved.
+No argument or nil as argument means use current buffer as BUFFER.
+
+If BUFFER was autosaved since it was last modified, this function
+returns the symbol `autosaved'.  */)
   (Lisp_Object buffer)
 {
   struct buffer *buf = decode_buffer (buffer);
-  return BUF_SAVE_MODIFF (buf) < BUF_MODIFF (buf) ? Qt : Qnil;
+  if (BUF_SAVE_MODIFF (buf) < BUF_MODIFF (buf))
+    {
+      if (BUF_AUTOSAVE_MODIFF (buf) == BUF_MODIFF (buf))
+	return Qautosaved;
+      else
+	return Qt;
+    }
+  else
+    return Qnil;
 }
 
 DEFUN ("force-mode-line-update", Fforce_mode_line_update,
@@ -1436,6 +1447,11 @@ and `buffer-file-truename' are non-nil.  */)
 DEFUN ("restore-buffer-modified-p", Frestore_buffer_modified_p,
        Srestore_buffer_modified_p, 1, 1, 0,
        doc: /* Like `set-buffer-modified-p', but doesn't redisplay buffer's mode line.
+A nil FLAG means to mark the buffer as unmodified.  A non-nil FLAG
+means mark the buffer as modified.  A special value of `autosaved'
+will mark the buffer as modified and also as autosaved since it was
+last modified.
+
 This function also locks or unlocks the file visited by the buffer,
 if both `buffer-file-truename' and `buffer-file-name' are non-nil.
 
@@ -1475,16 +1491,19 @@ state of the current buffer.  Use with care.  */)
      recent-auto-save-p from t to nil.
      Vice versa, if FLAG is non-nil and SAVE_MODIFF>=auto_save_modified
      we risk changing recent-auto-save-p from nil to t.  */
-  SAVE_MODIFF = (NILP (flag)
-		 /* FIXME: This unavoidably sets recent-auto-save-p to nil.  */
-		 ? MODIFF
-		 /* Let's try to preserve recent-auto-save-p.  */
-		 : SAVE_MODIFF < MODIFF ? SAVE_MODIFF
-		 /* If SAVE_MODIFF == auto_save_modified == MODIFF,
-		    we can either decrease SAVE_MODIFF and auto_save_modified
-		    or increase MODIFF.  */
-		 : modiff_incr (&MODIFF));
-
+  if (NILP (flag))
+    /* This unavoidably sets recent-auto-save-p to nil.  */
+    SAVE_MODIFF = MODIFF;
+  else
+    {
+      /* If SAVE_MODIFF == auto_save_modified == MODIFF, we can either
+	 decrease SAVE_MODIFF and auto_save_modified or increase
+	 MODIFF.  */
+      if (SAVE_MODIFF >= MODIFF)
+	SAVE_MODIFF = modiff_incr (&MODIFF);
+      if (EQ (flag, Qautosaved))
+	BUF_AUTOSAVE_MODIFF (b) = MODIFF;
+    }
   return flag;
 }
 
@@ -1646,16 +1665,7 @@ exists, return the buffer `*scratch*' (creating it if necessary).  */)
   if (!NILP (notsogood))
     return notsogood;
   else
-    {
-      AUTO_STRING (scratch, "*scratch*");
-      buf = Fget_buffer (scratch);
-      if (NILP (buf))
-	{
-	  buf = Fget_buffer_create (scratch, Qnil);
-	  Fset_buffer_major_mode (buf);
-	}
-      return buf;
-    }
+    return safe_call (1, Qget_scratch_buffer_create);
 }
 
 /* The following function is a safe variant of Fother_buffer: It doesn't
@@ -1671,15 +1681,7 @@ other_buffer_safely (Lisp_Object buffer)
     if (candidate_buffer (buf, buffer))
       return buf;
 
-  AUTO_STRING (scratch, "*scratch*");
-  buf = Fget_buffer (scratch);
-  if (NILP (buf))
-    {
-      buf = Fget_buffer_create (scratch, Qnil);
-      Fset_buffer_major_mode (buf);
-    }
-
-  return buf;
+  return safe_call (1, Qget_scratch_buffer_create);
 }
 
 DEFUN ("buffer-enable-undo", Fbuffer_enable_undo, Sbuffer_enable_undo,
@@ -5564,6 +5566,7 @@ syms_of_buffer (void)
   DEFSYM (Qbefore_change_functions, "before-change-functions");
   DEFSYM (Qafter_change_functions, "after-change-functions");
   DEFSYM (Qkill_buffer_query_functions, "kill-buffer-query-functions");
+  DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
   Fput (Qvertical_scroll_bar, Qchoice, list4 (Qnil, Qt, Qleft, Qright));
@@ -5595,8 +5598,11 @@ the mode line appears at the bottom.  */);
 		     &BVAR (current_buffer, header_line_format),
 		     Qnil,
 		     doc: /* Analogous to `mode-line-format', but controls the header line.
-The header line appears, optionally, at the top of a window;
-the mode line appears at the bottom.  */);
+The header line appears, optionally, at the top of a window; the mode
+line appears at the bottom.
+
+Also see `header-line-indent-mode' if `display-line-number-mode' is
+used.  */);
 
   DEFVAR_PER_BUFFER ("mode-line-format", &BVAR (current_buffer, mode_line_format),
 		     Qnil,
@@ -6464,6 +6470,8 @@ will run for `clone-indirect-buffer' calls as well.  */);
   defsubr (&Soverlay_get);
   defsubr (&Soverlay_put);
   defsubr (&Srestore_buffer_modified_p);
+
+  DEFSYM (Qautosaved, "autosaved");
 
   Fput (intern_c_string ("erase-buffer"), Qdisabled, Qt);
 }

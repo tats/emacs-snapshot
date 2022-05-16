@@ -1090,7 +1090,7 @@ strings done by `substitute-command-keys'."
   :version "29.1"
   :group 'help)
 
-(defun substitute-command-keys (string &optional no-face)
+(defun substitute-command-keys (string &optional no-face include-menus)
   "Substitute key descriptions for command names in STRING.
 Each substring of the form \\\\=[COMMAND] is replaced by either a
 keystroke sequence that invokes COMMAND, or \"M-x COMMAND\" if COMMAND
@@ -1100,11 +1100,13 @@ unless the optional argument NO-FACE is non-nil.
 Each substring of the form \\\\=`KEYBINDING' will be replaced by
 KEYBINDING and use the `help-key-binding' face.
 
-Each substring of the form \\\\={MAPVAR} is replaced by a summary of
-the value of MAPVAR as a keymap.  This summary is similar to the one
-produced by ‘describe-bindings’.  The summary ends in two newlines
-(used by the helper function ‘help-make-xrefs’ to find the end of the
-summary).
+Each substring of the form \\\\={MAPVAR} is replaced by a summary
+of the value of MAPVAR as a keymap.  This summary is similar to
+the one produced by ‘describe-bindings’.  This will normally
+exclude menu bindings, but if the optional INCLUDE-MENUS argument
+is non-nil, also include menu bindings.  The summary ends in two
+newlines (used by the helper function ‘help-make-xrefs’ to find
+the end of the summary).
 
 Each substring of the form \\\\=<MAPVAR> specifies the use of MAPVAR
 as the keymap for future \\\\=[COMMAND] substrings.
@@ -1253,9 +1255,11 @@ Otherwise, return a new string."
                    (t
                     ;; Get the list of active keymaps that precede this one.
                     ;; If this one's not active, get nil.
-                    (let ((earlier-maps (cdr (memq this-keymap (reverse active-maps)))))
+                    (let ((earlier-maps
+                           (cdr (memq this-keymap (reverse active-maps)))))
                       (describe-map-tree this-keymap t (nreverse earlier-maps)
-                                         nil nil t nil nil t))))))))
+                                         nil nil (not include-menus)
+                                         nil nil t))))))))
              ;; 2. Handle quotes.
              ((and (eq (text-quoting-style) 'curve)
                    (or (and (= (following-char) ?\`)
@@ -1934,40 +1938,39 @@ Return VALUE."
     ;; Return VALUE.
     value))
 
-;; `with-help-window' is a wrapper for `with-temp-buffer-window'
-;; providing the following additional twists:
-
-;; (1) It puts the buffer in `help-mode' (via `help-mode-setup') and
-;;     adds cross references (via `help-mode-finish').
-
-;; (2) It issues a message telling how to scroll and quit the help
-;;     window (via `help-window-setup').
-
-;; (3) An option (customizable via `help-window-select') to select the
-;;     help window automatically.
-
-;; (4) A marker (`help-window-point-marker') to move point in the help
-;;     window to an arbitrary buffer position.
 (defmacro with-help-window (buffer-or-name &rest body)
   "Evaluate BODY, send output to BUFFER-OR-NAME and show in a help window.
-This construct is like `with-temp-buffer-window', which see, but unlike
-that, it puts the buffer specified by BUFFER-OR-NAME in `help-mode' and
-displays a message about how to delete the help window when it's no
-longer needed.  The help window will be selected if
-`help-window-select' is non-nil.
-Most of this is done by `help-window-setup', which see."
+The return value from BODY will be returned.
+
+The help window will be selected if `help-window-select' is
+non-nil.
+
+The `temp-buffer-window-setup-hook' hook is called."
   (declare (indent 1) (debug t))
-  `(progn
-     ;; Make `help-window-point-marker' point nowhere.  The only place
-     ;; where this should be set to a buffer position is within BODY.
-     (set-marker help-window-point-marker nil)
-     (let ((temp-buffer-window-setup-hook
-	    (cons 'help-mode-setup temp-buffer-window-setup-hook))
-	   (temp-buffer-window-show-hook
-	    (cons 'help-mode-finish temp-buffer-window-show-hook)))
-       (setq help-window-old-frame (selected-frame))
-       (with-temp-buffer-window
-	,buffer-or-name nil 'help-window-setup (progn ,@body)))))
+  `(help--window-setup ,buffer-or-name (lambda () ,@body)))
+
+(defun help--window-setup (buffer callback)
+  ;; Make `help-window-point-marker' point nowhere.  The only place
+  ;; where this should be set to a buffer position is within BODY.
+  (set-marker help-window-point-marker nil)
+  (with-current-buffer (get-buffer-create buffer)
+    (unless (derived-mode-p 'help-mode)
+      (help-mode))
+    (setq buffer-read-only t
+          buffer-file-name nil)
+    (setq-local help-mode--current-data nil)
+    (buffer-disable-undo)
+    (let ((inhibit-read-only t)
+	  (inhibit-modification-hooks t))
+      (erase-buffer)
+      (delete-all-overlays)
+      (prog1
+          (let ((standard-output (current-buffer)))
+            (prog1
+                (funcall callback)
+              (run-hooks 'temp-buffer-window-setup-hook)))
+        (help-window-setup (temp-buffer-window-show (current-buffer)))
+        (help-make-xrefs (current-buffer))))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
 ;; Don't print to *Help*; that would clobber Help history.

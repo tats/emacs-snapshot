@@ -1517,7 +1517,7 @@ ns_make_frame_visible (struct frame *f)
 }
 
 
-static void
+void
 ns_make_frame_invisible (struct frame *f)
 /* --------------------------------------------------------------------------
      Hide the window (X11 semantics)
@@ -1708,10 +1708,8 @@ ns_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 
 
 static void
-ns_set_window_size (struct frame *f,
-                    bool change_gravity,
-                    int width,
-                    int height)
+ns_set_window_size (struct frame *f, bool change_gravity,
+                    int width, int height)
 /* --------------------------------------------------------------------------
      Adjust window pixel size based on native sizes WIDTH and HEIGHT.
      Impl is a bit more complex than other terms, need to do some
@@ -3450,36 +3448,35 @@ ns_draw_box (NSRect r, CGFloat hthickness, CGFloat vthickness,
 
 static void
 ns_draw_relief (NSRect outer, int hthickness, int vthickness, char raised_p,
-               char top_p, char bottom_p, char left_p, char right_p,
-               struct glyph_string *s)
+		char top_p, char bottom_p, char left_p, char right_p,
+		struct glyph_string *s)
 /* --------------------------------------------------------------------------
     Draw a relief rect inside r, optionally leaving some sides open.
     Note we can't just use an NSDrawBezel command, because of the possibility
     of some sides not being drawn, and because the rect will be filled.
    -------------------------------------------------------------------------- */
 {
-  static NSColor *baseCol = nil, *lightCol = nil, *darkCol = nil;
-  NSColor *newBaseCol = nil;
+  static NSColor *baseCol, *lightCol, *darkCol;
+  NSColor *newBaseCol;
   NSRect inner;
+  NSBezierPath *p;
+
+  baseCol = nil;
+  lightCol = nil;
+  newBaseCol = nil;
+  p = nil;
 
   NSTRACE ("ns_draw_relief");
 
   /* set up colors */
 
   if (s->face->use_box_color_for_shadows_p)
-    {
-      newBaseCol = [NSColor colorWithUnsignedLong:s->face->box_color];
-    }
-/*     else if (s->first_glyph->type == IMAGE_GLYPH
-	   && s->img->pixmap
-   	   && !IMAGE_BACKGROUND_TRANSPARENT (s->img, s->f, 0))
-       {
-         newBaseCol = IMAGE_BACKGROUND  (s->img, s->f, 0);
-       } */
+    newBaseCol = [NSColor colorWithUnsignedLong: s->face->box_color];
   else
-    {
-      newBaseCol = [NSColor colorWithUnsignedLong:s->face->background];
-    }
+    newBaseCol = [NSColor colorWithUnsignedLong: s->face->background];
+
+  if (s->hl == DRAW_CURSOR)
+    newBaseCol = FRAME_CURSOR_COLOR (s->f);
 
   if (newBaseCol == nil)
     newBaseCol = [NSColor grayColor];
@@ -3489,35 +3486,49 @@ ns_draw_relief (NSRect outer, int hthickness, int vthickness, char raised_p,
       [baseCol release];
       baseCol = [newBaseCol retain];
       [lightCol release];
-      lightCol = [[baseCol highlightWithLevel: 0.2] retain];
+      lightCol = [[baseCol highlightWithLevel: 0.4] retain];
       [darkCol release];
-      darkCol = [[baseCol shadowWithLevel: 0.3] retain];
+      darkCol = [[baseCol shadowWithLevel: 0.4] retain];
     }
 
   /* Calculate the inner rectangle.  */
-  inner = NSMakeRect (NSMinX (outer) + (left_p ? hthickness : 0),
-                      NSMinY (outer) + (top_p ? vthickness : 0),
-                      NSWidth (outer) - (left_p ? hthickness : 0)
-                                      - (right_p ? hthickness : 0),
-                      NSHeight (outer) - (top_p ? vthickness : 0)
-                                       - (bottom_p ? vthickness : 0));
+  inner = outer;
+
+  if (left_p)
+    {
+      inner.origin.x += vthickness;
+      inner.size.width -= vthickness;
+    }
+
+  if (right_p)
+    inner.size.width -= vthickness;
+
+  if (top_p)
+    {
+      inner.origin.y += hthickness;
+      inner.size.height -= hthickness;
+    }
+
+  if (bottom_p)
+    inner.size.height -= hthickness;
 
   [(raised_p ? lightCol : darkCol) set];
 
   if (top_p || left_p)
     {
-      NSBezierPath *p = [NSBezierPath bezierPath];
-      [p moveToPoint:NSMakePoint (NSMinX (outer), NSMinY (outer))];
+      p = [NSBezierPath bezierPath];
+
+      [p moveToPoint: NSMakePoint (NSMinX (outer), NSMinY (outer))];
       if (top_p)
         {
-          [p lineToPoint:NSMakePoint (NSMaxX (outer), NSMinY (outer))];
-          [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMinY (inner))];
+          [p lineToPoint: NSMakePoint (NSMaxX (outer), NSMinY (outer))];
+          [p lineToPoint: NSMakePoint (NSMaxX (inner), NSMinY (inner))];
         }
-      [p lineToPoint:NSMakePoint (NSMinX (inner), NSMinY (inner))];
+      [p lineToPoint: NSMakePoint (NSMinX (inner), NSMinY (inner))];
       if (left_p)
         {
-          [p lineToPoint:NSMakePoint (NSMinX (inner), NSMaxY (inner))];
-          [p lineToPoint:NSMakePoint (NSMinX (outer), NSMaxY (outer))];
+          [p lineToPoint: NSMakePoint (NSMinX (inner), NSMaxY (inner))];
+          [p lineToPoint: NSMakePoint (NSMinX (outer), NSMaxY (outer))];
         }
       [p closePath];
       [p fill];
@@ -3525,23 +3536,92 @@ ns_draw_relief (NSRect outer, int hthickness, int vthickness, char raised_p,
 
   [(raised_p ? darkCol : lightCol) set];
 
-    if (bottom_p || right_p)
+  if (bottom_p || right_p)
     {
-      NSBezierPath *p = [NSBezierPath bezierPath];
-      [p moveToPoint:NSMakePoint (NSMaxX (outer), NSMaxY (outer))];
+      p = [NSBezierPath bezierPath];
+
+      [p moveToPoint: NSMakePoint (NSMaxX (outer), NSMaxY (outer))];
       if (right_p)
         {
-          [p lineToPoint:NSMakePoint (NSMaxX (outer), NSMinY (outer))];
-          [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMinY (inner))];
+          [p lineToPoint: NSMakePoint (NSMaxX (outer), NSMinY (outer))];
+          [p lineToPoint: NSMakePoint (NSMaxX (inner), NSMinY (inner))];
         }
       [p lineToPoint:NSMakePoint (NSMaxX (inner), NSMaxY (inner))];
       if (bottom_p)
         {
-          [p lineToPoint:NSMakePoint (NSMinX (inner), NSMaxY (inner))];
-          [p lineToPoint:NSMakePoint (NSMinX (outer), NSMaxY (outer))];
+          [p lineToPoint: NSMakePoint (NSMinX (inner), NSMaxY (inner))];
+          [p lineToPoint: NSMakePoint (NSMinX (outer), NSMaxY (outer))];
         }
       [p closePath];
       [p fill];
+    }
+
+  /* If one of h/vthickness are more than 1, draw the outermost line
+     on the respective sides in the black relief color.  */
+
+  if (p)
+    [p removeAllPoints];
+  else
+    p = [NSBezierPath bezierPath];
+
+  if (hthickness > 1 && top_p)
+    {
+      [p moveToPoint: NSMakePoint (NSMinX (outer),
+				   NSMinY (outer) + 0.5)];
+      [p lineToPoint: NSMakePoint (NSMaxX (outer),
+				   NSMinY (outer) + 0.5)];
+    }
+
+  if (hthickness > 1 && bottom_p)
+    {
+      [p moveToPoint: NSMakePoint (NSMinX (outer),
+				   NSMaxY (outer) - 0.5)];
+      [p lineToPoint: NSMakePoint (NSMaxX (outer),
+				   NSMaxY (outer) - 0.5)];
+    }
+
+  if (vthickness > 1 && left_p)
+    {
+      [p moveToPoint: NSMakePoint (NSMinX (outer) + 0.5,
+				   NSMinY (outer) + 0.5)];
+      [p lineToPoint: NSMakePoint (NSMinX (outer) + 0.5,
+				   NSMaxY (outer) - 0.5)];
+    }
+
+  if (vthickness > 1 && left_p)
+    {
+      [p moveToPoint: NSMakePoint (NSMinX (outer) + 0.5,
+				   NSMinY (outer) + 0.5)];
+      [p lineToPoint: NSMakePoint (NSMinX (outer) + 0.5,
+				   NSMaxY (outer) - 0.5)];
+    }
+
+  [darkCol set];
+  [p stroke];
+
+  if (vthickness > 1 && hthickness > 1)
+    {
+      [FRAME_BACKGROUND_COLOR (s->f) set];
+
+      if (left_p && top_p)
+	[NSBezierPath fillRect: NSMakeRect (NSMinX (outer),
+					    NSMinY (outer),
+					    1, 1)];
+
+      if (right_p && top_p)
+	[NSBezierPath fillRect: NSMakeRect (NSMaxX (outer) - 1,
+					    NSMinY (outer),
+					    1, 1)];
+
+      if (right_p && bottom_p)
+	[NSBezierPath fillRect: NSMakeRect (NSMaxX (outer) - 1,
+					    NSMaxY (outer) - 1,
+					    1, 1)];
+
+      if (left_p && bottom_p)
+	[NSBezierPath fillRect: NSMakeRect (NSMinX (outer),
+					    NSMaxY (outer) - 1,
+					    1, 1)];
     }
 }
 
@@ -3624,6 +3704,7 @@ ns_maybe_dumpglyphs_background (struct glyph_string *s, char force_p)
   if (!s->background_filled_p/* || s->hl == DRAW_MOUSE_FACE*/)
     {
       int box_line_width = max (s->face->box_horizontal_line_width, 0);
+
       if (FONT_HEIGHT (s->font) < s->height - 2 * box_line_width
 	  /* When xdisp.c ignores FONT_HEIGHT, we cannot trust font
 	     dimensions, since the actual glyphs might be much
@@ -3650,7 +3731,7 @@ ns_maybe_dumpglyphs_background (struct glyph_string *s, char force_p)
 
 	  NSRect r = NSMakeRect (s->x, s->y + box_line_width,
 				 s->background_width,
-				 s->height-2*box_line_width);
+				 s->height - 2 * box_line_width);
 	  NSRectFill (r);
 
 	  s->background_filled_p = 1;
@@ -3658,6 +3739,92 @@ ns_maybe_dumpglyphs_background (struct glyph_string *s, char force_p)
     }
 }
 
+static void
+ns_draw_image_relief (struct glyph_string *s)
+{
+  int x1, y1, thick;
+  bool raised_p, top_p, bot_p, left_p, right_p;
+  int extra_x, extra_y;
+  int x = s->x;
+  int y = s->ybase - image_ascent (s->img, s->face, &s->slice);
+
+  /* If first glyph of S has a left box line, start drawing it to the
+     right of that line.  */
+  if (s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p
+      && s->slice.x == 0)
+    x += max (s->face->box_vertical_line_width, 0);
+
+  /* If there is a margin around the image, adjust x- and y-position
+     by that margin.  */
+  if (s->slice.x == 0)
+    x += s->img->hmargin;
+  if (s->slice.y == 0)
+    y += s->img->vmargin;
+
+  if (s->hl == DRAW_IMAGE_SUNKEN
+      || s->hl == DRAW_IMAGE_RAISED)
+    {
+      if (s->face->id == TAB_BAR_FACE_ID)
+	thick = (tab_bar_button_relief < 0
+		 ? DEFAULT_TAB_BAR_BUTTON_RELIEF
+		 : min (tab_bar_button_relief, 1000000));
+      else
+	thick = (tool_bar_button_relief < 0
+		 ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+		 : min (tool_bar_button_relief, 1000000));
+      raised_p = s->hl == DRAW_IMAGE_RAISED;
+    }
+  else
+    {
+      thick = eabs (s->img->relief);
+      raised_p = s->img->relief > 0;
+    }
+
+  x1 = x + s->slice.width - 1;
+  y1 = y + s->slice.height - 1;
+
+  extra_x = extra_y = 0;
+  if (s->face->id == TAB_BAR_FACE_ID)
+    {
+      if (CONSP (Vtab_bar_button_margin)
+	  && FIXNUMP (XCAR (Vtab_bar_button_margin))
+	  && FIXNUMP (XCDR (Vtab_bar_button_margin)))
+	{
+	  extra_x = XFIXNUM (XCAR (Vtab_bar_button_margin)) - thick;
+	  extra_y = XFIXNUM (XCDR (Vtab_bar_button_margin)) - thick;
+	}
+      else if (FIXNUMP (Vtab_bar_button_margin))
+	extra_x = extra_y = XFIXNUM (Vtab_bar_button_margin) - thick;
+    }
+
+  if (s->face->id == TOOL_BAR_FACE_ID)
+    {
+      if (CONSP (Vtool_bar_button_margin)
+	  && FIXNUMP (XCAR (Vtool_bar_button_margin))
+	  && FIXNUMP (XCDR (Vtool_bar_button_margin)))
+	{
+	  extra_x = XFIXNUM (XCAR (Vtool_bar_button_margin));
+	  extra_y = XFIXNUM (XCDR (Vtool_bar_button_margin));
+	}
+      else if (FIXNUMP (Vtool_bar_button_margin))
+	extra_x = extra_y = XFIXNUM (Vtool_bar_button_margin);
+    }
+
+  top_p = bot_p = left_p = right_p = false;
+
+  if (s->slice.x == 0)
+    x -= thick + extra_x, left_p = true;
+  if (s->slice.y == 0)
+    y -= thick + extra_y, top_p = true;
+  if (s->slice.x + s->slice.width == s->img->width)
+    x1 += thick + extra_x, right_p = true;
+  if (s->slice.y + s->slice.height == s->img->height)
+    y1 += thick + extra_y, bot_p = true;
+
+  ns_draw_relief (NSMakeRect (x, y, x1 - x + 1, y1 - y + 1), thick,
+		  thick, raised_p, top_p, bot_p, left_p, right_p, s);
+}
 
 static void
 ns_dumpglyphs_image (struct glyph_string *s, NSRect r)
@@ -3669,8 +3836,6 @@ ns_dumpglyphs_image (struct glyph_string *s, NSRect r)
   int box_line_vwidth = max (s->face->box_horizontal_line_width, 0);
   int x = s->x, y = s->ybase - image_ascent (s->img, s->face, &s->slice);
   int bg_x, bg_y, bg_height;
-  int th;
-  char raised_p;
   NSRect br;
   struct face *face = s->face;
   NSColor *tdCol;
@@ -3764,51 +3929,29 @@ ns_dumpglyphs_image (struct glyph_string *s, NSRect r)
   if (s->hl == DRAW_CURSOR)
     {
       [FRAME_CURSOR_COLOR (s->f) set];
-      tdCol = [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND (face)];
+      tdCol = [NSColor colorWithUnsignedLong: NS_FACE_BACKGROUND (face)];
     }
   else
-    {
-      tdCol = [NSColor colorWithUnsignedLong:NS_FACE_FOREGROUND (face)];
-    }
+    tdCol = [NSColor colorWithUnsignedLong: NS_FACE_FOREGROUND (face)];
 
   /* Draw underline, overline, strike-through.  */
   ns_draw_text_decoration (s, face, tdCol, br.size.width, br.origin.x);
 
-  /* Draw relief, if requested */
-  if (s->img->relief || s->hl ==DRAW_IMAGE_RAISED || s->hl ==DRAW_IMAGE_SUNKEN)
-    {
-      if (s->hl == DRAW_IMAGE_SUNKEN || s->hl == DRAW_IMAGE_RAISED)
-        {
-          th = (tool_bar_button_relief < 0
-		? DEFAULT_TOOL_BAR_BUTTON_RELIEF
-		: min (tool_bar_button_relief, 1000000));
-          raised_p = (s->hl == DRAW_IMAGE_RAISED);
-        }
-      else
-        {
-          th = abs (s->img->relief);
-          raised_p = (s->img->relief > 0);
-        }
+  /* If we must draw a relief around the image, do it.  */
+  if (s->img->relief
+      || s->hl == DRAW_IMAGE_RAISED
+      || s->hl == DRAW_IMAGE_SUNKEN)
+    ns_draw_image_relief (s);
 
-      r.origin.x = x - th;
-      r.origin.y = y - th;
-      r.size.width = s->slice.width + 2*th-1;
-      r.size.height = s->slice.height + 2*th-1;
-      ns_draw_relief (r, th, th, raised_p,
-                      s->slice.y == 0,
-                      s->slice.y + s->slice.height == s->img->height,
-                      s->slice.x == 0,
-                      s->slice.x + s->slice.width == s->img->width, s);
-    }
-
-  /* If there is no mask, the background won't be seen,
-     so draw a rectangle on the image for the cursor.
-     Do this for all images, getting transparency right is not reliable.  */
+  /* If there is no mask, the background won't be seen, so draw a
+     rectangle on the image for the cursor.  Do this for all images,
+     getting transparency right is not reliable.  */
   if (s->hl == DRAW_CURSOR)
     {
       int thickness = abs (s->img->relief);
       if (thickness == 0) thickness = 1;
-      ns_draw_box (br, thickness, thickness, FRAME_CURSOR_COLOR (s->f), 1, 1);
+      ns_draw_box (br, thickness, thickness,
+		   FRAME_CURSOR_COLOR (s->f), 1, 1);
     }
 }
 
@@ -8584,17 +8727,18 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 @implementation EmacsWindow
 
 
-- (instancetype) initWithEmacsFrame:(struct frame *)f
+- (instancetype) initWithEmacsFrame: (struct frame *) f
 {
   return [self initWithEmacsFrame:f fullscreen:NO screen:nil];
 }
 
 
-- (instancetype) initWithEmacsFrame:(struct frame *)f
-                         fullscreen:(BOOL)fullscreen
-                             screen:(NSScreen *)screen
+- (instancetype) initWithEmacsFrame: (struct frame *) f
+                         fullscreen: (BOOL) fullscreen
+                             screen: (NSScreen *) screen
 {
   NSWindowStyleMask styleMask;
+  int width, height;
 
   NSTRACE ("[EmacsWindow initWithEmacsFrame:fullscreen:screen:]");
 
@@ -8607,20 +8751,22 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
       styleMask |= NSWindowStyleMaskResizable;
 #endif
     }
+  else if (f->tooltip)
+    styleMask = 0;
   else
-    styleMask = NSWindowStyleMaskTitled
-      | NSWindowStyleMaskResizable
-      | NSWindowStyleMaskMiniaturizable
-      | NSWindowStyleMaskClosable;
+    styleMask = (NSWindowStyleMaskTitled
+		 | NSWindowStyleMaskResizable
+		 | NSWindowStyleMaskMiniaturizable
+		 | NSWindowStyleMaskClosable);
 
-  self = [super initWithContentRect:
-                  NSMakeRect (0, 0,
-                              FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, f->text_cols),
-                              FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, f->text_lines))
-                          styleMask:styleMask
-                            backing:NSBackingStoreBuffered
-                              defer:YES
-                             screen:screen];
+  width = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, f->text_cols);
+  height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, f->text_lines);
+
+  self = [super initWithContentRect: NSMakeRect (0, 0, width, height)
+                          styleMask: styleMask
+                            backing: NSBackingStoreBuffered
+                              defer: YES
+                             screen: screen];
   if (self)
     {
       NSString *name;

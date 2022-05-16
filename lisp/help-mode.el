@@ -422,12 +422,14 @@ Commands:
 ;;;###autoload
 (defun help-mode-setup ()
   "Enter Help mode in the current buffer."
+  (declare (obsolete nil "29.1"))
   (help-mode)
   (setq buffer-read-only nil))
 
 ;;;###autoload
 (defun help-mode-finish ()
   "Finalize Help mode setup in current buffer."
+  (declare (obsolete nil "29.1"))
   (when (derived-mode-p 'help-mode)
     (setq buffer-read-only t)
     (help-make-xrefs (current-buffer))))

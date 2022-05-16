@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
-;; Author: Andrea Corallo <akrl@sdf.com>
+;; Author: Andrea Corallo <akrl@sdf.org>
 ;; Keywords: lisp
 ;; Package: emacs
 
@@ -483,7 +483,7 @@ Useful to hook into pass checkers.")
     (point-min (function () integer))
     (preceding-char (function () fixnum))
     (previous-window (function (&optional window t t) window))
-    (prin1-to-string (function (t &optional t) string))
+    (prin1-to-string (function (t &optional t t) string))
     (processp (function (t) boolean))
     (proper-list-p (function (t) integer))
     (propertize (function (string &rest t) string))

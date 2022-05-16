@@ -614,9 +614,18 @@ the C sources, too."
    menus))
 
 (defun help-fns--compiler-macro (function)
-  (let ((handler (function-get function 'compiler-macro)))
+  (pcase-dolist (`(,type . ,handler)
+                 (list (cons "compiler macro"
+                             (function-get function 'compiler-macro))
+                       (cons "`byte-compile' property"
+                             (function-get function 'byte-compile))
+                       (cons "byte-code optimizer"
+                             (function-get function 'byte-optimizer))))
     (when handler
-      (insert "  This function has a compiler macro")
+      (if (bolp)
+          (insert "  This function has a ")
+        (insert " and a "))
+      (insert type)
       (if (symbolp handler)
           (progn
             (insert (format-message " `%s'" handler))
@@ -631,8 +640,17 @@ the C sources, too."
             (save-excursion
               (re-search-backward (substitute-command-keys "`\\([^`']+\\)'")
                                   nil t)
-              (help-xref-button 1 'help-function-cmacro function lib)))))
-      (insert ".\n"))))
+              (help-xref-button 1 'help-function-cmacro function lib)))))))
+  (unless (bolp)
+    (insert ".  See "
+            (buttonize "the manual"
+                       (lambda (_) (info "(elisp)Advice and Byte Code")))
+            " for details.\n")
+    (save-restriction
+      (let ((fill-prefix "    "))
+        (narrow-to-region (line-beginning-position -1) (point))
+        (fill-region (point-min) (point-max)))
+      (goto-char (point-max)))))
 
 (defun help-fns--signature (function doc real-def real-function buffer)
   "Insert usage at point and return docstring.  With highlighting."
@@ -1061,7 +1079,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
 (add-hook 'help-fns-describe-function-functions #'help-fns--obsolete)
 (add-hook 'help-fns-describe-function-functions #'help-fns--interactive-only)
 (add-hook 'help-fns-describe-function-functions #'help-fns--parent-mode)
-(add-hook 'help-fns-describe-function-functions #'help-fns--compiler-macro)
+(add-hook 'help-fns-describe-function-functions #'help-fns--compiler-macro 100)
 
 
 ;; Variables
@@ -1904,7 +1922,10 @@ in `describe-keymap'.  See also `Searching the Active Keymaps'."
 When called interactively, prompt for a variable that has a
 keymap value."
   (interactive
-   (let* ((km (help-fns--most-relevant-active-keymap))
+   (let* ((sym (symbol-at-point))
+          (km (or (and (keymapp (ignore-errors (symbol-value sym)))
+                       sym)
+                  (help-fns--most-relevant-active-keymap)))
           (val (completing-read
                 (format-prompt "Keymap" km)
                 obarray

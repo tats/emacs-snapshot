@@ -641,7 +641,12 @@ implemented as aliases.  See `sh-feature'."
   :version "24.4"                       ; bash4 additions
   :group 'sh-script)
 
-
+(defcustom sh-indent-statement-after-and t
+  "How to indent statements following && in Shell-Script mode.
+If t, indent to align with &&.
+If nil, indent to align with the previous line's indentation."
+  :type 'boolean
+  :version "29.1")
 
 (defcustom sh-leading-keywords
   '((bash sh-append sh
@@ -1990,7 +1995,9 @@ May return nil if the line should not be treated as continued."
                  (current-column)
                (smie-indent-calculate)))))
     (`(:before . ,(or "|" "&&" "||"))
-     (unless (smie-rule-parent-p token)
+     (when (and (not (smie-rule-parent-p token))
+                (or (not (equal token "&&"))
+                    sh-indent-statement-after-and))
        (smie-backward-sexp token)
        `(column . ,(+ (funcall smie-rules-function :elem 'basic)
                       (smie-indent-virtual)))))

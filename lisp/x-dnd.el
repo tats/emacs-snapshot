@@ -403,7 +403,7 @@ Currently XDND, Motif and old KDE 1.x protocols are recognized."
 ;;;  XDND protocol.
 
 (declare-function x-change-window-property "xfns.c"
-		  (prop value &optional frame type format outer-P))
+		  (prop value &optional frame type format outer-P window-id))
 
 (defun x-dnd-init-xdnd-for-frame (frame)
   "Set the XdndAware property for FRAME to indicate that we do XDND."
@@ -784,7 +784,7 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
 ;;; Handling drops.
 
 (defun x-dnd-handle-unsupported-drop (targets _x _y action _window-id _frame _time)
-  "Return non-nil if the drop described by TARGETS and ACTION should not proceeed."
+  "Return non-nil if the drop described by TARGETS and ACTION should not proceed."
   (not (and (or (eq action 'XdndActionCopy)
                 (eq action 'XdndActionMove))
             (or (member "STRING" targets)

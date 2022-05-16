@@ -1405,7 +1405,7 @@ main (int argc, char **argv)
      related to the GUI system, like -font, -geometry, and -title, and
      then processes the rest of arguments whose priority is below
      those that are related to the GUI system.  The arguments
-     porcessed by 'command-line' are removed from 'command-line-args';
+     processed by 'command-line' are removed from 'command-line-args';
      the arguments processed by 'command-line-1' aren't, they are only
      removed from 'command-line-args-left'.
 
@@ -1952,15 +1952,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_threads ();
   init_eval ();
 #ifdef HAVE_PGTK
-  init_pgtkterm ();   /* before init_atimer(). */
+  init_pgtkterm (); /* Must come before `init_atimer'.  */
 #endif
   running_asynch_code = 0;
   init_random ();
-
-#ifdef HAVE_PDUMPER
-  if (dumped_with_pdumper_p ())
-    init_xfaces ();
-#endif
+  init_xfaces ();
 
 #if defined HAVE_JSON && !defined WINDOWSNT
   init_json ();

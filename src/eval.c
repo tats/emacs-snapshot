@@ -1341,7 +1341,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 		 && (SYMBOLP (XCAR (tem))
 		     || CONSP (XCAR (tem))))))
 	error ("Invalid condition handler: %s",
-	       SDATA (Fprin1_to_string (tem, Qt)));
+	       SDATA (Fprin1_to_string (tem, Qt, Qnil)));
       if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
 	success_handler = XCDR (tem);
       else
@@ -2803,7 +2803,13 @@ apply1 (Lisp_Object fn, Lisp_Object arg)
 }
 
 DEFUN ("functionp", Ffunctionp, Sfunctionp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a function.  */)
+       doc: /* Return t if OBJECT is a function.
+
+An object is a function if it is callable via `funcall'; this includes
+symbols with function bindings, but excludes macros and special forms.
+
+Ordinarily return nil if OBJECT is not a function, although t might be
+returned in rare cases.  */)
      (Lisp_Object object)
 {
   if (FUNCTIONP (object))

@@ -4578,7 +4578,9 @@ as well.  In that case, if this option specifies a function, it
 will be called with the third argument nil.
 
 Under certain circumstances `switch-to-prev-buffer' may ignore
-this option, for example, when there is only one buffer left."
+this option, for example, when there is only one buffer left.
+
+Also see `switch-to-prev-buffer-skip-regexp'."
   :type
   '(choice (const :tag "Never" nil)
            (const :tag "This frame" this)
@@ -4589,16 +4591,37 @@ this option, for example, when there is only one buffer left."
   :version "27.1"
   :group 'windows)
 
+(defcustom switch-to-prev-buffer-skip-regexp nil
+  "Buffers that `switch-to-prev-buffer' and `switch-to-next-buffer' should skip.
+The value can either be a regexp or a list of regexps.  Buffers whose
+names match these regexps are skipped by `switch-to-prev-buffer'
+and `switch-to-next-buffer'.
+
+Also see `switch-to-prev-buffer-skip'."
+  :type '(choice regexp
+                 (repeat regexp))
+  :version "29.1"
+  :group 'windows)
+
 (defun switch-to-prev-buffer-skip-p (skip window buffer &optional bury-or-kill)
   "Return non-nil if `switch-to-prev-buffer' should skip BUFFER.
 SKIP is a value derived from `switch-to-prev-buffer-skip', WINDOW
 the window `switch-to-prev-buffer' acts upon.  Optional argument
 BURY-OR-KILL is passed unchanged by `switch-to-prev-buffer' and
 omitted in calls from `switch-to-next-buffer'."
-  (when skip
-    (if (functionp skip)
-        (funcall skip window buffer bury-or-kill)
-      (get-buffer-window buffer skip))))
+  (or (and skip
+           (if (functionp skip)
+               (funcall skip window buffer bury-or-kill)
+             (get-buffer-window buffer skip)))
+      (and switch-to-prev-buffer-skip-regexp
+           (or (and (stringp switch-to-prev-buffer-skip-regexp)
+                    (string-match-p switch-to-prev-buffer-skip-regexp
+                                    (buffer-name buffer)))
+               (and (consp switch-to-prev-buffer-skip-regexp)
+                    (catch 'found
+                      (dolist (regexp switch-to-prev-buffer-skip-regexp)
+                        (when (string-match-p regexp (buffer-name buffer))
+                          (throw 'tag t)))))))))
 
 (defun switch-to-prev-buffer (&optional window bury-or-kill)
   "In WINDOW switch to previous buffer.
@@ -4886,10 +4909,7 @@ the buffer `*scratch*', creating it if necessary."
   (setq frame (or frame (selected-frame)))
   (or (get-next-valid-buffer (nreverse (buffer-list frame))
  			     buffer visible-ok frame)
-      (get-buffer "*scratch*")
-      (let ((scratch (get-buffer-create "*scratch*")))
-	(set-buffer-major-mode scratch)
-	scratch)))
+      (get-scratch-buffer-create)))
 
 (defcustom frame-auto-hide-function #'iconify-frame
   "Function called to automatically hide frames.
@@ -5122,6 +5142,14 @@ all window-local buffer lists."
   :version "27.1"
   :group 'windows)
 
+(defun quit-restore-select-window (window)
+  "Select WINDOW after having quit another one.
+Do not select an inactive minibuffer window."
+  (when (and (window-live-p window)
+             (or (not (window-minibuffer-p window))
+                 (minibuffer-window-active-p window)))
+    (select-window window)))
+
 (defun quit-restore-window (&optional window bury-or-kill)
   "Quit WINDOW and deal with its buffer.
 WINDOW must be a live window and defaults to the selected one.
@@ -5171,15 +5199,13 @@ nil means to not handle the buffer in a particular way.  This
      ((and dedicated (not (eq dedicated 'side))
            (window--delete window 'dedicated (eq bury-or-kill 'kill)))
       ;; If the previously selected window is still alive, select it.
-      (when (window-live-p (nth 2 quit-restore))
-        (select-window (nth 2 quit-restore))))
+      (quit-restore-select-window (nth 2 quit-restore)))
      ((and (not prev-buffer)
 	   (eq (nth 1 quit-restore) 'tab)
 	   (eq (nth 3 quit-restore) buffer))
       (tab-bar-close-tab)
       ;; If the previously selected window is still alive, select it.
-      (when (window-live-p (nth 2 quit-restore))
-	(select-window (nth 2 quit-restore))))
+      (quit-restore-select-window (nth 2 quit-restore)))
      ((and (not prev-buffer)
 	   (or (eq (nth 1 quit-restore) 'frame)
 	       (and (eq (nth 1 quit-restore) 'window)
@@ -5191,8 +5217,7 @@ nil means to not handle the buffer in a particular way.  This
 	   ;; Delete WINDOW if possible.
 	   (window--delete window nil (eq bury-or-kill 'kill)))
       ;; If the previously selected window is still alive, select it.
-      (when (window-live-p (nth 2 quit-restore))
-	(select-window (nth 2 quit-restore))))
+      (quit-restore-select-window (nth 2 quit-restore)))
      ((and (listp (setq quad (nth 1 quit-restore)))
 	   (buffer-live-p (car quad))
 	   (eq (nth 3 quit-restore) buffer))
@@ -5236,8 +5261,8 @@ nil means to not handle the buffer in a particular way.  This
       ;; Reset the quit-restore parameter.
       (set-window-parameter window 'quit-restore nil)
       ;; Select old window.
-      (when (window-live-p (nth 2 quit-restore))
-	(select-window (nth 2 quit-restore))))
+      ;; If the previously selected window is still alive, select it.
+      (quit-restore-select-window (nth 2 quit-restore)))
      (t
       ;; Show some other buffer in WINDOW and reset the quit-restore
       ;; parameter.
@@ -5250,8 +5275,8 @@ nil means to not handle the buffer in a particular way.  This
           (when (eq dedicated 'side)
             (set-window-dedicated-p window 'side))
         (window--delete window nil (eq bury-or-kill 'kill))
-        (when (window-live-p (nth 2 quit-restore))
-          (select-window (nth 2 quit-restore))))))
+      ;; If the previously selected window is still alive, select it.
+      (quit-restore-select-window (nth 2 quit-restore)))))
 
     ;; Deal with the buffer.
     (cond
@@ -8621,12 +8646,13 @@ If BUFFER-OR-NAME is nil, return the buffer returned by
 `other-buffer'.  Else, if a buffer specified by BUFFER-OR-NAME
 exists, return that buffer.  If no such buffer exists, create a
 buffer with the name BUFFER-OR-NAME and return that buffer."
-  (if buffer-or-name
-      (or (get-buffer buffer-or-name)
-	  (let ((buffer (get-buffer-create buffer-or-name)))
-	    (set-buffer-major-mode buffer)
-	    buffer))
-    (other-buffer)))
+  (pcase buffer-or-name
+    ('nil (other-buffer))
+    ("*scratch*" (get-scratch-buffer-create))
+    (_ (or (get-buffer buffer-or-name)
+	   (let ((buffer (get-buffer-create buffer-or-name)))
+	     (set-buffer-major-mode buffer)
+	     buffer)))))
 
 (defcustom switch-to-buffer-preserve-window-point t
   "If non-nil, `switch-to-buffer' tries to preserve `window-point'.

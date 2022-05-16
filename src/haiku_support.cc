@@ -82,8 +82,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <csignal>
 #include <cfloat>
 
-#include <pthread.h>
-
 #ifdef USE_BE_CAIRO
 #include <cairo.h>
 #endif
@@ -143,7 +141,7 @@ struct font_selection_dialog_message
   /* Whether or not font selection was cancelled.  */
   bool_bf cancel : 1;
 
-  /* Whether or not a size was explictly specified.  */
+  /* Whether or not a size was explicitly specified.  */
   bool_bf size_specified : 1;
 
   /* The index of the selected font family.  */
@@ -1619,15 +1617,16 @@ public:
 	copy_bitmap = NULL;
       }
     if (!copy_bitmap)
-      copy_bitmap = new BBitmap (offscreen_draw_bitmap_1);
+      {
+	copy_bitmap = new BBitmap (offscreen_draw_bitmap_1);
+	SetViewBitmap (copy_bitmap, Frame (),
+		       Frame (), B_FOLLOW_NONE, 0);
+      }
     else
       copy_bitmap->ImportBits (offscreen_draw_bitmap_1);
 
     if (copy_bitmap->InitCheck () != B_OK)
       gui_abort ("Failed to init copy bitmap during buffer flip");
-
-    SetViewBitmap (copy_bitmap,
-		   Frame (), Frame (), B_FOLLOW_NONE, 0);
 
     Invalidate (&invalid_region);
     invalid_region.MakeEmpty ();
@@ -2619,13 +2618,22 @@ class EmacsFontSelectionDialog : public BWindow
   void
   UpdateStylesForIndex (int idx)
   {
-    int n, i;
+    int n, i, previous_selection;
     uint32 flags;
     font_family family;
     font_style style;
     BStringItem *item;
+    char *current_style;
 
     n = all_styles.CountItems ();
+    current_style = NULL;
+    previous_selection = font_style_pane.CurrentSelection ();
+
+    if (previous_selection >= 0)
+      {
+	item = all_styles.ItemAt (previous_selection);
+	current_style = strdup (item->Text ());
+      }
 
     font_style_pane.MakeEmpty ();
     all_styles.MakeEmpty ();
@@ -2641,6 +2649,10 @@ class EmacsFontSelectionDialog : public BWindow
 	    else
 	      item = new BStringItem ("<error>");
 
+	    if (current_style && pending_selection_idx < 0
+		&& !strcmp (current_style, style))
+	      pending_selection_idx = i;
+
 	    font_style_pane.AddItem (item);
 	    all_styles.AddItem (item);
 	  }
@@ -2654,6 +2666,9 @@ class EmacsFontSelectionDialog : public BWindow
 
     pending_selection_idx = -1;
     UpdateForSelectedStyle ();
+
+    if (current_style)
+      free (current_style);
   }
 
   bool
@@ -3362,56 +3377,28 @@ BView_resize_to (void *view, int width, int height)
   vw->UnlockLooper ();
 }
 
-void *
-BCursor_create_default (void)
-{
-  return new BCursor (B_CURSOR_ID_SYSTEM_DEFAULT);
-}
-
-void *
-BCursor_create_modeline (void)
-{
-  return new BCursor (B_CURSOR_ID_CONTEXT_MENU);
-}
-
-void *
-BCursor_from_id (enum haiku_cursor cursor)
-{
-  return new BCursor ((enum BCursorID) cursor);
-}
-
-void *
-BCursor_create_i_beam (void)
-{
-  return new BCursor (B_CURSOR_ID_I_BEAM);
-}
-
-void *
-BCursor_create_progress_cursor (void)
-{
-  return new BCursor (B_CURSOR_ID_PROGRESS);
-}
-
-void *
-BCursor_create_grab (void)
-{
-  return new BCursor (B_CURSOR_ID_GRAB);
-}
-
 void
-BCursor_delete (void *cursor)
+be_delete_cursor (void *cursor)
 {
   if (cursor)
     delete (BCursor *) cursor;
 }
 
+void *
+be_create_cursor_from_id (int id)
+{
+  return new BCursor ((enum BCursorID) id);
+}
+
 void
 BView_set_view_cursor (void *view, void *cursor)
 {
-  if (!((BView *) view)->LockLooper ())
+  BView *v = (BView *) view;
+
+  if (!v->LockLooper ())
     gui_abort ("Failed to lock view setting cursor");
-  ((BView *) view)->SetViewCursor ((BCursor *) cursor);
-  ((BView *) view)->UnlockLooper ();
+  v->SetViewCursor ((BCursor *) cursor);
+  v->UnlockLooper ();
 }
 
 void
@@ -5104,4 +5091,22 @@ be_roster_launch (const char *type, const char *file, char **cargs,
   return be_roster->Launch (&ref, (nargs > INT_MAX
 				   ? INT_MAX : nargs),
 			    cargs, team_id);
+}
+
+void *
+be_create_pixmap_cursor (void *bitmap, int x, int y)
+{
+  BBitmap *bm;
+  BCursor *cursor;
+
+  bm = (BBitmap *) bitmap;
+  cursor = new BCursor (bm, BPoint (x, y));
+
+  if (cursor->InitCheck () != B_OK)
+    {
+      delete cursor;
+      return NULL;
+    }
+
+  return cursor;
 }

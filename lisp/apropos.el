@@ -518,7 +518,7 @@ variables, not just user options."
 		      (if (or current-prefix-arg apropos-do-all)
 			  "variable" "user option"))
                      current-prefix-arg))
-  (apropos-command pattern nil
+  (apropos-command pattern (or do-all apropos-do-all)
 		   (if (or do-all apropos-do-all)
                        (lambda (symbol)
                          (and (boundp symbol)
@@ -874,7 +874,7 @@ Optional arg BUFFER (default: current buffer) is the buffer to check."
                             apropos-all-words apropos-accumulator))
          (setq var  (apropos-value-internal #'local-variable-if-set-p symb
                                             #'symbol-value)))
-       (when (and (fboundp 'apropos-false-hit-str)  (apropos-false-hit-str var))
+       (when (apropos-false-hit-str var)
          (setq var nil))
        (when var
          (setq apropos-accumulator (cons (list symb (apropos-score-str var) nil var)
@@ -1247,6 +1247,19 @@ as a heading."
 				 'apropos-user-option
 			       'apropos-variable)
 			     (not nosubst))
+          ;; Insert an excerpt of variable values.
+          (when (boundp symbol)
+            (insert "  Value: ")
+            (let* ((print-escape-newlines t)
+                   (value (prin1-to-string (symbol-value symbol)))
+                   (truncated (truncate-string-to-width
+                               value (- (window-width) 20) nil nil t)))
+              (insert truncated)
+              (unless (equal value truncated)
+                (buttonize-region (1- (point)) (point)
+                                  (lambda (_)
+                                    (message "Value: %s" value))))
+              (insert "\n")))
 	  (apropos-print-doc 7 'apropos-group t)
 	  (apropos-print-doc 6 'apropos-face t)
 	  (apropos-print-doc 5 'apropos-widget t)
@@ -1262,12 +1275,13 @@ as a heading."
   (let ((doc (nth i apropos-item)))
     (when (stringp doc)
       (if apropos-compact-layout
-      	  (insert (propertize "\t" 'display '(space :align-to 32)) " ")
-      	(insert "  "))
+          (insert (propertize "\t" 'display '(space :align-to 32)))
+        (insert " "))
       (if apropos-multi-type
 	  (let ((button-face (button-type-get type 'face)))
 	    (unless (consp button-face)
 	      (setq button-face (list button-face)))
+            (insert " ")
 	    (insert-text-button
 	     (if apropos-compact-layout
 		 (format "<%s>" (button-type-get type 'apropos-short-label))

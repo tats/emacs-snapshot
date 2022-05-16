@@ -34,6 +34,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "haiku_support.h"
 #include "termhooks.h"
 
+#include "bitmaps/leftptr.xbm"
+#include "bitmaps/leftpmsk.xbm"
+
 #include <stdlib.h>
 
 #include <kernel/OS.h>
@@ -763,6 +766,8 @@ haiku_create_frame (Lisp_Object parms)
                          "foreground", "Foreground", RES_TYPE_STRING);
   gui_default_parameter (f, parms, Qbackground_color, build_string ("white"),
                          "background", "Background", RES_TYPE_STRING);
+  gui_default_parameter (f, parms, Qmouse_color, build_string ("font-color"),
+                         "pointerColor", "Foreground", RES_TYPE_STRING);
   gui_default_parameter (f, parms, Qline_spacing, Qnil,
                          "lineSpacing", "LineSpacing", RES_TYPE_NUMBER);
   gui_default_parameter (f, parms, Qleft_fringe, Qnil,
@@ -820,33 +825,11 @@ haiku_create_frame (Lisp_Object parms)
                              RES_TYPE_BOOLEAN);
   f->no_split = minibuffer_only || (!EQ (tem, Qunbound) && !NILP (tem));
 
-  block_input ();
-#define ASSIGN_CURSOR(cursor) \
-  (FRAME_OUTPUT_DATA (f)->cursor = dpyinfo->cursor)
-
-  ASSIGN_CURSOR (text_cursor);
-  ASSIGN_CURSOR (nontext_cursor);
-  ASSIGN_CURSOR (modeline_cursor);
-  ASSIGN_CURSOR (hand_cursor);
-  ASSIGN_CURSOR (hourglass_cursor);
-  ASSIGN_CURSOR (horizontal_drag_cursor);
-  ASSIGN_CURSOR (vertical_drag_cursor);
-  ASSIGN_CURSOR (left_edge_cursor);
-  ASSIGN_CURSOR (top_left_corner_cursor);
-  ASSIGN_CURSOR (top_edge_cursor);
-  ASSIGN_CURSOR (top_right_corner_cursor);
-  ASSIGN_CURSOR (right_edge_cursor);
-  ASSIGN_CURSOR (bottom_right_corner_cursor);
-  ASSIGN_CURSOR (bottom_edge_cursor);
-  ASSIGN_CURSOR (bottom_left_corner_cursor);
-  ASSIGN_CURSOR (no_cursor);
-
-  FRAME_OUTPUT_DATA (f)->current_cursor = dpyinfo->text_cursor;
-#undef ASSIGN_CURSOR
-
   f->terminal->reference_count++;
 
-  FRAME_OUTPUT_DATA (f)->window = BWindow_new (&FRAME_OUTPUT_DATA (f)->view);
+  block_input ();
+  FRAME_OUTPUT_DATA (f)->window
+    = BWindow_new (&FRAME_OUTPUT_DATA (f)->view);
   unblock_input ();
 
   if (!FRAME_OUTPUT_DATA (f)->window)
@@ -1076,7 +1059,10 @@ haiku_create_tip_frame (Lisp_Object parms)
 
   gui_default_parameter (f, parms, Qbackground_color, build_string ("white"),
                          "background", "Background", RES_TYPE_STRING);
-  gui_default_parameter (f, parms, Qmouse_color, build_string ("black"),
+
+  /* FIXME: is there a better method to tell Emacs to not recolor the
+     cursors other than setting the color to a special value?  */
+  gui_default_parameter (f, parms, Qmouse_color, build_string ("font-color"),
                          "pointerColor", "Foreground", RES_TYPE_STRING);
   gui_default_parameter (f, parms, Qcursor_color, build_string ("black"),
                          "cursorColor", "Foreground", RES_TYPE_STRING);
@@ -1132,6 +1118,23 @@ haiku_create_tip_frame (Lisp_Object parms)
 
   /* FIXME - can this be done in a similar way to normal frames?
      https://lists.gnu.org/r/emacs-devel/2007-10/msg00641.html */
+
+  {
+    Lisp_Object disptype;
+
+    if (be_get_display_planes () == 1)
+      disptype = Qmono;
+    else if (be_is_display_grayscale ())
+      disptype = Qgrayscale;
+    else
+      disptype = Qcolor;
+
+    if (NILP (Fframe_parameter (frame, Qdisplay_type)))
+      {
+	AUTO_FRAME_ARG (arg, Qdisplay_type, disptype);
+	Fmodify_frame_parameters (frame, arg);
+      }
+  }
 
   /* Set up faces after all frame parameters are known.  This call
      also merges in face attributes specified for new frames.
@@ -1567,6 +1570,7 @@ haiku_free_frame_resources (struct frame *f)
   dpyinfo = FRAME_DISPLAY_INFO (f);
 
   free_frame_faces (f);
+  haiku_free_custom_cursors (f);
 
   /* Free scroll bars */
   for (bar = FRAME_SCROLL_BARS (f); !NILP (bar); bar = b->next)
@@ -1792,6 +1796,279 @@ haiku_set_sticky (struct frame *f, Lisp_Object new_value,
   unblock_input ();
 }
 
+struct user_cursor_info
+{
+  /* A pointer to the Lisp_Object describing the cursor.  */
+  Lisp_Object *lisp_cursor;
+
+  /* The offset of the cursor in the `struct haiku_output' of each
+     frame.  */
+  ptrdiff_t output_offset;
+
+  /* The offset of the default value of the cursor in the display
+     info structure.  */
+  ptrdiff_t default_offset;
+};
+
+struct user_cursor_bitmap_info
+{
+  /* A bitmap to use instead of the font cursor to create cursors in a
+     certain color.  */
+  const void *bits;
+
+  /* The mask for that bitmap.  */
+  const void *mask;
+
+  /* The dimensions of the cursor bitmap.  */
+  int width, height;
+
+  /* The position inside the cursor bitmap corresponding to the
+     position of the mouse pointer.  */
+  int x, y;
+};
+
+#define INIT_USER_CURSOR(lisp, cursor)			\
+  { (lisp), offsetof (struct haiku_output, cursor),	\
+      offsetof (struct haiku_display_info, cursor) }
+
+struct user_cursor_info custom_cursors[] =
+  {
+    INIT_USER_CURSOR (&Vx_pointer_shape,		text_cursor),
+    INIT_USER_CURSOR (NULL,				nontext_cursor),
+    INIT_USER_CURSOR (NULL,				modeline_cursor),
+    INIT_USER_CURSOR (&Vx_sensitive_text_pointer_shape,	hand_cursor),
+    INIT_USER_CURSOR (&Vx_hourglass_pointer_shape,	hourglass_cursor),
+    INIT_USER_CURSOR (NULL,				horizontal_drag_cursor),
+    INIT_USER_CURSOR (NULL,				vertical_drag_cursor),
+    INIT_USER_CURSOR (NULL,				left_edge_cursor),
+    INIT_USER_CURSOR (NULL,				top_left_corner_cursor),
+    INIT_USER_CURSOR (NULL,				top_edge_cursor),
+    INIT_USER_CURSOR (NULL,				top_right_corner_cursor),
+    INIT_USER_CURSOR (NULL,				right_edge_cursor),
+    INIT_USER_CURSOR (NULL,				bottom_right_corner_cursor),
+    INIT_USER_CURSOR (NULL,				bottom_edge_cursor),
+    INIT_USER_CURSOR (NULL,				bottom_left_corner_cursor),
+    INIT_USER_CURSOR (NULL,				no_cursor),
+  };
+
+struct user_cursor_bitmap_info cursor_bitmaps[] =
+  {
+    { ibeam_ptr_bits, ibeam_ptrmask_bits, 15, 15, 7, 7 },	/* text_cursor */
+    { left_ptr_bits, left_ptrmsk_bits, 16, 16, 3, 1 },		/* nontext_cursor */
+    { left_ptr_bits, left_ptrmsk_bits, 16, 16, 3, 1 },		/* modeline_cursor */
+    { hand_ptr_bits, hand_ptrmask_bits, 15, 15, 4, 3 },		/* hand_cursor */
+    { hourglass_bits, hourglass_mask_bits, 15, 15, 7, 7 },	/* hourglass_cursor */
+    { horizd_ptr_bits, horizd_ptrmask_bits, 15, 15, 7, 7 },	/* horizontal_drag_cursor */
+    { vertd_ptr_bits, vertd_ptrmask_bits, 15, 15, 7, 7 },	/* vertical_drag_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* left_edge_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* top_left_corner_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* top_edge_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* top_right_corner_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* right_edge_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* bottom_right_corner_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* bottom_edge_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* bottom_left_corner_cursor */
+    { NULL, NULL, 0, 0, 0, 0 },					/* no_cursor */
+  };
+
+/* Array of cursor bitmaps for each system cursor ID.  This is used to
+   color in user-specified cursors.  */
+struct user_cursor_bitmap_info cursor_bitmaps_for_id[28] =
+  {
+    { NULL, NULL, 0, 0, 0, 0					},
+    { left_ptr_bits, left_ptrmsk_bits, 16, 16, 3, 1		},
+    { ibeam_ptr_bits, ibeam_ptrmask_bits, 15, 15, 7, 7		},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { cross_ptr_bits, cross_ptrmask_bits, 30, 30, 15, 15	},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+    { NULL, NULL, 0, 0, 0, 0					},
+  };
+
+static void *
+haiku_create_colored_cursor (struct user_cursor_bitmap_info *info,
+			     uint32_t foreground, uint32_t background)
+{
+  const char *bits, *mask;
+  void *bitmap, *cursor;
+  int width, height, bytes_per_line, x, y;
+
+  bits = info->bits;
+  mask = info->mask;
+  width = info->width;
+  height = info->height;
+  bytes_per_line = (width + 7) / 8;
+
+  bitmap = BBitmap_new (width, height, false);
+
+  if (!bitmap)
+    memory_full (SIZE_MAX);
+
+  for (y = 0; y < height; ++y)
+    {
+      for (x = 0; x < width; ++x)
+	{
+	  if (mask[x / 8] >> (x % 8) & 1)
+	    haiku_put_pixel (bitmap, x, y,
+			     (bits[x / 8] >> (x % 8) & 1
+			      ? (foreground | 255u << 24)
+			      : (background | 255u << 24)));
+	  else
+	    haiku_put_pixel (bitmap, x, y, 0);
+	}
+
+      mask += bytes_per_line;
+      bits += bytes_per_line;
+    }
+
+  cursor = be_create_pixmap_cursor (bitmap, info->x, info->y);
+  BBitmap_free (bitmap);
+
+  return cursor;
+}
+
+/* Free all cursors on F that were allocated specifically for the
+   frame.  */
+void
+haiku_free_custom_cursors (struct frame *f)
+{
+  struct user_cursor_info *cursor;
+  struct haiku_output *output;
+  struct haiku_display_info *dpyinfo;
+  Emacs_Cursor *frame_cursor;
+  Emacs_Cursor *display_cursor;
+  int i;
+
+  output = FRAME_OUTPUT_DATA (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  for (i = 0; i < ARRAYELTS (custom_cursors); ++i)
+    {
+      cursor = &custom_cursors[i];
+      frame_cursor = (Emacs_Cursor *) ((char *) output
+				       + cursor->output_offset);
+      display_cursor = (Emacs_Cursor *) ((char *) dpyinfo
+					 + cursor->default_offset);
+
+      if (*frame_cursor != *display_cursor && *frame_cursor)
+	{
+	  if (output->current_cursor == *frame_cursor)
+	    output->current_cursor = *display_cursor;
+
+	  be_delete_cursor (*frame_cursor);
+	}
+
+      *frame_cursor = *display_cursor;
+    }
+}
+
+static void
+haiku_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
+{
+  struct haiku_output *output;
+  Emacs_Cursor *frame_cursor, old, *recolored;
+  int i, n, rc;
+  bool color_specified_p;
+  Emacs_Color color;
+
+  CHECK_STRING (arg);
+  color_specified_p = true;
+
+  if (!strcmp (SSDATA (arg), "font-color"))
+    color_specified_p = false;
+  else
+    rc = haiku_get_color (SSDATA (arg), &color);
+
+  if (color_specified_p && rc)
+    signal_error ("Invalid color", arg);
+
+  output = FRAME_OUTPUT_DATA (f);
+
+  /* This will also reset all the cursors back to their default
+     values.  */
+  haiku_free_custom_cursors (f);
+
+  for (i = 0; i < ARRAYELTS (custom_cursors); ++i)
+    {
+      frame_cursor = (Emacs_Cursor *) ((char *) output
+				       + custom_cursors[i].output_offset);
+      old = *frame_cursor;
+
+      if (custom_cursors[i].lisp_cursor
+	  && FIXNUMP (*custom_cursors[i].lisp_cursor))
+	{
+	  if (!RANGED_FIXNUMP (0, *custom_cursors[i].lisp_cursor,
+			       28)) /* 28 is the largest Haiku cursor ID.  */
+	    signal_error ("Invalid cursor",
+			  *custom_cursors[i].lisp_cursor);
+
+	  n = XFIXNUM (*custom_cursors[i].lisp_cursor);
+
+	  if (color_specified_p && cursor_bitmaps_for_id[n].bits)
+	    {
+	      recolored
+		= haiku_create_colored_cursor (&cursor_bitmaps_for_id[n],
+					       color.pixel,
+					       FRAME_BACKGROUND_PIXEL (f));
+
+	      if (recolored)
+		{
+		  *frame_cursor = recolored;
+		  continue;
+		}
+	    }
+
+	  /* Create and set the custom cursor.  */
+	  *frame_cursor = be_create_cursor_from_id (n);
+	}
+      else if (color_specified_p && cursor_bitmaps[i].bits)
+	{
+	  recolored
+	    = haiku_create_colored_cursor (&cursor_bitmaps[i], color.pixel,
+					   FRAME_BACKGROUND_PIXEL (f));
+
+	  if (recolored)
+	    *frame_cursor = recolored;
+	}
+    }
+
+  /* This function can be called before the frame's window is
+     created.  */
+  if (FRAME_HAIKU_WINDOW (f))
+    {
+      if (output->current_cursor == old
+	  && old != *frame_cursor)
+	{
+	  output->current_cursor = *frame_cursor;
+
+	  BView_set_view_cursor (FRAME_HAIKU_VIEW (f),
+				 *frame_cursor);
+	}
+    }
+
+  update_face_from_frame_parameter (f, Qmouse_color, arg);
+}
+
 
 
 DEFUN ("haiku-set-mouse-absolute-pixel-position",
@@ -1890,34 +2167,28 @@ DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p,
 }
 
 DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection,
-       1, 3, 0,
-       doc: /* SKIP: real doc in xfns.c.  */)
+       1, 3, 0, doc: /* SKIP: real doc in xfns.c.  */)
      (Lisp_Object display, Lisp_Object resource_string, Lisp_Object must_succeed)
 {
-  struct haiku_display_info *dpyinfo;
   CHECK_STRING (display);
 
   if (NILP (Fstring_equal (display, build_string ("be"))))
     {
       if (!NILP (must_succeed))
-	fatal ("Bad display");
+	fatal ("Invalid display %s", SDATA (display));
       else
-	error ("Bad display");
+	signal_error ("Invalid display", display);
     }
 
   if (x_display_list)
-    return Qnil;
-
-  dpyinfo = haiku_term_init ();
-
-  if (!dpyinfo)
     {
       if (!NILP (must_succeed))
-	fatal ("Display not responding");
+	fatal ("A display is already open");
       else
-	error ("Display not responding");
+	error ("A display is already open");
     }
 
+  haiku_term_init ();
   return Qnil;
 }
 
@@ -2579,6 +2850,7 @@ Frames are listed from topmost (first) to bottommost (last).  */)
 
   if (NILP (sel))
     return frames;
+
   return Fcons (sel, frames);
 }
 
@@ -2701,7 +2973,7 @@ frame_parm_handler haiku_frame_parm_handlers[] =
     gui_set_right_divider_width,
     gui_set_bottom_divider_width,
     haiku_set_menu_bar_lines,
-    NULL, /* set mouse color */
+    haiku_set_mouse_color,
     haiku_explicitly_set_name,
     gui_set_scroll_bar_width,
     gui_set_scroll_bar_height,
@@ -2751,6 +3023,9 @@ syms_of_haikufns (void)
   DEFSYM (Qstatic_color, "static-color");
   DEFSYM (Qstatic_gray, "static-gray");
   DEFSYM (Qtrue_color, "true-color");
+  DEFSYM (Qmono, "mono");
+  DEFSYM (Qgrayscale, "grayscale");
+  DEFSYM (Qcolor, "color");
 
   defsubr (&Sx_hide_tip);
   defsubr (&Sxw_display_color_p);
@@ -2804,6 +3079,19 @@ syms_of_haikufns (void)
   DEFVAR_LISP ("x-cursor-fore-pixel", Vx_cursor_fore_pixel,
 	       doc: /* SKIP: real doc in xfns.c.  */);
   Vx_cursor_fore_pixel = Qnil;
+
+  DEFVAR_LISP ("x-pointer-shape", Vx_pointer_shape,
+	       doc: /* SKIP: real doc in xfns.c.  */);
+  Vx_pointer_shape = Qnil;
+
+  DEFVAR_LISP ("x-hourglass-pointer-shape", Vx_hourglass_pointer_shape,
+	       doc: /* SKIP: real doc in xfns.c.  */);
+  Vx_hourglass_pointer_shape = Qnil;
+
+  DEFVAR_LISP ("x-sensitive-text-pointer-shape",
+	       Vx_sensitive_text_pointer_shape,
+	       doc: /* SKIP: real doc in xfns.c.  */);
+  Vx_sensitive_text_pointer_shape = Qnil;
 
   DEFVAR_LISP ("haiku-allowed-ui-colors", Vhaiku_allowed_ui_colors,
 	       doc: /* Vector of UI colors that Emacs can look up from the system.

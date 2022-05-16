@@ -3386,8 +3386,9 @@ BODY is the backend specific code."
 	 (lockname (file-truename (or ,lockname filename)))
 	 (handler (and (stringp ,visit)
 		       (let ((inhibit-file-name-handlers
-			      (cons 'tramp-file-name-handler
-				    inhibit-file-name-handlers))
+			      `(tramp-file-name-handler
+				tramp-crypt-file-name-handler
+				. inhibit-file-name-handlers))
 			     (inhibit-file-name-operation 'write-region))
 			 (find-file-name-handler ,visit 'write-region)))))
      (with-parsed-tramp-file-name filename nil
@@ -3414,6 +3415,7 @@ BODY is the backend specific code."
 	       (gid (or (file-attribute-group-id
 			 (file-attributes filename 'integer))
 			(tramp-get-remote-gid v 'integer)))
+	       (attributes (file-extended-attributes filename))
 	       (curbuf (current-buffer)))
 
 	   ;; Lock file.
@@ -3434,7 +3436,7 @@ BODY is the backend specific code."
 
 	   ;; We must protect `last-coding-system-used', now we have
 	   ;; set it to its correct value.
-	   (let (last-coding-system-used)
+	   (let (last-coding-system-used (need-chown t))
 	     ;; Set file modification time.
 	     (when (or (eq ,visit t) (stringp ,visit))
 	       (when-let ((file-attr (file-attributes filename 'integer)))
@@ -3444,10 +3446,19 @@ BODY is the backend specific code."
 		  ;; `file-precious-flag' is set.
 		  (or (file-attribute-modification-time file-attr)
 		      (current-time)))
-		 ;; Set the ownership.
 		 (unless (and (= (file-attribute-user-id file-attr) uid)
 			      (= (file-attribute-group-id file-attr) gid))
-		   (tramp-set-file-uid-gid filename uid gid)))))
+		   (setq need-chown nil))))
+
+	     ;; Set the ownership.
+             (when need-chown
+               (tramp-set-file-uid-gid filename uid gid)))
+
+	   ;; Set extended attributes.  We ignore possible errors,
+	   ;; because ACL strings could be incompatible.
+	   (when attributes
+	     (ignore-errors
+	       (set-file-extended-attributes filename attributes)))
 
 	   ;; Unlock file.
 	   (when file-locked
@@ -4221,7 +4232,9 @@ Parsing the remote \"ps\" output is controlled by
 It is not guaranteed, that all process attributes as described in
 `process-attributes' are returned.  The additional attribute
 `pid' shall be returned always."
-  (with-tramp-file-property vec "/" "process-attributes"
+  ;; Since Emacs 27.1.
+  (when (fboundp 'connection-local-criteria-for-default-directory)
+    (with-tramp-file-property vec "/" "process-attributes"
       (ignore-errors
         (with-temp-buffer
           (hack-connection-local-variables-apply
@@ -4265,7 +4278,7 @@ It is not guaranteed, that all process attributes as described in
                   (push (append res) result))
                 (forward-line))
               ;; Return result.
-              result))))))
+              result)))))))
 
 (defun tramp-handle-list-system-processes ()
   "Like `list-system-processes' for Tramp files."
@@ -5624,7 +5637,9 @@ If FILENAME is remote, a file name handler is called."
       (setq gid (file-attribute-group-id (file-attributes dir)))))
 
   (if (tramp-tramp-file-p filename)
-      (tramp-file-name-handler #'tramp-set-file-uid-gid filename uid gid)
+      (funcall (if (tramp-crypt-file-name-p filename)
+		   #'tramp-crypt-file-name-handler #'tramp-file-name-handler)
+	       #'tramp-set-file-uid-gid filename uid gid)
     ;; On W32 systems, "chown" does not work.
     (unless (memq system-type '(ms-dos windows-nt))
       (let ((uid (or (and (natnump uid) uid) (tramp-get-local-uid 'integer)))

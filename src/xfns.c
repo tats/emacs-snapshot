@@ -973,7 +973,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       if (p)
 	{
 	  window = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
-	  gdk_x11_window_set_frame_sync_enabled (window, false);
+	  gdk_x11_window_set_frame_sync_enabled (window, FALSE);
 	}
 #endif
       unblock_input ();
@@ -1261,25 +1261,27 @@ struct mouse_cursor_types {
 };
 
 /* This array must stay in sync with enum mouse_cursor above!  */
-static const struct mouse_cursor_types mouse_cursor_types[] = {
-  { "text",      &Vx_pointer_shape,                    XC_xterm               },
-  { "nontext",   &Vx_nontext_pointer_shape,            XC_left_ptr            },
-  { "hourglass", &Vx_hourglass_pointer_shape,          XC_watch               },
-  { "modeline",  &Vx_mode_pointer_shape,               XC_xterm               },
-  { NULL,        &Vx_sensitive_text_pointer_shape,     XC_hand2               },
-  { NULL,        &Vx_window_horizontal_drag_shape,     XC_sb_h_double_arrow   },
-  { NULL,        &Vx_window_vertical_drag_shape,       XC_sb_v_double_arrow   },
-  { NULL,        &Vx_window_left_edge_shape,           XC_left_side           },
-  { NULL,        &Vx_window_top_left_corner_shape,     XC_top_left_corner     },
-  { NULL,        &Vx_window_top_edge_shape,            XC_top_side            },
-  { NULL,        &Vx_window_top_right_corner_shape,    XC_top_right_corner    },
-  { NULL,        &Vx_window_right_edge_shape,          XC_right_side          },
-  { NULL,        &Vx_window_bottom_right_corner_shape, XC_bottom_right_corner },
-  { NULL,        &Vx_window_bottom_edge_shape,         XC_bottom_side         },
-  { NULL,        &Vx_window_bottom_left_corner_shape,  XC_bottom_left_corner  },
-};
+static const struct mouse_cursor_types mouse_cursor_types[] =
+  {
+    { "text",      &Vx_pointer_shape,                    XC_xterm               },
+    { "nontext",   &Vx_nontext_pointer_shape,            XC_left_ptr            },
+    { "hourglass", &Vx_hourglass_pointer_shape,          XC_watch               },
+    { "modeline",  &Vx_mode_pointer_shape,               XC_xterm               },
+    { NULL,        &Vx_sensitive_text_pointer_shape,     XC_hand2               },
+    { NULL,        &Vx_window_horizontal_drag_shape,     XC_sb_h_double_arrow   },
+    { NULL,        &Vx_window_vertical_drag_shape,       XC_sb_v_double_arrow   },
+    { NULL,        &Vx_window_left_edge_shape,           XC_left_side           },
+    { NULL,        &Vx_window_top_left_corner_shape,     XC_top_left_corner     },
+    { NULL,        &Vx_window_top_edge_shape,            XC_top_side            },
+    { NULL,        &Vx_window_top_right_corner_shape,    XC_top_right_corner    },
+    { NULL,        &Vx_window_right_edge_shape,          XC_right_side          },
+    { NULL,        &Vx_window_bottom_right_corner_shape, XC_bottom_right_corner },
+    { NULL,        &Vx_window_bottom_edge_shape,         XC_bottom_side         },
+    { NULL,        &Vx_window_bottom_left_corner_shape,  XC_bottom_left_corner  },
+  };
 
-struct mouse_cursor_data {
+struct mouse_cursor_data
+{
   /* Last index for which XCreateFontCursor has been called, and thus
      the last index for which x_request_serial[] is valid.  */
   int last_cursor_create_request;
@@ -1360,8 +1362,10 @@ x_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     {
       cursor_data.x_request_serial[i] = XNextRequest (dpy);
       cursor_data.last_cursor_create_request = i;
-      cursor_data.cursor[i] = XCreateFontCursor (dpy,
-						 cursor_data.cursor_num[i]);
+
+      cursor_data.cursor[i]
+	= x_create_font_cursor (FRAME_DISPLAY_INFO (f),
+				cursor_data.cursor_num[i]);
     }
 
   /* Now sync up and process all received errors from cursor
@@ -2370,6 +2374,63 @@ x_set_scroll_bar_default_height (struct frame *f)
      scroll bar.  */
   FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = 14;
 #endif
+}
+
+static void
+x_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
+{
+  double alpha = 1.0;
+  double newval[2];
+  int i;
+  Lisp_Object item;
+  bool alpha_identical_p;
+
+  alpha_identical_p = true;
+
+  for (i = 0; i < 2; i++)
+    {
+      newval[i] = 1.0;
+      if (CONSP (arg))
+        {
+          item = CAR (arg);
+          arg  = CDR (arg);
+
+	  alpha_identical_p = false;
+        }
+      else
+        item = arg;
+
+      if (NILP (item))
+	alpha = - 1.0;
+      else if (FLOATP (item))
+	{
+	  alpha = XFLOAT_DATA (item);
+	  if (! (0 <= alpha && alpha <= 1.0))
+	    args_out_of_range (make_float (0.0), make_float (1.0));
+	}
+      else if (FIXNUMP (item))
+	{
+	  EMACS_INT ialpha = XFIXNUM (item);
+	  if (! (0 <= ialpha && ialpha <= 100))
+	    args_out_of_range (make_fixnum (0), make_fixnum (100));
+	  alpha = ialpha / 100.0;
+	}
+      else
+	wrong_type_argument (Qnumberp, item);
+      newval[i] = alpha;
+    }
+
+  for (i = 0; i < 2; i++)
+    f->alpha[i] = newval[i];
+
+  FRAME_X_OUTPUT (f)->alpha_identical_p = alpha_identical_p;
+
+  if (FRAME_TERMINAL (f)->set_frame_alpha_hook)
+    {
+      block_input ();
+      FRAME_TERMINAL (f)->set_frame_alpha_hook (f);
+      unblock_input ();
+    }
 }
 
 
@@ -4490,6 +4551,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
   struct x_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
   struct kboard *kb;
+#ifdef HAVE_GTK3
+  GdkWindow *gwin;
+#endif
 
   parms = Fcopy_alist (parms);
 
@@ -4916,6 +4980,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
       if (EQ (x_gtk_resize_child_frames, Qresize_mode))
 	gtk_container_set_resize_mode
 	  (GTK_CONTAINER (FRAME_GTK_OUTER_WIDGET (f)), GTK_RESIZE_IMMEDIATE);
+#endif
+#ifdef HAVE_GTK3
+      gwin = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
+      gdk_x11_window_set_frame_sync_enabled (gwin, FALSE);
 #endif
       unblock_input ();
     }
@@ -6765,14 +6833,12 @@ mouse buttons are released on top of FRAME.  */)
 {
   struct frame *f = decode_window_system_frame (frame);
   int ntargets = 0, nnames = 0;
-  ptrdiff_t len;
   char *target_names[2048];
   Atom *target_atoms;
   Lisp_Object lval, original, tem, t1, t2;
   Atom xaction;
   Atom action_list[2048];
   char *name_list[2048];
-  char *scratch;
 
   USE_SAFE_ALLOCA;
 
@@ -6786,10 +6852,8 @@ mouse buttons are released on top of FRAME.  */)
 
       if (ntargets < 2048)
 	{
-	  scratch = SSDATA (XCAR (targets));
-	  len = strlen (scratch);
-	  target_names[ntargets] = SAFE_ALLOCA (len + 1);
-	  strncpy (target_names[ntargets], scratch, len + 1);
+	  SAFE_ALLOCA_STRING (target_names[ntargets],
+			      XCAR (targets));
 	  ntargets++;
 	}
       else
@@ -6839,10 +6903,8 @@ mouse buttons are released on top of FRAME.  */)
 	      else
 		signal_error ("Invalid drag-and-drop action", tem);
 
-	      scratch = SSDATA (ENCODE_UTF_8 (t2));
-	      len = strlen (scratch);
-	      name_list[nnames] = SAFE_ALLOCA (len + 1);
-	      strncpy (name_list[nnames], scratch, len + 1);
+	      SAFE_ALLOCA_STRING (name_list[nnames],
+				  ENCODE_SYSTEM (t2));
 
 	      nnames++;
 	    }
@@ -9368,7 +9430,7 @@ frame_parm_handler x_frame_parm_handlers[] =
   x_set_wait_for_wm,
   gui_set_fullscreen,
   gui_set_font_backend,
-  gui_set_alpha,
+  x_set_alpha,
   x_set_sticky,
   x_set_tool_bar_position,
 #ifdef HAVE_XDBE

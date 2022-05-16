@@ -105,6 +105,7 @@
 ;; at toplevel, so the compiler doesn't know under which circumstances
 ;; they're defined.
 (declare-function gud-until  "gud" (arg))
+(declare-function gud-go     "gud" (arg))
 (declare-function gud-print  "gud" (arg))
 (declare-function gud-down   "gud" (arg))
 (declare-function gud-up     "gud" (arg))
@@ -284,8 +285,8 @@ Possible values are:
   :type '(choice
           (const :tag "Always restore" t)
           (const :tag "Don't restore" nil)
-          (const :tag "Depends on `gdb-show-main'" 'if-gdb-show-main)
-          (const :tag "Depends on `gdb-many-windows'" 'if-gdb-many-windows))
+          (const :tag "Depends on `gdb-show-main'" if-gdb-show-main)
+          (const :tag "Depends on `gdb-many-windows'" if-gdb-many-windows))
   :group 'gdb
   :version "28.1")
 
@@ -955,12 +956,16 @@ detailed description of this mode.
 			  (forward-char 2)
 			  (gud-call "-exec-until *%a" arg)))
 	   "\C-u" "Continue to current line or address.")
-  ;; TODO Why arg here?
   (gud-def
-   gud-go (gud-call (if gdb-active-process
-                        (gdb-gud-context-command "-exec-continue")
-                      "-exec-run") arg)
-   nil "Start or continue execution.")
+   gud-go (progn
+            (when arg
+              (gud-call (concat "-exec-arguments "
+                                (read-string "Arguments to exec-run: "))))
+            (gud-call
+             (if gdb-active-process
+                 (gdb-gud-context-command "-exec-continue")
+               "-exec-run")))
+   "C-v" "Start or continue execution.  Use a prefix to specify arguments.")
 
   ;; For debugging Emacs only.
   (gud-def gud-pp
@@ -1139,7 +1144,8 @@ no input, and GDB is waiting for input."
       (setq name (nth 1 (split-string define "[( ]")))
       (push (cons name define) gdb-define-alist))))
 
-(declare-function tooltip-show "tooltip" (text &optional use-echo-area))
+(declare-function tooltip-show "tooltip" (text &optional use-echo-area
+                                               text-face default-face))
 
 (defconst gdb--string-regexp (rx "\""
                                  (* (or (seq "\\" nonl)

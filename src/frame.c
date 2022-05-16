@@ -2333,7 +2333,8 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	kset_default_minibuffer_frame (kb, Qnil);
     }
 
-  /* Cause frame titles to update--necessary if we now have just one frame.  */
+  /* Cause frame titles to update--necessary if we now have just one
+     frame.  */
   if (!is_tooltip_frame)
     update_mode_lines = 15;
 

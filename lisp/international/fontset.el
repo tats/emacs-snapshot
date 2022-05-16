@@ -184,6 +184,8 @@
 	(runic #x16A0)
 	(khmer #x1780)
 	(mongolian #x1826)
+        (tai-le #x1950)
+        (tai-lue #x1980)
         (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
 	(symbol . [#x201C #x2200 #x2500])
 	(braille #x2800)
@@ -194,6 +196,7 @@
 	(kanbun #x319D)
 	(han #x5B57)
 	(yi #xA288)
+        (syloti-nagri #xA807 #xA823 #xA82C)
 	(javanese #xA980)
 	(cham #xAA00)
 	(tai-viet #xAA80)
@@ -234,12 +237,13 @@
         (brahmi #x11013 #x11045 #x11052 #x11065)
         (kaithi #x1108D #x110B0 #x110BD)
 	(mahajani #x11150)
+        (sharada #x11191 #x111B3 #x111CD)
 	(khojki #x11200)
 	(khudawadi #x112B0)
 	(grantha #x11305)
 	(newa #x11400)
 	(tirhuta #x11481 #x1148F #x114D0)
-	(siddham #x11580)
+	(siddham #x1158E #x115AF #x115D4)
 	(modi #x11600)
 	(takri #x11680)
 	(dogra #x11800)
@@ -365,8 +369,8 @@
 	(latn . latin)
 	(lepc . lepcha)
 	(limb . limbu)
-	(lina . linear_a)
-	(linb . linear_b)
+	(lina . linear-a)
+	(linb . linear-b)
 	(lisu . lisu)
 	(lyci . lycian)
 	(lydi . lydian)
@@ -433,11 +437,11 @@
 	(sora . sora-sompeng)
 	(soyo . soyombo)
 	(sund . sundanese)
-	(sylo . syloti_nagri)
+	(sylo . syloti-nagri)
 	(syrc . syriac)
 	(tglg . tagalog)
 	(tagb . tagbanwa)
-	(tale . tai_le)
+	(tale . tai-le)
 	(talu . tai-lue)
 	(lana . tai-tham)
 	(tavt . tai-viet)
@@ -747,6 +751,7 @@
 		    symbol
 		    braille
 		    yi
+                    syloti-nagri
                     javanese
 		    tai-viet
 		    aegean-number
@@ -774,7 +779,9 @@
                     old-uyghur
                     brahmi
                     kaithi
+                    sharada
                     tirhuta
+                    siddham
 		    makasar
                     dives-akuru
 		    cuneiform
