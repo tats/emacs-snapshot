@@ -160,13 +160,16 @@ struct haiku_output
   int fontset;
   int baseline_offset;
 
-  bool_bf zoomed_p : 1;
+  /* Whether or not the hourglass cursor is currently being
+     displayed.  */
   bool_bf hourglass_p : 1;
+
+  /* Whether or not the menu bar is open.  */
   bool_bf menu_bar_open_p : 1;
 
   /* Whether or not there is data in a back buffer that hasn't been
      displayed yet.  */
-  bool dirty_p;
+  bool_bf dirty_p : 1;
 
   struct font *font;
 
@@ -196,6 +199,15 @@ struct haiku_output
      They are changed only when a different background is involved.
      -1 means no color has been computed.  */
   long relief_background;
+
+  /* The absolute position of this frame.  This differs from left_pos
+     and top_pos in that the decorator and parent frames are not taken
+     into account.  */
+  int frame_x, frame_y;
+
+  /* The current fullscreen mode of this frame.  This should be `enum
+     haiku_fullscreen_mode', but that isn't available here.  */
+  int fullscreen_mode;
 };
 
 struct x_output

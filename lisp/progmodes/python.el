@@ -362,6 +362,8 @@ This variant of `rx' supports common Python named REGEXPS."
   `(rx-let ((block-start       (seq symbol-start
                                     (or "def" "class" "if" "elif" "else" "try"
                                         "except" "finally" "for" "while" "with"
+                                        ;; Python 3.10+ PEP634
+                                        "match" "case"
                                         ;; Python 3.5+ PEP492
                                         (and "async" (+ space)
                                              (or "def" "for" "with")))
@@ -538,9 +540,9 @@ the {...} holes that appear within f-strings."
         (setq ppss (syntax-ppss))))))
 
 (defvar python-font-lock-keywords-level-1
-  `((,(rx symbol-start "def" (1+ space) (group (1+ (or word ?_))))
+  `((,(python-rx symbol-start "def" (1+ space) (group symbol-name))
      (1 font-lock-function-name-face))
-    (,(rx symbol-start "class" (1+ space) (group (1+ (or word ?_))))
+    (,(python-rx symbol-start "class" (1+ space) (group symbol-name))
      (1 font-lock-type-face)))
   "Font lock keywords to use in `python-mode' for level 1 decoration.
 
@@ -606,12 +608,15 @@ builtins.")
 Search for next occurrence if REGEXP matched within a `paren'
 context (to avoid, e.g., default values for arguments or passing
 arguments by name being treated as assignments) or is followed by
-an '=' sign (to avoid '==' being treated as an assignment."
+an '=' sign (to avoid '==' being treated as an assignment.  Set
+point to the position one character before the end of the
+occurrence found so that subsequent searches can detect the '='
+sign in chained assignment."
   (lambda (limit)
     (cl-loop while (re-search-forward regexp limit t)
              unless (or (python-syntax-context 'paren)
                         (equal (char-after) ?=))
-               return t)))
+               return (progn (backward-char) t))))
 
 (defvar python-font-lock-keywords-maximum-decoration
   `((python--font-lock-f-strings)
@@ -673,7 +678,7 @@ an '=' sign (to avoid '==' being treated as an assignment."
     ;; and variants thereof
     ;; the cases
     ;;   (a) = 5
-    ;;   [a] = 5
+    ;;   [a] = 5,
     ;;   [*a] = 5, 6
     ;; are handled separately below
     (,(python-font-lock-assignment-matcher
@@ -703,10 +708,10 @@ an '=' sign (to avoid '==' being treated as an assignment."
      (1 font-lock-variable-name-face))
     ;; special cases
     ;;   (a) = 5
-    ;;   [a] = 5
+    ;;   [a] = 5,
     ;;   [*a] = 5, 6
     (,(python-font-lock-assignment-matcher
-       (python-rx (or line-start ?\;) (* space)
+       (python-rx (or line-start ?\; ?=) (* space)
                   (or "[" "(") (* space)
                   grouped-assignment-target (* space)
                   (or ")" "]") (* space)

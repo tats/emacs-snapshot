@@ -602,8 +602,17 @@ struct x_display_info
   XModifierKeymap *modmap;
 
 #ifdef HAVE_XRANDR
+  bool xrandr_supported_p;
+  int xrandr_event_base;
+  int xrandr_error_base;
   int xrandr_major_version;
   int xrandr_minor_version;
+#endif
+
+#if defined HAVE_XRANDR || defined USE_GTK
+  /* This is used to determine if the monitor configuration really
+     changed upon receiving a monitor change event.  */
+  Lisp_Object last_monitor_attributes_list;
 #endif
 
 #if defined USE_CAIRO || defined HAVE_XRENDER
@@ -690,6 +699,12 @@ struct x_display_info
   int n_protected_windows;
   int protected_windows_max;
 #endif
+
+  /* The current dimensions of the screen.  This is updated when a
+     ConfigureNotify is received for the root window, and is zero if
+     that didn't happen.  */
+  int screen_width;
+  int screen_height;
 };
 
 #ifdef HAVE_X_I18N
@@ -1439,17 +1454,8 @@ extern void x_dnd_do_unsupported_drop (struct x_display_info *, Lisp_Object,
 				       int, Time);
 extern void x_set_dnd_targets (Atom *, int);
 
-INLINE int
-x_display_pixel_height (struct x_display_info *dpyinfo)
-{
-  return HeightOfScreen (dpyinfo->screen);
-}
-
-INLINE int
-x_display_pixel_width (struct x_display_info *dpyinfo)
-{
-  return WidthOfScreen (dpyinfo->screen);
-}
+extern int x_display_pixel_height (struct x_display_info *);
+extern int x_display_pixel_width (struct x_display_info *);
 
 INLINE unsigned long
 x_make_truecolor_pixel (struct x_display_info *dpyinfo, int r, int g, int b)

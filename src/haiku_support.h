@@ -112,8 +112,14 @@ enum haiku_event_type
     DRAG_AND_DROP_EVENT,
     APP_QUIT_REQUESTED_EVENT,
     DUMMY_EVENT,
-    MENU_BAR_LEFT
+    SCREEN_CHANGED_EVENT,
+    MENU_BAR_LEFT,
   };
+
+struct haiku_screen_changed_event
+{
+  bigtime_t when;
+};
 
 struct haiku_quit_requested_event
 {
@@ -219,8 +225,9 @@ struct haiku_iconification_event
 struct haiku_move_event
 {
   void *window;
-  int x;
-  int y;
+  int x, y;
+  int decorator_width;
+  int decorator_height;
 };
 
 struct haiku_wheel_move_event
@@ -248,7 +255,7 @@ struct haiku_menu_bar_help_event
 struct haiku_zoom_event
 {
   void *window;
-  bool zoomed;
+  int fullscreen_mode;
 };
 
 enum haiku_font_specification
@@ -313,6 +320,15 @@ enum haiku_font_weight
     HAIKU_ULTRA_HEAVY = 900,
     HAIKU_BLACK	      = 1000,
     HAIKU_MEDIUM      = 2000,
+  };
+
+enum haiku_fullscreen_mode
+  {
+    FULLSCREEN_MODE_NONE,
+    FULLSCREEN_MODE_WIDTH,
+    FULLSCREEN_MODE_HEIGHT,
+    FULLSCREEN_MODE_BOTH,
+    FULLSCREEN_MODE_MAXIMIZED,
   };
 
 struct haiku_font_pattern
@@ -475,6 +491,8 @@ extern void hsl_color_rgb (double, double, double, uint32_t *);
 extern void *BBitmap_new (int, int, int);
 extern void *BBitmap_data (void *);
 extern int BBitmap_convert (void *, void **);
+extern void be_draw_cross_on_pixmap (void *, int, int, int, int,
+				     uint32_t);
 
 extern void BBitmap_free (void *);
 
@@ -494,7 +512,6 @@ extern void BWindow_center_on_screen (void *);
 extern void BWindow_change_decoration (void *, int);
 extern void BWindow_set_tooltip_decoration (void *);
 extern void BWindow_set_avoid_focus (void *, int);
-extern void BWindow_zoom (void *);
 extern void BWindow_set_size_alignment (void *, int, int);
 extern void BWindow_sync (void *);
 extern void BWindow_send_behind (void *, void *);
@@ -622,8 +639,6 @@ extern void BAlert_delete (void *);
 extern void EmacsWindow_parent_to (void *, void *);
 extern void EmacsWindow_unparent (void *);
 extern void EmacsWindow_move_weak_child (void *, void *, int, int);
-extern void EmacsWindow_make_fullscreen (void *, int);
-extern void EmacsWindow_unzoom (void *);
 
 extern void be_get_version_string (char *, int);
 extern int be_get_display_planes (void);
@@ -686,6 +701,14 @@ extern bool be_select_font (void (*) (void), bool (*) (void),
 extern int be_find_font_indices (struct haiku_font_pattern *, int *, int *);
 extern status_t be_roster_launch (const char *, const char *, char **,
 				  ptrdiff_t, void *, team_id *);
+extern void be_get_window_decorator_dimensions (void *, int *, int *, int *, int *);
+extern void be_get_window_decorator_frame (void *, int *, int *, int *, int *);
+extern void be_send_move_frame_event (void *);
+extern void be_set_window_fullscreen_mode (void *, enum haiku_fullscreen_mode);
+
+extern void be_lock_window (void *);
+extern void be_unlock_window (void *);
+extern bool be_get_explicit_workarea (int *, int *, int *, int *);
 #ifdef __cplusplus
 }
 

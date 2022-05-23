@@ -1015,36 +1015,68 @@ static unsigned int x_dnd_keyboard_state;
    terminating DND as part of the display disconnect handler.  */
 static jmp_buf x_dnd_disconnect_handler;
 
+/* Structure describing a single window that can be the target of
+   drag-and-drop operations.  */
 struct x_client_list_window
 {
+  /* The window itself.  */
   Window window;
+
+  /* The display that window is on.  */
   Display *dpy;
+
+  /* Its X and Y coordinates from the root window.  */
   int x, y;
+
+  /* The width and height of the window.  */
   int width, height;
+
+  /* Whether or not the window is mapped.  */
   bool mapped_p;
+
+  /* A bitmask describing events Emacs was listening for from the
+     window before some extra events were added in
+     `x_dnd_compute_toplevels'.  */
   long previous_event_mask;
+
+  /* The window manager state of the window.  */
   unsigned long wm_state;
 
+  /* The next window in this list.  */
   struct x_client_list_window *next;
+
+  /* The Motif protocol style of this window, if any.  */
   uint8_t xm_protocol_style;
 
+  /* The extents of the frame window in each direction.  */
   int frame_extents_left;
   int frame_extents_right;
   int frame_extents_top;
   int frame_extents_bottom;
 
 #ifdef HAVE_XSHAPE
+  /* The border width of this window.  */
   int border_width;
 
+  /* The rectangles making up the input shape.  */
   XRectangle *input_rects;
+
+  /* The number of rectangles composing the input shape.  */
   int n_input_rects;
 
+  /* The rectangles making up the bounding shape.  */
   XRectangle *bounding_rects;
+
+  /* The number of rectangles composing the bounding shape.  */
   int n_bounding_rects;
 #endif
 };
 
-static struct x_client_list_window *x_dnd_toplevels = NULL;
+/* List of all toplevels in stacking order, from top to bottom.  */
+static struct x_client_list_window *x_dnd_toplevels;
+
+/* Whether or not the window manager supports the required features
+   for `x_dnd_toplevels' to work.  */
 static bool x_dnd_use_toplevels;
 
 /* Motif drag-and-drop protocol support.  */
@@ -1082,8 +1114,8 @@ typedef enum xm_byte_order
   }
 
 #else
-#define SWAPCARD32(l)	bswap_32 (l)
-#define SWAPCARD16(l)	bswap_16 (l)
+#define SWAPCARD32(l)	((l) = bswap_32 (l))
+#define SWAPCARD16(l)	((l) = bswap_16 (l))
 #endif
 
 typedef struct xm_targets_table_header
@@ -1223,6 +1255,10 @@ typedef struct xm_top_level_leave_message
 #define XM_DROP_SITE_VALID	3
 /* #define XM_DROP_SITE_INVALID	2 */
 #define XM_DROP_SITE_NONE	1
+
+/* The version of the Motif drag-and-drop protocols that Emacs
+   supports.  */
+#define XM_DRAG_PROTOCOL_VERSION	0
 
 static uint8_t
 xm_side_effect_from_action (struct x_display_info *dpyinfo, Atom action)
@@ -1637,7 +1673,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   if (!rc)
     {
       header.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-      header.protocol = 0;
+      header.protocol = XM_DRAG_PROTOCOL_VERSION;
       header.target_list_count = 1;
       header.total_data_size = 8 + 2 + ntargets * 4;
 
@@ -1682,7 +1718,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	      xfree (recs);
 
 	      header.byte_order = XM_BYTE_ORDER_CUR_FIRST;
-	      header.protocol = 0;
+	      header.protocol = XM_DRAG_PROTOCOL_VERSION;
 	      header.target_list_count = 1;
 	      header.total_data_size = 8 + 2 + ntargets * 4;
 
@@ -1719,7 +1755,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	 data format.  To avoid confusing Motif when that happens, set
 	 it back to 0.  There will probably be no more updates to the
 	 protocol either.  */
-      header.protocol = 0;
+      header.protocol = XM_DRAG_PROTOCOL_VERSION;
       xm_write_targets_table (dpyinfo->display, drag_window,
 			      dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
 			      &header, recs);
@@ -1749,7 +1785,7 @@ xm_setup_drag_info (struct x_display_info *dpyinfo,
   if (idx != -1)
     {
       drag_initiator_info.byteorder = XM_BYTE_ORDER_CUR_FIRST;
-      drag_initiator_info.protocol = 0;
+      drag_initiator_info.protocol = XM_DRAG_PROTOCOL_VERSION;
       drag_initiator_info.table_index = idx;
       drag_initiator_info.selection = dpyinfo->Xatom_XdndSelection;
 
@@ -1958,6 +1994,9 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
   if (rc)
     {
       data = (uint8_t *) tmp_data;
+
+      if (data[1] > XM_DRAG_PROTOCOL_VERSION)
+	return 1;
 
       rec->byteorder = data[0];
       rec->protocol = data[1];
@@ -2359,7 +2398,9 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 	      && xcb_get_property_value_length (xm_property_reply) >= 4)
 	    {
 	      xmdata = xcb_get_property_value (xm_property_reply);
-	      tem->xm_protocol_style = xmdata[2];
+
+	      if (xmdata[1] <= XM_DRAG_PROTOCOL_VERSION)
+		tem->xm_protocol_style = xmdata[2];
 	    }
 #endif
 
@@ -5618,6 +5659,15 @@ show_back_buffer (struct frame *f)
 static void
 x_flip_and_flush (struct frame *f)
 {
+  /* Flipping buffers requires a working connection to the X server,
+     which isn't always present if `inhibit-redisplay' is t, since
+     this can be called from the IO error handler.  */
+  if (!NILP (Vinhibit_redisplay)
+      /* This has to work for tooltip frames, however, and redisplay
+	 cannot happen when they are being flushed anyway.  (bug#55519) */
+      && !FRAME_TOOLTIP_P (f))
+    return;
+
   block_input ();
 #ifdef HAVE_XDBE
   if (FRAME_X_NEED_BUFFER_FLIP (f))
@@ -10052,7 +10102,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   struct frame *any;
   char *atom_name, *ask_actions;
   Lisp_Object action, ltimestamp;
-  specpdl_ref ref;
+  specpdl_ref ref, count;
   ptrdiff_t i, end, fill;
   XTextProperty prop;
   xm_drop_start_message dmsg;
@@ -10179,6 +10229,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
     {
       ask_actions = NULL;
       end = 0;
+      count = SPECPDL_INDEX ();
 
       for (i = 0; i < n_ask_actions; ++i)
 	{
@@ -10200,16 +10251,25 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       prop.format = 8;
       prop.nitems = end;
 
+      record_unwind_protect_ptr (xfree, ask_actions);
+
+      /* This can potentially store a lot of data in window
+	 properties, so check for allocation errors.  */
       block_input ();
+      x_catch_errors (FRAME_X_DISPLAY (f));
       XSetTextProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
 			&prop, FRAME_DISPLAY_INFO (f)->Xatom_XdndActionDescription);
-      xfree (ask_actions);
 
       XChangeProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
 		       FRAME_DISPLAY_INFO (f)->Xatom_XdndActionList, XA_ATOM, 32,
 		       PropModeReplace, (unsigned char *) ask_action_list,
 		       n_ask_actions);
+      x_check_errors (FRAME_X_DISPLAY (f),
+		      "Can't set action descriptions: %s");
+      x_uncatch_errors_after_check ();
       unblock_input ();
+
+      unbind_to (count, Qnil);
     }
   else
     {
@@ -14500,6 +14560,60 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
     }
 }
 
+int
+x_display_pixel_height (struct x_display_info *dpyinfo)
+{
+  if (dpyinfo->screen_height)
+    return dpyinfo->screen_height;
+
+  return HeightOfScreen (dpyinfo->screen);
+}
+
+int
+x_display_pixel_width (struct x_display_info *dpyinfo)
+{
+  if (dpyinfo->screen_width)
+    return dpyinfo->screen_width;
+
+  return WidthOfScreen (dpyinfo->screen);
+}
+
+#ifdef USE_GTK
+static void
+x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
+{
+  struct x_display_info *dpyinfo;
+  struct input_event ie;
+  Lisp_Object current_monitors, terminal;
+  GdkDisplay *gdpy;
+  Display *dpy;
+
+  gdpy = gdk_screen_get_display (gscr);
+  dpy = gdk_x11_display_get_xdisplay (gdpy);
+  dpyinfo = x_display_info_for_display (dpy);
+
+  if (!dpyinfo)
+    return;
+
+  XSETTERMINAL (terminal, dpyinfo->terminal);
+
+  current_monitors
+    = Fx_display_monitor_attributes_list (terminal);
+
+  if (NILP (Fequal (current_monitors,
+		    dpyinfo->last_monitor_attributes_list)))
+    {
+      EVENT_INIT (ie);
+      ie.kind = MONITORS_CHANGED_EVENT;
+      ie.arg = terminal;
+
+      kbd_buffer_store_event (&ie);
+    }
+
+  dpyinfo->last_monitor_attributes_list = current_monitors;
+}
+#endif
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -16508,6 +16622,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
          So if this ConfigureNotify is immediately followed by another
          for the same window, use the info from the latest update, and
          consider the events all handled.  */
+
       /* Opaque resize may be trickier; ConfigureNotify events are
          mixed with Expose events for multiple windows.  */
       configureEvent = *event;
@@ -16528,6 +16643,32 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           else
 	    configureEvent = next_event;
         }
+
+      /* If we get a ConfigureNotify for the root window, this means
+	 the dimensions of the screen it's on changed.  */
+
+      if (configureEvent.xconfigure.window == dpyinfo->root_window)
+	{
+#ifdef HAVE_XRANDR
+	  /* This function is OK to call even if the X server doesn't
+	     support RandR.  */
+	  XRRUpdateConfiguration (&configureEvent);
+#elif !defined USE_GTK
+	  /* Catch screen size changes even if RandR is not available
+	     on the client.  GTK does this internally.  */
+
+	  inev.ie.kind = MONITORS_CHANGED_EVENT;
+	  XSETTERMINAL (inev.ie.arg, dpyinfo->terminal);
+
+	  /* Store this event now since inev.ie.type could be set to
+	     MOVE_FRAME_EVENT later.  */
+	  kbd_buffer_store_event (&inev.ie);
+	  inev.ie.kind = NO_EVENT;
+#endif
+
+	  dpyinfo->screen_width = configureEvent.xconfigure.width;
+	  dpyinfo->screen_height = configureEvent.xconfigure.height;
+	}
 
       if (x_dnd_in_progress && x_dnd_use_toplevels
 	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
@@ -18322,9 +18463,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      g_object_ref (copy->button.window);
 
-	      if (popup_activated ()
-		  && xev->evtype == XI_ButtonRelease)
-		goto XI_OTHER;
+	      if (popup_activated ())
+		{
+		  /* GTK+ popup menus don't respond to core buttons
+		     after Button3, so don't dismiss popup menus upon
+		     wheel movement here either.  */
+		  if (xev->detail > 3)
+		    *finish = X_EVENT_DROP;
+
+		  if (xev->evtype == XI_ButtonRelease)
+		    goto XI_OTHER;
+		}
 #endif
 
 #ifdef HAVE_XINPUT2_1
@@ -19516,6 +19665,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      if (!menu_bar_p && !tool_bar_p)
 		{
+		  x_catch_errors (dpyinfo->display);
+
 		  if (f && device->direct_p)
 		    {
 		      *finish = X_EVENT_DROP;
@@ -19544,6 +19695,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    XIAllowTouchEvents (dpyinfo->display, xev->deviceid,
 					xev->detail, xev->event, XIRejectTouch);
 #endif
+		  x_uncatch_errors ();
 		}
 	      else
 		{
@@ -20005,6 +20157,62 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    }
 	}
 #endif
+#if defined HAVE_XRANDR && !defined USE_GTK
+      if (dpyinfo->xrandr_supported_p
+	  && (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify)
+	      || event->type == (dpyinfo->xrandr_event_base
+				 + RRNotify)))
+	{
+	  union buffered_input_event *ev;
+	  Time timestamp;
+	  Lisp_Object current_monitors;
+	  XRRScreenChangeNotifyEvent *notify;
+
+	  if (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify))
+	    XRRUpdateConfiguration (event);
+
+	  if (event->type == (dpyinfo->xrandr_event_base
+			      + RRScreenChangeNotify))
+	    {
+	      notify = ((XRRScreenChangeNotifyEvent *) event);
+	      timestamp = notify->timestamp;
+
+	      dpyinfo->screen_width = notify->width;
+	      dpyinfo->screen_height = notify->height;
+	    }
+	  else
+	    timestamp = 0;
+
+	  ev = (kbd_store_ptr == kbd_buffer
+		? kbd_buffer + KBD_BUFFER_SIZE - 1
+		: kbd_store_ptr - 1);
+
+	  if (kbd_store_ptr != kbd_fetch_ptr
+	      && ev->ie.kind == MONITORS_CHANGED_EVENT
+	      && XTERMINAL (ev->ie.arg) == dpyinfo->terminal)
+	    /* Don't store a MONITORS_CHANGED_EVENT if there is
+	       already an undelivered event on the queue.  */
+	    goto OTHER;
+
+	  inev.ie.kind = MONITORS_CHANGED_EVENT;
+	  inev.ie.timestamp = timestamp;
+	  XSETTERMINAL (inev.ie.arg, dpyinfo->terminal);
+
+	  /* Also don't do anything if the monitor configuration
+	     didn't really change.  */
+
+	  current_monitors
+	    = Fx_display_monitor_attributes_list (inev.ie.arg);
+
+	  if (!NILP (Fequal (current_monitors,
+			     dpyinfo->last_monitor_attributes_list)))
+	    inev.ie.kind = NO_EVENT;
+
+	  dpyinfo->last_monitor_attributes_list = current_monitors;
+	}
+#endif
     OTHER:
 #ifdef USE_X_TOOLKIT
       block_input ();
@@ -20134,8 +20342,14 @@ XTread_socket (struct terminal *terminal, struct input_event *hold_quit)
   /* Don't allow XTread_socket to do anything if drag-and-drop is in
      progress.  If unblock_input causes XTread_socket to be called and
      read X events while the drag-and-drop event loop is in progress,
-     things can go wrong very quick.  */
-  if (x_dnd_in_progress || x_dnd_waiting_for_finish)
+     things can go wrong very quick.
+
+     That doesn't matter for events from displays other than the
+     display of the drag-and-drop operation, though.  */
+  if ((x_dnd_in_progress
+       && dpyinfo->display == FRAME_X_DISPLAY (x_dnd_frame))
+      || (x_dnd_waiting_for_finish
+	  && dpyinfo->display == x_dnd_finish_display))
     return 0;
 
   block_input ();
@@ -22997,6 +23211,10 @@ x_iconify_frame (struct frame *f)
     msg.xclient.message_type = FRAME_DISPLAY_INFO (f)->Xatom_wm_change_state;
     msg.xclient.format = 32;
     msg.xclient.data.l[0] = IconicState;
+    msg.xclient.data.l[1] = 0;
+    msg.xclient.data.l[2] = 0;
+    msg.xclient.data.l[3] = 0;
+    msg.xclient.data.l[4] = 0;
 
     if (! XSendEvent (FRAME_X_DISPLAY (f),
 		      FRAME_DISPLAY_INFO (f)->root_window,
@@ -23226,7 +23444,6 @@ x_destroy_window (struct frame *f)
     x_free_frame_resources (f);
 
   xfree (f->output_data.x->saved_menu_event);
-  xfree (f->output_data.x);
 
 #ifdef HAVE_X_I18N
   if (f->output_data.x->preedit_chars)
@@ -23238,6 +23455,7 @@ x_destroy_window (struct frame *f)
     XFree (f->output_data.x->xi_masks);
 #endif
 
+  xfree (f->output_data.x);
   f->output_data.x = NULL;
 
   dpyinfo->reference_count--;
@@ -23689,6 +23907,10 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
   static char const cm_atom_fmt[] = "_NET_WM_CM_S%d";
   char cm_atom_sprintf[sizeof cm_atom_fmt - 2 + INT_STRLEN_BOUND (int)];
+#ifdef USE_GTK
+  GdkDisplay *gdpy;
+  GdkScreen *gscr;
+#endif
 
   block_input ();
 
@@ -23849,6 +24071,11 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       return 0;
     }
 #endif
+
+  /* Select for structure events on the root window, since this allows
+     us to record changes to the size of the screen.  */
+
+  XSelectInput (dpy, DefaultRootWindow (dpy), StructureNotifyMask);
 
   /* We have definitely succeeded.  Record the new connection.  */
 
@@ -24291,14 +24518,53 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
 
 #ifdef HAVE_XRANDR
-  int xrr_event_base, xrr_error_base;
-  bool xrr_ok = false;
-  xrr_ok = XRRQueryExtension (dpy, &xrr_event_base, &xrr_error_base);
-  if (xrr_ok)
+  Lisp_Object term;
+
+#ifndef USE_GTK
+  dpyinfo->last_monitor_attributes_list = Qnil;
+#endif
+  dpyinfo->xrandr_supported_p
+    = XRRQueryExtension (dpy, &dpyinfo->xrandr_event_base,
+			 &dpyinfo->xrandr_error_base);
+
+  XSETTERMINAL (term, terminal);
+
+  if (dpyinfo->xrandr_supported_p)
     {
       XRRQueryVersion (dpy, &dpyinfo->xrandr_major_version,
 		       &dpyinfo->xrandr_minor_version);
+
+#ifndef USE_GTK
+      if (dpyinfo->xrandr_major_version == 1
+	  && dpyinfo->xrandr_minor_version >= 2)
+	{
+	  XRRSelectInput (dpyinfo->display,
+			  dpyinfo->root_window,
+			  (RRScreenChangeNotifyMask
+			   | RRCrtcChangeNotifyMask
+			   | RROutputChangeNotifyMask
+			   /* Emacs doesn't actually need this, but GTK
+			      selects for it when the display is
+			      initialized.  */
+			   | RROutputPropertyNotifyMask));
+
+	  dpyinfo->last_monitor_attributes_list
+	    = Fx_display_monitor_attributes_list (term);
+	}
+#endif
     }
+#endif
+
+#ifdef USE_GTK
+  dpyinfo->last_monitor_attributes_list
+    = Fx_display_monitor_attributes_list (term);
+
+  gdpy = gdk_x11_lookup_xdisplay (dpyinfo->display);
+  gscr = gdk_display_get_default_screen (gdpy);
+
+  g_signal_connect (G_OBJECT (gscr), "monitors-changed",
+		    G_CALLBACK (x_monitors_changed_cb),
+		    NULL);
 #endif
 
 #ifdef HAVE_XKB
@@ -24656,7 +24922,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   /* Only do this for the very first display in the Emacs session.
      Ignore X session management when Emacs was first started on a
      tty or started as a daemon.  */
-  if (terminal->id == 1 && ! IS_DAEMON)
+  if (!dpyinfo->next && ! IS_DAEMON)
     x_session_initialize (dpyinfo);
 #endif
 
@@ -25106,7 +25372,8 @@ mark_xterm (void)
       mark_object (val);
     }
 
-#if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS
+#if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
+  || defined HAVE_XRANDR || defined USE_GTK
   for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
     {
 #ifdef HAVE_XINPUT2
@@ -25116,6 +25383,9 @@ mark_xterm (void)
 #ifdef USE_TOOLKIT_SCROLL_BARS
       for (i = 0; i < dpyinfo->n_protected_windows; ++i)
 	mark_object (dpyinfo->protected_windows[i]);
+#endif
+#if defined HAVE_XRANDR || defined USE_GTK
+      mark_object (dpyinfo->last_monitor_attributes_list);
 #endif
     }
 #endif

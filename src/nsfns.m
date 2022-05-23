@@ -47,6 +47,13 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #ifdef NS_IMPL_COCOA
 #include <IOKit/graphics/IOGraphicsLib.h>
 #include "macfont.h"
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
+#include <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 120000
+#define IOMasterPort IOMainPort
+#endif
+#endif
 #endif
 
 #ifdef HAVE_NS
@@ -789,11 +796,13 @@ ns_implicitly_set_icon_type (struct frame *f)
   Lisp_Object chain, elt;
   NSAutoreleasePool *pool;
   BOOL setMini = YES;
+  NSWorkspace *workspace;
 
   NSTRACE ("ns_implicitly_set_icon_type");
 
   block_input ();
   pool = [[NSAutoreleasePool alloc] init];
+  workspace = [NSWorkspace sharedWorkspace];
   if (f->output_data.ns->miniimage
       && [[NSString stringWithLispString:f->name]
                isEqualToString: [(NSImage *)f->output_data.ns->miniimage name]])
@@ -838,7 +847,21 @@ ns_implicitly_set_icon_type (struct frame *f)
 
   if (image == nil)
     {
-      image = [[[NSWorkspace sharedWorkspace] iconForFileType: @"text"] retain];
+#ifndef NS_IMPL_GNUSTEP
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+      if ([workspace respondsToSelector: @selector (iconForContentType:)])
+#endif
+	image = [[workspace iconForContentType:
+			      [UTType typeWithIdentifier: @"text"]] retain];
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+      else
+#endif
+#endif
+#endif
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+	image = [[workspace iconForFileType: @"text"] retain];
+#endif
       setMini = NO;
     }
 
@@ -1757,7 +1780,20 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
   ns_fd_data.ret = NO;
 #ifdef NS_IMPL_COCOA
   if (! NILP (mustmatch) || ! NILP (dir_only_p))
-    [panel setAllowedFileTypes: nil];
+    {
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 120000
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+      if ([panel respondsToSelector: @selector (setAllowedContentTypes:)])
+#endif
+	[panel setAllowedContentTypes: [NSArray array]];
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+      else
+#endif
+#endif
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000
+	[panel setAllowedFileTypes: nil];
+#endif
+    }
   if (dirS) [panel setDirectoryURL: [NSURL fileURLWithPath: dirS]];
   if (initS && NILP (Ffile_directory_p (init)))
     [panel setNameFieldStringValue: [initS lastPathComponent]];
@@ -2733,7 +2769,8 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
         }
       else
         {
-          // Flip y coordinate as NS has y starting from the bottom.
+          /* Flip y coordinate as NS screen coordinates originate from
+	     the bottom.  */
           y = (short) (primary_display_height - fr.size.height - fr.origin.y);
           vy = (short) (primary_display_height -
                         vfr.size.height - vfr.origin.y);
@@ -2745,11 +2782,12 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
       m->geom.height = (unsigned short) fr.size.height;
 
       m->work.x = (short) vfr.origin.x;
-      // y is flipped on NS, so vy - y are pixels missing at the bottom,
-      // and fr.size.height - vfr.size.height are pixels missing in total.
-      // Pixels missing at top are
-      // fr.size.height - vfr.size.height - vy + y.
-      // work.y is then pixels missing at top + y.
+      /* y is flipped on NS, so vy - y are pixels missing at the
+	 bottom, and fr.size.height - vfr.size.height are pixels
+	 missing in total.
+
+	 Pixels missing at top are fr.size.height - vfr.size.height -
+	 vy + y.  work.y is then pixels missing at top + y.  */
       m->work.y = (short) (fr.size.height - vfr.size.height) - vy + y + y;
       m->work.width = (unsigned short) vfr.size.width;
       m->work.height = (unsigned short) vfr.size.height;
@@ -2764,13 +2802,14 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
       }
 
 #else
-      // Assume 92 dpi as x-display-mm-height/x-display-mm-width does.
+      /* Assume 92 dpi as x-display-mm-height and x-display-mm-width
+	 do.  */
       m->mm_width = (int) (25.4 * fr.size.width / 92.0);
       m->mm_height = (int) (25.4 * fr.size.height / 92.0);
 #endif
     }
 
-  // Primary monitor is always first for NS.
+  /* Primary monitor is always ordered first for NS.  */
   attributes_list = ns_make_monitor_attribute_list (monitors, n_monitors,
                                                     0, "NS");
 

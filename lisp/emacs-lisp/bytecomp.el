@@ -1494,15 +1494,16 @@ when printing the error message."
                 byte-compile-unresolved-functions)))))
 
 (defun byte-compile-emit-callargs-warn (name actual-args min-args max-args)
-  (byte-compile-warn-x
-   name
-   "%s called with %d argument%s, but %s %s"
-   name actual-args
-   (if (= 1 actual-args) "" "s")
-   (if (< actual-args min-args)
-       "requires"
-     "accepts only")
-   (byte-compile-arglist-signature-string (cons min-args max-args))))
+  (when (byte-compile-warning-enabled-p 'callargs name)
+    (byte-compile-warn-x
+     name
+     "`%s' called with %d argument%s, but %s %s"
+     name actual-args
+     (if (= 1 actual-args) "" "s")
+     (if (< actual-args min-args)
+         "requires"
+       "accepts only")
+     (byte-compile-arglist-signature-string (cons min-args max-args)))))
 
 (defun byte-compile--check-arity-bytecode (form bytecode)
   "Check that the call in FORM matches that allowed by BYTECODE."
@@ -3114,7 +3115,8 @@ lambda-expression."
                        ;; which may include "calls" to
                        ;; internal-make-closure (Bug#29988).
                        lexical-binding)
-                   (setq int `(,(car int) ,newform)))))
+                   (setq int `(,(car int) ,newform))
+                 (setq int (byte-run-strip-symbol-positions int))))) ; for compile-defun.
             ((cdr int)                  ; Invalid (interactive . something).
 	     (byte-compile-warn-x int "malformed interactive spec: %s"
 				  int))))
@@ -3129,7 +3131,7 @@ lambda-expression."
                                         (byte-compile-make-lambda-lexenv
                                          arglistvars))
                                    reserved-csts))
-          (bare-arglist arglist))
+          (bare-arglist (byte-run-strip-symbol-positions arglist))) ; for compile-defun.
       ;; Build the actual byte-coded function.
       (cl-assert (eq 'byte-code (car-safe compiled)))
       (let ((out
@@ -3837,12 +3839,13 @@ If it is nil, then the handler is \"byte-compile-SYMBOL.\""
 
 
 (defun byte-compile-subr-wrong-args (form n)
-  (byte-compile-warn-x (car form)
-                        "`%s' called with %d arg%s, but requires %s"
-                        (car form) (length (cdr form))
-                        (if (= 1 (length (cdr form))) "" "s") n)
-  ;; Get run-time wrong-number-of-args error.
-  (byte-compile-normal-call form))
+  (when (byte-compile-warning-enabled-p 'callargs (car form))
+    (byte-compile-warn-x (car form)
+                         "`%s' called with %d arg%s, but requires %s"
+                         (car form) (length (cdr form))
+                         (if (= 1 (length (cdr form))) "" "s") n)
+    ;; Get run-time wrong-number-of-args error.
+    (byte-compile-normal-call form)))
 
 (defun byte-compile-no-args (form)
   (if (not (= (length form) 1))
@@ -3951,7 +3954,9 @@ discarding."
 (byte-defop-compiler-1 internal-get-closed-var byte-compile-get-closed-var)
 
 (defun byte-compile-make-closure (form)
-  "Byte-compile the special `internal-make-closure' form."
+  "Byte-compile the special `internal-make-closure' form.
+
+This function is never called when `lexical-binding' is nil."
   (if byte-compile--for-effect (setq byte-compile--for-effect nil)
     (let* ((vars (nth 1 form))
            (env (nth 2 form))
@@ -3973,24 +3978,33 @@ discarding."
                                     (number-sequence 4 (1- (length fun)))))
                   (proto-fun
                    (apply #'make-byte-code
-                          (aref fun 0) (aref fun 1)
+                          (aref fun 0)  ; The arglist is always the 15-bit
+                                        ; form, never the list of symbols.
+                          (aref fun 1)  ; The byte-code.
                           ;; Prepend dummy cells to the constant vector,
                           ;; to get the indices right when disassembling.
                           (vconcat dummy-vars (aref fun 2))
-                          (aref fun 3)
+                          (aref fun 3)  ; Stack depth of function
                           (if docstring-exp
-                              (cons (eval docstring-exp t) (cdr opt-args))
+                              (cons
+                               (eval (byte-run-strip-symbol-positions
+                                      docstring-exp)
+                                     t)
+                               (cdr opt-args)) ; The interactive spec will
+                                               ; have been stripped in
+                                               ; `byte-compile-lambda'.
                             opt-args))))
              `(make-closure ,proto-fun ,@env))
          ;; Nontrivial doc string expression: create a bytecode object
          ;; from small pieces at run time.
          `(make-byte-code
-           ',(aref fun 0) ',(aref fun 1)
-           (vconcat (vector . ,env) ',(aref fun 2))
+           ',(aref fun 0)         ; 15-bit form of arglist descriptor.
+           ',(aref fun 1)         ; The byte-code.
+           (vconcat (vector . ,env) ',(aref fun 2)) ; constant vector.
            ,@(let ((rest (nthcdr 3 (mapcar (lambda (x) `',x) fun))))
                (if docstring-exp
                    `(,(car rest)
-                     ,docstring-exp
+                     ,(byte-run-strip-symbol-positions docstring-exp)
                      ,@(cddr rest))
                  rest))))
          ))))

@@ -2845,6 +2845,11 @@ the function specified in @code{pop-up-frame-function}
 the newly created frame's parameters.
 @end defun
 
+@defun display-buffer-full-frame buffer alist
+This function displays the buffer on the current frame, deleting all
+other windows so that it takes up the full frame.
+@end defun
+
 @defun display-buffer-in-child-frame buffer alist
 This function tries to display @var{buffer} in a child frame
 (@pxref{Child Frames}) of the selected frame, either reusing an
@@ -3298,6 +3303,13 @@ allowed to split the window placing the new window to the right.  If
 the value is an integer, that means to split only if the original
 window has at least that many columns.  If the value is @code{nil},
 that means not to split this way.
+@end defopt
+
+@defopt display-buffer-avoid-small-windows
+If non-@code{nil}, this should be a number.  Windows that have fewer
+lines than that will be avoided when choosing an existing window.  The
+value is interpreted in units of the frame's canonical line height,
+like @code{window-total-height} does (@pxref{Window Sizes}).
 @end defopt
 
 @defopt even-window-sizes
@@ -6136,11 +6148,10 @@ configuration on the current frame.
 This function returns @code{t} if @var{object} is a window configuration.
 @end defun
 
-@defun compare-window-configurations config1 config2
-This function compares two window configurations as regards the
-structure of windows, but ignores the values of point and the
-saved scrolling positions---it can return @code{t} even if those
-aspects differ.
+@defun window-configuration-equal-p config1 config2
+This function says whether two window configurations have the same
+window layout, but ignores the values of point and the saved scrolling
+positions---it can return @code{t} even if those aspects differ.
 @end defun
 
 @defun window-configuration-frame config

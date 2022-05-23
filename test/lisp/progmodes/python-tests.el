@@ -214,6 +214,18 @@ aliqua."
     (should (string= (buffer-string) "\"\""))
     (should (null (nth 3 (syntax-ppss))))))
 
+(ert-deftest python-font-lock-keywords-level-1-1 ()
+  (python-tests-assert-faces
+   "def func():"
+   '((1 . font-lock-keyword-face) (4)
+     (5 . font-lock-function-name-face) (9))))
+
+(ert-deftest python-font-lock-keywords-level-1-2 ()
+  "Invalid function name should not be font-locked."
+  (python-tests-assert-faces
+   "def 1func():"
+   '((1 . font-lock-keyword-face) (4))))
+
 (ert-deftest python-font-lock-assignment-statement-1 ()
   (python-tests-assert-faces
    "a, b, c = 1, 2, 3"
@@ -342,6 +354,13 @@ aliqua."
      (16 . font-lock-variable-name-face) (17))))
 
 (ert-deftest python-font-lock-assignment-statement-17 ()
+  (python-tests-assert-faces
+   "(a) = (b) = 1"
+   `((1)
+     (2 . font-lock-variable-name-face) (3)
+     (8 . font-lock-variable-name-face) (9))))
+
+(ert-deftest python-font-lock-assignment-statement-18 ()
   (python-tests-assert-faces
    "CustomInt = int
 
@@ -1508,6 +1527,31 @@ this is an arbitrarily
      (python-indent-region (point-min) (point-max))
      (should (string= (buffer-substring-no-properties (point-min) (point-max))
                       expected)))))
+
+(ert-deftest python-indent-after-match-block ()
+  "Test PEP634 match."
+  (python-tests-with-temp-buffer
+   "
+match foo:
+"
+   (should (eq (car (python-indent-context)) :no-indent))
+   (should (= (python-indent-calculate-indentation) 0))
+   (goto-char (point-max))
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-after-case-block ()
+  "Test PEP634 case."
+  (python-tests-with-temp-buffer
+   "
+match foo:
+    case 1:
+"
+   (should (eq (car (python-indent-context)) :no-indent))
+   (should (= (python-indent-calculate-indentation) 0))
+   (goto-char (point-max))
+   (should (eq (car (python-indent-context)) :after-block-start))
+   (should (= (python-indent-calculate-indentation) 8))))
 
 
 ;;; Filling

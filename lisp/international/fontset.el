@@ -182,6 +182,8 @@
 	(canadian-aboriginal #x14C0)
 	(ogham #x168F)
 	(runic #x16A0)
+        (tagalog #x1700)
+        (hanunoo #x1720)
 	(khmer #x1780)
 	(mongolian #x1826)
         (tai-le #x1950)
@@ -244,7 +246,7 @@
 	(newa #x11400)
 	(tirhuta #x11481 #x1148F #x114D0)
 	(siddham #x1158E #x115AF #x115D4)
-	(modi #x11600)
+	(modi #x1160E #x11630 #x11655)
 	(takri #x11680)
 	(dogra #x11800)
 	(warang-citi #x118A1)
@@ -748,6 +750,8 @@
                     cham
 		    ogham
 		    runic
+                    tagalog
+                    hanunoo
 		    symbol
 		    braille
 		    yi
@@ -782,6 +786,7 @@
                     sharada
                     tirhuta
                     siddham
+                    modi
 		    makasar
                     dives-akuru
 		    cuneiform

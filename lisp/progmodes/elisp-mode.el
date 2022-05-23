@@ -627,13 +627,13 @@ functions are annotated with \"<f>\" via the
            ;; t if in function position.
            (funpos (eq (char-before beg) ?\())
            (quoted (elisp--form-quoted-p beg))
-           (fun-sym (condition-case nil
-                        (save-excursion
-                          (up-list -1)
-                          (forward-char 1)
-                          (and (memq (char-syntax (char-after)) '(?w ?_))
-                               (read (current-buffer))))
-                      (error nil))))
+           (is-ignore-error
+            (condition-case nil
+                (save-excursion
+                  (up-list -1)
+                  (forward-char 1)
+                  (looking-at-p "ignore-error\\>"))
+              (error nil))))
       (when (and end (or (not (nth 8 (syntax-ppss)))
                          (memq (char-before beg) '(?` ?‘))))
         (let ((table-etc
@@ -642,7 +642,7 @@ functions are annotated with \"<f>\" via the
                     ;; FIXME: We could look at the first element of
                     ;; the current form and use it to provide a more
                     ;; specific completion table in more cases.
-                    ((eq fun-sym 'ignore-error)
+                    (is-ignore-error
                      (list t (elisp--completion-local-symbols)
                            :predicate (lambda (sym)
                                         (get sym 'error-conditions))))
@@ -2088,7 +2088,9 @@ current buffer state and calls REPORT-FN when done."
     (when (process-live-p elisp-flymake--byte-compile-process)
       (kill-process elisp-flymake--byte-compile-process)))
   (let ((temp-file (make-temp-file "elisp-flymake-byte-compile"))
-        (source-buffer (current-buffer)))
+        (source-buffer (current-buffer))
+        (coding-system-for-write 'utf-8-unix)
+        (coding-system-for-read 'utf-8))
     (save-restriction
       (widen)
       (write-region (point-min) (point-max) temp-file nil 'nomessage))
@@ -2138,6 +2140,8 @@ Runs in a batch-mode Emacs.  Interactively use variable
   (interactive (list buffer-file-name))
   (let* ((file (or file
                    (car command-line-args-left)))
+         (coding-system-for-read 'utf-8-unix)
+         (coding-system-for-write 'utf-8)
          (byte-compile-log-buffer
           (generate-new-buffer " *dummy-byte-compile-log-buffer*"))
          (byte-compile-dest-file-function #'ignore)

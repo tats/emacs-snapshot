@@ -9,10 +9,9 @@
 
 @copying
 Copyright @copyright{} 2001--2022 Free Software Foundation, Inc.@*
-Copyright @copyright{} 1994, 1995, 1996, 1997, 1998, 1999, 2000
-Reuven M. Lerner@*
-Copyright @copyright{} 1992, 1993 Steven Byrnes@*
-Copyright @copyright{} 1990, 1991, 1992 Joseph Brian Wells@*
+Copyright @copyright{} 1994--2000 Reuven M. Lerner@*
+Copyright @copyright{} 1992--1993 Steven Byrnes@*
+Copyright @copyright{} 1990--1992 Joseph Brian Wells@*
 
 @quotation
 This list of frequently asked questions about GNU Emacs with answers
@@ -882,10 +881,11 @@ divergent TECO command sets and key bindings at MIT, and completed by
 RMS.
 
 Many people have said that TECO code looks a lot like line noise; you
-can read more at @uref{news:alt.lang.teco}.  Someone has written a TECO
-implementation in Emacs Lisp (to find it, see @ref{Packages that do not
-come with Emacs}); it would be an interesting project to run the
-original TECO Emacs inside of Emacs.
+can read more on
+@uref{https://en.wikipedia.org/wiki/TECO_(text_editor), Wikipedia}.
+Someone has written a TECO implementation in Emacs Lisp (to find it,
+see @ref{Packages that do not come with Emacs}); it would be an
+interesting project to run the original TECO Emacs inside of Emacs.
 
 @cindex Why Emacs?
 For some not-so-serious alternative reasons for Emacs to have that
@@ -3712,7 +3712,6 @@ information is available from
 * Compose Character::
 * Binding combinations of modifiers and function keys::
 * Meta key does not work in xterm::
-* SPC no longer completes file names::
 @end menu
 
 @node Binding keys to commands
@@ -4158,10 +4157,6 @@ If there is an @code{rlogin} connection between @code{xterm} and Emacs, the
 of every character.
 
 @item
-If Emacs is running on Ultrix, it is reported that evaluating
-@code{(set-input-mode t nil)} helps.
-
-@item
 If all else fails, you can make @code{xterm} generate @kbd{@key{ESC} W} when
 you type @kbd{M-W}, which is the same conversion Emacs would make if it
 got the @kbd{M-W} anyway.  In X11R4, the following resource
@@ -4185,22 +4180,6 @@ XTerm.VT100.Translations: #override \
 You might have to replace @samp{Meta} with @samp{Alt}.
 
 @end itemize
-
-@node SPC no longer completes file names
-@section Why doesn't @key{SPC} complete file names anymore?
-@cindex @kbd{SPC} file name completion
-
-Starting with Emacs 22.1, @kbd{SPC} no longer completes file names in
-the minibuffer, so that file names with embedded spaces could be typed
-without the need to quote the spaces.
-
-You can get the old behavior by binding @kbd{SPC} to
-@code{minibuffer-complete-word} in the minibuffer, as follows:
-
-@lisp
-(define-key minibuffer-local-filename-completion-map (kbd "SPC")
-  'minibuffer-complete-word)
-@end lisp
 
 @c ------------------------------------------------------------
 @node Alternate character sets

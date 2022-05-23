@@ -2488,8 +2488,16 @@ and no others."
 
 (defalias 'some-window 'get-window-with-predicate)
 
+(defcustom display-buffer-avoid-small-windows nil
+  "If non-nil, windows that have fewer lines than this are avoided.
+This is used by `get-lru-window'.  The value is interpreted in units
+of the frame's canonical line height, like `window-total-height' does."
+  :type '(choice (const nil) number)
+  :version "29.1"
+  :group 'windows)
+
 (defun get-lru-window (&optional all-frames dedicated not-selected no-other)
-   "Return the least recently used window on frames specified by ALL-FRAMES.
+  "Return the least recently used window on frames specified by ALL-FRAMES.
 Return a full-width window if possible.  A minibuffer window is
 never a candidate.  A dedicated window is never a candidate
 unless DEDICATED is non-nil, so if all windows are dedicated, the
@@ -2513,15 +2521,23 @@ have special meanings:
 - A frame means consider all windows on that frame only.
 
 Any other value of ALL-FRAMES means consider all windows on the
-selected frame and no others."
-   (let (best-window best-time second-best-window second-best-time time)
-    (dolist (window (window-list-1 nil 'nomini all-frames))
+selected frame and no others.
+
+`display-buffer-avoid-small-windows', if non-nil, is also taken into
+consideration.  Windows whose height is smaller that the value of that
+variable will be avoided if larger windows are available."
+  (let ((windows (window-list-1 nil 'nomini all-frames))
+        best-window best-time second-best-window second-best-time time)
+    (dolist (window windows)
       (when (and (or dedicated (not (window-dedicated-p window)))
 		 (or (not not-selected) (not (eq window (selected-window))))
                  (or (not no-other)
                      (not (window-parameter window 'no-other-window))))
 	(setq time (window-use-time window))
 	(if (or (eq window (selected-window))
+                (and display-buffer-avoid-small-windows
+                     (< (window-height window)
+                        display-buffer-avoid-small-windows))
 		(not (window-full-width-p window)))
 	    (when (or (not second-best-time) (< time second-best-time))
 	      (setq second-best-time time)
@@ -5142,7 +5158,7 @@ all window-local buffer lists."
   :version "27.1"
   :group 'windows)
 
-(defun quit-restore-select-window (window)
+(defun window--quit-restore-select-window (window)
   "Select WINDOW after having quit another one.
 Do not select an inactive minibuffer window."
   (when (and (window-live-p window)
@@ -5188,6 +5204,7 @@ nil means to not handle the buffer in a particular way.  This
   (setq window (window-normalize-window window t))
   (let* ((buffer (window-buffer window))
 	 (quit-restore (window-parameter window 'quit-restore))
+	 (quit-restore-2 (nth 2 quit-restore))
          (prev-buffer (catch 'prev-buffer
                         (dolist (buf (window-prev-buffers window))
                           (unless (eq (car buf) buffer)
@@ -5199,13 +5216,13 @@ nil means to not handle the buffer in a particular way.  This
      ((and dedicated (not (eq dedicated 'side))
            (window--delete window 'dedicated (eq bury-or-kill 'kill)))
       ;; If the previously selected window is still alive, select it.
-      (quit-restore-select-window (nth 2 quit-restore)))
+      (window--quit-restore-select-window quit-restore-2))
      ((and (not prev-buffer)
 	   (eq (nth 1 quit-restore) 'tab)
 	   (eq (nth 3 quit-restore) buffer))
       (tab-bar-close-tab)
       ;; If the previously selected window is still alive, select it.
-      (quit-restore-select-window (nth 2 quit-restore)))
+      (window--quit-restore-select-window quit-restore-2))
      ((and (not prev-buffer)
 	   (or (eq (nth 1 quit-restore) 'frame)
 	       (and (eq (nth 1 quit-restore) 'window)
@@ -5217,7 +5234,7 @@ nil means to not handle the buffer in a particular way.  This
 	   ;; Delete WINDOW if possible.
 	   (window--delete window nil (eq bury-or-kill 'kill)))
       ;; If the previously selected window is still alive, select it.
-      (quit-restore-select-window (nth 2 quit-restore)))
+      (window--quit-restore-select-window quit-restore-2))
      ((and (listp (setq quad (nth 1 quit-restore)))
 	   (buffer-live-p (car quad))
 	   (eq (nth 3 quit-restore) buffer))
@@ -5262,7 +5279,7 @@ nil means to not handle the buffer in a particular way.  This
       (set-window-parameter window 'quit-restore nil)
       ;; Select old window.
       ;; If the previously selected window is still alive, select it.
-      (quit-restore-select-window (nth 2 quit-restore)))
+      (window--quit-restore-select-window quit-restore-2))
      (t
       ;; Show some other buffer in WINDOW and reset the quit-restore
       ;; parameter.
@@ -5276,7 +5293,7 @@ nil means to not handle the buffer in a particular way.  This
             (set-window-dedicated-p window 'side))
         (window--delete window nil (eq bury-or-kill 'kill))
       ;; If the previously selected window is still alive, select it.
-      (quit-restore-select-window (nth 2 quit-restore)))))
+      (window--quit-restore-select-window quit-restore-2))))
 
     ;; Deal with the buffer.
     (cond
@@ -7434,6 +7451,7 @@ The actual non-nil value of this variable will be copied to the
 	   (const display-buffer-pop-up-window)
 	   (const display-buffer-same-window)
 	   (const display-buffer-pop-up-frame)
+	   (const display-buffer-full-frame)
 	   (const display-buffer-in-child-frame)
 	   (const display-buffer-below-selected)
 	   (const display-buffer-at-bottom)
@@ -7580,6 +7598,7 @@ to an expression containing one of these \"action\" functions:
  `display-buffer-use-least-recent-window' -- Try to avoid re-using
     windows that have recently been switched to.
  `display-buffer-pop-up-window' -- Pop up a new window.
+ `display-buffer-full-frame' -- Delete other windows and use the full frame.
  `display-buffer-below-selected' -- Use or pop up a window below
     the selected one.
  `display-buffer-at-bottom' -- Use or pop up a window at the
@@ -7812,6 +7831,23 @@ indirectly called by the latter."
 	      (window-minibuffer-p)
 	      (window-dedicated-p))
     (window--display-buffer buffer (selected-window) 'reuse alist)))
+
+(defun display-buffer-full-frame (buffer alist)
+  "Display BUFFER in the current frame, taking the entire frame.
+ALIST is an association list of action symbols and values.  See
+Info node `(elisp) Buffer Display Action Alists' for details of
+such alists.
+
+This is an action function for buffer display, see Info
+node `(elisp) Buffer Display Action Functions'.  It should be
+called only by `display-buffer' or a function directly or
+indirectly called by the latter."
+  (when-let ((window (or (display-buffer-reuse-window buffer alist)
+                         (display-buffer-same-window buffer alist)
+                         (display-buffer-pop-up-window buffer alist)
+                         (display-buffer-use-some-window buffer alist))))
+    (delete-other-windows window)
+    window))
 
 (defun display-buffer--maybe-same-window (buffer alist)
   "Conditionally display BUFFER in the selected window.

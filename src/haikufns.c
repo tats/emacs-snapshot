@@ -104,6 +104,22 @@ get_geometry_from_preferences (struct haiku_display_info *dpyinfo,
   return parms;
 }
 
+/* Update the left and top offsets of F after its decorators
+   change.  */
+static void
+haiku_update_after_decoration_change (struct frame *f)
+{
+  /* Don't reset offsets during initial frame creation, since the
+     contents of f->left_pos and f->top_pos won't be applied to the
+     window until `x-create-frame' finishes, so setting them here will
+     overwrite the offsets that the window should be moved to.  */
+
+  if (!FRAME_OUTPUT_DATA (f)->configury_done)
+    return;
+
+  be_send_move_frame_event (FRAME_HAIKU_WINDOW (f));
+}
+
 void
 haiku_change_tool_bar_height (struct frame *f, int height)
 {
@@ -252,6 +268,22 @@ haiku_set_tab_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
     haiku_change_tab_bar_height (f, nlines * FRAME_LINE_HEIGHT (f));
 }
 
+void
+gamma_correct (struct frame *f, Emacs_Color *color)
+{
+  if (f->gamma)
+    {
+      color->red = (pow (color->red / 65535.0, f->gamma)
+		    * 65535.0 + 0.5);
+      color->green = (pow (color->green / 65535.0, f->gamma)
+		      * 65535.0 + 0.5);
+      color->blue = (pow (color->blue / 65535.0, f->gamma)
+		     * 65535.0 + 0.5);
+      color->pixel = RGB_TO_ULONG (color->red / 256,
+				   color->green / 256,
+				   color->blue / 256);
+    }
+}
 
 int
 haiku_get_color (const char *name, Emacs_Color *color)
@@ -326,12 +358,12 @@ haiku_display_info_for_name (Lisp_Object name)
 {
   CHECK_STRING (name);
 
-  if (!NILP (Fstring_equal (name, build_string ("be"))))
+  if (!strcmp (SSDATA (name), "be"))
     {
-      if (!x_display_list)
+      if (x_display_list)
 	return x_display_list;
 
-      error ("Haiku windowing not initialized");
+      return haiku_term_init ();
     }
 
   error ("Haiku displays can only be named \"be\"");
@@ -827,10 +859,7 @@ haiku_create_frame (Lisp_Object parms)
 
   f->terminal->reference_count++;
 
-  block_input ();
-  FRAME_OUTPUT_DATA (f)->window
-    = BWindow_new (&FRAME_OUTPUT_DATA (f)->view);
-  unblock_input ();
+  FRAME_OUTPUT_DATA (f)->window = BWindow_new (&FRAME_OUTPUT_DATA (f)->view);
 
   if (!FRAME_OUTPUT_DATA (f)->window)
     xsignal1 (Qerror, build_unibyte_string ("Could not create window"));
@@ -842,7 +871,8 @@ haiku_create_frame (Lisp_Object parms)
 
   Vframe_list = Fcons (frame, Vframe_list);
 
-  Lisp_Object parent_frame = gui_display_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
+  Lisp_Object parent_frame = gui_display_get_arg (dpyinfo, parms,
+						  Qparent_frame, NULL, NULL,
 						  RES_TYPE_SYMBOL);
 
   if (EQ (parent_frame, Qunbound)
@@ -1315,6 +1345,8 @@ haiku_set_undecorated (struct frame *f, Lisp_Object new_value,
   FRAME_UNDECORATED (f) = !NILP (new_value);
   BWindow_change_decoration (FRAME_HAIKU_WINDOW (f), NILP (new_value));
   unblock_input ();
+
+  haiku_update_after_decoration_change (f);
 }
 
 static void
@@ -1329,6 +1361,8 @@ haiku_set_override_redirect (struct frame *f, Lisp_Object new_value,
 				 !NILP (new_value));
   FRAME_OVERRIDE_REDIRECT (f) = !NILP (new_value);
   unblock_input ();
+
+  haiku_update_after_decoration_change (f);
 }
 
 static void
@@ -1375,47 +1409,79 @@ haiku_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval
 static Lisp_Object
 frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 {
-  struct frame *f = decode_live_frame (frame);
-  check_window_system (f);
+  struct frame *f, *parent;
+  void *window;
+  int outer_x, outer_y, outer_width, outer_height;
+  int right_off, bottom_off, top_off;
+  int native_x, native_y;
+
+  f = decode_window_system_frame (frame);
+  parent = FRAME_PARENT_FRAME (f);
+  window = FRAME_HAIKU_WINDOW (f);
+
+  be_lock_window (window);
+  be_get_window_decorator_frame (window, &outer_x, &outer_y,
+				 &outer_width, &outer_height);
+  be_get_window_decorator_dimensions (window, NULL, &top_off,
+				      &right_off, &bottom_off);
+  be_unlock_window (window);
+
+  native_x = FRAME_OUTPUT_DATA (f)->frame_x;
+  native_y = FRAME_OUTPUT_DATA (f)->frame_y;
+
+  if (parent)
+    {
+      /* Adjust all the coordinates by the coordinates of the parent
+	 frame.  */
+      outer_x -= FRAME_OUTPUT_DATA (parent)->frame_x;
+      outer_y -= FRAME_OUTPUT_DATA (parent)->frame_y;
+      native_x -= FRAME_OUTPUT_DATA (parent)->frame_x;
+      native_y -= FRAME_OUTPUT_DATA (parent)->frame_y;
+    }
 
   if (EQ (attribute, Qouter_edges))
-    return list4i (f->left_pos, f->top_pos,
-		   f->left_pos, f->top_pos);
+    return list4i (outer_x, outer_y,
+		   outer_x + outer_width,
+		   outer_y + outer_height);
   else if (EQ (attribute, Qnative_edges))
-    return list4i (f->left_pos, f->top_pos,
-		   f->left_pos + FRAME_PIXEL_WIDTH (f),
-		   f->top_pos + FRAME_PIXEL_HEIGHT (f));
+    return list4i (native_x, native_y,
+		   native_x + FRAME_PIXEL_WIDTH (f),
+		   native_y + FRAME_PIXEL_HEIGHT (f));
   else if (EQ (attribute, Qinner_edges))
-    return list4i (f->left_pos + FRAME_INTERNAL_BORDER_WIDTH (f),
-		   f->top_pos + FRAME_INTERNAL_BORDER_WIDTH (f) +
-		   FRAME_MENU_BAR_HEIGHT (f) + FRAME_TOOL_BAR_HEIGHT (f),
-		   f->left_pos - FRAME_INTERNAL_BORDER_WIDTH (f) +
-		   FRAME_PIXEL_WIDTH (f),
-		   f->top_pos + FRAME_PIXEL_HEIGHT (f) -
-		   FRAME_INTERNAL_BORDER_WIDTH (f));
+    return list4i (native_x + FRAME_INTERNAL_BORDER_WIDTH (f),
+		   native_y + FRAME_INTERNAL_BORDER_WIDTH (f)
+		   + FRAME_MENU_BAR_HEIGHT (f) + FRAME_TOOL_BAR_HEIGHT (f),
+		   native_x - FRAME_INTERNAL_BORDER_WIDTH (f)
+		   + FRAME_PIXEL_WIDTH (f),
+		   native_y + FRAME_PIXEL_HEIGHT (f)
+		   - FRAME_INTERNAL_BORDER_WIDTH (f));
 
   else
-    return
-      list (Fcons (Qouter_position,
-		   Fcons (make_fixnum (f->left_pos),
-			  make_fixnum (f->top_pos))),
-	    Fcons (Qouter_size,
-		   Fcons (make_fixnum (FRAME_PIXEL_WIDTH (f)),
-			  make_fixnum (FRAME_PIXEL_HEIGHT (f)))),
-	    Fcons (Qexternal_border_size,
-		   Fcons (make_fixnum (0), make_fixnum (0))),
-	    Fcons (Qtitle_bar_size,
-		   Fcons (make_fixnum (0), make_fixnum (0))),
-	    Fcons (Qmenu_bar_external, Qnil),
-	    Fcons (Qmenu_bar_size, Fcons (make_fixnum (FRAME_PIXEL_WIDTH (f) -
-						       (FRAME_INTERNAL_BORDER_WIDTH (f) * 2)),
-					  make_fixnum (FRAME_MENU_BAR_HEIGHT (f)))),
-	    Fcons (Qtool_bar_external, Qnil),
-	    Fcons (Qtool_bar_position, Qtop),
-	    Fcons (Qtool_bar_size, Fcons (make_fixnum (FRAME_PIXEL_WIDTH (f) -
-						       (FRAME_INTERNAL_BORDER_WIDTH (f) * 2)),
-					  make_fixnum (FRAME_TOOL_BAR_HEIGHT (f)))),
-	    Fcons (Qinternal_border_width, make_fixnum (FRAME_INTERNAL_BORDER_WIDTH (f))));
+    return list (Fcons (Qouter_position,
+			Fcons (make_fixnum (outer_x),
+			       make_fixnum (outer_y))),
+		 Fcons (Qouter_size,
+			Fcons (make_fixnum (outer_width),
+			       make_fixnum (outer_height))),
+		 Fcons (Qexternal_border_size,
+			Fcons (make_fixnum (right_off),
+			       make_fixnum (bottom_off))),
+		 Fcons (Qtitle_bar_size,
+			Fcons (make_fixnum (outer_width),
+			       make_fixnum (top_off))),
+		 Fcons (Qmenu_bar_external, Qnil),
+		 Fcons (Qmenu_bar_size,
+			Fcons (make_fixnum (FRAME_PIXEL_WIDTH (f)
+					    - (FRAME_INTERNAL_BORDER_WIDTH (f) * 2)),
+			       make_fixnum (FRAME_MENU_BAR_HEIGHT (f)))),
+		 Fcons (Qtool_bar_external, Qnil),
+		 Fcons (Qtool_bar_position, Qtop),
+		 Fcons (Qtool_bar_size,
+			Fcons (make_fixnum (FRAME_PIXEL_WIDTH (f)
+					    - (FRAME_INTERNAL_BORDER_WIDTH (f) * 2)),
+			       make_fixnum (FRAME_TOOL_BAR_HEIGHT (f)))),
+		 Fcons (Qinternal_border_width,
+			make_fixnum (FRAME_INTERNAL_BORDER_WIDTH (f))));
 }
 
 void
@@ -1882,6 +1948,7 @@ struct user_cursor_bitmap_info cursor_bitmaps_for_id[28] =
     { NULL, NULL, 0, 0, 0, 0					},
     { cross_ptr_bits, cross_ptrmask_bits, 30, 30, 15, 15	},
     { NULL, NULL, 0, 0, 0, 0					},
+    { hand_ptr_bits, hand_ptrmask_bits, 15, 15, 4, 3		},
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
@@ -1897,9 +1964,8 @@ struct user_cursor_bitmap_info cursor_bitmaps_for_id[28] =
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
-    { NULL, NULL, 0, 0, 0, 0					},
-    { NULL, NULL, 0, 0, 0, 0					},
-    { NULL, NULL, 0, 0, 0, 0					},
+    { horizd_ptr_bits, horizd_ptrmask_bits, 15, 15, 7, 7	},
+    { vertd_ptr_bits, vertd_ptrmask_bits, 15, 15, 7, 7		},
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
     { NULL, NULL, 0, 0, 0, 0					},
@@ -2215,7 +2281,7 @@ DEFUN ("x-display-pixel-height", Fx_display_pixel_height, Sx_display_pixel_heigh
   check_haiku_display_info (terminal);
 
   be_get_screen_dimensions (&width, &height);
-  return make_fixnum (width);
+  return make_fixnum (height);
 }
 
 DEFUN ("x-display-mm-height", Fx_display_mm_height, Sx_display_mm_height, 0, 1, 0,
@@ -2955,6 +3021,57 @@ call this function yourself.  */)
   return Qnil;
 }
 
+DEFUN ("haiku-display-monitor-attributes-list",
+       Fhaiku_display_monitor_attributes_list,
+       Shaiku_display_monitor_attributes_list,
+       0, 1, 0,
+       doc: /* Return a list of physical monitor attributes on the display TERMINAL.
+
+The optional argument TERMINAL specifies which display to ask about.
+TERMINAL should be a terminal object, a frame or a display name (a string).
+If omitted or nil, that stands for the selected frame's display.
+
+Internal use only, use `display-monitor-attributes-list' instead.  */)
+  (Lisp_Object terminal)
+{
+  struct MonitorInfo monitor;
+  struct haiku_display_info *dpyinfo;
+  Lisp_Object frames, tail, tem;
+
+  dpyinfo = check_haiku_display_info (terminal);
+  frames = Qnil;
+
+  FOR_EACH_FRAME (tail, tem)
+    {
+      maybe_quit ();
+
+      if (FRAME_HAIKU_P (XFRAME (tem))
+	  && !FRAME_TOOLTIP_P (XFRAME (tem)))
+	frames = Fcons (tem, frames);
+    }
+
+  monitor.geom.x = 0;
+  monitor.geom.y = 0;
+  be_get_screen_dimensions ((int *) &monitor.geom.width,
+			    (int *) &monitor.geom.height);
+
+  monitor.mm_width = (monitor.geom.width
+		      / (dpyinfo->resx / 25.4));
+  monitor.mm_height = (monitor.geom.height
+		       / (dpyinfo->resy / 25.4));
+  monitor.name = (char *) "BeOS monitor";
+
+  if (!be_get_explicit_workarea ((int *) &monitor.work.x,
+				 (int *) &monitor.work.y,
+				 (int *) &monitor.work.width,
+				 (int *) &monitor.work.height))
+    monitor.work = monitor.geom;
+
+  return make_monitor_attribute_list (&monitor, 1, 0,
+				      make_vector (1, frames),
+				      "fallback");
+}
+
 frame_parm_handler haiku_frame_parm_handlers[] =
   {
     gui_set_autoraise,
@@ -3060,6 +3177,7 @@ syms_of_haikufns (void)
   defsubr (&Sx_display_save_under);
   defsubr (&Shaiku_frame_restack);
   defsubr (&Shaiku_save_session_reply);
+  defsubr (&Shaiku_display_monitor_attributes_list);
 
   tip_timer = Qnil;
   staticpro (&tip_timer);

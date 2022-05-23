@@ -458,6 +458,18 @@ monitor, the same string as returned by the function
 @var{display} should be the name of an X display (a string).
 @end deffn
 
+@cindex monitor change functions
+@defvar display-monitors-changed-functions
+This variable is an abnormal hook run when the monitor configuration
+changes, which can happen if a monitor is rotated, moved, added or
+removed from a multiple-monitor setup, if the primary monitor changes,
+or if the resolution of a monitor changes.  It is called with a single
+argument consisting of the terminal on which the monitor configuration
+changed.  Programs should call @code{display-monitor-attributes-list}
+with the terminal as the argument to retrieve the new monitor
+configuration on that terminal.
+@end defvar
+
 @node Frame Geometry
 @section Frame Geometry
 @cindex frame geometry
@@ -683,9 +695,9 @@ The position of the top left corner of the native frame specifies the
 indicate that position for the various builds:
 
 @itemize @w{}
-@item (1) non-toolkit and terminal frames
+@item (1) non-toolkit, Haiku, and terminal frames
 
-@item (2) Lucid, Motif, MS-Windows, and Haiku frames
+@item (2) Lucid, Motif, and MS-Windows frames
 
 @item (3) GTK+ and NS frames
 @end itemize
@@ -1734,16 +1746,14 @@ fit will be clipped by the window manager.
 @item fullscreen
 This parameter specifies whether to maximize the frame's width, height
 or both.  Its value can be @code{fullwidth}, @code{fullheight},
-@code{fullboth}, or @code{maximized}.@footnote{On Haiku, setting
-@code{fullscreen} to @code{fullwidth} or @code{fullheight} has no
-effect.}  A @dfn{fullwidth} frame is as
+@code{fullboth}, or @code{maximized}.  A @dfn{fullwidth} frame is as
 wide as possible, a @dfn{fullheight} frame is as tall as possible, and
 a @dfn{fullboth} frame is both as wide and as tall as possible.  A
-@dfn{maximized} frame is like a ``fullboth'' frame, except that it usually
-keeps its title bar and the buttons for resizing
-and closing the frame.  Also, maximized frames typically avoid hiding
-any task bar or panels displayed on the desktop.  A ``fullboth'' frame,
-on the other hand, usually omits the title bar and occupies the entire
+@dfn{maximized} frame is like a ``fullboth'' frame, except that it
+usually keeps its title bar and the buttons for resizing and closing
+the frame.  Also, maximized frames typically avoid hiding any task bar
+or panels displayed on the desktop.  A ``fullboth'' frame, on the
+other hand, usually omits the title bar and occupies the entire
 available screen space.
 
 Full-height and full-width frames are more similar to maximized

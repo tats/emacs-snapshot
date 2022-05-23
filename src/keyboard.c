@@ -4058,6 +4058,18 @@ kbd_buffer_get_event (KBOARD **kbp,
 	}
 #endif
 
+      case MONITORS_CHANGED_EVENT:
+	{
+	  kbd_fetch_ptr = next_kbd_event (event);
+	  input_pending = readable_events (0);
+
+	  CALLN (Frun_hook_with_args,
+		 Qdisplay_monitors_changed_functions,
+		 event->ie.arg);
+
+	  break;
+	}
+
 #ifdef HAVE_EXT_MENU_BAR
       case MENU_BAR_ACTIVATE_EVENT:
 	{
@@ -12609,6 +12621,8 @@ See also `pre-command-hook'.  */);
   DEFSYM (Qtouchscreen_end, "touchscreen-end");
   DEFSYM (Qtouchscreen_update, "touchscreen-update");
   DEFSYM (Qpinch, "pinch");
+  DEFSYM (Qdisplay_monitors_changed_functions,
+	  "display-monitors-changed-functions");
 
   DEFSYM (Qcoding, "coding");
 
@@ -12849,6 +12863,14 @@ Called with three arguments:
 - the context (a string which normally goes at the start of the message),
 - the Lisp function within which the error was signaled.
 
+For instance, to make error messages stand out more in the echo area,
+you could say something like:
+
+    (setq command-error-function
+          (lambda (data _ _)
+            (message "%s" (propertize (error-message-string data)
+                                      \\='face \\='error))))
+
 Also see `set-message-function' (which controls how non-error messages
 are displayed).  */);
   Vcommand_error_function = intern ("command-error-default-function");
@@ -12863,11 +12885,12 @@ and tool-bar buttons.  */);
 
   DEFVAR_LISP ("select-active-regions",
 	       Vselect_active_regions,
-	       doc: /* If non-nil, an active region automatically sets the primary selection.
-If the value is `only', only temporarily active regions (usually made
-by mouse-dragging or shift-selection) set the window selection.
+	       doc: /* If non-nil, any active region automatically sets the primary selection.
+This variable only has an effect when Transient Mark mode is enabled.
 
-This takes effect only when Transient Mark mode is enabled.  */);
+If the value is `only', only temporarily active regions (usually made
+by mouse-dragging or shift-selection) set the window system's primary
+selection.  */);
   Vselect_active_regions = Qt;
 
   DEFVAR_LISP ("saved-region-selection",
@@ -12951,6 +12974,15 @@ This flag may eventually be removed once this behavior is deemed safe.  */);
 Otherwise, a wheel event will be sent every time the mouse wheel is
 moved.  */);
   mwheel_coalesce_scroll_events = true;
+
+  DEFVAR_LISP ("display-monitors-changed-functions", Vdisplay_monitors_changed_functions,
+    doc: /* Abnormal hook run when the monitor configuration changes.
+This can happen if a monitor is rotated, moved, plugged in or removed
+from a multi-monitor setup, if the primary monitor changes, or if the
+resolution of a monitor changes.  The hook should accept a single
+argument, which is the terminal on which the monitor configuration
+changed.  */);
+  Vdisplay_monitors_changed_functions = Qnil;
 
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }

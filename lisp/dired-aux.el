@@ -819,7 +819,9 @@ are executed in the background on each file sequentially waiting
 for each command to terminate before running the next command.
 In shell syntax this means separating the individual commands with `;'.
 
-The output appears in the buffer named by `shell-command-buffer-name-async'."
+The output appears in the buffer named by `shell-command-buffer-name-async'.
+
+Commands that are run asynchronously do not accept user input."
   (interactive
    (let ((files (dired-get-marked-files t current-prefix-arg nil nil t)))
      (list
@@ -996,8 +998,15 @@ Also see the `dired-confirm-shell-command' variable."
                                file-list dired-mark-separator)))
          (when (cdr file-list)
            (setq files (concat dired-mark-prefix files dired-mark-postfix)))
-         (funcall stuff-it files))))
-     (or (and in-background "&") ""))))
+         (concat
+          (funcall stuff-it files)
+          ;; Be consistent in how we treat inputs to commands -- do
+          ;; the same here as in the `on-each' case.
+          (if (and in-background (not w32-shell))
+              "&wait"
+            "")))))
+     (or (and in-background "&")
+         ""))))
 
 ;; This is an extra function so that it can be redefined by ange-ftp.
 ;;;###autoload

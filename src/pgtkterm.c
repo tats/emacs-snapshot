@@ -1587,6 +1587,10 @@ pgtk_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 			     false);
       x += glyph->pixel_width;
     }
+
+  /* Pacify GCC 12 even though s->char2b is not used after this
+     function returns.  */
+  s->char2b = NULL;
 }
 
 /* Brightness beyond which a color won't have its highlight brightness
@@ -3347,15 +3351,10 @@ pgtk_mouse_position (struct frame **fp, int insist, Lisp_Object * bar_window,
   if (gui_mouse_grabbed (dpyinfo)
       && (!EQ (track_mouse, Qdropping)
 	  && !EQ (track_mouse, Qdrag_source)))
-    {
-      /* 1.1. use last_mouse_frame as frame where the pointer is
-	 on.  */
-      f1 = dpyinfo->last_mouse_frame;
-    }
+    f1 = dpyinfo->last_mouse_frame;
   else
     {
       f1 = *fp;
-      /* 1.2. get frame where the pointer is on.  */
       win = gtk_widget_get_window (FRAME_GTK_WIDGET (*fp));
       seat = gdk_display_get_default_seat (dpyinfo->gdpy);
       device = gdk_seat_get_pointer (seat);
@@ -3381,19 +3380,17 @@ pgtk_mouse_position (struct frame **fp, int insist, Lisp_Object * bar_window,
       return;
     }
 
-  /* 2. get the display and the device. */
   win = gtk_widget_get_window (FRAME_GTK_WIDGET (f1));
-  GdkDisplay *gdpy = gdk_window_get_display (win);
-  seat = gdk_display_get_default_seat (gdpy);
+  seat = gdk_display_get_default_seat (dpyinfo->gdpy);
   device = gdk_seat_get_pointer (seat);
 
-  /* 3. get x, y relative to edit window of the frame. */
-  win = gdk_window_get_device_position (win, device, &win_x, &win_y, &mask);
+  win = gdk_window_get_device_position (win, device,
+					&win_x, &win_y, &mask);
 
   if (f1 != NULL)
     {
-      dpyinfo = FRAME_DISPLAY_INFO (f1);
-      remember_mouse_glyph (f1, win_x, win_y, &dpyinfo->last_mouse_glyph);
+      remember_mouse_glyph (f1, win_x, win_y,
+			    &dpyinfo->last_mouse_glyph);
       dpyinfo->last_mouse_glyph_frame = f1;
 
       *bar_window = Qnil;
@@ -6163,6 +6160,20 @@ drag_data_received (GtkWidget *widget, GdkDragContext *context,
   gtk_drag_finish (context, TRUE, FALSE, time);
 }
 
+static void
+pgtk_monitors_changed_cb (GdkScreen *screen, gpointer user_data)
+{
+  struct terminal *terminal;
+  union buffered_input_event inev;
+
+  EVENT_INIT (inev.ie);
+  terminal = user_data;
+  inev.ie.kind = MONITORS_CHANGED_EVENT;
+  XSETTERMINAL (inev.ie.arg, terminal);
+
+  evq_enqueue (&inev);
+}
+
 void
 pgtk_set_event_handler (struct frame *f)
 {
@@ -6457,6 +6468,10 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   dpyinfo->resx = dpi;
   dpyinfo->resy = dpi;
+
+  g_signal_connect (G_OBJECT (gscr), "monitors-changed",
+		    G_CALLBACK (pgtk_monitors_changed_cb),
+		    terminal);
 
   /* Set up scrolling increments.  */
   dpyinfo->scroll.x_per_char = 1;

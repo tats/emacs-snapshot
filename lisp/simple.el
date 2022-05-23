@@ -60,6 +60,24 @@ value of 1 means that nothing is amalgamated.")
 (defgroup paren-matching nil
   "Highlight (un)matching of parens and expressions."
   :group 'matching)
+
+(defvar-local escaped-string-quote "\\"
+  "String to insert before a string quote character in a string to escape it.
+This is typically a backslash (in most languages):
+
+  \\='foo\\\\='bar\\='
+  \"foo\\\"bar\"
+
+But in SQL, for instance, it's \"\\='\":
+
+  \\='foo\\='\\='bar\\='
+
+This can also be a function, which is called with the string
+terminator as the argument, and should return a string to be
+used as the escape.
+
+This variable is used by the `yank-in-context' command.")
+
 
 ;;; next-error support framework
 
@@ -1153,7 +1171,8 @@ which accepts one argument is allowed.  It receives the raw
 prefix arg of this cycle.
 
 In addition, an action may take the form (ACTION ARG) where
-ACTION is any action except for `restore' and ARG is either
+ACTION is one of the predefined actions (except for `restore')
+and ARG is either
 - an integer with the meaning that ACTION should always use this
   fixed integer instead of the actual prefix arg or
 - the symbol `inverted-arg' with the meaning that ACTION should
@@ -1169,14 +1188,14 @@ ACTION is any action except for `restore' and ARG is either
                  (const :tag "Delete spaces after point" delete-space-after)
                  (const :tag "Delete spaces before point" delete-space-before)
                  (const :tag "Delete all spaces around point" delete-all-space)
-                 (function :tag "Function receiving a numerig arg"))))
+                 (function :tag "Function receiving a numeric arg"))))
           `(repeat
             (choice
              ,@actions
              (list :tag "Action with modified arg"
                    (choice ,@actions)
                    (choice (const :tag "Inverted prefix arg" inverted-arg)
-                           (const :tag "Fixed numeric arg" integer)
+                           (integer :tag "Fixed numeric arg")
                            (const :tag "Negative arg" -)))
              (const :tag "Restore the original spacing" restore))))
   :version "29.1")
@@ -5927,6 +5946,18 @@ See also `yank-handled-properties'."
   :group 'killing
   :version "24.3")
 
+(defcustom yank-transform-functions nil
+  "List of functions to run on strings to be yanked.
+Each function in this list will be called (in order) with the
+string to be yanked as the sole argument, and should return the (possibly)
+transformed string.
+
+The functions will be called with the destination buffer as the current
+buffer, and with point at the place where the string is to be inserted."
+  :type '(repeat function)
+  :version "29.1"
+  :group 'killing)
+
 (defvar yank-window-start nil)
 (defvar yank-undo-function nil
   "If non-nil, function used by `yank-pop' to delete last stretch of yanked text.
@@ -5998,6 +6029,11 @@ property, as described below.
 Properties listed in `yank-handled-properties' are processed,
 then those listed in `yank-excluded-properties' are discarded.
 
+STRING will be run through `yank-transform-functions'.
+`yank-in-context' is a command that uses this mechanism to
+provide a `yank' alternative that conveniently preserves
+string/comment syntax.
+
 If STRING has a non-nil `yank-handler' property anywhere, the
 normal insert behavior is altered, and instead, for each contiguous
 segment of STRING that has a given value of the `yank-handler'
@@ -6047,6 +6083,88 @@ See also the command `yank-pop' (\\[yank-pop])."
 With ARG, rotate that many kills forward (or backward, if negative)."
   (interactive "p")
   (current-kill arg))
+
+(defun yank-in-context (&optional arg)
+  "Insert the last stretch of killed text while preserving syntax.
+In particular, if point is inside a string, any quote characters
+in the killed text will be quoted, so that the string remains a
+valid string.
+
+If point is inside a comment, ensure that the inserted text is
+also marked as a comment.
+
+This command otherwise behaves as `yank'.  See that command for
+explanation of ARG.
+
+This function uses the `escaped-string-quote' buffer-local
+variable to determine how strings should be escaped."
+  (interactive "*P")
+  (let ((yank-transform-functions (cons #'yank-in-context--transform
+                                        yank-transform-functions)))
+    (yank arg)))
+
+(defun yank-in-context--transform (string)
+  (let ((ppss (syntax-ppss)))
+    (cond
+     ;; We're in a string.
+     ((ppss-string-terminator ppss)
+      (string-replace
+       (string (ppss-string-terminator ppss))
+       (concat (if (functionp escaped-string-quote)
+                   (funcall escaped-string-quote
+                            (ppss-string-terminator ppss))
+                 escaped-string-quote)
+               (string (ppss-string-terminator ppss)))
+       string))
+     ;; We're in a comment.
+     ((or (ppss-comment-depth ppss)
+          (and (bolp)
+               (not (eobp))
+               ;; If we're in the middle of a bunch of commented text,
+               ;; we probably want to be commented.  This is quite DWIM.
+               (or (bobp)
+                   (save-excursion
+                     (forward-line -1)
+                     (forward-char 1)
+                     (ppss-comment-depth (syntax-ppss))))
+               (ppss-comment-depth
+                (setq ppss (save-excursion
+                             (forward-char 1)
+                             (syntax-ppss))))))
+      (cond
+       ((and (eq (ppss-comment-depth ppss) t)
+             (> (length comment-end) 0)
+             (string-search comment-end string))
+        (user-error "Can't insert a string containing a comment terminator in a comment"))
+       ;; If this is a comment syntax that has an explicit end, then
+       ;; we can just insert as is.
+       ((> (length comment-end) 0) string)
+       ;; Line-based comment formats.
+       ((or (string-search "\n" string)
+            (bolp))
+        (let ((mode major-mode)
+              (bolp (bolp))
+              (eolp (eolp))
+              (comment-style 'plain))
+          (with-temp-buffer
+            (funcall mode)
+            (insert string)
+            (when (string-match-p "\n\\'" string)
+              (cond
+               ((not eolp) (delete-char -1))
+               (bolp (insert "\n"))))
+            (comment-normalize-vars)
+            (comment-region-default-1
+             (if bolp
+                 (point-min)
+               (save-excursion
+                 (goto-char (point-min))
+                 (forward-line 1)
+                 (point)))
+             (point-max) nil t)
+            (buffer-string))))
+       (t string)))
+     (t string))))
 
 (defvar read-from-kill-ring-history)
 (defun read-from-kill-ring (prompt)
@@ -6224,21 +6342,26 @@ then gives correct answers only for ASCII characters."
          (characterp (get-char-code-property char 'lowercase)))
         ((and (>= char ?A) (<= char ?Z)))))
 
-(defun zap-to-char (arg char)
+(defun zap-to-char (arg char &optional interactive)
   "Kill up to and including ARGth occurrence of CHAR.
+When run interactively, the argument INTERACTIVE is non-nil.
 Case is ignored if `case-fold-search' is non-nil in the current buffer.
 Goes backward if ARG is negative; error if CHAR not found.
-See also `zap-up-to-char'."
+See also `zap-up-to-char'.
+If called interactively, do a case sensitive search if CHAR
+is an upper-case character."
   (interactive (list (prefix-numeric-value current-prefix-arg)
 		     (read-char-from-minibuffer "Zap to char: "
-						nil 'read-char-history)))
+						nil 'read-char-history)
+               t))
   ;; Avoid "obsolete" warnings for translation-table-for-input.
   (with-no-warnings
     (if (char-table-p translation-table-for-input)
 	(setq char (or (aref translation-table-for-input char) char))))
-  (kill-region (point) (progn
-			 (search-forward (char-to-string char) nil nil arg)
-			 (point))))
+  (let ((case-fold-search (if (and interactive (char-uppercase-p char))
+                              nil
+                            case-fold-search)))
+    (kill-region (point) (search-forward (char-to-string char) nil nil arg))))
 
 ;; kill-line and its subroutines.
 

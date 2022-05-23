@@ -96,14 +96,9 @@ static void
 haiku_coords_from_parent (struct frame *f, int *x, int *y)
 {
   struct frame *p = FRAME_PARENT_FRAME (f);
-  eassert (p);
 
-  for (struct frame *parent = p; parent;
-       parent = FRAME_PARENT_FRAME (parent))
-    {
-      *x -= parent->left_pos;
-      *y -= parent->top_pos;
-    }
+  *x -= FRAME_OUTPUT_DATA (p)->frame_x;
+  *y -= FRAME_OUTPUT_DATA (p)->frame_y;
 }
 
 static void
@@ -580,7 +575,14 @@ static bool
 haiku_defined_color (struct frame *f, const char *name,
 		     Emacs_Color *color, bool alloc, bool make_index)
 {
-  return !haiku_get_color (name, color);
+  int rc;
+
+  rc = !haiku_get_color (name, color);
+
+  if (rc && f->gamma && alloc)
+    gamma_correct (f, color);
+
+  return rc;
 }
 
 /* Adapted from xterm `x_draw_box_rect'.  */
@@ -1996,7 +1998,7 @@ haiku_set_window_size (struct frame *f, bool change_gravity,
       /* Only do this if the fullscreen status has actually been
 	 applied.  */
       && f->want_fullscreen == FULLSCREEN_NONE
-      /* And if the configury during frame completion has been
+      /* And if the configury during frame creation has been
 	 completed.  Otherwise, there will be no valid "old size" to
 	 go back to.  */
       && FRAME_OUTPUT_DATA (f)->configury_done)
@@ -3016,11 +3018,20 @@ static struct redisplay_interface haiku_redisplay_interface =
 static void
 haiku_make_fullscreen_consistent (struct frame *f)
 {
-  Lisp_Object lval = get_frame_param (f, Qfullscreen);
+  Lisp_Object lval;
+  struct haiku_output *output;
 
-  if (!EQ (lval, Qmaximized) && FRAME_OUTPUT_DATA (f)->zoomed_p)
+  output = FRAME_OUTPUT_DATA (f);
+
+  if (output->fullscreen_mode == FULLSCREEN_MODE_BOTH)
+    lval = Qfullboth;
+  else if (output->fullscreen_mode == FULLSCREEN_MODE_WIDTH)
+    lval = Qfullwidth;
+  else if (output->fullscreen_mode == FULLSCREEN_MODE_HEIGHT)
+    lval = Qfullheight;
+  else if (output->fullscreen_mode == FULLSCREEN_MODE_MAXIMIZED)
     lval = Qmaximized;
-  else if (EQ (lval, Qmaximized) && !FRAME_OUTPUT_DATA (f)->zoomed_p)
+  else
     lval = Qnil;
 
   store_frame_param (f, Qfullscreen, lval);
@@ -3337,18 +3348,17 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		previous_help_echo_string = help_echo_string;
 		help_echo_string = Qnil;
 
-		/* A LeaveNotify event (well, the closest equivalent on Haiku, which
-		   is a B_MOUSE_MOVED event with `transit' set to B_EXITED_VIEW) might
-		   be sent out-of-order with regards to motion events from other
-		   windows, such as when the mouse pointer rapidly moves from an
-		   undecorated child frame to its parent.  This can cause a failure to
-		   clear the mouse face on the former if an event for the latter is
-		   read by Emacs first and ends up showing the mouse face there.
+		/* A crossing event might be sent out-of-order with
+		   regard to motion events from other windows, such as
+		   when the mouse pointer rapidly moves from an
+		   undecorated child frame to its parent.  This can
+		   cause a failure to clear the mouse face on the
+		   former if an event for the latter is read by Emacs
+		   first and ends up showing the mouse face there.
 
-		   In case the `movement_locker' (also see the comment
-		   there) doesn't take care of the problem, work
-		   around it by clearing the mouse face now, if it is
-		   currently shown on a different frame.  */
+		   Work around the problem by clearing the mouse face
+		   now if it is currently shown on a different
+		   frame.  */
 
 		if (hlinfo->mouse_face_hidden
 		    || (f != hlinfo->mouse_face_mouse_frame
@@ -3535,7 +3545,6 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		SET_FRAME_ICONIFIED (f, 0);
 		inev.kind = DEICONIFY_EVENT;
 
-
 		/* Haiku doesn't expose frames on deiconification, but
 		   if we are double-buffered, the previous screen
 		   contents should have been preserved. */
@@ -3559,30 +3568,36 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	  {
 	    struct haiku_move_event *b = buf;
 	    struct frame *f = haiku_window_to_frame (b->window);
+	    int top, left;
+	    struct frame *p;
 
 	    if (!f)
 	      continue;
 
+	    FRAME_OUTPUT_DATA (f)->frame_x = b->x;
+	    FRAME_OUTPUT_DATA (f)->frame_y = b->y;
+
 	    if (FRAME_PARENT_FRAME (f))
 	      haiku_coords_from_parent (f, &b->x, &b->y);
 
-	    if (b->x != f->left_pos || b->y != f->top_pos)
+	    left = b->x - b->decorator_width;
+	    top = b->y - b->decorator_height;
+
+	    if (left != f->left_pos || top != f->top_pos)
 	      {
 		inev.kind = MOVE_FRAME_EVENT;
 
-		XSETINT (inev.x, b->x);
-		XSETINT (inev.y, b->y);
+		XSETINT (inev.x, left);
+		XSETINT (inev.y, top);
 
-		f->left_pos = b->x;
-		f->top_pos = b->y;
+		f->left_pos = left;
+		f->top_pos = top;
 
-		struct frame *p;
+		p = FRAME_PARENT_FRAME (f);
 
-		if ((p = FRAME_PARENT_FRAME (f)))
-		  {
-		    void *window = FRAME_HAIKU_WINDOW (p);
-		    EmacsWindow_move_weak_child (window, b->window, b->x, b->y);
-		  }
+		if (p)
+		  EmacsWindow_move_weak_child (FRAME_HAIKU_WINDOW (p),
+					       b->window, left, top);
 
 		XSETFRAME (inev.frame_or_window, f);
 	      }
@@ -3850,14 +3865,17 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	case ZOOM_EVENT:
 	  {
 	    struct haiku_zoom_event *b = buf;
-
 	    struct frame *f = haiku_window_to_frame (b->window);
 
 	    if (!f)
 	      continue;
 
-	    FRAME_OUTPUT_DATA (f)->zoomed_p = b->zoomed;
-	    haiku_make_fullscreen_consistent (f);
+	    if (b->fullscreen_mode == FULLSCREEN_MODE_MAXIMIZED)
+	      f->want_fullscreen = FULLSCREEN_NONE;
+	    else
+	      f->want_fullscreen = FULLSCREEN_MAXIMIZED;
+
+	    FRAME_TERMINAL (f)->fullscreen_hook (f);
 	    break;
 	  }
 	case DRAG_AND_DROP_EVENT:
@@ -3879,6 +3897,15 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    XSETFRAME (inev.frame_or_window, f);
 
 	    BMessage_delete (b->message);
+	    break;
+	  }
+	case SCREEN_CHANGED_EVENT:
+	  {
+	    struct haiku_screen_changed_event *b = buf;
+
+	    inev.kind = MONITORS_CHANGED_EVENT;
+	    XSETTERMINAL (inev.arg, x_display_list->terminal);
+	    inev.timestamp = b->when / 1000;
 	    break;
 	  }
 	case APP_QUIT_REQUESTED_EVENT:
@@ -3939,6 +3966,21 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   unblock_input ();
 
   return message_count;
+}
+
+static Lisp_Object
+haiku_get_focus_frame (struct frame *f)
+{
+  Lisp_Object lisp_focus;
+  struct frame *focus;
+
+  focus = FRAME_DISPLAY_INFO (f)->focused_frame;
+
+  if (!focus)
+    return Qnil;
+
+  XSETFRAME (lisp_focus, focus);
+  return lisp_focus;
 }
 
 static void
@@ -4089,6 +4131,8 @@ haiku_toggle_invisible_pointer (struct frame *f, bool invisible_p)
 static void
 haiku_fullscreen (struct frame *f)
 {
+  enum haiku_fullscreen_mode mode;
+
   /* When FRAME_OUTPUT_DATA (f)->configury_done is false, the frame is
      being created, and its regular width and height have not yet been
      set.  This function will be called again by haiku_create_frame,
@@ -4097,18 +4141,22 @@ haiku_fullscreen (struct frame *f)
     return;
 
   if (f->want_fullscreen == FULLSCREEN_MAXIMIZED)
-    BWindow_zoom (FRAME_HAIKU_WINDOW (f));
+    mode = FULLSCREEN_MODE_MAXIMIZED;
   else if (f->want_fullscreen == FULLSCREEN_BOTH)
-    EmacsWindow_make_fullscreen (FRAME_HAIKU_WINDOW (f), 1);
+    mode = FULLSCREEN_MODE_BOTH;
+  else if (f->want_fullscreen == FULLSCREEN_WIDTH)
+    mode = FULLSCREEN_MODE_WIDTH;
+  else if (f->want_fullscreen == FULLSCREEN_HEIGHT)
+    mode = FULLSCREEN_MODE_HEIGHT;
   else
-    {
-      EmacsWindow_make_fullscreen (FRAME_HAIKU_WINDOW (f), 0);
-      EmacsWindow_unzoom (FRAME_HAIKU_WINDOW (f));
-    }
+    mode = FULLSCREEN_MODE_NONE;
 
   f->want_fullscreen = FULLSCREEN_NONE;
+  be_set_window_fullscreen_mode (FRAME_HAIKU_WINDOW (f), mode);
+  FRAME_OUTPUT_DATA (f)->fullscreen_mode = mode;
 
   haiku_update_size_hints (f);
+  haiku_make_fullscreen_consistent (f);
 }
 
 static struct terminal *
@@ -4160,6 +4208,7 @@ haiku_create_terminal (struct haiku_display_info *dpyinfo)
   terminal->fullscreen_hook = haiku_fullscreen;
   terminal->toolkit_position_hook = haiku_toolkit_position;
   terminal->activate_menubar_hook = haiku_activate_menubar;
+  terminal->get_focus_frame = haiku_get_focus_frame;
 
   return terminal;
 }
@@ -4352,6 +4401,22 @@ void
 haiku_set_offset (struct frame *frame, int x, int y,
 		  int change_gravity)
 {
+  Lisp_Object lframe;
+
+  /* Don't allow moving a fullscreen frame: the semantics of that are
+     unclear.  */
+
+  XSETFRAME (lframe, frame);
+  if (EQ (Fframe_parameter (lframe, Qfullscreen), Qfullboth)
+      /* Only do this if the fullscreen status has actually been
+	 applied.  */
+      && frame->want_fullscreen == FULLSCREEN_NONE
+      /* And if the configury during frame creation has been
+	 completed.  Otherwise, there will be no valid "old position"
+	 to go back to.  */
+      && FRAME_OUTPUT_DATA (frame)->configury_done)
+    return;
+
   if (change_gravity > 0)
     {
       frame->top_pos = y;
