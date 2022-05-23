@@ -28,7 +28,7 @@ Status: new
  4 files changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 877802e..63fab68 100644
+index 4b74963..e5549da 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -166,7 +166,9 @@ man1dir=
@@ -52,7 +52,7 @@ index 877802e..63fab68 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -1024,11 +1025,11 @@ test/%:
+@@ -1025,11 +1026,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -69,7 +69,7 @@ index 877802e..63fab68 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1059,9 +1060,6 @@ info-dir:
+@@ -1060,9 +1061,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -79,7 +79,7 @@ index 877802e..63fab68 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1083,14 +1081,10 @@ ${srcdir}/info/dir:
+@@ -1084,14 +1082,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -98,7 +98,7 @@ index 877802e..63fab68 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1108,14 +1102,10 @@ install-pdf:
+@@ -1109,14 +1103,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -118,10 +118,10 @@ index 877802e..63fab68 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 3d5eb7f..35e2a75 100644
+index 1d2d1f1..a46812a 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6541,7 +6541,7 @@ AC_DEFUN
+@@ -6554,7 +6554,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index 3d5eb7f..35e2a75 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6603,15 +6603,6 @@ m4_define
+@@ -6616,15 +6616,6 @@ m4_define
  fi
  ])
  
