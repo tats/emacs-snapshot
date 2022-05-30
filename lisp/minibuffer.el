@@ -902,10 +902,10 @@ If the value is t, the *Completions* buffer is displayed whenever completion
 is requested but cannot be done.
 If the value is `lazy', the *Completions* buffer is only displayed after
 the second failed attempt to complete.
-If the value is 'always', the *Completions* buffer is always shown
+If the value is `always', the *Completions* buffer is always shown
 after a completion attempt, and the list of completions is updated if
 already visible.
-If the value is 'visible', the *Completions* buffer is displayed
+If the value is `visible', the *Completions* buffer is displayed
 whenever completion is requested but cannot be done for the first time,
 but remains visible thereafter, and the list of completions in it is
 updated for subsequent attempts to complete.."
@@ -1001,7 +1001,11 @@ and DOC describes the way this style of completion works.")
 The available styles are listed in `completion-styles-alist'.
 
 Note that `completion-category-overrides' may override these
-styles for specific categories, such as files, buffers, etc."
+styles for specific categories, such as files, buffers, etc.
+
+Note that Tramp host name completion (e.g., \"/ssh:ho<TAB>\")
+currently doesn't work if this list doesn't contain at least one
+of `basic', `emacs22' or `emacs21'."
   :type completion--styles-type
   :version "23.1")
 
@@ -2070,11 +2074,11 @@ Runs of equal candidate strings are eliminated.  GROUP-FUN is a
       (when prefix
         (let ((beg (point))
               (end (progn (insert prefix) (point))))
-          (put-text-property beg end 'mouse-face nil)))
+          (add-text-properties beg end `(mouse-face nil completion--string ,(car str)))))
       (completion--insert (car str) group-fun)
       (let ((beg (point))
             (end (progn (insert suffix) (point))))
-        (put-text-property beg end 'mouse-face nil)
+        (add-text-properties beg end `(mouse-face nil completion--string ,(car str)))
         ;; Put the predefined face only when suffix
         ;; is added via annotation-function without prefix,
         ;; and when the caller doesn't use own face.

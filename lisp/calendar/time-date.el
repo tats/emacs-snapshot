@@ -552,7 +552,7 @@ changes in daylight saving time are not taken into account."
 
 (cl-defun make-decoded-time (&key second minute hour
                                   day month year
-                                  dst zone)
+                                  (dst -1) zone)
   "Return a `decoded-time' structure with only the keywords given filled out."
   (list second minute hour day month year nil dst zone))
 
@@ -561,6 +561,9 @@ changes in daylight saving time are not taken into account."
 The default value is based on January 1st, 1970 at midnight.
 This year is used to guarantee portability; see Info
 node `(elisp) Time of Day'.
+
+Optional argument DEFAULT-ZONE specifies what time zone to
+default to when TIME's time zone is nil (meaning local time).
 
 TIME is modified and returned."
   (unless (decoded-time-second time)
@@ -577,13 +580,11 @@ TIME is modified and returned."
   (unless (decoded-time-year time)
     (setf (decoded-time-year time) 1970))
 
-  ;; When we don't have a time zone, default to DEFAULT-ZONE without
-  ;; DST if DEFAULT-ZONE if given, and to unknown DST otherwise.
   (unless (decoded-time-zone time)
-    (if default-zone
-	(progn (setf (decoded-time-zone time) default-zone)
-	       (setf (decoded-time-dst time) nil))
-      (setf (decoded-time-dst time) -1)))
+    (setf (decoded-time-zone time) default-zone))
+
+  ;; Do not set decoded-time-weekday or decoded-time-dst,
+  ;; as encode-time can infer them well enough when unknown.
 
   time)
 

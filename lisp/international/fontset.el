@@ -184,8 +184,14 @@
 	(runic #x16A0)
         (tagalog #x1700)
         (hanunoo #x1720)
+        (buhid #x1740)
+        (tagbanwa #x1760)
 	(khmer #x1780)
 	(mongolian #x1826)
+        (limbu #x1901 #x1920 #x1936)
+        (balinese #x1B13 #x1B35 #x1B5E)
+        (sundanese #x1B8A #x1BAB #x1CC4)
+        (batak #x1BC2 #x1BE7 #x1BFF)
         (tai-le #x1950)
         (tai-lue #x1980)
         (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
@@ -199,7 +205,8 @@
 	(han #x5B57)
 	(yi #xA288)
         (syloti-nagri #xA807 #xA823 #xA82C)
-	(javanese #xA980)
+        (rejang #xA930 #xA947 #xA95F)
+	(javanese #xA98F #xA9B4 #xA9CA)
 	(cham #xAA00)
 	(tai-viet #xAA80)
 	(hangul #xAC00)
@@ -752,10 +759,17 @@
 		    runic
                     tagalog
                     hanunoo
+                    buhid
+                    tagbanwa
+                    limbu
+                    balinese
+                    sundanese
+                    batak
 		    symbol
 		    braille
 		    yi
                     syloti-nagri
+                    rejang
                     javanese
 		    tai-viet
 		    aegean-number

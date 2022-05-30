@@ -5434,6 +5434,9 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
 {
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
 
+  if (dpyinfo->screen_mm_height)
+    return make_fixnum (dpyinfo->screen_mm_height);
+
   return make_fixnum (HeightMMOfScreen (dpyinfo->screen));
 }
 
@@ -5450,6 +5453,9 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
+
+  if (dpyinfo->screen_mm_width)
+    return make_fixnum (dpyinfo->screen_mm_width);
 
   return make_fixnum (WidthMMOfScreen (dpyinfo->screen));
 }
@@ -6792,8 +6798,9 @@ buttons are released, then return the action chosen by the target, or
 starts when the mouse is pressed on FRAME, and the contents of the
 selection `XdndSelection' will be sent to the X window underneath the
 mouse pointer (the drop target) when the mouse button is released.
-ACTION is a symbol which tells the target what the source will do, and
-can be one of the following:
+
+ACTION is a symbol which tells the target what it should do, and can
+be one of the following:
 
  - `XdndActionCopy', which means to copy the contents from the drag
    source (FRAME) to the drop target.
@@ -6804,6 +6811,10 @@ can be one of the following:
 
 `XdndActionPrivate' is also a valid return value, and means that the
 drop target chose to perform an unspecified or unknown action.
+
+The source is also expected to cooperate with the target to perform
+the action chosen by the target.  For example, callers should delete
+the buffer text that was dragged if `XdndActionMove' is returned.
 
 There are also some other valid values of ACTION that depend on
 details of both the drop target's implementation details and that of
@@ -6827,7 +6838,12 @@ instead.
 
 If ALLOW-CURRENT-FRAME is not specified or nil, then the drop target
 is allowed to be FRAME.  Otherwise, no action will be taken if the
-mouse buttons are released on top of FRAME.  */)
+mouse buttons are released on top of FRAME.
+
+This function will sometimes return immediately if no mouse buttons
+are currently held down.  It should only be called when it is known
+that mouse buttons are being held down, such as immediately after a
+`down-mouse-1' (or similar) event.  */)
   (Lisp_Object targets, Lisp_Object action, Lisp_Object frame,
    Lisp_Object return_frame, Lisp_Object allow_current_frame)
 {
@@ -6916,18 +6932,18 @@ mouse buttons are released on top of FRAME.  */)
   else
     signal_error ("Invalid drag-and-drop action", action);
 
-  target_atoms = xmalloc (ntargets * sizeof *target_atoms);
+  target_atoms = SAFE_ALLOCA (ntargets * sizeof *target_atoms);
 
   block_input ();
   XInternAtoms (FRAME_X_DISPLAY (f), target_names,
 		ntargets, False, target_atoms);
   unblock_input ();
 
-  x_set_dnd_targets (target_atoms, ntargets);
   lval = x_dnd_begin_drag_and_drop (f, FRAME_DISPLAY_INFO (f)->last_user_time,
 				    xaction, return_frame, action_list,
 				    (const char **) &name_list, nnames,
-				    !NILP (allow_current_frame));
+				    !NILP (allow_current_frame), target_atoms,
+				    ntargets);
 
   SAFE_FREE ();
   return lval;
@@ -7246,19 +7262,28 @@ converted to an atom and the value of the atom is used.  If an element
 is a cons, it is converted to a 32 bit number where the car is the 16
 top bits and the cdr is the lower 16 bits.
 
-FRAME nil or omitted means use the selected frame.
-If TYPE is given and non-nil, it is the name of the type of VALUE.
- If TYPE is not given or nil, the type is STRING.
-FORMAT gives the size in bits of each element if VALUE is a list.
- It must be one of 8, 16 or 32.
- If VALUE is a string or FORMAT is nil or not given, FORMAT defaults to 8.
-If OUTER-P is non-nil, the property is changed for the outer X window of
- FRAME.  Default is to change on the edit X window.
-If WINDOW-ID is non-nil, change the property of that window instead
- of FRAME's X window; the number 0 denotes the root window.  This argument
- is separate from FRAME because window IDs are not unique across X
- displays or screens on the same display, so FRAME provides context
- for the window ID. */)
+FRAME nil or omitted means use the selected frame.  If TYPE is given
+and non-nil, it is the name of the type of VALUE.  If TYPE is not
+given or nil, the type is STRING.
+
+FORMAT gives the size in bits of each element if VALUE is a list.  It
+must be one of 8, 16 or 32.
+
+If VALUE is a string or FORMAT is nil or not given, FORMAT defaults to
+8.  If OUTER-P is non-nil, the property is changed for the outer X
+window of FRAME.  Default is to change on the edit X window.
+
+If WINDOW-ID is non-nil, change the property of that window instead of
+FRAME's X window; the number 0 denotes the root window.  This argument
+is separate from FRAME because window IDs are not unique across X
+displays or screens on the same display, so FRAME provides context for
+the window ID.
+
+If VALUE is a string and FORMAT is 32, then the format of VALUE is
+system-specific.  VALUE must contain unsigned integer data in native
+endian-ness in multiples of the size of the C type 'long': the low 32
+bits of each such number are used as the value of each element of the
+property.  */)
   (Lisp_Object prop, Lisp_Object value, Lisp_Object frame,
    Lisp_Object type, Lisp_Object format, Lisp_Object outer_p,
    Lisp_Object window_id)
@@ -7271,6 +7296,8 @@ If WINDOW-ID is non-nil, change the property of that window instead
   int nelements;
   Window target_window;
 #ifdef USE_XCB
+  bool intern_prop;
+  bool intern_target;
   xcb_intern_atom_cookie_t prop_atom_cookie;
   xcb_intern_atom_cookie_t target_type_cookie;
   xcb_intern_atom_reply_t *reply;
@@ -7341,41 +7368,62 @@ If WINDOW-ID is non-nil, change the property of that window instead
 
   block_input ();
 #ifndef USE_XCB
-  prop_atom = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (prop), False);
+  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+				    SSDATA (prop), false);
   if (! NILP (type))
     {
       CHECK_STRING (type);
-      target_type = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (type), False);
+      target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+					  SSDATA (type), false);
     }
 #else
   rc = true;
-  prop_atom_cookie
-    = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
-		       0, SBYTES (prop), SSDATA (prop));
+  intern_target = true;
+  intern_prop = true;
+
+  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+				    SSDATA (prop), true);
+
+  if (prop_atom != None)
+    intern_prop = false;
+  else
+    prop_atom_cookie
+      = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
+			 0, SBYTES (prop), SSDATA (prop));
 
   if (!NILP (type))
     {
       CHECK_STRING (type);
-      target_type_cookie
-	= xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
-			   0, SBYTES (type), SSDATA (type));
+
+      target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+					  SSDATA (type), true);
+
+      if (target_type)
+	intern_target = false;
+      else
+	target_type_cookie
+	  = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
+			     0, SBYTES (type), SSDATA (type));
     }
 
-  reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
-				 prop_atom_cookie, &generic_error);
-
-  if (reply)
+  if (intern_prop)
     {
-      prop_atom = (Atom) reply->atom;
-      free (reply);
-    }
-  else
-    {
-      free (generic_error);
-      rc = false;
+      reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
+				     prop_atom_cookie, &generic_error);
+
+      if (reply)
+	{
+	  prop_atom = (Atom) reply->atom;
+	  free (reply);
+	}
+      else
+	{
+	  free (generic_error);
+	  rc = false;
+	}
     }
 
-  if (!NILP (type))
+  if (!NILP (type) && intern_target)
     {
       reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
 				     target_type_cookie, &generic_error);
@@ -7396,16 +7444,17 @@ If WINDOW-ID is non-nil, change the property of that window instead
     error ("Failed to intern type or property atom");
 #endif
 
+  x_catch_errors (FRAME_X_DISPLAY (f));
   XChangeProperty (FRAME_X_DISPLAY (f), target_window,
 		   prop_atom, target_type, element_format, PropModeReplace,
 		   data, nelements);
 
   if (CONSP (value)) xfree (data);
+  x_check_errors (FRAME_X_DISPLAY (f),
+		  "Couldn't change window property: %s");
+  x_uncatch_errors_after_check ();
 
-  /* Make sure the property is set when we return.  */
-  XFlush (FRAME_X_DISPLAY (f));
   unblock_input ();
-
   return value;
 }
 
@@ -7437,13 +7486,16 @@ Value is PROP.  */)
     }
 
   block_input ();
-  prop_atom = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (prop), False);
+  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+				    SSDATA (prop), false);
+
+  x_catch_errors (FRAME_X_DISPLAY (f));
   XDeleteProperty (FRAME_X_DISPLAY (f), target_window, prop_atom);
+  x_check_errors (FRAME_X_DISPLAY (f),
+		  "Couldn't delete window property: %s");
+  x_uncatch_errors_after_check ();
 
-  /* Make sure the property is removed when we return.  */
-  XFlush (FRAME_X_DISPLAY (f));
   unblock_input ();
-
   return prop;
 }
 
@@ -7563,15 +7615,19 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
     }
 
   block_input ();
+  x_catch_errors (FRAME_X_DISPLAY (f));
+
   if (STRINGP (type))
     {
       if (strcmp ("AnyPropertyType", SSDATA (type)) == 0)
         target_type = AnyPropertyType;
       else
-        target_type = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (type), False);
+        target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+					    SSDATA (type), false);
     }
 
-  prop_atom = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (prop), False);
+  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+				    SSDATA (prop), false);
   prop_value = x_window_property_intern (f,
                                          target_window,
                                          prop_atom,
@@ -7593,6 +7649,9 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
                                              &found);
     }
 
+  x_check_errors (FRAME_X_DISPLAY (f),
+		  "Can't retrieve window property: %s");
+  x_uncatch_errors_after_check ();
 
   unblock_input ();
   return prop_value;
@@ -7638,7 +7697,9 @@ Otherwise, the return value is a vector with the following fields:
 
   block_input ();
 
-  prop_atom = XInternAtom (FRAME_X_DISPLAY (f), SSDATA (prop), False);
+  x_catch_errors (FRAME_X_DISPLAY (f));
+  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
+				    SSDATA (prop), false);
   rc = XGetWindowProperty (FRAME_X_DISPLAY (f), target_window,
 			   prop_atom, 0, 0, False, AnyPropertyType,
 			   &actual_type, &actual_format, &actual_size,
@@ -7667,6 +7728,10 @@ Otherwise, the return value is a vector with the following fields:
 			 make_fixnum (actual_format),
 			 make_fixnum (bytes_remaining / (actual_format >> 3)));
     }
+
+  x_check_errors (FRAME_X_DISPLAY (f),
+		  "Can't retrieve window property: %s");
+  x_uncatch_errors_after_check ();
 
   unblock_input ();
   return prop_attr;
@@ -9700,11 +9765,11 @@ default and usually works with most desktops.  Some desktop environments
 however, may refuse to resize a child frame when Emacs is built with
 GTK3.  For those environments, the two settings below are provided.
 
-If this equals the symbol 'hide', Emacs temporarily hides the child
+If this equals the symbol `hide', Emacs temporarily hides the child
 frame during resizing.  This approach seems to work reliably, may
 however induce some flicker when the frame is made visible again.
 
-If this equals the symbol 'resize-mode', Emacs uses GTK's resize mode to
+If this equals the symbol `resize-mode', Emacs uses GTK's resize mode to
 always trigger an immediate resize of the child frame.  This method is
 deprecated by GTK and may not work in future versions of that toolkit.
 It also may freeze Emacs when used with other desktop environments.  It

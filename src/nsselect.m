@@ -17,13 +17,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/*
-Originally by Carl Edman
-Updated by Christian Limpach (chris@nice.ch)
-OpenStep/Rhapsody port by Scott Bender (sbender@harmony-ds.com)
-macOS/Aqua port by Christophe de Dinechin (descubes@earthlink.net)
-GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
-*/
+/* Originally by Carl Edman
+   Updated by Christian Limpach (chris@nice.ch)
+   OpenStep/Rhapsody port by Scott Bender (sbender@harmony-ds.com)
+   macOS/Aqua port by Christophe de Dinechin (descubes@earthlink.net)
+   GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)  */
 
 /* This should be the first include, as it may set up #defines affecting
    interpretation of even the system includes.  */
@@ -559,6 +557,150 @@ nxatoms_of_nsselect (void)
 	 nil] retain];
 }
 
+static void
+ns_decode_data_to_pasteboard (Lisp_Object type, Lisp_Object data,
+			      NSPasteboard *pasteboard)
+{
+  NSArray *types, *new;
+
+  types = [pasteboard types];
+
+  CHECK_SYMBOL (type);
+
+  if (EQ (type, Qstring))
+    {
+      CHECK_STRING (data);
+
+      new = [types arrayByAddingObject: NSPasteboardTypeString];
+
+      [pasteboard declareTypes: new
+			 owner: nil];
+      [pasteboard setString: [NSString stringWithLispString: data]
+		    forType: NSPasteboardTypeString];
+    }
+  else if (EQ (type, Qfile))
+    {
+      CHECK_STRING (data);
+
+#if NS_USE_NSPasteboardTypeFileURL
+      new = [types arrayByAddingObject: NSPasteboardTypeFileURL];
+#else
+      new = [types arrayByAddingObject: NSFilenamesPboardType];
+#endif
+
+      [pasteboard declareTypes: new
+			 owner: nil];
+
+#if NS_USE_NSPasteboardTypeFileURL
+      [pasteboard setString: [NSString stringWithLispString: data]
+		    forType: NSPasteboardTypeFileURL];
+#else
+      [pasteboard setString: [NSString stringWithLispString: data]
+		    forType: NSFilenamesPboardType];
+#endif
+    }
+  else
+    signal_error ("Unknown pasteboard type", type);
+}
+
+static void
+ns_lisp_to_pasteboard (Lisp_Object object,
+		       NSPasteboard *pasteboard)
+{
+  Lisp_Object tem, type, data;
+
+  [pasteboard declareTypes: [NSArray array]
+		     owner: nil];
+
+  CHECK_LIST (object);
+  for (tem = object; CONSP (tem); tem = XCDR (tem))
+    {
+      maybe_quit ();
+
+      type = Fcar (Fcar (tem));
+      data = Fcdr (Fcar (tem));
+
+      ns_decode_data_to_pasteboard (type, data, pasteboard);
+    }
+  CHECK_LIST_END (tem, object);
+}
+
+static NSDragOperation
+ns_dnd_action_to_operation (Lisp_Object action)
+{
+  if (EQ (action, QXdndActionCopy))
+    return NSDragOperationCopy;
+
+  if (EQ (action, QXdndActionMove))
+    return NSDragOperationMove;
+
+  if (EQ (action, QXdndActionLink))
+    return NSDragOperationLink;
+
+  signal_error ("Unsupported drag-and-drop action", action);
+}
+
+static Lisp_Object
+ns_dnd_action_from_operation (NSDragOperation operation)
+{
+  switch (operation)
+    {
+    case NSDragOperationCopy:
+      return QXdndActionCopy;
+
+    case NSDragOperationMove:
+      return QXdndActionMove;
+
+    case NSDragOperationLink:
+      return QXdndActionLink;
+
+    case NSDragOperationNone:
+      return Qnil;
+
+    default:
+      return QXdndActionPrivate;
+    }
+}
+
+DEFUN ("ns-begin-drag", Fns_begin_drag, Sns_begin_drag, 3, 3, 0,
+       doc: /* Begin a drag-and-drop operation on FRAME.
+
+FRAME must be a window system frame.  PBOARD is an alist of (TYPE
+. DATA), where TYPE is one of the following data types that determine
+the meaning of DATA:
+
+  - `string' means DATA should be a string describing text that will
+    be dragged to another program.
+
+  - `file' means DATA should be a file URL that will be dragged to
+    another program.
+
+ACTION is the action that will be taken by the drop target towards the
+data inside PBOARD.
+
+Return the action that the drop target actually chose to perform, or
+nil if no action was performed (either because there was no drop
+target, or the drop was rejected).  */)
+  (Lisp_Object frame, Lisp_Object pboard, Lisp_Object action)
+{
+  struct frame *f;
+  NSPasteboard *pasteboard;
+  EmacsWindow *window;
+  NSDragOperation operation;
+
+  f = decode_window_system_frame (frame);
+  pasteboard = [NSPasteboard pasteboardWithName: NSPasteboardNameDrag];
+  window = (EmacsWindow *) [FRAME_NS_VIEW (f) window];
+
+  operation = ns_dnd_action_to_operation (action);
+  ns_lisp_to_pasteboard (pboard, pasteboard);
+
+  operation = [window beginDrag: operation
+		  forPasteboard: pasteboard];
+
+  return ns_dnd_action_from_operation (operation);
+}
+
 void
 syms_of_nsselect (void)
 {
@@ -568,12 +710,17 @@ syms_of_nsselect (void)
   DEFSYM (QFILE_NAME, "FILE_NAME");
 
   DEFSYM (QTARGETS, "TARGETS");
+  DEFSYM (QXdndActionCopy, "XdndActionCopy");
+  DEFSYM (QXdndActionMove, "XdndActionMove");
+  DEFSYM (QXdndActionLink, "XdndActionLink");
+  DEFSYM (QXdndActionPrivate, "XdndActionPrivate");
 
   defsubr (&Sns_disown_selection_internal);
   defsubr (&Sns_get_selection);
   defsubr (&Sns_own_selection_internal);
   defsubr (&Sns_selection_exists_p);
   defsubr (&Sns_selection_owner_p);
+  defsubr (&Sns_begin_drag);
 
   Vselection_alist = Qnil;
   staticpro (&Vselection_alist);

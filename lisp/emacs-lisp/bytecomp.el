@@ -325,7 +325,8 @@ Elements of the list may be:
   constants   let-binding of, or assignment to, constants/nonvariables.
   docstrings  docstrings that are too wide (longer than
               `byte-compile-docstring-max-column' or
-              `fill-column' characters, whichever is bigger).
+              `fill-column' characters, whichever is bigger) or
+              have other stylistic issues.
   suspicious  constructs that usually don't do what the coder wanted.
 
 If the list begins with `not', then the remaining elements specify warnings to
@@ -1180,39 +1181,34 @@ message buffer `default-directory'."
     (if (< (length f2) (length f1)) f2 f1)))
 
 (defun byte-compile--first-symbol-with-pos (form)
-  "Return the \"first\" symbol with position found in form, or 0 if none.
-Here, \"first\" is by a depth first search."
-  (let (sym)
-    (cond
-     ((symbol-with-pos-p form) form)
-     ((consp form)
-      (or (and (symbol-with-pos-p (setq sym (byte-compile--first-symbol-with-pos (car form))))
-               sym)
-          (and (symbolp (setq sym (byte-compile--first-symbol-with-pos (cdr form))))
-               sym)
-          0))
-     ((and (or (vectorp form) (recordp form))
-           (> (length form) 0))
-      (let ((i 0)
-            (len (length form))
-            elt)
-        (catch 'sym
-          (while (< i len)
-            (when (symbol-with-pos-p
-                   (setq elt (byte-compile--first-symbol-with-pos (aref form i))))
-              (throw 'sym elt))
-            (setq i (1+ i)))
-          0)))
-     (t 0))))
+  "Return the first symbol with position in form, or nil if none.
+Order is by depth-first search."
+  (cond
+   ((symbol-with-pos-p form) form)
+   ((consp form)
+    (or (byte-compile--first-symbol-with-pos (car form))
+        (let ((sym nil))
+          (setq form (cdr form))
+          (while (and (consp form)
+                      (not (setq sym (byte-compile--first-symbol-with-pos
+                                      (car form)))))
+            (setq form (cdr form)))
+          (or sym
+              (and form (byte-compile--first-symbol-with-pos form))))))
+   ((or (vectorp form) (recordp form))
+    (let ((len (length form))
+          (i 0)
+          (sym nil))
+      (while (and (< i len)
+                  (not (setq sym (byte-compile--first-symbol-with-pos
+                                  (aref form i)))))
+        (setq i (1+ i)))
+      sym))))
 
 (defun byte-compile--warning-source-offset ()
-  "Return a source offset from `byte-compile-form-stack'.
-Return nil if such is not found."
-  (catch 'offset
-    (dolist (form byte-compile-form-stack)
-      (let ((s (byte-compile--first-symbol-with-pos form)))
-        (if (symbol-with-pos-p s)
-            (throw 'offset (symbol-with-pos-pos s)))))))
+  "Return a source offset from `byte-compile-form-stack' or nil if none."
+  (let ((sym (byte-compile--first-symbol-with-pos byte-compile-form-stack)))
+    (and sym (symbol-with-pos-pos sym))))
 
 ;; This is used as warning-prefix for the compiler.
 ;; It is always called with the warnings buffer current.
@@ -1729,8 +1725,12 @@ value, it will override this variable."
   :safe #'integerp
   :version "28.1")
 
-(defun byte-compile-docstring-length-warn (form)
-  "Warn if documentation string of FORM is too wide.
+(define-obsolete-function-alias 'byte-compile-docstring-length-warn
+  'byte-compile-docstring-style-warn "29.1")
+
+(defun byte-compile-docstring-style-warn (form)
+  "Warn if there are stylistic problems with the docstring in FORM.
+Warn if documentation string of FORM is too wide.
 It is too wide if it has any lines longer than the largest of
 `fill-column' and `byte-compile-docstring-max-column'."
   (when (byte-compile-warning-enabled-p 'docstrings)
@@ -1750,12 +1750,24 @@ It is too wide if it has any lines longer than the largest of
       (when (and (consp name) (eq (car name) 'quote))
         (setq name (cadr name)))
       (setq name (if name (format " `%s' " name) ""))
-      (when (and kind docs (stringp docs)
-                 (byte-compile--wide-docstring-p docs col))
-        (byte-compile-warn-x
-         name
-         "%s%sdocstring wider than %s characters"
-         kind name col))))
+      (when (and kind docs (stringp docs))
+        (when (byte-compile--wide-docstring-p docs col)
+          (byte-compile-warn-x
+           name
+           "%s%sdocstring wider than %s characters"
+           kind name col))
+        ;; There's a "naked" ' character before a symbol/list, so it
+        ;; should probably be quoted with \=.
+        (when (string-match-p "\\( \"\\|[ \t]\\|^\\)'[a-z(]" docs)
+          (byte-compile-warn-x
+           name "%s%sdocstring has wrong usage of unescaped single quotes (use \\= or different quoting)"
+           kind name))
+        ;; There's a "Unicode quote" in the string -- it should probably
+        ;; be an ASCII one instead.
+        (when (string-match-p "\\( \"\\|[ \t]\\|^\\)[‘’]" docs)
+          (byte-compile-warn-x
+           name "%s%sdocstring has wrong usage of \"fancy\" single quotation marks"
+           kind name)))))
   form)
 
 ;; If we have compiled any calls to functions which are not known to be
@@ -2617,7 +2629,7 @@ list that represents a doc string reference.
   (if (stringp (nth 3 form))
       (prog1
           form
-        (byte-compile-docstring-length-warn form))
+        (byte-compile-docstring-style-warn form))
     ;; No doc string, so we can compile this as a normal form.
     (byte-compile-keep-pending form 'byte-compile-normal-call)))
 
@@ -2649,7 +2661,7 @@ list that represents a doc string reference.
   (if (and (null (cddr form))		;No `value' provided.
            (eq (car form) 'defvar))     ;Just a declaration.
       nil
-    (byte-compile-docstring-length-warn form)
+    (byte-compile-docstring-style-warn form)
     (setq form (copy-sequence form))
     (when (consp (nth 2 form))
       (setcar (cdr (cdr form))
@@ -2674,7 +2686,7 @@ list that represents a doc string reference.
            (byte-compile-warn-x
             newname
             "Alias for `%S' should be declared before its referent" newname)))))
-  (byte-compile-docstring-length-warn form)
+  (byte-compile-docstring-style-warn form)
   (byte-compile-keep-pending form))
 
 (put 'custom-declare-variable 'byte-hunk-handler
@@ -3066,7 +3078,7 @@ lambda-expression."
       (setq fun (cons 'lambda fun))
     (unless (eq 'lambda (car-safe fun))
       (error "Not a lambda list: %S" fun)))
-  (byte-compile-docstring-length-warn fun)
+  (byte-compile-docstring-style-warn fun)
   (byte-compile-check-lambda-list (nth 1 fun))
   (let* ((arglist (nth 1 fun))
          (arglistvars (byte-run-strip-symbol-positions
@@ -4931,8 +4943,6 @@ binding slots have been popped."
     (push (nth 1 (nth 1 form)) byte-compile-global-not-obsolete-vars))
   (byte-compile-normal-call form))
 
-(defconst byte-compile-tmp-var (make-symbol "def-tmp-var"))
-
 (defun byte-compile-defvar (form)
   ;; This is not used for file-level defvar/consts.
   (when (and (symbolp (nth 1 form))
@@ -4942,7 +4952,7 @@ binding slots have been popped."
      (nth 1 form)
      "global/dynamic var `%s' lacks a prefix"
      (nth 1 form)))
-  (byte-compile-docstring-length-warn form)
+  (byte-compile-docstring-style-warn form)
   (let ((fun (nth 0 form))
 	(var (nth 1 form))
 	(value (nth 2 form))
@@ -4965,18 +4975,17 @@ binding slots have been popped."
        string
        "third arg to `%s %s' is not a string: %s"
        fun var string))
+    ;; Delegate the actual work to the function version of the
+    ;; special form, named with a "-1" suffix.
     (byte-compile-form-do-effect
-     (if (cddr form)  ; `value' provided
-         ;; Quote with `quote' to prevent byte-compiling the body,
-         ;; which would lead to an inf-loop.
-         `(funcall '(lambda (,byte-compile-tmp-var)
-                      (,fun ,var ,byte-compile-tmp-var ,@(nthcdr 3 form)))
-                   ,value)
-        (if (eq fun 'defconst)
-            ;; This will signal an appropriate error at runtime.
-            `(eval ',form)
-          ;; A simple (defvar foo) just returns foo.
-          `',var)))))
+     (cond
+      ((eq fun 'defconst) `(defconst-1 ',var ,@(nthcdr 2 form)))
+      ((not (cddr form)) `',var) ; A simple (defvar foo) just returns foo.
+      (t `(defvar-1 ',var
+                    ;; Don't eval `value' if `defvar' wouldn't eval it either.
+                    ,(if (macroexp-const-p value) value
+                       `(if (boundp ',var) nil ,value))
+                    ,@(nthcdr 3 form)))))))
 
 (defun byte-compile-autoload (form)
   (and (macroexp-const-p (nth 1 form))
@@ -5018,7 +5027,7 @@ binding slots have been popped."
       ;; - `arg' is the expression to which it is defined.
       ;; - `rest' is the rest of the arguments.
       (`(,_ ',name ,arg . ,rest)
-       (byte-compile-docstring-length-warn form)
+       (byte-compile-docstring-style-warn form)
        (pcase-let*
            ;; `macro' is non-nil if it defines a macro.
            ;; `fun' is the function part of `arg' (defaults to `arg').

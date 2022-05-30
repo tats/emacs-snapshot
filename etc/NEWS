@@ -203,6 +203,13 @@ files that were compiled with an old EIEIO (Emacs<25).
 ** 'C-x 8 .' has been moved to 'C-x 8 . .'.
 This is to open up the 'C-x 8 .' map to bind further characters there.
 
+---
+** 'C-x 8 =' moved to 'C-x 8 = ='.
+You can now use 'C-x 8 =' to insert several characters with macron;
+for example, 'C-x 8 = a' will insert U+0101 LATIN SMALL LETTER A WITH
+MACRON.  To insert a lone macron, type 'C-x 8 = =' instead of the
+previous 'C-x ='.
+
 ** Eshell
 
 ---
@@ -322,6 +329,9 @@ a convenient method of making commands disabled in this way.
 
 ---
 ** 'count-lines' will now report buffer totals if given a prefix.
+
++++
+** 'count-words' will now report sentence count when used interactively.
 
 ---
 ** New user option 'find-library-include-other-files'.
@@ -820,6 +830,14 @@ corresponding language environments are:
 **** Modi script and language environment
 **** Baybayin script and Tagalog language environment
 **** Hanunoo script and language environment
+**** Buhid script and language environment
+**** Tagbanwa script and language environment
+**** Limbu script and language environment
+**** Balinese script and language environment
+**** Javanese script and language environment
+**** Sundanese script and language environment
+**** Batak script and language environment
+**** Rejang script and language environment
 
 ---
 *** The "Oriya" language environment was renamed to "Odia".
@@ -1868,6 +1886,11 @@ functions.
 
 * Lisp Changes in Emacs 29.1
 
+---
+** New eldoc function: 'elisp-eldoc-var-docstring-with-value'.
+This function includes the current value of the variable in eldoc display
+and can be used as a more detailed alternative to 'elisp-eldoc-var-docstring'.
+
 ** 'save-some-buffers' can now be extended to save other things.
 Traditionally, 'save-some-buffers' saved buffers, and also saved
 abbrevs.  This has been generalized via the
@@ -1905,6 +1928,20 @@ be kept aligned with the buffer contents when the user switches
 This returns non-nil if its argument its an uppercase character.
 
 ** Byte compilation
+
+---
+*** Byte compilation will now warn about some quoting mistakes in doc strings.
+When writing code snippets that contains the ' character (APOSTROPHE),
+that quote character has to be escaped to avoid Emacs displaying it as
+’ (LEFT SINGLE QUOTATION MARK), which would make code examples like
+
+    (setq foo '(1 2 3))
+
+invalid.  Emacs will now warn during byte compilation if it seems
+something like that, and also warn about when using RIGHT/LEFT SINGLE
+QUOTATION MARK directly.  In both these cases, if these characters
+should really be present in the doc string, they should be quoted with
+\=.
 
 ---
 *** Byte compilation will now warn about some malformed 'defcustom' types.
@@ -2249,8 +2286,8 @@ This command lets you examine all data in the current selection and
 the clipboard, and insert it into the buffer.
 
 +++
-** New user option 'yank-transform-functions'.
-This function allows the user to alter the string to be inserted.
+** New variable 'yank-transform-functions'.
+This variable allows the user to alter the string to be inserted.
 
 ---
 ** New command 'yank-in-context'.

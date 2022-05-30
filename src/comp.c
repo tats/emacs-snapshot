@@ -756,7 +756,7 @@ comp_hash_source_file (Lisp_Object filename)
 
 DEFUN ("comp--subr-signature", Fcomp__subr_signature,
        Scomp__subr_signature, 1, 1, 0,
-       doc: /* Support function to 'hash_native_abi'.
+       doc: /* Support function to hash_native_abi.
 For internal use.  */)
   (Lisp_Object subr)
 {
@@ -5342,7 +5342,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
 	 are necessary exclusively during the first load.  Once these
 	 are collected we don't have to maintain them in the heap
 	 forever.  */
-      Lisp_Object volatile data_ephemeral_vec;
+      Lisp_Object volatile data_ephemeral_vec = Qnil;
       /* In case another load of the same CU is active on the stack
 	 all ephemeral data is hold by that frame.  Re-writing
 	 'data_ephemeral_vec' would be not only a waste of cycles but

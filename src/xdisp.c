@@ -11234,7 +11234,7 @@ argument if the size of the buffer is large or unknown.
 
 Optional argument MODE-LINES nil or omitted means do not include the
 height of the mode-, tab- or header-line of WINDOW in the return value.
-If it is the symbol `mode-line', 'tab-line' or `header-line', include
+If it is the symbol `mode-line', `tab-line' or `header-line', include
 only the height of that line, if present, in the return value.  If t,
 include the height of any of these, if present, in the return value.
 
@@ -13200,8 +13200,9 @@ gui_consider_frame_title (Lisp_Object frame)
 	 mode_line_noprop_buf; then display the title.  */
       record_unwind_protect (unwind_format_mode_line,
 			     format_mode_line_unwind_data
-			     (NULL, current_buffer, Qnil, false));
+			     (f, current_buffer, selected_window, false));
 
+      Fselect_window (f->selected_window, Qt);
       set_buffer_internal_1
 	(XBUFFER (XWINDOW (f->selected_window)->contents));
       fmt = FRAME_ICONIFIED_P (f) ? Vicon_title_format : Vframe_title_format;
@@ -36249,7 +36250,7 @@ they return to their normal size when the minibuffer is closed, or the
 echo area becomes empty.
 
 This variable does not affect resizing of the minibuffer window of
-minibuffer-only frames.  These are handled by 'resize-mini-frames'
+minibuffer-only frames.  These are handled by `resize-mini-frames'
 only.  */);
   /* Contrary to the doc string, we initialize this to nil, so that
      loading loadup.el won't try to resize windows before loading
@@ -36473,7 +36474,7 @@ see biditest.el in the test suite.  */);
     doc: /* Non-nil means inhibit the Bidirectional Parentheses Algorithm.
 Disabling the BPA makes redisplay faster, but might produce incorrect
 display reordering of bidirectional text with embedded parentheses and
-other bracket characters whose 'paired-bracket' Unicode property is
+other bracket characters whose `paired-bracket' Unicode property is
 non-nil, see `get-char-code-property'.  */);
   bidi_inhibit_bpa = false;
 

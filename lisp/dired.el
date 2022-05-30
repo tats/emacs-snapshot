@@ -254,7 +254,7 @@ The target is used in the prompt for file copy, rename etc."
 Dragging the mouse and then releasing it over the window of
 another program will result in that program opening the file, or
 creating a copy of it.  This feature is supported only on X
-Windows and Haiku.
+Windows, Haiku, and Nextstep (macOS or GNUstep).
 
 If the value is `link', then a symbolic link will be created to
 the file instead by the other program (usually a file manager)."
@@ -1766,7 +1766,7 @@ when Emacs exits or the user drags another file.")
                                 #'dired-remove-last-dragged-local-file))
                     (gui-backend-set-selection 'XdndSelection filename)
                     (x-begin-drag '("text/uri-list" "text/x-dnd-username"
-                                    "FILE_NAME" "FILE" "HOST_NAME")
+                                    "FILE_NAME" "FILE" "HOST_NAME" "_DT_NETFILE")
                                   (if (eq 'dired-mouse-drag-files 'link)
                                       'XdndActionLink
                                     'XdndActionCopy)

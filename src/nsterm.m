@@ -440,28 +440,28 @@ ev_modifiers_helper (unsigned int flags, unsigned int left_mask,
 
 /* This is a piece of code which is common to all the event handling
    methods.  Maybe it should even be a function.  */
-#define EV_TRAILER(e)                                                   \
-  {                                                                     \
-    XSETFRAME (emacs_event->frame_or_window, emacsframe);               \
-    EV_TRAILER2 (e);                                                    \
+#define EV_TRAILER(e)						\
+  {								\
+    XSETFRAME (emacs_event->frame_or_window, emacsframe);	\
+    EV_TRAILER2 (e);						\
   }
 
 #define EV_TRAILER2(e)                                                  \
   {                                                                     \
-      if (e) emacs_event->timestamp = EV_TIMESTAMP (e);                 \
-      if (q_event_ptr)                                                  \
-        {                                                               \
-          Lisp_Object tem = Vinhibit_quit;                              \
-          Vinhibit_quit = Qt;                                           \
-          n_emacs_events_pending++;                                     \
-          kbd_buffer_store_event_hold (emacs_event, q_event_ptr);       \
-          Vinhibit_quit = tem;                                          \
-        }                                                               \
-      else                                                              \
-        hold_event (emacs_event);                                       \
-      EVENT_INIT (*emacs_event);                                        \
-      ns_send_appdefined (-1);                                          \
-    }
+    if (e) emacs_event->timestamp = EV_TIMESTAMP (e);			\
+    if (q_event_ptr)							\
+      {									\
+	Lisp_Object tem = Vinhibit_quit;				\
+	Vinhibit_quit = Qt;						\
+	n_emacs_events_pending++;					\
+	kbd_buffer_store_event_hold (emacs_event, q_event_ptr);		\
+	Vinhibit_quit = tem;						\
+      }									\
+    else								\
+      hold_event (emacs_event);						\
+    EVENT_INIT (*emacs_event);						\
+    ns_send_appdefined (-1);						\
+  }
 
 
 /* TODO: Get rid of need for these forward declarations.  */
@@ -5182,11 +5182,26 @@ ns_update_window_end (struct window *w, bool cursor_on_p,
 }
 #endif
 
-/* This and next define (many of the) public functions in this file.  */
-/* gui_* are generic versions in xdisp.c that we, and other terms, get away
-         with using despite presence in the "system dependent" redisplay
-         interface.  In addition, many of the ns_ methods have code that is
-         shared with all terms, indicating need for further refactoring.  */
+static void
+ns_flush_display (struct frame *f)
+{
+  struct input_event ie;
+
+  /* Called from some of the minibuffer code.  Run the event loop once
+     to make the toolkit make changes that were made to the back
+     buffer visible again.  TODO: what should happen to ie?  */
+
+  EVENT_INIT (ie);
+  ns_read_socket (FRAME_TERMINAL (f), &ie);
+}
+
+/* This and next define (many of the) public functions in this
+   file.  */
+/* gui_* are generic versions in xdisp.c that we, and other terms, get
+   away with using despite presence in the "system dependent"
+   redisplay interface.  In addition, many of the ns_ methods have
+   code that is shared with all terms, indicating need for further
+   refactoring.  */
 extern frame_parm_handler ns_frame_parm_handlers[];
 static struct redisplay_interface ns_redisplay_interface =
 {
@@ -5203,7 +5218,7 @@ static struct redisplay_interface ns_redisplay_interface =
 #else
   ns_update_window_end,
 #endif
-  0, /* flush_display */
+  ns_flush_display,
   gui_clear_window_mouse_face,
   gui_get_glyph_overhangs,
   gui_fix_overlapping_area,
@@ -7059,6 +7074,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 {
   struct ns_display_info *dpyinfo = FRAME_DISPLAY_INFO (emacsframe);
   NSPoint p = [self convertPoint: [theEvent locationInWindow] fromView: nil];
+  EmacsWindow *window;
 
   NSTRACE ("[EmacsView mouseDown:]");
 
@@ -7069,6 +7085,9 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   /* Appears to be needed to prevent spurious movement events generated on
      button clicks.  */
   emacsframe->mouse_moved = 0;
+
+  window = (EmacsWindow *) [self window];
+  [window setLastDragEvent: theEvent];
 
   if ([theEvent type] == NSEventTypeScrollWheel)
     {
@@ -8592,12 +8611,18 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
 - (NSDragOperation) draggingUpdated: (id <NSDraggingInfo>) sender
 {
+#ifdef NS_IMPL_GNUSTEP
   struct input_event ie;
+#else
+  Lisp_Object frame;
+#endif
   NSPoint position;
   int x, y;
 
+#ifdef NS_IMPL_GNUSTEP
   EVENT_INIT (ie);
   ie.kind = DRAG_N_DROP_EVENT;
+#endif
 
   /* Get rid of mouse face.  */
   [self mouseExited: [[self window] currentEvent]];
@@ -8607,6 +8632,7 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   x = lrint (position.x);
   y = lrint (position.y);
 
+#ifdef NS_IMPL_GNUSTEP
   XSETINT (ie.x, x);
   XSETINT (ie.y, y);
   XSETFRAME (ie.frame_or_window, emacsframe);
@@ -8614,6 +8640,17 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   ie.modifiers = 0;
 
   kbd_buffer_store_event (&ie);
+#else
+  /* Input events won't be processed until the drop happens on macOS,
+     so call this function instead.  */
+  XSETFRAME (frame, emacsframe);
+
+  safe_call (4, Vns_drag_motion_function, frame,
+	     make_fixnum (x), make_fixnum (y));
+
+  redisplay ();
+#endif
+
   return NSDragOperationGeneric;
 }
 
@@ -8859,6 +8896,8 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 		 | NSWindowStyleMaskMiniaturizable
 		 | NSWindowStyleMaskClosable);
 
+  last_drag_event = nil;
+
   width = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, f->text_cols);
   height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, f->text_lines);
 
@@ -8974,6 +9013,11 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
   /* We need to release the toolbar ourselves.  */
   [[self toolbar] release];
+
+  /* Also the last button press event .  */
+  if (last_drag_event)
+    [last_drag_event release];
+
   [super dealloc];
 }
 
@@ -9496,6 +9540,55 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   /* Required for fullscreen and undecorated windows.  */
 {
   return YES;
+}
+
+- (void) setLastDragEvent: (NSEvent *) event
+{
+  if (last_drag_event)
+    [last_drag_event release];
+  last_drag_event = [event copy];
+}
+
+- (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL) is_local
+{
+  return drag_op;
+}
+
+- (void) draggedImage: (NSImage *) image
+	      endedAt: (NSPoint) screen_point
+	    operation: (NSDragOperation) operation
+{
+  selected_op = operation;
+}
+
+- (NSDragOperation) beginDrag: (NSDragOperation) op
+		forPasteboard: (NSPasteboard *) pasteboard
+{
+  NSImage *image;
+
+  drag_op = op;
+  selected_op = NSDragOperationNone;
+  image = [[NSImage alloc] initWithSize: NSMakeSize (1.0, 1.0)];
+
+  /* Now draw transparency onto the image.  */
+  [image lockFocus];
+  [[NSColor colorWithUnsignedLong: 0] set];
+  NSRectFillUsingOperation (NSMakeRect (0, 0, 1, 1),
+			    NSCompositingOperationCopy);
+  [image unlockFocus];
+
+  if (last_drag_event)
+    [self dragImage: image
+		 at: NSMakePoint (0, 0)
+	     offset: NSMakeSize (0, 0)
+	      event: last_drag_event
+	 pasteboard: pasteboard
+	     source: self
+	  slideBack: NO];
+
+  [image release];
+
+  return selected_op;
 }
 
 @end /* EmacsWindow */
@@ -10430,6 +10523,7 @@ syms_of_nsterm (void)
   DEFSYM (Qns_drag_operation_copy, "ns-drag-operation-copy");
   DEFSYM (Qns_drag_operation_link, "ns-drag-operation-link");
   DEFSYM (Qns_drag_operation_generic, "ns-drag-operation-generic");
+  DEFSYM (Qns_handle_drag_motion, "ns-handle-drag-motion");
 
   Fput (Qalt, Qmodifier_value, make_fixnum (alt_modifier));
   Fput (Qhyper, Qmodifier_value, make_fixnum (hyper_modifier));
@@ -10437,117 +10531,117 @@ syms_of_nsterm (void)
   Fput (Qsuper, Qmodifier_value, make_fixnum (super_modifier));
   Fput (Qcontrol, Qmodifier_value, make_fixnum (ctrl_modifier));
 
+ DEFVAR_LISP ("ns-input-font", ns_input_font,
+   doc: /* The font specified in the last NS event. */);
+ ns_input_font = Qnil;
+
+ DEFVAR_LISP ("ns-input-fontsize", ns_input_fontsize,
+   doc: /* The fontsize specified in the last NS event. */);
+ ns_input_fontsize = Qnil;
+
+ DEFVAR_LISP ("ns-input-line", ns_input_line,
+   doc: /* The line specified in the last NS event. */);
+ ns_input_line = Qnil;
+
+ DEFVAR_LISP ("ns-input-spi-name", ns_input_spi_name,
+   doc: /* The service name specified in the last NS event. */);
+ ns_input_spi_name = Qnil;
+
+ DEFVAR_LISP ("ns-input-spi-arg", ns_input_spi_arg,
+   doc: /* The service argument specified in the last NS event. */);
+  ns_input_spi_arg = Qnil;
+
   DEFVAR_LISP ("ns-input-file", ns_input_file,
-              "The file specified in the last NS event.");
-  ns_input_file =Qnil;
+    doc: /* The file specified in the last NS event.  */);
+  ns_input_file = Qnil;
 
   DEFVAR_LISP ("ns-working-text", ns_working_text,
-              "String for visualizing working composition sequence.");
-  ns_working_text =Qnil;
-
-  DEFVAR_LISP ("ns-input-font", ns_input_font,
-              "The font specified in the last NS event.");
-  ns_input_font =Qnil;
-
-  DEFVAR_LISP ("ns-input-fontsize", ns_input_fontsize,
-              "The fontsize specified in the last NS event.");
-  ns_input_fontsize =Qnil;
-
-  DEFVAR_LISP ("ns-input-line", ns_input_line,
-               "The line specified in the last NS event.");
-  ns_input_line =Qnil;
-
-  DEFVAR_LISP ("ns-input-spi-name", ns_input_spi_name,
-               "The service name specified in the last NS event.");
-  ns_input_spi_name =Qnil;
-
-  DEFVAR_LISP ("ns-input-spi-arg", ns_input_spi_arg,
-               "The service argument specified in the last NS event.");
-  ns_input_spi_arg =Qnil;
+    doc: /* String for visualizing working composition sequence.  */);
+  ns_working_text = Qnil;
 
   DEFVAR_LISP ("ns-alternate-modifier", ns_alternate_modifier,
-               "This variable describes the behavior of the alternate or option key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the alternate or option key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_alternate_modifier = Qmeta;
 
   DEFVAR_LISP ("ns-right-alternate-modifier", ns_right_alternate_modifier,
-               "This variable describes the behavior of the right alternate or option key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-It can also be `left' to use the value of `ns-alternate-modifier' instead.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the right alternate or option key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+It can also be `left' to use the value of `ns-alternate-modifier' instead.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_right_alternate_modifier = Qleft;
 
   DEFVAR_LISP ("ns-command-modifier", ns_command_modifier,
-               "This variable describes the behavior of the command key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the command key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_command_modifier = Qsuper;
 
   DEFVAR_LISP ("ns-right-command-modifier", ns_right_command_modifier,
-               "This variable describes the behavior of the right command key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-It can also be `left' to use the value of `ns-command-modifier' instead.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the right command key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+It can also be `left' to use the value of `ns-command-modifier' instead.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_right_command_modifier = Qleft;
 
   DEFVAR_LISP ("ns-control-modifier", ns_control_modifier,
-               "This variable describes the behavior of the control key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the control key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_control_modifier = Qcontrol;
 
   DEFVAR_LISP ("ns-right-control-modifier", ns_right_control_modifier,
-               "This variable describes the behavior of the right control key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-It can also be `left' to use the value of `ns-control-modifier' instead.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the right control key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+It can also be `left' to use the value of `ns-control-modifier' instead.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_right_control_modifier = Qleft;
 
   DEFVAR_LISP ("ns-function-modifier", ns_function_modifier,
-               "This variable describes the behavior of the function (fn) key.\n\
-Either SYMBOL, describing the behavior for any event,\n\
-or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior\n\
-separately for ordinary keys, function keys, and mouse events.\n\
-\n\
-Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.\n\
-If `none', the key is ignored by Emacs and retains its standard meaning.");
+    doc: /* This variable describes the behavior of the function (fn) key.
+Either SYMBOL, describing the behavior for any event,
+or (:ordinary SYMBOL :function SYMBOL :mouse SYMBOL), describing behavior
+separately for ordinary keys, function keys, and mouse events.
+
+Each SYMBOL is `control', `meta', `alt', `super', `hyper' or `none'.
+If `none', the key is ignored by Emacs and retains its standard meaning.  */);
   ns_function_modifier = Qnone;
 
   DEFVAR_LISP ("ns-antialias-text", ns_antialias_text,
-               "Non-nil (the default) means to render text antialiased.");
+    doc: /* Non-nil (the default) means to render text antialiased.  */);
   ns_antialias_text = Qt;
 
   DEFVAR_LISP ("ns-use-thin-smoothing", ns_use_thin_smoothing,
-               "Non-nil turns on a font smoothing method that produces thinner strokes.");
+    doc: /* Non-nil turns on a font smoothing method that produces thinner strokes.  */);
   ns_use_thin_smoothing = Qnil;
 
   DEFVAR_LISP ("ns-confirm-quit", ns_confirm_quit,
-               "Whether to confirm application quit using dialog.");
+    doc: /* Whether to confirm application quit using dialog.  */);
   ns_confirm_quit = Qnil;
 
   DEFVAR_LISP ("ns-auto-hide-menu-bar", ns_auto_hide_menu_bar,
@@ -10616,6 +10710,16 @@ This variable is ignored on macOS < 10.7 and GNUstep.  Default is t.  */);
  This is only effective for pixel deltas generated from touch pads or
  mice with smooth scrolling capability.  */);
   Vns_scroll_event_delta_factor = make_float (1.0);
+
+  DEFVAR_LISP ("ns-drag-motion-function", Vns_drag_motion_function,
+    doc: /* Function called when another program drags items over Emacs.
+
+It is called with three arguments FRAME, X, and Y, whenever the user
+moves the mouse over an Emacs frame as part of a drag-and-drop
+operation.  FRAME is the frame the mouse is on top of, and X and Y are
+the frame-relative positions of the mouse in the X and Y axises
+respectively.  */);
+  Vns_drag_motion_function = Qns_handle_drag_motion;
 
   /* Tell Emacs about this window system.  */
   Fprovide (Qns, Qnil);

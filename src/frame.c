@@ -1572,6 +1572,19 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
   if (! FRAME_MINIBUF_ONLY_P (XFRAME (selected_frame)))
     last_nonminibuf_frame = XFRAME (selected_frame);
 
+  /* If the selected window in the target frame is its mini-window, we move
+     to a different window, the most recently used one, unless there is a
+     valid active minibuffer in the mini-window.  */
+  if (EQ (f->selected_window, f->minibuffer_window)
+      /* The following test might fail if the mini-window contains a
+	 non-active minibuffer.  */
+      && NILP (Fminibufferp (XWINDOW (f->minibuffer_window)->contents, Qt)))
+    {
+      Lisp_Object w = call1 (Qget_mru_window, frame);
+      if (WINDOW_LIVE_P (w)) /* W can be nil in minibuffer-only frames.  */
+        Fset_frame_selected_window (frame, w, Qnil);
+    }
+
   Fselect_window (f->selected_window, norecord);
 
   /* We want to make sure that the next event generates a frame-switch
@@ -1988,7 +2001,8 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
 	error ("Attempt to delete the only frame");
     }
 #ifdef HAVE_X_WINDOWS
-  else if (x_dnd_in_progress && f == x_dnd_frame)
+  else if ((x_dnd_in_progress && f == x_dnd_frame)
+	   || (x_dnd_waiting_for_finish && f == x_dnd_finish_frame))
     error ("Attempt to delete the drop source frame");
 #endif
 #ifdef HAVE_HAIKU
@@ -3643,7 +3657,7 @@ DEFUN ("frame-fringe-width", Ffringe_width, Sfringe_width, 0, 1, 0,
 
 DEFUN ("frame-child-frame-border-width", Fframe_child_frame_border_width, Sframe_child_frame_border_width, 0, 1, 0,
        doc: /* Return width of FRAME's child-frame border in pixels.
- If FRAME's 'child-frame-border-width' parameter is nil, return FRAME's
+ If FRAME's `child-frame-border-width' parameter is nil, return FRAME's
  internal border width instead.  */)
   (Lisp_Object frame)
 {
