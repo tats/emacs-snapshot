@@ -1,3 +1,11 @@
+emacs (1:28.1+1-1~1.gbp1dfd2d) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @1dfd2dc3f3f476ff7beb5d7128779e12bb521a60 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 30 May 2022 13:40:24 -0500
+
 emacs (1:27.1+1-3) unstable; urgency=medium
 
   * Strip parent path from package descriptions for reprodcibility.  Add
