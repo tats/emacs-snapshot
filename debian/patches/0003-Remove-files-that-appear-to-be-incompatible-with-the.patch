@@ -1,4 +1,4 @@
-From 8ba31a5b9c413f0efca428f979fbff7a03cf156f Mon Sep 17 00:00:00 2001
+From 441b88038e0151f77c6b7676dea64d15ab27607b Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:24 -0500
 Subject: Remove files that appear to be incompatible with the DFSG
@@ -30,10 +30,10 @@ Status: new
  5 files changed, 37 insertions(+), 76 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 67e15cfecd2..05bfedcd17c 100644
+index c902b46ceda..fadcf1015fe 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -164,7 +164,9 @@ man1dir=$(mandir)/man1
+@@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -42,19 +42,19 @@ index 67e15cfecd2..05bfedcd17c 100644
 +# package (see /usr/share/doc/emacs*-common/copyright).
 +INFO_NONMISC=
  
- # If no makeinfo was found and configured --without-makeinfo, "no"; else "yes".
- HAVE_MAKEINFO=@HAVE_MAKEINFO@
-@@ -830,8 +832,7 @@ endef
+ # Directory for local state files for all programs.
+ localstatedir=@localstatedir@
+@@ -885,8 +887,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
 -mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/emacs doc/misc \
--  doc/lispref doc/lispintro
-+mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc
+-  doc/lispref doc/lispintro test
++mostlyclean_dirs = src oldXMenu lwlib lib lib-src nt doc/misc test
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -965,11 +966,11 @@ endif
+@@ -1000,11 +1001,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -71,17 +71,17 @@ index 67e15cfecd2..05bfedcd17c 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -990,9 +991,6 @@ info-dir: ${srcdir}/info/dir
+@@ -1035,9 +1036,6 @@ info-dir: ${srcdir}/info/dir
+ texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
- ## Hopefully doc/misc/*.texi is not too long for some systems?
  srcdir_doc_info_dir_inputs = \
 -  ${srcdir}/doc/emacs/emacs.texi \
 -  ${srcdir}/doc/lispintro/emacs-lisp-intro.texi \
 -  ${srcdir}/doc/lispref/elisp.texi \
-   $(sort $(wildcard ${srcdir}/doc/misc/*.texi))
+   $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1014,14 +1012,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
+@@ -1059,14 +1057,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -100,7 +100,7 @@ index 67e15cfecd2..05bfedcd17c 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1039,14 +1033,10 @@ install-pdf: $(INSTALL_PDF)
+@@ -1084,14 +1078,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -120,10 +120,10 @@ index 67e15cfecd2..05bfedcd17c 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index af339a9e7ec..4864d89011b 100755
+index 5923bee22bb..44e681748af 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
-@@ -259,8 +259,7 @@ info_dir ()
+@@ -260,8 +260,7 @@ info_dir ()
  $topic
  EOF
          ## Bit faster than doc/*/*.texi.
@@ -134,10 +134,10 @@ index af339a9e7ec..4864d89011b 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 40bc610f9bf..3b10c855afc 100644
+index 660784347bb..015065e8db6 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -5798,7 +5798,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
+@@ -6049,7 +6049,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -146,7 +146,7 @@ index 40bc610f9bf..3b10c855afc 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -5850,14 +5850,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -6104,14 +6104,11 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -167,10 +167,10 @@ index 40bc610f9bf..3b10c855afc 100644
  dnl If we give this the more natural name, etc/refcards/emacsver.texi,
  dnl then a directory etc/refcards is created in the build directory,
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 7f536ad9529..6b56f47aab8 100644
+index 1e3398701fc..7c0f5694b23 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -61,18 +61,14 @@ INSTALL_DATA = @INSTALL_DATA@
+@@ -63,18 +63,14 @@ INSTALL_DATA = @INSTALL_DATA@
  MAKEINFO = @MAKEINFO@
  MAKEINFO_OPTS = --force -I$(emacsdir)
  
@@ -185,15 +185,15 @@ index 7f536ad9529..6b56f47aab8 100644
 -	dbus dired-x ebrowse ede ediff edt eieio \
 -	emacs-mime epa erc ert eshell eudc efaq eww \
 -	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
--	mairix-el message mh-e newsticker nxml-mode octave-mode \
+-	mairix-el message mh-e modus-themes newsticker nxml-mode octave-mode \
 -	org pcl-cvs pgg rcirc remember reftex sasl \
--	sc semantic ses sieve smtpmail speedbar srecode todo-mode tramp \
--	url vhdl-mode vip viper widget wisent woman
-+INFO_COMMON = efaq
+-	sc semantic ses sieve smtpmail speedbar srecode todo-mode transient \
+-	tramp url vhdl-mode vip viper widget wisent woman
++INFO_COMMON = efaq transient
  
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
-@@ -150,9 +146,6 @@ define info_template
+@@ -161,9 +157,6 @@ define info_template
   $(1): $$(buildinfodir)/$(1).info
  endef
  
@@ -203,7 +203,7 @@ index 7f536ad9529..6b56f47aab8 100644
  $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_template,$(ifile))))
  
  
-@@ -174,20 +167,11 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
+@@ -185,20 +178,11 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
  
  ## Extra dependencies.
  
@@ -225,7 +225,7 @@ index 7f536ad9529..6b56f47aab8 100644
  
  ## efaq, efaq_w32 do not depend on gfdl.
  ## Maybe we can use .SECONDEXPANSION for this.
-@@ -203,23 +187,6 @@ efaq%.pdf: ${srcdir}/efaq%.texi
+@@ -214,23 +198,6 @@ efaq%.pdf: ${srcdir}/efaq%.texi
  efaq%.html: ${srcdir}/efaq%.texi
  	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(HTML_OPTS) -o $@ $<
  
@@ -247,13 +247,13 @@ index 7f536ad9529..6b56f47aab8 100644
 -${buildinfodir}/tramp.info tramp.html: ${srcdir}/trampver.texi
 -
  
- .PHONY: mostlyclean clean distclean bootstrap-clean maintainer-clean
- 
+ abs_top_builddir = @abs_top_builddir@
+ EMACS = ${abs_top_builddir}/src/emacs
 diff --git a/lisp/help.el b/lisp/help.el
-index 0f1991e3185..775dd35cbb1 100644
+index fd331ac0d48..cfe6dd90740 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -296,6 +296,14 @@ view-help-file
+@@ -357,6 +357,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  

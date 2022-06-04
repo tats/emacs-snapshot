@@ -7,7 +7,3 @@
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
 0009-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
-0010-Mark-echo-server-with-dns-test-as-unstable-for-now.patch
-0011-emacs-module-tests-fix-VPATH-builds.patch
-0012-Strip-parent-path-from-package-descriptions-for-repr.patch
-0013-Recover-the-contents-of-the-schemas.xml-file.patch

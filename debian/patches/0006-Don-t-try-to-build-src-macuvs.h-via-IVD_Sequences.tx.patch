@@ -1,4 +1,4 @@
-From 473683ab8f34fcf255b57f964d12e9cccc98e568 Mon Sep 17 00:00:00 2001
+From 43fb7a766a21ab7d8acd0d2945221775ab202e10 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Tue, 21 Oct 2014 19:10:17 -0500
 Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
@@ -10,15 +10,15 @@ over the licensing.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
-index f3e1c786114..71d391d6c4f 100644
+index 2b0215dde4f..a464dc3933d 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -56,7 +56,7 @@ am__v_at_1 =
+@@ -40,7 +40,7 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
  
  .PHONY: all
  
 -all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
 +all: ${unifiles} ${unidir}/charscript.el \
-   ${unidir}/charprop.el
+   ${unidir}/charprop.el ${unidir}/emoji-zwj.el
  
  ## Specify .elc as an order-only prereq so as to not needlessly rebuild

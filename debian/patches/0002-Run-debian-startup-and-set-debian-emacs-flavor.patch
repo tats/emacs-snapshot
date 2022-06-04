@@ -1,4 +1,4 @@
-From f52e6bd94fab618e69d38332756e5321ed131f4e Mon Sep 17 00:00:00 2001
+From 5c4efdb422d8556f388f909374f7b9f89e67069f Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Mon, 4 Apr 2011 22:46:22 -0500
 Subject: Run debian-startup and set debian-emacs-flavor
@@ -16,10 +16,10 @@ Author: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/lisp/startup.el b/lisp/startup.el
-index bff10003f84..78cd8dd0e3a 100644
+index 9ebd4c1a707..052ba7b2c66 100644
 --- a/lisp/startup.el
 +++ b/lisp/startup.el
-@@ -436,6 +436,10 @@ tutorial-directory
+@@ -438,6 +438,10 @@ tutorial-directory
    :type 'directory
    :initialize #'custom-initialize-delay)
  
@@ -30,7 +30,7 @@ index bff10003f84..78cd8dd0e3a 100644
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Recursively add all subdirectories of `default-directory' to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -1361,7 +1365,14 @@ command-line
+@@ -1375,7 +1379,14 @@ command-line
          ;; Sites should not disable the startup screen.
          ;; Only individuals should disable the startup screen.
          (let ((inhibit-startup-screen inhibit-startup-screen))
