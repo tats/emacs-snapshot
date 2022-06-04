@@ -1,6 +1,6 @@
 /* ebrowse.c --- parsing files for the ebrowse C++ browser
 
-Copyright (C) 1992-2020 Free Software Foundation, Inc.
+Copyright (C) 1992-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1875,7 +1875,7 @@ yylex (void)
 
 
 /* Actually local to matching_regexp.  These variables must be in
-   global scope for the case that `static' get's defined away.  */
+   global scope for the case that `static' gets defined away.  */
 
 static char *matching_regexp_buffer, *matching_regexp_end_buf;
 
@@ -1925,7 +1925,15 @@ matching_regexp (void)
       *--s = *--t;
 
       if (*s == '"' || *s == '\\')
-        *--s = '\\';
+	{
+	  if (s > matching_regexp_buffer)
+	    *--s = '\\';
+	  else
+	    {
+	      s++;
+	      break;
+	    }
+	}
     }
 
   *(matching_regexp_end_buf - 1) = '\0';

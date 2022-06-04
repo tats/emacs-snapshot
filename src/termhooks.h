@@ -1,6 +1,6 @@
 /* Parameters and display hooks for terminal devices.
 
-Copyright (C) 1985-1986, 1993-1994, 2001-2020 Free Software Foundation,
+Copyright (C) 1985-1986, 1993-1994, 2001-2022 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -159,7 +159,6 @@ enum event_kind
   SELECTION_REQUEST_EVENT,	/* Another X client wants a selection from us.
 				   See `struct selection_input_event'.  */
   SELECTION_CLEAR_EVENT,	/* Another X client cleared our selection.  */
-  BUFFER_SWITCH_EVENT,		/* A process filter has switched buffers.  */
   DELETE_WINDOW_EVENT,		/* An X client said "delete this window".  */
 #ifdef HAVE_NTGUI
   END_SESSION_EVENT,		/* The user is logging out or shutting down.  */
@@ -219,10 +218,6 @@ enum event_kind
   /* Queued from XTread_socket when session manager sends
      save yourself before shutdown. */
   SAVE_SESSION_EVENT
-
-#ifdef HAVE_GPM
-  , GPM_CLICK_EVENT
-#endif
 
 #ifdef HAVE_DBUS
   , DBUS_EVENT
@@ -370,10 +365,8 @@ enum {
 
 #ifdef HAVE_GPM
 #include <gpm.h>
-extern int handle_one_term_event (struct tty_display_info *, Gpm_Event *, struct input_event *);
-#ifndef HAVE_WINDOW_SYSTEM
+extern int handle_one_term_event (struct tty_display_info *, Gpm_Event *);
 extern void term_mouse_moveto (int, int);
-#endif
 
 /* The device for which we have enabled gpm support.  */
 extern struct tty_display_info *gpm_tty;
@@ -590,7 +583,7 @@ struct terminal
    window gravity for this size change and subsequent size changes.
    Otherwise we leave the window gravity unchanged.  */
   void (*set_window_size_hook) (struct frame *f, bool change_gravity,
-                                int width, int height, bool pixelwise);
+                                int width, int height);
 
   /* CHANGE_GRAVITY is 1 when calling from Fset_frame_position,
    to really change the position, and 0 when calling from
