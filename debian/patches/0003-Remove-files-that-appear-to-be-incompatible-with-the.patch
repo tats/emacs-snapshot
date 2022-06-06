@@ -118,10 +118,10 @@ index 4b74963..e5549da 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index ed8ec89..55537ee 100644
+index 313a143..437d5da 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6555,7 +6555,7 @@ AC_DEFUN
+@@ -6556,7 +6556,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index ed8ec89..55537ee 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6617,15 +6617,6 @@ m4_define
+@@ -6618,15 +6618,6 @@ m4_define
  fi
  ])
  
