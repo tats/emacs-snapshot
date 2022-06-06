@@ -260,11 +260,16 @@ A FUNC form can have any number of `:no-eval' (or `:no-value'),
    :no-manual t
    :eval (string-blank-p " \n"))
   (string-lessp
-   :eval (string-lessp "foo" "bar"))
+   :eval (string-lessp "foo" "bar")
+   :eval (string-lessp "pic4.png" "pic32.png")
+   :eval (string-lessp "1.1" "1 2"))
   (string-greaterp
    :eval (string-greaterp "foo" "bar"))
   (string-version-lessp
-   :eval (string-version-lessp "pic4.png" "pic32.png"))
+   :eval (string-version-lessp "pic4.png" "pic32.png")
+   :eval (string-version-lessp "1.1" "1 2"))
+  (string-collate-lessp
+   :eval (string-collate-lessp "1.1" "1 2"))
   (string-prefix-p
    :eval (string-prefix-p "foo" "foobar"))
   (string-suffix-p
@@ -463,7 +468,9 @@ A FUNC form can have any number of `:no-eval' (or `:no-value'),
    :no-eval* (directory-files-and-attributes "/tmp/foo"))
   (file-expand-wildcards
    :no-eval (file-expand-wildcards "/tmp/*.png")
-   :eg-result ("/tmp/foo.png" "/tmp/zot.png"))
+   :eg-result ("/tmp/foo.png" "/tmp/zot.png")
+   :no-eval (file-expand-wildcards "/*/foo.png")
+   :eg-result ("/tmp/foo.png" "/var/foo.png"))
   (locate-dominating-file
    :no-eval (locate-dominating-file "foo.png" "/tmp/foo/bar/zot")
    :eg-result "/tmp/foo.png")

@@ -895,7 +895,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                          &context (window-system ns))
   (ns-get-selection selection-symbol target-type))
 
-(defun x-begin-drag (targets &optional action frame _return-frame _allow-current-frame)
+(defun x-begin-drag (targets &optional action frame return-frame allow-current-frame)
   "SKIP: real doc in xfns.c."
   (unless ns-dnd-selection-value
     (error "No local value for XdndSelection"))
@@ -905,12 +905,22 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
       (push (cons 'string ns-dnd-selection-value) pasteboard))
     (when (and (member "FILE_NAME" targets)
                (file-exists-p ns-dnd-selection-value))
-      (push (cons 'file
-                  (url-encode-url (concat "file://"
-                                          (expand-file-name
-                                           ns-dnd-selection-value))))
-            pasteboard))
-    (ns-begin-drag frame pasteboard action)))
+      (let ((value (if (stringp ns-dnd-selection-value)
+                       (or (get-text-property 0 'FILE_NAME
+                                              ns-dnd-selection-value)
+                           ns-dnd-selection-value)
+                     ns-dnd-selection-value)))
+        (if (vectorp value)
+            (push (cons 'file
+                        (cl-loop for file across value
+                                 collect (expand-file-name file)))
+                  pasteboard)
+          (push (cons 'file
+                      (url-encode-url (concat "file://"
+                                              (expand-file-name
+                                               ns-dnd-selection-value))))
+                pasteboard))))
+    (ns-begin-drag frame pasteboard action return-frame allow-current-frame)))
 
 (defun ns-handle-drag-motion (frame x y)
   "Handle mouse movement on FRAME at X and Y during drag-and-drop.

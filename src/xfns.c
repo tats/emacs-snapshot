@@ -6600,17 +6600,61 @@ menu bar or tool bar of FRAME.  */)
  * WINDOW to FRAMES and return FRAMES.
  */
 static Lisp_Object
-x_frame_list_z_order (Display* dpy, Window window)
+x_frame_list_z_order (struct x_display_info *dpyinfo, Window window)
 {
+  Display *dpy;
   Window root, parent, *children;
   unsigned int nchildren;
-  int i;
-  Lisp_Object frames = Qnil;
+  unsigned long i;
+  Lisp_Object frames, val;
+  Atom type;
+  Window *toplevels;
+  int format, rc;
+  unsigned long nitems, bytes_after;
+  unsigned char *data;
+  struct frame *f;
 
-  block_input ();
+  dpy = dpyinfo->display;
+  data = NULL;
+  frames = Qnil;
+
+  if (window == dpyinfo->root_window
+      && x_wm_supports_1 (dpyinfo,
+			  dpyinfo->Xatom_net_client_list_stacking))
+    {
+      rc = XGetWindowProperty (dpyinfo->display, dpyinfo->root_window,
+			       dpyinfo->Xatom_net_client_list_stacking,
+			       0, LONG_MAX, False, XA_WINDOW, &type,
+			       &format, &nitems, &bytes_after, &data);
+
+      if (rc != Success)
+	return Qnil;
+
+      if (format != 32 || type != XA_WINDOW)
+	{
+	  XFree (data);
+	  return Qnil;
+	}
+
+      toplevels = (Window *) data;
+
+      for (i = 0; i < nitems; ++i)
+	{
+	  f = x_top_window_to_frame (dpyinfo, toplevels[i]);
+
+	  if (f)
+	    {
+	      XSETFRAME (val, f);
+	      frames = Fcons (val, frames);
+	    }
+	}
+
+      XFree (data);
+      return frames;
+    }
+
   if (XQueryTree (dpy, window, &root, &parent, &children, &nchildren))
     {
-      unblock_input ();
       for (i = 0; i < nchildren; i++)
 	{
 	  Lisp_Object frame, tail;
@@ -6628,10 +6672,9 @@ x_frame_list_z_order (Display* dpy, Window window)
             }
 	}
 
-      if (children) XFree ((char *)children);
+      if (children)
+	XFree (children);
     }
-  else
-    unblock_input ();
 
   return frames;
 }
@@ -6652,7 +6695,6 @@ Frames are listed from topmost (first) to bottommost (last).  */)
   (Lisp_Object terminal)
 {
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
-  Display *dpy = dpyinfo->display;
   Window window;
 
   if (FRAMEP (terminal) && FRAME_LIVE_P (XFRAME (terminal)))
@@ -6660,7 +6702,7 @@ Frames are listed from topmost (first) to bottommost (last).  */)
   else
     window = dpyinfo->root_window;
 
-  return x_frame_list_z_order (dpy, window);
+  return x_frame_list_z_order (dpyinfo, window);
 }
 
 /**
@@ -8156,9 +8198,9 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
    the display in *ROOT_X, and *ROOT_Y.  */
 
 static void
-compute_tip_xy (struct frame *f,
-		Lisp_Object parms, Lisp_Object dx, Lisp_Object dy,
-		int width, int height, int *root_x, int *root_y)
+compute_tip_xy (struct frame *f, Lisp_Object parms, Lisp_Object dx,
+		Lisp_Object dy, int width, int height, int *root_x,
+		int *root_y)
 {
   Lisp_Object left, top, right, bottom;
   int win_x, win_y;
@@ -8184,7 +8226,7 @@ compute_tip_xy (struct frame *f,
 		     &root, &child, root_x, root_y, &win_x, &win_y, &pmask);
       unblock_input ();
 
-      XSETFRAME(frame, f);
+      XSETFRAME (frame, f);
       attributes = Fx_display_monitor_attributes_list (frame);
 
       /* Try to determine the monitor where the mouse pointer is and
@@ -8199,11 +8241,13 @@ compute_tip_xy (struct frame *f,
               min_y = XFIXNUM (Fnth (make_fixnum (2), geometry));
               max_x = min_x + XFIXNUM (Fnth (make_fixnum (3), geometry));
               max_y = min_y + XFIXNUM (Fnth (make_fixnum (4), geometry));
+
               if (min_x <= *root_x && *root_x < max_x
                   && min_y <= *root_y && *root_y < max_y)
                 {
                   break;
                 }
+
               max_y = -1;
             }
 
@@ -8213,7 +8257,7 @@ compute_tip_xy (struct frame *f,
 
   /* It was not possible to determine the monitor's geometry, so we
      assign some sane defaults here: */
-  if ( max_y < 0 )
+  if (max_y < 0)
     {
       min_x = 0;
       min_y = 0;
@@ -8487,7 +8531,7 @@ Text larger than the specified size is clipped.  */)
   if (!NILP (tip_frame) && FRAME_LIVE_P (XFRAME (tip_frame)))
     {
       if (FRAME_VISIBLE_P (XFRAME (tip_frame))
-	  && EQ (frame, tip_last_frame)
+	  && BASE_EQ (frame, tip_last_frame)
 	  && !NILP (Fequal_including_properties (tip_last_string, string))
 	  && !NILP (Fequal (tip_last_parms, parms)))
 	{
@@ -8508,7 +8552,7 @@ Text larger than the specified size is clipped.  */)
 
 	  goto start_timer;
 	}
-      else if (tooltip_reuse_hidden_frame && EQ (frame, tip_last_frame))
+      else if (tooltip_reuse_hidden_frame && BASE_EQ (frame, tip_last_frame))
 	{
 	  bool delete = false;
 	  Lisp_Object tail, elt, parm, last;

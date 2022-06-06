@@ -10103,28 +10103,45 @@ scroll window further, move cursor to the bottom line.
 When point is already on that position, then signal an error.
 A near full screen is `next-screen-context-lines' less than a full screen.
 Negative ARG means scroll downward.
-If ARG is the atom `-', scroll downward by nearly full screen."
+
+If ARG is the atom `-', scroll downward by nearly full screen.
+
+The command \\[set-goal-column] can be used to create a
+semipermanent goal column for this command."
   (interactive "^P")
-  (cond
-   ((null scroll-error-top-bottom)
-    (scroll-up arg))
-   ((eq arg '-)
-    (scroll-down-command nil))
-   ((< (prefix-numeric-value arg) 0)
-    (scroll-down-command (- (prefix-numeric-value arg))))
-   ((eobp)
-    (scroll-up arg))			; signal error
-   (t
-    (condition-case nil
-	(scroll-up arg)
-      (end-of-buffer
-       (if arg
-	   ;; When scrolling by ARG lines can't be done,
-	   ;; move by ARG lines instead.
-	   (forward-line arg)
-	 ;; When ARG is nil for full-screen scrolling,
-	 ;; move to the bottom of the buffer.
-	 (goto-char (point-max))))))))
+  (prog1
+      (cond
+       ((null scroll-error-top-bottom)
+        (scroll-up arg))
+       ((eq arg '-)
+        (scroll-down-command nil))
+       ((< (prefix-numeric-value arg) 0)
+        (scroll-down-command (- (prefix-numeric-value arg))))
+       ((eobp)
+        (scroll-up arg))                ; signal error
+       (t
+        (condition-case nil
+	    (scroll-up arg)
+          (end-of-buffer
+           (if arg
+	       ;; When scrolling by ARG lines can't be done,
+	       ;; move by ARG lines instead.
+	       (forward-line arg)
+	     ;; When ARG is nil for full-screen scrolling,
+	     ;; move to the bottom of the buffer.
+	     (goto-char (point-max)))))))
+    (scroll-command--goto-goal-column)))
+
+(defun scroll-command--goto-goal-column ()
+  (when goal-column
+    ;; Move to the desired column.
+    (if (and line-move-visual
+             (not (or truncate-lines truncate-partial-width-windows)))
+        ;; Under line-move-visual, goal-column should be
+        ;; interpreted in units of the frame's canonical character
+        ;; width, which is exactly what vertical-motion does.
+        (vertical-motion (cons goal-column 0))
+      (line-move-to-column (truncate goal-column)))))
 
 (put 'scroll-up-command 'scroll-command t)
 
@@ -10140,28 +10157,34 @@ scroll window further, move cursor to the top line.
 When point is already on that position, then signal an error.
 A near full screen is `next-screen-context-lines' less than a full screen.
 Negative ARG means scroll upward.
-If ARG is the atom `-', scroll upward by nearly full screen."
+
+If ARG is the atom `-', scroll upward by nearly full screen.
+
+The command \\[set-goal-column] can be used to create a
+semipermanent goal column for this command."
   (interactive "^P")
-  (cond
-   ((null scroll-error-top-bottom)
-    (scroll-down arg))
-   ((eq arg '-)
-    (scroll-up-command nil))
-   ((< (prefix-numeric-value arg) 0)
-    (scroll-up-command (- (prefix-numeric-value arg))))
-   ((bobp)
-    (scroll-down arg))			; signal error
-   (t
-    (condition-case nil
-	(scroll-down arg)
-      (beginning-of-buffer
-       (if arg
-	   ;; When scrolling by ARG lines can't be done,
-	   ;; move by ARG lines instead.
-	   (forward-line (- arg))
-	 ;; When ARG is nil for full-screen scrolling,
-	 ;; move to the top of the buffer.
-	 (goto-char (point-min))))))))
+  (prog1
+      (cond
+       ((null scroll-error-top-bottom)
+        (scroll-down arg))
+       ((eq arg '-)
+        (scroll-up-command nil))
+       ((< (prefix-numeric-value arg) 0)
+        (scroll-up-command (- (prefix-numeric-value arg))))
+       ((bobp)
+        (scroll-down arg))              ; signal error
+       (t
+        (condition-case nil
+	    (scroll-down arg)
+          (beginning-of-buffer
+           (if arg
+	       ;; When scrolling by ARG lines can't be done,
+	       ;; move by ARG lines instead.
+	       (forward-line (- arg))
+	     ;; When ARG is nil for full-screen scrolling,
+	     ;; move to the top of the buffer.
+	     (goto-char (point-min)))))))
+    (scroll-command--goto-goal-column)))
 
 (put 'scroll-down-command 'scroll-command t)
 
@@ -10569,55 +10592,6 @@ displaying that processes's buffer."
 (put 'enlarge-window-horizontally 'repeat-map 'resize-window-repeat-map)
 (put 'shrink-window-horizontally 'repeat-map 'resize-window-repeat-map)
 (put 'shrink-window 'repeat-map 'resize-window-repeat-map)
-
-(defun window-char-pixel-width (&optional window face)
-  "Return average character width for the font of FACE used in WINDOW.
-WINDOW must be a live window and defaults to the selected one.
-
-If FACE is nil or omitted, the default face is used.  If FACE is
-remapped (see `face-remapping-alist'), the function returns the
-information for the remapped face."
-  (with-selected-window (window-normalize-window window t)
-    (let* ((info (font-info (face-font (or face 'default))))
-	   (width (aref info 11)))
-      (if (> width 0)
-	  width
-	(aref info 10)))))
-
-(defun window-char-pixel-height (&optional window face)
-  "Return character height for the font of FACE used in WINDOW.
-WINDOW must be a live window and defaults to the selected one.
-
-If FACE is nil or omitted, the default face is used.  If FACE is
-remapped (see `face-remapping-alist'), the function returns the
-information for the remapped face."
-  (with-selected-window (window-normalize-window window t)
-    (aref (font-info (face-font (or face 'default))) 3)))
-
-(defun window-max-characters-per-line (&optional window face)
-  "Return the number of characters that can be displayed on one line in WINDOW.
-WINDOW must be a live window and defaults to the selected one.
-
-The character width of FACE is used for the calculation.  If FACE
-is nil or omitted, the default face is used.  If FACE is
-remapped (see `face-remapping-alist'), the function uses the
-remapped face.
-
-This function is different from `window-body-width' in two
-ways.  First, it accounts for the portions of the line reserved
-for the continuation glyph.  Second, it accounts for the size of
-the font, which may have been adjusted, e.g., using
-`text-scale-increase')."
-  (with-selected-window (window-normalize-window window t)
-    (let* ((window-width (window-body-width window t))
-           (font-width (window-char-pixel-width window face))
-           (ncols (/ window-width font-width)))
-      (if (and (display-graphic-p)
-               overflow-newline-into-fringe
-               (/= (frame-parameter nil 'left-fringe) 0)
-               (/= (frame-parameter nil 'right-fringe) 0))
-          ncols
-        (1- ncols)))))
 
 (provide 'window)
 

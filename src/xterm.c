@@ -550,6 +550,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 #include <stdlib.h>
 #include <math.h>
+#include <signal.h>
 
 #include "lisp.h"
 #include "blockinput.h"
@@ -699,6 +700,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 #endif
 
+#ifdef USE_GTK
+#include <xgselect.h>
+#endif
+
 #include "bitmaps/gray.xbm"
 
 #ifdef HAVE_XKB
@@ -783,6 +788,21 @@ static int current_count;
 static int current_finish;
 static struct input_event *current_hold_quit;
 #endif
+
+struct x_selection_request_event
+{
+  /* The selection request event.  */
+  struct selection_input_event se;
+
+  /* The next unprocessed selection request event.  */
+  struct x_selection_request_event *next;
+};
+
+/* Chain of unprocessed selection request events.  Used to handle
+   selection requests inside long-lasting modal event loops, such as
+   the drag-and-drop loop.  */
+
+struct x_selection_request_event *pending_selection_requests;
 
 /* Compare two request serials A and B with OP, handling
    wraparound.  */
@@ -1164,6 +1184,14 @@ static unsigned int x_dnd_keyboard_state;
    terminating DND as part of the display disconnect handler.  */
 static sigjmp_buf x_dnd_disconnect_handler;
 
+/* Whether or not the current invocation of handle_one_xevent
+   happened inside the drag_and_drop event loop.  */
+static bool x_dnd_inside_handle_one_xevent;
+
+/* The recursive edit depth when the drag-and-drop operation was
+   started.  */
+static int x_dnd_recursion_depth;
+
 /* Structure describing a single window that can be the target of
    drag-and-drop operations.  */
 struct x_client_list_window
@@ -1229,6 +1257,10 @@ static struct x_client_list_window *x_dnd_toplevels;
 static bool x_dnd_use_toplevels;
 
 /* Motif drag-and-drop protocol support.  */
+
+/* Pointer to a variable which stores whether or not an X error
+   occured while trying to create the Motif drag window.  */
+static volatile bool *xm_drag_window_error;
 
 typedef enum xm_byte_order
   {
@@ -1366,34 +1398,50 @@ typedef struct xm_top_level_leave_message
 /* #define XM_DRAG_SIDE_EFFECT_OPERATIONS(effect)	(((effect) & 0xf00) >> 8) */
 #define XM_DRAG_SIDE_EFFECT_DROP_ACTION(effect)	(((effect) & 0xf000) >> 12)
 
-#define XM_DRAG_NOOP 0
-#define XM_DRAG_MOVE (1L << 0)
-#define XM_DRAG_COPY (1L << 1)
-#define XM_DRAG_LINK (1L << 2)
+enum xm_drag_operation
+  {
+    XM_DRAG_NOOP = 0,
+    XM_DRAG_MOVE = (1L << 0),
+    XM_DRAG_COPY = (1L << 1),
+    XM_DRAG_LINK = (1L << 2),
+  };
 
-#define XM_DROP_ACTION_DROP		0
-#define XM_DROP_ACTION_DROP_HELP	1
-#define XM_DROP_ACTION_DROP_CANCEL	2
+enum xm_drag_action
+  {
+    XM_DROP_ACTION_DROP	       = 0,
+    XM_DROP_ACTION_DROP_HELP   = 1,
+    XM_DROP_ACTION_DROP_CANCEL = 2,
+  };
 
 #define XM_DRAG_REASON(originator, code)	((code) | ((originator) << 7))
 #define XM_DRAG_REASON_ORIGINATOR(reason)	(((reason) & 0x80) ? 1 : 0)
 #define XM_DRAG_REASON_CODE(reason)		((reason) & 0x7f)
 
-#define XM_DRAG_REASON_DROP_START	5
-#define XM_DRAG_REASON_TOP_LEVEL_ENTER	0
-#define XM_DRAG_REASON_TOP_LEVEL_LEAVE	1
-#define XM_DRAG_REASON_DRAG_MOTION	2
-#define XM_DRAG_ORIGINATOR_INITIATOR	0
-#define XM_DRAG_ORIGINATOR_RECEIVER	1
+enum xm_drag_reason
+  {
+    XM_DRAG_REASON_DROP_START	   = 5,
+    XM_DRAG_REASON_TOP_LEVEL_ENTER = 0,
+    XM_DRAG_REASON_TOP_LEVEL_LEAVE = 1,
+    XM_DRAG_REASON_DRAG_MOTION	   = 2,
+  };
 
-#define XM_DRAG_STYLE_NONE		0
+enum xm_drag_originator
+  {
+    XM_DRAG_ORIGINATOR_INITIATOR = 0,
+    XM_DRAG_ORIGINATOR_RECEIVER	 = 1,
+  };
 
-#define XM_DRAG_STYLE_DROP_ONLY		1
-#define XM_DRAG_STYLE_DROP_ONLY_REC	3
-
-#define XM_DRAG_STYLE_DYNAMIC		5
-#define XM_DRAG_STYLE_DYNAMIC_REC	2
-#define XM_DRAG_STYLE_DYNAMIC_REC1	4
+enum xm_drag_style
+  {
+    /* The values ending with _REC should be treated as equivalent to
+       the ones without in messages from the receiver.  */
+    XM_DRAG_STYLE_NONE		= 0,
+    XM_DRAG_STYLE_DROP_ONLY	= 1,
+    XM_DRAG_STYLE_DROP_ONLY_REC = 3,
+    XM_DRAG_STYLE_DYNAMIC	= 5,
+    XM_DRAG_STYLE_DYNAMIC_REC	= 2,
+    XM_DRAG_STYLE_DYNAMIC_REC1	= 4,
+  };
 
 #define XM_DRAG_STYLE_IS_DROP_ONLY(n)	((n) == XM_DRAG_STYLE_DROP_ONLY	\
 					 || (n) == XM_DRAG_STYLE_DROP_ONLY_REC)
@@ -1401,9 +1449,12 @@ typedef struct xm_top_level_leave_message
 					 || (n) == XM_DRAG_STYLE_DYNAMIC_REC \
 					 || (n) == XM_DRAG_STYLE_DYNAMIC_REC1)
 
-#define XM_DROP_SITE_VALID	3
-/* #define XM_DROP_SITE_INVALID	2 */
-#define XM_DROP_SITE_NONE	1
+enum xm_drop_site_status
+  {
+    XM_DROP_SITE_VALID	 = 3,
+    XM_DROP_SITE_INVALID = 2,
+    XM_DROP_SITE_NONE	 = 1,
+  };
 
 /* The version of the Motif drag-and-drop protocols that Emacs
    supports.  */
@@ -1609,6 +1660,9 @@ xm_write_drag_initiator_info (Display *dpy, Window wdesc,
 static int
 xm_drag_window_error_handler (Display *display, XErrorEvent *event)
 {
+  if (xm_drag_window_error)
+    *xm_drag_window_error = true;
+
   return 0;
 }
 
@@ -1631,6 +1685,9 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   XSetWindowAttributes attrs;
   Display *temp_display;
   void *old_handler, *old_io_handler;
+  /* These are volatile because GCC mistakenly warns about them being
+     clobbered by longjmp.  */
+  volatile bool error, created;
 
   drag_window = None;
   rc = XGetWindowProperty (dpyinfo->display, dpyinfo->root_window,
@@ -1686,6 +1743,9 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 	  return None;
 	}
 
+      error = false;
+      xm_drag_window_error = &error;
+
       XGrabServer (temp_display);
       XSetCloseDownMode (temp_display, RetainPermanent);
 
@@ -1695,6 +1755,9 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 
       _MOTIF_DRAG_WINDOW = XInternAtom (temp_display,
 					"_MOTIF_DRAG_WINDOW", False);
+
+      if (error)
+	goto give_up;
 
       /* Some other program might've created a drag window between now
 	 and when we first looked.  Use that if it exists.  */
@@ -1713,8 +1776,12 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
       if (tmp_data)
 	XFree (tmp_data);
 
+      error = false;
+
       if (drag_window == None)
 	{
+	  created = true;
+
 	  attrs.override_redirect = True;
 	  drag_window = XCreateWindow (temp_display, DefaultRootWindow (temp_display),
 				       -1, -1, 1, 1, 0, CopyFromParent, InputOnly,
@@ -1723,8 +1790,41 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 			   _MOTIF_DRAG_WINDOW, XA_WINDOW, 32, PropModeReplace,
 			   (unsigned char *) &drag_window, 1);
 	}
+      else
+	created = false;
 
+      /* Handle all errors now.   */
+      XSync (temp_display, False);
+
+    give_up:
+
+      /* Some part of the drag window creation process failed, so
+	 punt.  */
+      if (error)
+	{
+	  /* If the drag window was actually created, delete it now.
+	     Probably, a BadAlloc happened during the XChangeProperty
+	     request.  */
+	  if (created)
+	    {
+	      if (drag_window != None)
+		XDestroyWindow (temp_display, drag_window);
+
+	      XDeleteProperty (temp_display, DefaultRootWindow (temp_display),
+			       _MOTIF_DRAG_WINDOW);
+	    }
+
+	  drag_window = None;
+	}
+
+      xm_drag_window_error = NULL;
+
+      /* FIXME: why does XCloseDisplay hang if SIGIO arrives and there
+	 are multiple displays? */
+      unrequest_sigio ();
       XCloseDisplay (temp_display);
+      request_sigio ();
+
       XSetErrorHandler (old_handler);
       XSetIOErrorHandler (old_io_handler);
 
@@ -2215,23 +2315,57 @@ x_dnd_send_xm_leave_for_drop (struct x_display_info *dpyinfo,
 }
 
 static void
-x_dnd_free_toplevels (void)
+x_dnd_free_toplevels (bool display_alive)
 {
   struct x_client_list_window *last;
   struct x_client_list_window *tem = x_dnd_toplevels;
+  ptrdiff_t n_windows, i, buffer_size;
+  Window *destroy_windows;
+  unsigned long *prev_masks;
+  specpdl_ref count;
+  Display *dpy;
 
+  if (!x_dnd_toplevels)
+    /* Probably called inside an IO error handler.  */
+    return;
+
+  /* Pacify GCC.  */
+  prev_masks = NULL;
+  destroy_windows = NULL;
+
+  if (display_alive)
+    {
+      buffer_size = 1024;
+      destroy_windows = xmalloc (sizeof *destroy_windows
+				 * buffer_size);
+      prev_masks = xmalloc (sizeof *prev_masks *
+			    buffer_size);
+      n_windows = 0;
+    }
+
+  block_input ();
   while (tem)
     {
       last = tem;
       tem = tem->next;
 
-      x_catch_errors (last->dpy);
-      XSelectInput (last->dpy, last->window,
-		    last->previous_event_mask);
-#ifdef HAVE_XSHAPE
-      XShapeSelectInput (last->dpy, last->window, None);
-#endif
-      x_uncatch_errors ();
+      if (display_alive)
+	{
+	  if (++n_windows >= buffer_size)
+	    {
+	      buffer_size += 1024;
+	      destroy_windows
+		= xrealloc (destroy_windows, (sizeof *destroy_windows
+					      * buffer_size));
+	      prev_masks
+		= xrealloc (prev_masks, (sizeof *prev_masks
+					 * buffer_size));
+	    }
+
+	  dpy = last->dpy;
+	  prev_masks[n_windows - 1] = last->previous_event_mask;
+	  destroy_windows[n_windows - 1] = last->window;
+	}
 
 #ifdef HAVE_XSHAPE
       if (last->n_input_rects != -1)
@@ -2244,6 +2378,34 @@ x_dnd_free_toplevels (void)
     }
 
   x_dnd_toplevels = NULL;
+
+  if (!display_alive)
+    {
+      unblock_input ();
+      return;
+    }
+
+  count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (xfree, destroy_windows);
+  record_unwind_protect_ptr (xfree, prev_masks);
+
+  if (display_alive)
+    {
+      x_catch_errors (dpy);
+
+      for (i = 0; i < n_windows; ++i)
+	{
+	  XSelectInput (dpy, destroy_windows[i], prev_masks[i]);
+#ifdef HAVE_XSHAPE
+	  XShapeSelectInput (dpy, destroy_windows[i], None);
+#endif
+	}
+
+      x_uncatch_errors ();
+    }
+
+  unbind_to (count, Qnil);
+  unblock_input ();
 }
 
 static int
@@ -2826,6 +2988,9 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
   SAFE_FREE ();
 #endif
 
+  if (data)
+    XFree (data);
+
   return 0;
 }
 
@@ -3386,10 +3551,13 @@ x_dnd_get_target_window (struct x_display_info *dpyinfo,
 				  dpyinfo->Xatom_NET_WM_CM_Sn) != None)
 	    {
 	      x_catch_errors (dpyinfo->display);
+	      XGrabServer (dpyinfo->display);
 	      overlay_window = XCompositeGetOverlayWindow (dpyinfo->display,
 							   dpyinfo->root_window);
 	      XCompositeReleaseOverlayWindow (dpyinfo->display,
 					      dpyinfo->root_window);
+	      XUngrabServer (dpyinfo->display);
+
 	      if (!x_had_errors_p (dpyinfo->display))
 		{
 		  XGetWindowAttributes (dpyinfo->display, overlay_window, &attrs);
@@ -3544,10 +3712,13 @@ x_dnd_get_target_window (struct x_display_info *dpyinfo,
 			      dpyinfo->Xatom_NET_WM_CM_Sn) != None)
 	{
 	  x_catch_errors (dpyinfo->display);
+	  XGrabServer (dpyinfo->display);
 	  overlay_window = XCompositeGetOverlayWindow (dpyinfo->display,
 						       dpyinfo->root_window);
 	  XCompositeReleaseOverlayWindow (dpyinfo->display,
 					  dpyinfo->root_window);
+	  XUngrabServer (dpyinfo->display);
+
 	  if (!x_had_errors_p (dpyinfo->display))
 	    {
 	      XGetWindowAttributes (dpyinfo->display, overlay_window, &attrs);
@@ -3981,7 +4152,7 @@ x_dnd_cleanup_drag_and_drop (void *frame)
   x_dnd_waiting_for_finish = false;
 
   if (x_dnd_use_toplevels)
-    x_dnd_free_toplevels ();
+    x_dnd_free_toplevels (true);
 
   FRAME_DISPLAY_INFO (f)->grabbed = 0;
 #ifdef USE_GTK
@@ -4205,11 +4376,16 @@ x_update_opaque_region (struct frame *f, XEvent *configure)
 		     (unsigned char *) &opaque_region, 4);
   else
     {
-      object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
-      class = GTK_WIDGET_CLASS (object_class);
+      /* This causes child frames to not update correctly for an
+	 unknown reason.  (bug#55779) */
+      if (!FRAME_PARENT_FRAME (f))
+	{
+	  object_class = G_OBJECT_GET_CLASS (FRAME_GTK_OUTER_WIDGET (f));
+	  class = GTK_WIDGET_CLASS (object_class);
 
-      if (class->style_updated)
-	class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+	  if (class->style_updated)
+	    class->style_updated (FRAME_GTK_OUTER_WIDGET (f));
+	}
     }
 #endif
   unblock_input ();
@@ -10137,6 +10313,64 @@ x_window_to_frame (struct x_display_info *dpyinfo, int wdesc)
   return 0;
 }
 
+/* Like x_any_window_to_frame but only try to find tooltip frames.
+
+   If wdesc is a toolkit tooltip without an associated frame, set
+   UNRELATED_TOOLTIP_P to true.  Otherwise, set it to false.  */
+static struct frame *
+x_tooltip_window_to_frame (struct x_display_info *dpyinfo,
+			   Window wdesc, bool *unrelated_tooltip_p)
+{
+  Lisp_Object tail, frame;
+  struct frame *f;
+#ifdef USE_GTK
+  GtkWidget *widget;
+  GdkWindow *tooltip_window;
+#endif
+
+  *unrelated_tooltip_p = false;
+
+  FOR_EACH_FRAME (tail, frame)
+    {
+      f = XFRAME (frame);
+
+      if (FRAME_X_P (f) && FRAME_TOOLTIP_P (f)
+	  && FRAME_DISPLAY_INFO (f) == dpyinfo
+	  && FRAME_X_WINDOW (f) == wdesc)
+	return f;
+
+#ifdef USE_GTK
+      if (FRAME_X_OUTPUT (f)->ttip_window)
+	widget = GTK_WIDGET (FRAME_X_OUTPUT (f)->ttip_window);
+      else
+	widget = NULL;
+
+      if (widget)
+	tooltip_window = gtk_widget_get_window (widget);
+      else
+	tooltip_window = NULL;
+
+#ifdef HAVE_GTK3
+      if (tooltip_window
+	  && (gdk_x11_window_get_xid (tooltip_window) == wdesc))
+	{
+	  *unrelated_tooltip_p = true;
+	  break;
+	}
+#else
+      if (tooltip_window
+	  && (GDK_WINDOW_XID (tooltip_window) == wdesc))
+	{
+	  *unrelated_tooltip_p = true;
+	  break;
+	}
+#endif
+#endif
+    }
+
+  return NULL;
+}
+
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
 
 /* Like x_window_to_frame but also compares the window with the widget's
@@ -10291,8 +10525,11 @@ static void
 x_next_event_from_any_display (XEvent *event)
 {
   struct x_display_info *dpyinfo;
-  fd_set fds;
-  int fd, maxfd;
+  fd_set fds, rfds;
+  int fd, maxfd, rc;
+
+  rc = -1;
+  FD_ZERO (&rfds);
 
   while (true)
     {
@@ -10302,34 +10539,99 @@ x_next_event_from_any_display (XEvent *event)
       for (dpyinfo = x_display_list; dpyinfo;
 	   dpyinfo = dpyinfo->next)
 	{
-	  if (XPending (dpyinfo->display))
+	  fd = ConnectionNumber (dpyinfo->display);
+
+	  if ((rc < 0 || FD_ISSET (fd, &rfds))
+	      && XPending (dpyinfo->display))
 	    {
 	      XNextEvent (dpyinfo->display, event);
 	      return;
 	    }
 
-	  fd = XConnectionNumber (dpyinfo->display);
-
 	  if (fd > maxfd)
 	    maxfd = fd;
 
 	  eassert (fd < FD_SETSIZE);
-	  FD_SET (XConnectionNumber (dpyinfo->display), &fds);
+	  FD_SET (fd, &fds);
 	}
 
       eassert (maxfd >= 0);
 
-      /* We don't have to check the return of pselect, because if an
+      /* Continue to read input even if pselect fails, because if an
 	 error occurs XPending will call the IO error handler, which
 	 then brings us out of this loop.  */
-      pselect (maxfd, &fds, NULL, NULL, NULL, NULL);
+      rc = pselect (maxfd + 1, &fds, NULL, NULL, NULL, NULL);
+
+      if (rc >= 0)
+	rfds = fds;
     }
 }
 
 #endif /* USE_X_TOOLKIT || USE_GTK */
 
+static void
+x_handle_pending_selection_requests_1 (struct x_selection_request_event *tem)
+{
+  specpdl_ref count;
+  struct selection_input_event se;
+
+  count = SPECPDL_INDEX ();
+  se = tem->se;
+
+  record_unwind_protect_ptr (xfree, tem);
+  x_handle_selection_event (&se);
+  unbind_to (count, Qnil);
+}
+
+/* Handle all pending selection request events from modal event
+   loops.  */
+void
+x_handle_pending_selection_requests (void)
+{
+  struct x_selection_request_event *tem;
+
+  while (pending_selection_requests)
+    {
+      tem = pending_selection_requests;
+      pending_selection_requests = tem->next;
+
+      x_handle_pending_selection_requests_1 (tem);
+    }
+}
+
+static void
+x_push_selection_request (struct selection_input_event *se)
+{
+  struct x_selection_request_event *tem;
+
+  tem = xmalloc (sizeof *tem);
+  tem->next = pending_selection_requests;
+  tem->se = *se;
+  pending_selection_requests = tem;
+}
+
+bool
+x_detect_pending_selection_requests (void)
+{
+  return pending_selection_requests;
+}
+
 /* This function is defined far away from the rest of the XDND code so
    it can utilize `x_any_window_to_frame'.  */
+
+/* Implementors beware!  On most other platforms (where drag-and-drop
+   data is not provided via selections, but some kind of serialization
+   mechanism), it is usually much easier to implement a suitable
+   primitive instead of copying the C code here, and then to build
+   `x-begin-drag' on top of that, by making it a wrapper function in
+   Lisp that converts the list of targets and value of `XdndSelection'
+   to serialized data.  Also be sure to update the data types used in
+   dnd.el.
+
+   For examples of how to do this, see `haiku-drag-message' and
+   `x-begin-drag' in haikuselect.c and lisp/term/haiku-win.el, and
+   `ns-begin-drag' and `x-begin-drag' in nsselect.m and
+   lisp/term/ns-win.el.  */
 
 Lisp_Object
 x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
@@ -10528,7 +10830,19 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       unblock_input ();
     }
 
+  /* This shouldn't happen.  */
+  if (x_dnd_toplevels)
+    x_dnd_free_toplevels (true);
+
+#ifdef USE_GTK
+  /* Prevent GTK+ timeouts from being run, since they can call
+     handle_one_xevent behind our back.  */
+  suppress_xg_select ();
+  record_unwind_protect_void (release_xg_select);
+#endif
+
   x_dnd_in_progress = true;
+  x_dnd_recursion_depth = command_loop_level + minibuf_level;
   x_dnd_frame = f;
   x_dnd_last_seen_window = None;
   x_dnd_last_seen_toplevel = None;
@@ -10567,7 +10881,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
     {
       if (x_dnd_compute_toplevels (FRAME_DISPLAY_INFO (f)))
 	{
-	  x_dnd_free_toplevels ();
+	  x_dnd_free_toplevels (true);
 	  x_dnd_use_toplevels = false;
 	}
     }
@@ -10597,7 +10911,8 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
   while (x_dnd_in_progress || x_dnd_waiting_for_finish)
     {
-      hold_quit.kind = NO_EVENT;
+      EVENT_INIT (hold_quit);
+
 #ifdef USE_GTK
       current_finish = X_EVENT_NORMAL;
       current_hold_quit = &hold_quit;
@@ -10606,6 +10921,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 #endif
 
       block_input ();
+      x_dnd_inside_handle_one_xevent = true;
 #ifdef USE_GTK
       gtk_main_iteration ();
 #elif defined USE_X_TOOLKIT
@@ -10642,7 +10958,12 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 			     &next_event, &finish, &hold_quit);
 #endif
 	}
+#else
+      /* Clear these before the read_socket_hook can be called.  */
+      current_count = -1;
+      current_hold_quit = NULL;
 #endif
+      x_dnd_inside_handle_one_xevent = false;
 
       /* The unblock_input below might try to read input, but
 	 XTread_socket does nothing inside a drag-and-drop event
@@ -10695,29 +11016,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
 	  if (hold_quit.kind != NO_EVENT)
 	    {
-	      if (hold_quit.kind == SELECTION_REQUEST_EVENT)
-		{
-		  /* It's not safe to run Lisp inside this function if
-		     x_dnd_in_progress and x_dnd_waiting_for_finish
-		     are unset, so push it back into the event queue.  */
-
-		  if (!x_dnd_in_progress && !x_dnd_waiting_for_finish)
-		    kbd_buffer_store_event (&hold_quit);
-		  else
-		    {
-		      x_dnd_old_window_attrs = root_window_attrs;
-		      x_dnd_unwind_flag = true;
-
-		      ref = SPECPDL_INDEX ();
-		      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
-		      x_handle_selection_event ((struct selection_input_event *) &hold_quit);
-		      x_dnd_unwind_flag = false;
-		      unbind_to (ref, Qnil);
-		    }
-
-		  continue;
-		}
-
 	      if (x_dnd_in_progress)
 		{
 		  if (x_dnd_last_seen_window != None
@@ -10759,7 +11057,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      x_dnd_waiting_for_finish = false;
 
 	      if (x_dnd_use_toplevels)
-		x_dnd_free_toplevels ();
+		x_dnd_free_toplevels (true);
 
 	      x_dnd_return_frame_object = NULL;
 	      x_dnd_movement_frame = NULL;
@@ -10782,6 +11080,19 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 		XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
 				 FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
 	      quit ();
+	    }
+
+	  if (pending_selection_requests
+	      && (x_dnd_in_progress || x_dnd_waiting_for_finish))
+	    {
+	      x_dnd_old_window_attrs = root_window_attrs;
+	      x_dnd_unwind_flag = true;
+
+	      ref = SPECPDL_INDEX ();
+	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
+	      x_handle_pending_selection_requests ();
+	      x_dnd_unwind_flag = false;
+	      unbind_to (ref, Qnil);
 	    }
 
 #ifdef USE_GTK
@@ -10830,7 +11141,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      x_dnd_waiting_for_finish = false;
 
 	      if (x_dnd_use_toplevels)
-		x_dnd_free_toplevels ();
+		x_dnd_free_toplevels (true);
 
 	      x_dnd_return_frame_object = NULL;
 	      x_dnd_movement_frame = NULL;
@@ -10889,6 +11200,9 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 		     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
   unblock_input ();
 
+  if (x_dnd_use_toplevels)
+    x_dnd_free_toplevels (true);
+
   if (x_dnd_return_frame == 3
       && FRAME_LIVE_P (x_dnd_return_frame_object))
     {
@@ -10907,9 +11221,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
     }
 
   x_dnd_return_frame_object = NULL;
-
-  if (x_dnd_use_toplevels)
-    x_dnd_free_toplevels ();
   FRAME_DISPLAY_INFO (f)->grabbed = 0;
 
   /* Emacs can't respond to DND events inside the nested event
@@ -11487,6 +11798,80 @@ x_note_mouse_movement (struct frame *frame, const XMotionEvent *event,
   return false;
 }
 
+/* Get a sibling of DPY below WINDOW at PARENT_X and PARENT_Y.  */
+static Window
+x_get_window_below (Display *dpy, Window window,
+		    int parent_x, int parent_y,
+		    int *inner_x, int *inner_y)
+{
+  int rc, i, cx, cy;
+  XWindowAttributes attrs;
+  unsigned int nchildren;
+  Window root, parent, *children, value;
+  bool window_seen;
+
+  /* TODO: rewrite to have less dependencies.  */
+
+  children = NULL;
+  window_seen = false;
+  value = None;
+
+  rc = XQueryTree (dpy, window, &root, &parent,
+		   &children, &nchildren);
+
+  if (rc)
+    {
+      if (children)
+	XFree (children);
+
+      rc = XQueryTree (dpy, parent, &root,
+		       &parent, &children, &nchildren);
+    }
+
+  if (rc)
+    {
+      for (i = nchildren - 1; i >= 0; --i)
+	{
+	  if (children[i] == window)
+	    {
+	      window_seen = true;
+	      continue;
+	    }
+
+	  if (!window_seen)
+	    continue;
+
+	  rc = XGetWindowAttributes (dpy, children[i], &attrs);
+
+	  if (rc && attrs.map_state != IsViewable)
+	    continue;
+
+	  if (rc && parent_x >= attrs.x
+	      && parent_y >= attrs.y
+	      && parent_x < attrs.x + attrs.width
+	      && parent_y < attrs.y + attrs.height)
+	    {
+	      value = children[i];
+	      cx = parent_x - attrs.x;
+	      cy = parent_y - attrs.y;
+
+	      break;
+	    }
+	}
+    }
+
+  if (children)
+    XFree (children);
+
+  if (value)
+    {
+      *inner_x = cx;
+      *inner_y = cy;
+    }
+
+  return value;
+}
+
 /* Return the current position of the mouse.
    *FP should be a frame which indicates which display to ask about.
 
@@ -11512,8 +11897,9 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		  enum scroll_bar_part *part, Lisp_Object *x, Lisp_Object *y,
 		  Time *timestamp)
 {
-  struct frame *f1;
+  struct frame *f1, *maybe_tooltip;
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (*fp);
+  bool unrelated_tooltip;
 
   block_input ();
 
@@ -11568,9 +11954,11 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	Window first_win = 0;
 #endif
 	int win_x, win_y;
-	int parent_x = 0, parent_y = 0;
+	int parent_x, parent_y;
 
 	win = root;
+	parent_x = root_x;
+	parent_y = root_y;
 
 	/* XTranslateCoordinates can get errors if the window
 	   structure is changing at the same time this function
@@ -11605,6 +11993,22 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 				       root_x, root_y, &win_x, &win_y,
 				       /* Child of win.  */
 				       &child);
+
+		/* If CHILD is a tooltip frame, look below it if
+		   track-mouse is drag-source.  */
+		if (child != None
+		    && (EQ (track_mouse, Qdrag_source)
+			|| EQ (track_mouse, Qdropping)))
+		  {
+		    maybe_tooltip = x_tooltip_window_to_frame (dpyinfo, child,
+							       &unrelated_tooltip);
+
+		    if (maybe_tooltip || unrelated_tooltip)
+		      child = x_get_window_below (dpyinfo->display, child,
+						  parent_x, parent_y, &win_x,
+						  &win_y);
+		  }
+
 		if (child == None || child == win)
 		  {
 #ifdef USE_GTK
@@ -14843,12 +15247,21 @@ x_wait_for_cell_change (Lisp_Object cell, struct timespec timeout)
 {
   struct x_display_info *dpyinfo;
   fd_set fds;
-  int fd, maxfd, finish;
+  int fd, maxfd;
+#ifndef USE_GTK
+  int finish, rc;
   XEvent event;
+  fd_set rfds;
+#endif
   struct input_event hold_quit;
   struct timespec current, at;
 
   at = timespec_add (current_timespec (), timeout);
+
+#ifndef USE_GTK
+  FD_ZERO (&rfds);
+  rc = 0;
+#endif
 
   while (true)
     {
@@ -14858,30 +15271,68 @@ x_wait_for_cell_change (Lisp_Object cell, struct timespec timeout)
       for (dpyinfo = x_display_list; dpyinfo;
 	   dpyinfo = dpyinfo->next)
 	{
-	  if (XPending (dpyinfo->display))
+	  fd = ConnectionNumber (dpyinfo->display);
+
+#ifndef USE_GTK
+	  if ((rc < 0 || FD_ISSET (fd, &rfds))
+	      /* If pselect failed, the erroring display's IO error
+		 handler will eventually be called.  */
+	      && XPending (dpyinfo->display))
 	    {
-	      EVENT_INIT (hold_quit);
+	      while (XPending (dpyinfo->display))
+		{
+		  EVENT_INIT (hold_quit);
 
-	      XNextEvent (dpyinfo->display, &event);
-	      handle_one_xevent (dpyinfo, &event,
-				 &finish, &hold_quit);
+		  XNextEvent (dpyinfo->display, &event);
+		  handle_one_xevent (dpyinfo, &event,
+				     &finish, &hold_quit);
 
-	      /* Make us quit now.  */
-	      if (hold_quit.kind != NO_EVENT)
-		kbd_buffer_store_event (&hold_quit);
+		  if (!NILP (XCAR (cell)))
+		    return;
 
-	      if (!NILP (XCAR (cell)))
-		return;
+		  if (finish == X_EVENT_GOTO_OUT)
+		    break;
+
+		  /* Make us quit now.  */
+		  if (hold_quit.kind != NO_EVENT)
+		    kbd_buffer_store_event (&hold_quit);
+		}
 	    }
-
-	  fd = XConnectionNumber (dpyinfo->display);
+#endif
 
 	  if (fd > maxfd)
 	    maxfd = fd;
 
 	  eassert (fd < FD_SETSIZE);
-	  FD_SET (XConnectionNumber (dpyinfo->display), &fds);
+	  FD_SET (fd, &fds);
 	}
+
+      /* Prevent events from being lost (from GTK's point of view) by
+	 using GDK to run the event loop.  */
+#ifdef USE_GTK
+      while (gtk_events_pending ())
+	{
+	  EVENT_INIT (hold_quit);
+	  current_count = 0;
+	  current_hold_quit = &hold_quit;
+	  current_finish = X_EVENT_NORMAL;
+
+	  gtk_main_iteration ();
+
+	  current_count = -1;
+	  current_hold_quit = NULL;
+
+	  /* Make us quit now.  */
+	  if (hold_quit.kind != NO_EVENT)
+	    kbd_buffer_store_event (&hold_quit);
+
+	  if (!NILP (XCAR (cell)))
+	    return;
+
+	  if (current_finish == X_EVENT_GOTO_OUT)
+	    break;
+	}
+#endif
 
       eassert (maxfd >= 0);
 
@@ -14893,10 +15344,14 @@ x_wait_for_cell_change (Lisp_Object cell, struct timespec timeout)
 
       timeout = timespec_sub (at, current);
 
-      /* We don't have to check the return of pselect, because if an
-	 error occurs XPending will call the IO error handler, which
-	 then brings us out of this loop.  */
-      pselect (maxfd, &fds, NULL, NULL, &timeout, NULL);
+#ifndef USE_GTK
+      rc = pselect (maxfd + 1, &fds, NULL, NULL, &timeout, NULL);
+
+      if (rc >= 0)
+	rfds = fds;
+#else
+      pselect (maxfd + 1, &fds, NULL, NULL, &timeout, NULL);
+#endif
     }
 }
 
@@ -15014,6 +15469,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    && event->xclient.message_type == dpyinfo->Xatom_XdndStatus)
 	  {
 	    Window target;
+	    unsigned long r1, r2;
 
 	    target = event->xclient.data.l[0];
 
@@ -15021,11 +15477,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		&& target == x_dnd_last_seen_window
 		&& event->xclient.data.l[1] & 2)
 	      {
+		r1 = event->xclient.data.l[2];
+		r2 = event->xclient.data.l[2];
+
 		x_dnd_mouse_rect_target = target;
-		x_dnd_mouse_rect.x = (event->xclient.data.l[2] & 0xffff0000) >> 16;
-		x_dnd_mouse_rect.y = (event->xclient.data.l[2] & 0xffff);
-		x_dnd_mouse_rect.width = (event->xclient.data.l[3] & 0xffff0000) >> 16;
-		x_dnd_mouse_rect.height = (event->xclient.data.l[3] & 0xffff);
+		x_dnd_mouse_rect.x = (r1 & 0xffff0000) >> 16;
+		x_dnd_mouse_rect.y = (r1 & 0xffff);
+		x_dnd_mouse_rect.width = (r2 & 0xffff0000) >> 16;
+		x_dnd_mouse_rect.height = (r2 & 0xffff);
 	      }
 	    else
 	      x_dnd_mouse_rect_target = None;
@@ -15210,25 +15669,23 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 
 	    if (event->xclient.data.l[0] == dpyinfo->Xatom_net_wm_ping
+		/* Handling window stacking changes during
+		   drag-and-drop requires Emacs to select for
+		   SubstructureNotifyMask, which in turn causes the
+		   message to be sent to Emacs itself using the event
+		   mask specified by the EWMH.  To avoid an infinite
+		   loop, make sure the client message's window is not
+		   the root window if DND is in progress.  */
+		&& (!(x_dnd_in_progress
+		      || x_dnd_waiting_for_finish)
+		    || event->xclient.window != dpyinfo->root_window)
 		&& event->xclient.format == 32)
 	      {
 		XEvent send_event = *event;
 
 		send_event.xclient.window = dpyinfo->root_window;
 		XSendEvent (dpyinfo->display, dpyinfo->root_window, False,
-			    /* FIXME: handling window stacking changes
-			       during drag-and-drop requires Emacs to
-			       select for SubstructureNotifyMask,
-			       which in turn causes the message to be
-			       sent to Emacs itself using the event
-			       mask specified by the EWMH.  To avoid
-			       an infinite loop, just use
-			       SubstructureRedirectMask when a
-			       drag-and-drop operation is in
-			       progress.  */
-			    ((x_dnd_in_progress || x_dnd_waiting_for_finish)
-			     ? SubstructureRedirectMask
-			     : SubstructureRedirectMask | SubstructureNotifyMask),
+			    SubstructureRedirectMask | SubstructureNotifyMask,
 			    &send_event);
 
 		*finish = X_EVENT_DROP;
@@ -15408,6 +15865,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         SELECTION_EVENT_DPYINFO (&inev.sie) = dpyinfo;
         SELECTION_EVENT_SELECTION (&inev.sie) = eventp->selection;
         SELECTION_EVENT_TIME (&inev.sie) = eventp->time;
+
+	if ((x_dnd_in_progress
+	     && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
+	    || (x_dnd_waiting_for_finish
+		&& dpyinfo->display == x_dnd_finish_display))
+	  {
+	    x_push_selection_request (&inev.sie);
+	    EVENT_INIT (inev.ie);
+	  }
       }
       break;
 
@@ -15436,9 +15902,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    || (x_dnd_waiting_for_finish
 		&& dpyinfo->display == x_dnd_finish_display))
 	  {
-	    eassume (hold_quit);
-
-	    *hold_quit = inev.ie;
+	    x_push_selection_request (&inev.sie);
 	    EVENT_INIT (inev.ie);
 	  }
 
@@ -15448,7 +15912,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    && eventp->selection == dpyinfo->Xatom_XdndSelection
 	    && (eventp->target == dpyinfo->Xatom_XmTRANSFER_SUCCESS
 		|| eventp->target == dpyinfo->Xatom_XmTRANSFER_FAILURE))
-	  x_dnd_waiting_for_finish = false;
+	  {
+	    x_dnd_waiting_for_finish = false;
+
+	    /* If the transfer failed, then return nil from
+	       `x-begin-drag'.  */
+	    if (eventp->target == dpyinfo->Xatom_XmTRANSFER_FAILURE)
+	      x_dnd_action = None;
+	  }
       }
       break;
 
@@ -15666,11 +16137,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	{
 	  if (x_dnd_use_toplevels)
 	    {
-	      x_dnd_free_toplevels ();
+	      x_dnd_free_toplevels (true);
 
 	      if (x_dnd_compute_toplevels (dpyinfo))
 		{
-		  x_dnd_free_toplevels ();
+		  x_dnd_free_toplevels (true);
 		  x_dnd_use_toplevels = false;
 		}
 	    }
@@ -16638,7 +17109,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
              Do it only if there's something to cancel.
              Otherwise, the startup message is cleared when
              the mouse leaves the frame.  */
-          if (any_help_event_p)
+          if (any_help_event_p
+	      /* But never if `mouse-drag-and-drop-region' is in
+		 progress, since that results in the tooltip being
+		 dismissed when the mouse moves on top.  */
+	      && !((EQ (track_mouse, Qdrag_source)
+		    || EQ (track_mouse, Qdropping))
+		   && gui_mouse_grabbed (dpyinfo)))
 	    do_help = -1;
         }
 #ifdef USE_GTK
@@ -16669,6 +17146,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	f = mouse_or_wdesc_frame (dpyinfo, event->xmotion.window);
 
 	if (x_dnd_in_progress
+	    /* Handle these events normally if the recursion
+	       level is higher than when the drag-and-drop
+	       operation was initiated.  This is so that mouse
+	       input works while we're in the debugger for, say,
+	       `x-dnd-movement-function`.  */
+	    && (command_loop_level + minibuf_level
+		<= x_dnd_recursion_depth)
 	    && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	  {
 	    Window target, toplevel;
@@ -16676,6 +17160,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    xm_top_level_leave_message lmsg;
 	    xm_top_level_enter_message emsg;
 	    xm_drag_motion_message dmsg;
+	    XRectangle *r;
+
+	    /* Always clear mouse face.  */
+	    clear_mouse_face (hlinfo);
+	    hlinfo->mouse_face_hidden = true;
 
 	    /* Sometimes the drag-and-drop operation starts with the
 	       pointer of a frame invisible due to input.  Since
@@ -16683,7 +17172,28 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       visible manually.  */
 
 	    if (f)
-	      XTtoggle_invisible_pointer (f, false);
+	      {
+		XTtoggle_invisible_pointer (f, false);
+
+		r = &dpyinfo->last_mouse_glyph;
+
+		/* Also remember the mouse glyph and set
+		   mouse_moved.  */
+		if (f != dpyinfo->last_mouse_glyph_frame
+		    || event->xmotion.x < r->x
+		    || event->xmotion.x >= r->x + r->width
+		    || event->xmotion.y < r->y
+		    || event->xmotion.y >= r->y + r->height)
+		  {
+		    f->mouse_moved = true;
+		    f->last_mouse_device = Qnil;
+		    dpyinfo->last_mouse_scroll_bar = NULL;
+
+		    remember_mouse_glyph (f, event->xmotion.x,
+					  event->xmotion.y, r);
+		    dpyinfo->last_mouse_glyph_frame = f;
+		  }
+	      }
 
 	    target = x_dnd_get_target_window (dpyinfo,
 					      event->xmotion.x_root,
@@ -17160,15 +17670,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	    x_net_wm_state (f, configureEvent.xconfigure.window);
 
-#ifdef USE_X_TOOLKIT
+#if defined USE_X_TOOLKIT || defined USE_GTK
           /* Tip frames are pure X window, set size for them.  */
           if (FRAME_TOOLTIP_P (f))
             {
               if (FRAME_PIXEL_HEIGHT (f) != configureEvent.xconfigure.height
                   || FRAME_PIXEL_WIDTH (f) != configureEvent.xconfigure.width)
-                {
-                  SET_FRAME_GARBAGED (f);
-                }
+		SET_FRAME_GARBAGED (f);
+
               FRAME_PIXEL_HEIGHT (f) = configureEvent.xconfigure.height;
               FRAME_PIXEL_WIDTH (f) = configureEvent.xconfigure.width;
             }
@@ -17295,6 +17804,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	bool dnd_grab = false;
 
 	if (x_dnd_in_progress
+	    /* Handle these events normally if the recursion
+	       level is higher than when the drag-and-drop
+	       operation was initiated.  This is so that mouse
+	       input works while we're in the debugger for, say,
+	       `x-dnd-movement-function`.  */
+	    && (command_loop_level + minibuf_level
+		<= x_dnd_recursion_depth)
 	    && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	  {
 	    if (event->xbutton.type == ButtonPress
@@ -17420,7 +17936,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    goto OTHER;
 	  }
 
-	if (x_dnd_in_progress)
+	if (x_dnd_in_progress
+	    && (command_loop_level + minibuf_level
+		<= x_dnd_recursion_depth))
 	  goto OTHER;
 
 	memset (&compose_status, 0, sizeof (compose_status));
@@ -17973,7 +18491,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		     Do it only if there's something to cancel.
 		     Otherwise, the startup message is cleared when
 		     the mouse leaves the frame.  */
-		  if (any_help_event_p)
+		  if (any_help_event_p
+		      /* But never if `mouse-drag-and-drop-region' is
+			 in progress, since that results in the
+			 tooltip being dismissed when the mouse moves
+			 on top.  */
+		      && !((EQ (track_mouse, Qdrag_source)
+			    || EQ (track_mouse, Qdropping))
+			   && gui_mouse_grabbed (dpyinfo)))
 		    do_help = -1;
 		}
 #ifdef USE_GTK
@@ -18300,10 +18825,22 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      f = mouse_or_wdesc_frame (dpyinfo, xev->event);
 
 	      if (x_dnd_in_progress
+		  /* Handle these events normally if the recursion
+		     level is higher than when the drag-and-drop
+		     operation was initiated.  This is so that mouse
+		     input works while we're in the debugger for, say,
+		     `x-dnd-movement-function`.  */
+		  && (command_loop_level + minibuf_level
+		      <= x_dnd_recursion_depth)
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 		{
 		  Window target, toplevel;
 		  int target_proto, motif_style;
+		  XRectangle *r;
+
+		  /* Always clear mouse face.  */
+		  clear_mouse_face (hlinfo);
+		  hlinfo->mouse_face_hidden = true;
 
 		  /* Sometimes the drag-and-drop operation starts with the
 		     pointer of a frame invisible due to input.  Since
@@ -18311,7 +18848,29 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		     visible manually.  */
 
 		  if (f)
-		    XTtoggle_invisible_pointer (f, false);
+		    {
+		      XTtoggle_invisible_pointer (f, false);
+
+		      r = &dpyinfo->last_mouse_glyph;
+
+		      /* Also remember the mouse glyph and set
+			 mouse_moved.  */
+		      if (f != dpyinfo->last_mouse_glyph_frame
+			  || xev->event_x < r->x
+			  || xev->event_x >= r->x + r->width
+			  || xev->event_y < r->y
+			  || xev->event_y >= r->y + r->height)
+			{
+			  f->mouse_moved = true;
+			  f->last_mouse_device = (source ? source->name
+						  : Qnil);
+			  dpyinfo->last_mouse_scroll_bar = NULL;
+
+			  remember_mouse_glyph (f, xev->event_x,
+						xev->event_y, r);
+			  dpyinfo->last_mouse_glyph_frame = f;
+			}
+		    }
 
 		  target = x_dnd_get_target_window (dpyinfo,
 						    xev->root_x,
@@ -18593,6 +19152,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      int dnd_state;
 
 	      if (x_dnd_in_progress
+		  && (command_loop_level + minibuf_level
+		      <= x_dnd_recursion_depth)
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 		{
 		  if (xev->evtype == XI_ButtonPress
@@ -18738,7 +19299,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    }
 		}
 
-	      if (x_dnd_in_progress)
+	      if (x_dnd_in_progress
+		  && (command_loop_level + minibuf_level
+		      <= x_dnd_recursion_depth))
 		goto XI_OTHER;
 
 #ifdef USE_MOTIF
@@ -20692,12 +21255,16 @@ XTread_socket (struct terminal *terminal, struct input_event *hold_quit)
      read X events while the drag-and-drop event loop is in progress,
      things can go wrong very quick.
 
+     When x_dnd_unwind_flag is true, the above doesn't apply, since
+     the surrounding code takes special precautions to keep it safe.
+
      That doesn't matter for events from displays other than the
      display of the drag-and-drop operation, though.  */
-  if ((x_dnd_in_progress
-       && dpyinfo->display == FRAME_X_DISPLAY (x_dnd_frame))
-      || (x_dnd_waiting_for_finish
-	  && dpyinfo->display == x_dnd_finish_display))
+  if (!x_dnd_unwind_flag
+      && ((x_dnd_in_progress
+	   && dpyinfo->display == FRAME_X_DISPLAY (x_dnd_frame))
+	  || (x_dnd_waiting_for_finish
+	      && dpyinfo->display == x_dnd_finish_display)))
     return 0;
 
   block_input ();
@@ -21216,18 +21783,22 @@ x_text_icon (struct frame *f, const char *icon_name)
 
 #define X_ERROR_MESSAGE_SIZE 200
 
-/* If non-nil, this should be a string.  It means catch X errors and
-   store the error message in this string.
-
-   The reason we use a stack is that x_catch_error/x_uncatch_error can
-   be called from a signal handler.  */
-
 struct x_error_message_stack
 {
+  /* Buffer containing the error message of any error that was
+     generated.  */
   char string[X_ERROR_MESSAGE_SIZE];
+
+  /* The display this error handler applies to.  */
   Display *dpy;
+
+  /* A function to call upon an error if non-NULL.  */
   x_special_error_handler handler;
+
+  /* Some data to pass to that handler function.  */
   void *handler_data;
+
+  /* The previous handler in this stack.  */
   struct x_error_message_stack *prev;
 
   /* The first request that this error handler applies to.  Keeping
@@ -21236,6 +21807,14 @@ struct x_error_message_stack
   unsigned long first_request;
 };
 
+/* Stack of X error message handlers.  Whenever an error is generated
+   on a display, look in this stack for an appropriate error handler,
+   set its `string' to the error message and call its `handler' with
+   `handler_data'.  If no handler applies to the error, don't catch
+   it, and let it crash Emacs instead.
+
+   This used to be a pointer to a string in which any error would be
+   placed before 2006.  */
 static struct x_error_message_stack *x_error_message;
 
 static struct x_error_message_stack *
@@ -21258,9 +21837,10 @@ x_find_error_handler (Display *dpy, XErrorEvent *event)
   return NULL;
 }
 
-/* An X error handler which stores the error message in
-   *x_error_message.  This is called from x_error_handler if
-   x_catch_errors is in effect.  */
+/* An X error handler which stores the error message in the first
+   applicable handler in the x_error_message stack.  This is called
+   from *x_error_handler if an x_catch_errors for DISPLAY is in
+   effect.  */
 
 static void
 x_error_catcher (Display *display, XErrorEvent *event,
@@ -21277,8 +21857,8 @@ x_error_catcher (Display *display, XErrorEvent *event,
 /* Begin trapping X errors for display DPY.
 
    After calling this function, X protocol errors generated on DPY no
-   longer cause Emacs to exit; instead, they are recorded in the
-   string stored in *x_error_message.
+   longer cause Emacs to exit; instead, they are recorded in an error
+   handler pushed onto the stack `x_error_message'.
 
    Calling x_check_errors signals an Emacs error if an X error has
    occurred since the last call to x_catch_errors or x_check_errors.
@@ -21286,8 +21866,10 @@ x_error_catcher (Display *display, XErrorEvent *event,
    Calling x_uncatch_errors resumes the normal error handling,
    skipping an XSync if the last request made is known to have been
    processed.  Calling x_uncatch_errors_after_check is similar, but
-   skips an XSync to the server, and should be used only immediately
-   after x_had_errors_p or x_check_errors.  */
+   always skips an XSync to the server, and should be used only
+   immediately after x_had_errors_p or x_check_errors, or when it is
+   known that no requests have been made since the last x_catch_errors
+   call for DPY.  */
 
 void
 x_catch_errors_with_handler (Display *dpy, x_special_error_handler handler,
@@ -21380,8 +21962,10 @@ x_check_errors (Display *dpy, const char *format)
 
   /* There is no point in making this extra sync if all requests
      are known to have been fully processed.  */
-  if (LastKnownRequestProcessed (dpy)
-      != NextRequest (dpy) - 1)
+  if ((LastKnownRequestProcessed (dpy)
+       != NextRequest (dpy) - 1)
+      && (NextRequest (dpy)
+	  > x_error_message->first_request))
     XSync (dpy, False);
 
   if (x_error_message->string[0])
@@ -21393,8 +21977,8 @@ x_check_errors (Display *dpy, const char *format)
     }
 }
 
-/* Nonzero if we had any X protocol errors
-   since we did x_catch_errors on DPY.  */
+/* Nonzero if any X protocol errors were generated since the last call
+   to x_catch_errors on DPY.  */
 
 bool
 x_had_errors_p (Display *dpy)
@@ -21414,7 +21998,8 @@ x_had_errors_p (Display *dpy)
   return x_error_message->string[0] != 0;
 }
 
-/* Forget about any errors we have had, since we did x_catch_errors on DPY.  */
+/* Forget about any errors we have had, since we did x_catch_errors on
+   DPY.  */
 
 void
 x_clear_errors (Display *dpy)
@@ -21540,7 +22125,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
       x_dnd_waiting_for_finish = false;
 
       if (x_dnd_use_toplevels)
-	x_dnd_free_toplevels ();
+	x_dnd_free_toplevels (false);
 
       x_dnd_return_frame_object = NULL;
       x_dnd_movement_frame = NULL;
@@ -21652,11 +22237,10 @@ x_error_handler (Display *display, XErrorEvent *event)
 #endif
 
 #if defined USE_GTK && defined HAVE_GTK3
-  if ((event->error_code == BadMatch || event->error_code == BadWindow)
+  if ((event->error_code == BadMatch
+       || event->error_code == BadWindow)
       && event->request_code == X_SetInputFocus)
-    {
-      return 0;
-    }
+    return 0;
 #endif
 
   /* If we try to ungrab or grab a device that doesn't exist anymore
@@ -22186,17 +22770,16 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
    https://freedesktop.org/wiki/Specifications/wm-spec/.  */
 
 bool
-x_wm_supports (struct frame *f, Atom want_atom)
+x_wm_supports_1 (struct x_display_info *dpyinfo, Atom want_atom)
 {
   Atom actual_type;
   unsigned long actual_size, bytes_remaining;
   int i, rc, actual_format;
   bool ret;
   Window wmcheck_window;
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   Window target_window = dpyinfo->root_window;
   int max_len = 65536;
-  Display *dpy = FRAME_X_DISPLAY (f);
+  Display *dpy = dpyinfo->display;
   unsigned char *tmp_data = NULL;
   Atom target_type = XA_WINDOW;
 
@@ -22268,6 +22851,13 @@ x_wm_supports (struct frame *f, Atom want_atom)
   unblock_input ();
 
   return ret;
+}
+
+bool
+x_wm_supports (struct frame *f, Atom want_atom)
+{
+  return x_wm_supports_1 (FRAME_DISPLAY_INFO (f),
+			  want_atom);
 }
 
 static void
@@ -22432,15 +23022,20 @@ x_get_current_wm_state (struct frame *f,
 #ifdef USE_XCB
   xcb_get_property_cookie_t prop_cookie;
   xcb_get_property_reply_t *prop;
-  xcb_atom_t *reply_data UNINIT;
+  typedef xcb_atom_t reply_data_object;
 #else
   Display *dpy = FRAME_X_DISPLAY (f);
   unsigned long bytes_remaining;
   int rc, actual_format;
   Atom actual_type;
   unsigned char *tmp_data = NULL;
-  Atom *reply_data UNINIT;
+  typedef Atom reply_data_object;
 #endif
+  reply_data_object *reply_data;
+# if defined GCC_LINT || defined lint
+  reply_data_object reply_data_dummy;
+  reply_data = &reply_data_dummy;
+# endif
 
   *sticky = false;
   *size_state = FULLSCREEN_NONE;
@@ -22791,7 +23386,7 @@ x_check_expected_move (struct frame *f, int expected_left, int expected_top)
       int adjusted_left;
       int adjusted_top;
 
-        FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_A;
+      FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_A;
       FRAME_X_OUTPUT (f)->move_offset_left = expected_left - current_left;
       FRAME_X_OUTPUT (f)->move_offset_top = expected_top - current_top;
 
@@ -22808,7 +23403,6 @@ x_check_expected_move (struct frame *f, int expected_left, int expected_top)
   else
     /* It's a "Type B" window manager.  We don't have to adjust the
        frame's position. */
-
       FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_B;
 }
 
@@ -22822,11 +23416,17 @@ x_check_expected_move (struct frame *f, int expected_left, int expected_top)
 static void
 x_sync_with_move (struct frame *f, int left, int top, bool fuzzy)
 {
-  int count = 0;
+  sigset_t emptyset;
+  int count, current_left, current_top;
+  struct timespec fallback;
+
+  sigemptyset (&emptyset);
+  count = 0;
 
   while (count++ < 50)
     {
-      int current_left = 0, current_top = 0;
+      current_left = 0;
+      current_top = 0;
 
       /* In theory, this call to XSync only needs to happen once, but in
          practice, it doesn't seem to work, hence the need for the surrounding
@@ -22851,7 +23451,14 @@ x_sync_with_move (struct frame *f, int left, int top, bool fuzzy)
   /* As a last resort, just wait 0.5 seconds and hope that XGetGeometry
      will then return up-to-date position info. */
 
-  wait_reading_process_output (0, 500000000, 0, false, Qnil, NULL, 0);
+  fallback = dtotimespec (0.5);
+
+  /* This will hang if input is blocked, so use pselect to wait
+     instead.  */
+  if (input_blocked_p ())
+    pselect (0, NULL, NULL, NULL, &fallback, &emptyset);
+  else
+    wait_reading_process_output (0, 500000000, 0, false, Qnil, NULL, 0);
 }
 
 
@@ -25388,6 +25995,7 @@ x_delete_display (struct x_display_info *dpyinfo)
   struct terminal *t;
   struct color_name_cache_entry *color_entry, *next_color_entry;
   int i;
+  struct x_selection_request_event *ie, *last, *temp;
 
   /* Close all frames and delete the generic struct terminal for this
      X display.  */
@@ -25402,6 +26010,30 @@ x_delete_display (struct x_display_info *dpyinfo)
         delete_terminal (t);
         break;
       }
+
+  /* Find any pending selection requests for this display and unchain
+     them.  */
+
+  last = NULL;
+
+  for (ie = pending_selection_requests; ie; ie = ie->next)
+    {
+    again:
+
+      if (SELECTION_EVENT_DPYINFO (&ie->se) == dpyinfo)
+	{
+	  if (last)
+	    last->next = ie->next;
+
+	  temp = ie;
+	  ie = ie->next;
+	  xfree (temp);
+
+	  goto again;
+	}
+
+      last = ie;
+    }
 
   if (next_noop_dpyinfo == dpyinfo)
     next_noop_dpyinfo = dpyinfo->next;
@@ -25572,8 +26204,10 @@ x_delete_terminal (struct terminal *terminal)
 	  x_dnd_in_progress = false;
 	  x_dnd_waiting_for_finish = false;
 
+	  /* The display is going away, so there's no point in
+	     de-selecting for input on the DND toplevels.  */
 	  if (x_dnd_use_toplevels)
-	    x_dnd_free_toplevels ();
+	    x_dnd_free_toplevels (false);
 
 	  x_dnd_return_frame_object = NULL;
 	  x_dnd_movement_frame = NULL;

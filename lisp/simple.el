@@ -2450,6 +2450,11 @@ invoking, give a prefix argument to `execute-extended-command'."
          (find-shorter nil))
     (unless (commandp function)
       (error "`%s' is not a valid command name" command-name))
+    ;; If we're executing a command that's remapped, we can't actually
+    ;; execute that command with the keymapping we've found with
+    ;; `where-is-internal'.
+    (when (and binding (command-remapping function))
+      (setq binding nil))
     ;; Some features, such as novice.el, rely on this-command-keys
     ;; including M-x COMMAND-NAME RET.
     (set--this-command-keys (concat "\M-x" (symbol-name function) "\r"))
@@ -6161,7 +6166,7 @@ variable to determine how strings should be escaped."
                  (goto-char (point-min))
                  (forward-line 1)
                  (point)))
-             (point-max) nil t)
+             (point-max))
             (buffer-string))))
        (t string)))
      (t string))))
@@ -8078,31 +8083,28 @@ For motion by visual lines, see `beginning-of-visual-line'."
 (put 'set-goal-column 'disabled t)
 
 (defun set-goal-column (arg)
-  "Set the current horizontal position as a goal for \\[next-line] and \\[previous-line].
+  "Set the current horizontal position as a goal column.
+This goal column will affect the \\[next-line] and \\[previous-line] commands,
+as well as the \\[scroll-up-command] and \\[scroll-down-command] commands.
+
 Those commands will move to this position in the line moved to
 rather than trying to keep the same horizontal position.
-With a non-nil argument ARG, clears out the goal column
-so that \\[next-line] and \\[previous-line] resume vertical motion.
-The goal column is stored in the variable `goal-column'.
-This is a buffer-local setting."
+
+With a non-nil argument ARG, clears out the goal column so that
+these commands resume normal motion.
+
+The goal column is stored in the variable `goal-column'.  This is
+a buffer-local setting."
   (interactive "P")
   (if arg
       (progn
         (setq goal-column nil)
         (message "No goal column"))
     (setq goal-column (current-column))
-    ;; The older method below can be erroneous if `set-goal-column' is bound
-    ;; to a sequence containing %
-    ;;(message (substitute-command-keys
-    ;;"Goal column %d (use \\[set-goal-column] with an arg to unset it)")
-    ;;goal-column)
-    (message "%s"
-	     (concat
-	      (format "Goal column %d " goal-column)
-	      (substitute-command-keys
-	       "(use \\[set-goal-column] with an arg to unset it)")))
-
-    )
+    (message "Goal column %d %s"
+             goal-column
+	     (substitute-command-keys
+	      "(use \\[set-goal-column] with an arg to unset it)")))
   nil)
 
 ;;; Editing based on visual lines, as opposed to logical lines.
@@ -9513,14 +9515,14 @@ This affects the commands `next-completion' and
 When the value is t, pressing TAB will switch to the completion list
 buffer when Emacs pops up a window showing that buffer.
 If the value is `second-tab', then the first TAB will pop up the
-window shwoing the completions list buffer, and the next TAB will
+window showing the completions list buffer, and the next TAB will
 switch to that window.
 See `completion-auto-help' for controlling when the window showing
 the completions is popped up and down."
   :type '(choice (const :tag "Don't auto-select completions window" nil)
                  (const :tag "Select completions window on first TAB" t)
-                 (const :tag
-                        "Select completions window on second TAB" second-tab))
+                 (const :tag "Select completions window on second TAB"
+                        second-tab))
   :version "29.1"
   :group 'completion)
 
@@ -9573,7 +9575,8 @@ Also see the `completion-wrap-movement' variable."
           ;; If at the last completion option, wrap or skip
           ;; to the minibuffer, if requested.
           (when completion-wrap-movement
-            (if (and (eq completion-auto-select t) tabcommand)
+            (if (and (eq completion-auto-select t) tabcommand
+                     (minibufferp completion-reference-buffer))
                 (throw 'bound nil)
               (first-completion))))
         (setq n (1- n)))
@@ -9596,9 +9599,9 @@ Also see the `completion-wrap-movement' variable."
           ;; If at the first completion option, wrap or skip
           ;; to the minibuffer, if requested.
           (when completion-wrap-movement
-            (if (and (eq completion-auto-select t) tabcommand)
+            (if (and (eq completion-auto-select t) tabcommand
+                     (minibufferp completion-reference-buffer))
                 (progn
-                  ;; (goto-char (next-single-property-change (point) 'mouse-face))
                   (throw 'bound nil))
               (last-completion))))
         (setq n (1+ n))))
@@ -9801,7 +9804,7 @@ Called from `temp-buffer-show-hook'."
           ;; - With fancy completion styles, the code below will not always
           ;;   find the right base directory.
           (if minibuffer-completing-file-name
-              (file-name-as-directory
+              (file-name-directory
                (expand-file-name
                 (buffer-substring (minibuffer-prompt-end) (point)))))))
     (with-current-buffer standard-output
@@ -9826,9 +9829,7 @@ Called from `temp-buffer-show-hook'."
 	    (insert "Click on a completion to select it.\n"))
 	(insert (substitute-command-keys
 		 "In this buffer, type \\[choose-completion] to \
-select the completion near point.\n\n")))))
-  (when (eq completion-auto-select t)
-    (switch-to-completions)))
+select the completion near point.\n\n"))))))
 
 (add-hook 'completion-setup-hook #'completion-setup-function)
 

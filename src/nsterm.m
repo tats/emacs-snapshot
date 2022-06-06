@@ -2297,6 +2297,11 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
   struct frame *f = NULL;
   struct ns_display_info *dpyinfo;
   bool return_no_frame_flag = false;
+#ifdef NS_IMPL_COCOA
+  NSPoint screen_position;
+  NSInteger window_number;
+  NSWindow *w;
+#endif
 
   NSTRACE ("ns_mouse_position");
 
@@ -2323,18 +2328,29 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
      This doesn't work on GNUstep, although in recent versions there
      is compatibility code that makes it a noop.  */
 
-  NSPoint screen_position = [NSEvent mouseLocation];
-  NSInteger window_number = 0;
+  screen_position = [NSEvent mouseLocation];
+  window_number = 0;
+
   do
     {
-      NSWindow *w;
+      window_number = [NSWindow windowNumberAtPoint: screen_position
+                        belowWindowWithWindowNumber: window_number];
+      w = [NSApp windowWithWindowNumber: window_number];
 
-      window_number = [NSWindow windowNumberAtPoint:screen_position
-                        belowWindowWithWindowNumber:window_number];
-      w = [NSApp windowWithWindowNumber:window_number];
+      if ((EQ (track_mouse, Qdrag_source)
+	   || EQ (track_mouse, Qdropping))
+	  && w && [[w delegate] isKindOfClass: [EmacsTooltip class]])
+	continue;
 
-      if (w && [[w delegate] isKindOfClass:[EmacsView class]])
-        f = ((EmacsView *)[w delegate])->emacsframe;
+      if (w && [[w delegate] isKindOfClass: [EmacsView class]])
+        f = ((EmacsView *) [w delegate])->emacsframe;
+      else if (EQ (track_mouse, Qdrag_source))
+	break;
+
+      if (f && (EQ (track_mouse, Qdrag_source)
+		|| EQ (track_mouse, Qdropping))
+	  && FRAME_TOOLTIP_P (f))
+	continue;
     }
   while (window_number > 0 && !f);
 #endif
@@ -2348,6 +2364,9 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
   if (!FRAME_NS_P (f))
     f = NULL;
+
+  if (f && FRAME_TOOLTIP_P (f))
+    f = dpyinfo->last_mouse_frame;
 
   /* While dropping, use the last mouse frame only if there is no
      currently focused frame.  */
@@ -4523,11 +4542,14 @@ check_native_fs ()
 
 
 static int
-ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+ns_read_socket_1 (struct terminal *terminal, struct input_event *hold_quit,
+		  BOOL no_release)
 /* --------------------------------------------------------------------------
      External (hook): Post an event to ourself and keep reading events until
      we read it back again.  In effect process all events which were waiting.
      From 21+ we have to manage the event buffer ourselves.
+
+     NO_RELEASE means not to touch the global autorelease pool.
    -------------------------------------------------------------------------- */
 {
   struct input_event ev;
@@ -4558,11 +4580,14 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
       ns_init_events (&ev);
       q_event_ptr = hold_quit;
 
-      /* We manage autorelease pools by allocate/reallocate each time around
-         the loop; strict nesting is occasionally violated but seems not to
-         matter... earlier methods using full nesting caused major memory leaks.  */
-      [outerpool release];
-      outerpool = [[NSAutoreleasePool alloc] init];
+      if (!no_release)
+	{
+	  /* We manage autorelease pools by allocate/reallocate each time around
+	     the loop; strict nesting is occasionally violated but seems not to
+	     matter... earlier methods using full nesting caused major memory leaks.  */
+	  [outerpool release];
+	  outerpool = [[NSAutoreleasePool alloc] init];
+	}
 
       /* If have pending open-file requests, attend to the next one of those.  */
       if (ns_pending_files && [ns_pending_files count] != 0
@@ -4599,6 +4624,12 @@ ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
     return -1;
 
   return nevents;
+}
+
+static int
+ns_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+{
+  return ns_read_socket_1 (terminal, hold_quit, NO);
 }
 
 
@@ -5187,12 +5218,8 @@ ns_flush_display (struct frame *f)
 {
   struct input_event ie;
 
-  /* Called from some of the minibuffer code.  Run the event loop once
-     to make the toolkit make changes that were made to the back
-     buffer visible again.  TODO: what should happen to ie?  */
-
   EVENT_INIT (ie);
-  ns_read_socket (FRAME_TERMINAL (f), &ie);
+  ns_read_socket_1 (FRAME_TERMINAL (f), &ie, YES);
 }
 
 /* This and next define (many of the) public functions in this
@@ -7081,6 +7108,9 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   if (!emacs_event)
     return;
 
+  if (FRAME_TOOLTIP_P (emacsframe))
+    return;
+
   dpyinfo->last_mouse_frame = emacsframe;
   /* Appears to be needed to prevent spurious movement events generated on
      button clicks.  */
@@ -7281,7 +7311,8 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 	  tab_bar_p = EQ (window, emacsframe->tab_bar_window);
 
 	  if (tab_bar_p)
-	    tab_bar_arg = handle_tab_bar_click (emacsframe, x, y, EV_UDMODIFIERS (theEvent) & down_modifier,
+	    tab_bar_arg = handle_tab_bar_click (emacsframe, x, y,
+						EV_UDMODIFIERS (theEvent) & down_modifier,
 						EV_MODIFIERS (theEvent) | EV_UDMODIFIERS (theEvent));
 	}
 
@@ -7355,6 +7386,9 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   Lisp_Object frame;
   NSPoint pt;
   BOOL dragging;
+
+  if (FRAME_TOOLTIP_P (emacsframe))
+    return;
 
   NSTRACE_WHEN (NSTRACE_GROUP_EVENTS, "[EmacsView mouseMoved:]");
 
@@ -8594,13 +8628,30 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
 -(NSDragOperation) draggingEntered: (id <NSDraggingInfo>) sender
 {
+  id source;
+
   NSTRACE ("[EmacsView draggingEntered:]");
+
+  source = [sender draggingSource];
+
+  if (source && [source respondsToSelector: @selector(mustNotDropOn:)]
+      && [source mustNotDropOn: self])
+    return NSDragOperationNone;
+
   return NSDragOperationGeneric;
 }
 
 
--(BOOL)prepareForDragOperation: (id <NSDraggingInfo>) sender
+-(BOOL) prepareForDragOperation: (id <NSDraggingInfo>) sender
 {
+  id source;
+
+  source = [sender draggingSource];
+
+  if (source && [source respondsToSelector: @selector(mustNotDropOn:)]
+      && [source mustNotDropOn: self])
+    return NO;
+
   return YES;
 }
 
@@ -8618,6 +8669,12 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 #endif
   NSPoint position;
   int x, y;
+  NSAutoreleasePool *ap;
+  specpdl_ref count;
+
+  ap = [[NSAutoreleasePool alloc] init];
+  count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (ns_release_autorelease_pool, ap);
 
 #ifdef NS_IMPL_GNUSTEP
   EVENT_INIT (ie);
@@ -8651,28 +8708,33 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   redisplay ();
 #endif
 
+  unbind_to (count, Qnil);
   return NSDragOperationGeneric;
 }
 
--(BOOL)performDragOperation: (id <NSDraggingInfo>) sender
+- (BOOL) performDragOperation: (id <NSDraggingInfo>) sender
 {
-  id pb;
+  id pb, source;
   int x, y;
   NSString *type;
-  NSEvent *theEvent = [[self window] currentEvent];
   NSPoint position;
   NSDragOperation op = [sender draggingSourceOperationMask];
   Lisp_Object operations = Qnil;
   Lisp_Object strings = Qnil;
   Lisp_Object type_sym;
+  struct input_event ie;
 
-  NSTRACE ("[EmacsView performDragOperation:]");
+  NSTRACE (@"[EmacsView performDragOperation:]");
 
-  if (!emacs_event)
+  source = [sender draggingSource];
+
+  if (source && [source respondsToSelector: @selector(mustNotDropOn:)]
+      && [source mustNotDropOn: self])
     return NO;
 
   position = [self convertPoint: [sender draggingLocation] fromView: nil];
-  x = lrint (position.x);  y = lrint (position.y);
+  x = lrint (position.x);
+  y = lrint (position.y);
 
   pb = [sender draggingPasteboard];
   type = [pb availableTypeFromArray: ns_drag_types];
@@ -8688,11 +8750,9 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   if (op & NSDragOperationGeneric || NILP (operations))
     operations = Fcons (Qns_drag_operation_generic, operations);
 
-  if (type == 0)
-    {
-      return NO;
-    }
-#if NS_USE_NSPasteboardTypeFileURL != 0
+  if (!type)
+    return NO;
+#if NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSPasteboardTypeFileURL])
     {
       type_sym = Qfile;
@@ -8707,18 +8767,29 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 #else  // !NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSFilenamesPboardType])
     {
-      NSArray *files;
+      id files;
       NSEnumerator *fenum;
       NSString *file;
 
-      if (!(files = [pb propertyListForType: type]))
+      files = [pb propertyListForType: type];
+
+      if (!files)
         return NO;
 
       type_sym = Qfile;
 
-      fenum = [files objectEnumerator];
-      while ( (file = [fenum nextObject]) )
-        strings = Fcons ([file lispString], strings);
+      /* On GNUstep, files might be a string.  */
+
+      if ([files respondsToSelector: @selector (objectEnumerator:)])
+	{
+	  fenum = [files objectEnumerator];
+
+	  while ((file = [fenum nextObject]))
+	    strings = Fcons ([file lispString], strings);
+	}
+      else
+	/* Then `files' is an NSString.  */
+	strings = list1 ([files lispString]);
     }
 #endif   // !NS_USE_NSPasteboardTypeFileURL
   else if ([type isEqualToString: NSPasteboardTypeURL])
@@ -8735,29 +8806,26 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
     {
       NSString *data;
 
-      if (! (data = [pb stringForType: type]))
+      data = [pb stringForType: type];
+
+      if (!data)
         return NO;
 
       type_sym = Qnil;
-
       strings = list1 ([data lispString]);
     }
   else
-    {
-      fputs ("Invalid data type in dragging pasteboard\n", stderr);
-      return NO;
-    }
+    return NO;
 
-  emacs_event->kind = DRAG_N_DROP_EVENT;
-  XSETINT (emacs_event->x, x);
-  XSETINT (emacs_event->y, y);
-  emacs_event->modifiers = 0;
+  EVENT_INIT (ie);
+  ie.kind = DRAG_N_DROP_EVENT;
+  ie.arg = Fcons (type_sym, Fcons (operations,
+				   strings));
+  XSETINT (ie.x, x);
+  XSETINT (ie.y, y);
+  XSETFRAME (ie.frame_or_window, emacsframe);
 
-  emacs_event->arg = Fcons (type_sym,
-                            Fcons (operations,
-                                   strings));
-  EV_TRAILER (theEvent);
-
+  kbd_buffer_store_event (&ie);
   return YES;
 }
 
@@ -9561,14 +9629,58 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
   selected_op = operation;
 }
 
+#ifdef NS_IMPL_COCOA
+- (void) draggedImage: (NSImage *) dragged_image
+	      movedTo: (NSPoint) screen_point
+{
+  NSInteger window_number;
+  NSWindow *w;
+
+  if (dnd_mode == RETURN_FRAME_NEVER)
+    return;
+
+  window_number = [NSWindow windowNumberAtPoint: [NSEvent mouseLocation]
+		    belowWindowWithWindowNumber: 0];
+  w = [NSApp windowWithWindowNumber: window_number];
+
+  if (!w || w != self)
+    dnd_mode = RETURN_FRAME_NOW;
+
+  if (dnd_mode != RETURN_FRAME_NOW
+      || ![[w delegate] isKindOfClass: [EmacsView class]])
+    return;
+
+  dnd_return_frame = ((EmacsView *) [w delegate])->emacsframe;
+
+  /* FIXME: there must be a better way to leave the event loop.  */
+  [NSException raise: @""
+	      format: @"Must return DND frame"];
+}
+#endif
+
+- (BOOL) mustNotDropOn: (NSView *) receiver
+{
+  return ([receiver window] == self
+	  ? !dnd_allow_same_frame : NO);
+}
+
 - (NSDragOperation) beginDrag: (NSDragOperation) op
 		forPasteboard: (NSPasteboard *) pasteboard
+		     withMode: (enum ns_return_frame_mode) mode
+		returnFrameTo: (struct frame **) frame_return
+		 prohibitSame: (BOOL) prohibit_same_frame
 {
   NSImage *image;
-
+#ifdef NS_IMPL_COCOA
+  NSInteger window_number;
+  NSWindow *w;
+#endif
   drag_op = op;
   selected_op = NSDragOperationNone;
   image = [[NSImage alloc] initWithSize: NSMakeSize (1.0, 1.0)];
+  dnd_mode = mode;
+  dnd_return_frame = NULL;
+  dnd_allow_same_frame = !prohibit_same_frame;
 
   /* Now draw transparency onto the image.  */
   [image lockFocus];
@@ -9577,17 +9689,53 @@ nswindow_orderedIndex_sort (id w1, id w2, void *c)
 			    NSCompositingOperationCopy);
   [image unlockFocus];
 
-  if (last_drag_event)
-    [self dragImage: image
-		 at: NSMakePoint (0, 0)
-	     offset: NSMakeSize (0, 0)
-	      event: last_drag_event
-	 pasteboard: pasteboard
-	     source: self
-	  slideBack: NO];
+  block_input ();
+#ifdef NS_IMPL_COCOA
+  if (mode == RETURN_FRAME_NOW)
+    {
+      window_number = [NSWindow windowNumberAtPoint: [NSEvent mouseLocation]
+			belowWindowWithWindowNumber: 0];
+      w = [NSApp windowWithWindowNumber: window_number];
+
+      if (w && [[w delegate] isKindOfClass: [EmacsView class]])
+	{
+	  *frame_return = ((EmacsView *) [w delegate])->emacsframe;
+	  [image release];
+	  unblock_input ();
+
+	  return NSDragOperationNone;
+	}
+    }
+
+  @try
+    {
+#endif
+      if (last_drag_event)
+	[self dragImage: image
+		     at: NSMakePoint (0, 0)
+		 offset: NSMakeSize (0, 0)
+		  event: last_drag_event
+	     pasteboard: pasteboard
+		 source: self
+	      slideBack: NO];
+#ifdef NS_IMPL_COCOA
+    }
+  @catch (NSException *e)
+    {
+      /* Ignore.  This is probably the wrong way to leave the
+	 drag-and-drop run loop.  */
+    }
+#endif
+  unblock_input ();
+
+  /* Assume all buttons have been released since the drag-and-drop
+     operation is now over.  */
+  if (!dnd_return_frame)
+    x_display_list->grabbed = 0;
 
   [image release];
 
+  *frame_return = dnd_return_frame;
   return selected_op;
 }
 
