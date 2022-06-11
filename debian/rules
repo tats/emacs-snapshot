@@ -153,6 +153,8 @@ install_dir_gtk := $(CURDIR)/debian/install-gtk
 install_dir_nox := $(CURDIR)/debian/install-nox
 install_dir_lucid := $(CURDIR)/debian/install-lucid
 
+libexec_dir_emacs := usr/libexec/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
+
 local_lpath := /etc/emacs
 local_lpath := $(local_lpath):/usr/local/share/emacs/$(runtime_ver)/site-lisp
 local_lpath := $(local_lpath):/usr/local/share/emacs/site-lisp
@@ -253,7 +255,7 @@ debian/emacs-common.README.Debian: \
 # common configure flags
 confflags += --prefix=/usr
 confflags += --sharedstatedir=/var/lib
-confflags += --libexecdir=/usr/lib
+confflags += --libexecdir=/usr/libexec
 confflags += --localstatedir=/var/lib
 confflags += --infodir=/usr/share/info
 confflags += --mandir=/usr/share/man
@@ -340,10 +342,9 @@ define install_common_binpkg_bits
   test -f $(1)/usr/bin/emacs-*
   cp -a $(1)/usr/bin/emacs-* $(2)/usr/bin/emacs-$(4)
 
-  test -f $(1)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
-  install -d $(2)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
-  cp -a $(1)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp \
-        $(2)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/
+  test -f $(1)/$(libexec_dir_emacs)/emacs.pdmp
+  install -d $(2)/$(libexec_dir_emacs)
+  cp -a $(1)/$(libexec_dir_emacs)/emacs.pdmp $(2)/$(libexec_dir_emacs)/
 
   install -d $(2)/usr/share/emacs/$(runtime_ver)/etc
   cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC \
@@ -377,7 +378,12 @@ override_dh_auto_install: $(autogen_install_files)
 	  cp -a $(install_dir_gtk)/* $(pkgdir_common)
 
 	  rm -r $(pkgdir_common)/usr/bin
-	  rm -r $(pkgdir_common)/usr/lib
+	  rm \
+	    $(pkgdir_common)/$(libexec_dir_emacs)/hexl \
+	    $(pkgdir_common)/$(libexec_dir_emacs)/emacs.pdmp \
+	    $(pkgdir_common)/$(libexec_dir_emacs)/rcs2log
+	  cd $(pkgdir_common)/usr \
+	    && rmdir --parents libexec/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
 
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
 	  && test -f DOC
@@ -440,15 +446,14 @@ override_dh_auto_install: $(autogen_install_files)
 	  # Move common binaries to emacs-bin-common.
 	  install -d $(pkgdir_bin_common)/usr
 	  cp -a $(install_dir_gtk)/usr/bin $(pkgdir_bin_common)/usr
-	  cp -a $(install_dir_gtk)/usr/lib $(pkgdir_bin_common)/usr
+	  cp -a $(install_dir_gtk)/usr/libexec $(pkgdir_bin_common)/usr
 
 	  # Make sure there's just one.
 	  test -f $(pkgdir_bin_common)/usr/bin/emacs-*
 	  rm $(pkgdir_bin_common)/usr/bin/{emacs,emacs-*}
 
-	  # The pdmp files are flavor-specific
-	  test -f $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
-	  rm $(pkgdir_bin_common)/usr/lib/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)/emacs.pdmp
+          # The pdmp files are flavor-specific
+	  rm $(pkgdir_bin_common)/$(libexec_dir_emacs)/emacs.pdmp
 
 	  # Set up alternatives.
 	  alternatives=$$(ls $(pkgdir_bin_common)/usr/bin) \
