@@ -54,6 +54,7 @@ Depends:
   emacs-common (= ${source:Version}),
   ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
+Recommends: fonts-noto-color-emoji
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-gtk, emacs-nox
 Replaces: emacs-gtk, emacs-nox,
@@ -90,6 +91,7 @@ Depends:
   emacs-common (= ${source:Version}),
   ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
+Recommends: fonts-noto-color-emoji
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-lucid, emacs-nox
 Replaces: emacs-lucid, emacs-nox,
