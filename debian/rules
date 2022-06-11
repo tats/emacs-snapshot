@@ -14,6 +14,8 @@
 # Debhelper support added via one of Joey Hess' example files.
 # See the debian/changelog for further historical information.
 
+include /usr/share/dpkg/pkg-info.mk
+
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
@@ -33,8 +35,10 @@ bin_priority := 28
 # way.  So far that's always been true.  If it becomes false, some of
 # the values below will have to be set manually.
 
-src_name := $(shell dpkg-parsechangelog -S source)
-debian_ver := $(shell dpkg-parsechangelog -S version)
+# From /usr/share/dpkg/pkg-info.mk
+src_name := $(DEB_SOURCE)
+debian_ver := $(DEB_VERSION)
+
 major_ver := $(shell echo $(debian_ver) | sed 's/\..*//')
 
 # Everything before the last '-' (21.3, 21.3a, 21.3+1, etc.)
