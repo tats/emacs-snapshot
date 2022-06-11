@@ -15,6 +15,8 @@
 # Debhelper support added via one of Joey Hess' example files.
 # See the debian/changelog for further historical information.
 
+include /usr/share/dpkg/pkg-info.mk
+
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
@@ -51,13 +53,9 @@ runtime_ver := $(shell $(pf); echo $(upstream_ver) | perl -pe 's/[a-z]+$$//o')
 major_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/\..*$$//o')
 minor_ver := $(shell $(pf); echo $(runtime_ver) | perl -pe 's/^[^.]*\.//o')
 
-# The name of the Debian source package
-src_name := $(shell $(pf); dpkg-parsechangelog | egrep '^Source:')
-src_name := $(shell $(pf); echo $(src_name) | perl -pe 's/Source:\s+//o')
-
-# The version from the changelog (i.e. 20.5-1)
-debian_ver := $(shell $(pf); dpkg-parsechangelog | egrep '^Version:')
-debian_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/Version:\s+//o')
+# From /usr/share/dpkg/pkg-info.mk
+src_name := $(DEB_SOURCE)
+debian_ver := $(DEB_VERSION)
 
 # The Debian revision (i.e. the 1 from 20.5-1)
 # Always everything after the last '-'
