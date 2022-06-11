@@ -13,7 +13,7 @@ diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
 index 2b0215dde4f..a464dc3933d 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -40,7 +40,7 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
+@@ -40,7 +40,7 @@ unifiles =
  
  .PHONY: all
  

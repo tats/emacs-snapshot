@@ -1,4 +1,4 @@
-From 9d5a6d7cb9eb163ec254a8659682f4b9cb2f3c15 Mon Sep 17 00:00:00 2001
+From 8fe0e537224de59d034315b91f1ed6f62dcdd39e Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sun, 16 Dec 2018 17:13:36 -0600
 Subject: Mark vc-bzr-test-fauilt-bzr-autoloads as unstable for now
@@ -64,7 +64,7 @@ diff --git a/test/lisp/vc/vc-bzr-tests.el b/test/lisp/vc/vc-bzr-tests.el
 index 86d497631cb..b1171edbced 100644
 --- a/test/lisp/vc/vc-bzr-tests.el
 +++ b/test/lisp/vc/vc-bzr-tests.el
-@@ -124,6 +124,7 @@
+@@ -124,6 +124,7 @@ vc-bzr-test-bug9781
  ;; https://lists.gnu.org/r/help-gnu-emacs/2012-04/msg00145.html
  (ert-deftest vc-bzr-test-faulty-bzr-autoloads ()
    "Test we can generate autoloads in a bzr directory when bzr is faulty."

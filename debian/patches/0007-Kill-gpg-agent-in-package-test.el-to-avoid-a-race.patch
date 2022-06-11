@@ -23,7 +23,7 @@ diff --git a/test/lisp/emacs-lisp/package-tests.el b/test/lisp/emacs-lisp/packag
 index 69c14050b96..2cf57147200 100644
 --- a/test/lisp/emacs-lisp/package-tests.el
 +++ b/test/lisp/emacs-lisp/package-tests.el
-@@ -161,7 +161,14 @@ package-test-data-dir
+@@ -161,7 +161,14 @@ with-package-test
                (expand-file-name f package-test-archive-upload-base))))
           (delete-directory package-test-archive-upload-base))
         (when (file-directory-p package-test-user-dir)

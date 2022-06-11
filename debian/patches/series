@@ -5,5 +5,4 @@
 0005-Modify-the-output-of-version-to-indicate-Debian-modi.patch
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
-0008-Don-t-downcase-real-xref-in-elisp-mode-tests.patch
-0009-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
+0008-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
