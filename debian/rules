@@ -15,6 +15,7 @@
 # Debhelper support added via one of Joey Hess' example files.
 # See the debian/changelog for further historical information.
 
+include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/pkg-info.mk
 
 # Uncomment this to turn on verbose mode.
@@ -76,16 +77,6 @@ bin_priority := 28
 menu_ver := $(major_ver)
 
 ######################################################################
-
-# Should these be exported like this (as autotools-dev recommends for
-# the two vars below) or not?
-export DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
-export DEB_HOST_GNU_CPU ?= $(shell dpkg-architecture -qDEB_HOST_GNU_CPU)
-
-# As recommended by /usr/share/doc/autotools-dev/README.Debian.gz.
-# Handle cross-compiling and don't make ./configure guess.
-export DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-export DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 # FOR AUTOCONF 2.52 AND NEWER ONLY
 ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
