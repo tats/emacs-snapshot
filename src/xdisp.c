@@ -5894,7 +5894,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	location = tem;
     }
 
-  if (EQ (location, Qunbound))
+  if (BASE_EQ (location, Qunbound))
     {
       location = Qnil;
       value = spec;
@@ -13148,7 +13148,7 @@ store_mode_line_noprop (const char *string, int field_width, int precision)
    Vicon_title_format if FRAME is iconified, otherwise it is
    frame_title_format.  */
 
-static void
+void
 gui_consider_frame_title (Lisp_Object frame)
 {
   struct frame *f = XFRAME (frame);
@@ -17852,7 +17852,7 @@ cursor_row_fully_visible_p (struct window *w, bool force_p,
     buffer_local_value (Qmake_cursor_line_fully_visible, w->contents);
 
   /* If no local binding, use the global value.  */
-  if (EQ (mclfv_p, Qunbound))
+  if (BASE_EQ (mclfv_p, Qunbound))
     mclfv_p = Vmake_cursor_line_fully_visible;
   /* Follow mode sets the variable to a Lisp function in buffers that
      are under Follow mode.  */
@@ -28373,7 +28373,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	}
 
       prop = buffer_local_value (prop, it->w->contents);
-      if (EQ (prop, Qunbound))
+      if (BASE_EQ (prop, Qunbound))
 	prop = Qnil;
     }
 
@@ -28436,7 +28436,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	    }
 
 	  car = buffer_local_value (car, it->w->contents);
-	  if (EQ (car, Qunbound))
+	  if (BASE_EQ (car, Qunbound))
 	    car = Qnil;
 	}
 

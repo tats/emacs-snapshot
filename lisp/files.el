@@ -2797,6 +2797,9 @@ since only a single case-insensitive search through the alist is made."
      ;; .dir-locals.el is not really Elisp.  Could use the
      ;; `dir-locals-file' constant if it weren't defined below.
      ("\\.dir-locals\\(?:-2\\)?\\.el\\'" . lisp-data-mode)
+     ("\\.eld\\'" . lisp-data-mode)
+     ;; FIXME: The lisp-data-mode files below should use the `.eld' extension
+     ;; (or a -*- mode cookie) so we don't need ad-hoc entries here.
      ("eww-bookmarks\\'" . lisp-data-mode)
      ("tramp\\'" . lisp-data-mode)
      ("/archive-contents\\'" . lisp-data-mode)
@@ -5725,11 +5728,14 @@ Before and after saving the buffer, this function runs
 		     (signal (car err) (cdr err))))
 	    ;; Since we have created an entirely new file,
 	    ;; make sure it gets the right permission bits set.
-	    (setq setmodes (or setmodes
- 			       (list (or (file-modes buffer-file-name)
-					 (logand ?\666 (default-file-modes)))
-				     (file-extended-attributes buffer-file-name)
-				     buffer-file-name)))
+	    (setq setmodes
+                  (or setmodes
+                      (list (or (file-modes buffer-file-name)
+				(logand ?\666 (default-file-modes)))
+                            (with-demoted-errors
+                                "Error getting extended attributes: %s"
+			      (file-extended-attributes buffer-file-name))
+			    buffer-file-name)))
 	    ;; We succeeded in writing the temp file,
 	    ;; so rename it.
 	    (rename-file tempname
@@ -5746,9 +5752,12 @@ Before and after saving the buffer, this function runs
 	;; (setmodes is set) because that says we're superseding.
 	(cond ((and tempsetmodes (not setmodes))
 	       ;; Change the mode back, after writing.
-	       (setq setmodes (list (file-modes buffer-file-name)
-				    (file-extended-attributes buffer-file-name)
-				    buffer-file-name))
+	       (setq setmodes
+                     (list (file-modes buffer-file-name)
+                           (with-demoted-errors
+                               "Error getting extended attributes: %s"
+			     (file-extended-attributes buffer-file-name))
+			   buffer-file-name))
 	       ;; If set-file-extended-attributes fails, fall back on
 	       ;; set-file-modes.
 	       (unless
@@ -7218,8 +7227,9 @@ by `sh' are supported."
   :group 'dired)
 
 (defun file-expand-wildcards (pattern &optional full regexp)
-  "Expand wildcard pattern PATTERN.
-This returns a list of file names that match the pattern.
+  "Expand (a.k.a. \"glob\") file-name wildcard pattern PATTERN.
+This returns a list of file names that match PATTERN.
+The returned list of file names is sorted in the `string<' order.
 
 PATTERN is, by default, a \"glob\"/wildcard string, e.g.,
 \"/tmp/*.png\" or \"/*/*/foo.png\", but can also be a regular
@@ -7228,13 +7238,13 @@ case, the matches are applied per sub-directory, so a match can't
 span a parent/sub directory, which means that a regexp bit can't
 contain the \"/\" character.
 
-The list of files returned are sorted in `string<' order.
+The returned list of file names is sorted in the `string<' order.
 
-If PATTERN is written as an absolute file name, the values are
-absolute also.
+If PATTERN is written as an absolute file name, the expansions in
+the returned list are also absolute.
 
 If PATTERN is written as a relative file name, it is interpreted
-relative to the current default directory, `default-directory'.
+relative to the current `default-directory'.
 The file names returned are normally also relative to the current
 default directory.  However, if FULL is non-nil, they are absolute."
   (save-match-data
@@ -7305,9 +7315,6 @@ now defined as a sibling."
 
 (defun find-sibling-file (file)
   "Visit a \"sibling\" file of FILE.
-By default, return only files that exist, but if ALL is non-nil,
-return all matches.
-
 When called interactively, FILE is the currently visited file.
 
 The \"sibling\" file is defined by the `find-sibling-rules' variable."
@@ -7317,7 +7324,8 @@ The \"sibling\" file is defined by the `find-sibling-rules' variable."
                  (list buffer-file-name)))
   (unless find-sibling-rules
     (user-error "The `find-sibling-rules' variable has not been configured"))
-  (let ((siblings (find-sibling-file--search (expand-file-name file))))
+  (let ((siblings (find-sibling-file-search (expand-file-name file)
+                                            find-sibling-rules)))
     (cond
      ((null siblings)
       (user-error "Couldn't find any sibling files"))
@@ -7332,16 +7340,19 @@ The \"sibling\" file is defined by the `find-sibling-rules' variable."
          (completing-read (format-prompt "Find file" (car relatives))
                           relatives nil t nil nil (car relatives))))))))
 
-(defun find-sibling-file--search (file)
+(defun find-sibling-file-search (file &optional rules)
+  "Return a list of FILE's \"siblings\"
+RULES should be a list on the form defined by `find-sibling-rules' (which
+see), and if nil, defaults to `find-sibling-rules'."
   (let ((results nil))
-    (pcase-dolist (`(,match . ,expansions) find-sibling-rules)
+    (pcase-dolist (`(,match . ,expansions) (or rules find-sibling-rules))
       ;; Go through the list and find matches.
       (when (string-match match file)
         (let ((match-data (match-data)))
           (dolist (expansion expansions)
             (let ((start 0))
               ;; Expand \\1 forms in the expansions.
-              (while (string-match "\\\\\\([0-9]+\\)" expansion start)
+              (while (string-match "\\\\\\([&0-9]+\\)" expansion start)
                 (let ((index (string-to-number (match-string 1 expansion))))
                   (setq start (match-end 0)
                         expansion
@@ -7379,12 +7390,11 @@ and `list-directory-verbose-switches'."
      (list (read-file-name
             (if pfx "List directory (verbose): "
 	      "List directory (brief): ")
-	    nil default-directory t
-            nil
+	    nil default-directory
             (lambda (file)
               (or (file-directory-p file)
                   (insert-directory-wildcard-in-dir-p
-                   (expand-file-name file)))))
+                   (file-name-as-directory (expand-file-name file))))))
            pfx)))
   (let ((switches (if verbose list-directory-verbose-switches
 		    list-directory-brief-switches))
@@ -7403,9 +7413,9 @@ and `list-directory-verbose-switches'."
     ;; Finishing with-output-to-temp-buffer seems to clobber default-directory.
     (with-current-buffer buffer
       (setq default-directory
-	    (if (file-directory-p dirname)
+	    (if (file-accessible-directory-p dirname)
 		(file-name-as-directory dirname)
-	      (file-name-directory dirname))))))
+	      (file-name-directory (directory-file-name dirname)))))))
 
 (defun shell-quote-wildcard-pattern (pattern)
   "Quote characters special to the shell in PATTERN, leave wildcards alone.

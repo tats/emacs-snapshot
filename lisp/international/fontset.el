@@ -193,6 +193,7 @@
         (balinese #x1B13 #x1B35 #x1B5E)
         (sundanese #x1B8A #x1BAB #x1CC4)
         (batak #x1BC2 #x1BE7 #x1BFF)
+        (lepcha #x1C00 #x1C24 #x1C40)
         (tai-le #x1950)
         (tai-lue #x1980)
         (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
@@ -210,6 +211,7 @@
 	(javanese #xA98F #xA9B4 #xA9CA)
 	(cham #xAA00)
 	(tai-viet #xAA80)
+        (meetei-mayek #xABC0 #xABE3 #xAAE0 #xAAF6)
 	(hangul #xAC00)
 	(linear-b #x10000)
 	(aegean-number #x10100)
@@ -767,6 +769,7 @@
                     balinese
                     sundanese
                     batak
+                    lepcha
 		    symbol
 		    braille
 		    yi
@@ -774,6 +777,7 @@
                     rejang
                     javanese
 		    tai-viet
+                    meetei-mayek
 		    aegean-number
 		    ancient-greek-number
 		    ancient-symbol

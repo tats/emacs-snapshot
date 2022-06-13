@@ -895,7 +895,8 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                          &context (window-system ns))
   (ns-get-selection selection-symbol target-type))
 
-(defun x-begin-drag (targets &optional action frame return-frame allow-current-frame)
+(defun x-begin-drag (targets &optional action frame return-frame
+                             allow-current-frame follow-tooltip)
   "SKIP: real doc in xfns.c."
   (unless ns-dnd-selection-value
     (error "No local value for XdndSelection"))
@@ -920,7 +921,8 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                               (expand-file-name
                                                ns-dnd-selection-value))))
                 pasteboard))))
-    (ns-begin-drag frame pasteboard action return-frame allow-current-frame)))
+    (ns-begin-drag frame pasteboard action return-frame
+                   allow-current-frame follow-tooltip)))
 
 (defun ns-handle-drag-motion (frame x y)
   "Handle mouse movement on FRAME at X and Y during drag-and-drop.

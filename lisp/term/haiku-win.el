@@ -311,9 +311,11 @@ or a pair of markers) and turns it into a file system reference."
     (if (eq string 'lambda) ; This means the mouse moved.
         (dnd-handle-movement (event-start event))
       (cond
+       ;; Don't allow dropping on something other than the text area.
+       ;; It does nothing and doesn't work with text anyway.
+       ((posn-area (event-start event)))
        ((assoc "refs" string)
         (with-selected-window window
-          (raise-frame)
           (dolist (filename (cddr (assoc "refs" string)))
             (dnd-handle-one-url window 'private
                                 (concat "file:" filename)))))
@@ -324,9 +326,9 @@ or a pair of markers) and turns it into a file system reference."
               (dnd-handle-one-url window 'private bf)))))
        ((assoc "text/plain" string)
         (with-selected-window window
-          (raise-frame)
           (dolist (text (cddr (assoc "text/plain" string)))
-            (goto-char (posn-point (event-start event)))
+            (unless mouse-yank-at-point
+              (goto-char (posn-point (event-start event))))
             (dnd-insert-text window 'private
                              (if (multibyte-string-p text)
                                  text
@@ -362,7 +364,8 @@ take effect on menu items until the menu bar is updated again."
 
 (setq haiku-drag-track-function #'haiku-dnd-drag-handler)
 
-(defun x-begin-drag (targets &optional action frame _return-frame allow-current-frame)
+(defun x-begin-drag (targets &optional action frame _return-frame
+                             allow-current-frame follow-tooltip)
   "SKIP: real doc in xfns.c."
   (unless haiku-dnd-selection-value
     (error "No local value for XdndSelection"))
@@ -404,7 +407,8 @@ take effect on menu items until the menu bar is updated again."
                     action)
                'XdndActionCopy)
       (haiku-drag-message (or frame (selected-frame))
-                          message allow-current-frame))))
+                          message allow-current-frame
+                          follow-tooltip))))
 
 (add-variable-watcher 'use-system-tooltips #'haiku-use-system-tooltips-watcher)
 

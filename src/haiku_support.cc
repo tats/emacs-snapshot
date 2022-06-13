@@ -582,10 +582,11 @@ class Emacs : public BApplication
 {
 public:
   BMessage settings;
-  bool settings_valid_p = false;
+  bool settings_valid_p;
   EmacsScreenChangeMonitor *monitor;
 
-  Emacs (void) : BApplication ("application/x-vnd.GNU-emacs")
+  Emacs (void) : BApplication ("application/x-vnd.GNU-emacs"),
+		 settings_valid_p (false)
   {
     BPath settings_path;
 
@@ -1103,8 +1104,8 @@ public:
   {
     struct haiku_resize_event rq;
     rq.window = this;
-    rq.px_heightf = newHeight + 1.0f;
-    rq.px_widthf = newWidth + 1.0f;
+    rq.width = newWidth + 1.0f;
+    rq.height = newHeight + 1.0f;
 
     haiku_write (FRAME_RESIZED, &rq);
     BWindow::FrameResized (newWidth, newHeight);
@@ -1492,25 +1493,36 @@ public:
 class EmacsView : public BView
 {
 public:
-  uint32_t previous_buttons = 0;
-  int looper_locked_count = 0;
+  uint32_t previous_buttons;
+  int looper_locked_count;
   BRegion sb_region;
   BRegion invalid_region;
 
-  BView *offscreen_draw_view = NULL;
-  BBitmap *offscreen_draw_bitmap_1 = NULL;
-  BBitmap *copy_bitmap = NULL;
+  BView *offscreen_draw_view;
+  BBitmap *offscreen_draw_bitmap_1;
+  BBitmap *copy_bitmap;
 
 #ifdef USE_BE_CAIRO
-  cairo_surface_t *cr_surface = NULL;
-  cairo_t *cr_context = NULL;
+  cairo_surface_t *cr_surface;
+  cairo_t *cr_context;
   BLocker cr_surface_lock;
 #endif
 
   BPoint tt_absl_pos;
-  BMessage *wait_for_release_message = NULL;
+  BMessage *wait_for_release_message;
 
-  EmacsView () : BView (BRect (0, 0, 0, 0), "Emacs", B_FOLLOW_NONE, B_WILL_DRAW)
+  EmacsView () : BView (BRect (0, 0, 0, 0), "Emacs",
+			B_FOLLOW_NONE, B_WILL_DRAW),
+		 previous_buttons (0),
+		 looper_locked_count (0),
+		 offscreen_draw_view (NULL),
+		 offscreen_draw_bitmap_1 (NULL),
+		 copy_bitmap (NULL),
+#ifdef USE_BE_CAIRO
+		 cr_surface (NULL),
+		 cr_context (NULL),
+#endif
+		 wait_for_release_message (NULL)
   {
 
   }
@@ -1658,9 +1670,7 @@ public:
 #endif
 
 	if (looper_locked_count)
-	  {
-	    offscreen_draw_bitmap_1->Lock ();
-	  }
+	  offscreen_draw_bitmap_1->Lock ();
 
 	UnlockLooper ();
       }
@@ -1816,10 +1826,10 @@ public:
   }
 
   void
-  MouseDown (BPoint point)
+  BasicMouseDown (BPoint point, BView *scroll_bar)
   {
     struct haiku_button_event rq;
-    uint32 buttons;
+    uint32 mods, buttons;
 
     this->GetMouse (&point, &buttons, false);
 
@@ -1830,6 +1840,7 @@ public:
     grab_view_locker.Unlock ();
 
     rq.window = this->Window ();
+    rq.scroll_bar = scroll_bar;
 
     if (!(previous_buttons & B_PRIMARY_MOUSE_BUTTON)
 	&& (buttons & B_PRIMARY_MOUSE_BUTTON))
@@ -1848,7 +1859,7 @@ public:
     rq.x = point.x;
     rq.y = point.y;
 
-    uint32_t mods = modifiers ();
+    mods = modifiers ();
 
     rq.modifiers = 0;
     if (mods & B_SHIFT_KEY)
@@ -1863,18 +1874,25 @@ public:
     if (mods & B_OPTION_KEY)
       rq.modifiers |= HAIKU_MODIFIER_SUPER;
 
-    SetMouseEventMask (B_POINTER_EVENTS, (B_LOCK_WINDOW_FOCUS
-					  | B_NO_POINTER_HISTORY));
+    if (!scroll_bar)
+      SetMouseEventMask (B_POINTER_EVENTS, (B_LOCK_WINDOW_FOCUS
+					    | B_NO_POINTER_HISTORY));
 
     rq.time = system_time ();
     haiku_write (BUTTON_DOWN, &rq);
   }
 
   void
-  MouseUp (BPoint point)
+  MouseDown (BPoint point)
+  {
+    BasicMouseDown (point, NULL);
+  }
+
+  void
+  BasicMouseUp (BPoint point, BView *scroll_bar)
   {
     struct haiku_button_event rq;
-    uint32 buttons;
+    uint32 buttons, mods;
 
     this->GetMouse (&point, &buttons, false);
 
@@ -1895,6 +1913,7 @@ public:
       }
 
     rq.window = this->Window ();
+    rq.scroll_bar = scroll_bar;
 
     if ((previous_buttons & B_PRIMARY_MOUSE_BUTTON)
 	&& !(buttons & B_PRIMARY_MOUSE_BUTTON))
@@ -1913,7 +1932,7 @@ public:
     rq.x = point.x;
     rq.y = point.y;
 
-    uint32_t mods = modifiers ();
+    mods = modifiers ();
 
     rq.modifiers = 0;
     if (mods & B_SHIFT_KEY)
@@ -1928,37 +1947,48 @@ public:
     if (mods & B_OPTION_KEY)
       rq.modifiers |= HAIKU_MODIFIER_SUPER;
 
-    if (!buttons)
-      SetMouseEventMask (0, 0);
-
     rq.time = system_time ();
     haiku_write (BUTTON_UP, &rq);
+  }
+
+  void
+  MouseUp (BPoint point)
+  {
+    BasicMouseUp (point, NULL);
   }
 };
 
 class EmacsScrollBar : public BScrollBar
 {
 public:
-  int dragging = 0;
+  int dragging;
   bool horizontal;
   enum haiku_scroll_bar_part current_part;
   float old_value;
   scroll_bar_info info;
 
   /* True if button events should be passed to the parent.  */
-  bool handle_button = false;
-  bool in_overscroll = false;
-  bool can_overscroll = false;
-  bool maybe_overscroll = false;
+  bool handle_button;
+  bool in_overscroll;
+  bool can_overscroll;
+  bool maybe_overscroll;
   BPoint last_overscroll;
   int last_reported_overscroll_value;
   int max_value, real_max_value;
   int overscroll_start_value;
   bigtime_t repeater_start;
+  EmacsView *parent;
 
-  EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p) :
-    BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
-		B_HORIZONTAL : B_VERTICAL)
+  EmacsScrollBar (int x, int y, int x1, int y1, bool horizontal_p,
+		  EmacsView *parent)
+    : BScrollBar (BRect (x, y, x1, y1), NULL, NULL, 0, 0, horizontal_p ?
+		  B_HORIZONTAL : B_VERTICAL),
+      dragging (0),
+      handle_button (false),
+      in_overscroll (false),
+      can_overscroll (false),
+      maybe_overscroll (false),
+      parent (parent)
   {
     BView *vw = (BView *) this;
     vw->SetResizingMode (B_FOLLOW_NONE);
@@ -2159,7 +2189,6 @@ public:
     BLooper *looper;
     BMessage *message;
     int32 buttons, mods;
-    BView *parent;
 
     looper = Looper ();
     message = NULL;
@@ -2180,8 +2209,9 @@ public:
       {
 	/* Allow C-mouse-3 to split the window on a scroll bar.   */
 	handle_button = true;
-	parent = Parent ();
-	parent->MouseDown (ConvertToParent (pt));
+	SetMouseEventMask (B_POINTER_EVENTS, (B_SUSPEND_VIEW_FOCUS
+					      | B_LOCK_WINDOW_FOCUS));
+	parent->BasicMouseDown (ConvertToParent (pt), this);
 
 	return;
       }
@@ -2244,7 +2274,6 @@ public:
   MouseUp (BPoint pt)
   {
     struct haiku_scroll_bar_drag_event rq;
-    BView *parent;
 
     in_overscroll = false;
     maybe_overscroll = false;
@@ -2252,8 +2281,7 @@ public:
     if (handle_button)
       {
 	handle_button = false;
-	parent = Parent ();
-	parent->MouseUp (ConvertToParent (pt));
+	parent->BasicMouseUp (ConvertToParent (pt), this);
 
 	return;
       }
@@ -3494,20 +3522,22 @@ BWindow_Flush (void *window)
 
 /* Make a scrollbar, attach it to VIEW's window, and return it.  */
 void *
-BScrollBar_make_for_view (void *view, int horizontal_p,
-			  int x, int y, int x1, int y1,
-			  void *scroll_bar_ptr)
+be_make_scroll_bar_for_view (void *view, int horizontal_p,
+			     int x, int y, int x1, int y1)
 {
-  EmacsScrollBar *sb = new EmacsScrollBar (x, y, x1, y1, horizontal_p);
+  EmacsScrollBar *scroll_bar;
   BView *vw = (BView *) view;
-  BView *sv = (BView *) sb;
 
   if (!vw->LockLooper ())
     gui_abort ("Failed to lock scrollbar owner");
-  vw->AddChild ((BView *) sb);
-  sv->WindowActivated (vw->Window ()->IsActive ());
+
+  scroll_bar = new EmacsScrollBar (x, y, x1, y1, horizontal_p,
+				   (EmacsView *) vw);
+
+  vw->AddChild (scroll_bar);
   vw->UnlockLooper ();
-  return sb;
+
+  return scroll_bar;
 }
 
 void

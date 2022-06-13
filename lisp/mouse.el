@@ -53,9 +53,17 @@ mouse cursor to the echo area."
 This affects `mouse-save-then-kill' (\\[mouse-save-then-kill]) in
 addition to mouse drags.
 
+If this variable is `non-empty', only copy to the kill ring if
+the region is non-empty.  For instance, if you mouse drag an area
+that is less than a half a character, you'd normally get the
+empty string in your kill ring, but with this value, this short
+mouse drag won't affect the kill ring.
+
 This variable applies only to mouse adjustments in Emacs, not
 selecting and adjusting regions in other windows."
-  :type 'boolean
+  :type '(choice (const :tag "No" nil)
+                 (const :tag "Yes" t)
+                 (const :tag "Non-empty" non-empty))
   :version "24.1")
 
 (defcustom mouse-1-click-follows-link 450
@@ -1423,7 +1431,11 @@ command alters the kill ring or not."
         (if (< end beg)
             (setq end (nth 0 range) beg (nth 1 range))
           (setq beg (nth 0 range) end (nth 1 range)))))
-    (and mouse-drag-copy-region (integerp beg) (integerp end)
+    (when (and mouse-drag-copy-region
+               (integerp beg)
+               (integerp end)
+               (or (not (eq mouse-drag-copy-region 'non-empty))
+                   (/= beg end)))
 	 ;; Don't set this-command to `kill-region', so a following
 	 ;; C-w won't double the text in the kill ring.  Ignore
 	 ;; `last-command' so we don't append to a preceding kill.
@@ -2112,7 +2124,9 @@ if `mouse-drag-copy-region' is non-nil)."
 	(if before-scroll (goto-char before-scroll)))
       (exchange-point-and-mark)
       (mouse-set-region-1)
-      (when mouse-drag-copy-region
+      (when (and mouse-drag-copy-region
+                 (or (not (eq mouse-drag-copy-region 'non-empty))
+                     (not (/= (mark t) (point)))))
         (kill-new (filter-buffer-substring (mark t) (point))))
       (setq mouse-save-then-kill-posn click-pt)))))
 
@@ -3056,7 +3070,10 @@ Call `tooltip-show-help-non-mode' instead on non-graphical displays."
 	  (setf (alist-get 'border-color params) fg))
 	(when (stringp bg)
 	  (setf (alist-get 'background-color params) bg))
-        (x-show-tip tooltip nil params))
+        ;; Don't time out: this leads to very confusing behavior when
+        ;; Emacs isn't visible, and the only indication that the user
+        ;; is actually dragging something abruptly disappears.
+        (x-show-tip tooltip nil params most-positive-fixnum))
     (tooltip-show-help-non-mode tooltip)))
 
 (declare-function x-hide-tip "xfns.c")
@@ -3085,6 +3102,7 @@ is copied instead of being cut."
                      (display-multi-frame-p)
                      (require 'tooltip))
             mouse-drag-and-drop-region-show-tooltip))
+         (mouse-highlight nil)
          (start (region-beginning))
          (end (region-end))
          (point (point))
@@ -3102,6 +3120,9 @@ is copied instead of being cut."
          ;; tooltip.
          (mouse-fine-grained-tracking t)
          (was-tooltip-mode tooltip-mode)
+         ;; System tooltips tend to flicker and in general work
+         ;; incorrectly.
+         (use-system-tooltips nil)
          ;; Whether or not some text was ``cut'' from Emacs to another
          ;; program and the cleaanup code should not try modifying the
          ;; region.
@@ -3243,7 +3264,6 @@ is copied instead of being cut."
                                                                (cdr mouse-position)))))))
                                         (not (posn-window (event-end event))))))
                       (setq drag-again-mouse-position nil)
-                      (mouse-drag-and-drop-region-hide-tooltip)
                       (gui-set-selection 'XdndSelection value-selection)
                       (let ((drag-action-or-frame
                              (condition-case nil
@@ -3258,7 +3278,7 @@ is copied instead of being cut."
                                                ;; `return-frame' doesn't
                                                ;; work, allow dropping on
                                                ;; the drop frame.
-                                               (eq window-system 'haiku))
+                                               (eq window-system 'haiku) t)
                                (quit nil))))
                         (when (framep drag-action-or-frame)
                           ;; With some window managers `x-begin-drag'

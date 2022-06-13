@@ -392,16 +392,23 @@ If that doesn't give a function, return nil."
 The prefix described consists of all but the last event
 of the key sequence that ran this command."
   (interactive)
-  (let ((key (this-command-keys)))
-    (describe-bindings
-     (if (stringp key)
-	 (substring key 0 (1- (length key)))
-       (let ((prefix (make-vector (1- (length key)) nil))
-	     (i 0))
-	 (while (< i (length prefix))
-	   (aset prefix i (aref key i))
-	   (setq i (1+ i)))
-	 prefix)))))
+  (let* ((key (this-command-keys))
+         (prefix
+          (if (stringp key)
+	      (substring key 0 (1- (length key)))
+            (let ((prefix (make-vector (1- (length key)) nil))
+	          (i 0))
+	      (while (< i (length prefix))
+	        (aset prefix i (aref key i))
+	        (setq i (1+ i)))
+	      prefix))))
+    (describe-bindings prefix)
+    (with-current-buffer (help-buffer)
+      (when (< (buffer-size) 10)
+        (let ((inhibit-read-only t))
+          (insert (format "No commands with a binding that start with %s."
+                          (help--key-description-fontified prefix))))))))
+
 ;; Make C-h after a prefix, when not specifically bound,
 ;; run describe-prefix-bindings.
 (setq prefix-help-command 'describe-prefix-bindings)
@@ -1506,10 +1513,11 @@ in `describe-map-tree'."
       ;; Now output them in sorted order.
       (while vect
         (let* ((elem (car vect))
-               (start (car elem))
-               (definition (cadr elem))
-               (shadowed (caddr elem))
-               (end start))
+               (start (nth 0 elem))
+               (definition (nth 1 elem))
+               (shadowed (nth 2 elem))
+               (end start)
+               remapped)
           ;; Find consecutive chars that are identically defined.
           (when (fixnump start)
             (while (and (cdr vect)
@@ -1533,7 +1541,19 @@ in `describe-map-tree'."
             ;; Now START .. END is the range to describe next.
             ;; Insert the string to describe the event START.
             (setq line-start (point))
-            (insert (help--key-description-fontified (vector start) prefix))
+            ;; If we're in a <remap> section of the output, then also
+            ;; display the bindings of the keys that we've remapped from.
+            ;; This enables the user to actually see what keys to tap to
+            ;; execute the remapped commands.
+            (if (setq remapped
+                      (and (equal prefix [remap])
+                           (not (eq definition 'self-insert-command))
+                           (car (where-is-internal definition))))
+                (insert (help--key-description-fontified
+                         (vector (elt remapped (1- (length remapped))))
+                         (seq-into (butlast (seq-into remapped 'list))
+                                   'vector)))
+              (insert (help--key-description-fontified (vector start) prefix)))
             (when (not (eq start end))
               (insert " .. " (help--key-description-fontified (vector end)
                                                               prefix)))
@@ -1547,9 +1567,15 @@ in `describe-map-tree'."
             ;; Print a description of the definition of this character.
             ;; elt_describer will take care of spacing out far enough for
             ;; alignment purposes.
-            (when shadowed
+            (when (or shadowed remapped)
               (goto-char (max (1- (point)) (point-min)))
-              (insert "\n  (this binding is currently shadowed)")
+              (when shadowed
+                (insert "\n  (this binding is currently shadowed)"))
+              (when remapped
+                (insert (format
+                         "\n  (Remapped via %s)"
+                         (help--key-description-fontified
+                          (vector start) prefix))))
               (goto-char (min (1+ (point)) (point-max))))))
         ;; Next item in list.
         (setq vect (cdr vect)))

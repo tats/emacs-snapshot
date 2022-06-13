@@ -68,6 +68,21 @@ option '--without-xinput2' to disable this support.
 '(featurep 'xinput2)' can be used to test for the presence of XInput 2
 support from Lisp programs.
 
+---
+** Emacs no longer reduces the size of the Japanese dictionary.
+Building Emacs includes generation of a Japanese dictionary, which is
+used by Japanese input methods.  Previously, the build included a step
+of reducing the size of this dictionary's vocabulary.  This vocabulary
+reduction is now optional, by default off.  If you need the Emacs
+build to include the vocabulary reduction, configure Emacs with the
+option '--with-small-ja-dic'.  In an Emacs source tree already
+configured without that option, you can force the vocabulary reduction
+by saying
+
+    make -C leim generate-ja-dic JA_DIC_NO_REDUCTION_OPTION=''
+
+after deleting lisp/leim/ja-dic/ja-dic.el.
+
 +++
 ** Emacs now supports being built with pure GTK.
 To use this option, make sure the GTK 3 (version 3.20 or later) and
@@ -135,6 +150,13 @@ of 'user-emacs-directory'.
 
 
 * Incompatible changes in Emacs 29.1
+
++++
+** 'E' in 'query-replace' now edits the replacement with exact case.
+Previously, this command did the same as 'e'.
+
+---
+** '/ a' in *Packages* now limits by package name(s) instead of regexp.
 
 +++
 ** Setting the goal columns now also affects '<prior>' and '<next>'.
@@ -276,6 +298,9 @@ startup.  Previously, these functions ignored
 
 * Changes in Emacs 29.1
 
+---
+** Files with the '.eld' extension are now visited in 'lisp-data-mode'.
+
 +++
 ** New command 'find-sibling-file'.
 This command jumps to a file considered a "sibling file", which is
@@ -330,6 +355,10 @@ to another program.
 ** New user option 'mouse-drag-and-drop-region-scroll-margin'.
 If non-nil, this option allows scrolling a window while dragging text
 around without a scroll wheel.
+
++++
+*** 'mouse-drag-copy-region' can now be 'non-empty'.
+This inhibits putting empty strings onto the kill ring.
 
 +++
 ** New user options 'dnd-indicate-insertion-point' and 'dnd-scroll-margin'.
@@ -863,6 +892,9 @@ corresponding language environments are:
 **** Lontara script and language environment
 **** Hanifi Rohingya script and language environment
 **** Grantha script and language environment
+**** Kharoshthi script and language environment
+**** Lepcha script and language environment
+**** Meetei Mayek script and language environment
 
 ---
 *** The "Oriya" language environment was renamed to "Odia".
@@ -1554,6 +1586,12 @@ If non-nil (which is the default), hitting 'RET' or 'mouse-1' on
 the directory components at the directory displayed at the start of
 the buffer will take you to that directory.
 
+---
+*** Search and replace in Dired/Wdired supports more regexps.
+For example, the regexp ".*" will match only characters that are part
+of the file name.  Also "^.*$" can be used to match at the beginning
+of the file name and at the end of the file name.
+
 ** Exif
 
 ---
@@ -1945,6 +1983,19 @@ functions.
 Previously it produced a nonsense value, -1, that was never intended.
 
 * Lisp Changes in Emacs 29.1
+
++++
+** 'read-regexp' now allows the user to indicate whether to use case folding.
+
++++
+** 'completing-read' now allows a function as its REQUIRE-MATCH argument.
+This function is called to see whether what the user has typed in is a
+match.  This is also available from functions that call
+'completing-read', like 'read-file-name'.
+
++++
+** 'posn-col-row' can now give position data based on windows.
+Previously, it reported data only based on the frame.
 
 +++
 ** 'file-expand-wildcards' can now also take a regexp as PATTERN argument.
@@ -2428,6 +2479,12 @@ dimensions.
 ** 'window-text-pixel-size' understands a new meaning of FROM.
 Specifying a cons as the FROM argument allows to start measuring text
 from a specified amount of pixels above or below a position.
+
++++
+** 'window-body-width' and 'window-body-height' can use remapped faces.
+Specifying 'remap' as the PIXELWISE argument now checks if the default
+face was remapped, and if so, uses the remapped face to determine the
+character width/height.
 
 +++
 ** 'set-window-vscroll' now accepts a new argument PRESERVE-VSCROLL-P.

@@ -736,6 +736,9 @@ extern bool x_display_ok (const char *);
 extern void select_visual (struct x_display_info *);
 
 extern Window tip_window;
+extern Lisp_Object tip_dx;
+extern Lisp_Object tip_dy;
+extern Lisp_Object tip_frame;
 
 /* Each X frame object points to its own struct x_output object
    in the output_data.x field.  The x_output structure contains
@@ -1396,6 +1399,7 @@ extern void x_catch_errors_with_handler (Display *, x_special_error_handler,
 extern void x_check_errors (Display *, const char *)
   ATTRIBUTE_FORMAT_PRINTF (2, 0);
 extern bool x_had_errors_p (Display *);
+extern void x_unwind_errors_to (int);
 extern void x_uncatch_errors (void);
 extern void x_uncatch_errors_after_check (void);
 extern void x_clear_errors (Display *);
@@ -1455,11 +1459,18 @@ extern void x_xr_reset_ext_clip (struct frame *f);
 extern void x_scroll_bar_configure (GdkEvent *);
 #endif
 
+#define DEFER_SELECTIONS						\
+  x_defer_selection_requests ();					\
+  record_unwind_protect_void (x_release_selection_requests_and_flush)
+
+extern void x_defer_selection_requests (void);
+extern void x_release_selection_requests_and_flush (void);
 extern void x_handle_pending_selection_requests (void);
 extern bool x_detect_pending_selection_requests (void);
 extern Lisp_Object x_dnd_begin_drag_and_drop (struct frame *, Time, Atom,
 					      Lisp_Object, Atom *, const char **,
-					      size_t, bool, Atom *, int);
+					      size_t, bool, Atom *, int,
+					      Lisp_Object, bool);
 extern void x_dnd_do_unsupported_drop (struct x_display_info *, Lisp_Object,
 				       Lisp_Object, Lisp_Object, Window, int,
 				       int, Time);
@@ -1524,6 +1535,7 @@ extern void x_handle_property_notify (const XPropertyEvent *);
 extern void x_handle_selection_notify (const XSelectionEvent *);
 extern void x_handle_selection_event (struct selection_input_event *);
 extern void x_clear_frame_selections (struct frame *);
+extern Lisp_Object x_atom_to_symbol (struct x_display_info *, Atom);
 
 extern bool x_handle_dnd_message (struct frame *,
 				  const XClientMessageEvent *,
@@ -1615,6 +1627,7 @@ extern bool x_dnd_waiting_for_finish;
 extern struct frame *x_dnd_frame;
 extern struct frame *x_dnd_finish_frame;
 extern unsigned x_dnd_unsupported_event_level;
+extern int x_error_message_count;
 
 #ifdef HAVE_XINPUT2
 extern struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
