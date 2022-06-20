@@ -1584,7 +1584,7 @@ x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (STRINGP (arg))
     {
-      if (STRINGP (oldval) && EQ (Fstring_equal (oldval, arg), Qt))
+      if (STRINGP (oldval) && BASE_EQ (Fstring_equal (oldval, arg), Qt))
 	return;
     }
   else if (!STRINGP (oldval) && NILP (oldval) == NILP (arg))
@@ -1616,7 +1616,7 @@ x_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (STRINGP (arg))
     {
-      if (STRINGP (oldval) && EQ (Fstring_equal (oldval, arg), Qt))
+      if (STRINGP (oldval) && BASE_EQ (Fstring_equal (oldval, arg), Qt))
 	return;
     }
   else if (!NILP (arg) || NILP (oldval))
@@ -6899,7 +6899,7 @@ that mouse buttons are being held down, such as immediately after a
   int ntargets = 0, nnames = 0;
   char *target_names[2048];
   Atom *target_atoms;
-  Lisp_Object lval, original, tem, t1, t2;
+  Lisp_Object lval, original, targets_arg, tem, t1, t2;
   Atom xaction;
   Atom action_list[2048];
   char *name_list[2048];
@@ -6908,6 +6908,7 @@ that mouse buttons are being held down, such as immediately after a
 
   CHECK_LIST (targets);
   original = targets;
+  targets_arg = targets;
 
   for (; CONSP (targets); targets = XCDR (targets))
     {
@@ -6995,7 +6996,7 @@ that mouse buttons are being held down, such as immediately after a
 				    xaction, return_frame, action_list,
 				    (const char **) &name_list, nnames,
 				    !NILP (allow_current_frame), target_atoms,
-				    ntargets, original, !NILP (follow_tooltip));
+				    ntargets, targets_arg, !NILP (follow_tooltip));
 
   SAFE_FREE ();
   return lval;
@@ -9472,6 +9473,28 @@ DEFUN ("x-gtk-debug", Fx_gtk_debug, Sx_gtk_debug, 1, 1, 0,
 #endif /* HAVE_GTK3 */
 #endif	/* USE_GTK */
 
+DEFUN ("x-display-set-last-user-time", Fx_display_last_user_time,
+       Sx_display_set_last_user_time, 1, 2, 0,
+       doc: /* Set the last user time of TERMINAL to TIME-OBJECT.
+TIME-OBJECT is the X server time, in milliseconds, of the last user
+interaction.  This is the timestamp that `x-get-selection-internal'
+will use by default to fetch selection data.
+The optional second argument TERMINAL specifies which display to act
+on.  TERMINAL should be a terminal object, a frame or a display name
+(a string).  If TERMINAL is omitted or nil, that stands for the
+selected frame's display.  */)
+  (Lisp_Object time_object, Lisp_Object terminal)
+{
+  struct x_display_info *dpyinfo;
+  Time time;
+
+  dpyinfo = check_x_display_info (terminal);
+  CONS_TO_INTEGER (time_object, Time, time);
+
+  x_set_last_user_time_from_lisp (dpyinfo, time);
+  return Qnil;
+}
+
 DEFUN ("x-internal-focus-input-context", Fx_internal_focus_input_context,
        Sx_internal_focus_input_context, 1, 1, 0,
        doc: /* Focus and set the client window of all focused frames' GTK input context.
@@ -9937,6 +9960,7 @@ eliminated in future versions of Emacs.  */);
   defsubr (&Sx_hide_tip);
   defsubr (&Sx_double_buffered_p);
   defsubr (&Sx_begin_drag);
+  defsubr (&Sx_display_set_last_user_time);
   tip_timer = Qnil;
   staticpro (&tip_timer);
   tip_frame = Qnil;

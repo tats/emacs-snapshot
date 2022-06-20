@@ -2299,7 +2299,7 @@ This function uses the `read-extended-command-predicate' user option."
 (defun command-completion-using-modes-p (symbol buffer)
   "Say whether SYMBOL has been marked as a mode-specific command in BUFFER."
   ;; Check the modes.
-  (let ((modes (command-modes symbol)))
+  (when-let ((modes (command-modes symbol)))
     ;; Common fast case: Just a single mode.
     (if (null (cdr modes))
         (or (provided-mode-derived-p
@@ -2539,7 +2539,16 @@ maps."
           (read-extended-command-predicate
            (lambda (symbol buffer)
              (or (command-completion-using-modes-p symbol buffer)
-                 (where-is-internal symbol keymaps)))))
+                 ;; Include commands that are bound in a keymap in the
+                 ;; current buffer.
+                 (and (where-is-internal symbol keymaps)
+                      ;; But not if they have a command predicate that
+                      ;; says that they shouldn't.  (This is the case
+                      ;; for `ignore' and `undefined' and similar
+                      ;; commands commonly found in keymaps.)
+                      (or (null (get symbol 'completion-predicate))
+                          (funcall (get symbol 'completion-predicate)
+                                   symbol buffer)))))))
      (list current-prefix-arg
            (read-extended-command)
            execute-extended-command--last-typed)))
@@ -9502,10 +9511,10 @@ Go to the window from which completion was requested."
       (if (get-buffer-window buf)
 	  (select-window (get-buffer-window buf))))))
 
-(defcustom completion-wrap-movement t
+(defcustom completion-auto-wrap t
   "Non-nil means to wrap around when selecting completion options.
-This affects the commands `next-completion' and
-`previous-completion'."
+This affects the commands `next-completion' and `previous-completion'.
+When `completion-auto-select' is t, it wraps through the minibuffer."
   :type 'boolean
   :version "29.1"
   :group 'completion)
@@ -9549,7 +9558,7 @@ the completions is popped up and down."
 With prefix argument N, move back N items (negative N means move
 forward).
 
-Also see the `completion-wrap-movement' variable."
+Also see the `completion-auto-wrap' variable."
   (interactive "p")
   (next-completion (- n)))
 
@@ -9558,7 +9567,7 @@ Also see the `completion-wrap-movement' variable."
 With prefix argument N, move N items (negative N means move
 backward).
 
-Also see the `completion-wrap-movement' variable."
+Also see the `completion-auto-wrap' variable."
   (interactive "p")
   (let ((tabcommand (member (this-command-keys) '("\t" [backtab])))
         pos)
@@ -9574,7 +9583,7 @@ Also see the `completion-wrap-movement' variable."
             (goto-char pos)
           ;; If at the last completion option, wrap or skip
           ;; to the minibuffer, if requested.
-          (when completion-wrap-movement
+          (when completion-auto-wrap
             (if (and (eq completion-auto-select t) tabcommand
                      (minibufferp completion-reference-buffer))
                 (throw 'bound nil)
@@ -9598,7 +9607,7 @@ Also see the `completion-wrap-movement' variable."
                             (point) 'mouse-face nil (point-min)))))
           ;; If at the first completion option, wrap or skip
           ;; to the minibuffer, if requested.
-          (when completion-wrap-movement
+          (when completion-auto-wrap
             (if (and (eq completion-auto-select t) tabcommand
                      (minibufferp completion-reference-buffer))
                 (progn
@@ -10511,10 +10520,10 @@ This is an integer between 1 and 12 (inclusive).  January is 1.")
   (year nil :documentation "This is a four digit integer.")
   (weekday nil :documentation "\
 This is a number between 0 and 6, and 0 is Sunday.")
-  (dst nil :documentation "\
+  (dst -1 :documentation "\
 This is t if daylight saving time is in effect, nil if it is not
-in effect, and -1 if daylight saving information is not
-available.")
+in effect, and -1 if daylight saving information is not available.
+Also see `decoded-time-dst'.")
   (zone nil :documentation "\
 This is an integer indicating the UTC offset in seconds, i.e.,
 the number of seconds east of Greenwich.")
@@ -10524,9 +10533,13 @@ the number of seconds east of Greenwich.")
 ;; It should return -1 indicating unknown DST, but currently returns
 ;; nil indicating standard time.
 (put 'decoded-time-dst 'function-documentation
-     (append (get 'decoded-time-dst 'function-documentation)
-             "As a special case, `decoded-time-dst' returns an unspecified
-value when given a list too short to have a dst element."))
+     "Access slot \"dst\" of `decoded-time' struct CL-X.
+This is t if daylight saving time is in effect, nil if it is not
+in effect, and -1 if daylight saving information is not available.
+As a special case, return an unspecified value when given a list
+too short to have a dst element.
+
+(fn CL-X)")
 
 (defun get-scratch-buffer-create ()
   "Return the *scratch* buffer, creating a new one if needed."

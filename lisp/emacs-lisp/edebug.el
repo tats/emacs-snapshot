@@ -675,7 +675,7 @@ Maybe clear the markers and delete the symbol's edebug property?"
 	     (or (and (eq (aref edebug-read-syntax-table (following-char))
 			  'symbol)
 		      (not (= (following-char) ?\;)))
-		 (memq (following-char) '(?\, ?\.)))))
+		 (eq (following-char) ?.))))
       'symbol
     (aref edebug-read-syntax-table (following-char))))
 
@@ -3707,46 +3707,64 @@ Return the result of the last expression."
 (defalias 'edebug-format #'format-message)
 (defalias 'edebug-message #'message)
 
-(defun edebug-eval-expression (expr)
+(defun edebug-eval-expression (expr &optional pp)
   "Evaluate an expression in the outside environment.
 If interactive, prompt for the expression.
-Print result in minibuffer."
-  (interactive (list (read--expression "Eval: ")))
+
+Print result in minibuffer by default, but if PP is non-nil open
+a new window and pretty-print the result there.  (Interactively,
+this is the prefix key.)"
+  (interactive (list (read--expression "Edebug eval: ")
+                     current-prefix-arg))
   (let* ((errored nil)
-         (result
+         (value
           (edebug-outside-excursion
-           (let ((result (if debug-allow-recursive-debug
-                             (edebug-eval expr)
-                           (condition-case err
-                               (edebug-eval expr)
-                             (error
-                              (setq errored
-                                    (format "%s: %s"
-			                    (get (car err) 'error-message)
-			                    (car (cdr err)))))))))
-             (unless errored
-               (values--store-value result)
-               (concat (edebug-safe-prin1-to-string result)
-                       (eval-expression-print-format result)))))))
-    (if errored
-        (message "Error: %s" errored)
-      (princ result))))
+           (if debug-allow-recursive-debug
+               (edebug-eval expr)
+             (condition-case err
+                 (edebug-eval expr)
+               (error
+                (setq errored
+                      (format "%s: %s"
+		              (get (car err) 'error-message)
+		              (car (cdr err)))))))))
+         (result
+          (unless errored
+            (values--store-value value)
+            (concat (edebug-safe-prin1-to-string value)
+                    (eval-expression-print-format value)))))
+    (cond
+     (errored
+      (message "Error: %s" errored))
+     (pp
+      (save-selected-window
+        (pop-to-buffer "*Edebug Results*")
+        (erase-buffer)
+        (pp value (current-buffer))
+        (goto-char (point-min))
+        (lisp-data-mode)))
+     (t
+      (princ result)))))
 
-(defun edebug-eval-last-sexp (&optional no-truncate)
+(defun edebug-eval-last-sexp (&optional display-type)
   "Evaluate sexp before point in the outside environment.
-Print value in minibuffer.
-
-If NO-TRUNCATE is non-nil (or interactively with a prefix
-argument of zero), show the full length of the expression, not
-limited by `edebug-print-length' or `edebug-print-level'."
+If DISPLAY-TYPE is `pretty-print' (interactively, a non-zero
+prefix argument), pretty-print the value in a separate buffer.
+Otherwise, print the value in minibuffer.  If DISPLAY-TYPE is any
+other non-nil value (or interactively with a prefix argument of
+zero), show the full length of the expression, not limited by
+`edebug-print-length' or `edebug-print-level'."
   (interactive
    (list (and current-prefix-arg
-              (zerop (prefix-numeric-value current-prefix-arg)))))
-  (if no-truncate
-      (let ((edebug-print-length nil)
-            (edebug-print-level nil))
-        (edebug-eval-expression (edebug-last-sexp)))
-    (edebug-eval-expression (edebug-last-sexp))))
+              (if (zerop (prefix-numeric-value current-prefix-arg))
+                  'no-truncate
+                'pretty-print))))
+  (if (or (null display-type)
+          (eq display-type 'pretty-print))
+      (edebug-eval-expression (edebug-last-sexp) display-type)
+    (let ((edebug-print-length nil)
+          (edebug-print-level nil))
+      (edebug-eval-expression (edebug-last-sexp)))))
 
 (defun edebug-eval-print-last-sexp (&optional no-truncate)
   "Evaluate sexp before point in outside environment; insert value.

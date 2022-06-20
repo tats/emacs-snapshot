@@ -1045,7 +1045,7 @@ string_char_to_byte (Lisp_Object string, ptrdiff_t char_index)
   if (best_above == best_above_byte)
     return char_index;
 
-  if (EQ (string, string_char_byte_cache_string))
+  if (BASE_EQ (string, string_char_byte_cache_string))
     {
       if (string_char_byte_cache_charpos < char_index)
 	{
@@ -1105,7 +1105,7 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
   if (best_above == best_above_byte)
     return byte_index;
 
-  if (EQ (string, string_char_byte_cache_string))
+  if (BASE_EQ (string, string_char_byte_cache_string))
     {
       if (string_char_byte_cache_bytepos < byte_index)
 	{
@@ -1576,7 +1576,7 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
     {
       /* If the tortoise just jumped (which is rare),
 	 update TORTOISE_NUM accordingly.  */
-      if (EQ (tail, li.tortoise))
+      if (BASE_EQ (tail, li.tortoise))
 	tortoise_num = num;
 
       saved_tail = XCDR (tail);
@@ -2014,7 +2014,7 @@ This function may destructively modify SEQ to produce the value.  */)
 	  next = XCDR (tail);
 	  /* If SEQ contains a cycle, attempting to reverse it
 	     in-place will inevitably come back to SEQ.  */
-	  if (EQ (next, seq))
+	  if (BASE_EQ (next, seq))
 	    circular_list (seq);
 	  Fsetcdr (tail, prev);
 	  prev = tail;
@@ -2757,20 +2757,26 @@ usage: (nconc &rest LISTS)  */)
 static EMACS_INT
 mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 {
-  if (VECTORP (seq) || COMPILEDP (seq))
+  if (NILP (seq))
+    return 0;
+  else if (CONSP (seq))
+    {
+      Lisp_Object tail = seq;
+      for (ptrdiff_t i = 0; i < leni; i++)
+	{
+	  if (! CONSP (tail))
+	    return i;
+	  Lisp_Object dummy = call1 (fn, XCAR (tail));
+	  if (vals)
+	    vals[i] = dummy;
+	  tail = XCDR (tail);
+	}
+    }
+  else if (VECTORP (seq) || COMPILEDP (seq))
     {
       for (ptrdiff_t i = 0; i < leni; i++)
 	{
 	  Lisp_Object dummy = call1 (fn, AREF (seq, i));
-	  if (vals)
-	    vals[i] = dummy;
-	}
-    }
-  else if (BOOL_VECTOR_P (seq))
-    {
-      for (EMACS_INT i = 0; i < leni; i++)
-	{
-	  Lisp_Object dummy = call1 (fn, bool_vector_ref (seq, i));
 	  if (vals)
 	    vals[i] = dummy;
 	}
@@ -2788,17 +2794,14 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 	    vals[i_before] = dummy;
 	}
     }
-  else   /* Must be a list, since Flength did not get an error */
+  else
     {
-      Lisp_Object tail = seq;
-      for (ptrdiff_t i = 0; i < leni; i++)
+      eassert (BOOL_VECTOR_P (seq));
+      for (EMACS_INT i = 0; i < leni; i++)
 	{
-	  if (! CONSP (tail))
-	    return i;
-	  Lisp_Object dummy = call1 (fn, XCAR (tail));
+	  Lisp_Object dummy = call1 (fn, bool_vector_ref (seq, i));
 	  if (vals)
 	    vals[i] = dummy;
-	  tail = XCDR (tail);
 	}
     }
 
@@ -2831,12 +2834,18 @@ FUNCTION must be a function of one argument, and must return a value
   SAFE_ALLOCA_LISP (args, args_alloc);
   ptrdiff_t nmapped = mapcar1 (leni, args, function, sequence);
   ptrdiff_t nargs = 2 * nmapped - 1;
+  eassert (nmapped == leni);
 
-  for (ptrdiff_t i = nmapped - 1; i > 0; i--)
-    args[i + i] = args[i];
+  if (NILP (separator) || (STRINGP (separator) && SCHARS (separator) == 0))
+    nargs = nmapped;
+  else
+    {
+      for (ptrdiff_t i = nmapped - 1; i > 0; i--)
+        args[i + i] = args[i];
 
-  for (ptrdiff_t i = 1; i < nargs; i += 2)
-    args[i] = separator;
+      for (ptrdiff_t i = 1; i < nargs; i += 2)
+        args[i] = separator;
+    }
 
   Lisp_Object ret = Fconcat (nargs, args);
   SAFE_FREE ();

@@ -1677,8 +1677,8 @@ DONT-CYCLE tells the function not to setup cycling."
                    map)))))))))
 
 (defvar minibuffer-confirm-exit-commands
-  '(completion-at-point minibuffer-complete
-    minibuffer-complete-word PC-complete PC-complete-word)
+  '( completion-at-point minibuffer-complete
+     minibuffer-complete-word)
   "List of commands which cause an immediately following
 `minibuffer-complete-and-exit' to ask for extra confirmation.")
 
@@ -2837,7 +2837,6 @@ not active."
   "<down-mouse-1>" #'ignore)
 
 (define-derived-mode minibuffer-inactive-mode nil "InactiveMinibuffer"
-  :abbrev-table nil          ;abbrev.el is not loaded yet during dump.
   ;; Note: this major mode is called from minibuf.c.
   "Major mode to use in the minibuffer when it is not active.
 This is only used when the minibuffer area has no active minibuffer.
@@ -2859,7 +2858,6 @@ For customizing this mode, it is better to use
 `minibuffer-setup-hook' and `minibuffer-exit-hook' rather than
 the mode hook of this mode."
   :syntax-table nil
-  :abbrev-table nil
   :interactive nil)
 
 ;;; Completion tables.
@@ -4424,6 +4422,36 @@ minibuffer, but don't quit the completions window."
   (with-minibuffer-completions-window
     (let ((completion-use-base-affixes t))
       (choose-completion nil no-exit no-quit))))
+
+(defun minibuffer-complete-history ()
+  "Complete the minibuffer history as far as possible.
+Like `minibuffer-complete' but completes on the history items
+instead of the default completion table."
+  (interactive)
+  (let ((completions-sort nil)
+        (history (mapcar (lambda (h)
+                           ;; Support e.g. `C-x ESC ESC TAB' as
+                           ;; a replacement of `list-command-history'
+                           (if (consp h) (format "%S" h) h))
+                         (symbol-value minibuffer-history-variable))))
+    (completion-in-region (minibuffer--completion-prompt-end) (point-max)
+                          history nil)))
+
+(defun minibuffer-complete-defaults ()
+  "Complete minibuffer defaults as far as possible.
+Like `minibuffer-complete' but completes on the default items
+instead of the completion table."
+  (interactive)
+  (let ((completions-sort nil))
+    (when (and (not minibuffer-default-add-done)
+               (functionp minibuffer-default-add-function))
+      (setq minibuffer-default-add-done t
+            minibuffer-default (funcall minibuffer-default-add-function)))
+    (completion-in-region (minibuffer--completion-prompt-end) (point-max)
+                          (ensure-list minibuffer-default) nil)))
+
+(define-key minibuffer-local-map [?\C-x up] 'minibuffer-complete-history)
+(define-key minibuffer-local-map [?\C-x down] 'minibuffer-complete-defaults)
 
 (defcustom minibuffer-default-prompt-format " (default %s)"
   "Format string used to output \"default\" values.

@@ -151,6 +151,14 @@ of 'user-emacs-directory'.
 
 * Incompatible changes in Emacs 29.1
 
+---
+** Previously, the X reverseVideo value at startup was heeded for all frames.
+This meant that if you had a reverseVideo resource on the initial
+display, and then opened up a new frame on a display without any
+explicit reverseVideo setting, it would get heeded there, too.  (This
+included terminal frames.)  In Emacs 29, the reverseVideo X resource
+is handled like all the other X resources, and set on a per-frame basis.
+
 +++
 ** 'E' in 'query-replace' now edits the replacement with exact case.
 Previously, this command did the same as 'e'.
@@ -297,6 +305,10 @@ startup.  Previously, these functions ignored
 
 
 * Changes in Emacs 29.1
+
+---
+** New command 'duplicate-line'.
+This command duplicates the current line the specified number of times.
 
 ---
 ** Files with the '.eld' extension are now visited in 'lisp-data-mode'.
@@ -502,6 +514,12 @@ This is in addition to previously-supported ways of discovering 24-bit
 color support: either via the "RGB" or "setf24" capabilities, or if
 the 'COLORTERM' environment variable is set to the value "truecolor".
 
+*** Select active regions with xterm selection support.
+On terminals with xterm setSelection support, the active region may be
+saved to the X primary selection, following the
+'select-active-regions' variable.  This support is enabled when
+'tty-select-active-regions' is non-nil.
+
 ** ERT
 
 +++
@@ -562,6 +580,10 @@ This allows you to enter emoji using short strings, eg ':face_palm:'
 or ':scream:'.
 
 ** Help
+
+*** New user option 'help-clean-buttons'.
+If non-nil, link buttons in *Help* will have any surrounding quotes
+removed.
 
 ---
 *** 'M-x apropos-variable' output now includes values of variables.
@@ -983,6 +1005,11 @@ list-packages'.
 This command allows updating all packages without any queries.
 
 +++
+*** New commands 'package-recompile' and 'package-recompile-all'.
+These commands can be useful if the .elc files are out of date
+(invalid byte code and macros).
+
++++
 *** New DWIM action on 'x' in "*Packages*" buffer.
 If no packages are marked, 'x' will install the package under point if
 it isn't already, and remove it if it is installed.
@@ -997,11 +1024,29 @@ inadvertently delete the "*scratch*" buffer.
 
 ** Debugging
 
+---
+*** 'q' in a *Backtrace* buffer no longer clears the buffer.
+Instead it just buries the buffer and switches the mode from
+'debugger-mode' to 'backtrace-mode', since commands like 'e' are no
+longer available after exiting the recursive edit.
+
++++
 *** New user option 'debug-allow-recursive-debug'.
 This user option controls whether the 'e' (in a "*Backtrace*"
 buffer or while edebugging) and 'C-x C-e' (while edebugging) commands
 lead to a (further) backtrace.  By default, this variable is nil,
 which is a change in behaviour from previous Emacs versions.
+
++++
+*** 'e' in edebug can now take a prefix arg to pretty-print the results.
+When invoked with a prefix argument, as in 'C-u e', this command will
+pop up a new buffer and show the full pretty-printed value there.
+
++++
+*** 'C-x C-e' now interprets a non-zero prefix arg to pretty-print the results.
+When invoked with a non-zero prefix argument, as in 'C-u C-x C-e',
+this command will pop up a new buffer and show the full pretty-printed
+value there.
 
 ** Compile
 
@@ -1076,16 +1121,10 @@ To enable this behavior, customize the user option
 the second one will switch to the "*Completions*" buffer.
 
 ---
-*** New user option 'completion-wrap-movement'.
+*** New user option 'completion-auto-wrap'.
 When non-nil, the commands 'next-completion' and 'previous-completion'
 automatically wrap around on reaching the beginning or the end of
 the "*Completions*" buffer.
-
-+++
-*** New user option 'completions-sort'.
-This option controls the sorting of the completion candidates in
-the "*Completions*" buffer.  Available styles are no sorting,
-alphabetical (the default), or a custom sort function.
 
 +++
 *** New values for the 'completion-auto-help' user option.
@@ -1095,6 +1134,18 @@ behaves after pressing a 'TAB' if completion is not unique.  The value
 to complete.  The value 'visual' is like 'always', but only updates
 the completions if they are already visible.  The default value 't'
 always hides the completion buffer after some completion is made.
+
+*** New commands to complete the minibuffer history.
+'minibuffer-complete-history' ('C-x up') is like 'minibuffer-complete'
+but completes on the history items instead of the default completion
+table.  'minibuffer-complete-defaults' ('C-x down') completes
+on the list of default items.
+
++++
+*** New user option 'completions-sort'.
+This option controls the sorting of the completion candidates in
+the "*Completions*" buffer.  Available styles are no sorting,
+alphabetical (the default), or a custom sort function.
 
 +++
 *** New user option 'completions-max-height'.
@@ -1118,6 +1169,11 @@ The nil value disables this highlighting.
 This means that typing 'C-u RET' on a completion candidate in the
 "*Completions*" buffer inserts the completion to the minibuffer,
 but doesn't exit the minibuffer.
+
++++
+*** You can now define abbrevs for the fundamental minibuffer modes.
+'minibuffer-mode-abbrev-table' and
+'minibuffer-inactive-mode-abbrev-table' are now defined.
 
 ** Isearch and Replace
 
@@ -1566,6 +1622,11 @@ the thumbnail file.
 
 ** Dired
 
+---
+*** New user option 'dired-omit-line-regexp'.
+This is used by 'dired-omit-mode', and now allows you to hide based on
+other things than just the file names.
+
 +++
 *** New user option 'dired-mouse-drag-files'.
 If non-nil, dragging file names with the mouse in a Dired buffer will
@@ -1591,6 +1652,22 @@ the buffer will take you to that directory.
 For example, the regexp ".*" will match only characters that are part
 of the file name.  Also "^.*$" can be used to match at the beginning
 of the file name and at the end of the file name.
+
+** Bookmarks
+
+---
+*** 'list-bookmarks' now includes a type column.
+Types are registered via a 'bookmark-handler-type' symbol property on
+the jumping function.
+
++++
+*** 'bookmark-sort-flag' can now be set to 'last-modified'.
+This will display bookmark list from most recently set to least
+recently set.
+
+---
+*** When editing a bookmark annotation, 'C-c C-k' will now cancel.
+It is bound to the new command 'bookmark-edit-annotation-cancel'.
 
 ** Exif
 
@@ -1753,16 +1830,6 @@ using fonts of different sizes, and images.  See the "(vtable) Top"
 manual for more details.
 
 ---
-*** 'list-bookmarks' now includes a type column.
-Types are registered via a 'bookmark-handler-type' symbol property on
-the jumping function.
-
-+++
-*** 'bookmark-sort-flag' can now be set to 'last-modified'.
-This will display bookmark list from most recently set to least
-recently set.
-
----
 *** New minor mode 'elide-head-mode'.
 Enabling this minor mode turns on hiding header material, like
 'elide-head' does; disabling it shows the header.  The commands
@@ -1812,6 +1879,24 @@ Emacs buffers, like indentation and the like.  The new ert function
 
 
 * Incompatible Lisp Changes in Emacs 29.1
+
+---
+** 'find-image' now uses 'create-image'.
+This means that images found through 'find-image' also has
+auto-scaling applied.  (This only makes a difference on HiDPI
+displays.)
+
++++
+** Changes to "raw" in-memory xbm images are specified.
+Some years back Emacs gained the ability to scale images, and you
+could then specify :width and :height when using 'create-image' on all
+image types -- except xbm images, because this format already used the
+:width and :height arguments to specify the width/height of the "raw"
+in-memory format.  This meant that if you used these specifications
+on, for instance, xbm files, Emacs would refuse to display them.  This
+has been changed, and :width/:height now works as with all other image
+formats, and the way to specify the width/height of the "raw"
+in-memory format is now by using :data-width and :data-height.
 
 +++
 ** loaddefs.el generation has been reimplemented.
@@ -1981,6 +2066,12 @@ functions.
 ---
 ** '?\' at the end of a line now signals an error.
 Previously it produced a nonsense value, -1, that was never intended.
+
+** Some libraries obsolete since Emacs 24.1 and 24.3 have been removed:
+abbrevlist.el, assoc.el, complete.el, cust-print.el,
+erc-hecomplete.el, mailpost.el, mouse-sel.el, old-emacs-lock.el,
+patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
+
 
 * Lisp Changes in Emacs 29.1
 
@@ -2308,6 +2399,12 @@ whether a string is suspicious.  It heeds the 'textsec-check' user
 option.
 
 ** Keymaps and key definitions
+
++++
+*** 'where-is-internal' can now filter events marked as non key events.
+If a command maps to a key binding like [some-event], and 'some-event'
+has a symbol plist containing a non-nil 'non-key-event' property, then
+that binding is ignored by 'where-is-internal'.
 
 +++
 *** New functions for defining and manipulating keystrokes.

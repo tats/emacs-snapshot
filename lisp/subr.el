@@ -1542,21 +1542,21 @@ the `click' modifier."
         ;; sure the symbol has already been parsed.
 	(cdr (internal-event-symbol-parse-modifiers type))
       (let ((list nil)
-	    (char (logand type (lognot (logior ?\M-\^@ ?\C-\^@ ?\S-\^@
-					       ?\H-\^@ ?\s-\^@ ?\A-\^@)))))
-	(if (not (zerop (logand type ?\M-\^@)))
+	    (char (logand type (lognot (logior ?\M-\0 ?\C-\0 ?\S-\0
+					       ?\H-\0 ?\s-\0 ?\A-\0)))))
+	(if (not (zerop (logand type ?\M-\0)))
 	    (push 'meta list))
-	(if (or (not (zerop (logand type ?\C-\^@)))
+	(if (or (not (zerop (logand type ?\C-\0)))
 		(< char 32))
 	    (push 'control list))
-	(if (or (not (zerop (logand type ?\S-\^@)))
+	(if (or (not (zerop (logand type ?\S-\0)))
 		(/= char (downcase char)))
 	    (push 'shift list))
-	(or (zerop (logand type ?\H-\^@))
+	(or (zerop (logand type ?\H-\0))
 	    (push 'hyper list))
-	(or (zerop (logand type ?\s-\^@))
+	(or (zerop (logand type ?\s-\0))
 	    (push 'super list))
-	(or (zerop (logand type ?\A-\^@))
+	(or (zerop (logand type ?\A-\0))
 	    (push 'alt list))
 	list))))
 
@@ -1570,7 +1570,7 @@ in the current Emacs session, then this function may return nil."
       (setq event (car event)))
   (if (symbolp event)
       (car (get event 'event-symbol-elements))
-    (let* ((base (logand event (1- ?\A-\^@)))
+    (let* ((base (logand event (1- ?\A-\0)))
 	   (uncontrolled (if (< base 32) (logior base 64) base)))
       ;; There are some numbers that are invalid characters and
       ;; cause `downcase' to get an error.
@@ -6855,9 +6855,11 @@ CONDITION is either:
   arguments, and returns non-nil if the buffer matches,
 - a cons-cell, where the car describes how to interpret the cdr.
   The car can be one of the following:
-  * `major-mode': the buffer matches if the buffer's major
-    mode is derived from the major mode denoted by the cons-cell's
-    cdr
+  * `derived-mode': the buffer matches if the buffer's major mode
+    is derived from the major mode in the cons-cell's cdr.
+  * `major-mode': the buffer matches if the buffer's major mode
+    is eq to the cons-cell's cdr.  Prefer using `derived-mode'
+    instead when both can work.
   * `not': the cdr is interpreted as a negation of a condition.
   * `and': the cdr is a list of recursive conditions, that all have
     to be met.
@@ -6877,6 +6879,10 @@ CONDITION is either:
                           (funcall condition buffer)
                         (funcall condition buffer arg)))
                      ((eq (car-safe condition) 'major-mode)
+                      (eq
+                       (buffer-local-value 'major-mode buffer)
+                       (cdr condition)))
+                     ((eq (car-safe condition) 'derived-mode)
                       (provided-mode-derived-p
                        (buffer-local-value 'major-mode buffer)
                        (cdr condition)))

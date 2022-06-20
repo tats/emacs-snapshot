@@ -520,9 +520,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
   replying to the initiating client) is performed from Lisp inside
   `x-dnd.el'.
 
-  However, dragging contents from Emacs is implemented entirely in C.
-  X Windows has several competing drag-and-drop protocols, of which
-  Emacs supports two: the XDND protocol (see
+  However, dragging contents from Emacs is implemented almost entirely
+  in C.  X Windows has several competing drag-and-drop protocols, of
+  which Emacs supports two on the C level: the XDND protocol (see
   https://freedesktop.org/wiki/Specifications/XDND) and the Motif drag
   and drop protocols.  These protocols are based on the initiator
   owning a special selection, specifying an action the recipient
@@ -545,7 +545,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
   released over the recipient window, Emacs sends a "drop" message to
   the target window, waits for a reply, and returns the action
   selected by the recipient to the Lisp code that initiated the
-  drag-and-drop operation.  */
+  drag-and-drop operation.
+
+  When a drop happens on a window not supporting any protocol
+  implemented on the C level, the function inside
+  `x-dnd-unsupported-drop-function' is called with some parameters of
+  the drop.  If it returns non-nil, then Emacs tries to simulate a
+  drop happening with the primary selection and synthetic button
+  events (see `x_dnd_do_unsupported_drop').  That function implements
+  the OffiX drag-and-drop protocol by default.  See
+  `x-dnd-handle-unsupported-drop' in `x-dnd.el' for more details.  */
 
 #include <config.h>
 #include <stdlib.h>
@@ -922,6 +931,7 @@ static const struct x_atom_ref x_atom_refs[] =
     ATOM_REFS_INIT ("CLIPBOARD_MANAGER", Xatom_CLIPBOARD_MANAGER)
     ATOM_REFS_INIT ("_XEMBED_INFO", Xatom_XEMBED_INFO)
     ATOM_REFS_INIT ("_MOTIF_WM_HINTS", Xatom_MOTIF_WM_HINTS)
+    ATOM_REFS_INIT ("_EMACS_DRAG_ATOM", Xatom_EMACS_DRAG_ATOM)
     /* For properties of font.  */
     ATOM_REFS_INIT ("PIXEL_SIZE", Xatom_PIXEL_SIZE)
     ATOM_REFS_INIT ("AVERAGE_WIDTH", Xatom_AVERAGE_WIDTH)
@@ -1008,6 +1018,9 @@ static const struct x_atom_ref x_atom_refs[] =
 		    Xatom_MOTIF_DRAG_RECEIVER_INFO)
     ATOM_REFS_INIT ("XmTRANSFER_SUCCESS", Xatom_XmTRANSFER_SUCCESS)
     ATOM_REFS_INIT ("XmTRANSFER_FAILURE", Xatom_XmTRANSFER_FAILURE)
+    /* Old OffiX (a.k.a. old KDE) drop protocol support.  */
+    ATOM_REFS_INIT ("DndProtocol", Xatom_DndProtocol)
+    ATOM_REFS_INIT ("_DND_PROTOCOL", Xatom_DND_PROTOCOL)
   };
 
 enum
@@ -1050,6 +1063,7 @@ static void x_frame_rehighlight (struct x_display_info *);
 static void x_clip_to_row (struct window *, struct glyph_row *,
 			   enum glyph_row_area, GC);
 static struct scroll_bar *x_window_to_scroll_bar (Display *, Window, int);
+static struct frame *x_window_to_frame (struct x_display_info *, int);
 static void x_scroll_bar_report_motion (struct frame **, Lisp_Object *,
                                         enum scroll_bar_part *,
                                         Lisp_Object *, Lisp_Object *,
@@ -1150,6 +1164,9 @@ static bool x_dnd_xm_use_help;
 
 /* Whether or not Motif drag initiator info was set up.  */
 static bool x_dnd_motif_setup_p;
+
+/* The Motif drag atom used during the drag-and-drop operation.  */
+static Atom x_dnd_motif_atom;
 
 /* The target window we are waiting for an XdndFinished message
    from.  */
@@ -1284,6 +1301,11 @@ static bool x_dnd_inside_handle_one_xevent;
 /* The recursive edit depth when the drag-and-drop operation was
    started.  */
 static int x_dnd_recursion_depth;
+
+/* The cons cell containing the selection alias between the Motif drag
+   selection and `XdndSelection'.  The car and cdr are only set when
+   initiating Motif drag-and-drop for the first time.  */
+static Lisp_Object x_dnd_selection_alias_cell;
 
 /* Structure describing a single window that can be the target of
    drag-and-drop operations.  */
@@ -1471,6 +1493,17 @@ typedef struct xm_drag_motion_message
   /* CARD16 */ uint16_t x, y;
 } xm_drag_motion_message;
 
+typedef struct xm_drag_motion_reply
+{
+  /* BYTE   */ uint8_t reason;
+  /* BYTE   */ uint8_t byte_order;
+
+  /* CARD16 */ uint16_t side_effects;
+  /* CARD32 */ uint32_t timestamp;
+  /* CARD16 */ uint16_t better_x;
+  /* CARD16 */ uint16_t better_y;
+} xm_drag_motion_reply;
+
 typedef struct xm_top_level_leave_message
 {
   /* BYTE   */ uint8_t reason;
@@ -1493,11 +1526,15 @@ typedef struct xm_top_level_leave_message
 
 enum xm_drag_operation
   {
-    XM_DRAG_NOOP = 0,
-    XM_DRAG_MOVE = (1L << 0),
-    XM_DRAG_COPY = (1L << 1),
-    XM_DRAG_LINK = (1L << 2),
+    XM_DRAG_NOOP     = 0,
+    XM_DRAG_MOVE     = (1L << 0),
+    XM_DRAG_COPY     = (1L << 1),
+    XM_DRAG_LINK     = (1L << 2),
+    XM_DRAG_LINK_REC = 3,
   };
+
+#define XM_DRAG_OPERATION_IS_LINK(op)	((op) == XM_DRAG_LINK		\
+					 || (op) == XM_DRAG_LINK_REC)
 
 enum xm_drag_action
   {
@@ -1627,11 +1664,11 @@ xm_read_targets_table_rec (uint8_t *bytes, ptrdiff_t length,
 
   nitems = *(uint16_t *) bytes;
 
-  if (length < 2 + nitems * 4)
-    return NULL;
-
   if (byteorder != XM_BYTE_ORDER_CUR_FIRST)
     SWAPCARD16 (nitems);
+
+  if (length < 2 + nitems * 4)
+    return NULL;
 
   rec = xmalloc (FLEXSIZEOF (struct xm_targets_table_rec,
 			     targets, nitems * 4));
@@ -1768,7 +1805,7 @@ xm_drag_window_io_error_handler (Display *dpy)
 }
 
 static Window
-xm_get_drag_window (struct x_display_info *dpyinfo)
+xm_get_drag_window_1 (struct x_display_info *dpyinfo)
 {
   Atom actual_type, _MOTIF_DRAG_WINDOW;
   int rc, actual_format;
@@ -1796,10 +1833,8 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 	{
 	  drag_window = *(Window *) tmp_data;
 	  x_catch_errors (dpyinfo->display);
-	  /* We use ButtonPressMask since it's one of the events an
-	     input-only window can never get.  */
 	  XSelectInput (dpyinfo->display, drag_window,
-			ButtonPressMask);
+			StructureNotifyMask);
 	  rc = !x_had_errors_p (dpyinfo->display);
 	  x_uncatch_errors_after_check ();
 
@@ -1895,6 +1930,8 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 	 punt.  */
       if (error)
 	{
+	  XSetCloseDownMode (temp_display, DestroyAll);
+
 	  /* If the drag window was actually created, delete it now.
 	     Probably, a BadAlloc happened during the XChangeProperty
 	     request.  */
@@ -1925,10 +1962,7 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
 	 current display, and the XOpenDisplay above didn't
 	 accidentally connect to some other display.  */
       x_catch_errors (dpyinfo->display);
-      /* We use ButtonPressMask since it's one of the events an
-	 input-only window can never get.  */
-      XSelectInput (dpyinfo->display, drag_window,
-		    ButtonPressMask);
+      XSelectInput (dpyinfo->display, drag_window, StructureNotifyMask);
       rc = !x_had_errors_p (dpyinfo->display);
       x_uncatch_errors_after_check ();
       unblock_input ();
@@ -1941,6 +1975,16 @@ xm_get_drag_window (struct x_display_info *dpyinfo)
   return drag_window;
 }
 
+static Window
+xm_get_drag_window (struct x_display_info *dpyinfo)
+{
+  if (dpyinfo->motif_drag_window != None)
+    return dpyinfo->motif_drag_window;
+
+  dpyinfo->motif_drag_window = xm_get_drag_window_1 (dpyinfo);
+  return dpyinfo->motif_drag_window;
+}
+
 static int
 xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 		      Atom *targets, int ntargets)
@@ -1950,12 +1994,15 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   unsigned char *tmp_data = NULL;
   unsigned long nitems, bytes_remaining;
   int rc, actual_format, idx;
+  bool had_errors;
   xm_targets_table_header header;
   xm_targets_table_rec **recs;
   xm_byte_order byteorder;
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
   uint32_t size, target_count;
+
+ retry_drag_window:
 
   drag_window = xm_get_drag_window (dpyinfo);
 
@@ -1969,12 +2016,26 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	 sizeof (Atom), x_atoms_compare);
 
   XGrabServer (dpyinfo->display);
+
+  x_catch_errors (dpyinfo->display);
   rc = XGetWindowProperty (dpyinfo->display, drag_window,
 			   dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
 			   0L, LONG_MAX, False,
 			   dpyinfo->Xatom_MOTIF_DRAG_TARGETS,
 			   &actual_type, &actual_format, &nitems,
 			   &bytes_remaining, &tmp_data) == Success;
+  had_errors = x_had_errors_p (dpyinfo->display);
+  x_uncatch_errors ();
+
+  /* The drag window is probably invalid, so remove our record of
+     it.  */
+  if (had_errors)
+    {
+      dpyinfo->motif_drag_window = None;
+      XUngrabServer (dpyinfo->display);
+
+      goto retry_drag_window;
+    }
 
   if (rc && tmp_data && !bytes_remaining
       && actual_type == dpyinfo->Xatom_MOTIF_DRAG_TARGETS
@@ -2145,12 +2206,154 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   return idx;
 }
 
+/* Allocate an atom that will be used for the Motif selection during
+   the drag-and-drop operation.
+
+   Grab the server, and then retrieve a list of atoms named
+   _EMACS_DRAG_ATOM from the root window.  Find the first atom that
+   has no selection owner, own it and return it.  If there is no such
+   atom, add a unique atom to the end of the list and return that
+   instead.  */
+
+static Atom
+xm_get_drag_atom_1 (struct x_display_info *dpyinfo,
+		    struct frame *source_frame)
+{
+  Atom actual_type, *atoms, atom;
+  unsigned long nitems, bytes_remaining;
+  unsigned char *tmp_data;
+  int rc, actual_format;
+  unsigned long i;
+  char *buffer;
+  Window owner;
+
+  /* Make sure this operation is done atomically.  */
+  XGrabServer (dpyinfo->display);
+
+  rc = XGetWindowProperty (dpyinfo->display, dpyinfo->root_window,
+			   dpyinfo->Xatom_EMACS_DRAG_ATOM,
+			   0, LONG_MAX, False, XA_ATOM, &actual_type,
+			   &actual_format, &nitems, &bytes_remaining,
+			   &tmp_data);
+  atom = None;
+  /* GCC thinks i is used unitialized, but it's always initialized if
+     `atoms' exists at that particular spot.  */
+  i = 0;
+
+  if (rc == Success
+      && actual_format == 32 && nitems
+      && actual_type == XA_ATOM)
+    {
+      atoms = (Atom *) tmp_data;
+
+      x_catch_errors (dpyinfo->display);
+
+      for (i = 0; i < nitems; ++i)
+	{
+	  owner = XGetSelectionOwner (dpyinfo->display, atoms[i]);
+
+	  if (!x_had_errors_p (dpyinfo->display)
+	      && (owner == None
+		  /* If we already own this selection (even if another
+		     frame owns it), use it.  There is no way of
+		     knowing when ownership was asserted, so it still
+		     has to be owned again.  */
+		  || x_window_to_frame (dpyinfo, owner)))
+	    {
+	      atom = atoms[i];
+
+	      break;
+	    }
+	}
+
+      x_uncatch_errors ();
+    }
+
+  if (tmp_data)
+    XFree (tmp_data);
+
+  buffer = dpyinfo->motif_drag_atom_name;
+
+  if (atom)
+    {
+      sprintf (buffer, "_EMACS_ATOM_%lu", i + 1);
+      XSetSelectionOwner (dpyinfo->display, atom,
+			  FRAME_X_WINDOW (source_frame),
+			  dpyinfo->last_user_time);
+
+      /* The selection's last-change time is newer than our
+	 last_user_time, so create a new selection instead.  */
+      if (XGetSelectionOwner (dpyinfo->display, atom)
+	  != FRAME_X_WINDOW (source_frame))
+	atom = None;
+    }
+
+  while (!atom)
+    {
+      sprintf (buffer, "_EMACS_ATOM_%lu", nitems + 1);
+      atom = XInternAtom (dpyinfo->display, buffer, False);
+
+      XSetSelectionOwner (dpyinfo->display, atom,
+			  FRAME_X_WINDOW (source_frame),
+			  dpyinfo->last_user_time);
+
+      XChangeProperty (dpyinfo->display, dpyinfo->root_window,
+		       dpyinfo->Xatom_EMACS_DRAG_ATOM, XA_ATOM, 32,
+		       (rc != Success
+			|| (actual_format != 32
+			    || actual_type != XA_ATOM)
+			? PropModeReplace : PropModeAppend),
+		       (unsigned char *) &atom, 1);
+
+      actual_format = 32;
+      actual_type = XA_ATOM;
+      rc = Success;
+      nitems += 1;
+
+      /* The selection's last-change time is newer than our
+	 last_user_time, so create a new selection (again).  */
+      if (XGetSelectionOwner (dpyinfo->display, atom)
+	  != FRAME_X_WINDOW (source_frame))
+	atom = None;
+    }
+
+  dpyinfo->motif_drag_atom_time = dpyinfo->last_user_time;
+  dpyinfo->motif_drag_atom_owner = source_frame;
+
+  XUngrabServer (dpyinfo->display);
+  return atom;
+}
+
+static Atom
+xm_get_drag_atom (struct x_display_info *dpyinfo)
+{
+  Atom atom;
+
+  if (dpyinfo->motif_drag_atom != None)
+    atom = dpyinfo->motif_drag_atom;
+  else
+    atom = xm_get_drag_atom_1 (dpyinfo, x_dnd_frame);
+
+  dpyinfo->motif_drag_atom = atom;
+  return atom;
+}
+
 static void
 xm_setup_drag_info (struct x_display_info *dpyinfo,
 		    struct frame *source_frame)
 {
+  Atom atom;
   xm_drag_initiator_info drag_initiator_info;
   int idx;
+
+  atom = xm_get_drag_atom (dpyinfo);
+
+  if (atom == None)
+    return;
+
+  XSETCAR (x_dnd_selection_alias_cell,
+	   x_atom_to_symbol (dpyinfo, atom));
+  XSETCDR (x_dnd_selection_alias_cell, QXdndSelection);
 
   idx = xm_setup_dnd_targets (dpyinfo, x_dnd_targets,
 			      x_dnd_n_targets);
@@ -2160,14 +2363,15 @@ xm_setup_drag_info (struct x_display_info *dpyinfo,
       drag_initiator_info.byteorder = XM_BYTE_ORDER_CUR_FIRST;
       drag_initiator_info.protocol = XM_DRAG_PROTOCOL_VERSION;
       drag_initiator_info.table_index = idx;
-      drag_initiator_info.selection = dpyinfo->Xatom_XdndSelection;
+      drag_initiator_info.selection = atom;
 
-      xm_write_drag_initiator_info (dpyinfo->display, FRAME_X_WINDOW (source_frame),
-				    dpyinfo->Xatom_XdndSelection,
+      xm_write_drag_initiator_info (dpyinfo->display,
+				    FRAME_X_WINDOW (source_frame), atom,
 				    dpyinfo->Xatom_MOTIF_DRAG_INITIATOR_INFO,
 				    &drag_initiator_info);
 
       x_dnd_motif_setup_p = true;
+      x_dnd_motif_atom = atom;
     }
 }
 
@@ -2278,8 +2482,13 @@ xm_send_top_level_leave_message (struct x_display_info *dpyinfo, Window source,
 					       XM_DROP_SITE_NONE, x_dnd_motif_operations,
 					       XM_DROP_ACTION_DROP_CANCEL);
       mmsg.timestamp = dmsg->timestamp;
-      mmsg.x = 65535;
-      mmsg.y = 65535;
+
+      /* Use X_SHRT_MAX instead of the max value of uint16_t since
+	 that will be interpreted as a plausible position by Motif,
+	 and as such breaks if the drop target is beneath that
+	 position.  */
+      mmsg.x = X_SHRT_MAX;
+      mmsg.y = X_SHRT_MAX;
 
       xm_send_drag_motion_message (dpyinfo, source, target, &mmsg);
     }
@@ -2340,6 +2549,44 @@ xm_read_drop_start_reply (const XEvent *msg, xm_drop_start_reply *reply)
 }
 
 static int
+xm_read_drop_start_message (const XEvent *msg,
+			    xm_drop_start_message *dmsg)
+{
+  const uint8_t *data;
+
+  data = (const uint8_t *) &msg->xclient.data.b[0];
+
+  if ((XM_DRAG_REASON_ORIGINATOR (data[0])
+       != XM_DRAG_ORIGINATOR_INITIATOR)
+      || (XM_DRAG_REASON_CODE (data[0])
+	  != XM_DRAG_REASON_DROP_START))
+    return 1;
+
+  dmsg->reason = *(data++);
+  dmsg->byte_order = *(data++);
+  dmsg->side_effects = *(uint16_t *) data;
+  dmsg->timestamp = *(uint32_t *) (data + 2);
+  dmsg->x = *(uint16_t *) (data + 6);
+  dmsg->y = *(uint16_t *) (data + 8);
+  dmsg->index_atom = *(uint32_t *) (data + 10);
+  dmsg->source_window = *(uint32_t *) (data + 14);
+
+  if (dmsg->byte_order != XM_BYTE_ORDER_CUR_FIRST)
+    {
+      SWAPCARD16 (dmsg->side_effects);
+      SWAPCARD32 (dmsg->timestamp);
+      SWAPCARD16 (dmsg->x);
+      SWAPCARD16 (dmsg->y);
+      SWAPCARD32 (dmsg->index_atom);
+      SWAPCARD32 (dmsg->source_window);
+    }
+
+  dmsg->byte_order = XM_BYTE_ORDER_CUR_FIRST;
+
+  return 0;
+}
+
+static int
 xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
 			    Window wdesc, xm_drag_receiver_info *rec)
 {
@@ -2393,6 +2640,73 @@ xm_read_drag_receiver_info (struct x_display_info *dpyinfo,
     XFree (tmp_data);
 
   return !rc;
+}
+
+static int
+xm_read_drag_motion_message (const XEvent *msg,
+			     xm_drag_motion_message *dmsg)
+{
+  const uint8_t *data;
+
+  data = (const uint8_t *) &msg->xclient.data.b[0];
+
+  if ((XM_DRAG_REASON_CODE (data[0])
+       != XM_DRAG_REASON_DRAG_MOTION)
+      || (XM_DRAG_REASON_ORIGINATOR (data[0])
+	  != XM_DRAG_ORIGINATOR_INITIATOR))
+    return 1;
+
+  dmsg->reason = *(data++);
+  dmsg->byteorder = *(data++);
+  dmsg->side_effects = *(uint16_t *) data;
+  dmsg->timestamp = *(uint32_t *) (data + 2);
+  dmsg->x = *(uint16_t *) (data + 6);
+  dmsg->y = *(uint16_t *) (data + 8);
+
+  if (dmsg->byteorder != XM_BYTE_ORDER_CUR_FIRST)
+    {
+      SWAPCARD16 (dmsg->side_effects);
+      SWAPCARD32 (dmsg->timestamp);
+      SWAPCARD16 (dmsg->x);
+      SWAPCARD16 (dmsg->y);
+    }
+
+  dmsg->byteorder = XM_BYTE_ORDER_CUR_FIRST;
+
+  return 0;
+}
+
+static int
+xm_read_drag_motion_reply (const XEvent *msg, xm_drag_motion_reply *reply)
+{
+  const uint8_t *data;
+
+  data = (const uint8_t *) &msg->xclient.data.b[0];
+
+  if ((XM_DRAG_REASON_CODE (data[0])
+       != XM_DRAG_REASON_DRAG_MOTION)
+      || (XM_DRAG_REASON_ORIGINATOR (data[0])
+	  != XM_DRAG_ORIGINATOR_RECEIVER))
+    return 1;
+
+  reply->reason = *(data++);
+  reply->byte_order = *(data++);
+  reply->side_effects = *(uint16_t *) data;
+  reply->timestamp = *(uint32_t *) (data + 2);
+  reply->better_x = *(uint16_t *) (data + 6);
+  reply->better_y = *(uint16_t *) (data + 8);
+
+  if (reply->byte_order != XM_BYTE_ORDER_CUR_FIRST)
+    {
+      SWAPCARD16 (reply->side_effects);
+      SWAPCARD32 (reply->timestamp);
+      SWAPCARD16 (reply->better_x);
+      SWAPCARD16 (reply->better_y);
+    }
+
+  reply->byte_order = XM_BYTE_ORDER_CUR_FIRST;
+
+  return 0;
 }
 
 static void
@@ -4202,7 +4516,7 @@ x_dnd_cleanup_drag_and_drop (void *frame)
 				   XM_DROP_ACTION_DROP_CANCEL);
 	  dmsg.x = 0;
 	  dmsg.y = 0;
-	  dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+	  dmsg.index_atom = x_dnd_motif_atom;
 	  dmsg.source_window = FRAME_X_WINDOW (f);
 
 	  x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
@@ -6638,70 +6952,28 @@ static void x_scroll_bar_clear (struct frame *);
 static void x_check_font (struct frame *, struct font *);
 #endif
 
+/* If SEND_EVENT, make sure that TIME is larger than the current last
+   user time.  We don't sanitize timestamps from events sent by the X
+   server itself because some Lisp might have set the user time to a
+   ridiculously large value, and this way a more reasonable timestamp
+   can be obtained upon the next event.  */
+
 static void
-x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
+x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
+			      bool send_event)
 {
 #ifndef USE_GTK
   struct frame *focus_frame = dpyinfo->x_focus_frame;
-  struct x_output *output;
 #endif
 
 #ifdef ENABLE_CHECKING
   eassert (time <= X_ULONG_MAX);
 #endif
-  dpyinfo->last_user_time = time;
+
+  if (!send_event || time > dpyinfo->last_user_time)
+    dpyinfo->last_user_time = time;
 
 #ifndef USE_GTK
-  if (focus_frame
-      && (dpyinfo->last_user_time
-	  > (dpyinfo->last_user_check_time + 2000)))
-    {
-      output = FRAME_X_OUTPUT (focus_frame);
-
-      if (!x_wm_supports (focus_frame,
-			  dpyinfo->Xatom_net_wm_user_time_window))
-	{
-	  if (output->user_time_window == None)
-	    output->user_time_window = FRAME_OUTER_WINDOW (focus_frame);
-	  else if (output->user_time_window != FRAME_OUTER_WINDOW (focus_frame))
-	    {
-	      XDestroyWindow (dpyinfo->display,
-			      output->user_time_window);
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time_window);
-	      output->user_time_window = FRAME_OUTER_WINDOW (focus_frame);
-	    }
-	}
-      else
-	{
-	  if (output->user_time_window == FRAME_OUTER_WINDOW (focus_frame)
-	      || output->user_time_window == None)
-	    {
-	      XSetWindowAttributes attrs;
-	      memset (&attrs, 0, sizeof attrs);
-
-	      output->user_time_window
-		= XCreateWindow (dpyinfo->display,
-				 FRAME_X_WINDOW (focus_frame),
-				 -1, -1, 1, 1, 0, 0, InputOnly,
-				 CopyFromParent, 0, &attrs);
-
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time);
-	      XChangeProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (focus_frame),
-			       dpyinfo->Xatom_net_wm_user_time_window,
-			       XA_WINDOW, 32, PropModeReplace,
-			       (unsigned char *) &output->user_time_window,
-			       1);
-	    }
-	}
-
-      dpyinfo->last_user_check_time = time;
-    }
-
   if (focus_frame)
     {
       while (FRAME_PARENT_FRAME (focus_frame))
@@ -6715,6 +6987,64 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time)
 			 (unsigned char *) &time, 1);
     }
 #endif
+}
+
+/* Not needed on GTK because GTK handles reporting the user time
+   itself.  */
+
+#ifndef USE_GTK
+static void
+x_update_frame_user_time_window (struct frame *f)
+{
+  struct x_output *output;
+  struct x_display_info *dpyinfo;
+  XSetWindowAttributes attrs;
+
+  output = FRAME_X_OUTPUT (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  if (!x_wm_supports (f, dpyinfo->Xatom_net_wm_user_time_window))
+    {
+      if (output->user_time_window == None)
+	output->user_time_window = FRAME_OUTER_WINDOW (f);
+      else if (output->user_time_window != FRAME_OUTER_WINDOW (f))
+	{
+	  XDestroyWindow (dpyinfo->display,
+			  output->user_time_window);
+	  XDeleteProperty (dpyinfo->display,
+			   FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time_window);
+	  output->user_time_window = FRAME_OUTER_WINDOW (f);
+	}
+    }
+  else
+    {
+      if (output->user_time_window == FRAME_OUTER_WINDOW (f)
+	  || output->user_time_window == None)
+	{
+	  memset (&attrs, 0, sizeof attrs);
+
+	  output->user_time_window
+	    = XCreateWindow (dpyinfo->display, FRAME_X_WINDOW (f),
+			     -1, -1, 1, 1, 0, 0, InputOnly,
+			     CopyFromParent, 0, &attrs);
+
+	  XDeleteProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time);
+	  XChangeProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
+			   dpyinfo->Xatom_net_wm_user_time_window,
+			   XA_WINDOW, 32, PropModeReplace,
+			   (unsigned char *) &output->user_time_window, 1);
+	}
+    }
+}
+#endif
+
+void
+x_set_last_user_time_from_lisp (struct x_display_info *dpyinfo,
+				Time time)
+{
+  x_display_set_last_user_time (dpyinfo, time, true);
 }
 
 
@@ -10804,6 +11134,30 @@ x_clear_dnd_action (void)
   x_dnd_action_symbol = Qnil;
 }
 
+/* Delete action descriptions from F after drag-and-drop.  */
+static void
+x_dnd_delete_action_list (Lisp_Object frame)
+{
+  struct frame *f;
+
+  /* Delete those two properties, since some clients look at them and
+     not the action to decide whether or not the user should be
+     prompted to select an action.  This can be called with FRAME no
+     longer alive (or its display dead).  */
+
+  f = XFRAME (frame);
+
+  if (!FRAME_LIVE_P (f) || !FRAME_DISPLAY_INFO (f)->display)
+    return;
+
+  block_input ();
+  XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		   FRAME_DISPLAY_INFO (f)->Xatom_XdndActionList);
+  XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		   FRAME_DISPLAY_INFO (f)->Xatom_XdndActionDescription);
+  unblock_input ();
+}
+
 /* This function is defined far away from the rest of the XDND code so
    it can utilize `x_any_window_to_frame'.  */
 
@@ -10972,6 +11326,8 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	= xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
 				      ask_action_list[0]);
 
+      record_unwind_protect (x_dnd_delete_action_list, frame);
+
       ask_actions = NULL;
       end = 0;
       count = SPECPDL_INDEX ();
@@ -11016,19 +11372,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
       unbind_to (count, Qnil);
     }
-  else
-    {
-      /* Delete those two properties, since some clients look at them
-	 and not the action to decide whether or not the user should
-	 be prompted to select an action.  */
-
-      block_input ();
-      XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		       FRAME_DISPLAY_INFO (f)->Xatom_XdndActionList);
-      XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		       FRAME_DISPLAY_INFO (f)->Xatom_XdndActionDescription);
-      unblock_input ();
-    }
 
   if (follow_tooltip)
     {
@@ -11056,6 +11399,16 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   suppress_xg_select ();
   record_unwind_protect_void (release_xg_select);
 #endif
+
+  /* Set up a meaningless alias.  */
+  XSETCAR (x_dnd_selection_alias_cell, QSECONDARY);
+  XSETCDR (x_dnd_selection_alias_cell, QSECONDARY);
+
+  /* Bind this here.  The cell doesn't actually alias between
+     anything until `xm_setup_dnd_targets' is called.  */
+  specbind (Qx_selection_alias_alist,
+	    Fcons (x_dnd_selection_alias_cell,
+		   Vx_selection_alias_alist));
 
   /* Initialize most of the state for the drag-and-drop operation.  */
   x_dnd_in_progress = true;
@@ -11260,7 +11613,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 					       XM_DROP_ACTION_DROP_CANCEL);
 		      dmsg.x = 0;
 		      dmsg.y = 0;
-		      dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+		      dmsg.index_atom = x_dnd_motif_atom;
 		      dmsg.source_window = FRAME_X_WINDOW (f);
 
 		      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
@@ -11298,7 +11651,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      /* Delete the Motif drag initiator info if it was set up.  */
 	      if (x_dnd_motif_setup_p)
 		XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-				 FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
+				 x_dnd_motif_atom);
 
 
 	      /* Remove any type list set as well.  */
@@ -11353,7 +11706,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 					       XM_DROP_ACTION_DROP_CANCEL);
 		      dmsg.x = 0;
 		      dmsg.y = 0;
-		      dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+		      dmsg.index_atom = x_dnd_motif_atom;
 		      dmsg.source_window = FRAME_X_WINDOW (f);
 
 		      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
@@ -11390,7 +11743,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      /* Delete the Motif drag initiator info if it was set up.  */
 	      if (x_dnd_motif_setup_p)
 		XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-				 FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
+				 x_dnd_motif_atom);
 
 
 	      /* Remove any type list set as well.  */
@@ -11434,7 +11787,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   /* Delete the Motif drag initiator info if it was set up.  */
   if (x_dnd_motif_setup_p)
     XDeleteProperty (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		     FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection);
+		     x_dnd_motif_atom);
 
   /* Remove any type list set as well.  */
   if (x_dnd_init_type_lists && x_dnd_n_targets > 3)
@@ -12312,7 +12665,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	    && (dpyinfo->last_user_time
 		< dpyinfo->last_mouse_movement_time))
 	  x_display_set_last_user_time (dpyinfo,
-					dpyinfo->last_mouse_movement_time);
+					dpyinfo->last_mouse_movement_time, false);
 
 	if ((!f1 || FRAME_TOOLTIP_P (f1))
 	    && (EQ (track_mouse, Qdropping)
@@ -15497,7 +15850,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	      emsg.zero = 0;
 	      emsg.timestamp = timestamp;
 	      emsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
-	      emsg.index_atom = dpyinfo->Xatom_XdndSelection;
+	      emsg.index_atom = x_dnd_motif_atom;
 
 	      if (x_dnd_motif_setup_p)
 		xm_send_top_level_enter_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
@@ -15569,8 +15922,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 				   XM_DROP_ACTION_DROP_CANCEL);
 	  dsmsg.x = 0;
 	  dsmsg.y = 0;
-	  dsmsg.index_atom
-	    = FRAME_DISPLAY_INFO (x_dnd_frame)->Xatom_XdndSelection;
+	  dsmsg.index_atom = x_dnd_motif_atom;
 	  dsmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
 	  x_dnd_send_xm_leave_for_drop (dpyinfo, x_dnd_frame,
@@ -15762,6 +16114,88 @@ x_monitors_changed_cb (GdkScreen *gscr, gpointer user_data)
 }
 #endif
 
+/* Extract the root window coordinates from the client message EVENT
+   if it is a message that we already understand.  Return false if the
+   event was not understood.  */
+static bool
+x_coords_from_dnd_message (struct x_display_info *dpyinfo,
+			   XEvent *event, int *x_out, int *y_out)
+{
+  xm_drag_motion_message dmsg;
+  xm_drag_motion_reply dreply;
+  xm_drop_start_message smsg;
+  xm_drop_start_reply reply;
+  unsigned long kde_data;
+
+  if (event->type != ClientMessage)
+    return false;
+
+  if (event->xclient.message_type == dpyinfo->Xatom_XdndPosition)
+    {
+      if (event->xclient.format != 32)
+	return false;
+
+      *x_out = (((unsigned long) event->xclient.data.l[2]) >> 16
+		& 0xffff);
+      *y_out = (event->xclient.data.l[2] & 0xffff);
+
+      return true;
+    }
+
+  if ((event->xclient.message_type
+       == dpyinfo->Xatom_MOTIF_DRAG_AND_DROP_MESSAGE)
+      && event->xclient.format == 8)
+    {
+      if (!xm_read_drag_motion_message (event, &dmsg))
+	{
+	  *x_out = dmsg.x;
+	  *y_out = dmsg.y;
+
+	  return true;
+	}
+      else if (!xm_read_drag_motion_reply (event, &dreply))
+	{
+	  *x_out = dreply.better_x;
+	  *y_out = dreply.better_y;
+
+	  return true;
+	}
+      else if (!xm_read_drop_start_message (event, &smsg))
+	{
+	  *x_out = smsg.x;
+	  *y_out = smsg.y;
+
+	  return true;
+	}
+      else if (!xm_read_drop_start_reply (event, &reply))
+	{
+	  *x_out = reply.better_x;
+	  *y_out = reply.better_y;
+
+	  return true;
+	}
+    }
+
+  if (((event->xclient.message_type
+	== dpyinfo->Xatom_DndProtocol)
+       || (event->xclient.message_type
+	   == dpyinfo->Xatom_DND_PROTOCOL))
+      && event->xclient.format == 32
+      /* Check that the version of the old KDE protocol is new
+	 enough to include coordinates.  */
+      && event->xclient.data.l[4])
+    {
+      kde_data = (unsigned long) event->xclient.data.l[3];
+
+      *x_out = (kde_data & 0xffff);
+      *y_out = (kde_data >> 16 & 0xffff);
+
+      return true;
+    }
+
+  return false;
+}
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -15804,6 +16238,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   GdkEvent *copy = NULL;
   GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (dpyinfo->display);
 #endif
+  int dx, dy;
   USE_SAFE_ALLOCA;
 
   *finish = X_EVENT_NORMAL;
@@ -15835,6 +16270,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     {
     case ClientMessage:
       {
+	int rc;
+
 	if (x_dnd_in_progress
 	    && FRAME_DISPLAY_INFO (x_dnd_frame) == dpyinfo
 	    && event->xclient.message_type == dpyinfo->Xatom_XdndStatus)
@@ -15914,7 +16351,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		if (operation != XM_DRAG_MOVE
 		    && operation != XM_DRAG_COPY
-		    && operation != XM_DRAG_LINK)
+		    && XM_DRAG_OPERATION_IS_LINK (operation))
 		  {
 		    x_dnd_waiting_for_finish = false;
 		    goto done;
@@ -15938,7 +16375,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    x_dnd_action = dpyinfo->Xatom_XdndActionCopy;
 		    break;
 
-		  case XM_DRAG_LINK:
+		    /* This means XM_DRAG_OPERATION_IS_LINK (operation).  */
+		  default:
 		    x_dnd_action = dpyinfo->Xatom_XdndActionLink;
 		    break;
 		  }
@@ -16211,7 +16649,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	f = any;
 	if (!f)
 	  goto OTHER;
-	if (x_handle_dnd_message (f, &event->xclient, dpyinfo, &inev.ie))
+
+	/* These values are always used initialized, but GCC doesn't
+	   know that.  */
+	dx = 0;
+	dy = 0;
+
+	rc = x_coords_from_dnd_message (dpyinfo, (XEvent *) event,
+					&dx, &dy);
+
+	if (x_handle_dnd_message (f, &event->xclient, dpyinfo, &inev.ie,
+				  rc, dx, dy))
 	  *finish = X_EVENT_DROP;
       }
       break;
@@ -16231,6 +16679,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif /* not USE_X_TOOLKIT and not USE_GTK */
       {
         const XSelectionClearEvent *eventp = &event->xselectionclear;
+
+	if (eventp->selection == dpyinfo->motif_drag_atom
+	    && dpyinfo->motif_drag_atom_time <= eventp->time)
+	  dpyinfo->motif_drag_atom = None;
 
         inev.sie.kind = SELECTION_CLEAR_EVENT;
         SELECTION_EVENT_DPYINFO (&inev.sie) = dpyinfo;
@@ -16274,7 +16726,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	if (x_dnd_waiting_for_finish
 	    && x_dnd_waiting_for_motif_finish == 2
 	    && dpyinfo == x_dnd_waiting_for_motif_finish_display
-	    && eventp->selection == dpyinfo->Xatom_XdndSelection
+	    && eventp->selection == x_dnd_motif_atom
 	    && (eventp->target == dpyinfo->Xatom_XmTRANSFER_SUCCESS
 		|| eventp->target == dpyinfo->Xatom_XmTRANSFER_FAILURE))
 	  {
@@ -16524,8 +16976,26 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         {
 	  /* Maybe we shouldn't set this for child frames ??  */
 	  f->output_data.x->parent_desc = event->xreparent.parent;
+
 	  if (!FRAME_PARENT_FRAME (f))
-	    x_real_positions (f, &f->left_pos, &f->top_pos);
+	    {
+	      x_real_positions (f, &f->left_pos, &f->top_pos);
+
+	      /* Perhaps reparented due to a WM restart.  Reset this.  */
+	      FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_UNKNOWN;
+	      FRAME_DISPLAY_INFO (f)->net_supported_window = 0;
+
+#ifndef USE_GTK
+	      /* The window manager could have restarted and the new
+		 window manager might not support user time windows,
+		 so update what is used accordingly.
+
+	         Note that this doesn't handle changes between
+	         non-reparenting window managers.  */
+	      if (FRAME_X_OUTPUT (f)->has_been_visible)
+		x_update_frame_user_time_window (f);
+#endif
+	    }
 	  else
 	    {
 	      Window root;
@@ -16537,10 +17007,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    &dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
 	      unblock_input ();
 	    }
-
-          /* Perhaps reparented due to a WM restart.  Reset this.  */
-          FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_UNKNOWN;
-          FRAME_DISPLAY_INFO (f)->net_supported_window = 0;
 
           x_set_frame_alpha (f);
         }
@@ -16889,7 +17355,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case KeyPress:
-      x_display_set_last_user_time (dpyinfo, event->xkey.time);
+      x_display_set_last_user_time (dpyinfo, event->xkey.time,
+				    event->xkey.send_event);
       ignore_next_mouse_click_timeout = 0;
       coding = Qlatin_1;
 
@@ -17340,7 +17807,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
     case EnterNotify:
-      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
+				    event->xcrossing.send_event);
 
       if (x_top_window_to_frame (dpyinfo, event->xcrossing.window))
 	x_detect_focus_change (dpyinfo, any, event, &inev.ie);
@@ -17425,7 +17893,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case LeaveNotify:
-      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
+				    event->xcrossing.send_event);
 
 #ifdef HAVE_XWIDGETS
       {
@@ -17683,7 +18152,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    emsg.zero = 0;
 		    emsg.timestamp = event->xbutton.time;
 		    emsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
-		    emsg.index_atom = dpyinfo->Xatom_XdndSelection;
+		    emsg.index_atom = x_dnd_motif_atom;
 
 		    if (x_dnd_motif_setup_p)
 		      xm_send_top_level_enter_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
@@ -18149,7 +18618,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     case ButtonPress:
       {
 	if (event->xbutton.type == ButtonPress)
-	  x_display_set_last_user_time (dpyinfo, event->xbutton.time);
+	  x_display_set_last_user_time (dpyinfo, event->xbutton.time,
+					event->xbutton.send_event);
 
 #ifdef HAVE_XWIDGETS
 	struct xwidget_view *xvw = xwidget_view_from_window (event->xbutton.window);
@@ -18192,6 +18662,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (event->type == ButtonPress)
 	      {
+		x_display_set_last_user_time (dpyinfo, event->xbutton.time,
+					      event->xbutton.send_event);
+
 		dpyinfo->grabbed |= (1 << event->xbutton.button);
 		dpyinfo->last_mouse_frame = f;
 		if (f && !tab_bar_p)
@@ -18297,7 +18770,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				dmsg.timestamp = event->xbutton.time;
 				dmsg.x = event->xbutton.x_root;
 				dmsg.y = event->xbutton.y_root;
-				dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
+				dmsg.index_atom = x_dnd_motif_atom;
 				dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
 				if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
@@ -18698,7 +19171,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      ev.window = enter->event;
 	      ev.time = enter->time;
 
-	      x_display_set_last_user_time (dpyinfo, enter->time);
+	      x_display_set_last_user_time (dpyinfo, enter->time,
+					    enter->send_event);
 
 #ifdef USE_MOTIF
 	      use_copy = true;
@@ -18847,7 +19321,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							 leave->deviceid, false);
 #endif
 
-	      x_display_set_last_user_time (dpyinfo, leave->time);
+	      x_display_set_last_user_time (dpyinfo, leave->time,
+					    leave->send_event);
 
 #ifdef HAVE_XWIDGETS
 	      {
@@ -19101,7 +19576,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (xv)
 		{
 		  uint state = xev->mods.effective;
-		  x_display_set_last_user_time (dpyinfo, xev->time);
+		  x_display_set_last_user_time (dpyinfo, xev->time,
+						xev->send_event);
 
 		  if (xev->buttons.mask_len)
 		    {
@@ -19130,7 +19606,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 		  if (found_valuator)
 		    {
-		      x_display_set_last_user_time (dpyinfo, xev->time);
+		      x_display_set_last_user_time (dpyinfo, xev->time,
+						    xev->send_event);
+
 
 #if defined USE_GTK && !defined HAVE_GTK3
 		      /* Unlike on Motif, we can't select for XI
@@ -19145,6 +19623,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  && xev->child != FRAME_X_WINDOW (f))
 			goto XI_OTHER;
 #endif
+
+		      /* If this happened during a drag-and-drop
+			 operation, don't send an event.  We only have
+			 to set the user time.  */
+		      if (x_dnd_in_progress
+			  && (command_loop_level + minibuf_level
+			      <= x_dnd_recursion_depth)
+			  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
+			goto XI_OTHER;
 
 		      if (fabs (total_x) > 0 || fabs (total_y) > 0)
 			{
@@ -19316,7 +19803,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							    XM_DRAG_REASON_TOP_LEVEL_LEAVE);
 			      lmsg.byteorder = XM_BYTE_ORDER_CUR_FIRST;
 			      lmsg.zero = 0;
-			      lmsg.timestamp = event->xmotion.time;
+			      lmsg.timestamp = xev->time;
 			      lmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
 			      if (x_dnd_motif_setup_p)
@@ -19408,7 +19895,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  emsg.zero = 0;
 			  emsg.timestamp = xev->time;
 			  emsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
-			  emsg.index_atom = dpyinfo->Xatom_XdndSelection;
+			  emsg.index_atom = x_dnd_motif_atom;
 
 			  if (x_dnd_motif_setup_p)
 			    xm_send_top_level_enter_message (dpyinfo, FRAME_X_WINDOW (x_dnd_frame),
@@ -19576,19 +20063,32 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		{
 		  f = mouse_or_wdesc_frame (dpyinfo, xev->event);
 
-		  if (xev->evtype == XI_ButtonPress)
+		  /* Don't track grab status for emulated pointer
+		     events, because they are ignored by the regular
+		     mouse click processing code.  */
+#ifdef XIPointerEmulated
+		  if (!(xev->flags & XIPointerEmulated))
 		    {
-		      dpyinfo->grabbed |= (1 << xev->detail);
-		      dpyinfo->last_mouse_frame = f;
-		      if (f && !tab_bar_p)
-			f->last_tab_bar_item = -1;
+#endif
+		      if (xev->evtype == XI_ButtonPress)
+			{
+			  x_display_set_last_user_time (dpyinfo, xev->time,
+							xev->send_event);
+
+			  dpyinfo->grabbed |= (1 << xev->detail);
+			  dpyinfo->last_mouse_frame = f;
+			  if (f && !tab_bar_p)
+			    f->last_tab_bar_item = -1;
 #if ! defined (USE_GTK)
-		      if (f && !tool_bar_p)
-			f->last_tool_bar_item = -1;
+			  if (f && !tool_bar_p)
+			    f->last_tool_bar_item = -1;
 #endif /* not USE_GTK */
+			}
+		      else
+			dpyinfo->grabbed &= ~(1 << xev->detail);
+#ifdef XIPointerEmulated
 		    }
-		  else
-		    dpyinfo->grabbed &= ~(1 << xev->detail);
+#endif
 
 		  if (xev->evtype == XI_ButtonPress
 		      && x_dnd_last_seen_window != None
@@ -19704,7 +20204,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					 instances of Emacs try to drag
 					 into the same window at the same
 					 time.  */
-				      dmsg.index_atom = dpyinfo->Xatom_XdndSelection;
+				      dmsg.index_atom = x_dnd_motif_atom;
 				      dmsg.source_window = FRAME_X_WINDOW (x_dnd_frame);
 
 				      if (!XM_DRAG_STYLE_IS_DROP_ONLY (drag_receiver_info.protocol_style))
@@ -19848,7 +20348,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 	      if (xev->evtype == XI_ButtonPress)
-		x_display_set_last_user_time (dpyinfo, xev->time);
+		x_display_set_last_user_time (dpyinfo, xev->time,
+					      xev->send_event);
 
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 
@@ -20198,7 +20699,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 #endif
 
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 	      ignore_next_mouse_click_timeout = 0;
 
 	      f = x_any_window_to_frame (dpyinfo, xev->event);
@@ -20361,8 +20863,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 		  XSETFRAME (inev.ie.frame_or_window, f);
-		  inev.ie.modifiers
-		    = x_x_to_emacs_modifiers (FRAME_DISPLAY_INFO (f), state);
+		  inev.ie.modifiers = x_x_to_emacs_modifiers (dpyinfo, state);
 		  inev.ie.timestamp = xev->time;
 
 #ifdef HAVE_X_I18N
@@ -20992,7 +21493,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21078,7 +21580,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21124,7 +21627,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, xev->time);
+	      x_display_set_last_user_time (dpyinfo, xev->time,
+					    xev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21164,7 +21668,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      device = xi_device_from_id (dpyinfo, pev->deviceid);
 	      source = xi_device_from_id (dpyinfo, pev->sourceid);
-	      x_display_set_last_user_time (dpyinfo, pev->time);
+	      x_display_set_last_user_time (dpyinfo, pev->time,
+					    pev->send_event);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21180,7 +21685,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		}
 #endif
 
-	      any = x_any_window_to_frame (dpyinfo, pev->event);
+	      any = x_window_to_frame (dpyinfo, pev->event);
 	      if (any)
 		{
 		  inev.ie.kind = PINCH_EVENT;
@@ -22595,7 +23100,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 					   XM_DROP_ACTION_DROP_CANCEL);
 		  dmsg.x = 0;
 		  dmsg.y = 0;
-		  dmsg.index_atom = FRAME_DISPLAY_INFO (f)->Xatom_XdndSelection;
+		  dmsg.index_atom = x_dnd_motif_atom;
 		  dmsg.source_window = FRAME_X_WINDOW (f);
 
 		  x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
@@ -24382,56 +24887,21 @@ x_make_frame_visible (struct frame *f)
 
 #ifndef USE_GTK
       output = FRAME_X_OUTPUT (f);
+      x_update_frame_user_time_window (f);
 
-      if (!x_wm_supports (f, dpyinfo->Xatom_net_wm_user_time_window))
+      /* It's been a while since I wrote that code...  I don't
+	 remember if it can leave `user_time_window' unset or not.  */
+      if (output->user_time_window != None)
 	{
-	  if (output->user_time_window == None)
-	    output->user_time_window = FRAME_OUTER_WINDOW (f);
-	  else if (output->user_time_window != FRAME_OUTER_WINDOW (f))
-	    {
-	      XDestroyWindow (dpyinfo->display,
-			      output->user_time_window);
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (f),
-			       dpyinfo->Xatom_net_wm_user_time_window);
-	      output->user_time_window = FRAME_OUTER_WINDOW (f);
-	    }
+	  if (dpyinfo->last_user_time)
+	    XChangeProperty (dpyinfo->display, output->user_time_window,
+			     dpyinfo->Xatom_net_wm_user_time,
+			     XA_CARDINAL, 32, PropModeReplace,
+			     (unsigned char *) &dpyinfo->last_user_time, 1);
+	  else
+	    XDeleteProperty (dpyinfo->display, output->user_time_window,
+			     dpyinfo->Xatom_net_wm_user_time);
 	}
-      else
-	{
-	  if (output->user_time_window == FRAME_OUTER_WINDOW (f)
-	      || output->user_time_window == None)
-	    {
-	      XSetWindowAttributes attrs;
-	      memset (&attrs, 0, sizeof attrs);
-
-	      output->user_time_window
-		= XCreateWindow (dpyinfo->display, FRAME_X_WINDOW (f),
-				 -1, -1, 1, 1, 0, 0, InputOnly,
-				 CopyFromParent, 0, &attrs);
-
-	      XDeleteProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (f),
-			       dpyinfo->Xatom_net_wm_user_time);
-	      XChangeProperty (dpyinfo->display,
-			       FRAME_OUTER_WINDOW (f),
-			       dpyinfo->Xatom_net_wm_user_time_window,
-			       XA_WINDOW, 32, PropModeReplace,
-			       (unsigned char *) &output->user_time_window,
-			       1);
-	    }
-	}
-
-      if (dpyinfo->last_user_time)
-	XChangeProperty (dpyinfo->display,
-			 output->user_time_window,
-			 dpyinfo->Xatom_net_wm_user_time,
-			 XA_CARDINAL, 32, PropModeReplace,
-			 (unsigned char *) &dpyinfo->last_user_time, 1);
-      else
-	XDeleteProperty (dpyinfo->display,
-			 output->user_time_window,
-			 dpyinfo->Xatom_net_wm_user_time);
 #endif
 
       f->output_data.x->asked_for_visible = true;
@@ -24930,6 +25400,12 @@ x_free_frame_resources (struct frame *f)
     g_object_unref (FRAME_OUTPUT_DATA (f)->scrollbar_foreground_css_provider);
 #endif
 
+  if (f == dpyinfo->motif_drag_atom_owner)
+    {
+      dpyinfo->motif_drag_atom_owner = NULL;
+      dpyinfo->motif_drag_atom = None;
+    }
+
   if (f == dpyinfo->x_focus_frame)
     dpyinfo->x_focus_frame = 0;
   if (f == dpyinfo->x_focus_event_frame)
@@ -25025,6 +25501,10 @@ x_intern_cached_atom (struct x_display_info *dpyinfo,
   if (!strcmp (name, "WINDOW"))
     return XA_WINDOW;
 
+  if (dpyinfo->motif_drag_atom != None
+      && !strcmp (name, dpyinfo->motif_drag_atom_name))
+    return dpyinfo->motif_drag_atom;
+
   for (i = 0; i < ARRAYELTS (x_atom_refs); ++i)
     {
       ptr = (char *) dpyinfo;
@@ -25083,6 +25563,10 @@ x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
       return xstrdup ("WINDOW");
 
     default:
+      if (dpyinfo->motif_drag_atom
+	  && atom == dpyinfo->motif_drag_atom)
+	return xstrdup (dpyinfo->motif_drag_atom_name);
+
       if (atom == dpyinfo->Xatom_xsettings_sel)
 	{
 	  sprintf (buffer, "_XSETTINGS_S%d",
@@ -26352,7 +26836,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   x_find_modifier_meanings (dpyinfo);
 #endif
 
-  dpyinfo->x_dnd_atoms_size = 8;
+  dpyinfo->x_dnd_atoms_size = 16;
   dpyinfo->x_dnd_atoms = xmalloc (sizeof *dpyinfo->x_dnd_atoms
                                   * dpyinfo->x_dnd_atoms_size);
   dpyinfo->gray
@@ -26975,6 +27459,9 @@ syms_of_xterm (void)
   x_dnd_action_symbol = Qnil;
   staticpro (&x_dnd_action_symbol);
 
+  x_dnd_selection_alias_cell = Fcons (Qnil, Qnil);
+  staticpro (&x_dnd_selection_alias_cell);
+
   DEFSYM (Qvendor_specific_keysyms, "vendor-specific-keysyms");
   DEFSYM (Qlatin_1, "latin-1");
   DEFSYM (Qnow, "now");
@@ -27063,6 +27550,7 @@ With MS Windows, Haiku windowing or Nextstep, the value is t.  */);
   DEFSYM (Qsuper, "super");
   Fput (Qsuper, Qmodifier_value, make_fixnum (super_modifier));
   DEFSYM (QXdndSelection, "XdndSelection");
+  DEFSYM (Qx_selection_alias_alist, "x-selection-alias-alist");
 
   DEFVAR_LISP ("x-ctrl-keysym", Vx_ctrl_keysym,
     doc: /* Which keys Emacs uses for the ctrl modifier.
@@ -27224,13 +27712,15 @@ argument to `x-begin-drag'.  */);
   Vx_dnd_targets_list = Qnil;
 
   DEFVAR_LISP ("x-dnd-native-test-function", Vx_dnd_native_test_function,
-    doc: /* Function called to determine return when dropping on Emacs itself.
-It should accept two arguments POS and ACTION, and return a symbol
-describing what to return from `x-begin-drag'.  POS is a mouse
-position list detailing the location of the drop, and ACTION is the
-action specified by the caller of `x-begin-drag'.
+    doc: /* Function that determines return value of drag-and-drop on Emacs frames.
+If the value is a function, `x-begin-drag' will call it with two
+arguments, POS and ACTION, where POS is a mouse position list
+that specifies the location of the drop, and ACTION is the
+action specified by the caller of `x-begin-drag'.  The function
+should return a symbol describing what to return from
+`x-begin-drag' if the drop happens on an Emacs frame.
 
-If nil or a non-symbol value is returned, the drop will be
-cancelled.  */);
+If the value is nil, or the function returns a value that is not
+a symbol, a drop on an Emacs frame will be canceled.  */);
   Vx_dnd_native_test_function = Qnil;
 }

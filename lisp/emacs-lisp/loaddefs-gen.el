@@ -366,7 +366,11 @@ don't include."
 
       ;; We always return the package version (even for pre-dumped
       ;; files).
-      (when package-data
+      (if (not package-data)
+          ;; We have to switch `emacs-lisp-mode' when scanning
+          ;; loaddefs for packages so that `syntax-ppss' later gives
+          ;; correct results.
+          (emacs-lisp-mode)
         (let ((version (lm-header "version"))
               package)
           (when (and version
@@ -629,6 +633,7 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
   "Print DEF in the way make-docfile.c expects it."
   (if (or (not (consp def))
           (not (symbolp (car def)))
+          (eq (car def) 'make-obsolete)
           (not (stringp (nth 3 def))))
       (prin1 def (current-buffer) t)
     ;; The salient point here is that we have to have the doc string

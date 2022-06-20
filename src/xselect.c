@@ -774,6 +774,25 @@ x_handle_selection_request (struct selection_input_event *event)
   bool success = false;
   specpdl_ref count = SPECPDL_INDEX ();
   bool pushed;
+  Lisp_Object alias, tem;
+
+  alias = Vx_selection_alias_alist;
+
+  FOR_EACH_TAIL_SAFE (alias)
+    {
+      tem = Qnil;
+
+      if (CONSP (alias))
+	tem = XCAR (alias);
+
+      if (CONSP (tem)
+	  && EQ (XCAR (tem), selection_symbol)
+	  && SYMBOLP (XCDR (tem)))
+	{
+	  selection_symbol = XCDR (tem);
+	  break;
+	}
+    }
 
   pushed = false;
 
@@ -1242,7 +1261,13 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   intmax_t timeout = max (0, x_selection_timeout);
   intmax_t secs = timeout / 1000;
   int nsecs = (timeout % 1000) * 1000000;
-  TRACE1 ("  Start waiting %"PRIdMAX" secs for SelectionNotify", secs);
+  TRACE1 ("  Start waiting %"PRIdMAX" secs for SelectionNotify.", secs);
+
+  if (input_blocked_p ())
+    TRACE0 ("    Input is blocked.");
+  else
+    TRACE1 ("    Waiting for %d nsecs in addition.", nsecs);
+
   /* This function can be called with input blocked inside Xt or GTK
      timeouts run inside popup menus, so use a function that works
      when input is blocked.  Prefer wait_reading_process_output
@@ -1920,9 +1945,9 @@ clean_local_selection_data (Lisp_Object obj)
       && INTEGERP (XCAR (obj))
       && FIXNUMP (XCDR (obj)))
     {
-      if (EQ (XCAR (obj), make_fixnum (0)))
+      if (BASE_EQ (XCAR (obj), make_fixnum (0)))
 	return XCDR (obj);
-      if (EQ (XCAR (obj), make_fixnum (-1)))
+      if (BASE_EQ (XCAR (obj), make_fixnum (-1)))
 	return make_fixnum (- XFIXNUM (XCDR (obj)));
     }
   if (VECTORP (obj))
@@ -2055,14 +2080,26 @@ On Nextstep, TIME-STAMP and TERMINAL are unused.  */)
    Lisp_Object time_stamp, Lisp_Object terminal)
 {
   Lisp_Object val = Qnil;
+  Lisp_Object maybe_alias;
   struct frame *f = frame_for_x_selection (terminal);
 
   CHECK_SYMBOL (selection_symbol);
   CHECK_SYMBOL (target_type);
+
   if (EQ (target_type, QMULTIPLE))
     error ("Retrieving MULTIPLE selections is currently unimplemented");
   if (!f)
     error ("X selection unavailable for this frame");
+
+  /* Quitting inside this function is okay, so we don't have to use
+     FOR_EACH_TAIL_SAFE.  */
+  maybe_alias = Fassq (selection_symbol, Vx_selection_alias_alist);
+
+  if (!NILP (maybe_alias))
+    {
+      selection_symbol = XCDR (maybe_alias);
+      CHECK_SYMBOL (selection_symbol);
+    }
 
   val = x_get_local_selection (selection_symbol, target_type, true,
 			       FRAME_DISPLAY_INFO (f));
@@ -2522,7 +2559,8 @@ FRAME is on.  If FRAME is nil, the selected frame is used.  */)
 
 bool
 x_handle_dnd_message (struct frame *f, const XClientMessageEvent *event,
-                      struct x_display_info *dpyinfo, struct input_event *bufp)
+                      struct x_display_info *dpyinfo, struct input_event *bufp,
+		      bool root_window_coords, int root_x, int root_y)
 {
   Lisp_Object vec;
   Lisp_Object frame;
@@ -2532,6 +2570,7 @@ x_handle_dnd_message (struct frame *f, const XClientMessageEvent *event,
   unsigned char *data = (unsigned char *) event->data.b;
   int idata[5];
   ptrdiff_t i;
+  Window child_return;
 
   for (i = 0; i < dpyinfo->x_dnd_atoms_length; ++i)
     if (dpyinfo->x_dnd_atoms[i] == event->message_type) break;
@@ -2563,7 +2602,15 @@ x_handle_dnd_message (struct frame *f, const XClientMessageEvent *event,
 					 event->format,
 					 size));
 
-  x_relative_mouse_position (f, &x, &y);
+  if (!root_window_coords)
+    x_relative_mouse_position (f, &x, &y);
+  else
+    XTranslateCoordinates (dpyinfo->display,
+			   dpyinfo->root_window,
+			   FRAME_X_WINDOW (f),
+			   root_x, root_y,
+			   &x, &y, &child_return);
+
   bufp->kind = DRAG_N_DROP_EVENT;
   bufp->frame_or_window = frame;
   bufp->timestamp = CurrentTime;
@@ -2807,6 +2854,15 @@ If non-nil, selection converters for string types (`STRING',
 `UTF8_STRING', `COMPOUND_TEXT', etc) will encode the strings, even
 when Emacs itself is converting the selection.  */);
   Vx_treat_local_requests_remotely = Qnil;
+
+  DEFVAR_LISP ("x-selection-alias-alist", Vx_selection_alias_alist,
+    doc: /* List of selections to alias to another.
+It should be an alist of a selection name to another.  When a
+selection request arrives for the first selection, Emacs will respond
+as if the request was meant for the other.
+
+Note that this does not affect setting or owning selections.  */);
+  Vx_selection_alias_alist = Qnil;
 
   /* QPRIMARY is defined in keyboard.c.  */
   DEFSYM (QSECONDARY, "SECONDARY");

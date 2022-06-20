@@ -72,11 +72,35 @@ Default nil means to write characters above \\177 in octal notation."
   :type 'boolean
   :group 'kmacro)
 
-(defvar edmacro-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "\C-c\C-c" #'edmacro-finish-edit)
-    (define-key map "\C-c\C-q" #'edmacro-insert-key)
-    map))
+(defvar-keymap edmacro-mode-map
+  "C-c C-c" #'edmacro-finish-edit
+  "C-c C-q" #'edmacro-insert-key)
+
+(defface edmacro-label
+  '((default :inherit bold)
+    (((class color) (background dark)) :foreground "light blue")
+    (((min-colors 88) (class color) (background light)) :foreground "DarkBlue")
+    (((class color) (background light)) :foreground "blue")
+    (t :inherit bold))
+  "Face used for labels in `edit-kbd-macro'."
+  :version "29.1"
+  :group 'kmacro)
+
+(defvar edmacro-mode-font-lock-keywords
+  `((,(rx bol (group (or "Command" "Key" "Macro") ":")) 0 'edmacro-label)
+    (,(rx bol
+          (group ";; Keyboard Macro Editor.  Press ")
+          (group (*? any))
+          (group  " to finish; press "))
+     (1 'font-lock-comment-face)
+     (2 'help-key-binding)
+     (3 'font-lock-comment-face)
+     (,(rx (group (*? any))
+           (group " to cancel" (* any)))
+      nil nil
+      (1 'help-key-binding)
+      (2 'font-lock-comment-face)))
+    (,(rx (one-or-more ";") (zero-or-more any)) 0 'font-lock-comment-face)))
 
 (defvar edmacro-store-hook)
 (defvar edmacro-finish-hook)
@@ -153,9 +177,18 @@ With a prefix argument, format the macro in a more concise way."
         (setq-local edmacro-original-buffer oldbuf)
         (setq-local edmacro-finish-hook finish-hook)
         (setq-local edmacro-store-hook store-hook)
+        (setq-local font-lock-defaults
+                    '(edmacro-mode-font-lock-keywords nil nil nil nil))
+        (setq font-lock-multiline nil)
 	(erase-buffer)
-	(insert ";; Keyboard Macro Editor.  Press C-c C-c to finish; "
-		"press C-x k RET to cancel.\n")
+        (insert (substitute-command-keys
+                 (concat
+                  ;; When editing this, make sure to update
+                  ;; `edmacro-mode-font-lock-keywords' to match.
+                  ";; Keyboard Macro Editor.  Press \\[edmacro-finish-edit] "
+                  "to finish; press \\[kill-buffer] \\`RET' to cancel.\n")
+                 ;; Use 'no-face argument to not conflict with font-lock.
+                 'no-face))
 	(insert ";; Original keys: " fmt "\n")
 	(unless store-hook
 	  (insert "\nCommand: " (if cmd (symbol-name cmd) "none") "\n")
@@ -530,8 +563,8 @@ doubt, use whitespace."
                               ((integerp ch)
                                (concat
                                 (cl-loop for pf across "ACHMsS"
-                                         for bit in '(?\A-\^@ ?\C-\^@ ?\H-\^@
-                                                              ?\M-\^@ ?\s-\^@ ?\S-\^@)
+                                         for bit in '( ?\A-\0 ?\C-\0 ?\H-\0
+                                                       ?\M-\0 ?\s-\0 ?\S-\0)
                                          when (/= (logand ch bit) 0)
                                          concat (format "%c-" pf))
                                 (let ((ch2 (logand ch (1- (ash 1 18)))))

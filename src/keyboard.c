@@ -1345,7 +1345,7 @@ command_loop_1 (void)
 
       if (minibuf_level
 	  && !NILP (echo_area_buffer[0])
-	  && EQ (minibuf_window, echo_area_window)
+	  && BASE_EQ (minibuf_window, echo_area_window)
 	  && NUMBERP (Vminibuffer_message_timeout))
 	{
 	  /* Bind inhibit-quit to t so that C-g gets read in
@@ -1567,9 +1567,15 @@ command_loop_1 (void)
 	    call0 (Qdeactivate_mark);
 	  else
 	    {
+	      Lisp_Object symval;
 	      /* Even if not deactivating the mark, set PRIMARY if
 		 `select-active-regions' is non-nil.  */
-	      if (!NILP (Fwindow_system (Qnil))
+	      if ((!NILP (Fwindow_system (Qnil))
+		   || ((symval =
+			find_symbol_value (Qtty_select_active_regions),
+			(!EQ (symval, Qunbound) && !NILP (symval)))
+		       && !NILP (Fterminal_parameter (Qnil,
+						      Qxterm__set_selection))))
 		  /* Even if mark_active is non-nil, the actual buffer
 		     marker may not have been set yet (Bug#7044).  */
 		  && XMARKER (BVAR (current_buffer, mark))->buffer
@@ -2576,7 +2582,7 @@ read_char (int commandflag, Lisp_Object map,
 	       && (input_was_pending || !redisplay_dont_pause)))
 	{
 	  input_was_pending = input_pending;
-	  if (help_echo_showing_p && !EQ (selected_window, minibuf_window))
+	  if (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
 	    redisplay_preserve_echo_area (5);
 	  else
 	    redisplay ();
@@ -2924,7 +2930,7 @@ read_char (int commandflag, Lisp_Object map,
           goto exit;
         }
 
-      if (EQ (c, make_fixnum (-2)))
+      if (BASE_EQ (c, make_fixnum (-2)))
 	return c;
 
       if (CONSP (c) && EQ (XCAR (c), Qt))
@@ -3249,7 +3255,7 @@ read_char (int commandflag, Lisp_Object map,
       unbind_to (count, Qnil);
 
       redisplay ();
-      if (EQ (c, make_fixnum (040)))
+      if (BASE_EQ (c, make_fixnum (040)))
 	{
 	  cancel_echoing ();
 	  do
@@ -9498,7 +9504,7 @@ read_char_minibuf_menu_prompt (int commandflag,
       if (!FIXNUMP (obj) || XFIXNUM (obj) == -2
 	  || (! EQ (obj, menu_prompt_more_char)
 	      && (!FIXNUMP (menu_prompt_more_char)
-		  || ! EQ (obj, make_fixnum (Ctl (XFIXNUM (menu_prompt_more_char)))))))
+		  || ! BASE_EQ (obj, make_fixnum (Ctl (XFIXNUM (menu_prompt_more_char)))))))
 	{
 	  if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
 	    store_kbd_macro_char (obj);
@@ -12163,6 +12169,8 @@ syms_of_keyboard (void)
   DEFSYM (Qpolling_period, "polling-period");
 
   DEFSYM (Qgui_set_selection, "gui-set-selection");
+  DEFSYM (Qxterm__set_selection, "xterm--set-selection");
+  DEFSYM (Qtty_select_active_regions, "tty-select-active-regions");
 
   /* The primary selection.  */
   DEFSYM (QPRIMARY, "PRIMARY");

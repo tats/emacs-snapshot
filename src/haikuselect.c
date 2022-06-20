@@ -515,7 +515,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	      unblock_input ();
 
 	      if (rc)
-		signal_error ("Invalid message", msg_data);
+		signal_error ("Invalid message", data);
 	      unbind_to (ref, Qnil);
 	      break;
 
@@ -1012,6 +1012,12 @@ haiku_note_drag_motion (void)
 
   internal_catch_all (haiku_note_drag_motion_1, NULL,
 		      haiku_note_drag_motion_2);
+}
+
+void
+init_haiku_select (void)
+{
+  be_clipboard_init ();
 }
 
 void

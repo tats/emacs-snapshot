@@ -1584,8 +1584,9 @@ the face font sort order, see `face-font-selection-order'.  */)
 			      /* If the font was specified in a way
 				 different from XLFD (e.g., on MS-Windows),
 				 we will have a number there, not 'p'.  */
-			      || EQ (spacing,
-				     make_fixnum (FONT_SPACING_PROPORTIONAL)))
+			      || BASE_EQ (spacing,
+					  make_fixnum
+					  (FONT_SPACING_PROPORTIONAL)))
 			     ? Qnil : Qt,
 			     Ffont_xlfd_name (font, Qnil),
 			     AREF (font, FONT_REGISTRY_INDEX));
@@ -1942,7 +1943,7 @@ resolve_face_name (Lisp_Object face_name, bool signal_p)
 	break;
 
       tortoise = Fget (tortoise, Qface_alias);
-      if (EQ (hare, tortoise))
+      if (BASE_EQ (hare, tortoise))
 	{
 	  if (signal_p)
 	    circular_list (orig_face);
@@ -5176,8 +5177,9 @@ gui_supports_face_attributes_p (struct frame *f,
 	      return true;
 	    s1 = SYMBOL_NAME (face->font->props[i]);
 	    s2 = SYMBOL_NAME (def_face->font->props[i]);
-	    if (! EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
-					s2, make_fixnum (0), Qnil, Qt), Qt))
+	    if (! BASE_EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
+					     s2, make_fixnum (0), Qnil, Qt),
+			   Qt))
 	      return true;
 	  }
       return false;
@@ -5907,7 +5909,8 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
 #ifdef HAVE_WINDOW_SYSTEM
   struct face *default_face;
   struct frame *f;
-  Lisp_Object stipple, underline, overline, strike_through, box;
+  Lisp_Object stipple, underline, overline, strike_through, box, temp_spec;
+  Lisp_Object temp_extra, antialias;
 
   eassert (FRAME_WINDOW_P (cache->f));
 
@@ -5949,8 +5952,28 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
 	    emacs_abort ();
 	}
       if (! FONT_OBJECT_P (attrs[LFACE_FONT_INDEX]))
-	attrs[LFACE_FONT_INDEX]
-	  = font_load_for_lface (f, attrs, Ffont_spec (0, NULL));
+	{
+	  /* We want attrs to allow overriding most elements in the
+	     spec (IOW, to start out as an empty font spec), but
+	     preserve the antialiasing attribute.  (bug#17973,
+	     bug#37473).  */
+	  temp_spec = Ffont_spec (0, NULL);
+	  temp_extra = AREF (attrs[LFACE_FONT_INDEX],
+			     FONT_EXTRA_INDEX);
+	  /* If `:antialias' wasn't specified, keep it unspecified
+	     instead of changing it to nil.  */
+
+	  if (CONSP (temp_extra))
+	    antialias = Fassq (QCantialias, temp_extra);
+	  else
+	    antialias = Qnil;
+
+	  if (FONTP (attrs[LFACE_FONT_INDEX]) && !NILP (antialias))
+	    Ffont_put (temp_spec, QCantialias, Fcdr (antialias));
+
+	  attrs[LFACE_FONT_INDEX]
+	    = font_load_for_lface (f, attrs, temp_spec);
+	}
       if (FONT_OBJECT_P (attrs[LFACE_FONT_INDEX]))
 	{
 	  face->font = XFONT_OBJECT (attrs[LFACE_FONT_INDEX]);

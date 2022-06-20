@@ -1239,7 +1239,7 @@ comment at the start of cc-engine.el for more info."
 			   (not comma-delimited)
 			   (not (c-looking-at-inexpr-block lim nil t))
 			   (save-excursion
-			     (c-backward-token-2 1 t nil)
+			     (c-backward-token-2 1 t nil) ; Don't test the value
 			     (not (looking-at "=\\([^=]\\|$\\)")))
 			   (or
 			    (not c-opt-block-decls-with-vars-key)
@@ -6837,7 +6837,7 @@ comment at the start of cc-engine.el for more info."
   (let ((type (c-syntactic-content from to c-recognize-<>-arglists)))
     (unless (gethash type c-found-types)
       (puthash type t c-found-types)
-      (when (and (not c-record-found-types) ; Only call `c-fontify-new-fount-type'
+      (when (and (not c-record-found-types) ; Only call `c-fontify-new-found-type'
 					; when we haven't "bound" c-found-types
 					; to itself in c-forward-<>-arglist.
 		 (eq (string-match c-symbol-key type) 0)
@@ -8289,9 +8289,10 @@ multi-line strings (but not C++, for example)."
 (defun c-forward-noise-clause ()
   ;; Point is at a c-noise-macro-with-parens-names macro identifier.  Go
   ;; forward over this name, any parenthesis expression which follows it, and
-  ;; any syntactic WS, ending up at the next token.  If there is an unbalanced
-  ;; paren expression, leave point at it.  Always Return t.
-  (c-forward-token-2)
+  ;; any syntactic WS, ending up at the next token or EOB.  If there is an
+  ;; unbalanced paren expression, leave point at it.  Always Return t.
+  (or (zerop (c-forward-token-2))
+      (goto-char (point-max)))
   (if (and (eq (char-after) ?\()
 	   (c-go-list-forward))
       (c-forward-syntactic-ws))

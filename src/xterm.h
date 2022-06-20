@@ -428,8 +428,8 @@ struct x_display_info
   /* More atoms for font properties.  The last three are private
      properties, see the comments in src/fontset.h.  */
   Atom Xatom_PIXEL_SIZE, Xatom_AVERAGE_WIDTH,
-  Xatom_MULE_BASELINE_OFFSET, Xatom_MULE_RELATIVE_COMPOSE,
-  Xatom_MULE_DEFAULT_ASCENT;
+    Xatom_MULE_BASELINE_OFFSET, Xatom_MULE_RELATIVE_COMPOSE,
+    Xatom_MULE_DEFAULT_ASCENT;
 
   /* More atoms for Ghostscript support.  */
   Atom Xatom_DONE, Xatom_PAGE;
@@ -443,11 +443,21 @@ struct x_display_info
   /* Atom used to determine whether or not the screen is composited.  */
   Atom Xatom_NET_WM_CM_Sn;
 
+  /* Atoms used by the Motif drag and drop protocols.  */
   Atom Xatom_MOTIF_WM_HINTS, Xatom_MOTIF_DRAG_WINDOW,
     Xatom_MOTIF_DRAG_TARGETS, Xatom_MOTIF_DRAG_AND_DROP_MESSAGE,
     Xatom_MOTIF_DRAG_INITIATOR_INFO, Xatom_MOTIF_DRAG_RECEIVER_INFO;
 
+  /* Atoms used by Emacs internally.  */
+  Atom Xatom_EMACS_DRAG_ATOM;
+
+  /* Special selections used by the Motif drop protocol to indicate
+     success or failure.  */
   Atom Xatom_XmTRANSFER_SUCCESS, Xatom_XmTRANSFER_FAILURE;
+
+  /* Atoms used by both versions of the OffiX DND protocol (the "old
+     KDE" protocol in x-dnd.el). */
+  Atom Xatom_DndProtocol, Xatom_DND_PROTOCOL;
 
   /* The frame (if any) which has the X window that has keyboard focus.
      Zero if none.  This is examined by Ffocus_frame in xfns.c.  Note
@@ -485,9 +495,8 @@ struct x_display_info
   struct scroll_bar *last_mouse_scroll_bar;
 
   /* Time of last user interaction as returned in X events on this
-     display, and time where WM support for `_NET_WM_USER_TIME_WINDOW'
-     was last checked.  */
-  Time last_user_time, last_user_check_time;
+     display.  */
+  Time last_user_time;
 
   /* Position where the mouse was last time we reported a motion.
      This is a position on last_mouse_motion_frame.  */
@@ -554,6 +563,23 @@ struct x_display_info
   Atom *x_dnd_atoms;
   ptrdiff_t x_dnd_atoms_size;
   ptrdiff_t x_dnd_atoms_length;
+
+  /* The unique drag and drop atom used on Motif.  None if it was not
+     already computed.  */
+  Atom motif_drag_atom;
+
+  /* Its name.  */
+  char motif_drag_atom_name[sizeof "_EMACS_ATOM_%lu" - 3
+			    + INT_STRLEN_BOUND (unsigned long)];
+
+  /* When it was owned.  */
+  Time motif_drag_atom_time;
+
+  /* The frame that currently owns `motif_drag_atom'.  */
+  struct frame *motif_drag_atom_owner;
+
+  /* The drag window for this display.  */
+  Window motif_drag_window;
 
   /* Extended window manager hints, Atoms supported by the window manager and
      atoms for setting the window type.  */
@@ -1403,10 +1429,11 @@ extern void x_unwind_errors_to (int);
 extern void x_uncatch_errors (void);
 extern void x_uncatch_errors_after_check (void);
 extern void x_clear_errors (Display *);
-extern void x_set_window_size (struct frame *f, bool, int, int);
-extern void x_make_frame_visible (struct frame *f);
-extern void x_make_frame_invisible (struct frame *f);
-extern void x_iconify_frame (struct frame *f);
+extern void x_set_window_size (struct frame *, bool, int, int);
+extern void x_set_last_user_time_from_lisp (struct x_display_info *, Time);
+extern void x_make_frame_visible (struct frame *);
+extern void x_make_frame_invisible (struct frame *);
+extern void x_iconify_frame (struct frame *);
 extern void x_free_frame_resources (struct frame *);
 extern void x_wm_set_size_hint (struct frame *, long, bool);
 
@@ -1540,7 +1567,8 @@ extern Lisp_Object x_atom_to_symbol (struct x_display_info *, Atom);
 extern bool x_handle_dnd_message (struct frame *,
 				  const XClientMessageEvent *,
 				  struct x_display_info *,
-				  struct input_event *);
+				  struct input_event *,
+				  bool, int, int);
 extern int x_check_property_data (Lisp_Object);
 extern void x_fill_property_data (Display *,
                                   Lisp_Object,

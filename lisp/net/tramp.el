@@ -522,11 +522,12 @@ host runs a restricted shell, it shall be added to this list, too."
   (concat
    "\\`"
    (regexp-opt
-    (list "localhost" "localhost6" tramp-system-name "127.0.0.1" "::1") t)
+    `("localhost" "localhost4" "localhost6" ,tramp-system-name "127.0.0.1" "::1")
+    t)
    "\\'")
   "Host names which are regarded as local host.
 If the local host runs a chrooted environment, set this to nil."
-  :version "27.1"
+  :version "29.1"
   :type '(choice (const :tag "Chrooted environment" nil)
 		 (regexp :tag "Host regexp")))
 
@@ -2148,15 +2149,17 @@ applicable)."
 
 (put #'tramp-message 'tramp-suppress-trace t)
 
-(defsubst tramp-backtrace (&optional vec-or-proc)
+(defsubst tramp-backtrace (&optional vec-or-proc force)
   "Dump a backtrace into the debug buffer.
-If VEC-OR-PROC is nil, the buffer *debug tramp* is used.  This
-function is meant for debugging purposes."
-  (when (>= tramp-verbose 10)
-    (if vec-or-proc
-	(tramp-message
-	 vec-or-proc 10 "\n%s" (with-output-to-string (backtrace)))
-      (with-output-to-temp-buffer "*debug tramp*" (backtrace)))))
+If VEC-OR-PROC is nil, the buffer *debug tramp* is used.  FORCE
+forces the backtrace even if `tramp-verbose' is less than 10.
+This function is meant for debugging purposes."
+  (let ((tramp-verbose (if force 10 tramp-verbose)))
+    (when (>= tramp-verbose 10)
+      (if vec-or-proc
+	  (tramp-message
+	   vec-or-proc 10 "\n%s" (with-output-to-string (backtrace)))
+	(with-output-to-temp-buffer "*debug tramp*" (backtrace))))))
 
 (put #'tramp-backtrace 'tramp-suppress-trace t)
 
@@ -2391,6 +2394,16 @@ FILE must be a local file name on a connection identified via VEC."
        (tramp-set-connection-property ,key ,property value))
      value))
 
+(defmacro with-tramp-saved-connection-property (key property &rest body)
+  "Save PROPERTY, run BODY, reset PROPERTY."
+  (declare (indent 2) (debug t))
+  `(let ((value (tramp-get-connection-property
+		 ,key ,property tramp-cache-undefined)))
+     (unwind-protect (progn ,@body)
+       (if (eq value tramp-cache-undefined)
+	   (tramp-flush-connection-property ,key ,property)
+	 (tramp-set-connection-property ,key ,property value)))))
+
 (defun tramp-drop-volume-letter (name)
   "Cut off unnecessary drive letter from file NAME.
 The functions `tramp-*-handle-expand-file-name' call `expand-file-name'
@@ -2526,6 +2539,7 @@ arguments to pass to the OPERATION."
 	    ,(and (eq inhibit-file-name-operation operation)
 		  inhibit-file-name-handlers)))
 	 (inhibit-file-name-operation operation)
+	 (args (if (tramp-file-name-p (car args)) (cons nil (cdr args)) args))
 	 signal-hook-function)
     (apply operation args)))
 
@@ -2708,6 +2722,7 @@ Fall back to normal file name handler if no Tramp file name handler exists."
 			  (tramp-message
 			   v 5 "Non-essential received in operation %s"
 			   (cons operation args))
+			  (let ((tramp-verbose 10)) (tramp-backtrace v))
 			  (tramp-run-real-handler operation args))
 		         ((eq result 'suppress)
 			  (let ((inhibit-message t))
@@ -2952,7 +2967,7 @@ not in completion mode."
 	     (m (tramp-find-method method user host))
 	     all-user-hosts)
 
-	(unless localname        ;; Nothing to complete.
+	(unless localname ;; Nothing to complete.
 
 	  (if (or user host)
 
@@ -5746,26 +5761,29 @@ be granted."
 If USER is a string, return its home directory instead of the
 user identified by VEC.  If there is no user specified in either
 VEC or USER, or if there is no home directory, return nil."
-  (with-tramp-connection-property vec (concat "~" user)
-    (tramp-file-name-handler #'tramp-get-home-directory vec user)))
+  (and (tramp-file-name-p vec)
+       (with-tramp-connection-property vec (concat "~" user)
+	 (tramp-file-name-handler #'tramp-get-home-directory vec user))))
 
 (defun tramp-get-remote-uid (vec id-format)
   "The uid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "uid-%s" id-format)
-    (or (tramp-file-name-handler #'tramp-get-remote-uid vec id-format)
-	;; Ensure there is a valid result.
-	(and (equal id-format 'integer) tramp-unknown-id-integer)
-	(and (equal id-format 'string) tramp-unknown-id-string))))
+  (or (and (tramp-file-name-p vec)
+	   (with-tramp-connection-property vec (format "uid-%s" id-format)
+	     (tramp-file-name-handler #'tramp-get-remote-uid vec id-format)))
+      ;; Ensure there is a valid result.
+      (and (equal id-format 'integer) tramp-unknown-id-integer)
+      (and (equal id-format 'string) tramp-unknown-id-string)))
 
 (defun tramp-get-remote-gid (vec id-format)
   "The gid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "gid-%s" id-format)
-    (or (tramp-file-name-handler #'tramp-get-remote-gid vec id-format)
-	;; Ensure there is a valid result.
-	(and (equal id-format 'integer) tramp-unknown-id-integer)
-	(and (equal id-format 'string) tramp-unknown-id-string))))
+  (or (and (tramp-file-name-p vec)
+	   (with-tramp-connection-property vec (format "gid-%s" id-format)
+	     (tramp-file-name-handler #'tramp-get-remote-gid vec id-format)))
+      ;; Ensure there is a valid result.
+      (and (equal id-format 'integer) tramp-unknown-id-integer)
+      (and (equal id-format 'string) tramp-unknown-id-string)))
 
 (defun tramp-local-host-p (vec)
   "Return t if this points to the local host, nil otherwise.

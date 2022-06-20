@@ -2007,6 +2007,7 @@ from the comment."
     (let ((defun (looking-at
                   "(\\(?:cl-\\)?def\\(un\\|macro\\|subst\\|advice\\|generic\\|method\\)"))
 	  (is-advice (looking-at "(defadvice"))
+          (defun-depth (ppss-depth (syntax-ppss)))
 	  (lst nil)
 	  (ret nil)
 	  (oo (make-vector 3 0)))	;substitute obarray for `read'
@@ -2022,11 +2023,17 @@ from the comment."
 	(setq ret (cons nil ret))
 	;; Interactive
 	(save-excursion
-	  (setq ret (cons
-		     (re-search-forward "^\\s-*(interactive"
-					(save-excursion (end-of-defun) (point))
-					t)
-		     ret)))
+          (push (and (re-search-forward "^\\s-*(interactive"
+				        (save-excursion
+                                          (end-of-defun)
+                                          (point))
+				        t)
+                     ;; Disregard `interactive' from other parts of
+                     ;; the function.
+                     (= (ppss-depth (syntax-ppss))
+                        (+ defun-depth 2))
+                     (point))
+                ret))
 	(skip-chars-forward " \t\n")
 	(let ((bss (buffer-substring (point) (save-excursion (forward-sexp 1)
 							     (point))))
@@ -2628,7 +2635,7 @@ a space as a style error."
          (checkdoc-autofix-ask-replace
           (match-beginning 0) (match-end 0)
           (format-message
-           "`y-or-n-p' argument should end with \"? \".  Fix?")
+           "`y-or-n-p' argument should end with \"?\".  Fix?")
           "?\"" t))
         nil
       (checkdoc-create-error

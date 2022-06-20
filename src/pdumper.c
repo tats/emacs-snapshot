@@ -1210,8 +1210,8 @@ dump_queue_find_score_of_one_weight_queue (struct dump_queue *dump_queue,
 static Lisp_Object
 dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
 {
-  eassert (EQ (Fhash_table_count (dump_queue->sequence_numbers),
-               Fhash_table_count (dump_queue->link_weights)));
+  eassert (BASE_EQ (Fhash_table_count (dump_queue->sequence_numbers),
+		    Fhash_table_count (dump_queue->link_weights)));
 
   eassert (XFIXNUM (Fhash_table_count (dump_queue->sequence_numbers))
 	   <= (dump_tailq_length (&dump_queue->fancy_weight_objects)
@@ -5543,7 +5543,10 @@ pdumper_load (const char *dump_filename, char *argv0)
 
   struct dump_header header_buf = { 0 };
   struct dump_header *header = &header_buf;
-  struct dump_memory_map sections[NUMBER_DUMP_SECTIONS] = { 0 };
+  struct dump_memory_map sections[NUMBER_DUMP_SECTIONS];
+
+  /* Use memset instead of "= { 0 }" to work around GCC bug 105961.  */
+  memset (sections, 0, sizeof sections);
 
   const struct timespec start_time = current_timespec ();
   char *dump_filename_copy;

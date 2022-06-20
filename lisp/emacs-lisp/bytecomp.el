@@ -299,10 +299,10 @@ The information is logged to `byte-compile-log-buffer'."
   '(redefine callargs free-vars unresolved
              obsolete noruntime interactive-only
              make-local mapcar constants suspicious lexical lexical-dynamic
-             docstrings not-unused)
+             docstrings docstrings-non-ascii-quotes not-unused)
   "The list of warning types used when `byte-compile-warnings' is t.")
 (defcustom byte-compile-warnings t
-  "List of warnings that the byte-compiler should issue (t for all).
+  "List of warnings that the byte-compiler should issue (t for almost all).
 
 Elements of the list may be:
 
@@ -327,14 +327,27 @@ Elements of the list may be:
               `byte-compile-docstring-max-column' or
               `fill-column' characters, whichever is bigger) or
               have other stylistic issues.
+  docstrings-non-ascii-quotes docstrings that have non-ASCII quotes.
+                              This depends on the `docstrings' warning type.
   suspicious  constructs that usually don't do what the coder wanted.
 
 If the list begins with `not', then the remaining elements specify warnings to
-suppress.  For example, (not mapcar) will suppress warnings about mapcar."
+suppress.  For example, (not mapcar) will suppress warnings about mapcar.
+
+The t value means \"all non experimental warning types\", and
+excludes the types in `byte-compile--emacs-build-warning-types'.
+A value of `all' really means all."
   :type `(choice (const :tag "All" t)
 		 (set :menu-tag "Some"
                       ,@(mapcar (lambda (x) `(const ,x))
                                 byte-compile-warning-types))))
+
+(defconst byte-compile--emacs-build-warning-types
+  '(docstrings-non-ascii-quotes)
+  "List of warning types that are only enabled during Emacs builds.
+This is typically either warning types that are being phased in
+(but shouldn't be enabled for packages yet), or that are only relevant
+for the Emacs build itself.")
 
 (defvar byte-compile--suppressed-warnings nil
   "Dynamically bound by `with-suppressed-warnings' to suppress warnings.")
@@ -354,10 +367,15 @@ suppress.  For example, (not mapcar) will suppress warnings about mapcar."
                  (memq symbol (cdr elem)))
         (setq suppress t)))
     (and (not suppress)
-         (or (eq byte-compile-warnings t)
-             (if (eq (car byte-compile-warnings) 'not)
-                 (not (memq warning byte-compile-warnings))
-               (memq warning byte-compile-warnings))))))
+         ;; During an Emacs build, we want all warnings.
+         (or (eq byte-compile-warnings 'all)
+             ;; If t, we want almost all the warnings, but not the
+             ;; ones that are Emacs build specific.
+             (and (not (memq warning byte-compile--emacs-build-warning-types))
+                  (or (eq byte-compile-warnings t)
+                      (if (eq (car byte-compile-warnings) 'not)
+                          (not (memq warning byte-compile-warnings))
+                        (memq warning byte-compile-warnings))))))))
 
 ;;;###autoload
 (defun byte-compile-disable-warning (warning)
@@ -1761,7 +1779,14 @@ It is too wide if it has any lines longer than the largest of
         (when (string-match-p "\\( \"\\|[ \t]\\|^\\)'[a-z(]" docs)
           (byte-compile-warn-x
            name "%s%sdocstring has wrong usage of unescaped single quotes (use \\= or different quoting)"
-           kind name)))))
+           kind name))
+        ;; There's a "Unicode quote" in the string -- it should probably
+        ;; be an ASCII one instead.
+        (when (byte-compile-warning-enabled-p 'docstrings-non-ascii-quotes)
+          (when (string-match-p "\\( \"\\|[ \t]\\|^\\)[‘’]" docs)
+            (byte-compile-warn-x
+             name "%s%sdocstring has wrong usage of \"fancy\" single quotation marks"
+             kind name))))))
   form)
 
 ;; If we have compiled any calls to functions which are not known to be
@@ -2521,13 +2546,12 @@ list that represents a doc string reference.
 (defun byte-compile-keep-pending (form &optional handler)
   (if (memq byte-optimize '(t source))
       (setq form (byte-optimize-one-form form t)))
+  ;; To avoid consing up monstrously large forms at load time, we split
+  ;; the output regularly.
+  (when (nthcdr 300 byte-compile-output)
+    (byte-compile-flush-pending))
   (if handler
       (let ((byte-compile--for-effect t))
-	;; To avoid consing up monstrously large forms at load time, we split
-	;; the output regularly.
-	(and (memq (car-safe form) '(fset defalias))
-	     (nthcdr 300 byte-compile-output)
-	     (byte-compile-flush-pending))
 	(funcall handler form)
 	(if byte-compile--for-effect
 	    (byte-compile-discard)))
@@ -2557,9 +2581,7 @@ list that represents a doc string reference.
   ;; macroexpand-all.
   ;; (if (memq byte-optimize '(t source))
   ;;     (setq form (byte-optimize-form form for-effect)))
-  (cond
-   (lexical-binding (cconv-closure-convert form))
-   (t form)))
+  (cconv-closure-convert form))
 
 ;; byte-hunk-handlers cannot call this!
 (defun byte-compile-toplevel-file-form (top-level-form)
@@ -4225,25 +4247,13 @@ This function is never called when `lexical-binding' is nil."
 (byte-defop-compiler-1 quote)
 
 (defun byte-compile-setq (form)
-  (let* ((args (cdr form))
-         (len (length args)))
-    (if (= (logand len 1) 1)
-        (progn
-          (byte-compile-report-error
-           (format-message
-            "missing value for `%S' at end of setq" (car (last args))))
-          (byte-compile-form
-           `(signal 'wrong-number-of-arguments '(setq ,len))
-           byte-compile--for-effect))
-      (if args
-          (while args
-            (byte-compile-form (car (cdr args)))
-            (or byte-compile--for-effect (cdr (cdr args))
-                (byte-compile-out 'byte-dup 0))
-            (byte-compile-variable-set (car args))
-            (setq args (cdr (cdr args))))
-        ;; (setq), with no arguments.
-        (byte-compile-form nil byte-compile--for-effect)))
+  (cl-assert (= (length form) 3))       ; normalised in macroexp
+  (let ((var (nth 1 form))
+        (expr (nth 2 form)))
+    (byte-compile-form expr)
+    (unless byte-compile--for-effect
+      (byte-compile-out 'byte-dup 0))
+    (byte-compile-variable-set var)
     (setq byte-compile--for-effect nil)))
 
 (byte-defop-compiler-1 set-default)
@@ -4820,11 +4830,8 @@ binding slots have been popped."
     (byte-compile-out-tag endtag)))
 
 (defun byte-compile-unwind-protect (form)
-  (pcase (cddr form)
-    (`(:fun-body ,f)
-     (byte-compile-form f))
-    (handlers
-     (byte-compile-form `#'(lambda () ,@handlers))))
+  (cl-assert (eq (caddr form) :fun-body))
+  (byte-compile-form (nth 3 form))
   (byte-compile-out 'byte-unwind-protect 0)
   (byte-compile-form-do-effect (car (cdr form)))
   (byte-compile-out 'byte-unbind 1))
