@@ -252,6 +252,9 @@ debian/emacs-common.README.Debian: \
 	  >> debian/emacs-common.README.tmp
 	mv debian/emacs-common.README.tmp $@
 
+# Uncomment to experiment with NATIVE_FULL_AOT - tests don't appear to pass yet.
+#export NATIVE_FULL_AOT ?= 1
+
 # common configure flags
 confflags += --prefix=/usr
 confflags += --sharedstatedir=/var/lib
@@ -265,6 +268,7 @@ confflags += --enable-locallisppath=$(local_lpath)
 confflags += --with-sound=alsa
 confflags += --without-gconf
 confflags += --with-mailutils
+confflags += --with-native-compilation
 
 # x configure flags
 confflags_gtk := $(confflags)
@@ -291,6 +295,7 @@ confflags_lucid += --without-gsettings
 define cfg_tree
   cd $(1) && \
     CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" \
+    CC=gcc-11 \
     REL_ALLOC=no \
       $(CURDIR)/debian/build-src/configure $(confflags) $(2)
 endef
@@ -346,6 +351,10 @@ define install_common_binpkg_bits
   install -d $(2)/$(libexec_dir_emacs)
   cp -a $(1)/$(libexec_dir_emacs)/emacs.pdmp $(2)/$(libexec_dir_emacs)/
 
+  install -d $(2)/usr/lib/emacs/$(runtime_ver)
+  cp -a $(1)/usr/lib/emacs/$(runtime_ver)/native-lisp \
+	$(2)/usr/lib/emacs/$(runtime_ver)
+
   install -d $(2)/usr/share/emacs/$(runtime_ver)/etc
   cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC \
 	$(2)/usr/share/emacs/$(runtime_ver)/etc/
@@ -384,6 +393,8 @@ override_dh_auto_install: $(autogen_install_files)
 	    $(pkgdir_common)/$(libexec_dir_emacs)/rcs2log
 	  cd $(pkgdir_common)/usr \
 	    && rmdir --parents libexec/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
+
+	rm -r $(pkgdir_common)/usr/lib/emacs/$(runtime_ver)/native-lisp
 
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
 	  && test -f DOC
