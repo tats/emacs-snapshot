@@ -1366,7 +1366,8 @@ This returns an error if any Emacs frames are X frames."
 (cl-defmethod gui-backend-get-selection (selection-symbol target-type
                                          &context (window-system x)
                                          &optional time-stamp terminal)
-  (x-get-selection-internal selection-symbol target-type time-stamp terminal))
+  (x-get-selection-internal selection-symbol target-type
+                            time-stamp terminal))
 
 ;; Initiate drag and drop
 (add-hook 'after-make-frame-functions 'x-dnd-init-frame)

@@ -1630,6 +1630,14 @@ haiku_draw_image_relief (struct glyph_string *s)
 }
 
 static void
+haiku_translate_transform (double (*transform)[3], double dx,
+			   double dy)
+{
+  transform[0][2] += dx;
+  transform[1][2] += dy;
+}
+
+static void
 haiku_draw_image_glyph_string (struct glyph_string *s)
 {
   struct face *face = s->face;
@@ -1640,6 +1648,7 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
   struct haiku_rect nr;
   Emacs_Rectangle cr, ir, r;
   unsigned long background;
+  double image_transform[3][3];
 
   height = s->height;
   if (s->slice.y == 0)
@@ -1663,7 +1672,6 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
   view = FRAME_HAIKU_VIEW (s->f);
   bitmap = s->img->pixmap;
 
-  /* TODO: implement stipples for images with masks.  */
   s->stippled_p = face->stipple != 0;
 
   if (s->hl == DRAW_CURSOR)
@@ -1671,8 +1679,8 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
   else
     background = face->background;
 
-  BView_SetHighColor (view, background);
-  BView_FillRectangle (view, x, y, width, height);
+  haiku_draw_background_rect (s, face, x, y,
+			      width, height);
 
   if (bitmap)
     {
@@ -1701,34 +1709,66 @@ haiku_draw_image_glyph_string (struct glyph_string *s)
 
       if (gui_intersect_rectangles (&cr, &ir, &r))
 	{
-	  if (s->img->have_be_transforms_p)
+	  memcpy (&image_transform, &s->img->transform,
+		  sizeof image_transform);
+
+	  if (s->slice.x != x || s->slice.y != y
+	      || s->slice.width != s->img->width
+	      || s->slice.height != s->img->height)
 	    {
-	      bitmap = BBitmap_transform_bitmap (bitmap,
-						 s->img->mask,
-						 face->background,
-						 s->img->be_rotate,
-						 s->img->width,
-						 s->img->height);
-	      mask = NULL;
+	      BView_StartClip (view);
+	      BView_ClipToRect (view, r.x, r.y, r.width, r.height);
 	    }
 
-	  BView_DrawBitmap (view, bitmap,
-			    s->slice.x + r.x - x,
-			    s->slice.y + r.y - y,
-			    r.width, r.height,
-			    r.x, r.y, r.width, r.height);
-	  if (mask)
-	    {
-	      BView_DrawMask (mask, view,
-			      s->slice.x + r.x - x,
-			      s->slice.y + r.y - y,
-			      r.width, r.height,
-			      r.x, r.y, r.width, r.height,
-			      face->background);
-	    }
+	  haiku_translate_transform (image_transform,
+				     x - s->slice.x,
+				     y - s->slice.y);
 
-	  if (s->img->have_be_transforms_p)
-	    BBitmap_free (bitmap);
+	  be_apply_affine_transform (view,
+				     image_transform[0][0],
+				     image_transform[0][1],
+				     image_transform[0][2],
+				     image_transform[1][0],
+				     image_transform[1][1],
+				     image_transform[1][2]);
+
+	  if (!s->stippled_p || !mask)
+	    {
+	      BView_DrawBitmap (view, bitmap, 0, 0,
+				s->img->original_width,
+				s->img->original_height,
+				0, 0,
+				s->img->original_width,
+				s->img->original_height,
+				s->img->use_bilinear_filtering);
+
+	      if (mask)
+		be_draw_image_mask (mask, view, 0, 0,
+				    s->img->original_width,
+				    s->img->original_height,
+				    0, 0,
+				    s->img->original_width,
+				    s->img->original_height,
+				    background);
+	    }
+	  else
+	    /* In order to make sure the stipple background remains
+	       visible, use the mask for the alpha channel of BITMAP
+	       and composite it onto the view instead.  */
+	    be_draw_bitmap_with_mask (view, bitmap, mask, 0, 0,
+				      s->img->original_width,
+				      s->img->original_height,
+				      0, 0,
+				      s->img->original_width,
+				      s->img->original_height,
+				      s->img->use_bilinear_filtering);
+
+	  if (s->slice.x != x || s->slice.y != y
+	      || s->slice.width != s->img->width
+	      || s->slice.height != s->img->height)
+	    BView_EndClip (view);
+
+	  be_apply_affine_transform (view, 1, 0, 0, 0, 1, 0);
 	}
 
       if (!s->img->mask)
@@ -1922,10 +1962,8 @@ haiku_draw_glyph_string (struct glyph_string *s)
   /* Set the stipple_p flag indicating whether or not a stipple was
      drawn in s->row.  That is the case either when s is a stretch
      glyph string and s->face->stipple is not NULL, or when
-     s->face->stipple exists and s->hl is not DRAW_CURSOR, and s is
-     not an image.  This is different from X.  */
-  if (s->first_glyph->type != IMAGE_GLYPH
-      && s->face->stipple
+     s->face->stipple exists and s->hl is not DRAW_CURSOR.  */
+  if (s->face->stipple
       && (s->first_glyph->type == STRETCH_GLYPH
 	  || s->hl != DRAW_CURSOR))
     s->row->stipple_p = true;

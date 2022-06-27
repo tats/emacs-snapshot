@@ -3085,12 +3085,15 @@ struct image
   XFORM xform;
 #endif
 #ifdef HAVE_HAIKU
-  /* Non-zero if the image has not yet been transformed for display.  */
-  int have_be_transforms_p;
+  /* The affine transformation to apply to this image.  */
+  double transform[3][3];
 
-  double be_rotate;
-  double be_scale_x;
-  double be_scale_y;
+  /* The original width and height of the image.  */
+  int original_width, original_height;
+
+  /* Whether or not bilinear filtering should be used to "smooth" the
+     image.  */
+  bool use_bilinear_filtering;
 #endif
 
   /* Colors allocated for this image, if any.  Allocated via xmalloc.  */
@@ -3407,6 +3410,8 @@ int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
 extern bool redisplaying_p;
+extern bool display_working_on_window_p;
+extern void unwind_display_working_on_window (void);
 extern bool help_echo_showing_p;
 extern Lisp_Object help_echo_string, help_echo_window;
 extern Lisp_Object help_echo_object, previous_help_echo_string;
@@ -3504,6 +3509,8 @@ void w32_reset_fringes (void);
 extern unsigned row_hash (struct glyph_row *);
 
 extern bool buffer_flipping_blocked_p (void);
+
+extern void update_redisplay_ticks (int, struct window *);
 
 /* Defined in image.c */
 

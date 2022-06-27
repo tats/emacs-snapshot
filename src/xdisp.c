@@ -1030,6 +1030,15 @@ static struct glyph_slice null_glyph_slice = { 0, 0, 0, 0 };
 
 bool redisplaying_p;
 
+/* True while some display-engine code is working on layout of some
+   window.
+
+   WARNING: Use sparingly, preferably only in top level of commands
+   and important functions, because using it in nested calls might
+   reset the flag when the inner call returns, behind the back of
+   the callers.  */
+bool display_working_on_window_p;
+
 /* If a string, XTread_socket generates an event to display that string.
    (The display is done in read_char.)  */
 
@@ -3221,6 +3230,9 @@ init_iterator (struct it *it, struct window *w,
   it->f = XFRAME (w->frame);
 
   it->cmp_it.id = -1;
+
+  if (max_redisplay_ticks > 0)
+    update_redisplay_ticks (0, w);
 
   /* Extra space between lines (on window systems only).  */
   if (base_face_id == DEFAULT_FACE_ID
@@ -8175,6 +8187,9 @@ void
 set_iterator_to_next (struct it *it, bool reseat_p)
 {
 
+  if (max_redisplay_ticks > 0)
+    update_redisplay_ticks (1, it->w);
+
   switch (it->method)
     {
     case GET_FROM_BUFFER:
@@ -10957,6 +10972,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
     max_y = XFIXNUM (y_limit);
 
   itdata = bidi_shelve_cache ();
+
   start_display (&it, w, startp);
 
   int start_y = it.current_y;
@@ -14678,7 +14694,7 @@ build_desired_tool_bar_string (struct frame *f)
 	     selected.  */
 	  if (selected_p)
 	    {
-	      plist = Fplist_put (plist, QCrelief, make_fixnum (-relief));
+	      plist = plist_put (plist, QCrelief, make_fixnum (-relief));
 	      hmargin -= relief;
 	      vmargin -= relief;
 	    }
@@ -14688,10 +14704,10 @@ build_desired_tool_bar_string (struct frame *f)
 	  /* If image is selected, display it pressed, i.e. with a
 	     negative relief.  If it's not selected, display it with a
 	     raised relief.  */
-	  plist = Fplist_put (plist, QCrelief,
-			      (selected_p
-			       ? make_fixnum (-relief)
-			       : make_fixnum (relief)));
+	  plist = plist_put (plist, QCrelief,
+			     (selected_p
+			      ? make_fixnum (-relief)
+			      : make_fixnum (relief)));
 	  hmargin -= relief;
 	  vmargin -= relief;
 	}
@@ -14700,18 +14716,18 @@ build_desired_tool_bar_string (struct frame *f)
       if (hmargin || vmargin)
 	{
 	  if (hmargin == vmargin)
-	    plist = Fplist_put (plist, QCmargin, make_fixnum (hmargin));
+	    plist = plist_put (plist, QCmargin, make_fixnum (hmargin));
 	  else
-	    plist = Fplist_put (plist, QCmargin,
-				Fcons (make_fixnum (hmargin),
-				       make_fixnum (vmargin)));
+	    plist = plist_put (plist, QCmargin,
+			       Fcons (make_fixnum (hmargin),
+				      make_fixnum (vmargin)));
 	}
 
       /* If button is not enabled, and we don't have special images
 	 for the disabled state, make the image appear disabled by
 	 applying an appropriate algorithm to it.  */
       if (!enabled_p && idx < 0)
-	plist = Fplist_put (plist, QCconversion, Qdisabled);
+	plist = plist_put (plist, QCconversion, Qdisabled);
 
       /* Put a `display' text property on the string for the image to
 	 display.  Put a `menu-item' property on the string that gives
@@ -16724,9 +16740,14 @@ redisplay_internal (void)
 				 list_of_error,
 				 redisplay_window_error);
       if (update_miniwindow_p)
-	internal_condition_case_1 (redisplay_window_1,
-				   FRAME_MINIBUF_WINDOW (sf), list_of_error,
-				   redisplay_window_error);
+	{
+	  Lisp_Object mini_window = FRAME_MINIBUF_WINDOW (sf);
+
+	  displayed_buffer = XBUFFER (XWINDOW (mini_window)->contents);
+	  internal_condition_case_1 (redisplay_window_1, mini_window,
+				     list_of_error,
+				     redisplay_window_error);
+	}
 
       /* Compare desired and current matrices, perform output.  */
 
@@ -16904,6 +16925,11 @@ redisplay_internal (void)
   if (interrupt_input && interrupts_deferred)
     request_sigio ();
 
+  /* We're done with this redisplay cycle, so reset the tick count in
+     preparation for the next redisplay cycle.  */
+  if (max_redisplay_ticks > 0)
+    update_redisplay_ticks (0, NULL);
+
   unbind_to (count, Qnil);
   RESUME_POLLING;
 }
@@ -16961,6 +16987,13 @@ unwind_redisplay (void)
   unblock_buffer_flips ();
 }
 
+/* Function registered with record_unwind_protect before calling
+   start_display outside of redisplay_internal.  */
+void
+unwind_display_working_on_window (void)
+{
+  display_working_on_window_p = false;
+}
 
 /* Mark the display of leaf window W as accurate or inaccurate.
    If ACCURATE_P, mark display of W as accurate.
@@ -17135,9 +17168,19 @@ redisplay_windows (Lisp_Object window)
 }
 
 static Lisp_Object
-redisplay_window_error (Lisp_Object ignore)
+redisplay_window_error (Lisp_Object error_data)
 {
   displayed_buffer->display_error_modiff = BUF_MODIFF (displayed_buffer);
+
+  /* When in redisplay, the error is captured and not shown.  Arrange
+     for it to be shown later.  */
+  if (max_redisplay_ticks > 0
+      && CONSP (error_data)
+      && EQ (XCAR (error_data), Qerror)
+      && STRINGP (XCAR (XCDR (error_data))))
+    Vdelayed_warnings_list = Fcons (list2 (XCAR (error_data),
+					   XCAR (XCDR (error_data))),
+				    Vdelayed_warnings_list);
   return Qnil;
 }
 
@@ -17156,6 +17199,73 @@ redisplay_window_1 (Lisp_Object window)
     redisplay_window (window, true);
   return Qnil;
 }
+
+
+/***********************************************************************
+		      Aborting runaway redisplay
+ ***********************************************************************/
+
+/* Update the redisplay-tick count for window W, and signal an error
+   if the tick count is above some threshold, indicating that
+   redisplay of the window takes "too long".
+
+   TICKS is the amount of ticks to add to the W's current count; zero
+   means to initialize the tick count to zero.
+
+   W can be NULL if TICKS is zero: that means unconditionally
+   re-initialize the current tick count to zero.
+
+   W can also be NULL if the caller doesn't know which window is being
+   processed by the display code.  In that case, if TICKS is non-zero,
+   we assume it's the last window that shows the current buffer.  */
+void
+update_redisplay_ticks (int ticks, struct window *w)
+{
+  /* This keeps track of the window on which redisplay is working.  */
+  static struct window *cwindow;
+  static EMACS_INT window_ticks;
+
+  /* We only initialize the count if this is a different window or
+     NULL.  Otherwise, this is a call from init_iterator for the same
+     window we tracked before, and we should keep the count.  */
+  if (!ticks && w != cwindow)
+    {
+      cwindow = w;
+      window_ticks = 0;
+    }
+  /* Some callers can be run in contexts unrelated to display code, so
+     don't abort them and don't update the tick count in those cases.  */
+  if ((!w && !redisplaying_p && !display_working_on_window_p)
+      /* We never disable redisplay of a mini-window, since that is
+	 absolutely essential for communicating with Emacs.  */
+      || (w && MINI_WINDOW_P (w)))
+    return;
+
+  if (ticks > 0)
+    window_ticks += ticks;
+  if (max_redisplay_ticks > 0 && window_ticks > max_redisplay_ticks)
+    {
+      /* In addition to a buffer, this could be a window (for non-leaf
+	 windows, not expected here) or nil (for pseudo-windows like
+	 the one used for the native tool bar).  */
+      Lisp_Object contents = w ? w->contents : Qnil;
+      char *bufname =
+	NILP (contents)
+	? SSDATA (BVAR (current_buffer, name))
+	: (BUFFERP (contents)
+	   ? SSDATA (BVAR (XBUFFER (contents), name))
+	   : (char *) "<unknown>");
+
+      windows_or_buffers_changed = 177;
+      /* scrolling_window depends too much on the glyph matrices being
+	 correct, and we cannot guarantee that if we abort the
+	 redisplay of this window.  */
+      if (w && w->desired_matrix)
+	w->desired_matrix->no_scrolling_p = true;
+      error ("Window showing buffer %s takes too long to redisplay", bufname);
+    }
+}
+
 
 
 /* Set cursor position of W.  PT is assumed to be displayed in ROW.
@@ -21081,6 +21191,12 @@ try_window_id (struct window *w)
 						Qline_number_current_line,
 						w->frame))))
     GIVE_UP (24);
+
+  /* composition-break-at-point is incompatible with the optimizations
+     in this function, because we need to recompose characters when
+     point moves off their positions.  */
+  if (composition_break_at_point)
+    GIVE_UP (27);
 
   /* Make sure beg_unchanged and end_unchanged are up to date.  Do it
      only if buffer has really changed.  The reason is that the gap is
@@ -26394,8 +26510,8 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		    tem = props;
 		    while (CONSP (tem))
 		      {
-			oprops = Fplist_put (oprops, XCAR (tem),
-					     XCAR (XCDR (tem)));
+			oprops = plist_put (oprops, XCAR (tem),
+					    XCAR (XCDR (tem)));
 			tem = XCDR (XCDR (tem));
 		      }
 		    props = oprops;
@@ -26846,13 +26962,13 @@ store_mode_line_string (const char *string, Lisp_Object lisp_string,
 	props = mode_line_string_face_prop;
       else if (!NILP (mode_line_string_face))
 	{
-	  Lisp_Object face = Fplist_get (props, Qface);
+	  Lisp_Object face = plist_get (props, Qface);
 	  props = Fcopy_sequence (props);
 	  if (NILP (face))
 	    face = mode_line_string_face;
 	  else
 	    face = list2 (face, mode_line_string_face);
-	  props = Fplist_put (props, Qface, face);
+	  props = plist_put (props, Qface, face);
 	}
       Fadd_text_properties (make_fixnum (0), make_fixnum (len),
 			    props, lisp_string);
@@ -26871,7 +26987,7 @@ store_mode_line_string (const char *string, Lisp_Object lisp_string,
 	  Lisp_Object face;
 	  if (NILP (props))
 	    props = Ftext_properties_at (make_fixnum (0), lisp_string);
-	  face = Fplist_get (props, Qface);
+	  face = plist_get (props, Qface);
 	  if (NILP (face))
 	    face = mode_line_string_face;
 	  else
@@ -27921,7 +28037,7 @@ display_string (const char *string, Lisp_Object lisp_string, Lisp_Object face_st
 						    face_string);
 	  if (!NILP (display))
 	    {
-	      Lisp_Object min_width = Fplist_get (display, Qmin_width);
+	      Lisp_Object min_width = plist_get (display, Qmin_width);
 	      if (!NILP (min_width))
 		display_min_width (it, 0, face_string, min_width);
 	    }
@@ -30614,14 +30730,14 @@ produce_stretch_glyph (struct it *it)
   plist = XCDR (it->object);
 
   /* Compute the width of the stretch.  */
-  if ((prop = Fplist_get (plist, QCwidth), !NILP (prop))
+  if ((prop = plist_get (plist, QCwidth), !NILP (prop))
       && calc_pixel_width_or_height (&tem, it, prop, font, true, NULL))
     {
       /* Absolute width `:width WIDTH' specified and valid.  */
       zero_width_ok_p = true;
       width = (int)tem;
     }
-  else if (prop = Fplist_get (plist, QCrelative_width), NUMVAL (prop) > 0)
+  else if (prop = plist_get (plist, QCrelative_width), NUMVAL (prop) > 0)
     {
       /* Relative width `:relative-width FACTOR' specified and valid.
 	 Compute the width of the characters having this `display'
@@ -30658,7 +30774,7 @@ produce_stretch_glyph (struct it *it)
       PRODUCE_GLYPHS (&it2);
       width = NUMVAL (prop) * it2.pixel_width;
     }
-  else if ((prop = Fplist_get (plist, QCalign_to), !NILP (prop))
+  else if ((prop = plist_get (plist, QCalign_to), !NILP (prop))
 	   && calc_pixel_width_or_height (&tem, it, prop, font, true,
 					  &align_to))
     {
@@ -30684,13 +30800,13 @@ produce_stretch_glyph (struct it *it)
     {
       int default_height = normal_char_height (font, ' ');
 
-      if ((prop = Fplist_get (plist, QCheight), !NILP (prop))
+      if ((prop = plist_get (plist, QCheight), !NILP (prop))
 	  && calc_pixel_width_or_height (&tem, it, prop, font, false, NULL))
 	{
 	  height = (int)tem;
 	  zero_height_ok_p = true;
 	}
-      else if (prop = Fplist_get (plist, QCrelative_height),
+      else if (prop = plist_get (plist, QCrelative_height),
 	       NUMVAL (prop) > 0)
 	height = default_height * NUMVAL (prop);
       else
@@ -30702,7 +30818,7 @@ produce_stretch_glyph (struct it *it)
       /* Compute percentage of height used for ascent.  If
 	 `:ascent ASCENT' is present and valid, use that.  Otherwise,
 	 derive the ascent from the font in use.  */
-      if (prop = Fplist_get (plist, QCascent),
+      if (prop = plist_get (plist, QCascent),
           NUMVAL (prop) > 0 && NUMVAL (prop) <= 100)
 	ascent = height * NUMVAL (prop) / 100.0;
       else if (!NILP (prop)
@@ -34049,7 +34165,7 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
   if (IMAGEP (object))
     {
       Lisp_Object image_map, hotspot;
-      if ((image_map = Fplist_get (XCDR (object), QCmap),
+      if ((image_map = plist_get (XCDR (object), QCmap),
 	   !NILP (image_map))
 	  && (hotspot = find_hot_spot (image_map, dx, dy),
 	      CONSP (hotspot))
@@ -34064,10 +34180,10 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
 	  if (CONSP (hotspot)
 	      && (plist = XCAR (hotspot), CONSP (plist)))
 	    {
-	      pointer = Fplist_get (plist, Qpointer);
+	      pointer = plist_get (plist, Qpointer);
 	      if (NILP (pointer))
 		pointer = Qhand;
-	      help = Fplist_get (plist, Qhelp_echo);
+	      help = plist_get (plist, Qhelp_echo);
 	      if (!NILP (help))
 		{
 		  help_echo_string = help;
@@ -34078,7 +34194,7 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
 	    }
 	}
       if (NILP (pointer))
-	pointer = Fplist_get (XCDR (object), QCpointer);
+	pointer = plist_get (XCDR (object), QCpointer);
     }
 #endif	/* HAVE_WINDOW_SYSTEM */
 
@@ -34564,7 +34680,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 	  if (img != NULL && IMAGEP (img->spec))
 	    {
 	      Lisp_Object image_map, hotspot;
-	      if ((image_map = Fplist_get (XCDR (img->spec), QCmap),
+	      if ((image_map = plist_get (XCDR (img->spec), QCmap),
 		   !NILP (image_map))
 		  && (hotspot = find_hot_spot (image_map,
 					       glyph->slice.img.x + dx,
@@ -34582,10 +34698,10 @@ note_mouse_highlight (struct frame *f, int x, int y)
 		  if (CONSP (hotspot)
 		      && (plist = XCAR (hotspot), CONSP (plist)))
 		    {
-		      pointer = Fplist_get (plist, Qpointer);
+		      pointer = plist_get (plist, Qpointer);
 		      if (NILP (pointer))
 			pointer = Qhand;
-		      help_echo_string = Fplist_get (plist, Qhelp_echo);
+		      help_echo_string = plist_get (plist, Qhelp_echo);
 		      if (!NILP (help_echo_string))
 			{
 			  help_echo_window = window;
@@ -34595,7 +34711,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
 		    }
 		}
 	      if (NILP (pointer))
-		pointer = Fplist_get (XCDR (img->spec), QCpointer);
+		pointer = plist_get (XCDR (img->spec), QCpointer);
 	    }
 	}
 #endif	/* HAVE_WINDOW_SYSTEM */
@@ -35777,7 +35893,7 @@ be let-bound around code that needs to disable messages temporarily. */);
 
   DEFSYM (Qinhibit_free_realized_faces, "inhibit-free-realized-faces");
 
-  list_of_error = list1 (list2 (Qerror, Qvoid_variable));
+  list_of_error = list1 (Qerror);
   staticpro (&list_of_error);
 
   /* Values of those variables at last redisplay are stored as
@@ -36667,6 +36783,22 @@ and display the most important part of the minibuffer.   */);
 This makes it easier to edit character sequences that are
 composed on display.  */);
   composition_break_at_point = false;
+
+  DEFVAR_INT ("max-redisplay-ticks", max_redisplay_ticks,
+    doc: /* Maximum number of redisplay ticks before aborting redisplay of a window.
+
+This allows to abort the display of a window if the amount of low-level
+redisplay operations exceeds the value of this variable.  When display of
+a window is aborted due to this reason, the buffer shown in that window
+will not have its windows redisplayed until the buffer is modified or until
+you type \\[recenter-top-bottom] with one of its windows selected.
+You can also decide to kill the buffer and visit it in some
+other way, like under `so-long-mode' or literally.
+
+The default value is zero, which disables this feature.
+The recommended non-zero value is between 100000 and 1000000,
+depending on your patience and the speed of your system.  */);
+  max_redisplay_ticks = 0;
 }
 
 

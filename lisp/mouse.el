@@ -655,7 +655,13 @@ This command must be bound to a mouse click."
   (interactive "e")
   (unless (one-window-p t)
     (mouse-minibuffer-check click)
-    (delete-window (posn-window (event-start click)))))
+    ;; Only delete the window if the user hasn't moved point out of
+    ;; the mode line before releasing the button.
+    (when (and (eq (posn-area (event-end click))
+                   'mode-line)
+               (eq (posn-window (event-end click))
+                   (posn-window (event-start click))))
+      (delete-window (posn-window (event-start click))))))
 
 (defun mouse-select-window (click)
   "Select the window clicked on; don't move point."
@@ -681,10 +687,13 @@ This command must be bound to a mouse click."
     (switch-to-buffer buf)
     (delete-window window)))
 
-(defun mouse-delete-other-windows ()
+(defun mouse-delete-other-windows (click)
   "Delete all windows except the one you click on."
-  (interactive "@")
-  (delete-other-windows))
+  (interactive "e")
+  (when (and (eq (posn-area (event-end click)) 'mode-line)
+             (eq (posn-window (event-start click))
+                 (posn-window (event-end click))))
+    (delete-other-windows (posn-window (event-start click)))))
 
 (defun mouse-split-window-vertically (click)
   "Select Emacs window mouse is on, then split it vertically in half.

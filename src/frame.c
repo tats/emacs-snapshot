@@ -2176,6 +2176,17 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     x_clear_frame_selections (f);
 #endif
 
+#ifdef HAVE_PGTK
+  if (FRAME_PGTK_P (f))
+    {
+      /* Do special selection events now, in case the window gets
+	 destroyed by this deletion.  Does this run Lisp code?  */
+      swallow_events (false);
+
+      pgtk_clear_frame_selections (f);
+    }
+#endif
+
   /* Free glyphs.
      This function must be called before the window tree of the
      frame is deleted because windows contain dynamically allocated
@@ -5119,7 +5130,9 @@ gui_set_no_special_glyphs (struct frame *f, Lisp_Object new_value, Lisp_Object o
 bool
 gui_mouse_grabbed (Display_Info *dpyinfo)
 {
-  return (dpyinfo->grabbed
+  return ((dpyinfo->grabbed
+	   || (dpyinfo->terminal->any_grab_hook
+	       && dpyinfo->terminal->any_grab_hook (dpyinfo)))
 	  && dpyinfo->last_mouse_frame
 	  && FRAME_LIVE_P (dpyinfo->last_mouse_frame));
 }

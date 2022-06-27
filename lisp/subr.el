@@ -540,12 +540,12 @@ i.e., subtract 2 * `most-negative-fixnum' from VALUE before shifting it."
 ;; you may want to amend the other, too.
 (defun internal--compiler-macro-cXXr (form x)
   (let* ((head (car form))
-         (n (symbol-name (car form)))
+         (n (symbol-name head))
          (i (- (length n) 2)))
     (if (not (string-match "c[ad]+r\\'" n))
         (if (and (fboundp head) (symbolp (symbol-function head)))
-            (internal--compiler-macro-cXXr (cons (symbol-function head) (cdr form))
-                                     x)
+            (internal--compiler-macro-cXXr
+             (cons (symbol-function head) (cdr form)) x)
           (error "Compiler macro for cXXr applied to non-cXXr form"))
       (while (> i (match-beginning 0))
         (setq x (list (if (eq (aref n i) ?a) 'car 'cdr) x))
@@ -1883,12 +1883,6 @@ be a list of the form returned by `event-start' and `event-end'."
 (make-obsolete-variable 'load-dangerous-libraries
                         "no longer used." "27.1")
 
-(defvar inhibit--record-char nil
-  "Obsolete variable.
-This was used internally by quail.el and keyboard.c in Emacs 27.
-It does nothing in Emacs 28.")
-(make-obsolete-variable 'inhibit--record-char nil "28.1")
-
 (define-obsolete-function-alias 'compare-window-configurations
   #'window-configuration-equal-p "29.1")
 
@@ -3048,6 +3042,7 @@ by doing (clear-string STRING)."
             (use-local-map read-passwd-map)
             (setq-local inhibit-modification-hooks nil) ;bug#15501.
 	    (setq-local show-paren-mode nil)		;bug#16091.
+            (setq-local inhibit--record-char t)
             (add-hook 'post-command-hook #'read-password--hide-password nil t))
         (unwind-protect
             (let ((enable-recursive-minibuffers t)
@@ -4010,6 +4005,12 @@ Otherwise, return nil."
   (if (and (symbolp object) (fboundp object))
       (setq object (indirect-function object)))
   (and (subrp object) (eq (cdr (subr-arity object)) 'unevalled)))
+
+(defun plistp (object)
+  "Non-nil if and only if OBJECT is a valid plist."
+  (and (listp object)
+       (proper-list-p object)
+       (zerop (mod (length object) 2))))
 
 (defun macrop (object)
   "Non-nil if and only if OBJECT is a macro."
@@ -6911,5 +6912,17 @@ CONDITION."
       (when (buffer-match-p condition (get-buffer buf) arg)
         (push buf bufs)))
     bufs))
+
+(defmacro with-memoization (place &rest code)
+  "Return the value of CODE and stash it in PLACE.
+If PLACE's value is non-nil, then don't bother evaluating CODE
+and return the value found in PLACE instead."
+  (declare (indent 1) (debug (gv-place body)))
+  (gv-letplace (getter setter) place
+    `(or ,getter
+         ,(macroexp-let2 nil val (macroexp-progn code)
+            `(progn
+               ,(funcall setter val)
+               ,val)))))
 
 ;;; subr.el ends here

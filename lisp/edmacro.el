@@ -62,6 +62,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'seq)
 (require 'kmacro)
 
 ;;; The user-level commands for editing macros.
@@ -110,7 +111,7 @@ Default nil means to write characters above \\177 in octal notation."
 (defun edit-kbd-macro (keys &optional prefix finish-hook store-hook)
   "Edit a keyboard macro.
 At the prompt, type any key sequence which is bound to a keyboard macro.
-Or, type `\\[kmacro-end-and-call-macro]' or RET to edit the last
+Or, type `\\[kmacro-end-and-call-macro]' or \\`RET' to edit the last
 keyboard macro, `\\[view-lossage]' to edit the last 300
 keystrokes as a keyboard macro, or `\\[execute-extended-command]'
 to edit a macro by its command name.
@@ -254,7 +255,7 @@ or nil, use a compact 80-column format."
 ;;; Commands for *Edit Macro* buffer.
 
 (defun edmacro-finish-edit ()
-  (interactive)
+  (interactive nil edmacro-mode)
   (unless (eq major-mode 'edmacro-mode)
     (error
      "This command is valid only in buffers created by `edit-kbd-macro'"))
@@ -365,7 +366,7 @@ or nil, use a compact 80-column format."
 
 (defun edmacro-insert-key (key)
   "Insert the written name of a KEY in the buffer."
-  (interactive "kKey to insert: ")
+  (interactive "kKey to insert: " edmacro-mode)
   (if (bolp)
       (insert (edmacro-format-keys key t) "\n")
     (insert (edmacro-format-keys key) " ")))
@@ -373,7 +374,7 @@ or nil, use a compact 80-column format."
 (defun edmacro-mode ()
   "\\<edmacro-mode-map>Keyboard Macro Editing mode.  Press \
 \\[edmacro-finish-edit] to save and exit.
-To abort the edit, just kill this buffer with \\[kill-buffer] RET.
+To abort the edit, just kill this buffer with \\[kill-buffer] \\`RET'.
 
 Press \\[edmacro-insert-key] to insert the name of any key by typing the key.
 

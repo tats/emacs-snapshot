@@ -97,10 +97,6 @@ threading."
     (maphash (lambda (_ v) (push v values)) hash-table)
     values))
 
-(defsubst string-empty-p (string)
-  "Check whether STRING is empty."
-  (string= string ""))
-
 (defsubst string-join (strings &optional separator)
   "Join all STRINGS using SEPARATOR.
 Optional argument SEPARATOR must be a string, a vector, or a list of
@@ -289,19 +285,6 @@ as the new values of the bound variables in the recursive invocation."
     `(funcall
       (cl-labels ((,name ,fargs . ,body)) #',name)
       . ,aargs)))
-
-(defmacro with-memoization (place &rest code)
-  "Return the value of CODE and stash it in PLACE.
-If PLACE's value is non-nil, then don't bother evaluating CODE
-and return the value found in PLACE instead."
-  (declare (indent 1) (debug (gv-place body)))
-  (gv-letplace (getter setter) place
-    `(or ,getter
-         ,(macroexp-let2 nil val (macroexp-progn code)
-            `(progn
-               ,(funcall setter val)
-               ,val)))))
-
 
 ;;;###autoload
 (defun string-pixel-width (string)

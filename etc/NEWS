@@ -117,6 +117,14 @@ Emacs Sessions" node in the Emacs manual for more details.
 * Startup Changes in Emacs 29.1
 
 +++
+** -batch and -script now adjusts the garbage collection levels.
+These switches now set 'gc-cons-percentage' to 1.0 (up from the
+default of 0.1).  This means that batch processes will typically use
+more memory than before, but use less time doing garbage collection.
+Batch jobs that are supposed to run for a long time should adjust the
+limit back down again.
+
++++
 ** Emacs can now be used more easily in an executable script.
 If you start an executable script with
 
@@ -306,6 +314,19 @@ startup.  Previously, these functions ignored
 
 * Changes in Emacs 29.1
 
++++
+** New key binding after 'M-x' or 'M-X': 'M-X'.
+Emacs allows different completion predicates to be used with 'M-x'
+(i.e., 'execute-extended-command') via the
+'read-extended-command-predicate' user option.  Emacs also has the
+'M-X' (note upper case) command, which only displays commands
+especially relevant to the current buffer.  Emacs now allows toggling
+between these modes while the user is inputting a command by hitting
+'M-X' while in the minibuffer.
+
+---
+** Interactively, 'kill-buffer' will now offer to save the buffer if unsaved.
+
 ---
 ** New command 'duplicate-line'.
 This command duplicates the current line the specified number of times.
@@ -376,6 +397,13 @@ This inhibits putting empty strings onto the kill ring.
 ** New user options 'dnd-indicate-insertion-point' and 'dnd-scroll-margin'.
 These options allow adjusting point and scrolling a window when
 dragging items from another program.
+
++++
+** New user option 'record-all-keys'.
+If non-nil, this option will force recording of all input keys,
+including those typed in response to passwords prompt (this was the
+previous behavior).  The default is nil, which inhibits recording of
+passwords.
 
 +++
 ** New function 'command-query'.
@@ -581,6 +609,10 @@ or ':scream:'.
 
 ** Help
 
+---
+*** Variable values displayed by 'C-h v' in *Help* are now font-locked.
+
++++
 *** New user option 'help-clean-buttons'.
 If non-nil, link buttons in *Help* will have any surrounding quotes
 removed.
@@ -780,6 +812,14 @@ available options can be restored by enabling this option.
 Use it if you want Imenu to forget the buffer's index alist and
 recreate it anew next time 'imenu' is invoked.
 
++++
+** Emacs is now capable of abandoning a window's redisplay that takes too long.
+This is controlled by the new variable 'max-redisplay-ticks'.  If that
+variable is set to a non-zero value, display of a window will be
+aborted after that many low-level redisplay operations, thus
+preventing Emacs from becoming wedged when visiting files with very
+long lines.
+
 * Editing Changes in Emacs 29.1
 
 +++
@@ -932,6 +972,13 @@ so automatically.
 
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** Games
+
+---
+*** New user option 'tetris-allow-repetitions'.
+This controls how randomness is implemented (whether to use pure
+randomness as before or whether to use a bag).
 
 ** Battery
 
@@ -1338,6 +1385,13 @@ doesn't work on other systems.  Also see etc/PROBLEMS.
 These are used to alter an URL before using it.  By default it removes
 the common "utm_" trackers from URLs.
 
+** Find-Dired
+
+*** New command 'find-dired-with-command'.
+This enables users to run 'find-dired' with an arbitrary command,
+enabling running commands previously unsupported and also enabling new
+commands to be built on top.
+
 ** Gnus
 
 +++
@@ -1519,6 +1573,10 @@ This controls whether or not to show a message when opening certain
 image formats saying how to edit it as text.  The default is to show
 this message for SVG and XPM.
 
++++
+*** New commands: 'image-flip-horizontally' and 'image-flip-vertically'.
+These commands horizontally and vertically flip the image under point.
+
 ** Image-Dired
 
 +++
@@ -1623,7 +1681,7 @@ the thumbnail file.
 ** Dired
 
 ---
-*** New user option 'dired-omit-line-regexp'.
+*** New user option 'dired-omit-lines'.
 This is used by 'dired-omit-mode', and now allows you to hide based on
 other things than just the file names.
 
@@ -1802,6 +1860,12 @@ values passed as a single token, such as '-oVALUE' or
 'eshell-eval-using-options' macro.  See "Defining new built-in
 commands" in the "(eshell) Built-ins" node of the Eshell manual.
 
+---
+*** Eshell globs ending with '/' now match only directories.
+Additionally, globs ending with '**/' or '***/' no longer raise an
+error, and now expand to all directories recursively (following
+symlinks in the latter case).
+
 ** Shell
 
 ---
@@ -1839,6 +1903,17 @@ Enabling this minor mode turns on hiding header material, like
 *** New user option 'project-vc-include-untracked'.
 If non-nil, files untracked by a VCS are considered to be part of
 the project by a VC project based on that VCS.
+
+---
+*** 'recentf-mode' now uses shortened filenames by default.
+This means that e.g. "/home/foo/bar" is now displayed as "~/bar".
+Customize the user option 'recentf-filename-handlers' to nil to get
+back the old behavior.
+
+---
+*** New command 'recentf-open'.
+This command prompts for a recently opened file in the minibuffer, and
+visits it.
 
 ---
 ** The autoarg.el library is now marked obsolete.
@@ -2074,6 +2149,13 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** 'plist-get', 'plist-put' and 'plist-member' are no longer limited to 'eq'.
+These function now take an optional comparison predicate argument.
+
++++
+** 'read-multiple-choice' can now use long-form answers.
 
 +++
 ** 'read-regexp' now allows the user to indicate whether to use case folding.
@@ -2819,7 +2901,7 @@ invocation.  Such shells are POSIX conformant by default.
 This is to determine which function has to be called in order to
 deliver the signal.  This allows Tramp to send the signal to remote
 asynchronous processes.  The hitherto existing implementation has been
-moved to 'signal-default-interrupt-process'.
+moved to 'internal-default-signal-process'.
 
 +++
 ** 'list-system-processes' now returns remote process IDs.

@@ -1955,7 +1955,8 @@ The outline level is equal to the verbosity of the Tramp message."
   "A predicate for Tramp interactive commands.
 They are completed by \"M-x TAB\" only in Tramp debug buffers."
   (with-current-buffer buffer
-    (string-equal (buffer-substring 1 (min 10 (point-max))) ";; Emacs:")))
+    (string-equal
+     (buffer-substring (point-min) (min 10 (point-max))) ";; Emacs:")))
 
 (put #'tramp-debug-buffer-command-completion-p 'tramp-suppress-trace t)
 
@@ -3462,8 +3463,8 @@ BODY is the backend specific code."
 		  ;; `file-precious-flag' is set.
 		  (or (file-attribute-modification-time file-attr)
 		      (current-time)))
-		 (unless (and (= (file-attribute-user-id file-attr) uid)
-			      (= (file-attribute-group-id file-attr) gid))
+		 (when (and (= (file-attribute-user-id file-attr) uid)
+			    (= (file-attribute-group-id file-attr) gid))
 		   (setq need-chown nil))))
 
 	     ;; Set the ownership.

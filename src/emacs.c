@@ -975,20 +975,24 @@ load_pdump (int argc, char **argv)
   sprintf (dump_file, "%s%c%s-%s%s",
            path_exec, DIRECTORY_SEP, argv0_base, hexbuf, suffix);
 #if !defined (NS_SELF_CONTAINED)
-  /* Assume the Emacs binary lives in a sibling directory as set up by
-     the default installation configuration.  */
-  const char *go_up = "../../../../bin/";
-  needed += (strip_suffix ? strlen (strip_suffix) : 0)
-    - strlen (suffix) + strlen (go_up);
-  if (exec_bufsize < needed)
+  if (!(emacs_executable && *emacs_executable))
     {
-      xfree (emacs_executable);
-      emacs_executable = xpalloc (NULL, &exec_bufsize, needed - exec_bufsize,
-				  -1, 1);
+      /* If we didn't find the Emacs binary, assume that it lives in a
+	 sibling directory as set up by the default installation
+	 configuration.  */
+      const char *go_up = "../../../../bin/";
+      needed += (strip_suffix ? strlen (strip_suffix) : 0)
+	- strlen (suffix) + strlen (go_up);
+      if (exec_bufsize < needed)
+	{
+	  xfree (emacs_executable);
+	  emacs_executable = xpalloc (NULL, &exec_bufsize,
+				      needed - exec_bufsize, -1, 1);
+	}
+      sprintf (emacs_executable, "%s%c%s%s%s",
+	       path_exec, DIRECTORY_SEP, go_up, argv0_base,
+	       strip_suffix ? strip_suffix : "");
     }
-  sprintf (emacs_executable, "%s%c%s%s%s",
-	   path_exec, DIRECTORY_SEP, go_up, argv0_base,
-	   strip_suffix ? strip_suffix : "");
 #endif
   result = pdumper_load (dump_file, emacs_executable);
 
@@ -1926,9 +1930,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_bignum ();
   init_threads ();
   init_eval ();
-#ifdef HAVE_PGTK
-  init_pgtkterm (); /* Must come before `init_atimer'.  */
-#endif
   running_asynch_code = 0;
   init_random ();
   init_xfaces ();
@@ -1939,6 +1940,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   if (!initialized)
     syms_of_comp ();
+
+  /* Do less garbage collection in batch mode (since these tend to be
+     more short-lived, and the memory is returned to the OS on exit
+     anyway).  */
+  Vgc_cons_percentage = make_float (noninteractive? 1.0: 0.1);
 
   no_loadup
     = argmatch (argv, argc, "-nl", "--no-loadup", 6, NULL, &skip_args);

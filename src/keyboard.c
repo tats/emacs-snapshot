@@ -1501,7 +1501,14 @@ command_loop_1 (void)
             point_before_last_command_or_undo = PT;
             buffer_before_last_command_or_undo = current_buffer;
 
+	    /* Restart our counting of redisplay ticks before
+	       executing the command, so that we don't blame the new
+	       command for the sins of the previous one.  */
+	    update_redisplay_ticks (0, NULL);
+	    display_working_on_window_p = false;
+
             call1 (Qcommand_execute, Vthis_command);
+	    display_working_on_window_p = false;
 
 #ifdef HAVE_WINDOW_SYSTEM
 	  /* Do not check display_hourglass_p here, because
@@ -3313,6 +3320,11 @@ help_char_p (Lisp_Object c)
 static void
 record_char (Lisp_Object c)
 {
+  /* subr.el/read-passwd binds inhibit_record_char to avoid recording
+     passwords.  */
+  if (!record_all_keys && inhibit_record_char)
+    return;
+
   int recorded = 0;
 
   if (CONSP (c) && (EQ (XCAR (c), Qhelp_echo) || EQ (XCAR (c), Qmouse_movement)))
@@ -3726,7 +3738,7 @@ Time_to_position (Time encoded_pos)
 {
   if (encoded_pos <= INPUT_EVENT_POS_MAX)
     return encoded_pos;
-  Time encoded_pos_min = INPUT_EVENT_POS_MIN;
+  Time encoded_pos_min = position_to_Time (INPUT_EVENT_POS_MIN);
   eassert (encoded_pos_min <= encoded_pos);
   ptrdiff_t notpos = -1 - encoded_pos;
   return -1 - notpos;
@@ -4003,14 +4015,19 @@ kbd_buffer_get_event (KBOARD **kbp,
       case SELECTION_REQUEST_EVENT:
       case SELECTION_CLEAR_EVENT:
 	{
-#ifdef HAVE_X11
+#if defined HAVE_X11 || HAVE_PGTK
 	  /* Remove it from the buffer before processing it,
 	     since otherwise swallow_events will see it
 	     and process it again.  */
 	  struct selection_input_event copy = event->sie;
 	  kbd_fetch_ptr = next_kbd_event (event);
 	  input_pending = readable_events (0);
+
+#ifdef HAVE_X11
 	  x_handle_selection_event (&copy);
+#else
+	  pgtk_handle_selection_event (&copy);
+#endif
 #else
 	  /* We're getting selection request events, but we don't have
              a window system.  */
@@ -4381,7 +4398,7 @@ process_special_events (void)
       if (event->kind == SELECTION_REQUEST_EVENT
 	  || event->kind == SELECTION_CLEAR_EVENT)
 	{
-#ifdef HAVE_X11
+#if defined HAVE_X11 || defined HAVE_PGTK
 
 	  /* Remove the event from the fifo buffer before processing;
 	     otherwise swallow_events called recursively could see it
@@ -4406,7 +4423,12 @@ process_special_events (void)
 		   moved_events * sizeof *kbd_fetch_ptr);
 	  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
 	  input_pending = readable_events (0);
+
+#ifdef HAVE_X11
 	  x_handle_selection_event (&copy);
+#else
+	  pgtk_handle_selection_event (&copy);
+#endif
 #else
 	  /* We're getting selection request events, but we don't have
              a window system.  */
@@ -5579,7 +5601,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       if (IMAGEP (object))
 	{
 	  Lisp_Object image_map, hotspot;
-	  if ((image_map = Fplist_get (XCDR (object), QCmap),
+	  if ((image_map = plist_get (XCDR (object), QCmap),
 	       !NILP (image_map))
 	      && (hotspot = find_hot_spot (image_map, dx, dy),
 		  CONSP (hotspot))
@@ -12648,6 +12670,15 @@ See also `pre-command-hook'.  */);
 	       doc: /* Non-nil means menu bar, specified Lucid style, needs to be recomputed.  */);
   Vlucid_menu_bar_dirty_flag = Qnil;
 
+#ifdef USE_LUCID
+  DEFVAR_BOOL ("lucid--menu-grab-keyboard",
+               lucid__menu_grab_keyboard,
+               doc: /* If non-nil, grab keyboard during menu operations.
+This is only relevant when using the Lucid X toolkit.  It can be
+convenient to disable this for debugging purposes.  */);
+  lucid__menu_grab_keyboard = true;
+#endif
+
   DEFVAR_LISP ("menu-bar-final-items", Vmenu_bar_final_items,
 	       doc: /* List of menu bar items to move to the end of the menu bar.
 The elements of the list are event types that may have menu bar
@@ -12999,6 +13030,21 @@ resolution of a monitor changes.  The hook should accept a single
 argument, which is the terminal on which the monitor configuration
 changed.  */);
   Vdisplay_monitors_changed_functions = Qnil;
+
+  DEFVAR_BOOL ("inhibit--record-char",
+	       inhibit_record_char,
+	       doc: /* If non-nil, don't record input events.
+This inhibits recording input events for the purposes of keyboard
+macros, dribble file, and `recent-keys'.
+Internal use only.  */);
+  inhibit_record_char = false;
+
+  DEFVAR_BOOL ("record-all-keys", record_all_keys,
+	       doc: /* Non-nil means record all keys you type.
+When nil, the default, characters typed as part of passwords are
+not recorded.  The non-nil value countermands `inhibit--record-char',
+which see.  */);
+  record_all_keys = false;
 
   pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
 }

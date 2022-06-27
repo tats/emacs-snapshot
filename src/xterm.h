@@ -75,6 +75,9 @@ typedef GtkWidget *xt_or_gtk_widget;
 #endif
 #endif /* USE_GTK */
 
+/* Number of "failable requests" to store.  */
+#define N_FAILABLE_REQUESTS 128
+
 #ifdef USE_CAIRO
 #include <cairo-xlib.h>
 #ifdef CAIRO_HAS_PDF_SURFACE
@@ -515,6 +518,9 @@ struct x_display_info
      received, and return that in hopes that it's somewhat accurate.  */
   Time last_mouse_movement_time;
 
+  /* Whether or not the last mouse motion was synthetic.  */
+  bool last_mouse_movement_time_send_event;
+
   /* The gray pixmap.  */
   Pixmap gray;
 
@@ -739,6 +745,13 @@ struct x_display_info
      RRScreenChangeNotify.  */
   int screen_mm_width;
   int screen_mm_height;
+
+  /* Circular buffer of request serials to ignore inside an error
+     handler in increasing order.  */
+  unsigned long failable_requests[N_FAILABLE_REQUESTS];
+
+  /* Pointer to the next request in `failable_requests'.  */
+  unsigned long *next_failable_request;
 };
 
 #ifdef HAVE_X_I18N

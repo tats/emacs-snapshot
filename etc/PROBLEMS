@@ -1768,7 +1768,15 @@ This happens on the proprietary X server ASTEC-X when the number of
 monitors is changed after the server has started.  A workaround is to
 restart the X server after the monitor configuration has been changed.
 
-*** Touchpad gestures don't work and emit warning messages.
+*** Touchpad gestures don't work and/or emit warning messages.
+
+Support for touch gestures in Emacs requires a sufficiently new X
+server.  We currently know of only one: version 21.1.0 or later of the
+X.Org server, coupled with the xf86-input-libinput input driver.
+
+Type 'M-: (x-server-input-extension-version) RET'; if that doesn't
+return '(2 4)' (version 2.4) or later, your version of the X server
+and libraries are too old and need to be upgraded.
 
 When pinching or swiping on your touchpad, you might see a warning
 message that looks like:
@@ -2539,6 +2547,11 @@ Emacs so that it isn't compiled with '-O5'.
 
 We list bugs in current versions here.  See also the section on legacy
 systems.
+
+*** On Solaris 10 sparc, Emacs crashes during the build while saving state.
+This was observed for Emacs 28.1 on Solaris 10 32-bit sparc, with
+Oracle Developer Studio 12.6 (Sun C 5.15).  The failure was intermittent,
+and running GNU Make a second time would typically finish the build.
 
 *** On Solaris 10, Emacs crashes during the build process.
 (This applies only with './configure --with-unexec=yes', which is rare.)

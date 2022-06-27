@@ -903,6 +903,9 @@ Describe the following key, mouse click, or menu item: "
         (setq yank-menu (copy-sequence saved-yank-menu))
         (fset 'yank-menu (cons 'keymap yank-menu))))))
 
+;; Defined in help-fns.el.
+(defvar describe-function-orig-buffer)
+
 (defun describe-key (&optional key-list buffer up-event)
   "Display documentation of the function invoked by KEY-LIST.
 KEY-LIST can be any kind of a key sequence; it can include keyboard events,
@@ -933,6 +936,7 @@ current buffer."
     (setq buffer nil))
   (let* ((help-buffer-under-preparation t)
          (buf (or buffer (current-buffer)))
+         (describe-function-orig-buffer buf)
          (on-link
           (mapcar (lambda (kr)
                     (let ((raw (cdr kr)))
@@ -966,16 +970,16 @@ current buffer."
       (with-help-window (help-buffer)
         (when (> (length info-list) 1)
           ;; FIXME: Make this into clickable hyperlinks.
-          (princ "There were several key-sequences:\n\n")
-          (princ (mapconcat (lambda (info)
-                              (pcase-let ((`(,_seq ,brief-desc ,_defn ,_locus)
-                                           info))
-                                (concat "  " brief-desc)))
-                            info-list
-                            "\n"))
+          (insert "There were several key-sequences:\n\n")
+          (insert (mapconcat (lambda (info)
+                               (pcase-let ((`(,_seq ,brief-desc ,_defn ,_locus)
+                                            info))
+                                 (concat "  " brief-desc)))
+                             info-list
+                             "\n"))
           (when (delq nil on-link)
-            (princ "\n\nThose are influenced by `mouse-1-click-follows-link'"))
-          (princ "\n\nThey're all described below."))
+            (insert "\n\nThose are influenced by `mouse-1-click-follows-link'"))
+          (insert "\n\nThey're all described below."))
         (pcase-dolist (`(,_seq ,brief-desc ,defn ,locus)
                        info-list)
           (when defn
@@ -983,10 +987,10 @@ current buffer."
               (with-current-buffer standard-output
                 (insert "\n\n" (make-separator-line) "\n")))
 
-            (princ brief-desc)
+            (insert brief-desc)
             (when locus
-              (princ (format " (found in %s)" locus)))
-            (princ ", which is ")
+              (insert (format " (found in %s)" locus)))
+            (insert ", which is ")
 	    (describe-function-1 defn)))))))
 
 (defun search-forward-help-for-help ()
@@ -1161,26 +1165,24 @@ Otherwise, return a new string."
                 (delete-char 2)
                 (ignore-errors
                   (forward-char 1)))
+               ;; 1C. \`f' is replaced with a fontified f.
                ((and (= (following-char) ?`)
                      (save-excursion
                        (prog1 (search-forward "'" nil t)
-                         (setq end-point (- (point) 2)))))
-                (goto-char orig-point)
-                (delete-char 2)
-                (goto-char (1- end-point))
-                (delete-char 1)
-                ;; (backward-char 1)
-                (let ((k (buffer-substring-no-properties orig-point (point))))
-                  (cond ((= (length k) 0)
-                         (error "Empty key sequence in substitution"))
-                        ((and (not (string-match-p "\\`M-x " k))
-                              (not (key-valid-p k)))
-                         (error "Invalid key sequence in substitution: `%s'" k))))
-                (unless no-face
-                  (add-text-properties orig-point (point)
-                                       '( face help-key-binding
-                                          font-lock-face help-key-binding))))
-               ;; 1C. \[foo] is replaced with the keybinding.
+                         (setq end-point (1- (point))))))
+                (let ((k (buffer-substring-no-properties (+ orig-point 2)
+                                                         end-point)))
+                  (when (or (key-valid-p k)
+                            (string-match-p "\\`M-x " k))
+                    (goto-char orig-point)
+                    (delete-char 2)
+                    (goto-char (- end-point 2)) ; nb. take deletion into account
+                    (delete-char 1)
+                    (unless no-face
+                      (add-text-properties orig-point (point)
+                                           '( face help-key-binding
+                                              font-lock-face help-key-binding))))))
+               ;; 1D. \[foo] is replaced with the keybinding.
                ((and (= (following-char) ?\[)
                      (save-excursion
                        (prog1 (search-forward "]" nil t)
@@ -1224,7 +1226,7 @@ Otherwise, return a new string."
                                  (help-mode--add-function-link key fun)
                                key)
                            key)))))))
-               ;; 1D. \{foo} is replaced with a summary of the keymap
+               ;; 1E. \{foo} is replaced with a summary of the keymap
                ;;            (symbol-value foo).
                ;;     \<foo> just sets the keymap used for \[cmd].
                ((and (or (and (= (following-char) ?{)
