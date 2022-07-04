@@ -2135,7 +2135,7 @@ and with BASE-SIZE appended as the last element."
         (lambda (elem)
           (let ((str
                  ;; Don't modify the string itself, but a copy, since the
-                 ;; the string may be read-only or used for other purposes.
+                 ;; string may be read-only or used for other purposes.
                  ;; Furthermore, since `completions' may come from
                  ;; display-completion-list, `elem' may be a list.
                  (if (consp elem)
@@ -3091,7 +3091,8 @@ such as making the current buffer visit no file in the case of
   :type 'boolean)
 
 (defcustom minibuffer-beginning-of-buffer-movement nil
-  "Control how the `M-<' command in the minibuffer behaves.
+  "Control how the \\<minibuffer-local-map>\\[minibuffer-beginning-of-buffer] \
+command in the minibuffer behaves.
 If non-nil, the command will go to the end of the prompt (if
 point is after the end of the prompt).  If nil, it will behave
 like the `beginning-of-buffer' command."
@@ -3160,8 +3161,9 @@ Fourth arg MUSTMATCH can take the following values:
   input, but she needs to confirm her choice if she called
   `minibuffer-complete' right before `minibuffer-complete-and-exit'
   and the input is not an existing file.
-- a function, which will be called with the input as the argument.
-  If it returns a non-nil value, the minibuffer is exited with that value.
+- a function, which will be called with the input as the
+  argument.  If the function returns a non-nil value, the
+  minibuffer is exited with that argument as the value.
 - anything else behaves like t except that typing RET does not exit if it
   does non-null completion.
 

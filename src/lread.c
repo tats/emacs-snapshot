@@ -1735,13 +1735,24 @@ maybe_swap_for_eln (bool no_native, Lisp_Object *filename, int *fd,
 	{
 	  if (!NILP (find_symbol_value (
 		       Qnative_comp_warning_on_missing_source)))
-	    call2 (intern_c_string ("display-warning"),
-		   Qcomp,
-		   CALLN (Fformat,
-			  build_string ("Cannot look-up eln file as no source "
-					"file was found for %s"),
-			  *filename));
-	  return;
+	    {
+	      /* If we have an installation without any .el files,
+		 there's really no point in giving a warning here,
+		 because that will trigger a cascade of warnings.  So
+		 just do a sanity check and refuse to do anything if we
+		 can't find even central .el files.  */
+	      if (NILP (Flocate_file_internal (build_string ("simple.el"),
+					       Vload_path,
+					       Qnil, Qnil)))
+		return;
+	      call2 (intern_c_string ("display-warning"),
+		     Qcomp,
+		     CALLN (Fformat,
+			    build_string ("Cannot look up eln file as "
+					  "no source file was found for %s"),
+			    *filename));
+	      return;
+	    }
 	}
     }
   Lisp_Object eln_rel_name = Fcomp_el_to_eln_rel_filename (src_name);
@@ -4877,7 +4888,7 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
 
 /* Like 'oblookup', but considers 'Vread_symbol_shorthands',
    potentially recognizing that IN is shorthand for some other
-   longhand name, which is then then placed in OUT.  In that case,
+   longhand name, which is then placed in OUT.  In that case,
    memory is malloc'ed for OUT (which the caller must free) while
    SIZE_OUT and SIZE_BYTE_OUT respectively hold the character and byte
    sizes of the transformed symbol name.  If IN is not recognized

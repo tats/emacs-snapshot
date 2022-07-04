@@ -41,6 +41,7 @@
 (require 'timer)
 
 (defvar mouse-wheel-mode)
+
 (defvar mouse-wheel--installed-bindings-alist nil
   "Alist of all installed mouse wheel key bindings.")
 
@@ -113,7 +114,10 @@ set to the event sent when clicking on the mouse wheel button."
   :type 'number)
 
 (defcustom mouse-wheel-scroll-amount
-  '(1 ((shift) . hscroll) ((meta) . nil) ((control) . text-scale))
+  '(1 ((shift) . hscroll)
+      ((meta) . nil)
+      ((control meta) . global-text-scale)
+      ((control) . text-scale))
   "Amount to scroll windows by when spinning the mouse wheel.
 This is an alist mapping the modifier key to the amount to scroll when
 the wheel is moved with the modifier key depressed.
@@ -128,10 +132,11 @@ less than a full screen.
 If AMOUNT is the symbol `hscroll', this means that with MODIFIER,
 the mouse wheel will scroll horizontally instead of vertically.
 
-If AMOUNT is the symbol `text-scale', this means that with
-MODIFIER, the mouse wheel will change the font size instead of
-scrolling (by adjusting the font height of the default face).
-For more information, see `text-scale-adjust'."
+If AMOUNT is the symbol `text-scale' or `global-text-scale', this
+means that with MODIFIER, the mouse wheel will change the font size
+instead of scrolling (by adjusting the font height of the default
+face, either locally in the buffer or globally).  For more
+information, see `text-scale-adjust' and `global-text-scale-adjust'."
   :group 'mouse
   :type '(cons
 	  (choice :tag "Normal"
@@ -156,7 +161,8 @@ For more information, see `text-scale-adjust'."
                     (integer :tag "Scroll specific # of lines")
                     (float :tag "Scroll fraction of window")
                     (const :tag "Scroll horizontally" :value hscroll)
-                    (const :tag "Change face size" :value text-scale)))))
+                    (const :tag "Change buffer face size" :value text-scale)
+                    (const :tag "Change global face size" :value global-text-scale)))))
   :set 'mouse-wheel-change-button
   :version "28.1")
 
@@ -435,6 +441,20 @@ See also `text-scale-adjust'."
                (text-scale-decrease 1)))
       (select-window selected-window))))
 
+(declare-function global-text-scale-adjust "face-remap.el" (increment))
+(defun mouse-wheel-global-text-scale (event)
+  "Increase or decrease the global font size according to the EVENT.
+This invokes `global-text-scale-adjust', which see."
+  (interactive (list last-input-event))
+  (let ((button (mwheel-event-button event)))
+    (unwind-protect
+        (cond ((memq button (list mouse-wheel-down-event
+                                  mouse-wheel-down-alternate-event))
+               (global-text-scale-adjust 1))
+              ((memq button (list mouse-wheel-up-event
+                                  mouse-wheel-up-alternate-event))
+               (global-text-scale-adjust -1))))))
+
 (defun mouse-wheel--add-binding (key fun)
   "Bind mouse wheel button KEY to function FUN.
 Save it for later removal by `mouse-wheel--remove-bindings'."
@@ -487,8 +507,15 @@ an event used for scrolling, such as `mouse-wheel-down-event'."
                            mouse-wheel-down-alternate-event
                            mouse-wheel-up-alternate-event))
         (when event
-          (mouse-wheel--add-binding `[,(list (caar binding) event)]
+          (mouse-wheel--add-binding `[,(append (car binding) (list event))]
                                     'mouse-wheel-text-scale))))
+     ((and (consp binding) (eq (cdr binding) 'global-text-scale))
+      (dolist (event (list mouse-wheel-down-event mouse-wheel-up-event
+                           mouse-wheel-down-alternate-event
+                           mouse-wheel-up-alternate-event))
+        (when event
+          (mouse-wheel--add-binding `[,(append (car binding) (list event))]
+                                    'mouse-wheel-global-text-scale))))
      ;; Bindings for scrolling.
      (t
       (dolist (event (list mouse-wheel-down-event mouse-wheel-up-event

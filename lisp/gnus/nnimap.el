@@ -233,27 +233,28 @@ during splitting, which may be slow."
 	  params)
     (format "%s" (nreverse params))))
 
+(defvar nnimap--max-retrieve-headers 200)
+
 (deffoo nnimap-retrieve-headers (articles &optional group server _fetch-old)
   (with-current-buffer nntp-server-buffer
     (erase-buffer)
     (when (nnimap-change-group group server)
       (with-current-buffer (nnimap-buffer)
 	(erase-buffer)
-        (let ((ranges (gnus-compress-sequence articles t))
-              sequence)
-          ;; If we have a lot of ranges, split them up to avoid
-          ;; generating too-long lines.  (The limit is 8192 octects,
-          ;; and this should guarantee that it's (much) shorter than
-          ;; that.)
-          (while ranges
-            (setq sequence
-	          (nnimap-send-command
-	           "UID FETCH %s %s"
-	           (nnimap-article-ranges (seq-take ranges 200))
-	           (nnimap-header-parameters)))
-            (setq ranges (nthcdr 200 ranges)))
-          ;; Wait for the final one.
-	  (nnimap-wait-for-response sequence t))
+        ;; If we have a lot of ranges, split them up to avoid
+        ;; generating too-long lines.  (The limit is 8192 octects,
+        ;; and this should guarantee that it's (much) shorter than
+        ;; that.)  We don't stream the requests, since the server
+        ;; may respond to the requests out-of-order:
+        ;; https://datatracker.ietf.org/doc/html/rfc3501#section-5.5
+        (dolist (ranges (seq-split (gnus-compress-sequence articles t)
+                                   nnimap--max-retrieve-headers))
+          (nnimap-wait-for-response
+	   (nnimap-send-command
+	    "UID FETCH %s %s"
+	    (nnimap-article-ranges ranges)
+	    (nnimap-header-parameters))
+           t))
 	(unless (process-live-p (get-buffer-process (current-buffer)))
 	  (error "IMAP server %S closed connection" nnimap-address))
 	(nnimap-transform-headers)

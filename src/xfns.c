@@ -3712,6 +3712,16 @@ setup_xi_event_mask (struct frame *f)
   XIEventMask mask;
   ptrdiff_t l = XIMaskLen (XI_LASTEVENT);
   unsigned char *m;
+#ifndef HAVE_XINPUT2_1
+  /* Set up fallback values, since XIGetSelectedEvents doesn't work
+     with this version of libXi.  */
+  XIEventMask *selected;
+
+  selected = xzalloc (sizeof *selected + l);
+  selected->mask = ((unsigned char *) selected) + sizeof *selected;
+  selected->mask_len = l;
+  selected->deviceid = XIAllMasterDevices;
+#endif
 
   mask.mask = m = alloca (l);
   memset (m, 0, l);
@@ -3735,6 +3745,12 @@ setup_xi_event_mask (struct frame *f)
   XISelectEvents (FRAME_X_DISPLAY (f),
 		  FRAME_X_WINDOW (f),
 		  &mask, 1);
+
+  /* Fortunately `xi_masks' isn't used on GTK 3, where we really have
+     to get the event mask from the X server.  */
+#ifndef HAVE_XINPUT2_1
+  memcpy (selected->mask, m, l);
+#endif
 
   memset (m, 0, l);
 #endif /* !HAVE_GTK3 */
@@ -3775,6 +3791,12 @@ setup_xi_event_mask (struct frame *f)
   XISelectEvents (FRAME_X_DISPLAY (f),
 		  FRAME_X_WINDOW (f),
 		  &mask, 1);
+
+#ifndef HAVE_XINPUT2_1
+  FRAME_X_OUTPUT (f)->xi_masks = selected;
+  FRAME_X_OUTPUT (f)->num_xi_masks = 1;
+#endif
+
   unblock_input ();
 }
 #endif
@@ -4935,7 +4957,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
   x_icon (f, parms);
   x_make_gc (f);
 
-#ifdef HAVE_XINPUT2
+  /* While this function is present in versions of libXi that only
+     support 2.0, it does not release the display lock after
+     finishing, leading to a deadlock.  */
+#if defined HAVE_XINPUT2 && defined HAVE_XINPUT2_1
   if (dpyinfo->supports_xi2)
     FRAME_X_OUTPUT (f)->xi_masks
       = XIGetSelectedEvents (dpyinfo->display, FRAME_X_WINDOW (f),
@@ -5387,9 +5412,9 @@ DEFUN ("x-server-input-extension-version", Fx_server_input_extension_version,
        doc: /* Return the version of the X Input Extension supported by TERMINAL.
 The value is nil if TERMINAL's X server doesn't support the X Input
 Extension extension, or if Emacs doesn't support the version present
-on that server.  Otherwise, the return value is a list of the the
-major and minor versions of the X Input Extension extension running on
-that server.  */)
+on that server.  Otherwise, the return value is a list of the major
+and minor versions of the X Input Extension extension running on that
+server.  */)
   (Lisp_Object terminal)
 {
 #ifdef HAVE_XINPUT2
@@ -6910,10 +6935,9 @@ that mouse buttons are being held down, such as immediately after a
   original = targets;
   targets_arg = targets;
 
-  for (; CONSP (targets); targets = XCDR (targets))
+  FOR_EACH_TAIL (targets)
     {
       CHECK_STRING (XCAR (targets));
-      maybe_quit ();
 
       if (ntargets < 2048)
 	{
@@ -6937,15 +6961,19 @@ that mouse buttons are being held down, such as immediately after a
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionPrivate;
   else if (EQ (action, QXdndActionAsk))
     xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
+  else if (SYMBOLP (action))
+    /* This is to accommodate non-standard DND protocols such as XDS
+       that are explictly implemented by Emacs, and is not documented
+       for that reason.  */
+    xaction = symbol_to_x_atom (FRAME_DISPLAY_INFO (f), action);
   else if (CONSP (action))
     {
       xaction = FRAME_DISPLAY_INFO (f)->Xatom_XdndActionAsk;
       original = action;
 
       CHECK_LIST (action);
-      for (; CONSP (action); action = XCDR (action))
+      FOR_EACH_TAIL (action)
 	{
-	  maybe_quit ();
 	  tem = XCAR (action);
 	  CHECK_CONS (tem);
 	  t1 = XCAR (tem);
@@ -7336,18 +7364,23 @@ If VALUE is a string and FORMAT is 32, then the format of VALUE is
 system-specific.  VALUE must contain unsigned integer data in native
 endian-ness in multiples of the size of the C type 'long': the low 32
 bits of each such number are used as the value of each element of the
-property.  */)
+property.
+
+Wait for the request to complete and signal any error, unless
+`x-fast-protocol-requests' is non-nil, in which case errors will be
+silently ignored.  */)
   (Lisp_Object prop, Lisp_Object value, Lisp_Object frame,
    Lisp_Object type, Lisp_Object format, Lisp_Object outer_p,
    Lisp_Object window_id)
 {
-  struct frame *f = decode_window_system_frame (frame);
+  struct frame *f;
   Atom prop_atom;
   Atom target_type = XA_STRING;
   int element_format = 8;
   unsigned char *data;
   int nelements;
   Window target_window;
+  struct x_display_info *dpyinfo;
 #ifdef USE_XCB
   bool intern_prop;
   bool intern_target;
@@ -7357,6 +7390,9 @@ property.  */)
   xcb_generic_error_t *generic_error;
   bool rc;
 #endif
+
+  f = decode_window_system_frame (frame);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
 
   CHECK_STRING (prop);
 
@@ -7409,7 +7445,7 @@ property.  */)
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
       if (! target_window)
-        target_window = FRAME_DISPLAY_INFO (f)->root_window;
+        target_window = dpyinfo->root_window;
     }
   else
     {
@@ -7421,47 +7457,47 @@ property.  */)
 
   block_input ();
 #ifndef USE_XCB
-  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
-				    SSDATA (prop), false);
+  prop_atom = x_intern_cached_atom (dpyinfo, SSDATA (prop),
+				    false);
   if (! NILP (type))
     {
       CHECK_STRING (type);
-      target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
-					  SSDATA (type), false);
+      target_type = x_intern_cached_atom (dpyinfo, SSDATA (type),
+					  false);
     }
 #else
   rc = true;
   intern_target = true;
   intern_prop = true;
 
-  prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
-				    SSDATA (prop), true);
+  prop_atom = x_intern_cached_atom (dpyinfo, SSDATA (prop),
+				    true);
 
   if (prop_atom != None)
     intern_prop = false;
   else
     prop_atom_cookie
-      = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
+      = xcb_intern_atom (dpyinfo->xcb_connection,
 			 0, SBYTES (prop), SSDATA (prop));
 
   if (!NILP (type))
     {
       CHECK_STRING (type);
 
-      target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
-					  SSDATA (type), true);
+      target_type = x_intern_cached_atom (dpyinfo, SSDATA (type),
+					  true);
 
       if (target_type)
 	intern_target = false;
       else
 	target_type_cookie
-	  = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
+	  = xcb_intern_atom (dpyinfo->xcb_connection,
 			     0, SBYTES (type), SSDATA (type));
     }
 
   if (intern_prop)
     {
-      reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
+      reply = xcb_intern_atom_reply (dpyinfo->xcb_connection,
 				     prop_atom_cookie, &generic_error);
 
       if (reply)
@@ -7478,7 +7514,7 @@ property.  */)
 
   if (!NILP (type) && intern_target)
     {
-      reply = xcb_intern_atom_reply (FRAME_DISPLAY_INFO (f)->xcb_connection,
+      reply = xcb_intern_atom_reply (dpyinfo->xcb_connection,
 				     target_type_cookie, &generic_error);
 
       if (reply)
@@ -7497,15 +7533,18 @@ property.  */)
     error ("Failed to intern type or property atom");
 #endif
 
-  x_catch_errors (FRAME_X_DISPLAY (f));
-  XChangeProperty (FRAME_X_DISPLAY (f), target_window,
-		   prop_atom, target_type, element_format, PropModeReplace,
-		   data, nelements);
+  x_catch_errors_for_lisp (dpyinfo);
 
-  if (CONSP (value)) xfree (data);
-  x_check_errors (FRAME_X_DISPLAY (f),
-		  "Couldn't change window property: %s");
-  x_uncatch_errors_after_check ();
+  XChangeProperty (dpyinfo->display, target_window,
+		   prop_atom, target_type, element_format,
+		   PropModeReplace, data, nelements);
+
+  if (CONSP (value))
+    xfree (data);
+
+  x_check_errors_for_lisp (dpyinfo,
+			   "Couldn't change window property: %s");
+  x_uncatch_errors_for_lisp (dpyinfo);
 
   unblock_input ();
   return value;
@@ -7522,7 +7561,11 @@ If WINDOW-ID is non-nil, remove property from that window instead
  across X displays or screens on the same display, so FRAME provides
  context for the window ID.
 
-Value is PROP.  */)
+Value is PROP.
+
+Wait for the request to complete and signal any error, unless
+`x-fast-protocol-requests' is non-nil, in which case errors will be
+silently ignored.  */)
   (Lisp_Object prop, Lisp_Object frame, Lisp_Object window_id)
 {
   struct frame *f = decode_window_system_frame (frame);
@@ -7542,11 +7585,11 @@ Value is PROP.  */)
   prop_atom = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
 				    SSDATA (prop), false);
 
-  x_catch_errors (FRAME_X_DISPLAY (f));
+  x_catch_errors_for_lisp (FRAME_DISPLAY_INFO (f));
   XDeleteProperty (FRAME_X_DISPLAY (f), target_window, prop_atom);
-  x_check_errors (FRAME_X_DISPLAY (f),
-		  "Couldn't delete window property: %s");
-  x_uncatch_errors_after_check ();
+  x_check_errors_for_lisp (FRAME_DISPLAY_INFO (f),
+			   "Couldn't delete window property: %s");
+  x_uncatch_errors_for_lisp (FRAME_DISPLAY_INFO (f));
 
   unblock_input ();
   return prop;

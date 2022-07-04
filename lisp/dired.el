@@ -2079,8 +2079,10 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
   "D"       #'dired-do-delete
   "G"       #'dired-do-chgrp
   "H"       #'dired-do-hardlink
+  "I"       #'dired-do-info
   "L"       #'dired-do-load
   "M"       #'dired-do-chmod
+  "N"       #'dired-do-man
   "O"       #'dired-do-chown
   "P"       #'dired-do-print
   "Q"       #'dired-do-find-regexp-and-replace
@@ -2467,7 +2469,7 @@ Type \\[dired-do-copy] to Copy files.
 Type \\[dired-sort-toggle-or-edit] to toggle Sorting by name/date or change the `ls' switches.
 Type \\[revert-buffer] to read all currently expanded directories aGain.
   This retains all marks and hides subdirs again that were hidden before.
-Use `SPC' and `DEL' to move down and up by lines.
+Use \\`SPC' and \\`DEL' to move down and up by lines.
 
 If Dired ever gets confused, you can either type \\[revert-buffer] \
 to read the
@@ -3690,13 +3692,21 @@ See `dired-delete-file' in case you wish that."
   (dired-remove-entry file)
   (dired-clean-up-after-deletion file))
 
-(defvar dired-clean-up-buffers-too)
-(defvar dired-clean-confirm-killing-deleted-buffers)
+(defcustom dired-clean-up-buffers-too t
+  "Non-nil means offer to kill buffers visiting files and dirs deleted in Dired."
+  :type 'boolean
+  :group 'dired)
+
+(defcustom dired-clean-confirm-killing-deleted-buffers t
+  "If nil, don't ask whether to kill buffers visiting deleted files."
+  :type 'boolean
+  :group 'dired
+  :version "26.1")
 
 (defun dired-clean-up-after-deletion (fn)
   "Clean up after a deleted file or directory FN.
-Removes any expanded subdirectory of deleted directory.  If
-`dired-x' is loaded and `dired-clean-up-buffers-too' is non-nil,
+Removes any expanded subdirectory of deleted directory.
+If `dired-clean-up-buffers-too' is non-nil,
 kill any buffers visiting those files, prompting for
 confirmation.  To disable the confirmation, see
 `dired-clean-confirm-killing-deleted-buffers'."
@@ -4794,6 +4804,41 @@ Interactively with prefix argument, read FILE-NAME."
    (list (and current-prefix-arg
 	      (read-file-name "Jump to Dired file: "))))
   (dired-jump t file-name))
+
+(defvar-keymap dired-jump-map
+  :doc "Keymap to repeat `dired-jump'.  Used in `repeat-mode'."
+  "C-j" #'dired-jump)
+(put 'dired-jump 'repeat-map 'dired-jump-map)
+
+
+;;; Miscellaneous commands
+
+(declare-function Man-getpage-in-background "man" (topic))
+(declare-function dired-guess-shell-command "dired-x" (prompt files))
+(defvar manual-program) ; from man.el
+
+(defun dired-do-man ()
+  "In Dired, run `man' on this file."
+  (interactive nil dired-mode)
+  (require 'man)
+  ;; FIXME: Move `dired-guess-shell-command' to dired.el to remove the
+  ;;        need for requiring `dired-x'.
+  (require 'dired-x)
+  (let* ((file (dired-get-file-for-visit))
+         (manual-program (string-replace "*" "%s"
+                                         (dired-guess-shell-command
+                                          "Man command: " (list file)))))
+    (Man-getpage-in-background file)))
+
+(defun dired-do-info ()
+  "In Dired, run `info' on this file."
+  (interactive nil dired-mode)
+  (info (dired-get-file-for-visit)))
+
+(defun dired-do-eww ()
+  "In Dired, visit file in EWW."
+  (interactive nil dired-mode)
+  (eww-open-file (dired-get-file-for-visit)))
 
 (provide 'dired)
 

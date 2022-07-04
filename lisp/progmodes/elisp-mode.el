@@ -52,6 +52,9 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
   :parent lisp-mode-shared-map
   "M-TAB" #'completion-at-point
   "C-M-x" #'eval-defun
+  "C-c C-e" #'elisp-eval-buffer
+  "C-c C-f" #'elisp-byte-compile-file
+  "C-c C-b" #'elisp-byte-compile-buffer
   "C-M-q" #'indent-pp-sexp)
 
 (easy-menu-define emacs-lisp-mode-menu emacs-lisp-mode-map
@@ -1227,6 +1230,8 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
   :parent lisp-mode-shared-map
   "C-M-x" #'eval-defun
   "C-M-q" #'indent-pp-sexp
+  "C-c C-e" #'elisp-eval-buffer
+  "C-c C-b" #'elisp-byte-compile-buffer
   "M-TAB" #'completion-at-point
   "C-j"   #'eval-print-last-sexp)
 
@@ -1679,7 +1684,10 @@ Return the result of evaluation."
     elisp--eval-defun-result))
 
 (defun eval-defun (edebug-it)
-  "Evaluate the top-level form containing point, or after point.
+  "Evaluate the top-level form containing point.
+If point isn't in a top-level form, evaluate the first top-level
+form after point.  If there is no top-level form after point,
+eval the first preceeding top-level form.
 
 If the current defun is actually a call to `defvar' or `defcustom',
 evaluating it this way resets the variable using its initial value
@@ -2190,6 +2198,67 @@ Runs in a batch-mode Emacs.  Interactively use variable
     (prin1 :elisp-flymake-output-start)
     (terpri)
     (pp collected)))
+
+(defun elisp-eval-buffer ()
+  "Evaluate the forms in the current buffer."
+  (interactive)
+  (eval-buffer)
+  (message "Evaluated the %s buffer" (buffer-name)))
+
+(defun elisp-byte-compile-file (&optional load)
+  "Byte compile the file the current buffer is visiting.
+If LOAD is non-nil, load the resulting .elc file.  When called
+interactively, this is the prefix argument."
+  (interactive "P")
+  (unless buffer-file-name
+    (error "This buffer is not visiting a file"))
+  (byte-compile-file buffer-file-name)
+  (when load
+    (load (funcall byte-compile-dest-file-function buffer-file-name))))
+
+(defun elisp-byte-compile-buffer (&optional load)
+  "Byte compile the current buffer, but don't write a file.
+If LOAD is non-nil, load byte-compiled data.  When called
+interactively, this is the prefix argument."
+  (interactive "P")
+  (let ((bfn buffer-file-name)
+        file elc)
+    (require 'bytecomp)
+    (unwind-protect
+        (progn
+          (setq file (make-temp-file "compile" nil ".el")
+                elc (funcall byte-compile-dest-file-function file))
+          (write-region (point-min) (point-max) file nil 'silent)
+          (let ((set-message-function
+                 (lambda (message)
+                   (when (string-match-p "\\`Wrote " message)
+                     'ignore)))
+                (byte-compile-log-warning-function
+                 (lambda (string position &optional fill level)
+                   (if bfn
+                       ;; Massage the warnings to that they point to
+                       ;; this file, not the one in /tmp.
+                       (let ((byte-compile-current-file bfn)
+                             (byte-compile-root-dir (file-name-directory bfn)))
+                         (byte-compile--log-warning-for-byte-compile
+                          string position fill level))
+                     ;; We don't have a file name, so the warnings
+                     ;; will point to a file that doesn't exist.  This
+                     ;; should be fixed in some way.
+                     (byte-compile--log-warning-for-byte-compile
+                      string position fill level)))))
+            (byte-compile-file file))
+          (when (and bfn (get-buffer "*Compile-Log*"))
+            (with-current-buffer "*Compile-Log*"
+              (setq default-directory (file-name-directory bfn))))
+          (if load
+              (load elc)
+            (message "Byte-compiled the current buffer")))
+      (when file
+        (when (file-exists-p file)
+          (delete-file file))
+        (when (file-exists-p elc)
+          (delete-file elc))))))
 
 
 (put 'read-symbol-shorthands 'safe-local-variable #'consp)

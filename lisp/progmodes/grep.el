@@ -885,6 +885,14 @@ The value depends on `grep-command', `grep-template',
   (setq-local compilation-disable-input t)
   (setq-local compilation-error-screen-columns
               grep-error-screen-columns)
+  ;; We normally use a nul byte to separate the file name from the
+  ;; contents, but display it as ":".  That's fine, but when yanking
+  ;; to other buffers, it's annoying to have the nul byte there.
+  (unless kill-transform-function
+    (setq-local kill-transform-function #'identity))
+  (add-function :filter-return (local 'kill-transform-function)
+                (lambda (string)
+                  (string-replace "\0" ":" string)))
   (add-hook 'compilation-filter-hook #'grep-filter nil t))
 
 (defun grep--save-buffers ()
@@ -1210,7 +1218,7 @@ to specify a command to run.
 If CONFIRM is non-nil, the user will be given an opportunity to edit the
 command before it's run.
 
-Interactively, the user can use the `M-c' command while entering
+Interactively, the user can use the \\`M-c' command while entering
 the regexp to indicate whether the grep should be case sensitive
 or not."
   (interactive

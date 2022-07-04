@@ -84,20 +84,21 @@ if drop is successful, nil if not."
 
 (defcustom x-dnd-known-types
   (mapcar 'purecopy
-  '("text/uri-list"
-    "text/x-moz-url"
-    "_NETSCAPE_URL"
-    "FILE_NAME"
-    "UTF8_STRING"
-    "text/plain;charset=UTF-8"
-    "text/plain;charset=utf-8"
-    "text/unicode"
-    "text/plain"
-    "COMPOUND_TEXT"
-    "STRING"
-    "TEXT"
-    "DndTypeFile"
-    "DndTypeText"))
+          '("XdndDirectSave0"
+            "text/uri-list"
+            "text/x-moz-url"
+            "_NETSCAPE_URL"
+            "FILE_NAME"
+            "UTF8_STRING"
+            "text/plain;charset=UTF-8"
+            "text/plain;charset=utf-8"
+            "text/unicode"
+            "text/plain"
+            "COMPOUND_TEXT"
+            "STRING"
+            "TEXT"
+            "DndTypeFile"
+            "DndTypeText"))
   "The types accepted by default for dropped data.
 The types are chosen in the order they appear in the list."
   :version "22.1"
@@ -120,7 +121,41 @@ like xterm) for text."
                  (const :tag "Use the OffiX protocol for both files and text" t))
   :group 'x)
 
+(defcustom x-dnd-direct-save-function #'x-dnd-save-direct
+  "Function called when a file is dropped that Emacs must save.
+It is called with two arguments: the first is either nil or t,
+and the second is a string.
+
+If the first argument is t, the second argument is the name the
+dropped file should be saved under.  The function should return a
+complete local file name describing where the file should be
+saved.
+
+It can also return nil, which means to cancel the drop.
+
+If the first argument is nil, the second is the name of the file
+that was dropped."
+  :version "29.1"
+  :type 'function
+  :group 'x)
+
+(defcustom x-dnd-copy-types '("chromium/x-renderer-taint")
+  "List of data types offered by programs that don't support `private'.
+Some programs (such as Chromium) do not support
+`XdndActionPrivate'.  The default `x-dnd-test-function' will
+always return `copy' instead, for programs offering one of the
+data types in this list."
+  :version "29.1"
+  :type '(repeat string)
+  :group 'x)
+
 ;; Internal variables
+
+(defvar x-dnd-debug-errors nil
+  "Whether or not to signal protocol errors during drag-and-drop.
+This is useful for debugging errors in the DND code, but makes
+drag-and-drop much slower over network connections with high
+latency.")
 
 (defvar x-dnd-current-state nil
   "The current state for a drop.
@@ -144,7 +179,8 @@ any protocol specific data.")
     ("XdndActionCopy" . copy)
     ("XdndActionMove" . move)
     ("XdndActionLink" . link)
-    ("XdndActionAsk" . ask))
+    ("XdndActionAsk" . ask)
+    ("XdndActionDirectSave" . direct-save))
   "Mapping from XDND action types to Lisp symbols.")
 
 (defvar x-dnd-empty-state [nil nil nil nil nil nil nil])
@@ -180,13 +216,22 @@ any protocol specific data.")
 
 (defun x-dnd-default-test-function (_window _action types)
   "The default test function for drag and drop.
-WINDOW is where the mouse is when this function is called.  It may be
-a frame if the mouse is over the menu bar, scroll bar or tool bar.
-ACTION is the suggested action from the source, and TYPES are the
-types the drop data can have.  This function only accepts drops with
-types in `x-dnd-known-types'.  It always returns the action private."
+WINDOW is where the mouse is when this function is called.  It
+may be a frame if the mouse is over the menu bar, scroll bar or
+tool bar.  ACTION is the suggested action from the source, and
+TYPES are the types the drop data can have.  This function only
+accepts drops with types in `x-dnd-known-types'.  It always
+returns the action `private', unless `types' contains a value
+inside `x-dnd-copy-types'."
   (let ((type (x-dnd-choose-type types)))
-    (when type (cons 'private type))))
+    (when type (let ((list x-dnd-copy-types))
+                 (catch 'out
+                   (while t
+                     (if (not list)
+                         (throw 'out (cons 'private type))
+                       (if (x-dnd-find-type (car list) types)
+                           (throw 'out (cons 'copy type))
+                         (setq list (cdr list))))))))))
 
 (defun x-dnd-current-type (frame-or-window)
   "Return the type we want the DND data to be in for the current drop.
@@ -199,29 +244,49 @@ FRAME-OR-WINDOW is the frame or window that the mouse is over."
   (setcdr (x-dnd-get-state-cons-for-frame frame-or-window)
 	  (copy-sequence x-dnd-empty-state)))
 
-(defun x-dnd-maybe-call-test-function (window action)
+(defun x-dnd-find-type (target types)
+  "Find the type TARGET in an array of types TYPES.
+TARGET must be a string, but TYPES can contain either symbols or
+strings."
+  (catch 'done
+    (dotimes (i (length types))
+      (let* ((type (aref types i))
+	     (typename (if (symbolp type)
+			   (symbol-name type) type)))
+	(when (equal target typename)
+	  (throw 'done t))))
+    nil))
+
+(defun x-dnd-maybe-call-test-function (window action &optional xdnd)
   "Call `x-dnd-test-function' if something has changed.
 WINDOW is the window the mouse is over.  ACTION is the suggested
 action from the source.  If nothing has changed, return the last
-action and type we got from `x-dnd-test-function'."
+action and type we got from `x-dnd-test-function'.
+
+XDND means the XDND protocol is being used."
   (let ((buffer (when (window-live-p window)
 		  (window-buffer window)))
 	(current-state (x-dnd-get-state-for-frame window)))
-    (unless (and (equal buffer (aref current-state 0))
-                 (equal window (aref current-state 1))
-                 (equal action (aref current-state 3)))
-      (save-current-buffer
-	(when buffer (set-buffer buffer))
-	(let* ((action-type (funcall x-dnd-test-function
-				     window
-				     action
-				     (aref current-state 2)))
-	       (handler (cdr (assoc (cdr action-type) x-dnd-types-alist))))
-	  ;; Ignore action-type if we have no handler.
-	  (setq current-state
-		(x-dnd-save-state window
-				  action
-				  (when handler action-type)))))))
+    (if (and xdnd (x-dnd-find-type "XdndDirectSave0"
+                                   (aref current-state 2)))
+        (setq current-state
+              (x-dnd-save-state window 'direct-save
+                                '(direct-save . "XdndDirectSave0")))
+      (unless (and (equal buffer (aref current-state 0))
+                   (equal window (aref current-state 1))
+                   (equal action (aref current-state 3)))
+        (save-current-buffer
+	  (when buffer (set-buffer buffer))
+	  (let* ((action-type (funcall x-dnd-test-function
+				       window
+				       action
+				       (aref current-state 2)))
+	         (handler (cdr (assoc (cdr action-type) x-dnd-types-alist))))
+	    ;; Ignore action-type if we have no handler.
+	    (setq current-state
+		  (x-dnd-save-state window
+				    action
+				    (when handler action-type))))))))
   (let ((current-state (x-dnd-get-state-for-frame window)))
     (cons (aref current-state 5)
 	  (aref current-state 4))))
@@ -366,11 +431,14 @@ nil if not."
 	  (select-frame frame)
 	  (funcall handler window action data))))))
 
+(defvar x-fast-protocol-requests)
+
 (defun x-dnd-handle-drag-n-drop-event (event)
   "Receive drag and drop events (X client messages).
 Currently XDND, Motif and old KDE 1.x protocols are recognized."
   (interactive "e")
   (let* ((client-message (car (cdr (cdr event))))
+         (x-fast-protocol-requests (not x-dnd-debug-errors))
 	 (window (posn-window (event-start event))))
     (if (eq (and (consp client-message)
                  (car client-message))
@@ -380,7 +448,10 @@ Currently XDND, Motif and old KDE 1.x protocols are recognized."
         (progn
           (let ((action (cdr (assoc (symbol-name (cadr client-message))
                                     x-dnd-xdnd-to-action)))
-                (targets (cddr client-message)))
+                (targets (cddr client-message))
+                (local-value (nth 2 client-message)))
+            (when (windowp window)
+              (select-window window))
             (x-dnd-save-state window nil nil
                               (apply #'vector targets))
             (x-dnd-maybe-call-test-function window action)
@@ -388,8 +459,8 @@ Currently XDND, Motif and old KDE 1.x protocols are recognized."
                 (x-dnd-drop-data event (if (framep window) window
                                          (window-frame window))
                                  window
-                                 (x-get-selection-internal
-                                  'XdndSelection
+                                 (x-get-local-selection
+                                  local-value
                                   (intern (x-dnd-current-type window)))
                                  (x-dnd-current-type window))
               (x-dnd-forget-drop window))))
@@ -443,6 +514,8 @@ EVENT, FRAME, WINDOW and DATA mean the same thing they do in
         ;; Now call the test function to decide what action to perform.
         (x-dnd-maybe-call-test-function window 'private)
         (unwind-protect
+            (when (windowp window)
+              (select-window window))
             (x-dnd-drop-data event frame window data
                              (symbol-name type))
           (x-dnd-forget-drop window))))))
@@ -500,6 +573,8 @@ message (format 32) that caused EVENT to be generated."
     ;; Now call the test function to decide what action to perform.
     (x-dnd-maybe-call-test-function window 'private)
     (unwind-protect
+        (when (windowp window)
+          (select-window window))
         (x-dnd-drop-data event frame window data
                          (symbol-name type))
       (x-dnd-forget-drop window))))
@@ -517,7 +592,7 @@ message (format 32) that caused EVENT to be generated."
 			    frame "ATOM" 32 t))
 
 (defun x-dnd-get-drop-width-height (frame w accept)
-  "Return the width/height to be sent in a XDndStatus message.
+  "Return the width/height to be sent in a XdndStatus message.
 FRAME is the frame and W is the window where the drop happened.
 If ACCEPT is nil return 0 (empty rectangle),
 otherwise if W is a window, return its width/height,
@@ -534,7 +609,7 @@ otherwise return the frame width/height."
     0))
 
 (defun x-dnd-get-drop-x-y (frame w)
-  "Return the x/y coordinates to be sent in a XDndStatus message.
+  "Return the x/y coordinates to be sent in a XdndStatus message.
 Coordinates are required to be absolute.
 FRAME is the frame and W is the window where the drop happened.
 If W is a window, return its absolute coordinates,
@@ -592,9 +667,21 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
 		(dnd-source (aref data 0))
 		(action-type (x-dnd-maybe-call-test-function
 			      window
-			      (cdr (assoc action x-dnd-xdnd-to-action))))
-		(reply-action (car (rassoc (car action-type)
-					   x-dnd-xdnd-to-action)))
+			      (cdr (assoc action x-dnd-xdnd-to-action)) t))
+		(reply-action (car (rassoc
+                                    ;; Mozilla and some other programs
+                                    ;; support XDS, but only if we
+                                    ;; reply with `copy'.  We can
+                                    ;; recognize these broken programs
+                                    ;; by checking to see if
+                                    ;; `XdndActionDirectSave' was
+                                    ;; originally specified.
+                                    (if (and (eq (car action-type)
+                                                 'direct-save)
+                                             (not (eq action 'direct-save)))
+                                        'copy
+                                      (car action-type))
+				    x-dnd-xdnd-to-action)))
 		(accept ;; 1 = accept, 0 = reject
 		 (if (and reply-action action-type
                           ;; Only allow drops on the text area of a
@@ -604,10 +691,13 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
 		(list-to-send
 		 (list (string-to-number
 			(frame-parameter frame 'outer-window-id))
-		       accept ;; 1 = Accept, 0 = reject.
-		       (x-dnd-get-drop-x-y frame window)
-		       (x-dnd-get-drop-width-height
-			frame window (eq accept 1))
+		       (+ 2 accept) ;; 1 = accept, 0 = reject.  2 =
+                                    ;; "want position updates".
+                       (if dnd-indicate-insertion-point 0
+		         (x-dnd-get-drop-x-y frame window))
+                       (if dnd-indicate-insertion-point 0
+		         (x-dnd-get-drop-width-height
+			  frame window (eq accept 1)))
                        ;; The no-toolkit Emacs build can actually
                        ;; receive drops from programs that speak
                        ;; versions of XDND earlier than 3 (such as
@@ -629,34 +719,39 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
                 (version (aref state 6))
                 (dnd-source (aref data 0))
 		(timestamp (aref data 2))
-		(value (and (x-dnd-current-type window)
-			    (x-get-selection-internal
-			     'XdndSelection
-			     (intern (x-dnd-current-type window))
-			     timestamp)))
-		success action)
+                (current-action (aref state 5))
+                (current-type (aref state 4))
+		success action value)
            (x-display-set-last-user-time timestamp)
-           (unwind-protect
-               (setq action (if value
-			        (condition-case info
-				    (x-dnd-drop-data
-                                     event frame window value
-				     (x-dnd-current-type window))
-			          (error
-			           (message "Error: %s" info)
-			           nil))))
-	     (setq success (if action 1 0))
-             (when (>= version 2)
-	       (x-send-client-message
-	        frame dnd-source frame "XdndFinished" 32
-	        (list (string-to-number
-                       (frame-parameter frame 'outer-window-id))
-		      (if (>= version 5) success 0) ;; 1 = Success, 0 = Error
-		      (if (or (not success) (< version 5)) 0
-                        (or (car (rassoc action
-                                         x-dnd-xdnd-to-action))
-                            0))))))
-	   (x-dnd-forget-drop window)))
+           (if (and (eq current-action 'direct-save)
+                    (equal current-type "XdndDirectSave0"))
+               (x-dnd-handle-xds-drop event window dnd-source version)
+             (setq value (and (x-dnd-current-type window)
+			      (x-get-selection-internal
+			       'XdndSelection
+			       (intern (x-dnd-current-type window))
+			       timestamp)))
+             (unwind-protect
+                 (setq action (if value
+			          (condition-case info
+				      (x-dnd-drop-data
+                                       event frame window value
+				       (x-dnd-current-type window))
+			            (error
+			             (message "Error: %s" info)
+			             nil))))
+	       (setq success (if action 1 0))
+               (when (>= version 2)
+	         (x-send-client-message
+	          frame dnd-source frame "XdndFinished" 32
+	          (list (string-to-number
+                         (frame-parameter frame 'outer-window-id))
+		        (if (>= version 5) success 0) ;; 1 = Success, 0 = Error
+		        (if (or (not action) (< version 5)) 0
+                          (or (car (rassoc action
+                                           x-dnd-xdnd-to-action))
+                              0)))))
+	       (x-dnd-forget-drop window)))))
 
 	(t (error "Unknown XDND message %s %s" message data))))
 
@@ -926,6 +1021,8 @@ Return a vector of atoms containing the selection targets."
 				      reply)))
 
 	    ((eq message-type 'XmDROP_START)
+             (when (windowp window)
+               (select-window window))
 	     (let* ((x (x-dnd-motif-value-to-list
 		        (x-dnd-get-motif-value data 8 2 source-byteorder)
 		        2 my-byteorder))
@@ -1014,19 +1111,22 @@ Return a vector of atoms containing the selection targets."
 ;;; Handling drops.
 
 (defvar x-treat-local-requests-remotely)
+(declare-function x-get-local-selection "xfns.c")
 
-(defun x-dnd-convert-to-offix (targets)
-  "Convert the contents of `XdndSelection' to OffiX data.
+(defun x-dnd-convert-to-offix (targets local-selection)
+  "Convert local selection data to OffiX data.
 TARGETS should be the list of targets currently available in
 `XdndSelection'.  Return a list of an OffiX type, and data
 suitable for passing to `x-change-window-property', or nil if the
-data could not be converted."
+data could not be converted.
+LOCAL-SELECTION should be the local selection data describing the
+selection data to convert."
   (let ((x-treat-local-requests-remotely t)
         file-name-data string-data)
     (cond
      ((and (member "FILE_NAME" targets)
            (setq file-name-data
-                 (gui-get-selection 'XdndSelection 'FILE_NAME)))
+                 (x-get-local-selection local-selection 'FILE_NAME)))
       (if (string-match-p "\0" file-name-data)
           ;; This means there are multiple file names in
           ;; XdndSelection.  Convert the file name data to a format
@@ -1035,19 +1135,23 @@ data could not be converted."
         (cons 'DndTypeFile (concat file-name-data "\0"))))
      ((and (member "STRING" targets)
            (setq string-data
-                 (gui-get-selection 'XdndSelection 'STRING)))
+                 (x-get-local-selection local-selection 'STRING)))
       (cons 'DndTypeText (encode-coding-string string-data
                                                'latin-1))))))
 
-(defun x-dnd-do-offix-drop (targets x y frame window-id)
-  "Perform an OffiX drop on WINDOW-ID with the contents of `XdndSelection'.
+(defun x-dnd-do-offix-drop (targets x y frame window-id contents)
+  "Perform an OffiX drop on WINDOW-ID with the given selection contents.
 Return non-nil if the drop succeeded, or nil if it did not
 happen, which can happen if TARGETS didn't contain anything that
 the OffiX protocol can represent.
 
 X and Y are the root window coordinates of the drop.  TARGETS is
-the list of targets `XdndSelection' can be converted to."
-  (if-let* ((data (x-dnd-convert-to-offix targets))
+the list of targets CONTENTS can be converted to, and CONTENTS is
+the local selection data to drop onto the target window.
+
+FRAME is the frame that will act as a source window for the
+drop."
+  (if-let* ((data (x-dnd-convert-to-offix targets contents))
             (type-id (car (rassq (car data)
                                  x-dnd-offix-id-to-name)))
             (source-id (string-to-number
@@ -1074,23 +1178,31 @@ the list of targets `XdndSelection' can be converted to."
                              frame "_DND_PROTOCOL"
                              32 message-data))))
 
-(defun x-dnd-handle-unsupported-drop (targets x y action window-id frame _time)
+(defun x-dnd-handle-unsupported-drop (targets x y action window-id frame _time local-selection-data)
   "Return non-nil if the drop described by TARGETS and ACTION should not proceed.
 X and Y are the root window coordinates of the drop.
 FRAME is the frame the drop originated on.
-WINDOW-ID is the X window the drop should happen to."
-  (not (and (or (eq action 'XdndActionCopy)
-                (eq action 'XdndActionMove))
-            (not (and x-dnd-use-offix-drop
-                      (or (not (eq x-dnd-use-offix-drop 'files))
-                          (member "FILE_NAME" targets))
-                      (x-dnd-do-offix-drop targets x
-                                           y frame window-id)))
-            (or
-             (member "STRING" targets)
-             (member "UTF8_STRING" targets)
-             (member "COMPOUND_TEXT" targets)
-             (member "TEXT" targets)))))
+WINDOW-ID is the X window the drop should happen to.
+LOCAL-SELECTION-DATA is the local selection data of the drop."
+  (let ((chosen-action nil))
+    (not (and (or (eq action 'XdndActionCopy)
+                  (eq action 'XdndActionMove))
+              (not (and x-dnd-use-offix-drop local-selection-data
+                        (or (not (eq x-dnd-use-offix-drop 'files))
+                            (member "FILE_NAME" targets))
+                        (when (x-dnd-do-offix-drop targets x
+                                                   y frame window-id
+                                                   local-selection-data)
+                          (setq chosen-action 'XdndActionCopy))))
+              (let ((delegate-p (or (member "STRING" targets)
+                                    (member "UTF8_STRING" targets)
+                                    (member "COMPOUND_TEXT" targets)
+                                    (member "TEXT" targets))))
+                (prog1 delegate-p
+                  ;; A string will avoid the drop emulation done in C
+                  ;; code, but won't be returned from `x-begin-drag'.
+                  (setq chosen-action (unless delegate-p ""))))))
+    chosen-action))
 
 (defvar x-dnd-targets-list)
 (defvar x-dnd-native-test-function)
@@ -1108,6 +1220,232 @@ ACTION is the action given to `x-begin-drag'."
       (intern (car (rassq (car state) x-dnd-xdnd-to-action))))))
 
 (setq x-dnd-native-test-function #'x-dnd-handle-native-drop)
+
+;;; XDS protocol support.
+
+(declare-function x-begin-drag "xfns.c")
+(declare-function x-delete-window-property "xfns.c")
+(defvar selection-converter-alist)
+
+(defvar x-dnd-xds-current-file nil
+  "The file name for which a direct save is currently being performed.")
+
+(defvar x-dnd-xds-source-frame nil
+  "The frame from which a direct save is currently being performed.")
+
+(defvar x-dnd-xds-performed nil
+  "Whether or not the drop target made a request for `XdndDirectSave0'.")
+
+(defvar x-dnd-disable-motif-protocol)
+(defvar x-dnd-use-unsupported-drop)
+
+(defun x-dnd-handle-direct-save (_selection _type _value)
+  "Handle a selection request for `XdndDirectSave'."
+  (setq x-dnd-xds-performed t)
+  (let* ((uri (x-window-property "XdndDirectSave0"
+                                 x-dnd-xds-source-frame
+                                 "AnyPropertyType" nil t))
+         (local-file-uri (if (and (string-match "^file://\\([^/]*\\)" uri)
+                                  (not (equal (match-string 1 uri) "")))
+                             (dnd-get-local-file-uri uri)
+                           uri))
+         (local-name (and local-file-uri
+                          (dnd-get-local-file-name local-file-uri))))
+    (if (not local-name)
+        '(STRING . "F")
+      (condition-case nil
+          (progn
+            (copy-file x-dnd-xds-current-file
+                       local-name t)
+            (when (equal x-dnd-xds-current-file
+                         dnd-last-dragged-remote-file)
+              (dnd-remove-last-dragged-remote-file)))
+        (:success '(STRING . "S"))
+        (error '(STRING . "E"))))))
+
+(defun x-dnd-handle-octet-stream (_selection _type _value)
+  "Handle a selecton request for `application/octet-stream'.
+Return the contents of the XDS file."
+  (cons 'application/octet-stream
+        (ignore-errors
+          (with-temp-buffer
+            (set-buffer-multibyte nil)
+            (setq buffer-file-coding-system 'binary)
+            (insert-file-contents-literally x-dnd-xds-current-file)
+            (buffer-substring-no-properties (point-min)
+                                            (point-max))))))
+
+(defun x-dnd-do-direct-save (file name frame allow-same-frame)
+  "Perform a direct save operation on FILE, from FRAME.
+FILE is the file containing the contents to drop.
+NAME is the name that should be given to the file after dropping.
+FRAME is the frame from which the drop will originate.
+ALLOW-SAME-FRAME means whether or not dropping will be allowed
+on FRAME.
+
+Return the action taken by the drop target, or nil if no action
+was taken, or the direct save failed."
+  (dnd-remove-last-dragged-remote-file)
+  (let ((file-name file)
+        (original-file-name file)
+        (selection-converter-alist
+         (append '((XdndDirectSave0 . x-dnd-handle-direct-save)
+                   (application/octet-stream . x-dnd-handle-octet-stream))
+                 selection-converter-alist))
+        (x-dnd-xds-current-file nil)
+        (x-dnd-xds-source-frame frame)
+        (x-dnd-xds-performed nil)
+        ;; The XDS protocol is built on top of XDND, and cannot
+        ;; possibly work with Motif or OffiX programs.
+        (x-dnd-disable-motif-protocol t)
+        (x-dnd-use-offix-drop nil)
+        (x-dnd-use-unsupported-drop nil)
+        (prop-deleted nil)
+        encoded-name)
+    (unwind-protect
+        (progn
+          (when (file-remote-p file)
+            (setq file-name (file-local-copy file))
+            (setq dnd-last-dragged-remote-file file-name)
+            (add-hook 'kill-emacs-hook
+                      #'dnd-remove-last-dragged-remote-file))
+          (setq encoded-name
+                (encode-coding-string name
+                                      (or file-name-coding-system
+                                          default-file-name-coding-system)))
+          (setq x-dnd-xds-current-file file-name)
+          (x-change-window-property "XdndDirectSave0" encoded-name
+                                    frame "text/plain" 8 nil)
+          (gui-set-selection 'XdndSelection (concat "file://" file-name))
+          ;; FIXME: this does not work with GTK file managers, since
+          ;; they always reach for `text/uri-list' first, contrary to
+          ;; the spec.
+          (let ((action (x-begin-drag '("XdndDirectSave0" "text/uri-list"
+                                        "application/octet-stream")
+                                      'XdndActionDirectSave
+                                      frame nil allow-same-frame)))
+            (if (not x-dnd-xds-performed)
+                action
+              (let ((property (x-window-property "XdndDirectSave0" frame
+                                                 "AnyPropertyType" nil t)))
+                (setq prop-deleted t)
+                ;; "System-G" deletes the property upon success.
+                (and (or (null property)
+                         (and (stringp property)
+                              (not (equal property ""))))
+                     action)))))
+      (unless prop-deleted
+        (x-delete-window-property "XdndDirectSave0" frame))
+      ;; Delete any remote copy that was made.
+      (when (not (equal file-name original-file-name))
+        (delete-file file-name)))))
+
+(defun x-dnd-save-direct (need-name name)
+  "Handle dropping a file that should be saved immediately.
+NEED-NAME tells whether or not the file was not yet saved.  NAME
+is either the name of the file, or the name the drop source wants
+us to save under.
+
+Prompt the user for a file name, then open it."
+  (if (file-remote-p default-directory)
+      ;; TODO: figure out what to do with remote files.
+      nil
+    (if need-name
+        (let ((file-name (read-file-name "Write file: "
+                                         default-directory
+                                         nil nil name)))
+          (when (file-exists-p file-name)
+            (unless (y-or-n-p (format-message
+                               "File `%s' exists; overwrite? " file-name))
+              (setq file-name nil)))
+          file-name)
+      ;; TODO: move this to dired.el once a platform-agonistic
+      ;; interface can be found.
+      (if (derived-mode-p 'dired-mode)
+          (revert-buffer)
+        (find-file name)))))
+
+(defun x-dnd-handle-octet-stream-for-drop (save-to)
+  "Save the contents of the XDS selection to SAVE-TO.
+Return non-nil if successful, nil otherwise."
+  (ignore-errors
+    (let ((coding-system-for-write 'raw-text)
+          (data (x-get-selection-internal 'XdndSelection
+                                          'application/octet-stream)))
+      (when data
+        (write-region data nil save-to)
+        t))))
+
+(defun x-dnd-handle-xds-drop (event window source version)
+  "Handle an XDS (X Direct Save) protocol drop.
+EVENT is the drag-n-drop event containing the drop.
+WINDOW is the window on top of which the drop is supposed to happen.
+SOURCE is the X window that sent the drop.
+VERSION is the version of the XDND protocol understood by SOURCE."
+  (if (not (windowp window))
+      ;; We can't perform an XDS drop if there's no window from which
+      ;; to determine the current directory.
+      (let* ((start (event-start event))
+             (frame (posn-window start)))
+        (x-send-client-message frame source frame
+                               "XdndFinished" 32
+                               (list (string-to-number
+                                      (frame-parameter frame
+                                                       'outer-window-id)))))
+    (let ((desired-name (x-window-property "XdndDirectSave0"
+                                           (window-frame window)
+                                           ;; We currently don't handle
+                                           ;; any alternative character
+                                           ;; encodings.
+                                           "text/plain" source))
+          (frame (window-frame window))
+          (success nil) save-to)
+      (unwind-protect
+          (when (stringp desired-name)
+            (setq desired-name (decode-coding-string
+                                desired-name
+                                (or file-name-coding-system
+                                    default-file-name-coding-system)))
+            (setq save-to (expand-file-name
+                           (funcall x-dnd-direct-save-function
+                                    t desired-name)))
+            (when save-to
+              (with-selected-window window
+                (let ((uri (format "file://%s%s" (system-name) save-to)))
+                  (x-change-window-property "XdndDirectSave0"
+                                            (encode-coding-string
+                                             (url-encode-url uri) 'ascii)
+                                            frame "text/plain" 8 nil source)
+                  (let ((result (x-get-selection-internal 'XdndSelection
+                                                          'XdndDirectSave0)))
+                    (cond ((equal result "F")
+                           (setq success (x-dnd-handle-octet-stream-for-drop save-to))
+                           (unless success
+                             (x-change-window-property "XdndDirectSave0" ""
+                                                       frame "text/plain" 8
+                                                       nil source)))
+                          ((equal result "S")
+                           (setq success t))
+                          ((equal result "E")
+                           (setq success nil))
+                          (t (error "Broken implementation of XDS: got %s in reply"
+                                    result)))
+                    (when success
+                      (funcall x-dnd-direct-save-function nil save-to)))))))
+        ;; We assume XDS always comes from a client supporting version 2
+        ;; or later, since custom actions aren't present before.
+        (x-send-client-message frame source frame
+                               "XdndFinished" 32
+                               (list (string-to-number
+                                      (frame-parameter frame
+                                                       'outer-window-id))
+                                     (if (>= version 5)
+                                         (if success 1 0)
+                                       0)
+                                     (if (or (not success)
+                                             (< version 5))
+                                         0
+                                       "XdndDirectSave0")))))))
 
 (provide 'x-dnd)
 

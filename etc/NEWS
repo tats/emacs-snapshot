@@ -85,7 +85,7 @@ after deleting lisp/leim/ja-dic/ja-dic.el.
 
 +++
 ** Emacs now supports being built with pure GTK.
-To use this option, make sure the GTK 3 (version 3.20 or later) and
+To use this option, make sure the GTK 3 (version 3.22.23 or later) and
 Cairo development files are installed, and configure Emacs with the
 option '--with-pgtk'.  Unlike the default X and GTK build, the
 resulting Emacs binary will work on any underlying window system
@@ -148,8 +148,15 @@ This is run at the end of the Emacs startup process, and is meant to
 be used to reinitialize structures that would normally be done at load
 time.
 
+** Native Compilation
+
 ---
-** New function 'startup-redirect-eln-cache'.
+*** New command 'native-compile-prune-cache'.
+This command deletes older .eln cache entries (but not the ones for
+the current Emacs version).
+
+---
+*** New function 'startup-redirect-eln-cache'.
 This function can be called in your init files to change the
 user-specific directory where Emacs stores the "*.eln" files produced
 by native compilation of Lisp packages Emacs loads.  The default
@@ -158,6 +165,9 @@ of 'user-emacs-directory'.
 
 
 * Incompatible changes in Emacs 29.1
+
++++
+** Warning about "eager macro-expansion failure" is changed into an error.
 
 ---
 ** Previously, the X reverseVideo value at startup was heeded for all frames.
@@ -314,6 +324,42 @@ startup.  Previously, these functions ignored
 
 * Changes in Emacs 29.1
 
+---
+** 'longlines-mode' is no longer obsolete.
+
++++
+** New command to change the font size globally.
+To increase the font size, type 'C-x C-M-+' or 'C-x C-M-='; to
+decrease it, type 'C-x C-M--'; to restore the font size, type 'C-x
+C-M-0'.  The final key in these commands may be repeated without the
+leading 'C-x' and without the modifiers, e.g. 'C-x C-M-+ C-M-+ C-M-+'
+and 'C-x C-M-+ + +' increase the font size by three steps.  When
+mouse-wheel-mode is enabled, 'C-M-wheel-up' and 'C-M-wheel-down' also
+increase and decrease the font size globally.  Additionally, the
+variable 'global-text-scale-adjust-resizes-frames' controls whether
+the frames are resized when the font size is changed.
+
++++
+** New function 'file-parent-directory'.
+Get the parent directory of a file.
+
+** New config variable 'syntax-wholeline-max' to reduce the cost of long lines.
+This variable is used by some operations (mostly syntax-propertization
+and font-locking) to treat lines longer than this variable as if they
+were made up of various smaller lines.  This can help reduce the
+pathological slowdowns seen in buffers made of a single long line, but
+can also cause misbehavior in the presence of such long lines (tho
+most of that misbehavior should usually be limited to mis-highlighting).
+You can recover the previous behavior with:
+
+    (setq syntax-wholeline-max most-positive-fixnum)
+
+---
+** New bindings in 'find-function-setup-keys' for 'find-library'.
+When 'find-function-setup-keys' is enabled, 'C-x L' is now bound to
+'find-library', 'C-x 4 L' is now bound to 'find-library-other-window'
+and 'C-x 5 L' is now bound to 'find-library-other-frame'.
+
 +++
 ** New key binding after 'M-x' or 'M-X': 'M-X'.
 Emacs allows different completion predicates to be used with 'M-x'
@@ -349,6 +395,11 @@ regions (usually set by mouse-dragging or shift-selection).
 This should be a regexp or a list of regexps; buffers whose names
 match those regexps will be ignored by 'switch-to-prev-buffer' and
 'switch-to-next-buffer'.
+
++++
+** New command 'rename-visited-file'.
+This command renames the file visited by the current buffer by moving
+it to a new location, and also makes the buffer visit this new file.
 
 ** Menus
 
@@ -399,11 +450,22 @@ These options allow adjusting point and scrolling a window when
 dragging items from another program.
 
 +++
+** The X Direct Save (XDS) protocol is now supported.
+This means dropping an image or file link from programs such as
+Firefox will no longer create a temporary file in a random directory,
+instead asking you where to save the file first.
+
++++
 ** New user option 'record-all-keys'.
 If non-nil, this option will force recording of all input keys,
 including those typed in response to passwords prompt (this was the
 previous behavior).  The default is nil, which inhibits recording of
 passwords.
+
++++
+** New user option 'longlines-breakpoint-chars'.
+This is a string containing chars that could be used as breakpoint in
+longlines mode.
 
 +++
 ** New function 'command-query'.
@@ -456,6 +518,12 @@ mixed.
 ** New face 'mode-line-active'.
 This inherits from the 'mode-line' face, but is the face actually used
 on the mode lines (along with 'mode-line-inactive').
+
++++
+** New face attribute pseudo-value 'reset'.
+This value stands for the value of the corresponding attribute of the
+'default' face.  It can be used to reset attribute values produced by
+inheriting from other faces.
 
 +++
 ** New function 'buffer-text-pixel-size'.
@@ -601,6 +669,11 @@ inserted.
 *** New command 'emoji-describe' (bound to 'C-x 8 e d').
 This command will tell you the name of the Emoji at point.  (This
 command also works for non-Emoji characters.)
+
+---
+*** New commands 'emoji-zoom-increase' and 'emoji-zoom-decrease'.
+These are bound to 'C-x 8 e +' and 'C-x 8 e -', respectively.  They
+can be used on any character, but are mainly useful for emoji.
 
 ---
 *** New input method 'emoji'.
@@ -972,6 +1045,48 @@ so automatically.
 
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
+
+** Dired
+
+---
+*** 'dired-clean-up-buffers-too' moved from dired-x to dired.
+This means that Dired now offers to kill buffers visiting files and
+dirs when they are deleted in Dired.  Before, you had to require
+'dired-x' to enable this behavior.  To disable this behavior,
+customize the user option 'dired-clean-up-buffers-too' to nil.  The
+related user option 'dired-clean-confirm-killing-deleted-buffers'
+(which see) has also been moved to 'dired'.
+
++++
+*** 'dired-info' and 'dired-man' moved from dired-x to dired.
+The 'dired-info' and 'dired-man' commands have been moved from the
+'dired-x' package to 'dired'.  They have also been renamed to
+'dired-do-info' and 'dired-do-man'; the old command names are obsolete
+aliases.
+
+The keys 'I' ('dired-do-info') and 'N' ('dired-do-man') are now bound
+in Dired mode by default.  The user options 'dired-bind-man' and
+'dired-bind-info' no longer have any effect and are obsolete.
+
+To get the old behavior back and unbind these keys in Dired mode, add
+the following to your Init file:
+
+(with-eval-after-load 'dired
+  (keymap-set dired-mode-map "N" nil)
+  (keymap-set dired-mode-map "I" nil))
+
+---
+*** New command 'dired-do-eww'.
+This command visits the file on the current line with EWW.
+
+** Elisp
+
+*** New command 'elisp-eval-buffer' (bound to 'C-c C-e').
+This command evals the forms in the current buffer.
+
+*** New commands 'elisp-byte-compile-file' and 'elisp-byte-compile-buffer'.
+These commands (bound to 'C-c C-f' and 'C-c C-b', respectively)
+byte-compile the visited file and the current buffer, respectively.
 
 ** Games
 
@@ -2151,6 +2266,10 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 * Lisp Changes in Emacs 29.1
 
 +++
+** New function 'seq-split'.
+This returns a list of sub-sequences of the specified sequence.
+
++++
 ** 'plist-get', 'plist-put' and 'plist-member' are no longer limited to 'eq'.
 These function now take an optional comparison predicate argument.
 
@@ -2338,9 +2457,10 @@ list in reported motion events if there is no frame underneath the
 mouse pointer.
 
 +++
-** New functions 'x-begin-drag', 'dnd-begin-text-drag' and 'dnd-begin-file-drag'.
-These functions allow dragging contents (such as files and text) from
-Emacs to other programs.
+** New functions for dragging items from Emacs to other programs.
+The new functions 'x-begin-drag', 'dnd-begin-file-drag',
+'dnd-begin-drag-files', and 'dnd-direct-save' allow dragging contents
+(such as files and text) from Emacs to other programs.
 
 ---
 ** New function 'ietf-drums-parse-date-string'.
@@ -2881,6 +3001,10 @@ when used as part of a property list specification for the
 +++
 ** 'defalias' records a more precise history of definitions.
 This is recorded in the 'function-history' symbol property.
+
+---
+** New hook 'save-place-after-find-file-hook'.
+This is called at the end of 'save-place-find-file-hook'.
 
 ---
 ** 'indian-tml-base-table' no longer translates digits.

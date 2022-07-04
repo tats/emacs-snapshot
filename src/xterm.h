@@ -261,6 +261,16 @@ struct xi_device_t
 Status x_parse_color (struct frame *f, const char *color_name,
 		      XColor *color);
 
+struct x_failable_request
+{
+  /* The first request making up this sequence.  */
+  unsigned long start;
+
+  /* If this is zero, then the request has not yet been made.
+     Otherwise, this is the request that ends this sequence.  */
+  unsigned long end;
+};
+
 
 /* For each X display, we have a structure that records
    information about it.  */
@@ -746,12 +756,12 @@ struct x_display_info
   int screen_mm_width;
   int screen_mm_height;
 
-  /* Circular buffer of request serials to ignore inside an error
-     handler in increasing order.  */
-  unsigned long failable_requests[N_FAILABLE_REQUESTS];
+  /* Circular buffer of request serial ranges to ignore inside an
+     error handler in increasing order.  */
+  struct x_failable_request failable_requests[N_FAILABLE_REQUESTS];
 
   /* Pointer to the next request in `failable_requests'.  */
-  unsigned long *next_failable_request;
+  struct x_failable_request *next_failable_request;
 };
 
 #ifdef HAVE_X_I18N
@@ -1435,6 +1445,11 @@ extern bool x_text_icon (struct frame *, const char *);
 extern void x_catch_errors (Display *);
 extern void x_catch_errors_with_handler (Display *, x_special_error_handler,
 					 void *);
+extern void x_catch_errors_for_lisp (struct x_display_info *);
+extern void x_uncatch_errors_for_lisp (struct x_display_info *);
+extern void x_check_errors_for_lisp (struct x_display_info *,
+				     const char *)
+  ATTRIBUTE_FORMAT_PRINTF (2, 0);
 extern void x_check_errors (Display *, const char *)
   ATTRIBUTE_FORMAT_PRINTF (2, 0);
 extern bool x_had_errors_p (Display *);
@@ -1576,6 +1591,7 @@ extern void x_handle_selection_notify (const XSelectionEvent *);
 extern void x_handle_selection_event (struct selection_input_event *);
 extern void x_clear_frame_selections (struct frame *);
 extern Lisp_Object x_atom_to_symbol (struct x_display_info *, Atom);
+extern Atom symbol_to_x_atom (struct x_display_info *, Lisp_Object);
 
 extern bool x_handle_dnd_message (struct frame *,
 				  const XClientMessageEvent *,
@@ -1599,7 +1615,8 @@ extern void x_clipboard_manager_save_all (void);
 extern Lisp_Object x_timestamp_for_selection (struct x_display_info *,
 					      Lisp_Object);
 extern void x_set_pending_dnd_time (Time);
-extern void x_own_selection (Lisp_Object, Lisp_Object, Lisp_Object);
+extern void x_own_selection (Lisp_Object, Lisp_Object, Lisp_Object,
+			     Lisp_Object, Time);
 extern Atom x_intern_cached_atom (struct x_display_info *, const char *,
 				  bool);
 extern char *x_get_atom_name (struct x_display_info *, Atom, bool *)
@@ -1667,12 +1684,14 @@ extern bool x_dnd_in_progress;
 extern bool x_dnd_waiting_for_finish;
 extern struct frame *x_dnd_frame;
 extern struct frame *x_dnd_finish_frame;
-extern unsigned x_dnd_unsupported_event_level;
 extern int x_error_message_count;
 
 #ifdef HAVE_XINPUT2
 extern struct xi_device_t *xi_device_from_id (struct x_display_info *, int);
 extern bool xi_frame_selected_for (struct frame *, unsigned long);
+#ifndef USE_GTK
+extern unsigned int xi_convert_event_state (XIDeviceEvent *);
+#endif
 #endif
 
 extern void mark_xterm (void);

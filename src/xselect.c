@@ -47,7 +47,7 @@ struct selection_data;
 
 static void x_decline_selection_request (struct selection_input_event *);
 static bool x_convert_selection (Lisp_Object, Lisp_Object, Atom, bool,
-				 struct x_display_info *);
+				 struct x_display_info *, bool);
 static bool waiting_for_other_props_on_window (Display *, Window);
 static struct prop_location *expect_property_change (Display *, Window,
                                                      Atom, int);
@@ -121,7 +121,7 @@ selection_quantum (Display *display)
 /* This converts a Lisp symbol to a server Atom, avoiding a server
    roundtrip whenever possible.  */
 
-static Atom
+Atom
 symbol_to_x_atom (struct x_display_info *dpyinfo, Lisp_Object sym)
 {
   Atom val;
@@ -250,19 +250,25 @@ x_atom_to_symbol (struct x_display_info *dpyinfo, Atom atom)
 
 /* Do protocol to assert ourself as a selection owner.
    FRAME shall be the owner; it must be a valid X frame.
+   TIMESTAMP should be the timestamp where selection ownership will be
+   assumed.
+   DND_DATA is the local value that will be used for selection requests
+   with `pending_dnd_time'.
    Update the Vselection_alist so that we can reply to later requests for
    our selection.  */
 
 void
 x_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
-		 Lisp_Object frame)
+		 Lisp_Object frame, Lisp_Object dnd_data, Time timestamp)
 {
   struct frame *f = XFRAME (frame);
   Window selecting_window = FRAME_X_WINDOW (f);
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   Display *display = dpyinfo->display;
-  Time timestamp = dpyinfo->last_user_time;
   Atom selection_atom = symbol_to_x_atom (dpyinfo, selection_name);
+
+  if (!timestamp)
+    timestamp = dpyinfo->last_user_time;
 
   block_input ();
   x_catch_errors (display);
@@ -276,8 +282,9 @@ x_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
     Lisp_Object selection_data;
     Lisp_Object prev_value;
 
-    selection_data = list4 (selection_name, selection_value,
-			    INT_TO_INTEGER (timestamp), frame);
+    selection_data = list5 (selection_name, selection_value,
+			    INT_TO_INTEGER (timestamp), frame,
+			    dnd_data);
     prev_value = LOCAL_SELECTION (selection_name, dpyinfo);
 
     tset_selection_alist
@@ -307,18 +314,33 @@ x_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
    This function is used both for remote requests (LOCAL_REQUEST is zero)
    and for local x-get-selection-internal (LOCAL_REQUEST is nonzero).
 
+   If LOCAL_VALUE is non-nil, use it as the local copy.  Also allow
+   quitting in that case, and let DPYINFO be NULL.
+
+   If NEED_ALTERNATE is true, use the drag-and-drop local value
+   instead.
+
    This calls random Lisp code, and may signal or gc.  */
 
 static Lisp_Object
 x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
-		       bool local_request, struct x_display_info *dpyinfo)
+		       bool local_request, struct x_display_info *dpyinfo,
+		       Lisp_Object local_value, bool need_alternate)
 {
-  Lisp_Object local_value, tem;
+  Lisp_Object tem;
   Lisp_Object handler_fn, value, check;
+  bool may_quit;
+  specpdl_ref count;
 
-  local_value = LOCAL_SELECTION (selection_symbol, dpyinfo);
+  may_quit = false;
 
-  if (NILP (local_value)) return Qnil;
+  if (NILP (local_value))
+    local_value = LOCAL_SELECTION (selection_symbol, dpyinfo);
+  else
+    may_quit = true;
+
+  if (NILP (local_value))
+    return Qnil;
 
   /* TIMESTAMP is a special case.  */
   if (EQ (target_type, QTIMESTAMP))
@@ -331,8 +353,10 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       /* Don't allow a quit within the converter.
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
-      specpdl_ref count = SPECPDL_INDEX ();
-      specbind (Qinhibit_quit, Qt);
+      count = SPECPDL_INDEX ();
+
+      if (!may_quit)
+	specbind (Qinhibit_quit, Qt);
 
       CHECK_SYMBOL (target_type);
       handler_fn = Fcdr (Fassq (target_type, Vselection_converter_alist));
@@ -340,7 +364,10 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       if (CONSP (handler_fn))
 	handler_fn = XCDR (handler_fn);
 
-      tem = XCAR (XCDR (local_value));
+      if (!need_alternate)
+	tem = XCAR (XCDR (local_value));
+      else
+	tem = XCAR (XCDR (XCDR (XCDR (XCDR (local_value)))));
 
       if (STRINGP (tem))
 	{
@@ -774,7 +801,7 @@ x_handle_selection_request (struct selection_input_event *event)
   Lisp_Object local_selection_data;
   bool success = false;
   specpdl_ref count = SPECPDL_INDEX ();
-  bool pushed;
+  bool pushed, use_alternate;
   Lisp_Object alias, tem;
 
   alias = Vx_selection_alias_alist;
@@ -798,13 +825,7 @@ x_handle_selection_request (struct selection_input_event *event)
   pushed = false;
 
   if (!dpyinfo)
-    goto DONE;
-
-  /* This is how the XDND protocol recommends dropping text onto a
-     target that doesn't support XDND.  */
-  if (SELECTION_EVENT_TIME (event) == pending_dnd_time + 1
-      || SELECTION_EVENT_TIME (event) == pending_dnd_time + 2)
-    selection_symbol = QXdndSelection;
+    goto REALLY_DONE;
 
   local_selection_data = LOCAL_SELECTION (selection_symbol, dpyinfo);
 
@@ -817,6 +838,14 @@ x_handle_selection_request (struct selection_input_event *event)
   if (SELECTION_EVENT_TIME (event) != CurrentTime
       && local_selection_time > SELECTION_EVENT_TIME (event))
     goto DONE;
+
+  use_alternate = false;
+
+  /* This is how the XDND protocol recommends dropping text onto a
+     target that doesn't support XDND.  */
+  if (SELECTION_EVENT_TIME (event) == pending_dnd_time + 1
+      || SELECTION_EVENT_TIME (event) == pending_dnd_time + 2)
+    use_alternate = true;
 
   block_input ();
   pushed = true;
@@ -858,7 +887,8 @@ x_handle_selection_request (struct selection_input_event *event)
 
 	  if (subproperty != None)
 	    subsuccess = x_convert_selection (selection_symbol, subtarget,
-					      subproperty, true, dpyinfo);
+					      subproperty, true, dpyinfo,
+					      use_alternate);
 	  if (!subsuccess)
 	    ASET (multprop, 2*j+1, Qnil);
 	}
@@ -875,7 +905,8 @@ x_handle_selection_request (struct selection_input_event *event)
 	property = SELECTION_EVENT_TARGET (event);
       success = x_convert_selection (selection_symbol,
 				     target_symbol, property,
-				     false, dpyinfo);
+				     false, dpyinfo,
+				     use_alternate);
     }
 
  DONE:
@@ -894,6 +925,9 @@ x_handle_selection_request (struct selection_input_event *event)
     CALLN (Frun_hook_with_args, Qx_sent_selection_functions,
 	   selection_symbol, target_symbol, success ? Qt : Qnil);
 
+  /* Used to punt when dpyinfo is NULL.  */
+ REALLY_DONE:
+
   unbind_to (count, Qnil);
 }
 
@@ -907,7 +941,8 @@ x_handle_selection_request (struct selection_input_event *event)
 static bool
 x_convert_selection (Lisp_Object selection_symbol,
 		     Lisp_Object target_symbol, Atom property,
-		     bool for_multiple, struct x_display_info *dpyinfo)
+		     bool for_multiple, struct x_display_info *dpyinfo,
+		     bool use_alternate)
 {
   Lisp_Object lisp_selection;
   struct selection_data *cs;
@@ -915,7 +950,7 @@ x_convert_selection (Lisp_Object selection_symbol,
 
   lisp_selection
     = x_get_local_selection (selection_symbol, target_symbol,
-			     false, dpyinfo);
+			     false, dpyinfo, Qnil, use_alternate);
 
   frame = selection_request_stack;
 
@@ -2081,7 +2116,7 @@ On Nextstep, FRAME is unused.  */)
 
   CHECK_SYMBOL (selection);
   if (NILP (value)) error ("VALUE may not be nil");
-  x_own_selection (selection, value, frame);
+  x_own_selection (selection, value, frame, Qnil, 0);
   return value;
 }
 
@@ -2131,7 +2166,7 @@ On Nextstep, TIME-STAMP and TERMINAL are unused.  */)
     }
 
   val = x_get_local_selection (selection_symbol, target_type, true,
-			       FRAME_DISPLAY_INFO (f));
+			       FRAME_DISPLAY_INFO (f), Qnil, false);
 
   if (NILP (val) && FRAME_LIVE_P (f))
     {
@@ -2271,6 +2306,45 @@ On Nextstep, TERMINAL is unused.  */)
   owner = XGetSelectionOwner (dpyinfo->display, atom);
   unblock_input ();
   return (owner ? Qt : Qnil);
+}
+
+DEFUN ("x-get-local-selection", Fx_get_local_selection, Sx_get_local_selection,
+       0, 2, 0,
+       doc: /* Run selection converters for VALUE, and return the result.
+TARGET is the selection target that is used to find a suitable
+converter.  VALUE is a list of 4 values NAME, SELECTION-VALUE,
+TIMESTAMP and FRAME.  NAME is the name of the selection that will be
+passed to selection converters, SELECTION-VALUE is the value of the
+selection used by the converter, TIMESTAMP is not meaningful (but must
+be a number that fits in an X timestamp), and FRAME is the frame
+describing the terminal for which the selection converter will be
+run.  */)
+  (Lisp_Object value, Lisp_Object target)
+{
+  Time time;
+  Lisp_Object name, timestamp, frame, result;
+
+  CHECK_SYMBOL (target);
+  name = Fnth (make_fixnum (0), value);
+  timestamp = Fnth (make_fixnum (2), value);
+  frame = Fnth (make_fixnum (3), value);
+
+  CHECK_SYMBOL (name);
+  CONS_TO_INTEGER (timestamp, Time, time);
+  check_window_system (decode_live_frame (frame));
+
+  result = x_get_local_selection (name, target, true,
+				  NULL, value, false);
+
+  if (CONSP (result) && SYMBOLP (XCAR (result)))
+    {
+      result = XCDR (result);
+
+      if (CONSP (result) && NILP (XCDR (result)))
+	result = XCAR (result);
+    }
+
+  return clean_local_selection_data (result);
 }
 
 
@@ -2675,7 +2749,11 @@ to send.  If a value is a string, it is converted to an Atom and the value of
 the Atom is sent.  If a value is a cons, it is converted to a 32 bit number
 with the high 16 bits from the car and the lower 16 bit from the cdr.
 If more values than fits into the event is given, the excessive values
-are ignored.  */)
+are ignored.
+
+Wait for the event to be sent and signal any error, unless
+`x-fast-protocol-requests' is non-nil, in which case errors will be
+silently ignored.  */)
   (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
    Lisp_Object message_type, Lisp_Object format, Lisp_Object values)
 {
@@ -2756,7 +2834,7 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
      the destination window.  But if we are sending to the root window,
      there is no such client.  Then we set the event mask to 0xffffff.  The
      event then goes to clients selecting for events on the root window.  */
-  x_catch_errors (dpyinfo->display);
+  x_catch_errors_for_lisp (dpyinfo);
   {
     bool propagate = !to_root;
     long mask = to_root ? 0xffffff : 0;
@@ -2764,7 +2842,8 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
     XSendEvent (dpyinfo->display, wdest, propagate, mask, &event);
     XFlush (dpyinfo->display);
   }
-  x_uncatch_errors ();
+  x_check_errors_for_lisp (dpyinfo, "Failed to send client event: %s");
+  x_uncatch_errors_for_lisp (dpyinfo);
   unblock_input ();
 }
 
@@ -2809,6 +2888,7 @@ syms_of_xselect (void)
   defsubr (&Sx_get_atom_name);
   defsubr (&Sx_send_client_message);
   defsubr (&Sx_register_dnd_atom);
+  defsubr (&Sx_get_local_selection);
 
   reading_selection_reply = Fcons (Qnil, Qnil);
   staticpro (&reading_selection_reply);
