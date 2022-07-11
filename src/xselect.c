@@ -40,8 +40,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <X11/Xproto.h>
 
-static Time pending_dnd_time;
-
 struct prop_location;
 struct selection_data;
 
@@ -165,6 +163,12 @@ symbol_to_x_atom (struct x_display_info *dpyinfo, Lisp_Object sym)
     return dpyinfo->Xatom_XmTRANSFER_SUCCESS;
   if (EQ (sym, QXmTRANSFER_FAILURE))
     return dpyinfo->Xatom_XmTRANSFER_FAILURE;
+  if (EQ (sym, QXdndDirectSave0))
+    return dpyinfo->Xatom_XdndDirectSave0;
+  if (EQ (sym, Qtext_plain))
+    return dpyinfo->Xatom_text_plain;
+  if (EQ (sym, QXdndActionDirectSave))
+    return dpyinfo->Xatom_XdndActionDirectSave;
 
   if (!SYMBOLP (sym))
     emacs_abort ();
@@ -233,6 +237,12 @@ x_atom_to_symbol (struct x_display_info *dpyinfo, Atom atom)
     return QXmTRANSFER_SUCCESS;
   if (atom == dpyinfo->Xatom_XmTRANSFER_FAILURE)
     return QXmTRANSFER_FAILURE;
+  if (atom == dpyinfo->Xatom_XdndDirectSave0)
+    return QXdndDirectSave0;
+  if (atom == dpyinfo->Xatom_text_plain)
+    return Qtext_plain;
+  if (atom == dpyinfo->Xatom_XdndActionDirectSave)
+    return QXdndActionDirectSave;
 
   x_catch_errors (dpyinfo->display);
   str = x_get_atom_name (dpyinfo, atom, NULL);
@@ -253,7 +263,7 @@ x_atom_to_symbol (struct x_display_info *dpyinfo, Atom atom)
    TIMESTAMP should be the timestamp where selection ownership will be
    assumed.
    DND_DATA is the local value that will be used for selection requests
-   with `pending_dnd_time'.
+   with `dpyinfo->pending_dnd_time'.
    Update the Vselection_alist so that we can reply to later requests for
    our selection.  */
 
@@ -427,10 +437,19 @@ static void
 x_decline_selection_request (struct selection_input_event *event)
 {
   XEvent reply_base;
-  XSelectionEvent *reply = &(reply_base.xselection);
+  XSelectionEvent *reply;
+  Display *dpy;
+  struct x_display_info *dpyinfo;
+
+  reply = &(reply_base.xselection);
+  dpy = SELECTION_EVENT_DISPLAY (event);
+  dpyinfo = x_display_info_for_display (dpy);
+
+  if (!dpyinfo)
+    return;
 
   reply->type = SelectionNotify;
-  reply->display = SELECTION_EVENT_DISPLAY (event);
+  reply->display = dpy;
   reply->requestor = SELECTION_EVENT_REQUESTOR (event);
   reply->selection = SELECTION_EVENT_SELECTION (event);
   reply->time = SELECTION_EVENT_TIME (event);
@@ -440,10 +459,12 @@ x_decline_selection_request (struct selection_input_event *event)
   /* The reason for the error may be that the receiver has
      died in the meantime.  Handle that case.  */
   block_input ();
-  x_catch_errors (reply->display);
-  XSendEvent (reply->display, reply->requestor, False, 0, &reply_base);
-  XFlush (reply->display);
-  x_uncatch_errors ();
+  x_ignore_errors_for_next_request (dpyinfo);
+  XSendEvent (dpyinfo->display, reply->requestor,
+	      False, 0, &reply_base);
+  x_stop_ignoring_errors (dpyinfo);
+
+  XFlush (dpyinfo->display);
   unblock_input ();
 }
 
@@ -843,8 +864,11 @@ x_handle_selection_request (struct selection_input_event *event)
 
   /* This is how the XDND protocol recommends dropping text onto a
      target that doesn't support XDND.  */
-  if (SELECTION_EVENT_TIME (event) == pending_dnd_time + 1
-      || SELECTION_EVENT_TIME (event) == pending_dnd_time + 2)
+  if (dpyinfo->pending_dnd_time
+      && ((SELECTION_EVENT_TIME (event)
+	   == dpyinfo->pending_dnd_time + 1)
+	  || (SELECTION_EVENT_TIME (event)
+	      == dpyinfo->pending_dnd_time + 2)))
     use_alternate = true;
 
   block_input ();
@@ -2325,9 +2349,13 @@ run.  */)
   Lisp_Object name, timestamp, frame, result;
 
   CHECK_SYMBOL (target);
-  name = Fnth (make_fixnum (0), value);
-  timestamp = Fnth (make_fixnum (2), value);
-  frame = Fnth (make_fixnum (3), value);
+
+  /* Check that VALUE has 4 elements, for x_get_local_selection.  */
+  Lisp_Object v = value; CHECK_CONS (v);
+  name = XCAR (v); v = XCDR (v); CHECK_CONS (v);
+  v = XCDR (v); CHECK_CONS (v);
+  timestamp = XCAR (v); v = XCDR (v); CHECK_CONS (v);
+  frame = XCAR (v);
 
   CHECK_SYMBOL (name);
   CONS_TO_INTEGER (timestamp, Time, time);
@@ -2868,12 +2896,6 @@ x_timestamp_for_selection (struct x_display_info *dpyinfo,
   return value;
 }
 
-void
-x_set_pending_dnd_time (Time time)
-{
-  pending_dnd_time = time;
-}
-
 static void syms_of_xselect_for_pdumper (void);
 
 void
@@ -2994,6 +3016,9 @@ Note that this does not affect setting or owning selections.  */);
   DEFSYM (QCLIPBOARD_MANAGER, "CLIPBOARD_MANAGER");
   DEFSYM (QSAVE_TARGETS, "SAVE_TARGETS");
   DEFSYM (QNULL, "NULL");
+  DEFSYM (QXdndDirectSave0, "XdndDirectSave0");
+  DEFSYM (QXdndActionDirectSave, "XdndActionDirectSave");
+  DEFSYM (Qtext_plain, "text/plain");
   DEFSYM (Qforeign_selection, "foreign-selection");
   DEFSYM (Qx_lost_selection_functions, "x-lost-selection-functions");
   DEFSYM (Qx_sent_selection_functions, "x-sent-selection-functions");

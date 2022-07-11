@@ -97,7 +97,7 @@
 When a file is visited and hi-lock mode is on, patterns starting
 up to this limit are added to font-lock's patterns.  See documentation
 of functions `hi-lock-mode' and `hi-lock-find-patterns'."
-  :type 'integer
+  :type 'natnum
   :group 'hi-lock)
 
 (defcustom hi-lock-highlight-range 2000000
@@ -107,7 +107,7 @@ such as the buffer created by `list-colors-display'.  In those buffers
 hi-lock patterns will only be applied over a range of
 `hi-lock-highlight-range' characters.  If font-lock is active then
 highlighting will be applied throughout the buffer."
-  :type 'integer
+  :type 'natnum
   :group 'hi-lock)
 
 (defcustom hi-lock-exclude-modes
@@ -128,10 +128,9 @@ patterns."
                  (const :tag "Ask about file patterns" ask)
                  (function :tag "Function to check file patterns"))
   :group 'hi-lock
+  ;; It can have a function value.
+  :risky t
   :version "22.1")
-
-;; It can have a function value.
-(put 'hi-lock-file-patterns-policy 'risky-local-variable t)
 
 (defcustom hi-lock-auto-select-face nil
   "When nil, highlighting commands prompt for the face to use.

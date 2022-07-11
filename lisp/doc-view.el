@@ -225,7 +225,7 @@ are available (see Info node `(emacs)Document View')"
 (defcustom doc-view-resolution 100
   "Dots per inch resolution used to render the documents.
 Higher values result in larger images."
-  :type 'number)
+  :type 'natnum)
 
 (defvar doc-view-doc-type nil
   "The type of document in the current buffer.
@@ -301,7 +301,7 @@ scaling."
 Has only an effect if `doc-view-scale-internally' is non-nil and support for
 scaling is compiled into Emacs."
   :version "24.1"
-  :type 'number)
+  :type 'natnum)
 
 (defcustom doc-view-dvipdfm-program "dvipdfm"
   "Program to convert DVI files to PDF.
@@ -378,7 +378,8 @@ After such a refresh newly converted pages will be available for
 viewing.  If set to nil there won't be any refreshes and the
 pages won't be displayed before conversion of the whole document
 has finished."
-  :type 'integer)
+  :type '(choice natnum
+                 (const :value nil :tag "No refreshes")))
 
 (defcustom doc-view-continuous nil
   "In Continuous mode reaching the page edge advances to next/previous page.

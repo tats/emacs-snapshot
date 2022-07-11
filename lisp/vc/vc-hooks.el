@@ -141,9 +141,9 @@ confirmation whether it should follow the link.  If nil, the link is
 visited and a warning displayed."
   :type '(choice (const :tag "Ask for confirmation" ask)
 		 (const :tag "Visit link and warn" nil)
-		 (const :tag "Follow link" t))
+                 (const :tag "Follow link" t))
+  :safe #'null
   :group 'vc)
-(put 'vc-follow-symlinks 'safe-local-variable #'null)
 
 (defcustom vc-display-status t
   "If non-nil, display revision number and lock status in mode line.
@@ -555,15 +555,6 @@ this function."
 	       (throw 'found trial))))
        templates))))
 
-
-;; toggle-read-only is obsolete since 24.3, but since vc-t-r-o was made
-;; obsolete earlier, it is ok for the latter to be an alias to the former,
-;; since the latter will be removed first.  We can't just make it
-;; an alias for read-only-mode, since that is not 100% the same.
-(defalias 'vc-toggle-read-only 'toggle-read-only)
-(make-obsolete 'vc-toggle-read-only
-               "use `read-only-mode' instead (or `toggle-read-only' in older versions of Emacs)."
-               "24.1")
 
 (defun vc-default-make-version-backups-p (_backend _file)
   "Return non-nil if unmodified versions should be backed up locally.

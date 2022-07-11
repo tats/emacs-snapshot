@@ -128,15 +128,18 @@ and the second is a string.
 
 If the first argument is t, the second argument is the name the
 dropped file should be saved under.  The function should return a
-complete local file name describing where the file should be
-saved.
+complete file name describing where the file should be saved.
 
 It can also return nil, which means to cancel the drop.
 
 If the first argument is nil, the second is the name of the file
 that was dropped."
   :version "29.1"
-  :type 'function
+  :type '(choice (const :tag "Prompt for name before saving"
+                        x-dnd-save-direct)
+                 (const :tag "Save and open immediately without prompting"
+                        x-dnd-save-direct-immediately)
+                 (function :tag "Other function"))
   :group 'x)
 
 (defcustom x-dnd-copy-types '("chromium/x-renderer-taint")
@@ -187,18 +190,21 @@ any protocol specific data.")
 
 (declare-function x-register-dnd-atom "xselect.c")
 
+(defvar x-fast-protocol-requests)
+
 (defun x-dnd-init-frame (&optional frame)
   "Setup drag and drop for FRAME (i.e. create appropriate properties)."
   (when (eq 'x (window-system frame))
-    (x-register-dnd-atom "DndProtocol" frame)
-    (x-register-dnd-atom "_MOTIF_DRAG_AND_DROP_MESSAGE" frame)
-    (x-register-dnd-atom "XdndEnter" frame)
-    (x-register-dnd-atom "XdndPosition" frame)
-    (x-register-dnd-atom "XdndLeave" frame)
-    (x-register-dnd-atom "XdndDrop" frame)
-    (x-register-dnd-atom "_DND_PROTOCOL" frame)
-    (x-dnd-init-xdnd-for-frame frame)
-    (x-dnd-init-motif-for-frame frame)))
+    (let ((x-fast-protocol-requests (not x-dnd-debug-errors)))
+      (x-register-dnd-atom "DndProtocol" frame)
+      (x-register-dnd-atom "_MOTIF_DRAG_AND_DROP_MESSAGE" frame)
+      (x-register-dnd-atom "XdndEnter" frame)
+      (x-register-dnd-atom "XdndPosition" frame)
+      (x-register-dnd-atom "XdndLeave" frame)
+      (x-register-dnd-atom "XdndDrop" frame)
+      (x-register-dnd-atom "_DND_PROTOCOL" frame)
+      (x-dnd-init-xdnd-for-frame frame)
+      (x-dnd-init-motif-for-frame frame))))
 
 (defun x-dnd-get-state-cons-for-frame (frame-or-window)
   "Return the entry in `x-dnd-current-state' for a frame or window."
@@ -430,8 +436,6 @@ nil if not."
 	(let ((dnd-open-file-other-window t))
 	  (select-frame frame)
 	  (funcall handler window action data))))))
-
-(defvar x-fast-protocol-requests)
 
 (defun x-dnd-handle-drag-n-drop-event (event)
   "Receive drag and drop events (X client messages).
@@ -691,13 +695,13 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
 		(list-to-send
 		 (list (string-to-number
 			(frame-parameter frame 'outer-window-id))
-		       (+ 2 accept) ;; 1 = accept, 0 = reject.  2 =
-                                    ;; "want position updates".
-                       (if dnd-indicate-insertion-point 0
-		         (x-dnd-get-drop-x-y frame window))
-                       (if dnd-indicate-insertion-point 0
-		         (x-dnd-get-drop-width-height
-			  frame window (eq accept 1)))
+                       ;; 1 = accept, 0 = reject.  2 = "want position
+                       ;; updates even for movement inside the given
+                       ;; widget bounds".
+		       (+ (if dnd-indicate-insertion-point 2 0) accept)
+		       (x-dnd-get-drop-x-y frame window)
+		       (x-dnd-get-drop-width-height
+			frame window (eq accept 1))
                        ;; The no-toolkit Emacs build can actually
                        ;; receive drops from programs that speak
                        ;; versions of XDND earlier than 3 (such as
@@ -1347,23 +1351,41 @@ is either the name of the file, or the name the drop source wants
 us to save under.
 
 Prompt the user for a file name, then open it."
-  (if (file-remote-p default-directory)
-      ;; TODO: figure out what to do with remote files.
-      nil
-    (if need-name
-        (let ((file-name (read-file-name "Write file: "
-                                         default-directory
-                                         nil nil name)))
-          (when (file-exists-p file-name)
-            (unless (y-or-n-p (format-message
-                               "File `%s' exists; overwrite? " file-name))
-              (setq file-name nil)))
-          file-name)
-      ;; TODO: move this to dired.el once a platform-agonistic
-      ;; interface can be found.
-      (if (derived-mode-p 'dired-mode)
-          (revert-buffer)
-        (find-file name)))))
+  (if need-name
+      (let ((file-name (read-file-name "Write file: "
+                                       default-directory
+                                       nil nil name)))
+        (when (file-exists-p file-name)
+          (unless (y-or-n-p (format-message
+                             "File `%s' exists; overwrite? " file-name))
+            (setq file-name nil)))
+        file-name)
+    ;; TODO: move this to dired.el once a platform-agonistic
+    ;; interface can be found.
+    (if (derived-mode-p 'dired-mode)
+        (revert-buffer)
+      (find-file name))))
+
+(defun x-dnd-save-direct-immediately (need-name name)
+  "Save and open a dropped file, like `x-dnd-save-direct'.
+NEED-NAME tells whether or not the file was not yet saved.  NAME
+is either the name of the file, or the name the drop source wants
+us to save under.
+
+Unlike `x-dnd-save-direct', do not prompt for the name by which
+to save the file.  Simply save it in the current directory."
+  (if need-name
+      (let ((file-name (expand-file-name name)))
+        (when (file-exists-p file-name)
+          (unless (y-or-n-p (format-message
+                             "File `%s' exists; overwrite? " file-name))
+            (setq file-name nil)))
+        file-name)
+    ;; TODO: move this to dired.el once a platform-agonistic
+    ;; interface can be found.
+    (if (derived-mode-p 'dired-mode)
+        (revert-buffer)
+      (find-file name))))
 
 (defun x-dnd-handle-octet-stream-for-drop (save-to)
   "Save the contents of the XDS selection to SAVE-TO.
@@ -1399,19 +1421,23 @@ VERSION is the version of the XDND protocol understood by SOURCE."
                                            ;; encodings.
                                            "text/plain" source))
           (frame (window-frame window))
-          (success nil) save-to)
+          (success nil) save-to save-to-remote hostname)
       (unwind-protect
           (when (stringp desired-name)
             (setq desired-name (decode-coding-string
                                 desired-name
                                 (or file-name-coding-system
                                     default-file-name-coding-system)))
-            (setq save-to (expand-file-name
-                           (funcall x-dnd-direct-save-function
-                                    t desired-name)))
+            (let ((name (funcall x-dnd-direct-save-function
+                                 t desired-name)))
+              (setq save-to name save-to-remote name))
             (when save-to
+              (if (file-remote-p save-to)
+                  (setq hostname (file-remote-p save-to 'host)
+                        save-to (file-local-name save-to))
+                (setq hostname (system-name)))
               (with-selected-window window
-                (let ((uri (format "file://%s%s" (system-name) save-to)))
+                (let ((uri (format "file://%s%s" hostname save-to)))
                   (x-change-window-property "XdndDirectSave0"
                                             (encode-coding-string
                                              (url-encode-url uri) 'ascii)
@@ -1419,7 +1445,8 @@ VERSION is the version of the XDND protocol understood by SOURCE."
                   (let ((result (x-get-selection-internal 'XdndSelection
                                                           'XdndDirectSave0)))
                     (cond ((equal result "F")
-                           (setq success (x-dnd-handle-octet-stream-for-drop save-to))
+                           (setq success
+                                 (x-dnd-handle-octet-stream-for-drop save-to-remote))
                            (unless success
                              (x-change-window-property "XdndDirectSave0" ""
                                                        frame "text/plain" 8
@@ -1431,7 +1458,7 @@ VERSION is the version of the XDND protocol understood by SOURCE."
                           (t (error "Broken implementation of XDS: got %s in reply"
                                     result)))
                     (when success
-                      (funcall x-dnd-direct-save-function nil save-to)))))))
+                      (funcall x-dnd-direct-save-function nil save-to-remote)))))))
         ;; We assume XDS always comes from a client supporting version 2
         ;; or later, since custom actions aren't present before.
         (x-send-client-message frame source frame

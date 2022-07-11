@@ -304,19 +304,17 @@ When nil, make them for files that have some already.
 The value `never' means do not make them."
   :type '(choice (const :tag "Never" never)
 		 (const :tag "If existing" nil)
-		 (other :tag "Always" t))
+                 (other :tag "Always" t))
+  :safe #'version-control-safe-local-p
   :group 'backup)
 
 (defun version-control-safe-local-p (x)
   "Return whether X is safe as local value for `version-control'."
   (or (booleanp x) (equal x 'never)))
 
-(put 'version-control 'safe-local-variable
-     #'version-control-safe-local-p)
-
 (defcustom dired-kept-versions 2
   "When cleaning directory, number of versions to keep."
-  :type 'integer
+  :type 'natnum
   :group 'backup
   :group 'dired)
 
@@ -330,16 +328,16 @@ If nil, ask confirmation.  Any other value prevents any trimming."
 
 (defcustom kept-old-versions 2
   "Number of oldest versions to keep when a new numbered backup is made."
-  :type 'integer
+  :type 'natnum
+  :safe #'natnump
   :group 'backup)
-(put 'kept-old-versions 'safe-local-variable 'integerp)
 
 (defcustom kept-new-versions 2
   "Number of newest versions to keep when a new numbered backup is made.
 Includes the new backup.  Must be greater than 0."
-  :type 'integer
+  :type 'natnum
+  :safe #'natnump
   :group 'backup)
-(put 'kept-new-versions 'safe-local-variable 'integerp)
 
 (defcustom require-final-newline nil
   "Whether to add a newline automatically at the end of the file.
@@ -443,18 +441,60 @@ idle for `auto-save-visited-interval' seconds."
          (when auto-save--timer
            (timer-set-idle-time auto-save--timer value :repeat))))
 
-(define-minor-mode auto-save-visited-mode
-  "Toggle automatic saving to file-visiting buffers on or off.
+(defcustom auto-save-visited-predicate nil
+  "Predicate function for `auto-save-visited-mode'.
 
-Unlike `auto-save-mode', this mode will auto-save buffer contents
-to the visited files directly and will also run all save-related
-hooks.  See Info node `Saving' for details of the save process.
+If non-nil, the value should be a function of no arguments; it
+will be called once in each file-visiting buffer when the time
+comes to auto-save.  A buffer will be saved only if the predicate
+function returns a non-nil value.
+
+For example, you could add this to your Init file to only save
+files that are both in Org mode and in a particular directory:
+
+    (setq auto-save-visited-predicate
+          (lambda () (and (eq major-mode \\='org-mode)
+                          (string-match \"^/home/skangas/org/\"
+                                        buffer-file-name))))
+
+If the value of this variable is not a function, it is ignored.
+This is the same as having a predicate that always returns
+non-nil."
+  :group 'auto-save
+  :type '(choice :tag "Function:"
+                 (const :tag "No extra predicate" :value nil)
+                 (function :tag "Predicate function" :value always))
+  :risky t
+  :version "29.1")
+
+(defcustom remote-file-name-inhibit-auto-save-visited nil
+  "When nil, `auto-save-visited-mode' will auto-save remote files.
+Any other value means that it will not."
+  :group 'auto-save
+  :type 'boolean
+  :version "29.1")
+
+(define-minor-mode auto-save-visited-mode
+  "Toggle automatic saving of file-visiting buffers to their files.
+
+When this mode is enabled, file-visiting buffers are automatically
+saved to their files.  This is in contrast to `auto-save-mode', which
+auto-saves those buffers to a separate file, leaving the original
+file intact.  See Info node `Saving' for details of the save process.
+
+The user option `auto-save-visited-interval' controls how often to
+auto-save a buffer into its visited file.
+
+You can use `auto-save-visited-predicate' to control which
+buffers are saved.
 
 You can also set the buffer-local value of the variable
 `auto-save-visited-mode' to nil.  A buffer where the buffer-local
 value of this variable is nil is ignored for the purpose of
 `auto-save-visited-mode', even if `auto-save-visited-mode' is
-enabled."
+enabled.
+
+For more details, see Info node `(emacs) Auto Save Files'."
   :group 'auto-save
   :global t
   (when auto-save--timer (cancel-timer auto-save--timer))
@@ -467,7 +507,11 @@ enabled."
              (and buffer-file-name
                   auto-save-visited-mode
                   (not (and buffer-auto-save-file-name
-                            auto-save-visited-file-name))))))))
+                            auto-save-visited-file-name))
+                  (or (not (file-remote-p buffer-file-name))
+                      (not remote-file-name-inhibit-auto-save-visited))
+                  (or (not (functionp auto-save-visited-predicate))
+                      (funcall auto-save-visited-predicate))))))))
 
 ;; The 'set' part is so we don't get a warning for using this variable
 ;; above, while still catching code that _sets_ the variable to get
@@ -1250,8 +1294,8 @@ Tip: You can use this expansion of remote identifier components
 
 (defcustom remote-file-name-inhibit-cache 10
   "Whether to use the remote file-name cache for read access.
-When nil, never expire cached values (caution)
-When t, never use the cache (safe, but may be slow)
+When nil, never expire cached values (caution).
+When t, never use the cache (safe, but may be slow).
 A number means use cached values for that amount of seconds since caching.
 
 The attributes of remote files are cached for better performance.
@@ -3118,9 +3162,6 @@ major mode MODE.
 
 See also `auto-mode-alist'.")
 
-(define-obsolete-variable-alias 'inhibit-first-line-modes-regexps
-  'inhibit-file-local-variables-regexps "24.1")
-
 ;; TODO really this should be a list of modes (eg tar-mode), not regexps,
 ;; because we are duplicating info from auto-mode-alist.
 ;; TODO many elements of this list are also in auto-coding-alist.
@@ -3140,9 +3181,6 @@ specifications, but are not really, or they may be containers for
 member files with their own local variable sections, which are
 not appropriate for the containing file.
 The function `inhibit-local-variables-p' uses this.")
-
-(define-obsolete-variable-alias 'inhibit-first-line-modes-suffixes
-  'inhibit-local-variables-suffixes "24.1")
 
 (defvar inhibit-local-variables-suffixes nil
   "List of regexps matching suffixes to remove from file names.

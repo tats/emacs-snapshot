@@ -753,17 +753,16 @@ font-lock keywords will not be case sensitive."
 					(progn (forward-sexp 1)
 					       (point)))))))
 
-(defvar lisp-mode-shared-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map prog-mode-map)
-    (define-key map "\e\C-q" 'indent-sexp)
-    (define-key map "\177" 'backward-delete-char-untabify)
-    ;; This gets in the way when viewing a Lisp file in view-mode.  As
-    ;; long as [backspace] is mapped into DEL via the
-    ;; function-key-map, this should remain disabled!!
-    ;;;(define-key map [backspace] 'backward-delete-char-untabify)
-    map)
-  "Keymap for commands shared by all sorts of Lisp modes.")
+(defvar-keymap lisp-mode-shared-map
+  :doc "Keymap for commands shared by all sorts of Lisp modes."
+  :parent prog-mode-map
+  "C-M-q" #'indent-sexp
+  "DEL"   #'backward-delete-char-untabify
+  ;; This gets in the way when viewing a Lisp file in view-mode.  As
+  ;; long as [backspace] is mapped into DEL via the
+  ;; function-key-map, this should remain disabled!!
+  ;;;"<backspace>" #'backward-delete-char-untabify
+  )
 
 (defcustom lisp-mode-hook nil
   "Hook run when entering Lisp mode."
@@ -779,14 +778,12 @@ font-lock keywords will not be case sensitive."
 
 ;;; Generic Lisp mode.
 
-(defvar lisp-mode-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map lisp-mode-shared-map)
-    (define-key map "\e\C-x" 'lisp-eval-defun)
-    (define-key map "\C-c\C-z" 'run-lisp)
-    map)
-  "Keymap for ordinary Lisp mode.
-All commands in `lisp-mode-shared-map' are inherited by this map.")
+(defvar-keymap lisp-mode-map
+  :doc "Keymap for ordinary Lisp mode.
+All commands in `lisp-mode-shared-map' are inherited by this map."
+  :parent lisp-mode-shared-map
+  "C-M-x"   #'lisp-eval-defun
+  "C-c C-z" #'run-lisp)
 
 (easy-menu-define lisp-mode-menu lisp-mode-map
   "Menu for ordinary Lisp mode."
@@ -841,9 +838,8 @@ or to switch back to an existing one."
 (defcustom lisp-indent-offset nil
   "If non-nil, indent second line of expressions that many more columns."
   :group 'lisp
-  :type '(choice (const nil) integer))
-(put 'lisp-indent-offset 'safe-local-variable
-     (lambda (x) (or (null x) (integerp x))))
+  :type '(choice (const nil) integer)
+  :safe (lambda (x) (or (null x) (integerp x))))
 
 (defcustom lisp-indent-function 'lisp-indent-function
   "A function to be called by `calculate-lisp-indent'.
@@ -1255,8 +1251,8 @@ Lisp function does not specify a special indentation."
 (defcustom lisp-body-indent 2
   "Number of columns to indent the second line of a `(def...)' form."
   :group 'lisp
-  :type 'integer)
-(put 'lisp-body-indent 'safe-local-variable 'integerp)
+  :type 'integer
+  :safe #'integerp)
 
 (defun lisp-indent-specform (count state indent-point normal-indent)
   (let ((containing-form-start (elt state 1))
@@ -1417,9 +1413,8 @@ Any non-integer value means do not use a different value of
 `fill-column' when filling docstrings."
   :type '(choice (integer)
                  (const :tag "Use the current `fill-column'" t))
+  :safe (lambda (x) (or (eq x t) (integerp x)))
   :group 'lisp)
-(put 'emacs-lisp-docstring-fill-column 'safe-local-variable
-     (lambda (x) (or (eq x t) (integerp x))))
 
 (defun lisp-fill-paragraph (&optional justify)
   "Like \\[fill-paragraph], but handle Emacs Lisp comments and docstrings.
@@ -1471,7 +1466,10 @@ and initial semicolons."
                              emacs-lisp-docstring-fill-column
                            fill-column)))
         (let ((ppss (syntax-ppss))
-              (start (point)))
+              (start (point))
+              ;; Avoid recursion if we're being called directly with
+              ;; `M-x lisp-fill-paragraph' in an `emacs-lisp-mode' buffer.
+              (fill-paragraph-function t))
           (save-excursion
             (save-restriction
               ;; If we're not inside a string, then do very basic

@@ -584,9 +584,6 @@
 
     menu))
 
-(define-obsolete-function-alias
-  'menu-bar-kill-ring-save 'kill-ring-save "24.1")
-
 ;; These are alternative definitions for the cut, paste and copy
 ;; menu items.  Use them if your system expects these to use the clipboard.
 
@@ -2194,12 +2191,12 @@ otherwise it could decide to silently do nothing."
 
 (defcustom yank-menu-length 20
   "Text of items in `yank-menu' longer than this will be truncated."
-  :type 'integer
+  :type 'natnum
   :group 'menu)
 
 (defcustom yank-menu-max-items 60
   "Maximum number of entries to display in the `yank-menu'."
-  :type 'integer
+  :type 'natnum
   :group 'menu
   :version "29.1")
 

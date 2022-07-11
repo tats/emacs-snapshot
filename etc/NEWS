@@ -321,6 +321,10 @@ the major mode according to 'initial-major-mode', like at Emacs
 startup.  Previously, these functions ignored
 'initial-scratch-message' and left "*scratch*" in 'fundamental-mode'.
 
+---
+** The rlogin.el library is now obsolete.
+Use something like `M-x shell RET ssh <host> RET' instead.
+
 
 * Changes in Emacs 29.1
 
@@ -463,8 +467,8 @@ previous behavior).  The default is nil, which inhibits recording of
 passwords.
 
 +++
-** New user option 'longlines-breakpoint-chars'.
-This is a string containing chars that could be used as breakpoint in
+** New user option 'longlines-break-chars'.
+This is a string containing chars that could be used as break point in
 longlines mode.
 
 +++
@@ -1056,6 +1060,19 @@ dirs when they are deleted in Dired.  Before, you had to require
 customize the user option 'dired-clean-up-buffers-too' to nil.  The
 related user option 'dired-clean-confirm-killing-deleted-buffers'
 (which see) has also been moved to 'dired'.
+
++++
+*** 'dired-do-relsymlink' moved from dired-x to dired.
+The corresponding key "Y" is now bound by default in Dired.
+
++++
+*** 'dired-do-relsymlink-regexp' moved from dired-x to dired.
+The corresponding key "% Y" is now bound by default in Dired.
+
+---
+*** 'M-G' is now bound to 'dired-goto-subdir'.
+Before, that binding was only available if the 'dired-x' package was
+loaded.
 
 +++
 *** 'dired-info' and 'dired-man' moved from dired-x to dired.
@@ -1912,6 +1929,12 @@ related 'auth-sources' entry were wrong.
 ** Browse URL
 
 ---
+*** New user option 'browse-url-default-scheme'.
+This user option decides which URL scheme that 'browse-url' and
+related functions will use by default.  For example, you could
+customize this to "https" to always prefer HTTPS URLs.
+
+---
 *** Support for the Netscape web browser has been removed.
 This support has been obsolete since Emacs 25.1.  The final version of
 the Netscape web browser was released in February, 2008.
@@ -1920,6 +1943,11 @@ the Netscape web browser was released in February, 2008.
 *** Support for the Galeon web browser has been removed.
 This support has been obsolete since Emacs 25.1.  The final version of
 the Galeon web browser was released in September, 2008.
+
+---
+*** Support for the "Mozilla" web browser is now obsolete.
+Note that this historical web browser is different from Mozilla
+Firefox; it is its predecessor.
 
 ** Ruby Mode
 
@@ -2001,6 +2029,18 @@ Set it to nil to exclude line numbering from kills and copies.
 This option provides a mechanism to selectively disable font-lock
 keyword-driven fontifications.
 
+---
+*** New user option 'auto-save-visited-predicate'.
+This user option is a predicate function which is called by
+'auto-save-visited-mode' to decide whether or not to save a buffer.
+You can use it to automatically save only specific buffers, for
+example buffers using a particular mode or in some directory.
+
+---
+*** New user option 'remote-file-name-inhibit-auto-save-visited'.
+If this user option is non-nil, 'auto-save-visited-mode' will not
+auto-save remote buffers.  The default is nil.
+
 +++
 *** New package vtable.el for formatting tabular data.
 This package allows formatting data using variable-pitch fonts.
@@ -2029,6 +2069,15 @@ back the old behavior.
 *** New command 'recentf-open'.
 This command prompts for a recently opened file in the minibuffer, and
 visits it.
+
+---
+*** 'ffap-machine-at-point' no longer pings hosts by default.
+It will now simply look at a hostname to determine if it is valid,
+instead of also trying to ping it.  Customize the user option
+'ffap-machine-p-known' to 'ping' to get the old behavior back.
+
+---
+*** The 'run-dig' command is now obsolete; use 'dig' instead.
 
 ---
 ** The autoarg.el library is now marked obsolete.
@@ -2227,6 +2276,55 @@ Use 'exif-parse-file' and 'exif-field' instead.
 This change is now applied in 'dired-insert-directory'.
 
 ---
+** Some functions and variables obsolete since Emacs 24 have been removed:
+'Info-edit-map', 'allout-abbreviate-flattened-numbering',
+'allout-mode-deactivate-hook', 'ansi-color-unfontify-region',
+'auth-source-forget-user-or-password', 'auth-source-hide-passwords',
+'auth-source-user-or-password', 'bibtex-complete',
+'bibtex-entry-field-alist', 'buffer-substring-filters',
+'byte-compile-disable-print-circle', 'cfengine-mode-abbrevs',
+'chart-map', 'comint-dynamic-complete',
+'comint-dynamic-complete-as-filename',
+'comint-dynamic-simple-complete', 'command-history-map',
+'completion-annotate-function', 'condition-case-no-debug',
+'count-lines-region', 'data-debug-map', 'deferred-action-list',
+'deferred-action-function', 'dired-x-submit-report',
+'eieio-defgeneric', 'eieio-defmethod', 'emacs-lock-from-exiting',
+'erc-complete-word', 'eshell-cmpl-suffix-list', 'eshell-for',
+'font-lock-maximum-size', 'gnus-carpal',
+'gnus-debug-exclude-variables', 'gnus-debug-files',
+'gnus-local-domain', 'gnus-outgoing-message-group',
+'gnus-registry-user-format-function-M', 'image-extension-data',
+'image-library-alist', 'inhibit-first-line-modes-regexps',
+'inhibit-first-line-modes-suffixes', 'intdos',
+'mail-complete-function', 'mail-completion-at-point-function',
+'mail-mailer-swallows-blank-line', 'mail-sent-via', 'make-register',
+'makefile-complete', 'menu-bar-kill-ring-save',
+'meta-complete-symbol', 'meta-mode-map',
+'minibuffer-completing-symbol',
+'minibuffer-local-filename-must-match-map', 'mode25', 'mode4350',
+'msb-after-load-hooks', 'nnimap-split-rule', 'ns-alternatives-map',
+'ns-store-cut-buffer-internal', 'package-menu-view-commentary',
+'pascal-last-completions', 'pascal-show-completions',
+'pascal-toggle-completions', 'prolog-char-quote-workaround',
+'read-filename-at-point', 'reftex-index-map',
+'reftex-index-phrases-map', 'reftex-select-bib-map',
+'reftex-select-label-map', 'reftex-toc-map', 'register-name-alist',
+'register-value', 'report-emacs-bug-pretest-address',
+'rmail-default-dont-reply-to-names', 'rmail-dont-reply-to',
+'rmail-dont-reply-to-names', 'rst-block-face', 'rst-comment-face',
+'rst-definition-face', 'rst-directive-face', 'rst-emphasis1-face',
+'rst-emphasis2-face', 'rst-external-face', 'rst-literal-face',
+'rst-reference-face', 'semantic-grammar-map',
+'semantic-grammar-syntax-table', 'set-register-value',
+'speedbar-key-map', 'speedbar-syntax-table',
+'starttls-any-program-available', 'strokes-report-bug',
+'toggle-emacs-lock', 'tooltip-use-echo-area', 'turn-on-cwarn-mode',
+'turn-on-iimage-mode', 'vc-toggle-read-only', 'view-return-to-alist',
+'view-return-to-alist-update', 'w32-default-color-map' (function),
+'which-func-mode' (function), 'x-cut-buffer-or-selection-value'.
+
+---
 ** Some functions and variables obsolete since Emacs 23 have been removed:
 'find-emacs-lisp-shadows', 'newsticker-cache-filename',
 'unify-8859-on-decoding-mode', 'unify-8859-on-encoding-mode',
@@ -2266,6 +2364,14 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 * Lisp Changes in Emacs 29.1
 
 +++
+** New arguments MESSAGE and TIMEOUT of 'set-transient-map'.
+MESSAGE specifies a message to display after activating the transient
+map, including a special formatting spec to list available keys.
+TIMEOUT is the idle time after which to deactivate the transient map.
+The default timeout value can be defined by the new variable
+'set-transient-map-timeout'.
+
++++
 ** New function 'seq-split'.
 This returns a list of sub-sequences of the specified sequence.
 
@@ -2277,7 +2383,7 @@ These function now take an optional comparison predicate argument.
 ** 'read-multiple-choice' can now use long-form answers.
 
 +++
-** 'read-regexp' now allows the user to indicate whether to use case folding.
+** 'M-c' in 'read-regexp' now toggles case folding.
 
 +++
 ** 'completing-read' now allows a function as its REQUIRE-MATCH argument.
@@ -2336,6 +2442,11 @@ This parameter can be used to override values of print-related settings.
 This is meant to be used in modes that have a header line that should
 be kept aligned with the buffer contents when the user switches
 'display-line-numbers-mode' on or off.
+
++++
+** New minor mode 'lost-selection-mode'.
+This minor mode makes Emacs deactivate the mark in all buffers when
+the primary selection is obtained by another program.
 
 +++
 ** New predicate 'char-uppercase-p'.
@@ -2557,6 +2668,10 @@ them towards or away from each other.
 ** New hook 'x-pre-popup-menu-hook'.
 This hook is run before 'x-popup-menu' is about to display a
 deck-of-cards menu on screen.
+
+** New hook 'post-select-region-hook'.
+This hook is run immediately after 'select-active-regions' causes the
+region to be set as the primary selection.
 
 ** New function 'buffer-match-p'.
 Check if a buffer satisfies some condition.  Some examples for

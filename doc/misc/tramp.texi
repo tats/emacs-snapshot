@@ -50,13 +50,10 @@ This file documents @w{@value{tramp} @value{trampver}}, a remote file
 editing package for Emacs.
 
 @value{tramp} stands for ``Transparent Remote (file) Access, Multiple
-Protocol''.  This package provides remote file editing, similar to
-Ange FTP@.
-
-The difference is that Ange FTP uses FTP to transfer files between the
-local and the remote host, whereas @value{tramp} uses a combination of
-@command{rsh} and @command{rcp} or other work-alike programs, such as
-@command{ssh}/@command{scp}.
+Protocol''.  This package provides an easy, convenient, and consistent
+interface to editing remote files transparently, just as if they are
+local files.  This extends to editing, version control, @code{dired},
+and more.
 
 You can find the latest version of this document on the web at
 @uref{@value{trampurl}}.
@@ -182,10 +179,11 @@ interface to remote files as if they are local files.  @value{tramp}'s
 transparency extends to editing, version control, and @code{dired}.
 
 @value{tramp} can access remote hosts using any number of access
-methods, such as @command{rsh}, @command{rlogin}, @command{telnet},
-and related programs.  If these programs can successfully pass
-@acronym{ASCII} characters, @value{tramp} can use them.
-@value{tramp} does not require or mandate 8-bit clean connections.
+methods, such as @command{ssh}, @command{rsh}, @command{rlogin},
+@command{telnet}, and related programs.  If these programs can
+successfully pass @acronym{ASCII} characters, @value{tramp} can use
+them.  @value{tramp} does not require or mandate 8-bit clean
+connections.
 
 @value{tramp}'s most common access method is through @command{ssh}, a
 more secure alternative to @command{ftp} and other older access
@@ -312,7 +310,7 @@ I hope this has provided you with a basic overview of what happens
 behind the scenes when you open a file with @value{tramp}.
 
 
-@c For the end user
+@c For the end user.
 @node Obtaining @value{tramp}
 @chapter Obtaining @value{tramp}
 @cindex obtaining @value{tramp}
@@ -3124,6 +3122,14 @@ auto-saved files to the same directory as the original file.
 Alternatively, set the user option @code{tramp-auto-save-directory}
 to direct all auto saves to that location.
 
+@c Since Emacs 29.
+@vindex remote-file-name-inhibit-auto-save-visited
+An alternative to @code{auto-save-mode} is
+@code{auto-save-visited-mode}.  In this mode, auto-saving is identical
+to explicit saving.  If you want to disable this behavior for remote
+files, set user option
+@code{remote-file-name-inhibit-auto-save-visited} to non-@code{nil}.
+
 @vindex lock-file-name-transforms
 And still more issues to handle.  Since @w{Emacs 28}, file locks use a
 similar user option as auto-save files, called
@@ -5672,10 +5678,19 @@ local host's root directory as @file{/ssh:example.com:}.
 To unload @value{tramp}, type @kbd{M-x tramp-unload-tramp @key{RET}}.
 Unloading @value{tramp} resets Ange FTP plugins also.
 @end itemize
+
+
+@item
+What is the difference between Ange FTP and @value{tramp}?
+
+The difference is that Ange FTP uses @command{ftp} to transfer files
+between the local and the remote host, whereas @value{tramp} uses a
+combination of @command{rsh} and @command{rcp} or other work-alike
+programs, such as @command{ssh}/@command{scp}.
 @end itemize
 
 
-@c For the developer
+@c For the developer.
 @node Files directories and localnames
 @chapter How file names, directories and localnames are mangled and managed
 

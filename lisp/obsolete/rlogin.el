@@ -1,10 +1,10 @@
 ;;; rlogin.el --- remote login interface  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1995, 1997-1998, 2001-2022 Free Software
-;; Foundation, Inc.
+;; Copyright (C) 1992-2022 Free Software Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Keywords: unix, comm
+;; Obsolete-since: 29.1
 
 ;; This file is part of GNU Emacs.
 
@@ -23,6 +23,9 @@
 
 ;;; Commentary:
 
+;; This library is obsolete.
+;; See: https://debbugs.gnu.org/56461
+
 ;; Support for remote logins using `rlogin'.
 ;; This program is layered on top of shell.el; the code here only accounts
 ;; for the variations needed to handle a remote process, e.g. directory
@@ -34,11 +37,6 @@
 ;; `comint-password-prompt-regexp' to match your password prompt).
 
 ;;; Code:
-
-;; FIXME?
-;; Maybe this file should be obsolete.
-;; https://lists.gnu.org/r/emacs-devel/2013-02/msg00517.html
-;; It only adds rlogin-directory-tracking-mode.  Is that useful?
 
 (require 'comint)
 (require 'shell)
@@ -118,19 +116,15 @@ this variable is set from that."
   :type '(choice (const nil) string)
   :group 'rlogin)
 
-(defvar rlogin-mode-map
-  (let ((map (if (consp shell-mode-map)
-                 (cons 'keymap shell-mode-map)
-               (copy-keymap shell-mode-map))))
-    (define-key map "\C-c\C-c" 'rlogin-send-Ctrl-C)
-    (define-key map "\C-c\C-d" 'rlogin-send-Ctrl-D)
-    (define-key map "\C-c\C-z" 'rlogin-send-Ctrl-Z)
-    (define-key map "\C-c\C-\\" 'rlogin-send-Ctrl-backslash)
-    (define-key map "\C-d" 'rlogin-delchar-or-send-Ctrl-D)
-    (define-key map "\C-i" 'rlogin-tab-or-complete)
-    map)
-  "Keymap for `rlogin-mode'.")
-
+(defvar-keymap rlogin-mode-map
+  :doc "Keymap for `rlogin-mode'."
+  :parent shell-mode-map
+  "C-c C-c"  #'rlogin-send-Ctrl-C
+  "C-c C-d"  #'rlogin-send-Ctrl-D
+  "C-c C-z"  #'rlogin-send-Ctrl-Z
+  "C-c C-\\" #'rlogin-send-Ctrl-backslash
+  "C-d"      #'rlogin-delchar-or-send-Ctrl-D
+  "TAB"      #'rlogin-tab-or-complete)
 
 
 (defvar rlogin-history nil)

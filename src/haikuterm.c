@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "haiku_support.h"
 #include "thread.h"
 #include "window.h"
+#include "haikuselect.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -3202,6 +3203,11 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 		FRAME_PIXEL_HEIGHT (f) = height;
 
 		haiku_clear_under_internal_border (f);
+
+		/* Flush the frame and flip buffers here.  It is
+		   necessary for tooltips displayed inside menus, as
+		   redisplay cannot happen.  */
+		haiku_flush (f);
 		continue;
 	      }
 
@@ -4005,6 +4011,9 @@ haiku_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 	    inev.timestamp = b->when / 1000;
 	    break;
 	  }
+	case CLIPBOARD_CHANGED_EVENT:
+	  be_handle_clipboard_changed_message ();
+	  break;
 	case APP_QUIT_REQUESTED_EVENT:
 	  inev.kind = SAVE_SESSION_EVENT;
 	  inev.arg = Qt;
@@ -4398,6 +4407,7 @@ haiku_term_init (void)
   else
     dpyinfo->default_name = build_string ("GNU Emacs");
 
+  haiku_start_watching_selections ();
   unblock_input ();
 
   return dpyinfo;
@@ -4438,6 +4448,7 @@ haiku_clear_under_internal_border (struct frame *f)
 	    : INTERNAL_BORDER_FACE_ID));
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
       void *view = FRAME_HAIKU_VIEW (f);
+
       block_input ();
       BView_draw_lock (view, true, 0, 0, FRAME_PIXEL_WIDTH (f),
 		       FRAME_PIXEL_HEIGHT (f));

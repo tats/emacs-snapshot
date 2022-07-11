@@ -171,7 +171,7 @@ attempt."
   "The number of times smtpmail will retry sending when getting transient errors.
 These are errors with a code of 4xx from the SMTP server, which
 mean \"try again\"."
-  :type 'integer
+  :type 'natnum
   :version "27.1")
 
 (defcustom smtpmail-store-queue-variables nil
@@ -342,8 +342,6 @@ for `smtpmail-try-auth-method'.")
 	    ;; Insert an extra newline if we need it to work around
 	    ;; Sun's bug that swallows newlines.
 	    (goto-char (1+ delimline))
-	    (if (eval mail-mailer-swallows-blank-line t)
-		(newline))
 	    ;; Find and handle any Fcc fields.
 	    (goto-char (point-min))
 	    (if (re-search-forward "^Fcc:" delimline t)

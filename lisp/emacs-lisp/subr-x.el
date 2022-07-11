@@ -169,7 +169,11 @@ limiting, and LENGTH is interpreted as the number of bytes to
 limit the string to.  The result will be a unibyte string that is
 shorter than LENGTH, but will not contain \"partial\"
 characters (or glyphs), even if CODING-SYSTEM encodes characters
-with several bytes per character.
+with several bytes per character.  If the coding system specifies
+prefix like the byte order mark (aka \"BOM\") or a shift-in sequence,
+their bytes will be normally counted as part of LENGTH.  This is
+the case, for instance, with `utf-16'.  If this isn't desired, use a
+coding system that doesn't specify a BOM, like `utf-16le' or `utf-16be'.
 
 When shortening strings for display purposes,
 `truncate-string-to-width' is almost always a better alternative
@@ -286,6 +290,7 @@ it makes no sense to convert it to a string using
 		(set-buffer source-buffer)
 		(replace-buffer-contents tmp-buffer max-secs max-costs)))))))))
 
+;;;###autoload
 (defmacro named-let (name bindings &rest body)
   "Looping construct taken from Scheme.
 Like `let', bind variables in BINDINGS and then evaluate BODY,

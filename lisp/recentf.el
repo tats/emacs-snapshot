@@ -178,7 +178,7 @@ The default is to call `find-file' to edit the selected file."
 (defcustom recentf-max-menu-items 10
   "Maximum number of items in the recentf menu."
   :group 'recentf
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom recentf-menu-filter nil
   "Function used to filter files displayed in the recentf menu.
@@ -837,7 +837,7 @@ corresponding sub-menu items are displayed in the main recent files
 menu or in the `recentf-arrange-by-rule-others' sub-menu if
 defined."
   :group 'recentf-filters
-  :type 'number)
+  :type 'natnum)
 
 (defcustom recentf-arrange-by-rule-subfilter nil
   "Function called by a rule based filter to filter sub-menu elements.

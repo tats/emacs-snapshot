@@ -56,16 +56,14 @@
 
 (defvar eudc-form-widget-list nil)
 
-(defvar eudc-mode-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map widget-keymap)
-    (define-key map "q" #'kill-current-buffer)
-    (define-key map "x" #'kill-current-buffer)
-    (define-key map "f" #'eudc-query-form)
-    (define-key map "b" #'eudc-try-bbdb-insert)
-    (define-key map "n" #'eudc-move-to-next-record)
-    (define-key map "p" #'eudc-move-to-previous-record)
-    map))
+(defvar-keymap eudc-mode-map
+  :parent widget-keymap
+  "q" #'kill-current-buffer
+  "x" #'kill-current-buffer
+  "f" #'eudc-query-form
+  "b" #'eudc-try-bbdb-insert
+  "n" #'eudc-move-to-next-record
+  "p" #'eudc-move-to-previous-record)
 
 (defvar mode-popup-menu)
 
@@ -383,32 +381,51 @@ accordingly.  Otherwise it is set to its EUDC default binding."
 	    (cons protocol eudc-known-protocols))))
 
 
-(defun eudc-translate-query (query)
+(defun eudc-translate-query (query &optional reverse)
   "Translate attribute names of QUERY.
 The translation is done according to
-`eudc-protocol-attributes-translation-alist'."
+`eudc-protocol-attributes-translation-alist'.
+
+When REVERSE is nil or omitted, the attribute names are
+translated from EUDC generic names to protocol-specific
+names. When REVERSE is non-nil, the translation is from
+protocol-specific names back to EUDC generic names."
   (if eudc-protocol-attributes-translation-alist
       (mapcar (lambda (attribute)
-                (let ((trans (assq (car attribute)
-                                   (symbol-value eudc-protocol-attributes-translation-alist))))
+                (let ((trans
+                       (if reverse
+                           (rassq (car attribute)
+                                  (symbol-value eudc-protocol-attributes-translation-alist))
+                         (assq (car attribute)
+                               (symbol-value eudc-protocol-attributes-translation-alist)))))
                   (if trans
-                      (cons (cdr trans) (cdr attribute))
+                      (cons (if reverse (car trans) (cdr trans))
+                            (cdr attribute))
                     attribute)))
 	      query)
     query))
 
-(defun eudc-translate-attribute-list (list)
+(defun eudc-translate-attribute-list (list &optional reverse)
   "Translate a list of attribute names LIST.
 The translation is done according to
-`eudc-protocol-attributes-translation-alist'."
+`eudc-protocol-attributes-translation-alist'.
+
+When REVERSE is nil or omitted, the attribute names are
+translated from EUDC generic names to protocol-specific
+names. When REVERSE is non-nil, the translation is from
+protocol-specific names back to EUDC generic names."
   (if eudc-protocol-attributes-translation-alist
       (let (trans)
 	(mapcar (lambda (attribute)
-		   (setq trans (assq attribute
-				     (symbol-value eudc-protocol-attributes-translation-alist)))
-		   (if trans
-		       (cdr trans)
-		     attribute))
+		  (setq trans
+                        (if reverse
+                            (rassq attribute
+				   (symbol-value eudc-protocol-attributes-translation-alist))
+                          (assq attribute
+				(symbol-value eudc-protocol-attributes-translation-alist))))
+		  (if trans
+		      (if reverse (car trans) (cdr trans))
+		    attribute))
 		list))
     list))
 

@@ -363,7 +363,9 @@ new buffer instead of reusing the default EWW buffer.
 
 If BUFFER, the data to be rendered is in that buffer.  In that
 case, this function doesn't actually fetch URL.  BUFFER will be
-killed after rendering."
+killed after rendering.
+
+For more information, see Info node `(eww) Top'."
   (interactive
    (let ((uris (eww-suggested-uris)))
      (list (read-string (format-prompt "Enter URL or keywords"
@@ -1206,6 +1208,8 @@ instead of `browse-url-new-window-flag'."
     (eww-mode))
   (let ((url-allow-non-local-files t))
     (eww url)))
+
+(function-put 'eww-browse-url 'browse-url-browser-kind 'internal)
 
 (defun eww-back-url ()
   "Go to the previously displayed page."

@@ -133,8 +133,6 @@ orientation.  See `Info-nth-menu-item'.")
   :version "22.1"
   :type 'boolean)
 
-;; It's unfortunate that nil means no fontification, as opposed to no limit,
-;; since that differs from font-lock-maximum-size.
 (defcustom Info-fontify-maximum-menu-size 400000
   "Maximum size of menu to fontify if `font-lock-mode' is non-nil.
 Set to nil to disable node fontification; set to t for no limit."
@@ -260,7 +258,7 @@ This only has an effect if `Info-hide-note-references' is non-nil."
   "Depth of breadcrumbs to display.
 0 means do not display breadcrumbs."
   :version "23.1"
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom Info-search-whitespace-regexp "\\s-+"
   "If non-nil, regular expression to match a sequence of whitespace chars.
@@ -2208,7 +2206,7 @@ and is not in the header line or a tag table."
     (let ((backward (< found beg-found)))
       (not
        (or
-	(and (not search-invisible)
+	(and (not (eq search-invisible t))
 	     (if backward
 		 (or (text-property-not-all found beg-found 'invisible nil)
 		     (text-property-not-all found beg-found 'display nil))

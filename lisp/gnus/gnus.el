@@ -1130,16 +1130,6 @@ you could set this variable:
   :group 'gnus-server
   :type '(repeat gnus-select-method))
 
-(defcustom gnus-local-domain nil
-  "Local domain name without a host name.
-The DOMAINNAME environment variable is used instead if it is defined.
-If the function `system-name' returns the full Internet name, there is
-no need to set this variable."
-  :group 'gnus-message
-  :type '(choice (const :tag "default" nil)
-		 string))
-(make-obsolete-variable 'gnus-local-domain nil "24.1")
-
 ;; Customization variables
 
 (defcustom gnus-refer-article-method 'current
@@ -2263,12 +2253,12 @@ a string, be sure to use a valid format, see RFC 2616."
   :version "22.1"
   :group 'gnus-message
   :type '(choice (list (set :inline t
-			    (const gnus  :tag "Gnus version")
-			    (const emacs :tag "Emacs version")
+                            (const :value gnus  :tag "Gnus version")
+                            (const :value emacs :tag "Emacs version")
 			    (choice :tag "system"
-				    (const type   :tag "system type")
-				    (const config :tag "system configuration"))
-			    (const codename :tag "Emacs codename")))
+                                    (const :value type   :tag "system type")
+                                    (const :value config :tag "system configuration"))
+                            (const :value codename :tag "Emacs codename")))
 		 (string)))
 
 ;; Convert old (< 2005-01-10) symbol type values:
@@ -2315,11 +2305,6 @@ automatically cache the article in the agent cache."
 (defvar gnus-ephemeral-servers nil)
 (defvar gnus-server-method-cache nil)
 (defvar gnus-extended-servers nil)
-
-;; The carpal mode has been removed, but define the variable for
-;; backwards compatibility.
-(defvar gnus-carpal nil)
-(make-obsolete-variable 'gnus-carpal nil "24.1")
 
 (defvar gnus-agent-fetching nil
   "Whether Gnus agent is in fetching mode.")
