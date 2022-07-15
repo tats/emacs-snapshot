@@ -1,0 +1,45 @@
+From 0736ab81f1be76c373f9bd5b30f06705f3c4cfed Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Fri, 15 Jul 2022 14:45:11 -0500
+Subject: Build org.info from org.org without emacs source tree
+
+---
+ doc/misc/Makefile.in   | 4 ++--
+ doc/misc/org-setup.org | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
+index 3a45f7d18bd..386171a4922 100644
+--- a/doc/misc/Makefile.in
++++ b/doc/misc/Makefile.in
+@@ -219,7 +219,7 @@ ${buildinfodir}/tramp.info tramp.html: ${srcdir}/trampver.texi
+ 
+ 
+ abs_top_builddir = @abs_top_builddir@
+-EMACS = ${abs_top_builddir}/src/emacs
++EMACS = /usr/bin/emacs
+ emacs = "${EMACS}" -batch --no-site-file --no-site-lisp --eval '(setq load-prefer-newer t)'
+ 
+ # Generated .texi files go in srcdir so they can be included in the
+@@ -227,7 +227,7 @@ emacs = "${EMACS}" -batch --no-site-file --no-site-lisp --eval '(setq load-prefe
+ # Work in srcdir (and use abs_top_builddir) so that +setupfile and
+ # things like org-setup's "version" macro work.  Sigh.
+ define org_template
+- $(1:.org=.texi): $(1) ${top_srcdir}/lisp/org/ox-texinfo.el
++ $(1:.org=.texi): $(1)
+ 	$${AM_V_GEN}cd "$${srcdir}" && $${emacs} -l ox-texinfo \
+ 	  -f org-texinfo-export-to-texinfo-batch $$(notdir $$<) $$(notdir $$@)
+ endef
+diff --git a/doc/misc/org-setup.org b/doc/misc/org-setup.org
+index 88474538e5b..e20c272dfe1 100644
+--- a/doc/misc/org-setup.org
++++ b/doc/misc/org-setup.org
+@@ -45,7 +45,7 @@
+ # returns major.minor version number.  This is sufficient since bugfix
+ # releases are not expected to add features and therefore imply manual
+ # modifications.
+-#+macro: version (eval (with-current-buffer (find-file-noselect "../../lisp/org/org.el") (org-with-point-at 1 (if (re-search-forward "Version: +\\([0-9.]+\\)" nil t) (mapconcat #'identity (cl-subseq (split-string (match-string-no-properties 1) "\\.") 0 2) ".") (error "Missing \"Version\" keyword in \"org.el\"")))))
++#+macro: version (eval (let ((v (getenv "DEB_EMACS_BUILD_ORG_DOC_VERSION"))) (if v v (error "DEB_EMACS_BUILD_ORG_DOC_VERSION is unset"))))
+ 
+ # The "kbd" macro turns KBD into @kbd{KBD}.  Additionally, it
+ # encloses case-sensitive special keys (SPC, RET...) within @key{...}.
