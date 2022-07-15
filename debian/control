@@ -2,7 +2,12 @@ Source: emacs-non-dfsg
 Section: non-free/editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
-Build-Depends: texinfo, autotools-dev, dpkg-dev (>> 1.10.0), debhelper (>= 10)
+Build-Depends:
+ autotools-dev,
+ debhelper (>= 10),
+ dpkg-dev (>> 1.10.0),
+ emacs-nox (>= 1:28) | emacs (>= 1:28),
+ texinfo
 Standards-Version: 3.7.2
 
 Package: emacs-common-non-dfsg
