@@ -1,4 +1,4 @@
-From 9b8021296d0fe152a6ee87169bf21c006d8d84ad Mon Sep 17 00:00:00 2001
+From 8403a2532d01ae7cb42ca1f73d3966187f745703 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 9 Apr 2011 20:41:52 -0500
 Subject: Adjust the build system to handle the DFSG split.
@@ -14,28 +14,28 @@ Status: new
  1 file changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 7f536ad9529..a2e0666076c 100644
+index 1e3398701fc..3a45f7d18bd 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -67,7 +67,7 @@ DOCMISC_W32 = @DOCMISC_W32@
+@@ -69,7 +69,7 @@ DOCMISC_W32 = @DOCMISC_W32@
  ## Info files to build and install on all platforms.
  INFO_COMMON = auth autotype bovine calc ccmode cl \
  	dbus dired-x ebrowse ede ediff edt eieio \
 -	emacs-mime epa erc ert eshell eudc efaq eww \
 +	emacs-mime epa erc ert eshell eudc eww \
  	flymake forms gnus emacs-gnutls htmlfontify idlwave ido info.info \
- 	mairix-el message mh-e newsticker nxml-mode octave-mode \
+ 	mairix-el message mh-e modus-themes newsticker nxml-mode octave-mode \
  	org pcl-cvs pgg rcirc remember reftex sasl \
-@@ -80,7 +80,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
+@@ -82,7 +82,7 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
  ## Info files to build on current platform.
  ## This is all of them, even though they might not all get installed,
  ## because the info files are pre-built in release tarfiles.
 -INFO_TARGETS = $(INFO_COMMON) efaq-w32
 +INFO_TARGETS = $(INFO_COMMON)
  
- # There are some naming differences between the info targets and the other
- # targets, so let's resolve them here.
-@@ -174,7 +174,7 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
+ ## Some manuals have their source in .org format.
+ ## This is discouraged because the .texi files it generates
+@@ -185,7 +185,7 @@ $(foreach ifile,$(filter-out info.info,$(INFO_TARGETS)),$(eval $(call info_templ
  
  ## Extra dependencies.
  
@@ -44,7 +44,7 @@ index 7f536ad9529..a2e0666076c 100644
  need_emacsver_prefix = $(addprefix ${buildinfodir}/,${need_emacsver})
  
  $(need_emacsver_prefix:=.info) $(need_emacsver:=.dvi) $(need_emacsver:=.pdf) $(need_emacsver:=.html) : ${emacsdir}/emacsver.texi
-@@ -189,20 +189,6 @@ ${buildinfodir}/ccmode.info: \
+@@ -200,20 +200,6 @@ ${buildinfodir}/ccmode.info: \
    ${srcdir}/cc-mode.texi ${gfdl} ${style} | ${buildinfodir}
  	$(AM_V_GEN)$(MAKEINFO) $(MAKEINFO_OPTS) $(INFO_OPTS) -o $@ $<
  
