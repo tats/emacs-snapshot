@@ -2,7 +2,10 @@ Source: emacs
 Section: editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
-Build-Depends: bsd-mailx | mailx, libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev,
+Build-Depends:
+ bsd-mailx | mailx,
+ ca-certificates,
+ libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev,
  dbus-x11,
  gcc-11,
  git,
