@@ -1,3 +1,11 @@
+emacs-non-dfsg (1:28.1+1-1~1.gbpa66ad7) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @a66ad70750a404872f728bd364cc79a4b98aa780 **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 14 Jul 2022 19:37:55 -0500
+
 emacs-non-dfsg (1:27.1+1-2) unstable; urgency=medium
 
   * Upload to unstable for bullseye with no changes from the 1:27.1+1-1
