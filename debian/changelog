@@ -6,6 +6,15 @@ emacs (1:28.1+1-1~1.gbp1dfd2d) UNRELEASED; urgency=medium
 
  -- Rob Browning <rlb@defaultvalue.org>  Mon, 30 May 2022 13:40:24 -0500
 
+emacs (1:27.1+1-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * d/p/0014-Skip-tests-that-require-Internet-when-there-s-no-Int.patch:
+    Skip tests that require internet connection, fixing a FTBFS.
+    (Closes: #982969)
+
+ -- Sergio Durigan Junior <sergiodj@debian.org>  Sat, 20 Mar 2021 17:41:44 -0400
+
 emacs (1:27.1+1-3) unstable; urgency=medium
 
   * Strip parent path from package descriptions for reprodcibility.  Add
