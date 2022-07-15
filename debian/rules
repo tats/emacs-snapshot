@@ -20,6 +20,9 @@
 SHELL := /bin/bash
 pf := set -o pipefail
 
+# Emacs 28+ reads the version from org.el, which we don't have.
+org_version := 9.5
+
 # Must match emacs24{,-lucid,-nox} packages
 bin_priority := 28
 
@@ -137,8 +140,9 @@ endif
 
 override_dh_auto_build: $(doc_makefiles)
 	rm -rf info && install -d info
-	$(MAKE) -j$(parallel) \
-	  -f debian/rules $(foreach m,$(doc_makefiles),debian/stamp/doc-$(m))
+	DEB_EMACS_BUILD_ORG_DOC_VERSION=$(org_version) \
+	  $(MAKE) -j$(parallel) \
+	    -f debian/rules $(foreach m,$(doc_makefiles),debian/stamp/doc-$(m))
 
 override_dh_auto_install: ; true
 
