@@ -118,10 +118,10 @@ index 4b74963..e5549da 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 45b6264..0d61f09 100644
+index 87c126e..f3346d4 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6672,7 +6672,7 @@ AC_DEFUN
+@@ -6676,7 +6676,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index 45b6264..0d61f09 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6737,15 +6737,6 @@ m4_define
+@@ -6741,15 +6741,6 @@ m4_define
  fi
  ])
  
@@ -174,7 +174,7 @@ index 1d881a5..b1fc978 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index d7ee1a8..3c6fadf 100644
+index abe17fa..8992a24 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -362,6 +362,14 @@ view-help-file
