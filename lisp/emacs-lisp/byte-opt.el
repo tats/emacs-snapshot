@@ -171,7 +171,7 @@ Earlier variables shadow later ones with the same name.")
        (if (eq fn localfn)
            ;; From the same file => same mode.
            (macroexp--unfold-lambda `(,fn ,@(cdr form)))
-         ;; Since we are called from inside the optimiser, we need to make
+         ;; Since we are called from inside the optimizer, we need to make
          ;; sure not to propagate lexvar values.
          (let ((byte-optimize--lexvars nil)
                ;; Silence all compilation warnings: the useful ones should
@@ -204,7 +204,7 @@ Same format as `byte-optimize--lexvars', with shared structure and contents.")
 This indicates the loop discovery phase.")
 
 (defvar byte-optimize--dynamic-vars nil
-  "List of variables declared as dynamic during optimisation.")
+  "List of variables declared as dynamic during optimization.")
 
 (defvar byte-optimize--aliased-vars nil
   "List of variables which may be aliased by other lexical variables.
@@ -315,7 +315,7 @@ for speeding up processing.")
       (`(cond . ,clauses)
        ;; FIXME: The condition in the first clause is always executed, and
        ;; clause bodies are mutually exclusive -- use this for improved
-       ;; optimisation (see comment about `if' below).
+       ;; optimization (see comment about `if' below).
        (cons fn
              (mapcar (lambda (clause)
                        (if (consp clause)
@@ -364,9 +364,9 @@ for speeding up processing.")
        ;; FIXME: We have to traverse the expressions in left-to-right
        ;; order (because that is the order of evaluation and variable
        ;; mutations must be found prior to their use), but doing so we miss
-       ;; some optimisation opportunities:
+       ;; some optimization opportunities:
        ;; consider (and A B) in a for-effect context, where B => nil.
-       ;; Then A could be optimised in a for-effect context too.
+       ;; Then A could be optimized in a for-effect context too.
        (let ((tail exps)
              (args nil))
          (while tail
@@ -380,19 +380,19 @@ for speeding up processing.")
        ;; FIXME: If the loop condition is statically nil after substitution
        ;; of surrounding variables then we can eliminate the whole loop,
        ;; even if those variables are mutated inside the loop.
-       ;; We currently don't perform this important optimisation.
+       ;; We currently don't perform this important optimization.
        (let* ((byte-optimize--vars-outside-loop byte-optimize--lexvars)
               (condition-body
                (if byte-optimize--inhibit-outside-loop-constprop
                    ;; We are already inside the discovery phase of an outer
                    ;; loop so there is no need for traversing this loop twice.
                    (cons exp exps)
-                 ;; Discovery phase: run optimisation without substitution
+                 ;; Discovery phase: run optimization without substitution
                  ;; of variables bound outside this loop.
                  (let ((byte-optimize--inhibit-outside-loop-constprop t))
                    (cons (byte-optimize-form exp nil)
                          (byte-optimize-body exps t)))))
-              ;; Optimise again, this time with constprop enabled (unless
+              ;; Optimize again, this time with constprop enabled (unless
               ;; we are in discovery of an outer loop),
               ;; as mutated variables have been marked as non-substitutable.
               (condition (byte-optimize-form (car condition-body) nil))
@@ -425,7 +425,7 @@ for speeding up processing.")
       ;; `unwind-protect' is a special form which here takes the shape
       ;; (unwind-protect EXPR :fun-body UNWIND-FUN).
       ;; We can treat it as if it were a plain function at this point,
-      ;; although there are specific optimisations possible.
+      ;; although there are specific optimizations possible.
       ;; In particular, the return value of UNWIND-FUN is never used
       ;; so its body should really be compiled for-effect, but we
       ;; don't do that right now.
@@ -438,12 +438,12 @@ for speeding up processing.")
       (`(internal-make-closure . ,_)
        (and (not for-effect)
             (progn
-              ;; Look up free vars and mark them to be kept, so that they
-              ;; won't be optimised away.
-              (dolist (var (caddr form))
-                (let ((lexvar (assq var byte-optimize--lexvars)))
-                  (when lexvar
-                    (setcar (cdr lexvar) t))))
+       ;; Look up free vars and mark them to be kept, so that they
+       ;; won't be optimized away.
+       (dolist (var (caddr form))
+         (let ((lexvar (assq var byte-optimize--lexvars)))
+           (when lexvar
+             (setcar (cdr lexvar) t))))
               form)))
 
       (`((lambda . ,_) . ,_)
@@ -513,7 +513,7 @@ for speeding up processing.")
 
 (defun byte-optimize-one-form (form &optional for-effect)
   "The source-level pass of the optimizer."
-  ;; Make optimiser aware of lexical arguments.
+  ;; Make optimizer aware of lexical arguments.
   (let ((byte-optimize--lexvars
          (mapcar (lambda (v) (list (car v) t))
                  byte-compile--lexical-environment)))
@@ -525,7 +525,7 @@ for speeding up processing.")
         ;; First, optimize all sub-forms of this one.
         (setq form (byte-optimize-form-code-walker form for-effect))
 
-        ;; If a form-specific optimiser is available, run it and start over
+        ;; If a form-specific optimizer is available, run it and start over
         ;; until a fixpoint has been reached.
         (and (consp form)
              (symbolp (car form))
@@ -1281,11 +1281,97 @@ See Info node `(elisp) Integer Basics'."
 
 (put 'cons 'byte-optimizer #'byte-optimize-cons)
 (defun byte-optimize-cons (form)
-  ;; (cons X nil) => (list X)
-  (if (and (= (safe-length form) 3)
-           (null (nth 2 form)))
-      `(list ,(nth 1 form))
-    form))
+  (let ((tail (nth 2 form)))
+    (cond
+     ;; (cons X nil) => (list X)
+     ((null tail) `(list ,(nth 1 form)))
+     ;; (cons X (list YS...)) -> (list X YS...)
+     ((and (consp tail) (eq (car tail) 'list))
+      `(,(car tail) ,(nth 1 form) . ,(cdr tail)))
+     (t form))))
+
+(put 'list 'byte-optimizer #'byte-optimize-list)
+(defun byte-optimize-list (form)
+  ;; (list) -> nil
+  (and (cdr form) form))
+
+(put 'append 'byte-optimizer #'byte-optimize-append)
+(defun byte-optimize-append (form)
+  ;; There is (probably) too much code relying on `append' to return a
+  ;; new list for us to do full constant-folding; these transformations
+  ;; preserve the allocation semantics.
+  (and (cdr form)                       ; (append) -> nil
+       (named-let loop ((args (cdr form)) (newargs nil))
+         (let ((arg (car args))
+               (prev (car newargs)))
+           (cond
+            ;; Flatten nested `append' forms.
+            ((and (consp arg) (eq (car arg) 'append))
+             (loop (append (cdr arg) (cdr args)) newargs))
+
+            ;; Merge consecutive `list' forms.
+            ((and (consp arg) (eq (car arg) 'list)
+                  newargs (consp prev) (eq (car prev) 'list))
+             (loop (cons (cons (car prev) (append (cdr prev) (cdr arg)))
+                         (cdr args))
+                   (cdr newargs)))
+
+            ;; non-terminal arg
+            ((cdr args)
+             (cond
+              ((macroexp-const-p arg)
+               ;; constant arg
+               (let ((val (eval arg)))
+                 (cond
+                  ;; Elide empty arguments (nil, empty string, etc).
+                  ((zerop (length val))
+                   (loop (cdr args) newargs))
+                  ;; Merge consecutive constants.
+                  ((and newargs (macroexp-const-p prev))
+                   (loop (cdr args)
+                         (cons
+                          (list 'quote
+                                (append (eval prev) val nil))
+                          (cdr newargs))))
+                  (t (loop (cdr args) (cons arg newargs))))))
+
+              ;; (list CONSTANTS...) -> '(CONSTANTS...)
+              ((and (consp arg) (eq (car arg) 'list)
+                    (not (memq nil (mapcar #'macroexp-const-p (cdr arg)))))
+               (loop (cons (list 'quote (eval arg)) (cdr args)) newargs))
+
+              (t (loop (cdr args) (cons arg newargs)))))
+
+            ;; At this point, `arg' is the last (tail) argument.
+
+            ;; (append X) -> X
+            ((null newargs) arg)
+
+            ;; (append (list Xs...) nil) -> (list Xs...)
+            ((and (null arg)
+                  newargs (null (cdr newargs))
+                  (consp prev) (eq (car prev) 'list))
+             prev)
+
+            ;; (append '(X) Y)     -> (cons 'X Y)
+            ;; (append (list X) Y) -> (cons X Y)
+            ((and newargs (null (cdr newargs))
+                  (consp prev)
+                  (cond ((eq (car prev) 'quote)
+                         (and (consp (cadr prev))
+                              (= (length (cadr prev)) 1)))
+                        ((eq (car prev) 'list)
+                         (= (length (cdr prev)) 1))))
+             (list 'cons (if (eq (car prev) 'quote)
+                             (macroexp-quote (caadr prev))
+                           (cadr prev))
+                   arg))
+
+            (t
+             (let ((new-form (cons 'append (nreverse (cons arg newargs)))))
+               (if (equal new-form form)
+                   form
+                 new-form))))))))
 
 ;; Fixme: delete-char -> delete-region (byte-coded)
 
@@ -1373,7 +1459,7 @@ See Info node `(elisp) Integer Basics'."
 	 symbol-function symbol-name symbol-plist symbol-value string-make-unibyte
 	 string-make-multibyte string-as-multibyte string-as-unibyte
 	 string-to-multibyte
-	 tan time-convert truncate
+	 take tan time-convert truncate
 	 unibyte-char-to-multibyte upcase user-full-name
 	 user-login-name user-original-login-name custom-variable-p
 	 vconcat
@@ -1474,7 +1560,7 @@ See Info node `(elisp) Integer Basics'."
          ;; arguments.  This is pure enough for the purposes of
          ;; constant folding, but not necessarily for all kinds of
          ;; code motion.
-         car cdr car-safe cdr-safe nth nthcdr last
+         car cdr car-safe cdr-safe nth nthcdr last take
          equal
          length safe-length
          memq memql member

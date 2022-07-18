@@ -370,7 +370,7 @@ require user confirmation."
 (defun icomplete-fido-exit (force)
   "Attempt to exit minibuffer immediately with current input.
 Unless FORCE is non-nil (interactively with a prefix argument),
-honour a non-nil REQUIRE-MATCH argument to `completing-read' by
+honor a non-nil REQUIRE-MATCH argument to `completing-read' by
 trying to complete as much as possible and disallowing the exit
 if that doesn't produce a completion match."
   (interactive "P")
@@ -840,13 +840,13 @@ by `group-function''s second \"transformation\" protocol."
                                           while (listp r)
                                           count 1))
            repeat total-space
-           for neighbour = nil
+           for neighbor = nil
            if (and preds (> space-above 0)) do
-           (push (setq neighbour (pop preds)) scroll-above)
+           (push (setq neighbor (pop preds)) scroll-above)
            (cl-decf space-above)
            else if (consp succs) collect
-           (setq neighbour (pop succs)) into scroll-below-aux
-           while neighbour
+           (setq neighbor (pop succs)) into scroll-below-aux
+           while neighbor
            finally (setq scroll-below scroll-below-aux))
   ;; Halfway there...
   (let* ((selected (propertize (car comps) 'icomplete-selected t))

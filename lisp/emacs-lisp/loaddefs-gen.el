@@ -174,7 +174,8 @@ expression, in which case we want to handle forms differently."
                        define-globalized-minor-mode defun defmacro
 		       easy-mmode-define-minor-mode define-minor-mode
                        define-inline cl-defun cl-defmacro cl-defgeneric
-                       cl-defstruct pcase-defmacro iter-defun cl-iter-defun))
+                       cl-defstruct pcase-defmacro iter-defun cl-iter-defun
+                       transient-define-prefix))
            (macrop car)
 	   (setq expand (let ((load-true-file-name file)
                               (load-file-name file))
@@ -329,9 +330,9 @@ expression, in which case we want to handle forms differently."
 						     'string<))))))
 
 (defun loaddefs-generate--parse-file (file main-outfile &optional package-data)
-  "Examing FILE for ;;;###autoload statements.
+  "Examining FILE for ;;;###autoload statements.
 MAIN-OUTFILE is the main loaddefs file these statements are
-destined for, but this can be overriden by the buffer-local
+destined for, but this can be overridden by the buffer-local
 setting of `generated-autoload-file' in FILE, and
 by ;;;###foo-autoload statements.
 

@@ -166,6 +166,11 @@ of 'user-emacs-directory'.
 
 * Incompatible changes in Emacs 29.1
 
+---
+** 'w' ('dired-copy-filename-as-kill') has changed behaviour.
+If there are several files marked, file names containing space and
+quote characters will be quoted "like this".
+
 +++
 ** Warning about "eager macro-expansion failure" is changed into an error.
 
@@ -322,8 +327,8 @@ startup.  Previously, these functions ignored
 'initial-scratch-message' and left "*scratch*" in 'fundamental-mode'.
 
 ---
-** The rlogin.el library is now obsolete.
-Use something like `M-x shell RET ssh <host> RET' instead.
+** The rlogin.el library and 'rsh' command are now obsolete.
+Use something like 'M-x shell RET ssh <host> RET' instead.
 
 
 * Changes in Emacs 29.1
@@ -543,6 +548,11 @@ and pop-up menus.
 ** New X resource: "inputStyle".
 This controls the style of the pre-edit and status areas of X input
 methods.
+
++++
+** New X resources: "highlightForeground" and "highlightBackground"
+Only in the Lucid build, this controls colors used for highlighted
+menu item widgets.
 
 +++
 ** On X11, Emacs now tries to synchronize window resize with the window manager.
@@ -876,7 +886,7 @@ are met.  The conditions are given by the argument, which can be
 +++
 *** New user option 'rcirc-cycle-completion-flag'.
 Rcirc will use the default 'completion-at-point' mechanism.  The
-conventional IRC behaviour of completing by cycling through the
+conventional IRC behavior of completing by cycling through the
 available options can be restored by enabling this option.
 
 ** Imenu
@@ -1047,6 +1057,13 @@ supported.
 Type 'C-u C-h t' to select it in case your language setup does not do
 so automatically.
 
+---
+*** New default phonetic input method for the Tamil language environment.
+The default input method for the Tamil language environment is now
+"tamil-phonetic" which is a customizable phonetic input method.  To
+change the input method's translation rules, customize the user option
+'tamil-translation-rules'.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
@@ -1214,7 +1231,7 @@ longer available after exiting the recursive edit.
 This user option controls whether the 'e' (in a "*Backtrace*"
 buffer or while edebugging) and 'C-x C-e' (while edebugging) commands
 lead to a (further) backtrace.  By default, this variable is nil,
-which is a change in behaviour from previous Emacs versions.
+which is a change in behavior from previous Emacs versions.
 
 +++
 *** 'e' in edebug can now take a prefix arg to pretty-print the results.
@@ -1445,7 +1462,7 @@ header before sending a message.
 ** Texinfo Mode
 
 ---
-*** 'texinfo-mode' now has a specialised 'narrow-to-defun' definition.
+*** 'texinfo-mode' now has a specialized 'narrow-to-defun' definition.
 It narrows to the current node.
 
 ** EUDC
@@ -1708,6 +1725,12 @@ this message for SVG and XPM.
 +++
 *** New commands: 'image-flip-horizontally' and 'image-flip-vertically'.
 These commands horizontally and vertically flip the image under point.
+
+** Images
+
++++
+*** Users can now add special image conversion functions.
+This is done via 'image-converter-add-handler'.
 
 ** Image-Dired
 
@@ -2024,6 +2047,11 @@ Set it to nil to exclude line numbering from kills and copies.
 
 ** Miscellaneous
 
+---
+*** New user option 'webjump-use-internal-browser'.
+When non-nil, WebJump will use an internal browser to open web pages,
+instead of the default external browser.
+
 +++
 *** New user option 'font-lock-ignore'.
 This option provides a mechanism to selectively disable font-lock
@@ -2294,8 +2322,9 @@ This change is now applied in 'dired-insert-directory'.
 'font-lock-maximum-size', 'gnus-carpal',
 'gnus-debug-exclude-variables', 'gnus-debug-files',
 'gnus-local-domain', 'gnus-outgoing-message-group',
-'gnus-registry-user-format-function-M', 'image-extension-data',
-'image-library-alist', 'inhibit-first-line-modes-regexps',
+'gnus-secondary-servers', 'gnus-registry-user-format-function-M',
+'image-extension-data', 'image-library-alist',
+'inhibit-first-line-modes-regexps',
 'inhibit-first-line-modes-suffixes', 'intdos',
 'mail-complete-function', 'mail-completion-at-point-function',
 'mail-mailer-swallows-blank-line', 'mail-sent-via', 'make-register',
@@ -2447,6 +2476,15 @@ be kept aligned with the buffer contents when the user switches
 ** New minor mode 'lost-selection-mode'.
 This minor mode makes Emacs deactivate the mark in all buffers when
 the primary selection is obtained by another program.
+
+---
+** On X, Emacs will try to preserve selection ownership when a frame is deleted.
+This means that if you make Emacs the owner of a selection, such as by
+selecting some text into the clipboard or primary selection, and then
+delete the current frame, you will still be able to insert the
+contents of that selection into other programs as long as another
+frame is open on the same display.  This behavior can be disabled by
+setting the variable 'x-auto-preserve-selections' to nil.
 
 +++
 ** New predicate 'char-uppercase-p'.
@@ -3158,6 +3196,11 @@ to preserve the old behavior, apply
 
     (let ((default-directory temporary-file-directory))
       (process-attributes pid))
+
++++
+** New functions 'take' and 'ntake'.
+'(take N LIST)' returns the first N elements of LIST; 'ntake' does
+the same but works by modifying LIST destructively.
 
 
 

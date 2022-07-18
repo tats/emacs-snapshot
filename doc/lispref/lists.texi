@@ -340,6 +340,44 @@ If @var{n} is zero, @code{nthcdr} returns all of
 @end example
 @end defun
 
+@defun take n list
+This function returns the @var{n} first elements of @var{list}.  Essentially,
+it returns the part of @var{list} that @code{nthcdr} skips.
+
+@code{take} returns @var{list} if shorter than @var{n} elements;
+it returns @code{nil} if @var{n} is zero or negative.
+
+@example
+@group
+(take 3 '(a b c d))
+     @result{} (a b c)
+@end group
+@group
+(take 10 '(a b c d))
+     @result{} (a b c d)
+@end group
+@group
+(take 0 '(a b c d))
+     @result{} nil
+@end group
+@end example
+@end defun
+
+@defun ntake n list
+This is a version of @code{take} that works by destructively modifying
+the list structure of the argument.  That makes it faster, but the
+original value of @var{list} may be lost.
+
+@code{ntake} returns @var{list} unmodified if shorter than @var{n}
+elements; it returns @code{nil} if @var{n} is zero or negative.
+Otherwise, it returns @var{list} truncated to its first @var{n}
+elements.
+
+This means that it is usually a good idea to use the return value and
+not just rely on the truncation effect unless @var{n} is known to be
+positive.
+@end defun
+
 @defun last list &optional n
 This function returns the last link of @var{list}.  The @code{car} of
 this link is the list's last element.  If @var{list} is null,

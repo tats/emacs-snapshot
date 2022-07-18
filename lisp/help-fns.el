@@ -837,6 +837,15 @@ the C sources, too."
   (unless (memq 'help-fns--customize-variable-version
                 help-fns--activated-functions)
     (when-let ((first (and (symbolp object)
+                           ;; Weed out things that probably aren't
+                           ;; official things (so that we don't say
+                           ;; "Introduced in version 1.1" if the user
+                           ;; has done `(setq a 42)').
+                           (or (string-search "-" (symbol-name object))
+                               (and (boundp object)
+                                    (get object 'variable-documentation))
+                               (and (fboundp object)
+                                    (documentation object)))
                            (help-fns--first-release object))))
       (with-current-buffer standard-output
         (insert (format "  Probably introduced at or before Emacs version %s.\n"
@@ -1791,8 +1800,10 @@ current buffer and the selected frame, respectively."
                                (when (funcall testfn symbol)
                                  ;; Don't record the current entry in the stack.
                                  (setq help-xref-stack-item nil)
-                                 (cons name
-                                       (funcall descfn symbol buffer frame))))
+                                 (let ((help-xref-stack nil)
+                                       (help-xref-forward-stack nil))
+                                   (funcall descfn symbol buffer frame))
+                                 (cons name (buffer-string))))
                              describe-symbol-backends))))
              (single (null (cdr docs))))
         (while (cdr docs)
@@ -1813,6 +1824,8 @@ current buffer and the selected frame, respectively."
           ;; Don't record the `describe-variable' item in the stack.
           (setq help-xref-stack-item nil)
           (help-setup-xref (list #'describe-symbol symbol) nil))
+        (goto-char (point-max))
+        (help-xref--navigation-buttons)
         (goto-char (point-min))))))
 
 ;;;###autoload

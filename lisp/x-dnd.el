@@ -588,6 +588,7 @@ message (format 32) that caused EVENT to be generated."
 
 (declare-function x-change-window-property "xfns.c"
 		  (prop value &optional frame type format outer-P window-id))
+(declare-function x-translate-coordinates "xfns.c")
 
 (defun x-dnd-init-xdnd-for-frame (frame)
   "Set the XdndAware property for FRAME to indicate that we do XDND."
@@ -595,39 +596,93 @@ message (format 32) that caused EVENT to be generated."
 			    '(5)	;; The version of XDND we support.
 			    frame "ATOM" 32 t))
 
-(defun x-dnd-get-drop-width-height (frame w accept)
-  "Return the width/height to be sent in a XdndStatus message.
-FRAME is the frame and W is the window where the drop happened.
-If ACCEPT is nil return 0 (empty rectangle),
-otherwise if W is a window, return its width/height,
-otherwise return the frame width/height."
-  (if accept
-      (if (windowp w)   ;; w is not a window if dropping on the menu bar,
-			;; scroll bar or tool bar.
-	  (let ((edges (window-inside-pixel-edges w)))
-	    (cons
-	     (- (nth 2 edges) (nth 0 edges))	;; right - left
-	     (- (nth 3 edges) (nth 1 edges))))	;; bottom - top
-	(cons (frame-pixel-width frame)
-	      (frame-pixel-height frame)))
-    0))
+(defun x-dnd-after-move-frame (frame)
+  "Handle FRAME moving to a different position.
+Clear any cached root window position."
+  (set-frame-parameter frame 'dnd-root-window-position
+                       nil))
 
-(defun x-dnd-get-drop-x-y (frame w)
-  "Return the x/y coordinates to be sent in a XdndStatus message.
-Coordinates are required to be absolute.
-FRAME is the frame and W is the window where the drop happened.
-If W is a window, return its absolute coordinates,
-otherwise return the frame coordinates."
-  (let* ((frame-left (or (car-safe (cdr-safe (frame-parameter frame 'left)))
-			 (frame-parameter frame 'left)))
-	 (frame-top (or (car-safe (cdr-safe (frame-parameter frame 'top)))
-			(frame-parameter frame 'top))))
-    (if (windowp w)
-	(let ((edges (window-inside-pixel-edges w)))
-	  (cons
-	   (+ frame-left (nth 0 edges))
-	   (+ frame-top (nth 1 edges))))
-      (cons frame-left frame-top))))
+(add-hook 'move-frame-functions #'x-dnd-after-move-frame)
+
+(defun x-dnd-compute-root-window-position (frame)
+  "Return the position of FRAME's edit widget relative to the root window.
+The value is a cons of (X . Y), describing the position of
+FRAME's edit widget (inner window) relative to the root window of
+its screen."
+  (or (frame-parameter frame 'dnd-root-window-position)
+      (let* ((result (x-translate-coordinates frame))
+             (param (cons (car result) (cadr result))))
+        (unless result
+          (error "Frame isn't on the same screen as its root window"))
+        (prog1 param
+          (set-frame-parameter frame 'dnd-root-window-position param)))))
+
+(defun x-dnd-get-window-rectangle (window)
+  "Return the bounds of WINDOW as a rectangle.
+The coordinates in the rectangle are relative to its frame's root
+window.  Return the bounds as a list of (X Y WIDTH HEIGHT)."
+  (let* ((frame (window-frame window))
+         (frame-pos (x-dnd-compute-root-window-position frame))
+         (edges (window-inside-pixel-edges window)))
+    (list (+ (car frame-pos) (nth 0 edges))
+          (+ (cdr frame-pos) (nth 1 edges))
+          (- (nth 2 edges) (nth 0 edges))
+          (- (nth 3 edges) (nth 1 edges)))))
+
+(defun x-dnd-intersect-rectangles (r1 r2)
+  "Return the intersection of R1 and R2, both rectangles."
+  (let ((left (if (< (car r1) (car r2)) r1 r2))
+        (right (if (> (car r2) (car r1)) r2 r1))
+        (upper (if (< (cadr r1) (cadr r2)) r1 r2))
+        (lower (if (> (cadr r2) (cadr r1)) r2 r1))
+        (result (list 0 0 0 0)))
+    (when (<= (car right) (+ (car left) (nth 2 left)))
+      (setcar result (car right))
+      (setcar (nthcdr 2 result)
+              (- (min (+ (car left) (nth 2 left))
+                      (+ (car right) (nth 2 right)))
+                 (car result)))
+      (when (<= (cadr lower) (+ (cadr upper) (nth 3 upper)))
+        (setcar (cdr result) (cadr lower))
+        (setcar (nthcdr 3 result)
+                (- (min (+ (cadr lower) (nth 3 lower))
+                        (+ (cadr upper) (nth 3 upper)))
+                   (cadr result)))))
+    result))
+
+(defun x-dnd-get-object-rectangle (window posn)
+  "Return the rectangle of the object (character or image) under POSN.
+WINDOW is the window POSN represents.  The rectangle is returned
+with coordinates relative to the root window."
+  (if (posn-point posn)
+      (with-selected-window window
+        (if-let* ((new-posn (posn-at-point (posn-point posn)))
+                  (posn-x-y (posn-x-y new-posn))
+                  (object-width-height (posn-object-width-height new-posn))
+                  (edges (window-inside-pixel-edges window))
+                  (frame-pos (x-dnd-compute-root-window-position
+                              (window-frame window))))
+            (list (+ (car frame-pos) (car posn-x-y)
+                     (car edges))
+                  (+ (cdr frame-pos) (cdr posn-x-y)
+                     (cadr edges))
+                  (car object-width-height)
+                  (cdr object-width-height))
+          '(0 0 0 0)))
+    '(0 0 0 0)))
+
+(defun x-dnd-get-drop-rectangle (window posn)
+  "Return the drag-and-drop rectangle at POSN on WINDOW."
+  (if (or dnd-scroll-margin
+          (not (windowp window)))
+      '(0 0 0 0)
+    (let ((window-rectangle (x-dnd-get-window-rectangle window))
+          object-rectangle)
+      (when dnd-indicate-insertion-point
+        (setq object-rectangle (x-dnd-get-object-rectangle window posn)
+              window-rectangle (x-dnd-intersect-rectangles object-rectangle
+                                                           window-rectangle)))
+      window-rectangle)))
 
 (declare-function x-get-atom-name "xselect.c" (value &optional frame))
 (declare-function x-send-client-message "xselect.c"
@@ -641,11 +696,110 @@ otherwise return the frame coordinates."
   "Return the nmore-than3 bit from the 32 bit FLAGS in an XDndEnter message."
   (logand flags 1))
 
+(declare-function x-get-modifier-masks "xfns.c")
+
+(defun x-dnd-modifier-mask (mods)
+  "Return the X modifier mask for the Emacs modifier state MODS.
+MODS is a single symbol, or a list of symbols such as `shift' or
+`control'."
+  (let ((virtual-modifiers (x-get-modifier-masks))
+        (mask 0))
+    (unless (consp mods)
+      (setq mods (list mods)))
+    (dolist (modifier mods)
+      ;; TODO: handle virtual modifiers such as Meta and Hyper.
+      (cond ((eq modifier 'shift)
+             (setq mask (logior mask 1))) ; ShiftMask
+            ((eq modifier 'control)
+             (setq mask (logior mask 4))) ; ControlMask
+            ((eq modifier 'meta)
+             (setq mask (logior mask (nth 4 virtual-modifiers))))
+            ((eq modifier 'hyper)
+             (setq mask (car virtual-modifiers)))
+            ((eq modifier 'super)
+             (setq mask (cadr virtual-modifiers)))
+            ((eq modifier 'alt)
+             (setq mask (nth 2 virtual-modifiers)))))
+    mask))
+
+(defun x-dnd-hscroll-flags ()
+  "Return the event state of a button press that should result in hscroll.
+Value is a mask of all the X modifier states that would normally
+cause a button press event to perform horizontal scrolling."
+  (let ((i 0))
+    (dolist (modifier mouse-wheel-scroll-amount)
+      (when (eq (cdr-safe modifier) 'hscroll)
+        (setq i (logior i (x-dnd-modifier-mask (car modifier))))))
+    i))
+
+(defvar x-dnd-click-count nil
+  "Alist of button numbers to click counters during drag-and-drop.
+The cdr of each association's cdr is the timestamp of the last
+button press event for the given button, and the car is the
+number of clicks in quick succession currently received.")
+
+(defun x-dnd-note-click (button timestamp)
+  "Note that button BUTTON was pressed at TIMESTAMP during drag-and-drop.
+Return the number of clicks that were made in quick succession."
+  (if (not (integerp double-click-time))
+      1
+    (let ((cell (cdr (assq button x-dnd-click-count))))
+      (unless cell
+        (setq cell (cons 0 timestamp))
+        (push (cons button cell)
+              x-dnd-click-count))
+      (when (< (cdr cell) (- timestamp double-click-time))
+        (setcar cell 0))
+      (setcar cell (1+ (car cell)))
+      (setcdr cell timestamp)
+      (car cell))))
+
+(defun x-dnd-mwheel-scroll (button count modifiers)
+  "Call the appropriate wheel scrolling function for BUTTON.
+Use MODIFIERS, an X modifier mask, to determine if any
+alternative operation (such as scrolling horizontally) should be
+taken.  COUNT is the number of times in quick succession BUTTON
+has been pressed."
+  (let ((hscroll (not (zerop (logand modifiers
+                                     (x-dnd-hscroll-flags)))))
+        (amt (or (and (not mouse-wheel-progressive-speed) 1)
+                 (* 1 count))))
+    (unless (and (not mouse-wheel-tilt-scroll)
+                 (or (eq button 6) (eq button 7)))
+      (let ((function (cond ((eq button 4)
+                             (if hscroll
+                                 mwheel-scroll-left-function
+                               mwheel-scroll-down-function))
+                            ((eq button 5)
+                             (if hscroll
+                                 mwheel-scroll-right-function
+                               mwheel-scroll-up-function))
+                            ((eq button 6)
+                             (if mouse-wheel-flip-direction
+                                 mwheel-scroll-right-function
+                               mwheel-scroll-left-function))
+                            ((eq button 7)
+                             (if mouse-wheel-flip-direction
+                                 mwheel-scroll-left-function
+                               mwheel-scroll-right-function)))))
+        (when function
+          (condition-case nil
+              (funcall function amt)
+            ;; Do not error at buffer limits.  Show a message instead.
+            ;; This is especially important here because signalling an
+            ;; error will mess up the drag-and-drop operation.
+            (beginning-of-buffer
+             (message (error-message-string '(beginning-of-buffer))))
+            (end-of-buffer
+             (message (error-message-string '(end-of-buffer))))))))))
+
 (defun x-dnd-handle-xdnd (event frame window message _format data)
   "Receive one XDND event (client message) and send the appropriate reply.
 EVENT is the client message.  FRAME is where the mouse is now.
 WINDOW is the window within FRAME where the mouse is now.
-FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
+DATA is the vector containing the data of the client message as a
+vector of cardinals.
+MESSAGE is the type of the ClientMessage that was sent."
   (cond ((equal "XdndEnter" message)
 	 (let* ((flags (aref data 1))
 		(version (x-dnd-version-from-flags flags))
@@ -664,55 +818,75 @@ FORMAT is 32 (not used).  MESSAGE is the data part of an XClientMessageEvent."
               version))))
 
 	((equal "XdndPosition" message)
-	 (let* ((state (x-dnd-get-state-for-frame window))
-                (version (aref state 6))
-                (action (if (< version 2) 'copy ; `copy' is the default action.
-                          (x-get-atom-name (aref data 4))))
-		(dnd-source (aref data 0))
-		(action-type (x-dnd-maybe-call-test-function
-			      window
-			      (cdr (assoc action x-dnd-xdnd-to-action)) t))
-		(reply-action (car (rassoc
-                                    ;; Mozilla and some other programs
-                                    ;; support XDS, but only if we
-                                    ;; reply with `copy'.  We can
-                                    ;; recognize these broken programs
-                                    ;; by checking to see if
-                                    ;; `XdndActionDirectSave' was
-                                    ;; originally specified.
-                                    (if (and (eq (car action-type)
-                                                 'direct-save)
-                                             (not (eq action 'direct-save)))
-                                        'copy
-                                      (car action-type))
-				    x-dnd-xdnd-to-action)))
-		(accept ;; 1 = accept, 0 = reject
-		 (if (and reply-action action-type
-                          ;; Only allow drops on the text area of a
-                          ;; window.
-                          (not (posn-area (event-start event))))
-                     1 0))
-		(list-to-send
-		 (list (string-to-number
-			(frame-parameter frame 'outer-window-id))
-                       ;; 1 = accept, 0 = reject.  2 = "want position
-                       ;; updates even for movement inside the given
-                       ;; widget bounds".
-		       (+ (if dnd-indicate-insertion-point 2 0) accept)
-		       (x-dnd-get-drop-x-y frame window)
-		       (x-dnd-get-drop-width-height
-			frame window (eq accept 1))
-                       ;; The no-toolkit Emacs build can actually
-                       ;; receive drops from programs that speak
-                       ;; versions of XDND earlier than 3 (such as
-                       ;; GNUstep), since the toplevel window is the
-                       ;; innermost window.
-		       (if (>= version 2)
-                           (or reply-action 0)
-                         0))))
-	   (x-send-client-message
-	    frame dnd-source frame "XdndStatus" 32 list-to-send)
-           (dnd-handle-movement (event-start event))))
+         ;; If (flags >> 10) & 1, then Emacs should scroll according
+         ;; to the button passed in bits 8 and 9, and the state passed
+         ;; in bits 0 to 7.
+         (let ((state (x-dnd-get-state-for-frame window)))
+           (when (windowp (posn-window (event-start event)))
+             (let ((flags (aref data 1))
+                   (version (aref state 6)))
+               (when (not (zerop (logand (lsh flags -10) 1)))
+                 (let* ((button (+ 4 (logand (lsh flags -8) #x3)))
+                        (count (or (and (>= version 1)
+                                        (x-dnd-note-click button
+                                                          (aref data 3)))
+                                   1))
+                        (state (logand flags #xff)))
+                   (with-selected-window (posn-window (event-start event))
+                     (x-dnd-mwheel-scroll button count state)
+                     (let ((old-x-y (posn-x-y (event-start event))))
+                       (setcar (cdr event)
+                               (posn-at-x-y (max (car old-x-y) 0)
+                                            (max (cdr old-x-y) 0)))))))))
+	   (let* ((version (aref state 6))
+                  (action (if (< version 2) 'copy ; `copy' is the default action.
+                            (x-get-atom-name (aref data 4))))
+		  (dnd-source (aref data 0))
+		  (action-type (x-dnd-maybe-call-test-function
+			        window
+			        (cdr (assoc action x-dnd-xdnd-to-action)) t))
+		  (reply-action (car (rassoc
+                                      ;; Mozilla and some other programs
+                                      ;; support XDS, but only if we
+                                      ;; reply with `copy'.  We can
+                                      ;; recognize these broken programs
+                                      ;; by checking to see if
+                                      ;; `XdndActionDirectSave' was
+                                      ;; originally specified.
+                                      (if (and (eq (car action-type)
+                                                   'direct-save)
+                                               (not (eq action 'direct-save)))
+                                          'copy
+                                        (car action-type))
+				      x-dnd-xdnd-to-action)))
+		  (accept ;; 1 = accept, 0 = reject
+		   (if (and reply-action action-type
+                            ;; Only allow drops on the text area of a
+                            ;; window.
+                            (not (posn-area (event-start event))))
+                       1 0))
+                  (rect (x-dnd-get-drop-rectangle window
+                                                  (event-start event)))
+		  (list-to-send
+		   (list (string-to-number
+			  (frame-parameter frame 'outer-window-id))
+                         ;; 1 = accept, 0 = reject.  2 = "want position
+                         ;; updates even for movement inside the given
+                         ;; widget bounds".
+		         accept
+		         (cons (car rect) (cadr rect))
+		         (cons (nth 2 rect) (nth 3 rect))
+                         ;; The no-toolkit Emacs build can actually
+                         ;; receive drops from programs that speak
+                         ;; versions of XDND earlier than 3 (such as
+                         ;; GNUstep), since the toplevel window is the
+                         ;; innermost window.
+		         (if (>= version 2)
+                             (or reply-action 0)
+                           0))))
+	     (x-send-client-message
+	      frame dnd-source frame "XdndStatus" 32 list-to-send)
+             (dnd-handle-movement (event-start event)))))
 
 	((equal "XdndLeave" message)
 	 (x-dnd-forget-drop window))

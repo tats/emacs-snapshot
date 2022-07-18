@@ -179,11 +179,10 @@ interface to remote files as if they are local files.  @value{tramp}'s
 transparency extends to editing, version control, and @code{dired}.
 
 @value{tramp} can access remote hosts using any number of access
-methods, such as @command{ssh}, @command{rsh}, @command{rlogin},
-@command{telnet}, and related programs.  If these programs can
-successfully pass @acronym{ASCII} characters, @value{tramp} can use
-them.  @value{tramp} does not require or mandate 8-bit clean
-connections.
+methods, such as @command{ssh}, @command{scp}, @command{telnet}, and
+related programs.  If these programs can successfully pass
+@acronym{ASCII} characters, @value{tramp} can use them.  @value{tramp}
+does not require or mandate 8-bit clean connections.
 
 @value{tramp}'s most common access method is through @command{ssh}, a
 more secure alternative to @command{ftp} and other older access
@@ -231,10 +230,10 @@ first time connecting to that host, here's what happens:
 
 @itemize
 @item
-@value{tramp} invokes @samp{telnet @var{host}} or @samp{rsh @var{host}
--l @var{user}} and establishes an external process to connect to the
-remote host.  @value{tramp} communicates with the process through an
-Emacs buffer, which also shows output from the remote host.
+@value{tramp} invokes @samp{telnet @var{host}} or @samp{ssh -l
+@var{user} @var{host}} and establishes an external process to connect
+to the remote host.  @value{tramp} communicates with the process
+through an Emacs buffer, which also shows output from the remote host.
 
 @item
 The remote host may prompt for a login name (for @command{telnet}, for
@@ -244,7 +243,7 @@ followed by a newline.
 
 @item
 The remote host may then prompt for a password or passphrase (for
-@command{rsh} or for @command{telnet}).  @value{tramp} displays the
+@command{ssh} or for @command{telnet}).  @value{tramp} displays the
 password prompt in the minibuffer.  @value{tramp} then sends whatever
 is entered to the remote host, followed by a newline.
 
@@ -667,6 +666,11 @@ may be used in your init file:
 @lisp
 (with-eval-after-load 'tramp (tramp-change-syntax 'simplified))
 @end lisp
+
+@vindex enable-remote-dir-locals
+Changing other variables via directory-local variables on a remote
+directory must be enabled by setting @code{enable-remote-dir-locals}
+to non-@code{nil}, @xref{Directory Variables, , , emacs}.
 
 
 @menu
@@ -2428,7 +2432,7 @@ example below:
 @end lisp
 
 @vindex password-word-equivalents
-This user option is, by default, initialised from
+This user option is, by default, initialized from
 @code{password-word-equivalents} when @value{tramp} is loaded, and it
 is usually more convenient to add new passphrases to that user option
 instead of altering this user option.
@@ -5620,6 +5624,7 @@ Disable @value{tramp} file name completion:
 (customize-set-variable 'ido-enable-tramp-completion nil)
 @end lisp
 
+@c Obsolete since Emacs 29.1.
 @item
 @file{rlogin.el}
 
@@ -5685,8 +5690,8 @@ What is the difference between Ange FTP and @value{tramp}?
 
 The difference is that Ange FTP uses @command{ftp} to transfer files
 between the local and the remote host, whereas @value{tramp} uses a
-combination of @command{rsh} and @command{rcp} or other work-alike
-programs, such as @command{ssh}/@command{scp}.
+combination of @command{ssh} and @command{scp} or other work-alike
+programs.
 @end itemize
 
 
@@ -5819,15 +5824,15 @@ The verbosity levels are
 @*@indent @w{ 4}  activities
 @*@indent @w{ 5}  internal
 @*@indent @w{ 6}  sent and received strings
-@*@indent @w{ 7}  file caching
-@*@indent @w{ 8}  connection properties
+@*@indent @w{ 7}  connection properties
+@*@indent @w{ 8}  file caching
 @*@indent @w{ 9}  test commands
 @*@indent @w{10}  traces (huge)
 @*@indent @w{11}  call traces (maintainer only)
 
 With @code{tramp-verbose} greater than or equal to 4, messages are
 also written to a @value{tramp} debug buffer.  Such debug buffers are
-essential to bug and problem analyses.  For @value{tramp} bug reports,
+essential to bug and problem analyzes.  For @value{tramp} bug reports,
 set the @code{tramp-verbose} level to 6 (@pxref{Bug Reports}).
 
 The debug buffer is in

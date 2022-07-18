@@ -13468,9 +13468,6 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
 	      /* If it has changed current-menubar from previous value,
 		 really recompute the menu-bar from the value.  */
-	      if (! NILP (Vlucid_menu_bar_dirty_flag))
-		call0 (Qrecompute_lucid_menubar);
-
 	      safe_run_hooks (Qmenu_bar_update_hook);
 
 	      hooks_run = true;
@@ -14057,15 +14054,41 @@ redisplay_tab_bar (struct frame *f)
       return false;
     }
 
+  /* Build a string that represents the contents of the tab-bar.  */
+  build_desired_tab_bar_string (f);
+
+  int new_nrows;
+  int new_height = tab_bar_height (f, &new_nrows, true);
+
+  if (f->n_tab_bar_rows == 0)
+    {
+      f->n_tab_bar_rows = new_nrows;
+      if (new_height != WINDOW_PIXEL_HEIGHT (w))
+	frame_default_tab_bar_height = new_height;
+    }
+
+  /* If new_height or new_nrows indicate that we need to enlarge the
+     tab-bar window, we can return right away.  */
+  if (new_nrows > f->n_tab_bar_rows
+      || (EQ (Vauto_resize_tab_bars, Qgrow_only)
+	  && !f->minimize_tab_bar_window_p
+	  && new_height > WINDOW_PIXEL_HEIGHT (w)))
+    {
+      if (FRAME_TERMINAL (f)->change_tab_bar_height_hook)
+	FRAME_TERMINAL (f)->change_tab_bar_height_hook (f, new_height);
+      if (new_nrows != f->n_tab_bar_rows)
+	f->n_tab_bar_rows = new_nrows;
+      clear_glyph_matrix (w->desired_matrix);
+      f->fonts_changed = true;
+      return true;
+    }
+
   /* Set up an iterator for the tab-bar window.  */
   init_iterator (&it, w, -1, -1, w->desired_matrix->rows, TAB_BAR_FACE_ID);
   it.first_visible_x = 0;
   it.last_visible_x = WINDOW_PIXEL_WIDTH (w);
   row = it.glyph_row;
   row->reversed_p = false;
-
-  /* Build a string that represents the contents of the tab-bar.  */
-  build_desired_tab_bar_string (f);
   reseat_to_string (&it, NULL, f->desired_tab_bar_string, 0, 0, 0,
                     STRING_MULTIBYTE (f->desired_tab_bar_string));
   /* FIXME: This should be controlled by a user option.  But it
@@ -14076,22 +14099,6 @@ redisplay_tab_bar (struct frame *f)
      call unproduce_glyphs like display_line and display_string
      do.  */
   it.paragraph_embedding = L2R;
-
-  if (f->n_tab_bar_rows == 0)
-    {
-      int new_height = tab_bar_height (f, &f->n_tab_bar_rows, true);
-
-      if (new_height != WINDOW_PIXEL_HEIGHT (w))
-	{
-          if (FRAME_TERMINAL (f)->change_tab_bar_height_hook)
-            FRAME_TERMINAL (f)->change_tab_bar_height_hook (f, new_height);
-	  frame_default_tab_bar_height = new_height;
-	  /* Always do that now.  */
-	  clear_glyph_matrix (w->desired_matrix);
-	  f->fonts_changed = true;
-	  return true;
-	}
-    }
 
   /* Display as many lines as needed to display all tab-bar items.  */
 
@@ -14138,7 +14145,7 @@ redisplay_tab_bar (struct frame *f)
 
   if (!NILP (Vauto_resize_tab_bars))
     {
-      bool change_height_p = true;
+      bool change_height_p = false;
 
       /* If we couldn't display everything, change the tab-bar's
 	 height if there is room for more.  */
@@ -15066,7 +15073,7 @@ redisplay_tool_bar (struct frame *f)
 
   if (!NILP (Vauto_resize_tool_bars))
     {
-      bool change_height_p = true;
+      bool change_height_p = false;
 
       /* If we couldn't display everything, change the tool-bar's
 	 height if there is room for more.  */
@@ -20174,11 +20181,19 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
    buffer position POS.
 
    Value is 1 if successful.  It is zero if fonts were loaded during
-   redisplay which makes re-adjusting glyph matrices necessary, and -1
-   if point would appear in the scroll margins.
-   (We check the former only if TRY_WINDOW_IGNORE_FONTS_CHANGE is
-   unset in FLAGS, and the latter only if TRY_WINDOW_CHECK_MARGINS is
-   set in FLAGS.)  */
+   redisplay or the dimensions of the desired matrix were found
+   insufficient, which makes re-adjusting glyph matrices necessary.
+   Value is -1 if point would appear in the scroll margins.  (We check
+   the former only if TRY_WINDOW_IGNORE_FONTS_CHANGE is unset in
+   FLAGS, and the latter only if TRY_WINDOW_CHECK_MARGINS is set in
+   FLAGS.)
+
+   Note that 'x-show-tip' invokes this function in a special way, and
+   in that case the return value of zero doesn't necessarily mean the
+   glyph matrices need to be re-adjusted, if the entire text of the
+   tooltip was processed and has its glyphs in the matrix's glyph
+   rows, i.e. if the dimensions of the matrix were found insufficient
+   while producing empty glyph rows beyond ZV.  */
 
 int
 try_window (Lisp_Object window, struct text_pos pos, int flags)
@@ -20203,9 +20218,16 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
   /* Display all lines of W.  */
   while (it.current_y < it.last_visible_y)
     {
+      int last_row_scale = it.w->nrows_scale_factor;
+      int last_col_scale = it.w->ncols_scale_factor;
       if (display_line (&it, cursor_vpos))
 	last_text_row = it.glyph_row - 1;
-      if (f->fonts_changed && !(flags & TRY_WINDOW_IGNORE_FONTS_CHANGE))
+      if (f->fonts_changed
+	  && !((flags & TRY_WINDOW_IGNORE_FONTS_CHANGE)
+	       /* If the matrix dimensions are insufficient, we _must_
+		  fail and let dispnew.c reallocate the matrix.  */
+	       && last_row_scale == it.w->nrows_scale_factor
+	       && last_col_scale == it.w->ncols_scale_factor))
 	return 0;
     }
 
