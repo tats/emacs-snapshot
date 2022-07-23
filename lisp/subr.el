@@ -524,7 +524,14 @@ was called."
   "Return VALUE with its bits shifted left by COUNT.
 If COUNT is negative, shifting is actually to the right.
 In this case, if VALUE is a negative fixnum treat it as unsigned,
-i.e., subtract 2 * `most-negative-fixnum' from VALUE before shifting it."
+i.e., subtract 2 * `most-negative-fixnum' from VALUE before shifting it.
+
+This function is provided for compatibility.  In new code, use `ash'
+instead."
+  (declare (compiler-macro
+            (lambda (form)
+              (macroexp-warn-and-return "avoid `lsh'; use `ash' instead"
+                                        form '(suspicious lsh) t form))))
   (when (and (< value 0) (< count 0))
     (when (< value most-negative-fixnum)
       (signal 'args-out-of-range (list value count)))
@@ -707,11 +714,14 @@ If N is bigger than the length of LIST, return LIST."
 
 (defun butlast (list &optional n)
   "Return a copy of LIST with the last N elements removed.
-If N is omitted or nil, the last element is removed from the
-copy."
+If N is omitted or nil, return a copy of LIST without its last element.
+If N is zero or negative, return LIST."
   (declare (side-effect-free t))
-  (if (and n (<= n 0)) list
-    (nbutlast (copy-sequence list) n)))
+  (unless n
+    (setq n 1))
+  (if (<= n 0)
+      list
+    (take (- (length list) n) list)))
 
 (defun nbutlast (list &optional n)
   "Modify LIST to remove the last N elements.

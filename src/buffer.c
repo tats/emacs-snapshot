@@ -985,6 +985,7 @@ reset_buffer (register struct buffer *b)
   /* It is more conservative to start out "changed" than "unchanged".  */
   b->clip_changed = 0;
   b->prevent_redisplay_optimizations_p = 1;
+  b->long_line_optimizations_p = 0;
   bset_backed_up (b, Qnil);
   bset_local_minor_modes (b, Qnil);
   BUF_AUTOSAVE_MODIFF (b) = 0;
@@ -1501,7 +1502,7 @@ state of the current buffer.  Use with care.  */)
 	 decrease SAVE_MODIFF and auto_save_modified or increase
 	 MODIFF.  */
       if (SAVE_MODIFF >= MODIFF)
-	SAVE_MODIFF = modiff_incr (&MODIFF);
+	SAVE_MODIFF = modiff_incr (&MODIFF, 1);
       if (EQ (flag, Qautosaved))
 	BUF_AUTOSAVE_MODIFF (b) = MODIFF;
     }
@@ -2446,6 +2447,7 @@ results, see Info node `(elisp)Swapping Text'.  */)
   swapfield (bidi_paragraph_cache, struct region_cache *);
   current_buffer->prevent_redisplay_optimizations_p = 1;
   other_buffer->prevent_redisplay_optimizations_p = 1;
+  swapfield (long_line_optimizations_p, bool_bf);
   swapfield (overlays_before, struct Lisp_Overlay *);
   swapfield (overlays_after, struct Lisp_Overlay *);
   swapfield (overlay_center, ptrdiff_t);
@@ -2465,12 +2467,12 @@ results, see Info node `(elisp)Swapping Text'.  */)
   bset_point_before_scroll (current_buffer, Qnil);
   bset_point_before_scroll (other_buffer, Qnil);
 
-  modiff_incr (&current_buffer->text->modiff);
-  modiff_incr (&other_buffer->text->modiff);
-  modiff_incr (&current_buffer->text->chars_modiff);
-  modiff_incr (&other_buffer->text->chars_modiff);
-  modiff_incr (&current_buffer->text->overlay_modiff);
-  modiff_incr (&other_buffer->text->overlay_modiff);
+  modiff_incr (&current_buffer->text->modiff, 1);
+  modiff_incr (&other_buffer->text->modiff, 1);
+  modiff_incr (&current_buffer->text->chars_modiff, 1);
+  modiff_incr (&other_buffer->text->chars_modiff, 1);
+  modiff_incr (&current_buffer->text->overlay_modiff, 1);
+  modiff_incr (&other_buffer->text->overlay_modiff, 1);
   current_buffer->text->beg_unchanged = current_buffer->text->gpt;
   current_buffer->text->end_unchanged = current_buffer->text->gpt;
   other_buffer->text->beg_unchanged = other_buffer->text->gpt;
@@ -4009,7 +4011,7 @@ modify_overlay (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
 
   bset_redisplay (buf);
 
-  modiff_incr (&BUF_OVERLAY_MODIFF (buf));
+  modiff_incr (&BUF_OVERLAY_MODIFF (buf), 1);
 }
 
 /* Remove OVERLAY from LIST.  */
@@ -5610,7 +5612,7 @@ used.  */);
 
   DEFVAR_PER_BUFFER ("mode-line-format", &BVAR (current_buffer, mode_line_format),
 		     Qnil,
-		     doc: /* Template for displaying mode line for current buffer.
+		     doc: /* Template for displaying mode line for a window's buffer.
 
 The value may be nil, a string, a symbol or a list.
 
@@ -5622,6 +5624,9 @@ For any symbol other than t or nil, the symbol's value is processed as
  %-constructs (see below).  Also, unless the symbol has a non-nil
  `risky-local-variable' property, all properties in any strings, as
  well as all :eval and :propertize forms in the value, are ignored.
+
+When the value is processed, the window's buffer is temporarily the
+current buffer.
 
 A list whose car is a string or list is processed by processing each
  of the list elements recursively, as separate mode line constructs,
@@ -6423,6 +6428,16 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
 Since `clone-indirect-buffer' calls `make-indirect-buffer', this hook
 will run for `clone-indirect-buffer' calls as well.  */);
   Vclone_indirect_buffer_hook = Qnil;
+
+  DEFVAR_LISP ("long-line-threshold", Vlong_line_threshold,
+    doc: /* Line length above which to use redisplay shortcuts.
+The value should be a positive integer or nil.
+If the value is an integer, shortcuts in the display code intended
+to speed up redisplay for long lines will automatically be enabled
+in buffers which contain one or more lines whose length is above
+this threshold.
+If nil, these display shortcuts will always remain disabled.  */);
+  XSETFASTINT (Vlong_line_threshold, 10000);
 
   defsubr (&Sbuffer_live_p);
   defsubr (&Sbuffer_list);

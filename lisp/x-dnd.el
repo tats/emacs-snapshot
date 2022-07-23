@@ -722,15 +722,27 @@ MODS is a single symbol, or a list of symbols such as `shift' or
              (setq mask (nth 2 virtual-modifiers)))))
     mask))
 
-(defun x-dnd-hscroll-flags ()
-  "Return the event state of a button press that should result in hscroll.
-Value is a mask of all the X modifier states that would normally
-cause a button press event to perform horizontal scrolling."
-  (let ((i 0))
-    (dolist (modifier mouse-wheel-scroll-amount)
-      (when (eq (cdr-safe modifier) 'hscroll)
-        (setq i (logior i (x-dnd-modifier-mask (car modifier))))))
-    i))
+(defun x-dnd-get-modifiers ()
+  "Obtain an X modifier mask containing all modifiers.
+Value is an X modifier mask containing all modifiers that can
+modify an Emacs keyboard or mouse event."
+  (let ((mods (x-get-modifier-masks))
+        (mask 5)) ; ShiftMask | ControlMask
+    (dolist (mod mods)
+      (setq mask (logior mask mod)))
+    mask))
+
+(defun x-dnd-wheel-modifier-type (flags)
+  "Return the modifier type of an X modifier mask.
+FLAGS is the X modifier mask of a turn of the mouse wheel."
+  (let ((modifiers (x-dnd-get-modifiers)))
+    (catch 'type
+      (dolist (modifier mouse-wheel-scroll-amount)
+        (when (and (consp modifier)
+                   (eq (x-dnd-modifier-mask (car modifier))
+                       (logand flags modifiers)))
+          (throw 'type (cdr modifier))))
+      nil)))
 
 (defvar x-dnd-click-count nil
   "Alist of button numbers to click counters during drag-and-drop.
@@ -760,19 +772,23 @@ Use MODIFIERS, an X modifier mask, to determine if any
 alternative operation (such as scrolling horizontally) should be
 taken.  COUNT is the number of times in quick succession BUTTON
 has been pressed."
-  (let ((hscroll (not (zerop (logand modifiers
-                                     (x-dnd-hscroll-flags)))))
-        (amt (or (and (not mouse-wheel-progressive-speed) 1)
-                 (* 1 count))))
+  (let* ((type (x-dnd-wheel-modifier-type modifiers))
+         (hscroll (eq type 'hscroll))
+         (amt (or (and (not mouse-wheel-progressive-speed) 1)
+                  (* 1 count))))
     (unless (and (not mouse-wheel-tilt-scroll)
                  (or (eq button 6) (eq button 7)))
-      (let ((function (cond ((eq button 4)
+      (let ((function (cond ((eq type 'text-scale)
+                             #'text-scale-adjust)
+                            ((eq type 'global-text-scale)
+                             #'global-text-scale-adjust)
+                            ((eq button 4)
                              (if hscroll
-                                 mwheel-scroll-left-function
+                                 mwheel-scroll-right-function
                                mwheel-scroll-down-function))
                             ((eq button 5)
                              (if hscroll
-                                 mwheel-scroll-right-function
+                                 mwheel-scroll-left-function
                                mwheel-scroll-up-function))
                             ((eq button 6)
                              (if mouse-wheel-flip-direction
@@ -782,9 +798,17 @@ has been pressed."
                              (if mouse-wheel-flip-direction
                                  mwheel-scroll-left-function
                                mwheel-scroll-right-function)))))
+        ;; Button5 should decrease the text scale, not increase it.
+        (when (and (memq type '(text-scale global-text-scale))
+                   (eq button 5))
+          (setq amt (- amt)))
         (when function
           (condition-case nil
-              (funcall function amt)
+              ;; Don't overwrite any echo-area message that might
+              ;; already be shown, since this can be called from
+              ;; `x-begin-drag'.
+              (let ((inhibit-message t))
+                (funcall function amt))
             ;; Do not error at buffer limits.  Show a message instead.
             ;; This is especially important here because signalling an
             ;; error will mess up the drag-and-drop operation.
@@ -825,8 +849,8 @@ MESSAGE is the type of the ClientMessage that was sent."
            (when (windowp (posn-window (event-start event)))
              (let ((flags (aref data 1))
                    (version (aref state 6)))
-               (when (not (zerop (logand (lsh flags -10) 1)))
-                 (let* ((button (+ 4 (logand (lsh flags -8) #x3)))
+               (when (not (zerop (logand (ash flags -10) 1)))
+                 (let* ((button (+ 4 (logand (ash flags -8) #x3)))
                         (count (or (and (>= version 1)
                                         (x-dnd-note-click button
                                                           (aref data 3)))
@@ -1086,7 +1110,7 @@ Return a vector of atoms containing the selection targets."
 (defun x-dnd-handle-motif (event frame window _message-atom _format data)
   (let* ((message-type (cdr (assoc (logand (aref data 0) #x3f)
                                    x-dnd-motif-message-types)))
-         (initiator-p (eq (lsh (aref data 0) -7) 0))
+         (initiator-p (eq (ash (aref data 0) -7) 0))
 	 (source-byteorder (aref data 1))
 	 (my-byteorder (byteorder))
 	 (source-flags (x-dnd-get-motif-value data 2 2 source-byteorder))
@@ -1647,6 +1671,24 @@ VERSION is the version of the XDND protocol understood by SOURCE."
                                              (< version 5))
                                          0
                                        "XdndDirectSave0")))))))
+
+;; Internal wheel movement.
+
+(defvar x-dnd-wheel-function)
+
+(defun x-dnd-note-wheel-movement (position button state time)
+  "Note wheel movement at POSITION.
+POSITION is a mouse position list describing the position of the
+wheel movement.
+BUTTON is the wheel button that was pressed.
+STATE is the X modifier state at the time of the wheel movement.
+TIME is the X server time at which the wheel moved."
+  (when (posn-window position)
+    (with-selected-window (posn-window position)
+      (let ((count (x-dnd-note-click button time)))
+        (x-dnd-mwheel-scroll button count state)))))
+
+(setq x-dnd-wheel-function #'x-dnd-note-wheel-movement)
 
 (provide 'x-dnd)
 

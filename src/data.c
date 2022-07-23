@@ -3517,9 +3517,16 @@ representation.  */)
 }
 
 DEFUN ("ash", Fash, Sash, 2, 2, 0,
-       doc: /* Return VALUE with its bits shifted left by COUNT.
-If COUNT is negative, shifting is actually to the right.
-In this case, the sign bit is duplicated.  */)
+       doc: /* Return integer VALUE with its bits shifted left by COUNT bit positions.
+If COUNT is negative, shift VALUE to the right instead.
+VALUE and COUNT must be integers.
+Mathematically, the return value is VALUE multiplied by 2 to the
+power of COUNT, rounded down.  If the result is non-zero, its sign
+is the same as that of VALUE.
+In terms of bits, when COUNT is positive, the function moves
+the bits of VALUE to the left, adding zero bits on the right; when
+COUNT is negative, it moves the bits of VALUE to the right,
+discarding bits.  */)
   (Lisp_Object value, Lisp_Object count)
 {
   CHECK_INTEGER (value);

@@ -1028,7 +1028,7 @@ window_body_unit_from_symbol (Lisp_Object unit)
 /* Return the number of lines/pixels of W's body.  Don't count any mode
    or header line or horizontal divider of W.  Rounds down to nearest
    integer when not working pixelwise. */
-static int
+int
 window_body_height (struct window *w, enum window_body_unit pixelwise)
 {
   int height = (w->pixel_height
@@ -1275,7 +1275,10 @@ set_window_hscroll (struct window *w, EMACS_INT hscroll)
 
   /* Prevent redisplay shortcuts when changing the hscroll.  */
   if (w->hscroll != new_hscroll)
-    XBUFFER (w->contents)->prevent_redisplay_optimizations_p = true;
+    {
+      XBUFFER (w->contents)->prevent_redisplay_optimizations_p = true;
+      wset_redisplay (w);
+    }
 
   w->hscroll = new_hscroll;
   w->suspend_auto_hscroll = true;
