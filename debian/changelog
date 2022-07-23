@@ -2,6 +2,12 @@ emacs-snapshot (2:20220723+emacs-28.1.90-157670-g1b99f2908b7-1) unstable; urgenc
 
   * New snapshot
 
+ -- Dima Kogan <dima@secretsauce.net>  Sat, 23 Jul 2022 16:19:10 -0700
+
+emacs-snapshot (2:20220723+emacs-28.1.90-157670-g1b99f2908b7-1) unstable; urgency=medium
+
+  * New snapshot
+
  -- Dima Kogan <dima@secretsauce.net>  Sat, 23 Jul 2022 13:25:59 -0700
 
 emacs-snapshot (2:20220723+emacs-28.1.90-157670-g1b99f2908b7-1) unstable; urgency=medium
