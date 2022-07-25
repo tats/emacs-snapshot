@@ -90,6 +90,8 @@ AgAABQMAAAYDAAATGwAAGhsAAA==")
 
 ;;; XDS tests.
 
+(defvar x-dnd-xds-testing)
+
 (defvar x-dnd-tests-xds-target-dir nil
   "The name of the target directory where the file will be saved.")
 
@@ -122,8 +124,8 @@ Return the result of the selection."
                      (format "file://%s%s" (system-name)
                              (expand-file-name x-dnd-tests-xds-property-value
                                                x-dnd-tests-xds-target-dir))
-                   (concat "file:///" (expand-file-name x-dnd-tests-xds-property-value
-                                                        x-dnd-tests-xds-target-dir)))))
+                   (concat "file://" (expand-file-name x-dnd-tests-xds-property-value
+                                                       x-dnd-tests-xds-target-dir)))))
         (setq x-dnd-tests-xds-property-value
               (encode-coding-string (url-encode-url uri)
                                     'raw-text)))
@@ -162,7 +164,8 @@ hostname in the target URI."
         (original-file (expand-file-name
                         (make-temp-name "x-dnd-test")
                         temporary-file-directory))
-        (x-dnd-tests-xds-name (make-temp-name "x-dnd-test-target")))
+        (x-dnd-tests-xds-name (make-temp-name "x-dnd-test-target"))
+        (x-dnd-xds-testing t))
     ;; The call to `gui-set-selection' is only used for providing the
     ;; conventional `text/uri-list' target and can be ignored.
     (cl-flet ((gui-set-selection #'ignore))
