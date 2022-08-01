@@ -1357,7 +1357,7 @@ Possible values for the file identifier are:
                      to open [[file:document.pdf::5]] with evince at page 5.
 
  `directory'   Matches a directory
- `remote'      Matches a remote file, accessible through tramp or efs.
+ `remote'      Matches a remote file, accessible through tramp.
                Remote files most likely should be visited through Emacs
                because external applications cannot handle such paths.
 `auto-mode'    Matches files that are matched by any entry in `auto-mode-alist',
@@ -9319,6 +9319,7 @@ TYPE is the dynamic block type, as a string."
   "List all defined dynamic block types."
   (mapcar #'car org-dynamic-block-alist))
 
+;;;###org-autoload
 (defun org-dynamic-block-define (type func)
   "Define dynamic block TYPE with FUNC.
 TYPE is a string.  FUNC is the function creating the dynamic

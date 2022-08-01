@@ -160,7 +160,7 @@ the current Emacs version).
 This function can be called in your init files to change the
 user-specific directory where Emacs stores the "*.eln" files produced
 by native compilation of Lisp packages Emacs loads.  The default
-eln-cache directory is unchanged: it is the 'eln-cache' subdirectory
+eln-cache directory is unchanged: it is the "eln-cache" subdirectory
 of 'user-emacs-directory'.
 
 
@@ -204,7 +204,7 @@ is handled like all the other X resources, and set on a per-frame basis.
 Previously, this command did the same as 'e'.
 
 ---
-** '/ a' in "*Packages*" buffer now limits by package name(s) instead of regexp.
+** '/ a' in "*Packages*" buffer now limits by archive name(s) instead of regexp.
 
 +++
 ** Setting the goal columns now also affects '<prior>' and '<next>'.
@@ -328,7 +328,7 @@ variable set to nil, as it will default to nil in a future Emacs
 version and will be removed some time after that.
 
 +++
-** Functions which recreate the "*scratch*" buffer now also initialize it.
+** Functions that recreate the "*scratch*" buffer now also initialize it.
 When functions like 'other-buffer' and 'server-execute' recreate
 "*scratch*", they now also insert 'initial-scratch-message' and set
 the major mode according to 'initial-major-mode', like at Emacs
@@ -336,23 +336,47 @@ startup.  Previously, these functions ignored
 'initial-scratch-message' and left "*scratch*" in 'fundamental-mode'.
 
 ---
-** The rlogin.el library and 'rsh' command are now obsolete.
+** The autoarg.el library is now marked obsolete.
+This library provides the 'autoarg-mode' and 'autoarg-kp-mode' minor
+modes to emulate the behavior of the historical editor Twenex Emacs.
+It is believed to no longer be useful.
+
+---
+** The quickurl.el library is now obsolete.
+Use 'abbrev', 'skeleton' or 'tempo' instead.
+
+---
+** The rlogin.el library, and the 'rsh' command are now obsolete.
 Use something like 'M-x shell RET ssh <host> RET' instead.
+
+---
+** The fast-lock.el and lazy-lock.el library have been removed.
+They have been obsolete since Emacs 22.1.
+
+The variable 'font-lock-support-mode' is occasionally useful for
+debugging purposes.  It is now a regular variable (instead of a user
+option) and can be set to nil to disable Just-in-time Lock mode.
 
 
 * Changes in Emacs 29.1
 
 ---
-** Emacs is now capable of editing files with arbitrarily long lines.
-The display of long lines has been optimized, and Emacs no longer
-chokes when a buffer on display contains long lines.  If you still
-experience slowdowns while editing files with long lines, this is
-either due to font locking, which you can turn off with 'M-x
-font-lock-mode' or 'C-u C-x x f', or to the current major mode or one
-of the enabled minor modes, in which case you should open the the file
-with 'M-x find-file-literally' instead of 'C-x C-f'.  The variable
-'long-line-threshold' controls whether and when these display
-optimizations are used.
+** Emacs is now capable of editing files with very long lines.
+The display of long lines has been optimized, and Emacs should no
+longer choke when a buffer on display contains long lines.  The
+variable 'long-line-threshold' controls whether and when these display
+optimizations are in effect.
+
+If you still experience slowdowns while editing files with long lines,
+this may be due to line truncation, or to one of the enabled minor
+modes, or to the current major mode.  Try turning off line truncation
+with 'C-x x t', or try disabling all known slow minor modes with
+'M-x so-long-minor-mode', or try disabling both known slow minor modes
+and the major mode with 'M-x so-long-mode', or visit the file with
+'M-x find-file-literally' instead of the usual 'C-x C-f'.
+
+Note that the display optimizations in these cases may cause the
+buffer to be occasionally mis-fontified.
 
 +++
 ** New command to change the font size globally.
@@ -401,11 +425,23 @@ between these modes while the user is inputting a command by hitting
 ** Interactively, 'kill-buffer' will now offer to save the buffer if unsaved.
 
 ---
-** New command 'duplicate-line'.
-This command duplicates the current line the specified number of times.
+** New commands 'duplicate-line' and 'duplicate-dwim'.
+'duplicate-line' duplicates the current line the specified number of times.
+'duplicate-dwim' duplicates the region if it is active.  If not, it
+works like 'duplicate-line'.  An active rectangular region is
+duplicated on its right-hand side.
 
 ---
 ** Files with the ".eld" extension are now visited in 'lisp-data-mode'.
+
++++
+** 'network-lookup-address-info' can now check numeric IP address validity.
+Specifying 'numeric as the new optional 'hints' argument makes it
+check if the passed address is a valid IPv4/IPv6 address (without DNS
+traffic).
+
+    (network-lookup-address-info "127.1" 'ipv4 'numeric)
+    => ([127 0 0 1 0])
 
 +++
 ** New command 'find-sibling-file'.
@@ -568,12 +604,24 @@ Only in the Lucid build, this controls colors used for highlighted
 menu item widgets.
 
 +++
-** On X11, Emacs now tries to synchronize window resize with the window manager.
+** On X, Emacs now tries to synchronize window resize with the window manager.
 This leads to less flicker and empty areas of a frame being displayed
 when a frame is being resized.  Unfortunately, it does not work on
 some ancient buggy window managers, so if Emacs appears to freeze, but
 is still responsive to input, you can turn it off by setting the X
 resource "synchronizeResize" to "off".
+
++++
+** On X, Emacs can optionally synchronize display with the graphics hardware.
+When this is enabled by setting the X resource "synchronizeResize" to
+"extended", frame content "tearing" is drastically reduced.  This is
+only supported on the Motif, Lucid, and no-toolkit builds, and
+requires an X compositing manager supporting the extended frame
+synchronization protocol (see
+https://fishsoup.net/misc/wm-spec-synchronization.html).
+
+This behavior can be toggled on and off via the frame parameter
+'use-frame-synchronization'.
 
 +++
 ** New frame parameter 'alpha-background' and X resource "alphaBackground".
@@ -812,11 +860,8 @@ or is itself too long.
 +++
 *** New user option 'outline-minor-mode-use-buttons'.
 If non-nil, Outline Minor Mode will use buttons to hide/show outlines
-in addition to the ellipsis.  The default is nil.
-
----
-*** New user option 'outline-minor-mode-buttons'.
-This is a list of pairs of open/close strings used to display buttons.
+in addition to the ellipsis.  The default is nil in editing modes, but
+non-nil in 'special-mode' and its derivatives.
 
 +++
 ** Support for the WebP image format.
@@ -1194,7 +1239,9 @@ contents.
 
 ---
 *** New user option 'diff-whitespace-style'.
-This option determines buffer-local 'whitespace-style' value.
+Sets the value of the buffer-local variable 'whitespace-style' in
+'diff-mode' buffers.  By default, this variable is '(face trailing)',
+which preserves behavior from previous Emacs versions.
 
 
 ** Ispell
@@ -1302,7 +1349,11 @@ characters instead of just 'SPC' and 'TAB'.
 ---
 ** New mode, 'emacs-news-mode', for editing the NEWS file.
 This mode adds some highlighting, fixes the 'M-q' command, and has
-commands for doing maintenance.
+commands for doing maintenance of the Emacs NEWS files.  In addition,
+this mode turns on 'outline-minor-mode', and thus displays
+customizable icons (see 'icon-preference') on heading lines.  To
+disable these icons, customize 'outline-minor-mode-use-buttons' to a
+nil value.
 
 ---
 ** Kmacro
@@ -2140,13 +2191,17 @@ instead of also trying to ping it.  Customize the user option
 *** The 'run-dig' command is now obsolete; use 'dig' instead.
 
 ---
-** The autoarg.el library is now marked obsolete.
-This library provides the 'autoarg-mode' and 'autoarg-kp-mode' minor
-modes to emulate the behavior of the historical editor Twenex Emacs.
-It is believed to no longer be useful.
+*** Some `bib-mode' commands and variables have been renamed.
+To respect Emacs naming conventions, the variable 'unread-bib-file'
+has been renamed to 'bib-unread-file'.  The following commands have
+also been renamed:
+  'addbib'           to  'bib-add'
+  'return-key-bib'   to  'bib-return-key'
+  'mark-bib'         to  'bib-mark'
+  'unread-bib'       to  'bib-unread'
 
 ---
-** proced.el shows system processes of remote hosts.
+*** proced.el shows system processes of remote hosts.
 When 'default-directory' is remote, and 'proced' is invoked with a
 negative argument like 'C-u - proced', the system processes of that
 remote host are shown.  Alternatively, the user option
@@ -2364,7 +2419,8 @@ but switching to `ash` is generally much preferable.
 'dired-x-submit-report', 'eieio-defgeneric', 'eieio-defmethod',
 'emacs-lock-from-exiting', 'erc-complete-word',
 'eshell-cmpl-suffix-list', 'eshell-for', 'font-lock-maximum-size',
-'gnus-carpal', 'gnus-debug-exclude-variables', 'gnus-debug-files',
+'font-lock-reference-face', 'gnus-carpal',
+'gnus-debug-exclude-variables', 'gnus-debug-files',
 'gnus-local-domain', 'gnus-outgoing-message-group',
 'gnus-secondary-servers', 'gnus-registry-user-format-function-M',
 'image-extension-data', 'image-library-alist',
@@ -2400,11 +2456,17 @@ but switching to `ash` is generally much preferable.
 ---
 ** Some functions and variables obsolete since Emacs 23 have been removed:
 'find-emacs-lisp-shadows', 'newsticker-cache-filename',
+'redisplay-end-trigger-functions', 'set-window-redisplay-end-trigger',
 'unify-8859-on-decoding-mode', 'unify-8859-on-encoding-mode',
-'vc-arch-command'.
+'vc-arch-command', 'window-redisplay-end-trigger'.
+
+---
+** Some functions and variables obsolete since Emacs 21 or 22 have been removed:
+'c-toggle-auto-state', 'find-file-not-found-hooks',
+'ls-lisp-dired-ignore-case', 'query-replace-regexp-eval'.
 
 +++
-** New generic function 'function-doumentation'.
+** New generic function 'function-documentation'.
 Can dynamically generate a raw docstring depending on the type of
 a function.
 Used mainly for docstrings of OClosures.
@@ -2435,6 +2497,11 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** Emacs now supports user-customizable and themable icons.
+These can be used for buttons in buffers and the like.  See
+'(elisp)Icons' and '(emacs)Icons' for details.
 
 +++
 ** New arguments MESSAGE and TIMEOUT of 'set-transient-map'.
@@ -2489,6 +2556,16 @@ Traditionally, 'save-some-buffers' saved buffers, and also saved
 abbrevs.  This has been generalized via the
 'save-some-buffers-functions' variable, and packages can now register
 things to be saved.
+
+** New function 'string-equal-ignore-case'.
+This compares strings ignoring case differences.
+
++++
+** New argument LOCK of 'narrow-to-region'.
+If 'narrow-to-region' is called from Lisp with the new optional
+argument LOCK non-nil, then calls to 'widen' and calls to
+'narrow-to-region' with the optional argument LOCK nil or omitted do
+not produce any effect until the end of the current body form.
 
 ** Themes
 

@@ -1451,8 +1451,7 @@ See Info node `(elisp) Integer Basics'."
 	 radians-to-degrees rassq rassoc read-from-string regexp-opt
          regexp-quote region-beginning region-end reverse round
 	 sin sqrt string string< string= string-equal string-lessp
-         string> string-greaterp string-empty-p
-         string-prefix-p string-suffix-p string-blank-p
+         string> string-greaterp string-empty-p string-blank-p
          string-search string-to-char
 	 string-to-number string-to-syntax substring
 	 sxhash sxhash-equal sxhash-eq sxhash-eql
@@ -1472,7 +1471,7 @@ See Info node `(elisp) Integer Basics'."
 	 window-next-buffers window-next-sibling window-new-normal
 	 window-new-total window-normal-size window-parameter window-parameters
 	 window-parent window-pixel-edges window-point window-prev-buffers
-	 window-prev-sibling window-redisplay-end-trigger window-scroll-bars
+         window-prev-sibling window-scroll-bars
 	 window-start window-text-height window-top-child window-top-line
 	 window-total-height window-total-width window-use-time window-vscroll
 	 window-width zerop))
@@ -1500,7 +1499,7 @@ See Info node `(elisp) Integer Basics'."
 	 natnump nlistp not null number-or-marker-p numberp
 	 one-window-p overlayp
 	 point point-marker point-min point-max preceding-char primary-charset
-	 processp
+	 processp proper-list-p
 	 recent-keys recursion-depth
 	 safe-length selected-frame selected-window sequencep
 	 standard-case-table standard-syntax-table stringp subrp symbolp
@@ -1545,7 +1544,7 @@ See Info node `(elisp) Integer Basics'."
          floor ceiling round truncate
          ffloor fceiling fround ftruncate
          string= string-equal string< string-lessp string> string-greaterp
-         string-empty-p string-blank-p string-prefix-p string-suffix-p
+         string-empty-p string-blank-p
          string-search
          consp atom listp nlistp proper-list-p
          sequencep arrayp vectorp stringp bool-vector-p hash-table-p

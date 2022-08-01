@@ -368,6 +368,17 @@
              2)))
 
 (ert-deftest string-comparison-test ()
+  (should (string-equal-ignore-case "abc" "abc"))
+  (should (string-equal-ignore-case "abc" "ABC"))
+  (should (string-equal-ignore-case "abc" "abC"))
+  (should-not (string-equal-ignore-case "abc" "abCD"))
+  (should (string-equal-ignore-case "S" "s"))
+  (should (string-equal-ignore-case "ẞ" "ß"))
+  (should (string-equal-ignore-case "ǲ" "Ǳ"))
+  (should (string-equal-ignore-case "Όσος" "ΌΣΟΣ"))
+  ;; not yet: (should (string-equal-ignore-case "SS" "ß"))
+  ;; not yet: (should (string-equal-ignore-case "SS" "ẞ"))
+
   (should (string-lessp "abc" "acb"))
   (should (string-lessp "aBc" "abc"))
   (should (string-lessp "abc" "abcd"))
@@ -1026,7 +1037,19 @@ final or penultimate step during initialization."))
 
 (ert-deftest test-readablep ()
   (should (readablep "foo"))
-  (should-not (readablep (list (make-marker)))))
+  (should-not (readablep (list (make-marker))))
+  (should-not (readablep (make-marker))))
+
+(ert-deftest test-print-unreadable-function ()
+  ;; Check that problem with unwinding properly is fixed (bug#56773).
+  (let* ((before nil)
+         (after nil)
+         (r (with-temp-buffer
+              (setq before (current-buffer))
+              (prog1 (readablep (make-marker))
+                (setq after (current-buffer))))))
+    (should (equal after before))
+    (should (equal r nil))))
 
 (ert-deftest test-string-lines ()
   (should (equal (string-lines "") '("")))

@@ -838,21 +838,9 @@ x_set_inhibit_double_buffering (struct frame *f,
 
       block_input ();
       if (want_double_buffering != was_double_buffered)
-	{
-	  /* Force XftDraw etc to be recreated with the new double
-	     buffered drawable.  */
-	  font_drop_xrender_surfaces (f);
-
-	  /* Scroll bars decide whether or not to use a back buffer
-	     based on the value of this frame parameter, so destroy
-	     all scroll bars.  */
-#ifndef USE_TOOLKIT_SCROLL_BARS
-	  if (FRAME_TERMINAL (f)->condemn_scroll_bars_hook)
-	    FRAME_TERMINAL (f)->condemn_scroll_bars_hook (f);
-	  if (FRAME_TERMINAL (f)->judge_scroll_bars_hook)
-	    FRAME_TERMINAL (f)->judge_scroll_bars_hook (f);
-#endif
-	}
+	/* Force XftDraw etc to be recreated with the new double
+	   buffered drawable.  */
+	font_drop_xrender_surfaces (f);
       if (FRAME_X_DOUBLE_BUFFERED_P (f) && !want_double_buffering)
         tear_down_x_back_buffer (f);
       else if (!FRAME_X_DOUBLE_BUFFERED_P (f) && want_double_buffering)
@@ -975,6 +963,16 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
 	  window = gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (f));
 	  gdk_x11_window_set_frame_sync_enabled (window, FALSE);
 	}
+#endif
+
+#if defined HAVE_XSYNC && !defined USE_GTK
+      /* Frame synchronization can't be used in child frames since
+	 they are not directly managed by the compositing manager.
+	 Re-enabling vsync in former child frames also leads to
+	 inconsistent display.  In addition, they can only be updated
+	 outside of a toplevel frame.  */
+      FRAME_X_OUTPUT (f)->use_vsync_p = false;
+      FRAME_X_WAITING_FOR_DRAW (f) = false;
 #endif
       unblock_input ();
 
@@ -2431,6 +2429,28 @@ x_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       FRAME_TERMINAL (f)->set_frame_alpha_hook (f);
       unblock_input ();
     }
+}
+
+static void
+x_set_use_frame_synchronization (struct frame *f, Lisp_Object arg,
+				 Lisp_Object oldval)
+{
+#if !defined USE_GTK && defined HAVE_XSYNC
+  struct x_display_info *dpyinfo;
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  if (!NILP (arg) && FRAME_X_EXTENDED_COUNTER (f))
+    FRAME_X_OUTPUT (f)->use_vsync_p
+      = x_wm_supports (f, dpyinfo->Xatom_net_wm_frame_drawn);
+  else
+    FRAME_X_OUTPUT (f)->use_vsync_p = false;
+
+  store_frame_param (f, Quse_frame_synchronization,
+		     FRAME_X_OUTPUT (f)->use_vsync_p ? Qt : Qnil);
+#else
+  store_frame_param (f, Quse_frame_synchronization, Qnil);
+#endif
 }
 
 
@@ -5113,7 +5133,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
     }
 
 #ifdef HAVE_XSYNC
-  if (dpyinfo->xsync_supported_p)
+  if (dpyinfo->xsync_supported_p
+      /* Frame synchronization isn't supported in child frames.  */
+      && NILP (parent_frame)
+      && !f->output_data.x->explicit_parent)
     {
 #ifndef HAVE_GTK3
       XSyncValue initial_value;
@@ -5153,6 +5176,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
 #endif
 
   unblock_input ();
+
+  /* Set whether or not frame synchronization is enabled.  */
+  gui_default_parameter (f, parms, Quse_frame_synchronization, Qt,
+			 NULL, NULL, RES_TYPE_BOOLEAN);
 
   /* Works iff frame has been already mapped.  */
   gui_default_parameter (f, parms, Qskip_taskbar, Qnil,
@@ -8681,7 +8708,8 @@ Text larger than the specified size is clipped.  */)
   if (!NILP (tip_frame) && FRAME_LIVE_P (XFRAME (tip_frame)))
     {
       if (FRAME_VISIBLE_P (XFRAME (tip_frame))
-	  && BASE_EQ (frame, tip_last_frame)
+	  && (FRAME_X_DISPLAY (XFRAME (frame))
+	      == FRAME_X_DISPLAY (XFRAME (tip_last_frame)))
 	  && !NILP (Fequal_including_properties (tip_last_string, string))
 	  && !NILP (Fequal (tip_last_parms, parms)))
 	{
@@ -9767,6 +9795,7 @@ frame_parm_handler x_frame_parm_handlers[] =
   x_set_override_redirect,
   gui_set_no_special_glyphs,
   x_set_alpha_background,
+  x_set_use_frame_synchronization,
   x_set_shaded,
 };
 

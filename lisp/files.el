@@ -577,8 +577,6 @@ location of point in the current buffer."
 
 ;;;It is not useful to make this a local variable.
 ;;;(put 'find-file-not-found-functions 'permanent-local t)
-(define-obsolete-variable-alias 'find-file-not-found-hooks
-    'find-file-not-found-functions "22.1")
 (defvar find-file-not-found-functions nil
   "List of functions to be called for `find-file' on nonexistent file.
 These functions are called as soon as the error is detected.
@@ -1428,7 +1426,7 @@ containing it, until no links are left at any level.
 	    ;; If these are equal, we have the (or a) root directory.
 	    (or (string= dir dirfile)
 		(and (file-name-case-insensitive-p dir)
-		     (eq (compare-strings dir 0 nil dirfile 0 nil t) t))
+		     (string-equal-ignore-case dir dirfile))
 		;; If this is the same dir we last got the truename for,
 		;; save time--don't recalculate.
 		(if (assoc dir (car prev-dirs))
@@ -4448,7 +4446,8 @@ This function returns either:
                   ;; The entry MTIME should match the most recent
                   ;; MTIME among matching files.
                   (and cached-files
-		       (equal (nth 2 dir-elt)
+		       (time-equal-p
+			      (nth 2 dir-elt)
 			      (let ((latest 0))
 				(dolist (f cached-files latest)
 				  (let ((f-time
@@ -5119,14 +5118,16 @@ extension, the value is \"\"."
             "")))))
 
 (defun file-name-with-extension (filename extension)
-  "Set the EXTENSION of a FILENAME.
+  "Return FILENAME modified to have the specified EXTENSION.
 The extension (in a file name) is the part that begins with the last \".\".
+This function removes any existing extension from FILENAME, and then
+appends EXTENSION to it.
 
-Trims a leading dot from the EXTENSION so that either \"foo\" or
-\".foo\" can be given.
+EXTENSION may include the leading dot; if it doesn't, this function
+will provide it.
 
-Errors if the FILENAME or EXTENSION are empty, or if the given
-FILENAME has the format of a directory.
+It is an error if FILENAME or EXTENSION is empty, or if FILENAME
+is in the form of a directory name according to `directory-name-p'.
 
 See also `file-name-sans-extension'."
   (let ((extn (string-trim-left extension "[.]")))
@@ -5459,21 +5460,17 @@ on a DOS/Windows machine, it returns FILENAME in expanded form."
 	     ;; Test for different drive letters
 	     (not (eq t (compare-strings filename 0 2 directory 0 2 fold-case)))
 	     ;; Test for UNCs on different servers
-	     (not (eq t (compare-strings
-			 (progn
-			   (if (string-match "\\`//\\([^:/]+\\)/" filename)
-			       (match-string 1 filename)
-			     ;; Windows file names cannot have ? in
-			     ;; them, so use that to detect when
-			     ;; neither FILENAME nor DIRECTORY is a
-			     ;; UNC.
-			     "?"))
-			 0 nil
-			 (progn
-			   (if (string-match "\\`//\\([^:/]+\\)/" directory)
-			       (match-string 1 directory)
-			     "?"))
-			 0 nil t)))))
+	     (not (string-equal-ignore-case
+		   (if (string-match "\\`//\\([^:/]+\\)/" filename)
+		       (match-string 1 filename)
+		     ;; Windows file names cannot have ? in
+		     ;; them, so use that to detect when
+		     ;; neither FILENAME nor DIRECTORY is a
+		     ;; UNC.
+		     "?")
+		   (if (string-match "\\`//\\([^:/]+\\)/" directory)
+		       (match-string 1 directory)
+		     "?")))))
 	   ;; Test for different remote file system identification
 	   (not (equal fremote dremote)))
 	  filename
@@ -8238,6 +8235,7 @@ arguments as the running Emacs)."
         (_
          (apply operation arguments))))))
 
+;;;###autoload
 (defsubst file-name-quoted-p (name &optional top)
   "Whether NAME is quoted with prefix \"/:\".
 If NAME is a remote file name and TOP is nil, check the local part of NAME."

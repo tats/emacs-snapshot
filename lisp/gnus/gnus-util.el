@@ -383,7 +383,7 @@ Cache the result as a text property stored in DATE."
   ;; Either return the cached value...
   `(let ((d ,date))
      (if (equal "" d)
-	 '(0 0)
+	 0
        (or (get-text-property 0 'gnus-time d)
 	   ;; or compute the value...
 	   (let ((time (safe-date-to-time d)))
@@ -1078,6 +1078,7 @@ ARG is passed to the first function."
 ;; (`string-equal' uses symbol print names.)
 (defun gnus-string-equal (x y)
   "Like `string-equal', except it compares case-insensitively."
+  (declare (obsolete string-equal-ignore-case "29.1"))
   (and (= (length x) (length y))
        (or (string-equal x y)
 	   (string-equal (downcase x) (downcase y)))))
@@ -1253,7 +1254,7 @@ SPEC is a predicate specifier that contains stuff like `or', `and',
 	contents value)
     (if (or (null (setq value (symbol-value variable)))
 	    (not (equal (car value) file))
-	    (not (equal (nth 1 value) time)))
+	    (not (time-equal-p (nth 1 value) time)))
 	(progn
 	  (setq contents (funcall function file))
 	  (set variable (list file time contents))

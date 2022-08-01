@@ -980,13 +980,10 @@ type detected."
 	  (symbol-name type) value))))))
 
 (defvar ange-ftp-name-format)
-(defvar efs-path-regexp)
 
 (defun mml-parse-file-name (path)
-  (if (if (boundp 'efs-path-regexp)
-	  (string-match efs-path-regexp path)
-	(if (boundp 'ange-ftp-name-format)
-	    (string-match (car ange-ftp-name-format) path)))
+  (if (and (boundp 'ange-ftp-name-format)
+           (string-match (car ange-ftp-name-format) path))
       (list (match-string 1 path) (match-string 2 path)
 	    (substring path (1+ (match-end 2))))
     path))
@@ -1517,7 +1514,7 @@ BUFFER is the name of the buffer to attach.  See
 
 (defun mml-attach-external (file &optional type description)
   "Attach an external file into the buffer.
-FILE is an ange-ftp/efs specification of the part location.
+FILE is an ange-ftp specification of the part location.
 TYPE is the MIME type to use."
   (interactive
    (let* ((file (mml-minibuffer-read-file "Attach external file: "))

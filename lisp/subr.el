@@ -733,11 +733,6 @@ If N is omitted or nil, remove the last element."
 	   (if (> n 0) (setcdr (nthcdr (- (1- m) n) list) nil))
 	   list))))
 
-;; The function's definition was moved to fns.c,
-;; but it's easier to set properties here.
-(put 'proper-list-p 'pure t)
-(put 'proper-list-p 'side-effect-free 'error-free)
-
 (defun delete-dups (list)
   "Destructively remove `equal' duplicates from LIST.
 Store the result in LIST and return it.  LIST must be a proper list.
@@ -868,7 +863,7 @@ Non-strings in LIST are ignored."
   (declare (side-effect-free t))
   (while (and list
 	      (not (and (stringp (car list))
-			(eq t (compare-strings elt 0 nil (car list) 0 nil t)))))
+			(string-equal-ignore-case elt (car list)))))
     (setq list (cdr list)))
   list)
 
@@ -1865,10 +1860,7 @@ be a list of the form returned by `event-start' and `event-end'."
 
 ;;;; Obsolescence declarations for variables, and aliases.
 
-(make-obsolete-variable 'redisplay-end-trigger-functions 'jit-lock-register "23.1")
 (make-obsolete-variable 'redisplay-dont-pause nil "24.5")
-(make-obsolete 'window-redisplay-end-trigger nil "23.1")
-(make-obsolete 'set-window-redisplay-end-trigger nil "23.1")
 (make-obsolete-variable 'operating-system-release nil "28.1")
 (make-obsolete-variable 'inhibit-changing-match-data 'save-match-data "29.1")
 
@@ -5302,10 +5294,18 @@ and replace a sub-expression, e.g.
       (setq matches (cons (substring string start l) matches)) ; leftover
       (apply #'concat (nreverse matches)))))
 
+(defsubst string-equal-ignore-case (string1 string2)
+  "Like `string-equal', but case-insensitive.
+Upper-case and lower-case letters are treated as equal.
+Unibyte strings are converted to multibyte for comparison."
+  (declare (pure t) (side-effect-free t))
+  (eq t (compare-strings string1 0 nil string2 0 nil t)))
+
 (defun string-prefix-p (prefix string &optional ignore-case)
   "Return non-nil if PREFIX is a prefix of STRING.
 If IGNORE-CASE is non-nil, the comparison is done without paying attention
 to case differences."
+  (declare (pure t) (side-effect-free t))
   (let ((prefix-length (length prefix)))
     (if (> prefix-length (length string)) nil
       (eq t (compare-strings prefix 0 prefix-length string
@@ -5315,6 +5315,7 @@ to case differences."
   "Return non-nil if SUFFIX is a suffix of STRING.
 If IGNORE-CASE is non-nil, the comparison is done without paying
 attention to case differences."
+  (declare (pure t) (side-effect-free t))
   (let ((start-pos (- (length string) (length suffix))))
     (and (>= start-pos 0)
          (eq t (compare-strings suffix nil nil
@@ -6819,7 +6820,7 @@ This means that OBJECT can be printed out and then read back
 again by the Lisp reader.  This function returns nil if OBJECT is
 unreadable, and the printed representation (from `prin1') of
 OBJECT if it is readable."
-  (declare (side-effect-free t))
+  (declare (side-effect-free error-free))
   (catch 'unreadable
     (let ((print-unreadable-function
            (lambda (_object _escape)
@@ -6895,6 +6896,8 @@ lines."
 (defun buffer-match-p (condition buffer-or-name &optional arg)
   "Return non-nil if BUFFER-OR-NAME matches CONDITION.
 CONDITION is either:
+- the symbol t, to always match,
+- the symbol nil, which never matches,
 - a regular expression, to match a buffer name,
 - a predicate function that takes a buffer object and ARG as
   arguments, and returns non-nil if the buffer matches,
@@ -6917,6 +6920,7 @@ CONDITION is either:
           (catch 'match
             (dolist (condition conditions)
               (when (cond
+                     ((eq condition t))
                      ((stringp condition)
                       (string-match-p condition (buffer-name buffer)))
                      ((functionp condition)

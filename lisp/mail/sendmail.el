@@ -537,7 +537,7 @@ This also saves the value of `send-mail-function' via Customize."
   (when mail-personal-alias-file
     (let ((modtime (file-attribute-modification-time
 		    (file-attributes mail-personal-alias-file))))
-      (or (equal mail-alias-modtime modtime)
+      (or (time-equal-p mail-alias-modtime modtime)
 	  (setq mail-alias-modtime modtime
 		mail-aliases t)))))
 
@@ -820,6 +820,7 @@ If within the headers, this makes the new lines into continuation lines."
 
 ;; User-level commands for sending.
 
+;;;###autoload
 (defun mail-send-and-exit (&optional arg)
   "Send message like `mail-send', then, if no errors, exit from mail buffer.
 Prefix arg means don't delete this window."

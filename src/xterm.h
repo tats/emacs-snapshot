@@ -614,7 +614,7 @@ struct x_display_info
     Xatom_net_wm_state_shaded, Xatom_net_frame_extents, Xatom_net_current_desktop,
     Xatom_net_workarea, Xatom_net_wm_opaque_region, Xatom_net_wm_ping,
     Xatom_net_wm_sync_request, Xatom_net_wm_sync_request_counter,
-    Xatom_net_wm_frame_drawn, Xatom_net_wm_user_time,
+    Xatom_net_wm_frame_drawn, Xatom_net_wm_frame_timings, Xatom_net_wm_user_time,
     Xatom_net_wm_user_time_window, Xatom_net_client_list_stacking,
     Xatom_net_wm_pid;
 
@@ -1026,15 +1026,41 @@ struct x_output
 #endif
 
 #ifdef HAVE_XSYNC
+  /* The "basic frame counter" used for resize synchronization.  */
   XSyncCounter basic_frame_counter;
+
+  /* The "extended frame counter" used for frame synchronization.  */
   XSyncCounter extended_frame_counter;
+
+  /* The pending value of the basic counter.  */
   XSyncValue pending_basic_counter_value;
+
+  /* The current value of the extended counter.  */
   XSyncValue current_extended_counter_value;
 
+  /* The configure event value of the extended counter.  */
+  XSyncValue resize_counter_value;
+
+  /* Whether or not basic resize synchronization is in progress.  */
   bool_bf sync_end_pending_p : 1;
+
+  /* Whether or not extended resize synchronization is in
+     progress.  */
   bool_bf ext_sync_end_pending_p : 1;
+
 #ifdef HAVE_GTK3
+  /* Whether or not GDK resize synchronization is in progress.  */
   bool_bf xg_sync_end_pending_p : 1;
+#endif
+
+  /* Whether or Emacs is waiting for the compositing manager to draw a
+     frame.  */
+  bool_bf waiting_for_frame_p : 1;
+
+#ifndef USE_GTK
+  /* Whether or not Emacs should wait for the compositing manager to
+     draw frames before starting a new frame.  */
+  bool_bf use_vsync_p : 1;
 #endif
 #endif
 
@@ -1211,8 +1237,14 @@ extern void x_mark_frame_dirty (struct frame *f);
 #endif
 
 #ifdef HAVE_XSYNC
-#define FRAME_X_BASIC_COUNTER(f) FRAME_X_OUTPUT (f)->basic_frame_counter
-#define FRAME_X_EXTENDED_COUNTER(f) FRAME_X_OUTPUT (f)->extended_frame_counter
+#define FRAME_X_BASIC_COUNTER(f)		\
+  FRAME_X_OUTPUT (f)->basic_frame_counter
+#define FRAME_X_EXTENDED_COUNTER(f)		\
+  FRAME_X_OUTPUT (f)->extended_frame_counter
+#define FRAME_X_WAITING_FOR_DRAW(f)		\
+  FRAME_X_OUTPUT (f)->waiting_for_frame_p
+#define FRAME_X_COUNTER_VALUE(f)		\
+  FRAME_X_OUTPUT (f)->current_extended_counter_value
 #endif
 
 /* This is the Colormap which frame F uses.  */
@@ -1249,11 +1281,6 @@ struct scroll_bar
 
   /* The X window representing this scroll bar.  */
   Window x_window;
-
-#if defined HAVE_XDBE && !defined USE_TOOLKIT_SCROLL_BARS
-  /* The X drawable representing this scroll bar.  */
-  Drawable x_drawable;
-#endif
 
   /* The position and size of the scroll bar in pixels, relative to the
      frame.  */

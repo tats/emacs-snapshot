@@ -727,6 +727,8 @@ extern void be_set_window_fullscreen_mode (void *, enum haiku_fullscreen_mode);
 extern void be_lock_window (void *);
 extern void be_unlock_window (void *);
 extern bool be_get_explicit_workarea (int *, int *, int *, int *);
+extern void be_clear_grab_view (void);
+extern void be_set_use_frame_synchronization (void *, bool);
 #ifdef __cplusplus
 }
 
