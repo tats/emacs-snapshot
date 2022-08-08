@@ -28,7 +28,7 @@ Status: new
  4 files changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 4b74963..e5549da 100644
+index bf0f52b..7811000 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -166,7 +166,9 @@ man1dir=
@@ -42,7 +42,7 @@ index 4b74963..e5549da 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -909,8 +911,7 @@ $(1)_$(2):
+@@ -902,8 +904,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -52,7 +52,7 @@ index 4b74963..e5549da 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -1025,11 +1026,11 @@ test/%:
+@@ -1018,11 +1019,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -69,7 +69,7 @@ index 4b74963..e5549da 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1060,9 +1061,6 @@ info-dir:
+@@ -1053,9 +1054,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -79,7 +79,7 @@ index 4b74963..e5549da 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1084,14 +1082,10 @@ ${srcdir}/info/dir:
+@@ -1077,14 +1075,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -98,7 +98,7 @@ index 4b74963..e5549da 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1109,14 +1103,10 @@ install-pdf:
+@@ -1102,14 +1096,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -118,10 +118,10 @@ index 4b74963..e5549da 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 87c126e..f3346d4 100644
+index 1a26427..a3b660a 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6676,7 +6676,7 @@ AC_DEFUN
+@@ -6680,7 +6680,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index 87c126e..f3346d4 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6741,15 +6741,6 @@ m4_define
+@@ -6745,15 +6745,6 @@ m4_define
  fi
  ])
  
@@ -174,7 +174,7 @@ index 1d881a5..b1fc978 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 1c1ce16..fe52b09 100644
+index 37aab15..7cbe4c7 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -362,6 +362,14 @@ view-help-file
