@@ -1861,7 +1861,6 @@ all marked sessions must be active."
 	    ;; handle an individual session with a live control buffer
 	    ((ediff-buffer-live-p session-buf)
 	     (ediff-with-current-buffer session-buf
-	       (setq ediff-mouse-pixel-position (mouse-pixel-position))
 	       (ediff-recenter 'no-rehighlight)))
 
 	    ((ediff-problematic-session-p info)
@@ -2005,7 +2004,6 @@ all marked sessions must be active."
 	    (ediff-show-meta-buffer ctl-buf t)
 	  ;; it's a session buffer -- invoke go back to session
 	  (ediff-with-current-buffer ctl-buf
-	    (setq ediff-mouse-pixel-position (mouse-pixel-position))
 	    (ediff-recenter 'no-rehighlight)))
       (beep)
       (message "You've selected a stale session --- try again")
@@ -2056,14 +2054,14 @@ all marked sessions must be active."
 	      ((and
 		(setq wind
 		      (ediff-get-visible-buffer-window ediff-registry-buffer))
-		(ediff-window-display-p))
+                (display-graphic-p))
 	       (select-window wind)
 	       (other-window 1)
 	       (set-window-buffer (selected-window) meta-buf))
 	      (t (ediff-skip-unsuitable-frames 'ok-unsplittable)
 		 (set-window-buffer (selected-window) meta-buf)))
 	))
-    (if (and (ediff-window-display-p)
+    (if (and (display-graphic-p)
 	     (window-live-p
 	      (setq wind (ediff-get-visible-buffer-window meta-buf))))
 	(progn
@@ -2117,14 +2115,14 @@ all marked sessions must be active."
 		(select-window ediff-window-B))
 	       ((and (setq wind
 			   (ediff-get-visible-buffer-window ediff-meta-buffer))
-		     (ediff-window-display-p))
+                     (display-graphic-p))
 		(select-window wind)
 		(other-window 1)
 		(set-window-buffer (selected-window) ediff-registry-buffer))
 	       (t (ediff-skip-unsuitable-frames 'ok-unsplittable)
 		  (set-window-buffer (selected-window) ediff-registry-buffer)))
 	))
-    (if (ediff-window-display-p)
+    (if (display-graphic-p)
 	(progn
 	  (setq frame
 		(window-frame

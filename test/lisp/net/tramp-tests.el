@@ -2481,6 +2481,19 @@ This checks also `file-name-as-directory', `file-name-directory',
 	      (insert-file-contents tmp-name)
 	      (should (string-equal (buffer-string) "foo")))
 
+	    ;; Write empty string.  Used for creation of temporary files.
+	    ;; Since Emacs 27.1.
+	    (when (fboundp 'make-empty-file)
+	      (with-no-warnings
+		(should-error
+		 (make-empty-file tmp-name)
+		 :type 'file-already-exists)
+		(delete-file tmp-name)
+		(make-empty-file tmp-name)
+		(with-temp-buffer
+		  (insert-file-contents tmp-name)
+		  (should (string-equal (buffer-string) "")))))
+
 	    ;; Write partly.
 	    (with-temp-buffer
 	      (insert "123456789")
@@ -3219,20 +3232,21 @@ This tests also `file-directory-p' and `file-accessible-directory-p'."
 	      (goto-char (point-min))
 	      (should
 	       (looking-at-p (format "^.+ %s/$" (regexp-quote tmp-name1)))))
-	    (with-temp-buffer
-	      (insert-directory
-	       (file-name-as-directory tmp-name1) "-al" nil 'full-directory-p)
-	      (goto-char (point-min))
-	      (should
-	       (looking-at-p
-		(concat
-		 ;; There might be a summary line.
-		 "\\(total.+[[:digit:]]+ ?[kKMGTPEZY]?i?B?\n\\)?"
-		 ;; We don't know in which order ".", ".." and "foo" appear.
-		 (format
-		  "\\(.+ %s\\( ->.+\\)?\n\\)\\{%d\\}"
-		  (regexp-opt (directory-files tmp-name1))
-		  (length (directory-files tmp-name1)))))))
+	    (let ((directory-files (directory-files tmp-name1)))
+	      (with-temp-buffer
+		(insert-directory
+		 (file-name-as-directory tmp-name1) "-al" nil 'full-directory-p)
+		(goto-char (point-min))
+		(should
+		 (looking-at-p
+		  (concat
+		   ;; There might be a summary line.
+		   "\\(total.+[[:digit:]]+ ?[kKMGTPEZY]?i?B?\n\\)?"
+		   ;; We don't know in which order ".", ".." and "foo" appear.
+		   (format
+		    "\\(.+ %s\\( ->.+\\)?\n\\)\\{%d\\}"
+		    (regexp-opt directory-files)
+		    (length directory-files)))))))
 
 	    ;; Check error cases.
 	    (when (and (tramp--test-supports-set-file-modes-p)
@@ -3790,7 +3804,11 @@ This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
 	    (when (tramp--test-emacs28-p)
 	      (with-no-warnings
 		(set-file-modes tmp-name1 #o222 'nofollow)
-		(should (= (file-modes tmp-name1 'nofollow) #o222)))))
+		(should (= (file-modes tmp-name1 'nofollow) #o222))))
+	    ;; Setting the mode for not existing files shall fail.
+	    (should-error
+	     (set-file-modes tmp-name2 #o777)
+	     :type 'file-missing))
 
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name1)))
@@ -4150,9 +4168,20 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		      (file-attributes tmp-name1))
 		     tramp-time-dont-know)
 	      (should
-	       (tramp-compat-time-equal-p
-                (file-attribute-modification-time (file-attributes tmp-name1))
-		(seconds-to-time 1)))
+	       (or (tramp-compat-time-equal-p
+                    (file-attribute-modification-time
+		     (file-attributes tmp-name1))
+		    (seconds-to-time 1))
+		   ;; Some remote machines cannot resolve seconds.
+		   ;; The return the modification time `(0 0).
+		   (tramp-compat-time-equal-p
+                    (file-attribute-modification-time
+		     (file-attributes tmp-name1))
+		    (seconds-to-time 0))))
+	      ;; Setting the time for not existing files shall fail.
+	      (should-error
+	       (set-file-times tmp-name2)
+	       :type 'file-missing)
 	      (write-region "bla" nil tmp-name2)
 	      (should (file-exists-p tmp-name2))
 	      (should (file-newer-than-file-p tmp-name2 tmp-name1))
@@ -4165,10 +4194,16 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		(with-no-warnings
 		  (set-file-times tmp-name1 (seconds-to-time 1) 'nofollow)
 		  (should
-		   (tramp-compat-time-equal-p
-                    (file-attribute-modification-time
-		     (file-attributes tmp-name1))
-		    (seconds-to-time 1)))))))
+		   (or (tramp-compat-time-equal-p
+			(file-attribute-modification-time
+			 (file-attributes tmp-name1))
+			(seconds-to-time 1))
+		       ;; Some remote machines cannot resolve seconds.
+		       ;; The return the modification time `(0 0).
+		       (tramp-compat-time-equal-p
+			(file-attribute-modification-time
+			 (file-attributes tmp-name1))
+			(seconds-to-time 0))))))))
 
 	;; Cleanup.
 	(ignore-errors
@@ -7569,7 +7604,7 @@ Since it unloads Tramp, it shall be the last test to run."
   (should-not (cl--find-class 'tramp-file-name))
   (mapatoms
    (lambda (x)
-     (and (functionp x)
+     (and (functionp x) (null (autoloadp (symbol-function x)))
           (string-match-p "tramp-file-name" (symbol-name x))
           (ert-fail (format "Structure function `%s' still exists" x)))))
 

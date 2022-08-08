@@ -50,17 +50,27 @@ prefix, that will not be registered.  But all other prefixes will
 be included.")
 (put 'autoload-compute-prefixes 'safe-local-variable #'booleanp)
 
+(defvar no-update-autoloads nil
+  "File local variable to prevent scanning this file for autoload cookies.")
+
 (defvar autoload-ignored-definitions
   '("define-obsolete-function-alias"
     "define-obsolete-variable-alias"
-    "define-category" "define-key"
+    "define-category"
+    "define-key" "define-key-after" "define-keymap"
     "defgroup" "defface" "defadvice"
     "def-edebug-spec"
     ;; Hmm... this is getting ugly:
     "define-widget"
     "define-erc-module"
     "define-erc-response-handler"
-    "defun-rcirc-command")
+    "defun-rcirc-command"
+    "define-short-documentation-group"
+    "def-edebug-elem-spec"
+    "defvar-mode-local"
+    "defcustom-mode-local-semantic-dependency-system-include-path"
+    "define-ibuffer-column"
+    "define-ibuffer-sorter")
   "List of strings naming definitions to ignore for prefixes.
 More specifically those definitions will not be considered for the
 `register-definition-prefixes' call.")
@@ -447,7 +457,7 @@ don't include."
   (let ((prefs nil))
     ;; Avoid (defvar <foo>) by requiring a trailing space.
     (while (re-search-forward
-            "^(\\(def[^ ]+\\) ['(]*\\([^' ()\"\n]+\\)[\n \t]" nil t)
+            "^(\\(def[^ \t\n]+\\)[ \t\n]+['(]*\\([^' ()\"\n]+\\)[\n \t]" nil t)
       (unless (member (match-string 1) autoload-ignored-definitions)
         (let ((name (match-string-no-properties 2)))
           (when (save-excursion
@@ -486,27 +496,6 @@ If COMPILE, don't include a \"don't compile\" cookie."
        :compile compile
        :inhibit-provide (not feature))
       (buffer-string))))
-
-(defun loaddefs-generate--insert-section-header (outbuf autoloads
-                                                        load-name file time)
-  "Insert into buffer OUTBUF the section-header line for FILE.
-The header line lists the file name, its \"load name\", its autoloads,
-and the time the FILE was last updated (the time is inserted only
-if `autoload-timestamps' is non-nil, otherwise a fixed fake time is inserted)."
-  (insert "\f\n;;;### ")
-  (prin1 `(autoloads ,autoloads ,load-name ,file ,time)
-	 outbuf)
-  (terpri outbuf)
-  ;; Break that line at spaces, to avoid very long lines.
-  ;; Make each sub-line into a comment.
-  (with-current-buffer outbuf
-    (save-excursion
-      (forward-line -1)
-      (while (not (eolp))
-	(move-to-column 64)
-	(skip-chars-forward "^ \n")
-	(or (eolp)
-	    (insert "\n" ";;;;;; "))))))
 
 ;;;###autoload
 (defun loaddefs-generate (dir output-file &optional excluded-files
@@ -588,7 +577,8 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
           (with-temp-buffer
             (if (and updating (file-exists-p loaddefs-file))
                 (insert-file-contents loaddefs-file)
-              (insert (loaddefs-generate--rubric loaddefs-file nil t))
+              (insert (loaddefs-generate--rubric
+                       loaddefs-file nil t include-package-version))
               (search-backward "\f")
               (when extra-data
                 (insert extra-data)
@@ -634,18 +624,19 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
                                t "GEN")))))))
 
 (defun loaddefs-generate--print-form (def)
-  "Print DEF in the way make-docfile.c expects it."
+  "Print DEF in a format that makes sense for version control."
   (if (or (not (consp def))
           (not (symbolp (car def)))
           (memq (car def) '( make-obsolete
                              define-obsolete-function-alias))
           (not (stringp (nth 3 def))))
       (prin1 def (current-buffer) t)
-    ;; The salient point here is that we have to have the doc string
-    ;; that starts with a backslash and a newline, and there mustn't
-    ;; be any newlines before that.  So -- typically
-    ;; (defvar foo 'value "\
-    ;; Doc string" ...).
+    ;; We want to print, for instance, `defvar' values while escaping
+    ;; control characters (so that we don't end up with lines with
+    ;; trailing tab characters and the like), but we don't want to do
+    ;; this for doc strings, because then the doc strings would be on
+    ;; one single line, which would lead to more VC churn.  So --
+    ;; typically (defvar foo 'value "\ Doc string" ...).
     (insert "(")
     (dotimes (_ 3)
       (prin1 (pop def) (current-buffer)

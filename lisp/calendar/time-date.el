@@ -174,12 +174,18 @@ If DATE lacks timezone information, GMT is assumed."
 (defalias 'time-to-seconds 'float-time)
 
 ;;;###autoload
-(defalias 'seconds-to-time 'time-convert)
+(defun seconds-to-time (seconds &rest form)
+  "Convert SECONDS to a proper time, like `current-time' would.
+FORM means the same as in `time-convert'."
+  (time-convert seconds form))
 
 ;;;###autoload
 (defun days-to-time (days)
   "Convert DAYS into a time value."
-  (let ((time (time-convert (* 86400 days))))
+  ;; FIXME: We should likely just pass `t' to `time-convert'.
+  ;; All uses I could find in Emacs, GNU ELPA, and NonGNU ELPA can handle
+  ;; any valid time representation as return value.
+  (let ((time (time-convert (* 86400 days) 'list)))
     ;; Traditionally, this returned a two-element list if DAYS was an integer.
     ;; Keep that tradition if time-convert outputs timestamps in list form.
     (if (and (integerp days) (consp (cdr time)))

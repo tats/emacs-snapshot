@@ -248,7 +248,7 @@ with these words enabled."
 ;;;###autoload(put 'checkdoc-spellcheck-documentation-flag 'safe-local-variable #'booleanp)
 
 (defvar checkdoc-ispell-lisp-words
-  '("alist" "emacs" "etags" "keymap" "paren" "regexp" "sexp" "xemacs")
+  '("alist" "emacs" "etags" "keymap" "paren" "regexp" "sexp")
   "List of words that are correct when spell-checking Lisp documentation.")
 ;;;###autoload(put 'checkdoc-ispell-list-words 'safe-local-variable #'checkdoc-list-of-strings-p)
 
@@ -2360,8 +2360,6 @@ News agents may remove it"
 
 ;;; Comment checking engine
 ;;
-(defvar generate-autoload-cookie)
-
 (defun checkdoc-file-comments-engine ()
   "Return a message list if this file does not match the Emacs standard.
 This checks for style only, such as the first line, Commentary:,

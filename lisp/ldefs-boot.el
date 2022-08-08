@@ -825,7 +825,7 @@ it is disabled.
 
 ;;; Generated autoloads from net/ange-ftp.el
 
-(defalias 'ange-ftp-re-read-dir 'ange-ftp-reread-dir)
+(define-obsolete-function-alias 'ange-ftp-re-read-dir #'ange-ftp-reread-dir "29.1")
 (autoload 'ange-ftp-reread-dir "ange-ftp" "\
 Reread remote directory DIR to update the directory cache.
 The implementation of remote FTP file names caches directory contents
@@ -1426,6 +1426,10 @@ Special commands:
 How many seconds passwords are cached, or nil to disable expiring.
 Overrides `password-cache-expiry' through a let-binding.")
 (custom-autoload 'auth-source-cache-expiry "auth-source" t)
+(autoload 'auth-source-netrc-parse-all "auth-source" "\
+Parse FILE and return all entries.
+
+(fn FILE)" nil nil)
 (autoload 'authinfo-mode "auth-source" "\
 Mode for editing .authinfo/.netrc files.
 
@@ -1532,60 +1536,6 @@ it is disabled.
 
 (fn &optional ARG)" t nil)
 (register-definition-prefixes "autoinsert" '("auto-insert"))
-
-
-;;; Generated autoloads from emacs-lisp/autoload.el
-
-(put 'autoload-ensure-writable 'risky-local-variable t)
-(autoload 'update-file-autoloads "autoload" "\
-Update the autoloads for FILE.
-If prefix arg SAVE-AFTER is non-nil, save the buffer too.
-
-If FILE binds `generated-autoload-file' as a file-local variable,
-autoloads are written into that file.  Otherwise, the autoloads
-file is determined by OUTFILE.  If called interactively, prompt
-for OUTFILE; if called from Lisp with OUTFILE nil, use the
-existing value of `generated-autoload-file'.
-
-Return FILE if there was no autoload cookie in it, else nil.
-
-(fn FILE &optional SAVE-AFTER OUTFILE)" t nil)
-(autoload 'update-directory-autoloads "autoload" "\
-Update autoload definitions for Lisp files in the directories DIRS.
-In an interactive call, you must give one argument, the name of a
-single directory.  In a call from Lisp, you can supply multiple
-directories as separate arguments, but this usage is discouraged.
-
-The function does NOT recursively descend into subdirectories of the
-directory or directories specified.
-
-In an interactive call, prompt for a default output file for the
-autoload definitions.  When called from Lisp, use the existing
-value of `generated-autoload-file'.  If any Lisp file binds
-`generated-autoload-file' as a file-local variable, write its
-autoloads into the specified file instead.
-
-(fn &rest DIRS)" t nil)
-(make-obsolete 'update-directory-autoloads 'make-directory-autoloads "28.1")
-(autoload 'make-directory-autoloads "autoload" "\
-Update autoload definitions for Lisp files in the directories DIRS.
-DIR can be either a single directory or a list of
-directories.  (The latter usage is discouraged.)
-
-The autoloads will be written to OUTPUT-FILE.  If any Lisp file
-binds `generated-autoload-file' as a file-local variable, write
-its autoloads into the specified file instead.
-
-The function does NOT recursively descend into subdirectories of the
-directory or directories specified.
-
-(fn DIR OUTPUT-FILE)" t nil)
-(autoload 'batch-update-autoloads "autoload" "\
-Update loaddefs.el autoloads in batch mode.
-Calls `update-directory-autoloads' on the command line arguments.
-Definitions are written to `generated-autoload-file' (which
-should be non-nil)." nil nil)
-(register-definition-prefixes "autoload" '("autoload-" "batch-update-autoloads--summary" "generate-" "make-autoload" "no-update-autoloads"))
 
 
 ;;; Generated autoloads from autorevert.el
@@ -1825,7 +1775,7 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t nil)
-(register-definition-prefixes "battery" '("battery-" "my-"))
+(register-definition-prefixes "battery" '("battery-"))
 
 
 ;;; Generated autoloads from emacs-lisp/benchmark.el
@@ -2865,7 +2815,7 @@ and corresponding effects.
 
 ;;; Generated autoloads from cedet/semantic/bovine/c.el
 
-(register-definition-prefixes "semantic/bovine/c" '("c-mode" "semantic"))
+(register-definition-prefixes "semantic/bovine/c" '("semantic"))
 
 
 ;;; Generated autoloads from calendar/cal-bahai.el
@@ -4566,7 +4516,7 @@ it is disabled.
 
 ;;; Generated autoloads from emacs-lisp/cl-macs.el
 
-(register-definition-prefixes "cl-macs" '("cl-" "foo" "function-form"))
+(register-definition-prefixes "cl-macs" '("cl-"))
 
 
 ;;; Generated autoloads from emacs-lisp/cl-print.el
@@ -5562,7 +5512,7 @@ Run `perldoc' on WORD.
 (fn WORD)" t nil)
 (autoload 'cperl-perldoc-at-point "cperl-mode" "\
 Run a `perldoc' on the word around point." t nil)
-(register-definition-prefixes "cperl-mode" '("cperl-" "pod2man-program"))
+(register-definition-prefixes "cperl-mode" '("cperl-"))
 
 
 ;;; Generated autoloads from progmodes/cpp.el
@@ -6135,7 +6085,7 @@ omitted, a buffer named *Custom Themes* is used.
 
 ;;; Generated autoloads from cedet/ede/custom.el
 
-(register-definition-prefixes "ede/custom" '("ede-" "eieio-ede-old-variables"))
+(register-definition-prefixes "ede/custom" '("ede-"))
 
 
 ;;; Generated autoloads from vc/cvs-status.el
@@ -6293,12 +6243,12 @@ Create a new data-debug buffer with NAME.
 
 ;;; Generated autoloads from cedet/semantic/db-ebrowse.el
 
-(register-definition-prefixes "semantic/db-ebrowse" '("c++-mode" "semanticdb-"))
+(register-definition-prefixes "semantic/db-ebrowse" '("semanticdb-"))
 
 
 ;;; Generated autoloads from cedet/semantic/db-el.el
 
-(register-definition-prefixes "semantic/db-el" '("emacs-lisp-mode" "semanticdb-"))
+(register-definition-prefixes "semantic/db-el" '("semanticdb-"))
 
 
 ;;; Generated autoloads from cedet/semantic/db-file.el
@@ -6318,7 +6268,7 @@ Create a new data-debug buffer with NAME.
 
 ;;; Generated autoloads from cedet/semantic/db-javascript.el
 
-(register-definition-prefixes "semantic/db-javascript" '("javascript-mode" "semanticdb-"))
+(register-definition-prefixes "semantic/db-javascript" '("semanticdb-"))
 
 
 ;;; Generated autoloads from cedet/semantic/db-mode.el
@@ -7309,7 +7259,7 @@ If given a \\[universal-argument] prefix, also prompt for the QUERY-TYPE paramet
 If given a \\[universal-argument] \\[universal-argument] prefix, also prompt for the SERVER parameter.
 
 (fn DOMAIN &optional QUERY-TYPE QUERY-CLASS QUERY-OPTION DIG-OPTION SERVER)" t nil)
-(register-definition-prefixes "dig" '("dig-" "query-dig"))
+(register-definition-prefixes "dig" '("dig-"))
 
 
 ;;; Generated autoloads from cedet/ede/dired.el
@@ -7464,7 +7414,7 @@ Like \\[dired-jump] (`dired-jump') but in other window.
 
 ;;; Generated autoloads from dired-aux.el
 
-(register-definition-prefixes "dired-aux" '("dired-" "minibuffer-default-add-dired-shell-commands"))
+(register-definition-prefixes "dired-aux" '("dired-"))
 
 
 ;;; Generated autoloads from dired-x.el
@@ -7921,7 +7871,7 @@ it is disabled.
 
 (autoload 'doctor "doctor" "\
 Switch to *doctor* buffer and start giving psychotherapy." t nil)
-(register-definition-prefixes "doctor" '("doc" "make-doctor-variables"))
+(register-definition-prefixes "doctor" '("doc"))
 
 
 ;;; Generated autoloads from cedet/srecode/document.el
@@ -8636,7 +8586,7 @@ already is one.)" t nil)
 Toggle edebugging of all definitions." t nil)
 (autoload 'edebug-all-forms "edebug" "\
 Toggle edebugging of all forms." t nil)
-(register-definition-prefixes "edebug" '("arglist" "backquote-form" "def-declarations" "edebug" "function-form" "interactive" "lambda-" "name" "nested-backquote-form"))
+(register-definition-prefixes "edebug" '("edebug"))
 
 
 ;;; Generated autoloads from vc/ediff.el
@@ -9168,7 +9118,7 @@ Describe CTR if it is a class constructor.
 
 ;;; Generated autoloads from cedet/semantic/bovine/el.el
 
-(register-definition-prefixes "semantic/bovine/el" '("emacs-lisp-mode" "semantic-"))
+(register-definition-prefixes "semantic/bovine/el" '("semantic-"))
 
 
 ;;; Generated autoloads from emacs-lisp/eldoc.el
@@ -9366,7 +9316,7 @@ displayed." t nil)
 
 ;;; Generated autoloads from eshell/em-extpipe.el
 
-(register-definition-prefixes "em-extpipe" '("em-extpipe--or-with-catch" "eshell-"))
+(register-definition-prefixes "em-extpipe" '("eshell-"))
 
 
 ;;; Generated autoloads from eshell/em-glob.el
@@ -9421,7 +9371,7 @@ displayed." t nil)
 
 ;;; Generated autoloads from eshell/em-unix.el
 
-(register-definition-prefixes "em-unix" '("eshell" "nil-blank-string"))
+(register-definition-prefixes "em-unix" '("eshell"))
 
 
 ;;; Generated autoloads from eshell/em-xtra.el
@@ -11079,7 +11029,7 @@ Display the bookmarks." t nil)
 Default bookmark handler for EWW buffers.
 
 (fn BOOKMARK)" nil nil)
-(register-definition-prefixes "eww" '("erc--download-directory" "eww-"))
+(register-definition-prefixes "eww" '("eww-"))
 
 
 ;;; Generated autoloads from progmodes/executable.el
@@ -11914,7 +11864,7 @@ where the first string in the value of the variable `find-ls-option'
 specifies what to use in place of \"-ls\" as the final argument.
 
 (fn DIR REGEXP)" t nil)
-(register-definition-prefixes "find-dired" '("find-" "kill-find" "lookfor-dired"))
+(register-definition-prefixes "find-dired" '("find-" "kill-find"))
 
 
 ;;; Generated autoloads from find-file.el
@@ -13093,7 +13043,7 @@ detailed description of this mode.
 +-----------------------------------+----------------------------------+
 
 (fn COMMAND-LINE)" t nil)
-(register-definition-prefixes "gdb-mi" '("breakpoint" "def-gdb-" "gdb" "gud-" "hollow-right-triangle" "nil"))
+(register-definition-prefixes "gdb-mi" '("breakpoint" "def-gdb-" "gdb" "gud-" "hollow-right-triangle"))
 
 
 ;;; Generated autoloads from emacs-lisp/generator.el
@@ -13417,7 +13367,7 @@ CLEAN is obsolete and ignored.
 
 (autoload 'gnus-article-prepare-display "gnus-art" "\
 Make the current buffer look like a nice article." nil nil)
-(register-definition-prefixes "gnus-art" '(":keymap" "article-" "gnus-"))
+(register-definition-prefixes "gnus-art" '("article-" "gnus-"))
 
 
 ;;; Generated autoloads from gnus/gnus-async.el
@@ -13657,7 +13607,7 @@ The arguments have the same meaning as those of
 `gnus-read-ephemeral-bug-group', which see.
 
 (fn IDS &optional WINDOW-CONF)" t nil)
-(register-definition-prefixes "gnus-group" '(":keymap" "gnus-"))
+(register-definition-prefixes "gnus-group" '("gnus-"))
 
 
 ;;; Generated autoloads from gnus/gnus-html.el
@@ -13850,7 +13800,7 @@ Like `message-reply'.
 
 (fn &optional TO-ADDRESS WIDE)" t nil)
 (define-mail-user-agent 'gnus-user-agent 'gnus-msg-mail 'message-send-and-exit 'message-kill-buffer 'message-send-hook)
-(register-definition-prefixes "gnus-msg" '(":prefix" "gnus-"))
+(register-definition-prefixes "gnus-msg" '("gnus-"))
 
 
 ;;; Generated autoloads from gnus/gnus-notifications.el
@@ -14011,7 +13961,7 @@ Handler function for record returned by `gnus-summary-bookmark-make-record'.
 BOOKMARK is a bookmark name or a bookmark record.
 
 (fn BOOKMARK)" nil nil)
-(register-definition-prefixes "gnus-sum" '(":keymap" "gnus-"))
+(register-definition-prefixes "gnus-sum" '("gnus-"))
 
 
 ;;; Generated autoloads from gnus/gnus-topic.el
@@ -14635,7 +14585,7 @@ FUNC is a function to handle input key.
 HELP-TEXT is a text set in `hangul-input-method-help-text'.
 
 (fn INPUT-METHOD FUNC HELP-TEXT &rest ARGS)" nil nil)
-(register-definition-prefixes "quail/hangul" '("alphabetp" "hangul" "notzerop"))
+(register-definition-prefixes "quail/hangul" '("hangul" "notzerop"))
 
 
 ;;; Generated autoloads from language/hanja-util.el
@@ -14650,16 +14600,13 @@ Towers of Hanoi diversion.  Use NRINGS rings.
 
 (fn NRINGS)" t nil)
 (autoload 'hanoi-unix "hanoi" "\
-Towers of Hanoi, UNIX doomsday version.
-Displays 32-ring towers that have been progressing at one move per
-second since 1970-01-01 00:00:00 GMT.
+Towers of Hanoi, 32-bit UNIX doomsday version.
+Display 32-ring towers that have been progressing at one move per
+second since 1970-01-01 00:00:00 UTC.
 
 Repent before ring 31 moves." t nil)
 (autoload 'hanoi-unix-64 "hanoi" "\
-Like `hanoi-unix', but pretend to have a 64-bit clock.
-This is, necessarily (as of Emacs 20.3), a crock.  When the
-`current-time' interface is made s2G-compliant, hanoi.el will need
-to be updated." t nil)
+Like `hanoi-unix', but with a 64-bit clock." t nil)
 (register-definition-prefixes "hanoi" '("hanoi-"))
 
 
@@ -16044,7 +15991,7 @@ Call Ibuffer and set point at the line listing the current buffer.
 If optional arg OTHER-WINDOW is non-nil, then use another window.
 
 (fn &optional OTHER-WINDOW)" t nil)
-(register-definition-prefixes "ibuffer" '("filename" "ibuffer-" "locked" "mark" "mod" "name" "process" "read-only" "recency" "size"))
+(register-definition-prefixes "ibuffer" '("ibuffer-"))
 
 
 ;;; Generated autoloads from calendar/icalendar.el
@@ -18730,7 +18677,7 @@ This scans for ;;;###autoload forms and related things.
 The first element on the command line should be the (main)
 loaddefs.el output file, and the rest are the directories to
 use." nil nil)
-(register-definition-prefixes "loaddefs-gen" '("autoload-" "generated-autoload-" "loaddefs-generate--"))
+(register-definition-prefixes "loaddefs-gen" '("autoload-" "generated-autoload-" "loaddefs-generate--" "no-update-autoloads"))
 
 
 ;;; Generated autoloads from loadhist.el
@@ -19343,7 +19290,7 @@ Mairix will be called asynchronously unless
 
 ;;; Generated autoloads from cedet/semantic/bovine/make.el
 
-(register-definition-prefixes "semantic/bovine/make" '("makefile-mode" "semantic-"))
+(register-definition-prefixes "semantic/bovine/make" '("semantic-"))
 
 
 ;;; Generated autoloads from cedet/ede/make.el
@@ -19757,7 +19704,7 @@ Major mode for editing Metafont sources.
 Major mode for editing MetaPost sources.
 
 (fn)" t nil)
-(register-definition-prefixes "meta-mode" '("font-lock-match-meta-declaration-item-and-skip-to-next" "meta"))
+(register-definition-prefixes "meta-mode" '("meta"))
 
 
 ;;; Generated autoloads from mh-e/mh-acros.el
@@ -19942,7 +19889,7 @@ perform the operation on all messages in that region.
 \\{mh-folder-mode-map}
 
 (fn)" t nil)
-(register-definition-prefixes "mh-folder" '(":keymap" "mh-"))
+(register-definition-prefixes "mh-folder" '("mh-"))
 
 
 ;;; Generated autoloads from mh-e/mh-funcs.el
@@ -19967,7 +19914,7 @@ perform the operation on all messages in that region.
 
 ;;; Generated autoloads from mh-e/mh-letter.el
 
-(register-definition-prefixes "mh-letter" '(":keymap" "mh-"))
+(register-definition-prefixes "mh-letter" '("mh-"))
 
 
 ;;; Generated autoloads from mh-e/mh-limit.el
@@ -19992,7 +19939,7 @@ perform the operation on all messages in that region.
 
 ;;; Generated autoloads from mh-e/mh-search.el
 
-(register-definition-prefixes "mh-search" '(":keymap" "mh-"))
+(register-definition-prefixes "mh-search" '("mh-"))
 
 
 ;;; Generated autoloads from mh-e/mh-seq.el
@@ -20002,12 +19949,12 @@ perform the operation on all messages in that region.
 
 ;;; Generated autoloads from mh-e/mh-show.el
 
-(register-definition-prefixes "mh-show" '(":keymap" "mh-"))
+(register-definition-prefixes "mh-show" '("mh-"))
 
 
 ;;; Generated autoloads from mh-e/mh-speed.el
 
-(register-definition-prefixes "mh-speed" '(":keymap" "mh-"))
+(register-definition-prefixes "mh-speed" '("mh-"))
 
 
 ;;; Generated autoloads from mh-e/mh-thread.el
@@ -20590,7 +20537,7 @@ To test this function, evaluate:
 
 (autoload 'mpc "mpc" "\
 Main entry point for MPC." t nil)
-(register-definition-prefixes "mpc" '("mpc-" "tag-browser-tagtypes"))
+(register-definition-prefixes "mpc" '("mpc-"))
 
 
 ;;; Generated autoloads from play/mpuz.el
@@ -21047,17 +20994,6 @@ Open a network connection to HOST on PORT.
 
 (fn HOST PORT)" t nil)
 (register-definition-prefixes "net-utils" '("arp-program" "dns-lookup-program" "finger-X.500-host-regexps" "ftp-" "ifconfig-program" "ipconfig" "iwconfig-program" "net" "nslookup-" "ping-program" "route-program" "run-network-program" "smbclient" "traceroute-program" "whois-"))
-
-
-;;; Generated autoloads from net/netrc.el
-
-(autoload 'netrc-credentials "netrc" "\
-Return a user name/password pair.
-Port specifications will be prioritized in the order they are
-listed in the PORTS list.
-
-(fn MACHINE &rest PORTS)" nil nil)
-(register-definition-prefixes "netrc" '("netrc-"))
 
 
 ;;; Generated autoloads from net/network-stream.el
@@ -23519,7 +23455,7 @@ Various indentation styles:       K&R  BSD  BLK  GNU  LW
 Turning on Perl mode runs the normal hook `perl-mode-hook'.
 
 (fn)" t nil)
-(register-definition-prefixes "perl-mode" '("indent-perl-exp" "mark-perl-function" "perl-"))
+(register-definition-prefixes "perl-mode" '("perl-"))
 
 
 ;;; Generated autoloads from pgtk-dnd.el
@@ -23601,11 +23537,6 @@ Note that Picture mode commands will work outside of Picture mode, but
 they are not by default assigned to keys." t nil)
 (defalias 'edit-picture 'picture-mode)
 (register-definition-prefixes "picture" '("picture-"))
-
-
-;;; Generated autoloads from language/pinyin.el
-
-(register-definition-prefixes "pinyin" '("pinyin-character-map"))
 
 
 ;;; Generated autoloads from textmodes/pixel-fill.el
@@ -26914,7 +26845,7 @@ The mode's hook is called both when the mode is enabled and when
 it is disabled.
 
 (fn &optional ARG)" t nil)
-(register-definition-prefixes "saveplace" '("load-save-place-alist-from-file" "save-place"))
+(register-definition-prefixes "saveplace" '("save-place"))
 
 
 ;;; Generated autoloads from cedet/semantic/sb.el
@@ -27850,7 +27781,7 @@ If SAME-WINDOW, don't pop to a new window.
 
 (fn GROUP &optional FUNCTION SAME-WINDOW)" t nil)
 (defalias 'shortdoc #'shortdoc-display-group)
-(register-definition-prefixes "shortdoc" '("alist" "buffer" "file" "hash-table" "keymaps" "list" "number" "overlay" "process" "regexp" "sequence" "shortdoc-" "string" "text-properties" "vector"))
+(register-definition-prefixes "shortdoc" '("shortdoc-"))
 
 
 ;;; Generated autoloads from net/shr.el
@@ -28628,7 +28559,7 @@ explicitly, and matters only if you need the extra headers
 installed through `spam-necessary-extra-headers'.
 
 (fn &rest SYMBOLS)" t nil)
-(register-definition-prefixes "spam" '(":keymap" "spam-"))
+(register-definition-prefixes "spam" '("spam-"))
 
 
 ;;; Generated autoloads from gnus/spam-report.el
@@ -30236,7 +30167,7 @@ converts a table into plain text without frames.  It is a companion to
 
 ;;; Generated autoloads from cedet/srecode/table.el
 
-(register-definition-prefixes "srecode/table" '("object-sort-list" "srecode-"))
+(register-definition-prefixes "srecode/table" '("srecode-"))
 
 
 ;;; Generated autoloads from emacs-lisp/tabulated-list.el
@@ -31239,7 +31170,11 @@ If DATE lacks timezone information, GMT is assumed.
 
 (fn DATE)" nil nil)
 (defalias 'time-to-seconds 'float-time)
-(defalias 'seconds-to-time 'time-convert)
+(autoload 'seconds-to-time "time-date" "\
+Convert SECONDS to a proper time, like `current-time' would.
+FORM means the same as in `time-convert'.
+
+(fn SECONDS &rest FORM)" nil nil)
 (autoload 'days-to-time "time-date" "\
 Convert DAYS into a time value.
 
@@ -31277,7 +31212,7 @@ Gregorian date Sunday, December 31, 1 BC.
 (fn TIME)" nil nil)
 (autoload 'safe-date-to-time "time-date" "\
 Parse a string DATE that represents a date-time and return a time value.
-If DATE is malformed, return a time value of zeros.
+If DATE is malformed, return a time value of zero.
 
 (fn DATE)" nil nil)
 (autoload 'format-seconds "time-date" "\
@@ -31790,12 +31725,7 @@ List of suffixes which indicate a compressed file.
 It must be supported by libarchive(3).")
 (defmacro tramp-archive-autoload-file-name-regexp nil "\
 Regular expression matching archive file names." '(concat "\\`" "\\(" ".+" "\\." (regexp-opt tramp-archive-suffixes) "\\(?:" "\\." (regexp-opt tramp-archive-compression-suffixes) "\\)*" "\\)" "\\(" "/" ".*" "\\)" "\\'"))
-(autoload 'tramp-archive-file-name-handler "tramp-archive" "\
-Invoke the file archive related OPERATION.
-First arg specifies the OPERATION, second arg ARGS is a list of
-arguments to pass to the OPERATION.
-
-(fn OPERATION &rest ARGS)" nil nil)
+(autoload 'tramp-archive-file-name-handler "tramp-archine")
 (defun tramp-archive-autoload-file-name-handler (operation &rest args) "\
 Load Tramp archive file name handler, and perform OPERATION." (defvar tramp-archive-autoload) (let ((default-directory temporary-file-directory) (tramp-archive-autoload tramp-archive-enabled)) (apply #'tramp-autoload-file-name-handler operation args)))
 (defun tramp-register-archive-file-name-handler nil "\
@@ -31807,7 +31737,7 @@ Add archive file name handler to `file-name-handler-alist'." (when (and tramp-ar
 
 ;;; Generated autoloads from net/tramp-cache.el
 
-(register-definition-prefixes "tramp-cache" '("tramp-"))
+(register-definition-prefixes "tramp-cache" '("tramp-" "with-tramp-"))
 
 
 ;;; Generated autoloads from net/tramp-cmds.el
@@ -31933,9 +31863,11 @@ SUFFIX is a suffix command or a group specification (of
 LOC is a command, a key vector, a key description (a string
   as returned by `key-description'), or a coordination list
   (whose last element may also be a command or key).
+Remove a conflicting binding unless optional KEEP-OTHER is
+  non-nil.
 See info node `(transient)Modifying Existing Transients'.
 
-(fn PREFIX LOC SUFFIX)" nil nil)
+(fn PREFIX LOC SUFFIX &optional KEEP-OTHER)" nil nil)
 (function-put 'transient-insert-suffix 'lisp-indent-function 'defun)
 (autoload 'transient-append-suffix "transient" "\
 Insert a SUFFIX into PREFIX after LOC.
@@ -31945,9 +31877,11 @@ SUFFIX is a suffix command or a group specification (of
 LOC is a command, a key vector, a key description (a string
   as returned by `key-description'), or a coordination list
   (whose last element may also be a command or key).
+Remove a conflicting binding unless optional KEEP-OTHER is
+  non-nil.
 See info node `(transient)Modifying Existing Transients'.
 
-(fn PREFIX LOC SUFFIX)" nil nil)
+(fn PREFIX LOC SUFFIX &optional KEEP-OTHER)" nil nil)
 (function-put 'transient-append-suffix 'lisp-indent-function 'defun)
 (autoload 'transient-replace-suffix "transient" "\
 Replace the suffix at LOC in PREFIX with SUFFIX.
@@ -31971,7 +31905,7 @@ See info node `(transient)Modifying Existing Transients'.
 
 (fn PREFIX LOC)" nil nil)
 (function-put 'transient-remove-suffix 'lisp-indent-function 'defun)
-(register-definition-prefixes "transient" '("magit--fit-window-to-buffer" "transient-"))
+(register-definition-prefixes "transient" '("magit--fit-window-to-buffer" "transient"))
 
 
 ;;; Generated autoloads from tree-widget.el
@@ -32187,7 +32121,7 @@ FRAC should be the inverse of the fractional value; for example, a value of
 2 would mean to use one half, a value of 4 would mean to use one quarter, etc.
 
 (fn WPM &optional WORDLEN FRAC)" t nil)
-(register-definition-prefixes "type-break" '("timep" "type-break-"))
+(register-definition-prefixes "type-break" '("type-break-"))
 
 
 ;;; Generated autoloads from international/ucs-normalize.el
@@ -32335,11 +32269,6 @@ how long to wait for a response before giving up.
 (register-definition-prefixes "url" '("url-"))
 
 
-;;; Generated autoloads from url/url-about.el
-
-(register-definition-prefixes "url-about" '("url-"))
-
-
 ;;; Generated autoloads from url/url-auth.el
 
 (autoload 'url-get-authentication "url-auth" "\
@@ -32439,11 +32368,6 @@ added to this list, so most requests can just pass in nil.
 
 (fn URL)" nil nil)
 (register-definition-prefixes "url-dav" '("url-dav-"))
-
-
-;;; Generated autoloads from url/url-dired.el
-
-(register-definition-prefixes "url-dired" '("url-"))
 
 
 ;;; Generated autoloads from url/url-domsuf.el
@@ -32798,14 +32722,8 @@ Will not do anything if `url-show-status' is nil.
 Return a date string that most HTTP servers can understand.
 
 (fn &optional SPECIFIED-TIME)" nil nil)
-(autoload 'url-eat-trailing-space "url-util" "\
-Remove spaces/tabs at the end of a string.
-
-(fn X)" nil nil)
-(autoload 'url-strip-leading-spaces "url-util" "\
-Remove spaces at the front of a string.
-
-(fn X)" nil nil)
+(define-obsolete-function-alias 'url-eat-trailing-space #'string-trim-right "29.1")
+(define-obsolete-function-alias 'url-strip-leading-spaces #'string-trim-left "29.1")
 (autoload 'url-display-percentage "url-util" "\
 
 
@@ -34592,7 +34510,7 @@ Toggle Viper on/off.
 If Viper is enabled, turn it off.  Otherwise, turn it on." t nil)
 (autoload 'viper-mode "viper" "\
 Turn on Viper emulation of Vi in Emacs.  See Info node `(viper)Top'." t nil)
-(register-definition-prefixes "viper" '("set-viper-state-in-major-mode" "this-major-mode-requires-vi-state" "viper-"))
+(register-definition-prefixes "viper" '("viper-"))
 
 
 ;;; Generated autoloads from emulation/viper-cmd.el
@@ -35539,7 +35457,7 @@ decompress the file if appropriate.  See the documentation for the
 Default bookmark handler for Woman buffers.
 
 (fn BOOKMARK)" nil nil)
-(register-definition-prefixes "woman" '("WoMan-" "menu-bar-manuals-menu" "set-woman-file-regexp" "woman"))
+(register-definition-prefixes "woman" '("WoMan-" "woman"))
 
 
 ;;; Generated autoloads from textmodes/word-wrap-mode.el
@@ -35784,7 +35702,7 @@ to control which program to use when looking for matches.
 
 ;;; Generated autoloads from progmodes/xscheme.el
 
-(register-definition-prefixes "xscheme" '("default-xscheme-runlight" "exit-scheme-interaction-mode" "global-set-scheme-interaction-buffer" "local-" "reset-scheme" "run-scheme" "scheme-" "start-scheme" "verify-xscheme-buffer" "xscheme-"))
+(register-definition-prefixes "xscheme" '("exit-scheme-interaction-mode" "global-set-scheme-interaction-buffer" "local-" "reset-scheme" "run-scheme" "scheme-" "start-scheme" "xscheme-"))
 
 
 ;;; Generated autoloads from nxml/xsd-regexp.el
@@ -35897,8 +35815,8 @@ Zone out, completely." t nil)
 (provide 'loaddefs)
 
 ;; Local Variables:
-;; version-control: never
 ;; no-byte-compile: t
+;; version-control: never
 ;; no-update-autoloads: t
 ;; coding: utf-8-emacs-unix
 ;; End:
