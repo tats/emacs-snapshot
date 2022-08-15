@@ -127,6 +127,15 @@ scanning for autoloads and will be in the `load-path'."
         (substring name 0 (match-beginning 0))
       name)))
 
+(defun loaddefs-generate--shorten-autoload (form)
+  "Remove optional nil elements from an `autoload' form."
+  (take (max (- (length form)
+                (seq-position (reverse form) nil
+                              (lambda (e1 e2)
+                                (not (eq e1 e2)))))
+             3)
+        form))
+
 (defun loaddefs-generate--make-autoload (form file &optional expansion)
   "Turn FORM into an autoload or defvar for source file FILE.
 Returns nil if FORM is not a special autoload form (i.e. a function definition
@@ -165,8 +174,8 @@ expression, in which case we want to handle forms differently."
         ;; Add the usage form at the end where describe-function-1
         ;; can recover it.
         (when (consp args) (setq doc (help-add-fundoc-usage doc args)))
-        ;; (message "autoload of %S" (nth 1 form))
-        `(autoload ,(nth 1 form) ,file ,doc ,interactive ,type)))
+        (loaddefs-generate--shorten-autoload
+         `(autoload ,(nth 1 form) ,file ,doc ,interactive ,type))))
 
      ((and expansion (memq car '(progn prog1)))
       (let ((end (memq :autoload-end form)))
@@ -220,22 +229,23 @@ expression, in which case we want to handle forms differently."
         ;; can recover it.
 	(when (listp args) (setq doc (help-add-fundoc-usage doc args)))
         ;; `define-generic-mode' quotes the name, so take care of that
-        `(autoload ,(if (listp name) name (list 'quote name))
-           ,file ,doc
-           ,(or (and (memq car '(define-skeleton define-derived-mode
-                                  define-generic-mode
-                                  easy-mmode-define-global-mode
-                                  define-global-minor-mode
-                                  define-globalized-minor-mode
-                                  easy-mmode-define-minor-mode
-                                  define-minor-mode))
-                     t)
-                (and (eq (car-safe (car body)) 'interactive)
-                     ;; List of modes or just t.
-                     (or (if (nthcdr 1 (car body))
-                             (list 'quote (nthcdr 1 (car body)))
-                           t))))
-           ,(if macrop ''macro nil))))
+        (loaddefs-generate--shorten-autoload
+         `(autoload ,(if (listp name) name (list 'quote name))
+            ,file ,doc
+            ,(or (and (memq car '(define-skeleton define-derived-mode
+                                   define-generic-mode
+                                   easy-mmode-define-global-mode
+                                   define-global-minor-mode
+                                   define-globalized-minor-mode
+                                   easy-mmode-define-minor-mode
+                                   define-minor-mode))
+                      t)
+                 (and (eq (car-safe (car body)) 'interactive)
+                      ;; List of modes or just t.
+                      (or (if (nthcdr 1 (car body))
+                              (list 'quote (nthcdr 1 (car body)))
+                            t))))
+            ,(if macrop ''macro nil)))))
 
      ;; For defclass forms, use `eieio-defclass-autoload'.
      ((eq car 'defclass)
@@ -509,15 +519,21 @@ binds `generated-autoload-file' as a file-local variable, write
 its autoloads into the specified file instead.
 
 The function does NOT recursively descend into subdirectories of the
-directory or directories specified.
+directory or directories specified by DIRS.
 
-If EXTRA-DATA, include this string at the start of the generated
-file.  This will also force generation of OUTPUT-FILE even if
-there are no autoloads to put into the file.
+Optional argument EXCLUDED-FILES, if non-nil, should be a list of
+files, such as preloaded files, whose autoloads should not be written
+to OUTPUT-FILE.
 
-If INCLUDE-PACKAGE-VERSION, include package version data.
+If EXTRA-DATA is non-nil, it should be a string; include that string
+at the beginning of the generated file.  This will also force the
+generation of OUTPUT-FILE even if there are no autoloads to put into
+that file.
 
-If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
+If INCLUDE-PACKAGE-VERSION is non-nil, include package version data.
+
+If GENERATE-FULL is non-nil, regenerate all the loaddefs files anew,
+instead of just updating them with the new/changed autoloads."
   (let* ((files-re (let ((tmp nil))
 		     (dolist (suf (get-load-suffixes))
                        ;; We don't use module-file-suffix below because
@@ -535,6 +551,11 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
          (updating (and (file-exists-p output-file) (not generate-full)))
          (defs nil))
 
+    ;; Allow the excluded files to be relative.
+    (setq excluded-files
+          (mapcar (lambda (file) (expand-file-name file dir))
+                  excluded-files))
+
     ;; Collect all the autoload data.
     (let ((progress (make-progress-reporter
                      (byte-compile-info
@@ -549,16 +570,15 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
                   (time-less-p output-time
                                (file-attribute-modification-time
                                 (file-attributes file))))
-          (setq defs (nconc
-		      (loaddefs-generate--parse-file
-                       file output-file
-                       ;; We only want the package name from the
-                       ;; excluded files.
-                       (and include-package-version
-                            (if (member (expand-file-name file) excluded-files)
-                                'only
-                              t)))
-                      defs))))
+          ;; If we're scanning for package versions, we want to look
+          ;; at the file even if it's excluded.
+          (let* ((excluded (member (expand-file-name file dir) excluded-files))
+                 (package-data
+                  (and include-package-version (if excluded 'only t))))
+            (when (or package-data (not excluded))
+              (setq defs (nconc (loaddefs-generate--parse-file
+                                 file output-file package-data)
+                                defs))))))
       (progress-reporter-done progress))
 
     ;; If we have no autoloads data, but we have EXTRA-DATA, then
@@ -573,7 +593,8 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
       ;; We have some data, so generate the loaddef files.  First
       ;; group per output file.
       (dolist (fdefs (seq-group-by #'car defs))
-        (let ((loaddefs-file (car fdefs)))
+        (let ((loaddefs-file (car fdefs))
+              hash)
           (with-temp-buffer
             (if (and updating (file-exists-p loaddefs-file))
                 (insert-file-contents loaddefs-file)
@@ -583,6 +604,7 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
               (when extra-data
                 (insert extra-data)
                 (ensure-empty-lines 1)))
+            (setq hash (buffer-hash))
             ;; Then group by source file (and sort alphabetically).
             (dolist (section (sort (seq-group-by #'cadr (cdr fdefs))
                                    (lambda (e1 e2)
@@ -619,9 +641,11 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
                     (loaddefs-generate--print-form def))
                   (unless (bolp)
                     (insert "\n")))))
-            (write-region (point-min) (point-max) loaddefs-file nil 'silent)
-            (byte-compile-info (file-relative-name loaddefs-file lisp-directory)
-                               t "GEN")))))))
+            ;; Only write the file if we actually made a change.
+            (unless (equal (buffer-hash) hash)
+              (write-region (point-min) (point-max) loaddefs-file nil 'silent)
+              (byte-compile-info
+               (file-relative-name loaddefs-file lisp-directory) t "GEN"))))))))
 
 (defun loaddefs-generate--print-form (def)
   "Print DEF in a format that makes sense for version control."
@@ -650,7 +674,9 @@ If GENERATE-FULL, don't update, but regenerate all the loaddefs files."
         (insert "\\\n")))
     (while def
       (insert " ")
-      (prin1 (pop def) (current-buffer) t))
+      (prin1 (pop def) (current-buffer)
+             '(t (escape-newlines . t)
+                 (escape-control-characters . t))))
     (insert ")")))
 
 (defun loaddefs-generate--excluded-files ()

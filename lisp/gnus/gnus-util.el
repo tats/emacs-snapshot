@@ -40,17 +40,14 @@
 
 (defcustom gnus-completing-read-function 'gnus-emacs-completing-read
   "Function use to do completing read."
-  :version "24.1"
+  :version "29.1"
   :group 'gnus-meta
   :type '(radio (function-item
                  :doc "Use Emacs standard `completing-read' function."
                  gnus-emacs-completing-read)
 		(function-item
 		 :doc "Use `ido-completing-read' function."
-		 gnus-ido-completing-read)
-		(function-item
-		 :doc "Use iswitchb based completing-read function."
-		 gnus-iswitchb-completing-read)))
+                 gnus-ido-completing-read)))
 
 (defcustom gnus-completion-styles
   (append (when (and (assq 'substring completion-styles-alist)
@@ -750,15 +747,6 @@ nil.  See also `gnus-bind-print-variables'."
   (when (file-exists-p file)
     (delete-file file)))
 
-(defun gnus-delete-duplicates (list)
-  "Remove duplicate entries from LIST."
-  (let ((result nil))
-    (while list
-      (unless (member (car list) result)
-	(push (car list) result))
-      (pop list))
-    (nreverse result)))
-
 (defun gnus-delete-directory (directory)
   "Delete files in DIRECTORY.  Subdirectories remain.
 If there's no subdirectory, delete DIRECTORY as well."
@@ -1211,6 +1199,7 @@ SPEC is a predicate specifier that contains stuff like `or', `and',
 (defun gnus-iswitchb-completing-read (prompt collection &optional require-match
                                             initial-input history def)
   "`iswitchb' based completing-read function."
+  (declare (obsolete nil "29.1"))
   ;; Make sure iswitchb is loaded before we let-bind its variables.
   ;; If it is loaded inside the let, variables can become unbound afterwards.
   (require 'iswitchb)
@@ -1385,8 +1374,7 @@ sequence, this is like `mapcar'.  With several, it is like the Common Lisp
 			  system-configuration)
 			 ((memq 'type lst)
 			  (symbol-name system-type))
-			 (t nil)))
-	 ) ;; codename
+                         (t nil))))
     (cond
      ((not (memq 'emacs lst))
       nil)
@@ -1550,6 +1538,8 @@ lists of strings."
 ;; separate file to avoid pulling in rmail.el when requiring
 ;; gnus-util.
 (autoload 'gnus-output-to-rmail "gnus-rmail")
+
+(define-obsolete-function-alias 'gnus-delete-duplicates #'seq-uniq "29.1")
 
 (provide 'gnus-util)
 

@@ -760,21 +760,26 @@ decided heuristically.)"
           ;; If there's an edebug spec, use that to determine what the
           ;; name is.
           (when symbol
-            (let ((spec (get symbol 'edebug-form-spec)))
+            (let ((spec (or (get symbol 'edebug-form-spec)
+                            (and (eq (get symbol 'lisp-indent-function) 'defun)
+                                 (get 'defun 'edebug-form-spec)))))
               (save-excursion
-                (when (and (eq (car spec) '&define)
+                (when (and (eq (car-safe spec) '&define)
                            (memq 'name spec))
                   (pop spec)
                   (while (and spec (not name))
                     (let ((candidate (ignore-errors (read (current-buffer)))))
                       (when (eq (pop spec) 'name)
+                        (when (and (consp candidate)
+                                   (symbolp (car (delete 'quote candidate))))
+                          (setq candidate (car (delete 'quote candidate))))
                         (setq name candidate
                               spec nil))))))))
           ;; We didn't have an edebug spec (or couldn't find the
           ;; name).  If the symbol starts with \"def\", then it's
           ;; likely that the next symbol is the name.
           (when (and (not name)
-                     (string-match-p "\\`def" (symbol-name symbol)))
+                     (string-match-p "\\(\\`\\|-\\)def" (symbol-name symbol)))
             (when-let ((candidate (ignore-errors (read (current-buffer)))))
               (cond
                ((symbolp candidate)
@@ -783,7 +788,7 @@ decided heuristically.)"
                      (symbolp (car (delete 'quote candidate))))
                 (setq name (car (delete 'quote candidate)))))))
           (when-let ((result (or name symbol)))
-            (symbol-name result)))))))
+            (and (symbolp result) (symbol-name result))))))))
 
 (defvar-keymap lisp-mode-shared-map
   :doc "Keymap for commands shared by all sorts of Lisp modes."

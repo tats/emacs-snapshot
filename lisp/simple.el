@@ -6731,7 +6731,8 @@ If Transient Mark mode is disabled, this function normally does
 nothing; but if FORCE is non-nil, it deactivates the mark anyway.
 
 Deactivating the mark sets `mark-active' to nil, updates the
-primary selection according to `select-active-regions', and runs
+primary selection according to `select-active-regions' (unless
+`deactivate-mark' is `dont-save'), and runs
 `deactivate-mark-hook'.
 
 If Transient Mark mode was temporarily enabled, reset the value
@@ -6742,6 +6743,7 @@ run `deactivate-mark-hook'."
     (when (and (if (eq select-active-regions 'only)
 		   (eq (car-safe transient-mark-mode) 'only)
 		 select-active-regions)
+               (not (eq deactivate-mark 'dont-save))
 	       (region-active-p)
 	       (display-selections-p))
       ;; The var `saved-region-selection', if non-nil, is the text in
@@ -6863,6 +6865,14 @@ point otherwise."
   :version "23.1"
   :group 'editing-basics)
 
+(defun use-region-beginning ()
+  "Return the start of the region if `use-region-p'."
+  (and (use-region-p) (region-beginning)))
+
+(defun use-region-end ()
+  "Return the end of the region if `use-region-p'."
+  (and (use-region-p) (region-end)))
+
 (defun use-region-p ()
   "Return t if the region is active and it is appropriate to act on it.
 This is used by commands that act specially on the region under
@@ -6873,7 +6883,11 @@ mark is active; furthermore, if `use-empty-active-region' is nil,
 the region must not be empty.  Otherwise, the return value is nil.
 
 For some commands, it may be appropriate to ignore the value of
-`use-empty-active-region'; in that case, use `region-active-p'."
+`use-empty-active-region'; in that case, use `region-active-p'.
+
+Also see the convenience functions `use-region-beginning' and
+`use-region-end', which may be handy when writing `interactive'
+specs."
   (and (region-active-p)
        (or use-empty-active-region (> (region-end) (region-beginning)))
        t))
@@ -7678,11 +7692,33 @@ not vscroll."
 		 ;; But don't vscroll in a keyboard macro.
 		 (not defining-kbd-macro)
 		 (not executing-kbd-macro)
+                 ;; Lines are not truncated...
+                 (not
+                  (and
+                   (or truncate-lines
+                       (and (integerp truncate-partial-width-windows)
+                            (< (window-total-width)
+                               truncate-partial-width-windows))
+                       (and truncate-partial-width-windows
+                            (not (integerp truncate-partial-width-windows))
+                            (not (window-full-width-p))))
+                   ;; ...or if lines are truncated, this buffer
+                   ;; doesn't have very long lines.
+                   (long-line-optimizations-p)))
 		 (line-move-partial arg noerror))
       (set-window-vscroll nil 0 t)
       (if (and line-move-visual
 	       ;; Display-based column are incompatible with goal-column.
 	       (not goal-column)
+               ;; Lines aren't truncated.
+               (not
+                (or truncate-lines
+                    (and (integerp truncate-partial-width-windows)
+                         (< (window-width)
+                            truncate-partial-width-windows))
+                    (and truncate-partial-width-windows
+                         (not (integerp truncate-partial-width-windows))
+                         (not (window-full-width-p)))))
 	       ;; When the text in the window is scrolled to the left,
 	       ;; display-based motion doesn't make sense (because each
 	       ;; logical line occupies exactly one screen line).
@@ -8119,10 +8155,11 @@ For motion by visual lines, see `beginning-of-visual-line'."
 	  (line-move (1- arg) t)))
 
     ;; Move to beginning-of-line, ignoring fields and invisible text.
-    (skip-chars-backward "^\n")
-    (while (and (not (bobp)) (invisible-p (1- (point))))
-      (goto-char (previous-char-property-change (point)))
-      (skip-chars-backward "^\n"))
+    (let ((inhibit-field-text-motion t))
+      (goto-char (line-beginning-position))
+      (while (and (not (bobp)) (invisible-p (1- (point))))
+        (goto-char (previous-char-property-change (point)))
+        (goto-char (line-beginning-position))))
 
     ;; Now find first visible char in the line.
     (while (and (< (point) orig) (invisible-p (point)))

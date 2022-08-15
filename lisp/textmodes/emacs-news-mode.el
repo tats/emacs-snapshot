@@ -25,6 +25,7 @@
 
 (eval-when-compile (require 'cl-lib))
 (require 'outline)
+(require 'subr-x)    ; `emacs-etc--hide-local-variables'
 
 (defgroup emacs-news-mode nil
   "Major mode for editing and viewing the Emacs NEWS file."
@@ -59,9 +60,12 @@
   "C-x C-q" #'emacs-news-view-mode
   "<remap> <open-line>" #'emacs-news-open-line)
 
-(defvar-keymap emacs-news-view-mode-map
-  :parent emacs-news-common-map
-  "C-x C-q" #'emacs-news-mode)
+(defvar emacs-news-view-mode-map
+  ;; This is defined this way instead of inheriting because we're
+  ;; deriving the mode from `special-mode' and want the keys from there.
+  (let ((map (copy-keymap emacs-news-common-map)))
+    (keymap-set map "C-x C-q" #'emacs-news-mode)
+    map))
 
 (defvar emacs-news-mode-font-lock-keywords
   `(("^---$" 0 'emacs-news-does-not-need-documentation)
@@ -69,13 +73,12 @@
 
 (defun emacs-news--mode-common ()
   (setq-local font-lock-defaults '(emacs-news-mode-font-lock-keywords t))
-  (setq-local outline-regexp "\\*+ "
+  (setq-local outline-regexp "\\(:? +\\)?\\(\\*+\\) "
               outline-minor-mode-cycle t
-              ;; We subtract one from the level, because we have a
-              ;; space after the asterisks.
-              outline-level (lambda () (1- (length (match-string 0))))
+              outline-level (lambda () (length (match-string 2)))
               outline-minor-mode-highlight 'append)
-  (outline-minor-mode))
+  (outline-minor-mode)
+  (emacs-etc--hide-local-variables))
 
 ;;;###autoload
 (define-derived-mode emacs-news-mode text-mode "NEWS"

@@ -171,12 +171,12 @@ static void
 fix_command (Lisp_Object function, Lisp_Object values)
 {
   /* Quick exit if there's no values to alter.  */
-  if (!CONSP (values))
+  if (!CONSP (values) || !SYMBOLP (function))
     return;
 
   Lisp_Object reps = Fget (function, Qinteractive_args);
 
-  if (!NILP (reps) && CONSP (reps))
+  if (CONSP (reps))
     {
       int i = 0;
       Lisp_Object vals = values;

@@ -1398,6 +1398,15 @@ static int x_dnd_last_tooltip_x, x_dnd_last_tooltip_y;
 /* Whether or not those values are actually known yet.  */
 static bool x_dnd_last_tooltip_valid;
 
+#ifdef HAVE_XINPUT2
+/* The master pointer device being used for the drag-and-drop
+   operation.  */
+static int x_dnd_pointer_device;
+
+/* The keyboard device attached to that pointer device.  */
+static int x_dnd_keyboard_device;
+#endif
+
 /* Structure describing a single window that can be the target of
    drag-and-drop operations.  */
 struct x_client_list_window
@@ -2100,7 +2109,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   int rc, actual_format, idx;
   bool had_errors;
   xm_targets_table_header header;
-  xm_targets_table_rec **recs;
+  xm_targets_table_rec **recs UNINIT;
   xm_byte_order byteorder;
   uint8_t *data;
   ptrdiff_t total_bytes, total_items, i;
@@ -2841,7 +2850,7 @@ x_dnd_free_toplevels (bool display_alive)
   Window *destroy_windows UNINIT;
   unsigned long *prev_masks UNINIT;
   specpdl_ref count;
-  Display *dpy;
+  Display *dpy UNINIT;
   struct x_display_info *dpyinfo;
 
   if (!x_dnd_toplevels)
@@ -4705,6 +4714,67 @@ x_restore_events_after_dnd (struct frame *f, XWindowAttributes *wa)
 		     dpyinfo->Xatom_XdndTypeList);
 }
 
+#ifdef HAVE_XINPUT2
+
+/* Cancel the current drag-and-drop operation, sending leave messages
+   to any relevant toplevels.  This is called from the event loop when
+   an event is received telling Emacs to gracefully cancel the
+   drag-and-drop operation.  */
+
+static void
+x_dnd_cancel_dnd_early (void)
+{
+  struct frame *f;
+  xm_drop_start_message dmsg;
+
+  eassert (x_dnd_frame && x_dnd_in_progress);
+
+  f = x_dnd_frame;
+
+  if (x_dnd_last_seen_window != None
+      && x_dnd_last_protocol_version != -1)
+    x_dnd_send_leave (x_dnd_frame,
+		      x_dnd_last_seen_window);
+  else if (x_dnd_last_seen_window != None
+	   && !XM_DRAG_STYLE_IS_DROP_ONLY (x_dnd_last_motif_style)
+	   && x_dnd_last_motif_style != XM_DRAG_STYLE_NONE
+	   && x_dnd_motif_setup_p)
+    {
+      dmsg.reason = XM_DRAG_REASON (XM_DRAG_ORIGINATOR_INITIATOR,
+				    XM_DRAG_REASON_DROP_START);
+      dmsg.byte_order = XM_BYTE_ORDER_CUR_FIRST;
+      dmsg.timestamp = FRAME_DISPLAY_INFO (f)->last_user_time;
+      dmsg.side_effects
+	= XM_DRAG_SIDE_EFFECT (xm_side_effect_from_action (FRAME_DISPLAY_INFO (f),
+							   x_dnd_wanted_action),
+			       XM_DROP_SITE_VALID, x_dnd_motif_operations,
+			       XM_DROP_ACTION_DROP_CANCEL);
+      dmsg.x = 0;
+      dmsg.y = 0;
+      dmsg.index_atom = x_dnd_motif_atom;
+      dmsg.source_window = FRAME_X_WINDOW (f);
+
+      x_dnd_send_xm_leave_for_drop (FRAME_DISPLAY_INFO (f), f,
+				    x_dnd_last_seen_window,
+				    FRAME_DISPLAY_INFO (f)->last_user_time);
+      xm_send_drop_message (FRAME_DISPLAY_INFO (f), FRAME_X_WINDOW (f),
+			    x_dnd_last_seen_window, &dmsg);
+    }
+
+  x_dnd_last_seen_window = None;
+  x_dnd_last_seen_toplevel = None;
+  x_dnd_in_progress = false;
+  x_dnd_waiting_for_finish = false;
+  x_dnd_return_frame_object = NULL;
+  x_dnd_movement_frame = NULL;
+  x_dnd_wheel_frame = NULL;
+  x_dnd_frame = NULL;
+  x_dnd_action = None;
+  x_dnd_action_symbol = Qnil;
+}
+
+#endif
+
 static void
 x_dnd_cleanup_drag_and_drop (void *frame)
 {
@@ -5282,16 +5352,15 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 				  * device->num_classes);
   values = NULL;
 #endif
-#ifdef HAVE_XINPUT2_2
-  xi_device->touchpoints = NULL;
-#endif
 
   xi_device->use = device->use;
-#ifdef HAVE_XINPUT2_2
-  xi_device->direct_p = false;
-#endif
   xi_device->name = build_string (device->name);
   xi_device->attachment = device->attachment;
+
+#ifdef HAVE_XINPUT2_2
+  xi_device->touchpoints = NULL;
+  xi_device->direct_p = false;
+#endif
 
   for (c = 0; c < device->num_classes; ++c)
     {
@@ -11910,6 +11979,9 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   struct x_display_info *event_display;
 #endif
   unsigned int additional_mask;
+#ifdef HAVE_XINPUT2
+  struct xi_device_t *device;
+#endif
 
   base = SPECPDL_INDEX ();
 
@@ -12090,6 +12162,33 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   x_dnd_wheel_frame = NULL;
   x_dnd_init_type_lists = false;
   x_dnd_need_send_drop = false;
+
+#ifdef HAVE_XINPUT2
+
+  if (FRAME_DISPLAY_INFO (f)->supports_xi2)
+    {
+      /* Only accept input from the last master pointer to have interacted
+	 with Emacs.  This prevents another pointer device getting our
+	 idea of the button state messed up.  */
+      if (FRAME_DISPLAY_INFO (f)->client_pointer_device != -1)
+	x_dnd_pointer_device
+	  = FRAME_DISPLAY_INFO (f)->client_pointer_device;
+      else
+	/* This returns Bool but cannot actually fail.  */
+	XIGetClientPointer (FRAME_X_DISPLAY (f), None,
+			    &x_dnd_pointer_device);
+
+      x_dnd_keyboard_device = -1;
+
+      device = xi_device_from_id (FRAME_DISPLAY_INFO (f),
+				  x_dnd_pointer_device);
+
+      if (device)
+	x_dnd_keyboard_device = device->attachment;
+    }
+
+#endif
+
 #ifdef HAVE_XKB
   x_dnd_keyboard_state = 0;
 
@@ -12703,6 +12802,226 @@ xi_handle_interaction (struct x_display_info *dpyinfo,
   /* If F isn't currently focused, update the focus state.  */
   if (change && f != dpyinfo->x_focus_frame)
     xi_handle_focus_change (dpyinfo);
+}
+
+#ifdef HAVE_XINPUT2_1
+
+/* Look up a scroll valuator in DEVICE by NUMBER.  */
+
+static struct xi_scroll_valuator_t *
+xi_get_scroll_valuator (struct xi_device_t *device, int number)
+{
+  int i;
+
+  for (i = 0; i < device->scroll_valuator_count; ++i)
+    {
+      if (device->valuators[i].number == number)
+	return &device->valuators[i];
+    }
+
+  return NULL;
+}
+
+#endif
+
+/* Handle EVENT, a DeviceChanged event.  Look up the device that
+   changed, and update its information with the data in EVENT.  */
+
+static void
+xi_handle_device_changed (struct x_display_info *dpyinfo,
+			  struct xi_device_t *device,
+			  XIDeviceChangedEvent *event)
+{
+#ifdef HAVE_XINPUT2_1
+  XIDeviceInfo *info;
+  XIScrollClassInfo *scroll;
+  int i, ndevices;
+  struct xi_scroll_valuator_t *valuator;
+  XIValuatorClassInfo *valuator_info;
+#endif
+#ifdef HAVE_XINPUT2_2
+  struct xi_touch_point_t *tem, *last;
+  XITouchClassInfo *touch;
+#endif
+
+#ifdef HAVE_XINPUT2_1
+  /* When a DeviceChange event is received for a master device, we
+     don't get any scroll valuators along with it.  This is possibly
+     an X server bug but I really don't want to dig any further, so
+     fetch the scroll valuators manually.  (bug#57020) */
+
+  x_catch_errors (dpyinfo->display);
+  info = XIQueryDevice (dpyinfo->display, event->deviceid,
+			/* ndevices is always 1 if a deviceid is
+			   specified.  If the request fails, NULL will
+			   be returned.  */
+			&ndevices);
+  x_uncatch_errors ();
+
+  if (info)
+    {
+      device->valuators = xrealloc (device->valuators,
+				    (info->num_classes
+				     * sizeof *device->valuators));
+      device->scroll_valuator_count = 0;
+#ifdef HAVE_XINPUT2_2
+      device->direct_p = false;
+#endif
+
+      for (i = 0; i < info->num_classes; ++i)
+	{
+	  switch (info->classes[i]->type)
+	    {
+	    case XIScrollClass:
+	      scroll = (XIScrollClassInfo *) info->classes[i];
+
+	      valuator = &device->valuators[device->scroll_valuator_count++];
+	      valuator->horizontal = (scroll->scroll_type
+				      == XIScrollTypeHorizontal);
+	      valuator->invalid_p = true;
+	      valuator->emacs_value = DBL_MIN;
+	      valuator->increment = scroll->increment;
+	      valuator->number = scroll->number;
+	      break;
+
+#ifdef HAVE_XINPUT2_2
+	    case XITouchClass:
+	      touch = (XITouchClassInfo *) info->classes[i];
+
+	      if (touch->mode == XIDirectTouch)
+		device->direct_p = true;
+	      break;
+#endif
+	    }
+	}
+
+      /* Restore the values of any scroll valuators that we already
+	 know about.  */
+
+      for (i = 0; i < info->num_classes; ++i)
+	{
+	  switch (info->classes[i]->type)
+	    {
+	    case XIValuatorClass:
+	      valuator_info = (XIValuatorClassInfo *) info->classes[i];
+
+	      valuator = xi_get_scroll_valuator (device,
+						 valuator_info->number);
+	      if (valuator)
+		{
+		  valuator->invalid_p = false;
+		  valuator->current_value = valuator_info->value;
+
+		  /* Make sure that this is reset if the pointer moves
+		     into a window of ours.
+
+		     Otherwise the valuator state could be left
+		     invalid if the DeviceChange event happened with
+		     the pointer outside any Emacs frame. */
+		  valuator->pending_enter_reset = true;
+		}
+
+	      break;
+	    }
+	}
+
+#ifdef HAVE_XINPUT2_2
+      /* The device is no longer a DirectTouch device, so
+	 remove any touchpoints that we might have
+	 recorded.  */
+      if (!device->direct_p)
+	{
+	  tem = device->touchpoints;
+
+	  while (tem)
+	    {
+	      last = tem;
+	      tem = tem->next;
+	      xfree (last);
+	    }
+
+	  device->touchpoints = NULL;
+	}
+#endif
+
+      XIFreeDeviceInfo (info);
+    }
+#endif
+}
+
+/* Remove the client-side record of every device in TO_DISABLE.
+   Called while processing XI_HierarchyChanged events.  We batch up
+   multiple disabled devices because it is more efficient to disable
+   them at once.  */
+
+static void
+xi_disable_devices (struct x_display_info *dpyinfo,
+		    int *to_disable, int n_disabled)
+{
+  struct xi_device_t *devices;
+  int ndevices, i, j;
+#ifdef HAVE_XINPUT2_2
+  struct xi_touch_point_t *tem, *last;
+#endif
+
+  /* Don't pointlessly copy dpyinfo->devices if there are no devices
+     to disable.  */
+  if (!n_disabled)
+    return;
+
+  ndevices = 0;
+  devices = xzalloc (sizeof *devices * dpyinfo->num_devices);
+
+  /* Loop through every device currently in DPYINFO, and copy it to
+     DEVICES if it is not in TO_DISABLE.  Note that this function
+     should be called with input blocked, since xfree can otherwise
+     call GC, which will call mark_xterm with invalid state.  */
+  for (i = 0; i < dpyinfo->num_devices; ++i)
+    {
+      for (j = 0; j < n_disabled; ++j)
+	{
+	  if (to_disable[j] == dpyinfo->devices[i].device_id)
+	    {
+	      if (x_dnd_in_progress
+		  /* If the drag-and-drop pointer device is being
+		     disabled, then cancel the drag and drop
+		     operation.  */
+		  && to_disable[j] == x_dnd_pointer_device)
+		x_dnd_cancel_dnd_early ();
+
+	      /* Free any scroll valuators that might be on this
+		 device.  */
+#ifdef HAVE_XINPUT2_1
+	      xfree (dpyinfo->devices[i].valuators);
+#endif
+
+	      /* Free any currently active touch points on this
+		 device.  */
+#ifdef HAVE_XINPUT2_2
+	      tem = dpyinfo->devices[i].touchpoints;
+	      while (tem)
+		{
+		  last = tem;
+		  tem = tem->next;
+		  xfree (last);
+		}
+#endif
+
+	      goto out;
+	    }
+
+	  devices[ndevices++] = dpyinfo->devices[i];
+
+	out:
+	  continue;
+	}
+    }
+
+  /* Free the old devices array and replace it with ndevices.  */
+  xfree (dpyinfo->devices);
+
+  dpyinfo->devices = devices;
+  dpyinfo->num_devices = ndevices;
 }
 
 #endif
@@ -13952,11 +14271,13 @@ x_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
   ev->window = FRAME_X_WINDOW (f);
   ev->format = 32;
 
-  /* A 32-bit X client on a 64-bit X server can pass a window pointer
-     as-is.  A 64-bit client on a 32-bit X server is in trouble
-     because a pointer does not fit and would be truncated while
-     passing through the server.  So use two slots and hope that X12
-     will resolve such issues someday.  */
+  /* A 32-bit X client can pass a window pointer through the X server
+     as-is.
+
+     A 64-bit client is in trouble because a pointer does not fit in
+     the 32 bits given for ClientMessage data and will be truncated by
+     Xlib.  So use two slots and hope that X12 will resolve such
+     issues someday.  */
   ev->data.l[0] = iw >> 31 >> 1;
   ev->data.l[1] = sign_shift <= 0 ? iw : iw << sign_shift >> sign_shift;
   ev->data.l[2] = part;
@@ -17104,6 +17425,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   union buffered_input_event inev;
   int count = 0;
   int do_help = 0;
+#ifdef HAVE_XINPUT2
+  struct xi_device_t *gen_help_device;
+  Time gen_help_time;
+#endif
   ptrdiff_t nbytes = 0;
   struct frame *any, *f = NULL;
   Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
@@ -17133,6 +17458,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   EVENT_INIT (inev.ie);
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
+#ifdef HAVE_XINPUT2
+  gen_help_device = NULL;
+#endif
 
   /* Ignore events coming from various extensions, such as XFIXES and
      XKB.  */
@@ -17658,6 +17986,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (!x_window_to_frame (dpyinfo, event->xselection.requestor))
         goto OTHER;
 #endif /* not USE_X_TOOLKIT and not USE_GTK */
+#ifdef HAVE_GTK3
+      /* GTK 3 apparently chokes on these events since they have no
+	 associated device.  (bug#56869, another bug as well that I
+	 can't find) */
+      *finish = X_EVENT_DROP;
+#endif
       x_handle_selection_notify (&event->xselection);
       break;
 
@@ -17666,6 +18000,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (!x_window_to_frame (dpyinfo, event->xselectionclear.window))
         goto OTHER;
 #endif /* not USE_X_TOOLKIT and not USE_GTK */
+#ifdef HAVE_GTK3
+      *finish = X_EVENT_DROP;
+#endif
       {
         const XSelectionClearEvent *eventp = &event->xselectionclear;
 
@@ -17692,6 +18029,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (!x_window_to_frame (dpyinfo, event->xselectionrequest.owner))
         goto OTHER;
 #endif /* USE_X_TOOLKIT */
+#ifdef HAVE_GTK3
+      *finish = X_EVENT_DROP;
+#endif
       {
 	const XSelectionRequestEvent *eventp = &event->xselectionrequest;
 
@@ -18234,6 +18574,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
       if (x_dnd_in_progress
+	  /* When _NET_WM_CLIENT_LIST stacking is being used, changes
+	     in that property are watched for, and it's not necessary
+	     to update the state in response to ordinary window
+	     substructure events.  */
+	  && !x_dnd_use_toplevels
 	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	x_dnd_update_state (dpyinfo, dpyinfo->last_user_time);
 
@@ -20068,6 +20413,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case CirculateNotify:
       if (x_dnd_in_progress
+	  /* When _NET_WM_CLIENT_LIST stacking is being used, changes
+	     in that property are watched for, and it's not necessary
+	     to update the state in response to ordinary window
+	     substructure events.  */
+	  && !x_dnd_use_toplevels
 	  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 	x_dnd_update_state (dpyinfo, dpyinfo->last_user_time);
       goto OTHER;
@@ -20664,6 +21014,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			 operation, don't send an event.  We only have
 			 to set the user time.  */
 		      if (x_dnd_in_progress
+			  /* If another master device moved the
+			     pointer, we should put a wheel event on
+			     the keyboard buffer as usual.  It will be
+			     run once the drag-and-drop operation
+			     completes.  */
+			  && xev->deviceid == x_dnd_pointer_device
 			  && (command_loop_level + minibuf_level
 			      <= x_dnd_recursion_depth)
 			  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
@@ -20756,6 +21112,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		     `x-dnd-movement-function`.  */
 		  && (command_loop_level + minibuf_level
 		      <= x_dnd_recursion_depth)
+		  && xev->deviceid == x_dnd_pointer_device
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 		{
 		  Window target, toplevel;
@@ -21058,7 +21415,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 has changed, generate a HELP_EVENT.  */
 	      if (!NILP (help_echo_string)
 		  || !NILP (previous_help_echo_string))
-		do_help = 1;
+		{
+		  /* Also allow the focus and client pointer to be
+		     adjusted accordingly, in case a help tooltip is
+		     shown.  */
+		  gen_help_device = device;
+		  gen_help_time = xev->time;
+
+		  do_help = 1;
+		}
 	      goto XI_OTHER;
 	    }
 
@@ -21082,6 +21447,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (x_dnd_in_progress
 		  && (command_loop_level + minibuf_level
 		      <= x_dnd_recursion_depth)
+		  && xev->deviceid == x_dnd_pointer_device
 		  && dpyinfo == FRAME_DISPLAY_INFO (x_dnd_frame))
 		{
 		  f = mouse_or_wdesc_frame (dpyinfo, xev->event);
@@ -21120,6 +21486,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef XIPointerEmulated
 		    }
 #endif
+
+		  if (f && device)
+		    xi_handle_interaction (dpyinfo, f, device,
+					   xev->time);
 
 		  if (xev->evtype == XI_ButtonPress
 		      && x_dnd_last_seen_window != None)
@@ -21367,11 +21737,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					      xev->send_event);
 
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
+	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
 #ifdef HAVE_XWIDGETS
 	      xvw = xwidget_view_from_window (xev->event);
 	      if (xvw)
 		{
+		  /* If the user interacts with a frame that's focused
+		     on another device, but not the current focus
+		     frame, make it the focus frame.  */
+		  if (device)
+		    xi_handle_interaction (dpyinfo, xvw->frame,
+					   device, xev->time);
+
 		  xwidget_button (xvw, xev->evtype == XI_ButtonPress,
 				  lrint (xev->event_x), lrint (xev->event_y),
 				  xev->detail, xi_convert_event_state (xev),
@@ -21390,8 +21768,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  goto XI_OTHER;
 		}
 #endif
-
-	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -21950,7 +22326,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  inev.ie.modifiers = x_x_to_emacs_modifiers (dpyinfo, state);
 
 #ifdef XK_F1
-		  if (x_dnd_in_progress && keysym == XK_F1)
+		  if (x_dnd_in_progress
+		      && xev->deviceid == x_dnd_keyboard_device
+		      && keysym == XK_F1)
 		    {
 		      x_dnd_xm_use_help = true;
 		      goto xi_done_keysym;
@@ -22214,14 +22592,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  case XI_HierarchyChanged:
 	    {
-	      XIHierarchyEvent *hev = (XIHierarchyEvent *) xi_event;
+	      XIHierarchyEvent *hev;
 	      XIDeviceInfo *info;
-	      int i, j, ndevices, n_disabled, *disabled;
-	      struct xi_device_t *device, *devices;
-#ifdef HAVE_XINPUT2_2
-	      struct xi_touch_point_t *tem, *last;
-#endif
+	      int i, ndevices, n_disabled, *disabled;
+	      struct xi_device_t *device;
+	      bool any_changed;
 
+	      any_changed = false;
+	      hev = (XIHierarchyEvent *) xi_event;
 	      disabled = SAFE_ALLOCA (sizeof *disabled * hev->num_info);
 	      n_disabled = 0;
 
@@ -22231,44 +22609,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    {
 		      /* Handle all disabled devices now, to prevent
 			 things happening out-of-order later.  */
-		      if (n_disabled)
+
+		      if (ndevices)
 			{
-			  ndevices = 0;
-			  devices = xzalloc (sizeof *devices * dpyinfo->num_devices);
-
-			  for (i = 0; i < dpyinfo->num_devices; ++i)
-			    {
-			      for (j = 0; j < n_disabled; ++j)
-				{
-				  if (disabled[j] == dpyinfo->devices[i].device_id)
-				    {
-#ifdef HAVE_XINPUT2_1
-				      xfree (dpyinfo->devices[i].valuators);
-#endif
-#ifdef HAVE_XINPUT2_2
-				      tem = dpyinfo->devices[i].touchpoints;
-				      while (tem)
-					{
-					  last = tem;
-					  tem = tem->next;
-					  xfree (last);
-					}
-#endif
-				      goto continue_detachment;
-				    }
-				}
-
-			      devices[ndevices++] = dpyinfo->devices[i];
-
-			    continue_detachment:
-			      continue;
-			    }
-
-			  xfree (dpyinfo->devices);
-			  dpyinfo->devices = devices;
-			  dpyinfo->num_devices = ndevices;
-
+			  xi_disable_devices (dpyinfo, disabled, n_disabled);
 			  n_disabled = 0;
+
+			  /* This flag really just means that disabled
+			     devices were handled early and should be
+			     used in conjunction with n_disabled.  */
+			  any_changed = true;
 			}
 
 		      x_catch_errors (dpyinfo->display);
@@ -22316,63 +22666,26 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    }
 		}
 
-	      if (n_disabled)
-		{
-		  ndevices = 0;
-		  devices = xzalloc (sizeof *devices * dpyinfo->num_devices);
+	      /* Delete all devices that were disabled by this
+		 event.  */
+	      xi_disable_devices (dpyinfo, disabled, n_disabled);
 
-		  for (i = 0; i < dpyinfo->num_devices; ++i)
-		    {
-		      for (j = 0; j < n_disabled; ++j)
-			{
-			  if (disabled[j] == dpyinfo->devices[i].device_id)
-			    {
-#ifdef HAVE_XINPUT2_1
-			      xfree (dpyinfo->devices[i].valuators);
-#endif
-#ifdef HAVE_XINPUT2_2
-			      tem = dpyinfo->devices[i].touchpoints;
-			      while (tem)
-				{
-				  last = tem;
-				  tem = tem->next;
-				  xfree (last);
-				}
-#endif
-			      goto break_detachment;
-			    }
-			}
-
-		      devices[ndevices++] = dpyinfo->devices[i];
-
-		    break_detachment:
-		      continue;
-		    }
-
-		  xfree (dpyinfo->devices);
-		  dpyinfo->devices = devices;
-		  dpyinfo->num_devices = ndevices;
-		}
-
-	      /* Now that the device hierarchy has been changed,
-		 recompute focus.  */
-	      xi_handle_focus_change (dpyinfo);
+	      /* If the device hierarchy has been changed, recompute
+		 focus.  This might seem like a micro-optimization but
+		 it actually keeps the focus from changing in some
+		 cases where it would be undesierable.  */
+	      if (any_changed || n_disabled)
+		xi_handle_focus_change (dpyinfo);
 
 	      goto XI_OTHER;
 	    }
 
 	  case XI_DeviceChanged:
 	    {
-	      XIDeviceChangedEvent *device_changed = (XIDeviceChangedEvent *) xi_event;
+	      XIDeviceChangedEvent *device_changed;
 	      struct xi_device_t *device;
-#ifdef HAVE_XINPUT2_2
-	      struct xi_touch_point_t *tem, *last;
-#endif
-	      int c;
-#ifdef HAVE_XINPUT2_1
-	      int i;
-#endif
 
+	      device_changed = (XIDeviceChangedEvent *) xi_event;
 	      device = xi_device_from_id (dpyinfo, device_changed->deviceid);
 
 	      /* If the device isn't enabled, then stop handling this
@@ -22381,105 +22694,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      if (!device)
 		goto XI_OTHER;
 
-	      /* Free data that we will regenerate from new
-		 information.  */
-#ifdef HAVE_XINPUT2_1
-	      device->valuators = xrealloc (device->valuators,
-					    (device_changed->num_classes
-					     * sizeof *device->valuators));
-	      device->scroll_valuator_count = 0;
-#endif
-#ifdef HAVE_XINPUT2_2
-	      device->direct_p = false;
-#endif
-
-	      for (c = 0; c < device_changed->num_classes; ++c)
-		{
-		  switch (device_changed->classes[c]->type)
-		    {
-#ifdef HAVE_XINPUT2_1
-		    case XIScrollClass:
-		      {
-			XIScrollClassInfo *info;
-
-			info = (XIScrollClassInfo *) device_changed->classes[c];
-			struct xi_scroll_valuator_t *valuator;
-
-			valuator = &device->valuators[device->scroll_valuator_count++];
-			valuator->horizontal
-			  = (info->scroll_type == XIScrollTypeHorizontal);
-			valuator->invalid_p = true;
-			valuator->emacs_value = DBL_MIN;
-			valuator->increment = info->increment;
-			valuator->number = info->number;
-
-			break;
-		      }
-#endif
-
-#ifdef HAVE_XINPUT2_2
-		    case XITouchClass:
-		      {
-			XITouchClassInfo *info;
-
-			info = (XITouchClassInfo *) device_changed->classes[c];
-			device->direct_p = info->mode == XIDirectTouch;
-		      }
-#endif
-		    default:
-		      break;
-		    }
-		}
-
-#ifdef HAVE_XINPUT2_1
-	      for (c = 0; c < device_changed->num_classes; ++c)
-		{
-		  if (device_changed->classes[c]->type == XIValuatorClass)
-		    {
-		      XIValuatorClassInfo *info;
-
-		      info = (XIValuatorClassInfo *) device_changed->classes[c];
-
-		      for (i = 0; i < device->scroll_valuator_count; ++i)
-			{
-			  if (device->valuators[i].number == info->number)
-			    {
-			      device->valuators[i].invalid_p = false;
-			      device->valuators[i].current_value = info->value;
-
-			      /* Make sure that this is reset if the
-				 pointer moves into a window of ours.
-
-				 Otherwise the valuator state could be
-				 left invalid if the DeviceChange
-				 event happened with the pointer
-				 outside any Emacs frame. */
-			      device->valuators[i].pending_enter_reset = true;
-			    }
-			}
-		    }
-		}
-#endif
-
-#ifdef HAVE_XINPUT2_2
-	      /* The device is no longer a DirectTouch device, so
-		 remove any touchpoints that we might have
-		 recorded.  */
-	      if (!device->direct_p)
-		{
-		  tem = device->touchpoints;
-
-		  while (tem)
-		    {
-		      last = tem;
-		      tem = tem->next;
-		      xfree (last);
-		    }
-
-		  device->touchpoints = NULL;
-		}
-#endif
-
+	      /* Now handle the event by retrieving scroll valuators
+		 and touch info.  */
+	      xi_handle_device_changed (dpyinfo, device, device_changed);
 	      goto XI_OTHER;
 	    }
 
@@ -23146,6 +23363,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (do_help > 0)
 	{
 	  any_help_event_p = true;
+#ifdef HAVE_XINPUT2
+	  if (gen_help_device)
+	    xi_handle_interaction (dpyinfo, f,
+				   gen_help_device,
+				   gen_help_time);
+#endif
 	  gen_help_event (help_echo_string, frame, help_echo_window,
 			  help_echo_object, help_echo_pos);
 	}
@@ -25911,27 +26134,25 @@ x_set_window_size (struct frame *f, bool change_gravity,
 void
 frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
 {
-  block_input ();
 #ifdef HAVE_XINPUT2
   int deviceid;
 
-  if (FRAME_DISPLAY_INFO (f)->supports_xi2)
+  deviceid = FRAME_DISPLAY_INFO (f)->client_pointer_device;
+
+  if (FRAME_DISPLAY_INFO (f)->supports_xi2
+      && deviceid != -1)
     {
-      if (XIGetClientPointer (FRAME_X_DISPLAY (f),
-			      FRAME_X_WINDOW (f),
-			      &deviceid))
-	{
-	  x_ignore_errors_for_next_request (FRAME_DISPLAY_INFO (f));
-	  XIWarpPointer (FRAME_X_DISPLAY (f), deviceid, None,
-			 FRAME_X_WINDOW (f), 0, 0, 0, 0, pix_x, pix_y);
-	  x_stop_ignoring_errors (FRAME_DISPLAY_INFO (f));
-	}
+      block_input ();
+      x_ignore_errors_for_next_request (FRAME_DISPLAY_INFO (f));
+      XIWarpPointer (FRAME_X_DISPLAY (f), deviceid, None,
+		     FRAME_X_WINDOW (f), 0, 0, 0, 0, pix_x, pix_y);
+      x_stop_ignoring_errors (FRAME_DISPLAY_INFO (f));
+      unblock_input ();
     }
   else
 #endif
     XWarpPointer (FRAME_X_DISPLAY (f), None, FRAME_X_WINDOW (f),
 		  0, 0, 0, 0, pix_x, pix_y);
-  unblock_input ();
 }
 
 /* Raise frame F.  */
@@ -28919,7 +29140,7 @@ void
 x_preserve_selections (struct x_display_info *dpyinfo, Lisp_Object lost,
 		       Lisp_Object current_owner)
 {
-  Lisp_Object tail, frame, new_owner, tem;
+  Lisp_Object tail, frame, new_owner;
   Time timestamp;
   Window *owners;
   Atom *names;
@@ -28949,7 +29170,7 @@ x_preserve_selections (struct x_display_info *dpyinfo, Lisp_Object lost,
 
   FOR_EACH_TAIL_SAFE (tail)
     {
-      tem = XCAR (tail);
+      Lisp_Object tem = XCAR (tail);
       ++nowners;
 
       /* The selection is really lost (since we cannot find a new
@@ -28983,7 +29204,7 @@ x_preserve_selections (struct x_display_info *dpyinfo, Lisp_Object lost,
 
       FOR_EACH_TAIL_SAFE (tail)
 	{
-	  tem = XCAR (tail);
+	  Lisp_Object tem = XCAR (tail);
 
 	  /* Now check if we still don't own that selection, which can
 	     happen if another program set itself as the owner.  */
@@ -29003,9 +29224,10 @@ x_preserve_selections (struct x_display_info *dpyinfo, Lisp_Object lost,
 
       FOR_EACH_TAIL_SAFE (tail)
 	{
+	  Lisp_Object tem = XCAR (tail);
+
 	  reply = xcb_get_selection_owner_reply (dpyinfo->xcb_connection,
 						 cookies[nowners++], &error);
-
 	  if (reply)
 	    owners[nowners - 1] = reply->owner;
 	  else
@@ -29035,7 +29257,7 @@ x_preserve_selections (struct x_display_info *dpyinfo, Lisp_Object lost,
 
       FOR_EACH_TAIL_SAFE (tail)
 	{
-	  tem = XCAR (tail);
+	  Lisp_Object tem = XCAR (tail);
 
 	  /* If the selection isn't owned by us anymore, note that the
 	     selection was lost.  */
