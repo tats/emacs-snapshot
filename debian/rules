@@ -295,7 +295,7 @@ confflags_lucid += --without-gsettings
 define cfg_tree
   cd $(1) && \
     CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" \
-    CC=gcc-11 \
+    CC=gcc-12 \
     REL_ALLOC=no \
       $(CURDIR)/debian/build-src/configure $(confflags) $(2)
 endef
