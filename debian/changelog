@@ -1,10 +1,8 @@
-emacs (1:28.1+1-2~1.gbp22246c) UNRELEASED; urgency=medium
+emacs (1:28.1+1-2) unstable; urgency=medium
 
-  ** SNAPSHOT build @22246c8c7ae8eb6ec49ac4bd6129dada8a2de08e **
+  * Switch from gcc 11 to 12.
 
-  * UNRELEASED
-
- -- Rob Browning <rlb@defaultvalue.org>  Fri, 19 Aug 2022 18:57:35 -0500
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 20 Aug 2022 17:02:41 -0500
 
 emacs (1:28.1+1-1) unstable; urgency=medium
 
