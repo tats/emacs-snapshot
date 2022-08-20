@@ -1,3 +1,11 @@
+emacs (1:28.1+1-2~1.gbp22246c) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @22246c8c7ae8eb6ec49ac4bd6129dada8a2de08e **
+
+  * UNRELEASED
+
+ -- Rob Browning <rlb@defaultvalue.org>  Fri, 19 Aug 2022 18:57:35 -0500
+
 emacs (1:28.1+1-1) unstable; urgency=medium
 
   * Merge upstream version 28.1. (Closes: #1009169)
