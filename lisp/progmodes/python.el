@@ -359,6 +359,7 @@
   "Python mode specialized rx macro.
 This variant of `rx' supports common Python named REGEXPS."
   `(rx-let ((sp-bsnl (or space (and ?\\ ?\n)))
+            (sp-nl (or space (and (? ?\\) ?\n)))
             (block-start       (seq symbol-start
                                     (or "def" "class" "if" "elif" "else" "try"
                                         "except" "finally" "for" "while" "with"
@@ -583,9 +584,9 @@ the {...} holes that appear within f-strings."
              finally return (and result-valid result))))
 
 (defvar python-font-lock-keywords-level-1
-  `((,(python-rx symbol-start "def" (1+ space) (group symbol-name))
+  `((,(python-rx symbol-start "def" (1+ sp-bsnl) (group symbol-name))
      (1 font-lock-function-name-face))
-    (,(python-rx symbol-start "class" (1+ space) (group symbol-name))
+    (,(python-rx symbol-start "class" (1+ sp-bsnl) (group symbol-name))
      (1 font-lock-type-face)))
   "Font lock keywords to use in `python-mode' for level 1 decoration.
 
@@ -725,12 +726,12 @@ sign in chained assignment."
     ;;   [*a] = 5, 6
     ;; are handled separately below
     (,(python-font-lock-assignment-matcher
-        (python-rx (? (or "[" "(") (* space))
-                   grouped-assignment-target (* space) ?, (* space)
-                   (* assignment-target (* space) ?, (* space))
-                   (? assignment-target (* space))
-                   (? ?, (* space))
-                   (? (or ")" "]") (* space))
+        (python-rx (? (or "[" "(") (* sp-nl))
+                   grouped-assignment-target (* sp-nl) ?, (* sp-nl)
+                   (* assignment-target (* sp-nl) ?, (* sp-nl))
+                   (? assignment-target (* sp-nl))
+                   (? ?, (* sp-nl))
+                   (? (or ")" "]") (* sp-bsnl))
                    (group assignment-operator)))
      (1 font-lock-variable-name-face)
      (,(python-rx grouped-assignment-target)
@@ -745,19 +746,20 @@ sign in chained assignment."
     ;;   c: Collection = {1, 2, 3}
     ;;   d: Mapping[int, str] = {1: 'bar', 2: 'baz'}
     (,(python-font-lock-assignment-matcher
-        (python-rx grouped-assignment-target (* space)
-                   (? ?: (* space) (+ not-simple-operator) (* space))
-                   assignment-operator))
+       (python-rx (or line-start ?\;) (* sp-bsnl)
+                  grouped-assignment-target (* sp-bsnl)
+                  (? ?: (* sp-bsnl) (+ not-simple-operator) (* sp-bsnl))
+                  assignment-operator))
      (1 font-lock-variable-name-face))
     ;; special cases
     ;;   (a) = 5
     ;;   [a] = 5,
     ;;   [*a] = 5, 6
     (,(python-font-lock-assignment-matcher
-       (python-rx (or line-start ?\; ?=) (* space)
-                  (or "[" "(") (* space)
-                  grouped-assignment-target (* space)
-                  (or ")" "]") (* space)
+       (python-rx (or line-start ?\; ?=) (* sp-bsnl)
+                  (or "[" "(") (* sp-nl)
+                  grouped-assignment-target (* sp-nl)
+                  (or ")" "]") (* sp-bsnl)
                   assignment-operator))
      (1 font-lock-variable-name-face))
     ;; escape sequences within bytes literals
@@ -795,6 +797,18 @@ decorators, exceptions, and assignments.")
 
 Which one will be chosen depends on the value of
 `font-lock-maximum-decoration'.")
+
+(defun python-font-lock-extend-region (beg end _old-len)
+  "Extend font-lock region given by BEG and END to statement boundaries."
+  (save-excursion
+    (save-match-data
+      (goto-char beg)
+      (python-nav-beginning-of-statement)
+      (setq beg (point))
+      (goto-char end)
+      (python-nav-end-of-statement)
+      (setq end (point))
+      (cons beg end))))
 
 
 (defconst python-syntax-propertize-function
@@ -1224,8 +1238,14 @@ possibilities can be narrowed to specific indentation points."
          ;; Add one indentation level.
          (goto-char start)
          (+ (current-indentation) python-indent-offset))
+        (`(:after-backslash-block-continuation . ,start)
+         (goto-char start)
+         (let ((column (current-column)))
+           (if (= column (+ (current-indentation) python-indent-offset))
+               ;; Add one level to avoid same indent as next logical line.
+               (+ column python-indent-offset)
+             column)))
         (`(,(or :inside-paren
-                :after-backslash-block-continuation
                 :after-backslash-dotted-continuation) . ,start)
          ;; Use the column given by the context.
          (goto-char start)
@@ -4542,6 +4562,11 @@ the if condition."
                       (not (python-syntax-comment-or-string-p))
                       python-skeleton-autoinsert)))
 
+(defun python--completion-predicate (_ buffer)
+  (provided-mode-derived-p
+   (buffer-local-value 'major-mode buffer)
+   'python-mode))
+
 (defmacro python-skeleton-define (name doc &rest skel)
   "Define a `python-mode' skeleton using NAME DOC and SKEL.
 The skeleton will be bound to python-skeleton-NAME and will
@@ -4550,6 +4575,7 @@ be added to `python-mode-skeleton-abbrev-table'."
   (let* ((name (symbol-name name))
          (function-name (intern (concat "python-skeleton-" name))))
     `(progn
+       (put ',function-name 'completion-predicate #'python--completion-predicate)
        (define-abbrev python-mode-skeleton-abbrev-table
          ,name "" ',function-name :system t)
        (setq python-skeleton-available
@@ -4575,13 +4601,15 @@ The skeleton will be bound to python-skeleton-NAME."
       (setq skel
             `(< ,(format "%s:" name) \n \n
                 > _ \n)))
-    `(define-skeleton ,function-name
-       ,(or doc
-            (format "Auxiliary skeleton for %s statement." name))
-       nil
-       (unless (y-or-n-p ,msg)
-         (signal 'quit t))
-       ,@skel)))
+    `(progn
+       (put ',function-name 'completion-predicate #'ignore)
+       (define-skeleton ,function-name
+         ,(or doc
+              (format "Auxiliary skeleton for %s statement." name))
+         nil
+         (unless (y-or-n-p ,msg)
+           (signal 'quit t))
+         ,@skel))))
 
 (python-define-auxiliary-skeleton else)
 
@@ -4704,11 +4732,12 @@ def __FFAP_get_module_path(objstr):
 ;;; Code check
 
 (defcustom python-check-command
-  (or (executable-find "pyflakes")
-      (executable-find "epylint")
-      "install pyflakes, pylint or something else")
+  (cond ((executable-find "pyflakes") "pyflakes")
+        ((executable-find "epylint") "epylint")
+        (t "pyflakes"))
   "Command used to check a Python file."
-  :type 'string)
+  :type 'string
+  :version "29.1")
 
 (defcustom python-check-buffer-name
   "*Python check: %s*"
@@ -5627,9 +5656,13 @@ returned as is."
 This is a non empty list of strings, the checker tool possibly followed by
 required arguments.  Once launched it will receive the Python source to be
 checked as its standard input.
-To use `flake8' you would set this to (\"flake8\" \"-\")."
+To use `flake8' you would set this to (\"flake8\" \"-\").
+To use `pylint' you would set this to (\"pylint\" \"--from-stdin\" \"stdin\")."
   :version "26.1"
-  :type '(repeat string))
+  :type '(choice (const :tag "Pyflakes" ("pyflakes"))
+                 (const :tag "Flake8" ("flake8" "-"))
+                 (const :tag "Pylint" ("pylint" "--from-stdin" "stdin"))
+                 (repeat :tag "Custom command" string)))
 
 ;; The default regexp accommodates for older pyflakes, which did not
 ;; report the column number, and at the same time it's compatible with
@@ -5637,7 +5670,7 @@ To use `flake8' you would set this to (\"flake8\" \"-\")."
 ;; TYPE
 (defcustom python-flymake-command-output-pattern
   (list
-   "^\\(?:<?stdin>?\\):\\(?1:[0-9]+\\):\\(?:\\(?2:[0-9]+\\):\\)? \\(?3:.*\\)$"
+   "^\\(?:<?stdin>?\\):\\(?1:[0-9]+\\):\\(?:\\(?2:[0-9]+\\):?\\)? \\(?3:.*\\)$"
    1 2 nil 3)
   "Specify how to parse the output of `python-flymake-command'.
 The value has the form (REGEXP LINE COLUMN TYPE MESSAGE): if
@@ -5649,7 +5682,6 @@ MESSAGE'th gives the message text itself.
 If COLUMN or TYPE are nil or that index didn't match, that
 information is not present on the matched line and a default will
 be used."
-  :version "26.1"
   :type '(list regexp
                (integer :tag "Line's index")
                (choice
@@ -5658,7 +5690,8 @@ be used."
                (choice
                 (const :tag "No type" nil)
                 (integer :tag "Type's index"))
-               (integer :tag "Message's index")))
+               (integer :tag "Message's index"))
+  :version "29.1")
 
 (defcustom python-flymake-msg-alist
   '(("\\(^redefinition\\|.*unused.*\\|used$\\)" . :warning))
@@ -5780,7 +5813,9 @@ REPORT-FN is Flymake's callback function."
               `(,python-font-lock-keywords
                 nil nil nil nil
                 (font-lock-syntactic-face-function
-                 . python-font-lock-syntactic-face-function)))
+                 . python-font-lock-syntactic-face-function)
+                (font-lock-extend-after-change-region-function
+                 . python-font-lock-extend-region)))
 
   (setq-local syntax-propertize-function
               python-syntax-propertize-function)
@@ -5845,7 +5880,6 @@ REPORT-FN is Flymake's callback function."
      nil))
 
   (setq-local outline-regexp (python-rx (* space) block-start))
-  (setq-local outline-heading-end-regexp ":[^\n]*\n")
   (setq-local outline-level
               (lambda ()
                 "`outline-level' function for Python mode."
@@ -5861,6 +5895,52 @@ REPORT-FN is Flymake's callback function."
     (python-indent-guess-indent-offset))
 
   (add-hook 'flymake-diagnostic-functions #'python-flymake nil t))
+
+;;; Completion predicates for M-x
+(dolist (sym '(python-check
+               python-fill-paragraph
+               python-indent-dedent-line
+               python-indent-dedent-line-backspace
+               python-indent-guess-indent-offset
+               python-indent-shift-left
+               python-indent-shift-right
+               python-mark-defun
+               python-nav-backward-block
+               python-nav-backward-defun
+               python-nav-backward-sexp
+               python-nav-backward-sexp-safe
+               python-nav-backward-statement
+               python-nav-backward-up-list
+               python-nav-beginning-of-block
+               python-nav-beginning-of-statement
+               python-nav-end-of-block
+               python-nav-end-of-defun
+               python-nav-end-of-statement
+               python-nav-forward-block
+               python-nav-forward-defun
+               python-nav-forward-sexp
+               python-nav-forward-sexp-safe
+               python-nav-forward-statement
+               python-nav-if-name-main
+               python-nav-up-list
+               python-shell-send-buffer
+               python-shell-send-defun
+               python-shell-send-statement))
+  (put sym 'completion-predicate #'python--completion-predicate))
+
+(dolist (sym '(python-describe-at-point
+               python-eldoc-at-point
+               python-shell-completion-native-toggle
+               python-shell-completion-native-turn-off
+               python-shell-completion-native-turn-on
+               python-shell-completion-native-turn-on-maybe
+               python-shell-font-lock-cleanup-buffer
+               python-shell-font-lock-toggle
+               python-shell-font-lock-turn-off
+               python-shell-font-lock-turn-on
+               python-shell-package-enable
+               python-shell-completion-complete-or-indent  ))
+  (put sym 'completion-predicate #'python--completion-predicate))
 
 (provide 'python)
 

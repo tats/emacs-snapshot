@@ -187,13 +187,15 @@ It should normally be a symbol with position and it defaults to FORM."
                msg))
     form)))
 
-(defun macroexp--obsolete-warning (fun obsolescence-data type)
+(defun macroexp--obsolete-warning (fun obsolescence-data type &optional key)
   (let ((instead (car obsolescence-data))
         (asof (nth 2 obsolescence-data)))
     (format-message
      "`%s' is an obsolete %s%s%s" fun type
      (if asof (concat " (as of " asof ")") "")
      (cond ((stringp instead) (concat "; " (substitute-command-keys instead)))
+           ((and instead key)
+            (format-message "; use `%s' (%s) instead." instead key))
            (instead (format-message "; use `%s' instead." instead))
            (t ".")))))
 
@@ -369,6 +371,11 @@ Assumes the caller has bound `macroexpand-all-environment'."
                    (macroexp--all-forms body))
                  (cdr form))
                 form)))
+            (`(while)
+             (macroexp-warn-and-return
+              "missing `while' condition"
+              `(signal 'wrong-number-of-arguments '(while 0))
+              nil 'compile-only form))
             (`(setq ,(and var (pred symbolp)
                           (pred (not booleanp)) (pred (not keywordp)))
                     ,expr)

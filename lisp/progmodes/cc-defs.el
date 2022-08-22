@@ -794,15 +794,16 @@ right side of it."
 	       `(c-safe (scan-lists ,from ,count ,depth)))))
     (if limit
 	`(save-restriction
-	   (when ,limit
-	     ,(if (numberp count)
-		  (if (< count 0)
-		      `(narrow-to-region ,limit (point-max))
-		    `(narrow-to-region (point-min) ,limit))
-		`(if (< ,count 0)
-		     (narrow-to-region ,limit (point-max))
-		   (narrow-to-region (point-min) ,limit))))
-	   ,res)
+	   (let ((-limit- ,limit))
+	     (when -limit-
+	       ,(if (numberp count)
+		    (if (< count 0)
+			`(narrow-to-region -limit- (point-max))
+		      `(narrow-to-region (point-min) -limit-))
+		  `(if (< ,count 0)
+		       (narrow-to-region -limit- (point-max))
+		     (narrow-to-region (point-min) -limit-))))
+	     ,res))
       res)))
 
 
@@ -2070,8 +2071,8 @@ non-nil, a caret is prepended to invert the set."
     str))
 
 ;; Leftovers from (X)Emacs 19 compatibility.
-(defalias 'c-regexp-opt 'regexp-opt)
-(defalias 'c-regexp-opt-depth 'regexp-opt-depth)
+(define-obsolete-function-alias 'c-regexp-opt #'regexp-opt "29.1")
+(define-obsolete-function-alias 'c-regexp-opt-depth #'regexp-opt-depth "29.1")
 
 
 ;; Figure out what features this Emacs has

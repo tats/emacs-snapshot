@@ -1159,6 +1159,12 @@ change the input method's translation rules, customize the user option
 
 ** Dired
 
++++
+*** 'dired-guess-shell-command' moved from dired-x to dired.
+This means that 'dired-do-shell-command' will now provide smarter
+defaults without first having to require 'dired-x'.  See the node
+"(emacs) Shell Command Guessing" in the Emacs manual for more details.
+
 ---
 *** 'dired-clean-up-buffers-too' moved from dired-x to dired.
 This means that Dired now offers to kill buffers visiting files and
@@ -1857,6 +1863,11 @@ this message for SVG and XPM.
 *** New commands: 'image-flip-horizontally' and 'image-flip-vertically'.
 These commands horizontally and vertically flip the image under point.
 
++++
+*** New command 'image-transform-set-percent'.
+It allows setting the image size to a percentage of its original size,
+and is bound to "s p" in Image mode.
+
 ** Images
 
 +++
@@ -2012,6 +2023,11 @@ recently set.
 ---
 *** When editing a bookmark annotation, 'C-c C-k' will now cancel.
 It is bound to the new command 'bookmark-edit-annotation-cancel'.
+
+---
+*** New option 'bookmark-fringe-mark'.
+This option controls the bitmap used to indicate bookmarks in the
+fringe (or 'nil' to disable showing this marker).
 
 ** Exif
 
@@ -2528,7 +2544,8 @@ but switching to `ash` is generally much preferable.
 ---
 ** Some functions and variables obsolete since Emacs 23 have been removed:
 'find-emacs-lisp-shadows', 'newsticker-cache-filename',
-'redisplay-end-trigger-functions', 'set-window-redisplay-end-trigger',
+'process-filter-multibyte-p', 'redisplay-end-trigger-functions',
+'set-process-filter-multibyte', 'set-window-redisplay-end-trigger',
 'unify-8859-on-decoding-mode', 'unify-8859-on-encoding-mode',
 'vc-arch-command', 'window-redisplay-end-trigger', 'x-selection'.
 
@@ -2570,6 +2587,16 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** New function 'make-obsolete-generalized-variable'.
+This can be used to mark setters used by 'setf' as obsolete, and the
+byte-compiler will then warn about using them.
+
++++
+** New functions 'pos-eol' and 'pos-bol'.
+These are like 'line-end-position' and 'line-beginning-position'
+(respectively), but ignore fields (and are more efficient).
 
 +++
 ** New function 'compiled-function-p'.

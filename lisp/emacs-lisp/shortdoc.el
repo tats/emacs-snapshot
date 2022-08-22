@@ -941,12 +941,24 @@ A FUNC form can have any number of `:no-eval' (or `:no-value'),
    :eval (point-min))
   (point-max
    :eval (point-max))
+  (pos-bol
+   :eval (pos-bol))
+  (pos-eol
+   :eval (pos-eol))
+  (bolp
+   :eval (bolp))
+  (eolp
+   :eval (eolp))
   (line-beginning-position
    :eval (line-beginning-position))
   (line-end-position
    :eval (line-end-position))
   (buffer-size
    :eval (buffer-size))
+  (bobp
+   :eval (bobp))
+  (eobp
+   :eval (eobp))
   "Moving Around"
   (goto-char
    :no-eval (goto-char (point-max))
@@ -972,8 +984,13 @@ A FUNC form can have any number of `:no-eval' (or `:no-value'),
   (following-char
    :no-eval (following-char)
    :eg-result 67)
+  (preceding-char
+   :no-eval (preceding-char)
+   :eg-result 38)
   (char-after
    :eval (char-after 45))
+  (char-before
+   :eval (char-before 13))
   (get-byte
    :no-eval (get-byte 45)
    :eg-result-string "#xff")
@@ -982,6 +999,8 @@ A FUNC form can have any number of `:no-eval' (or `:no-value'),
    :no-value (delete-region (point-min) (point-max)))
   (erase-buffer
    :no-value (erase-buffer))
+  (delete-line
+   :no-value (delete-line))
   (insert
    :no-value (insert "This string will be inserted in the buffer\n"))
   (subst-char-in-region
