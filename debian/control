@@ -117,7 +117,7 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: emacs-common
 Architecture: all
-Depends: emacsen-common (>= 3.0.0), install-info, ${misc:Depends}
+Depends: emacsen-common (>= 3.0.0), emacs-el, install-info, ${misc:Depends}
 Recommends: emacs-el
 Suggests: emacs-common-non-dfsg, ncurses-term
 Conflicts: emacs-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
