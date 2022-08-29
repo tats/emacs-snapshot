@@ -403,7 +403,7 @@ The syntax tables aren't stored directly since they're quite large."
   t  (if (c-lang-const c-recognize-<>-arglists)
      `(lambda ()
 	;(if (c-lang-const c-recognize-<>-arglists)
-	(let ((table (funcall ,(c-lang-const c-make-mode-syntax-table))))
+	(let ((table (funcall ',(c-lang-const c-make-mode-syntax-table))))
 	  (modify-syntax-entry ?\( "." table)
 	  (modify-syntax-entry ?\) "." table)
 	  (modify-syntax-entry ?\[ "." table)
@@ -4278,7 +4278,7 @@ This macro is expanded at compile time to a form tailored for the mode
 in question, so MODE must be a constant.  Therefore MODE is not
 evaluated and should not be quoted."
   (declare (debug nil))
-  `(funcall ,(c-make-init-lang-vars-fun mode)))
+  `(funcall #',(c-make-init-lang-vars-fun mode)))
 
 
 (cc-provide 'cc-langs)

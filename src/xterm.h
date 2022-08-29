@@ -286,6 +286,12 @@ struct xi_device_t
   /* The frame that is currently this device's implicit keyboard
      focus, or NULL.  */
   struct frame *focus_implicit_frame;
+
+  /* The window on which the last motion event happened.  */
+  Window last_motion_window;
+
+  /* The rounded integer coordinates of the last motion event.  */
+  int last_motion_x, last_motion_y;
 };
 #endif
 
@@ -822,14 +828,15 @@ struct x_display_info
      drag-and-drop emulation.  */
   Time pending_dnd_time;
 
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   /* Whether or not the server time is probably the same as
      "clock_gettime (CLOCK_MONOTONIC, ...)".  */
   bool server_time_monotonic_p;
 
   /* The time difference between the X server clock and the monotonic
-     clock.  */
-  int64_t server_time_offset;
+     clock, or 0 if unknown (if the difference is legitimately 0,
+     server_time_monotonic_p will be true).  */
+  int_fast64_t server_time_offset;
 #endif
 };
 
@@ -1119,16 +1126,16 @@ struct x_output
      frame.  */
   bool_bf waiting_for_frame_p : 1;
 
-#ifndef USE_GTK
+#if !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   /* Whether or not Emacs should wait for the compositing manager to
      draw frames before starting a new frame.  */
   bool_bf use_vsync_p : 1;
 
   /* The time (in microseconds) it took to draw the last frame.  */
-  uint64_t last_frame_time;
+  uint_fast64_t last_frame_time;
 
   /* A temporary time used to calculate that value.  */
-  uint64_t temp_frame_time;
+  uint_fast64_t temp_frame_time;
 
 #ifdef HAVE_XSYNCTRIGGERFENCE
   /* An array of two sync fences that are triggered in order after a
@@ -1577,7 +1584,8 @@ extern void x_make_frame_invisible (struct frame *);
 extern void x_iconify_frame (struct frame *);
 extern void x_free_frame_resources (struct frame *);
 extern void x_wm_set_size_hint (struct frame *, long, bool);
-#if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK
+#if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK \
+  && defined HAVE_CLOCK_GETTIME
 extern void x_sync_init_fences (struct frame *);
 #endif
 

@@ -7842,15 +7842,14 @@ lookup_glyphless_char_display (int c, struct it *it)
       && CHAR_TABLE_EXTRA_SLOTS (XCHAR_TABLE (Vglyphless_char_display)) >= 1)
     {
       if (c >= 0)
-	{
-	  glyphless_method = CHAR_TABLE_REF (Vglyphless_char_display, c);
-      if (CONSP (glyphless_method))
-	glyphless_method = FRAME_WINDOW_P (it->f)
-	      ? XCAR (glyphless_method)
-	      : XCDR (glyphless_method);
-	}
+	glyphless_method = CHAR_TABLE_REF (Vglyphless_char_display, c);
       else
 	glyphless_method = XCHAR_TABLE (Vglyphless_char_display)->extras[0];
+
+      if (CONSP (glyphless_method))
+	glyphless_method = FRAME_WINDOW_P (it->f)
+	  ? XCAR (glyphless_method)
+	  : XCDR (glyphless_method);
     }
 
  retry:
@@ -17323,6 +17322,7 @@ mark_window_display_accurate_1 (struct window *w, bool accurate_p)
 
       BUF_UNCHANGED_MODIFIED (b) = BUF_MODIFF (b);
       BUF_OVERLAY_UNCHANGED_MODIFIED (b) = BUF_OVERLAY_MODIFF (b);
+      BUF_CHARS_UNCHANGED_MODIFIED (b) = BUF_CHARS_MODIFF (b);
       BUF_BEG_UNCHANGED (b) = BUF_GPT (b) - BUF_BEG (b);
       BUF_END_UNCHANGED (b) = BUF_Z (b) - BUF_GPT (b);
 
@@ -19585,7 +19585,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Check whether the buffer to be displayed contains long lines.  */
   if (!NILP (Vlong_line_threshold)
       && !current_buffer->long_line_optimizations_p
-      && MODIFF - UNCHANGED_MODIFIED > 8)
+      && CHARS_MODIFF - CHARS_UNCHANGED_MODIFIED > 8)
     {
       ptrdiff_t cur, next, found, max = 0, threshold;
       threshold = XFIXNUM (Vlong_line_threshold);
@@ -37116,7 +37116,9 @@ GRAPHICAL and TEXT should each have one of the values listed above.
 The char-table has one extra slot to control the display of a character for
 which no font is found.  This slot only takes effect on graphical terminals.
 Its value should be an ASCII acronym string, `hex-code', `empty-box', or
-`thin-space'.  The default is `empty-box'.
+`thin-space'.  It could also be a cons cell of any two of these, to specify
+separate values for graphical and text terminals.
+The default is `empty-box'.
 
 If a character has a non-nil entry in an active display table, the
 display table takes effect; in this case, Emacs does not consult

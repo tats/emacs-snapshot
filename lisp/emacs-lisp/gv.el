@@ -169,6 +169,18 @@ arguments as NAME.  DO is a function as defined in `gv-get'."
         ;; (`(expand ,expander) `(gv-define-expand ,name ,expander))
         (_ (message "Unknown %s declaration %S" symbol handler) nil))))
 
+(defun make-obsolete-generalized-variable (obsolete-name current-name when)
+  "Make byte-compiler warn that generalized variable OBSOLETE-NAME is obsolete.
+The warning will say that CURRENT-NAME should be used instead.
+
+If CURRENT-NAME is a string, that is the `use instead' message.
+
+WHEN should be a string indicating when the variable was first
+made obsolete, for example a date or a release number."
+  (put obsolete-name 'byte-obsolete-generalized-variable
+       (purecopy (list current-name when)))
+  obsolete-name)
+
 ;; Additions for `declare'.  We specify the values as named aliases so
 ;; that `describe-variable' prints something useful; cf. Bug#40491.
 
@@ -395,6 +407,7 @@ The return value is the last VAL in the list.
 (gv-define-setter buffer-local-value (val var buf)
   (macroexp-let2 nil v val
     `(with-current-buffer ,buf (set (make-local-variable ,var) ,v))))
+(make-obsolete-generalized-variable 'buffer-local-value nil "29.1")
 
 (gv-define-expander alist-get
   (lambda (do key alist &optional default remove testfn)
@@ -619,18 +632,6 @@ REF must have been previously obtained with `gv-ref'."
 
 ;;; Generalized variables.
 
-(defun make-obsolete-generalized-variable (obsolete-name current-name when)
-  "Make byte-compiler warn that generalized variable OBSOLETE-NAME is obsolete.
-The warning will say that CURRENT-NAME should be used instead.
-
-If CURRENT-NAME is a string, that is the `use instead' message.
-
-WHEN should be a string indicating when the variable was first
-made obsolete, for example a date or a release number."
-  (put obsolete-name 'byte-obsolete-generalized-variable
-       (purecopy (list current-name when)))
-  obsolete-name)
-
 ;; Some Emacs-related place types.
 (gv-define-simple-setter buffer-file-name set-visited-file-name t)
 (make-obsolete-generalized-variable
@@ -684,7 +685,10 @@ made obsolete, for example a date or a release number."
 (gv-define-setter face-background (x f &optional s)
   `(set-face-background ,f ,x ,s))
 (gv-define-setter face-background-pixmap (x f &optional s)
-  `(set-face-background-pixmap ,f ,x ,s))
+  `(set-face-stipple ,f ,x ,s))
+(make-obsolete-generalized-variable 'face-background-pixmap 'face-stipple "29.1")
+(gv-define-setter face-stipple (x f &optional s)
+  `(set-face-stipple ,f ,x ,s))
 (gv-define-setter face-font (x f &optional s) `(set-face-font ,f ,x ,s))
 (gv-define-setter face-foreground (x f &optional s)
   `(set-face-foreground ,f ,x ,s))
@@ -702,6 +706,8 @@ made obsolete, for example a date or a release number."
 
 (gv-define-setter frame-width (x &optional frame)
   `(set-frame-width (or ,frame (selected-frame)) ,x))
+(make-obsolete-generalized-variable 'frame-width 'set-frame-width "29.1")
+
 (gv-define-simple-setter getenv setenv t)
 (gv-define-simple-setter get-register set-register)
 
@@ -760,7 +766,8 @@ made obsolete, for example a date or a release number."
 (make-obsolete-generalized-variable 'selected-frame 'select-frame "29.1")
 
 (gv-define-simple-setter standard-case-table set-standard-case-table)
-(make-obsolete-generalized-variable 'standard-case-table 'set-standard-case-table "29.1")
+(make-obsolete-generalized-variable
+ 'standard-case-table 'set-standard-case-table "29.1")
 
 (gv-define-simple-setter syntax-table set-syntax-table)
 (make-obsolete-generalized-variable 'syntax-table 'set-syntax-table "29.1")

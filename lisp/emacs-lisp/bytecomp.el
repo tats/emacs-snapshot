@@ -1235,7 +1235,8 @@ Order is by depth-first search."
                     (let (new-l new-c)
                       (save-excursion
                         (goto-char offset)
-                        (setq new-l (1+ (count-lines (point-min) (point-at-bol)))
+                        (setq new-l (1+ (count-lines (point-min)
+                                                     (line-beginning-position)))
                               new-c (1+ (current-column)))
                         (format "%d:%d:" new-l new-c))))
 		""))
@@ -1355,6 +1356,7 @@ FORMAT and ARGS are as in `byte-compile-warn'."
   (let ((byte-compile-form-stack (cons arg byte-compile-form-stack)))
     (apply #'byte-compile-warn format args)))
 
+;;;###autoload
 (defun byte-compile-warn-obsolete (symbol type)
   "Warn that SYMBOL (a variable, function or generalized variable) is obsolete.
 TYPE is a string that say which one of these three types it is."

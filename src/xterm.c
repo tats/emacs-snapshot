@@ -952,7 +952,7 @@ static const struct x_atom_ref x_atom_refs[] =
     ATOM_REFS_INIT ("MULTIPLE", Xatom_MULTIPLE)
     ATOM_REFS_INIT ("INCR", Xatom_INCR)
     ATOM_REFS_INIT ("_EMACS_TMP_",  Xatom_EMACS_TMP)
-    ATOM_REFS_INIT ("EMACS_SERVER_TIME_PROP", Xatom_EMACS_SERVER_TIME_PROP)
+    ATOM_REFS_INIT ("_EMACS_SERVER_TIME_PROP", Xatom_EMACS_SERVER_TIME_PROP)
     ATOM_REFS_INIT ("TARGETS", Xatom_TARGETS)
     ATOM_REFS_INIT ("NULL", Xatom_NULL)
     ATOM_REFS_INIT ("ATOM", Xatom_ATOM)
@@ -6655,7 +6655,7 @@ x_set_frame_alpha (struct frame *f)
 		    Starting and ending an update
  ***********************************************************************/
 
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
 
 /* Wait for an event matching PREDICATE to show up in the event
    queue, or TIMEOUT to elapse.
@@ -6714,9 +6714,9 @@ x_if_event (Display *dpy, XEvent *event_return,
    server timestamp TIMESTAMP.  Return 0 if the necessary information
    is not available.  */
 
-static uint64_t
+static uint_fast64_t
 x_sync_get_monotonic_time (struct x_display_info *dpyinfo,
-			   uint64_t timestamp)
+			   uint_fast64_t timestamp)
 {
   if (dpyinfo->server_time_monotonic_p)
     return timestamp;
@@ -6725,19 +6725,29 @@ x_sync_get_monotonic_time (struct x_display_info *dpyinfo,
   if (!dpyinfo->server_time_offset)
     return 0;
 
-  return timestamp - dpyinfo->server_time_offset;
+  uint_fast64_t t;
+  return (INT_SUBTRACT_WRAPV (timestamp, dpyinfo->server_time_offset, &t)
+	  ? 0 : t);
 }
 
-/* Return the current monotonic time in the same format as a
-   high-resolution server timestamp.  */
+# ifndef CLOCK_MONOTONIC
+#  define CLOCK_MONOTONIC CLOCK_REALTIME
+# endif
 
-static uint64_t
+/* Return the current monotonic time in the same format as a
+   high-resolution server timestamp, or 0 if not available.  */
+
+static uint_fast64_t
 x_sync_current_monotonic_time (void)
 {
   struct timespec time;
-
-  clock_gettime (CLOCK_MONOTONIC, &time);
-  return time.tv_sec * 1000000 + time.tv_nsec / 1000;
+  uint_fast64_t t;
+  return (((clock_gettime (CLOCK_MONOTONIC, &time) != 0
+	    && (CLOCK_MONOTONIC == CLOCK_REALTIME
+		|| clock_gettime (CLOCK_REALTIME, &time) != 0))
+	   || INT_MULTIPLY_WRAPV (time.tv_sec, 1000000, &t)
+	   || INT_ADD_WRAPV (t, time.tv_nsec / 1000, &t))
+	  ? 0 : t);
 }
 
 /* Decode a _NET_WM_FRAME_DRAWN message and calculate the time it took
@@ -6747,7 +6757,7 @@ static void
 x_sync_note_frame_times (struct x_display_info *dpyinfo,
 			 struct frame *f, XEvent *event)
 {
-  uint64_t low, high, time;
+  uint_fast64_t low, high, time;
   struct x_output *output;
 
   low = event->xclient.data.l[2];
@@ -6756,12 +6766,16 @@ x_sync_note_frame_times (struct x_display_info *dpyinfo,
 
   time = x_sync_get_monotonic_time (dpyinfo, low | (high << 32));
 
-  if (time)
-    output->last_frame_time = time - output->temp_frame_time;
+  if (!time || !output->temp_frame_time
+      || INT_SUBTRACT_WRAPV (time, output->temp_frame_time,
+			     &output->last_frame_time))
+    output->last_frame_time = 0;
 
 #ifdef FRAME_DEBUG
-  fprintf (stderr, "Drawing the last frame took: %lu ms (%lu)\n",
-	   output->last_frame_time / 1000, time);
+  uint_fast64_t last_frame_ms = output->last_frame_time / 1000;
+  fprintf (stderr,
+	   "Drawing the last frame took: %"PRIuFAST64" ms (%"PRIuFAST64")\n",
+	   last_frame_ms, time);
 #endif
 }
 
@@ -6891,7 +6905,7 @@ x_sync_update_begin (struct frame *f)
 static void
 x_sync_trigger_fence (struct frame *f, XSyncValue value)
 {
-  uint64_t n, low, high, idx;
+  uint_fast64_t n, low, high, idx;
 
   /* Sync fences aren't supported by the X server.  */
   if (FRAME_DISPLAY_INFO (f)->xsync_major < 3
@@ -7029,7 +7043,7 @@ x_sync_handle_frame_drawn (struct x_display_info *dpyinfo,
 static void
 x_update_begin (struct frame *f)
 {
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   /* If F is double-buffered, we can make the entire frame center
      around XdbeSwapBuffers.  */
 #ifdef HAVE_XDBE
@@ -7138,7 +7152,7 @@ show_back_buffer (struct frame *f)
 
   if (FRAME_X_DOUBLE_BUFFERED_P (f))
     {
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
       /* Wait for drawing of the previous frame to complete before
 	 displaying this new frame.  */
       x_sync_wait_for_frame_drawn_event (f);
@@ -7157,7 +7171,7 @@ show_back_buffer (struct frame *f)
       swap_info.swap_action = XdbeCopied;
       XdbeSwapBuffers (FRAME_X_DISPLAY (f), &swap_info, 1);
 
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
       /* Finish the frame here.  */
       x_sync_update_finish (f);
 #endif
@@ -7211,7 +7225,7 @@ x_update_end (struct frame *f)
   /* If double buffering is disabled, finish the update here.
      Otherwise, finish the update when the back buffer is next
      displayed.  */
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
 #ifdef HAVE_XDBE
   if (!FRAME_X_DOUBLE_BUFFERED_P (f))
 #endif
@@ -7600,9 +7614,6 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
 #ifndef USE_GTK
   struct frame *focus_frame;
   Time old_time;
-#if defined HAVE_XSYNC
-  uint64_t monotonic_time;
-#endif
 
   focus_frame = dpyinfo->x_focus_frame;
   old_time = dpyinfo->last_user_time;
@@ -7615,24 +7626,31 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
   if (!send_event || time > dpyinfo->last_user_time)
     dpyinfo->last_user_time = time;
 
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   if (!send_event)
     {
       /* See if the current CLOCK_MONOTONIC time is reasonably close
 	 to the X server time.  */
-      monotonic_time = x_sync_current_monotonic_time ();
+      uint_fast64_t monotonic_time = x_sync_current_monotonic_time ();
+      uint_fast64_t monotonic_ms = monotonic_time / 1000;
+      int_fast64_t diff_ms;
 
-      if (time * 1000 > monotonic_time - 500 * 1000
-	  && time * 1000 < monotonic_time + 500 * 1000)
-	dpyinfo->server_time_monotonic_p = true;
-      else
+      dpyinfo->server_time_monotonic_p
+	= (monotonic_time != 0
+	   && !INT_SUBTRACT_WRAPV (time, monotonic_ms, &diff_ms)
+	   && -500 < diff_ms && diff_ms < 500);
+
+      if (!dpyinfo->server_time_monotonic_p)
 	{
 	  /* Compute an offset that can be subtracted from the server
 	     time to estimate the monotonic time on the X server.  */
 
-	  dpyinfo->server_time_monotonic_p = false;
-	  dpyinfo->server_time_offset
-	    = ((int64_t) time * 1000) - monotonic_time;
+	  if (!monotonic_time
+	      || INT_MULTIPLY_WRAPV (time, 1000, &dpyinfo->server_time_offset)
+	      || INT_SUBTRACT_WRAPV (dpyinfo->server_time_offset,
+				     monotonic_time,
+				     &dpyinfo->server_time_offset))
+	    dpyinfo->server_time_offset = 0;
 	}
     }
 #endif
@@ -8298,6 +8316,8 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 		   ? CHAR_TABLE_REF (Vglyphless_char_display,
 				     glyph->u.glyphless.ch)
 		   : XCHAR_TABLE (Vglyphless_char_display)->extras[0]);
+	      if (CONSP (acronym))
+		acronym = XCAR (acronym);
 	      if (STRINGP (acronym))
 		str = SSDATA (acronym);
 	    }
@@ -12809,6 +12829,43 @@ xi_handle_interaction (struct x_display_info *dpyinfo,
     xi_handle_focus_change (dpyinfo);
 }
 
+/* Return whether or not XEV actually represents a change in the
+   position of the pointer on DEVICE, with respect to the last event
+   received.  This is necessary because the input extension reports
+   motion events in very high resolution, while Emacs is only fast
+   enough to process motion events aligned to the pixel grid.  */
+
+static bool
+xi_position_changed (struct xi_device_t *device, XIDeviceEvent *xev)
+{
+  bool changed;
+
+  changed = true;
+
+  if (xev->event != device->last_motion_window)
+    goto out;
+
+  if (lrint (xev->event_x) == device->last_motion_x
+      && lrint (xev->event_y) == device->last_motion_y)
+    {
+      changed = false;
+      goto out;
+    }
+
+ out:
+  device->last_motion_x = lrint (xev->event_x);
+  device->last_motion_y = lrint (xev->event_y);
+  device->last_motion_window = xev->event;
+
+  return changed;
+}
+
+static void
+xi_report_motion_window_clear (struct xi_device_t *device)
+{
+  device->last_motion_window = None;
+}
+
 #ifdef HAVE_XINPUT2_1
 
 /* Look up a scroll valuator in DEVICE by NUMBER.  */
@@ -13462,6 +13519,8 @@ x_query_pointer_1 (struct x_display_info *dpyinfo,
 
 	  xi_convert_button_state (&buttons, &state);
 	  *mask_return = state | modifiers.effective;
+
+	  XFree (buttons.mask);
 
 	  *root_x_return = lrint (root_x);
 	  *root_y_return = lrint (root_y);
@@ -17995,7 +18054,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
             goto done;
           }
 
-#if defined HAVE_XSYNC && !defined USE_GTK
+#if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
 	/* These messages are sent by the compositing manager after a
 	   frame is drawn under extended synchronization.  */
 	if (event->xclient.message_type
@@ -19254,6 +19313,21 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case FocusIn:
+#if defined HAVE_XINPUT2						\
+  && (defined HAVE_GTK3 || (!defined USE_GTK && !defined USE_X_TOOLKIT))
+      /* If a FocusIn event is received (because the window manager
+	 sent us one), don't set the core focus if XInput 2 is
+	 enabled, since that would mess up the device-specific focus
+	 tracking.
+
+	 The long looking preprocessor conditional only enables this
+	 code on GTK 3 and no toolkit builds, since those are the only
+	 builds where focus is tracked specific to each master device.
+	 Other builds use core events and the client pointer to handle
+	 focus, much like on a build without XInput 2.  */
+      if (dpyinfo->supports_xi2)
+	goto OTHER;
+#endif
 #ifdef USE_GTK
       /* Some WMs (e.g. Mutter in Gnome Shell), don't unmap
          minimized/iconified windows; thus, for those WMs we won't get
@@ -19367,6 +19441,21 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case FocusOut:
+#if defined HAVE_XINPUT2						\
+  && (defined HAVE_GTK3 || (!defined USE_GTK && !defined USE_X_TOOLKIT))
+      /* If a FocusIn event is received (because the window manager
+	 sent us one), don't set the core focus if XInput 2 is
+	 enabled, since that would mess up the device-specific focus
+	 tracking.
+
+	 The long looking preprocessor conditional only enables this
+	 code on GTK 3 and no toolkit builds, since those are the only
+	 builds where focus is tracked specific to each master device.
+	 Other builds use core events and the client pointer to handle
+	 focus, much like on a build without XInput 2.  */
+      if (dpyinfo->supports_xi2)
+	goto OTHER;
+#endif
       x_detect_focus_change (dpyinfo, any, event, &inev.ie);
       goto OTHER;
 
@@ -20030,6 +20119,28 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    }
 #endif
 
+#ifdef HAVE_XINPUT2
+	  if (f && dpyinfo->supports_xi2)
+	    {
+	      Mouse_HLInfo *hlinfo;
+
+	      /* The input extension doesn't report motion events when
+		 the part of the window below the pointer changes.  To
+		 avoid outdated information from keeping
+		 i.e. mouse-highlight at the wrong position after the
+		 frame is moved or resized, reset the mouse highlight
+		 and last_mouse_motion_frame.  */
+
+	      if (dpyinfo->last_mouse_motion_frame == f)
+		dpyinfo->last_mouse_motion_frame = NULL;
+
+	      hlinfo = MOUSE_HL_INFO (f);
+
+	      if (hlinfo->mouse_face_mouse_frame == f)
+		reset_mouse_highlight (hlinfo);
+	    }
+#endif
+
 	}
 
       if (x_dnd_in_progress
@@ -20519,11 +20630,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	bool must_free_data = false;
 	XIEvent *xi_event = (XIEvent *) event->xcookie.data;
+
 	/* Sometimes the event is already claimed by GTK, which
 	   will free its data in due course. */
-	if (!xi_event && XGetEventData (dpyinfo->display, &event->xcookie))
+	if (!xi_event)
 	  {
-	    must_free_data = true;
+	    if (XGetEventData (dpyinfo->display, &event->xcookie))
+	      must_free_data = true;
+
 	    xi_event = (XIEvent *) event->xcookie.data;
 	  }
 
@@ -20531,7 +20645,25 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	if (!xi_event)
 	  {
-	    eassert (!must_free_data);
+	    /* It may turn out that the event data has already been
+	       implicitly freed for various reasons up to and
+	       including XMenuActivate pushing some other event onto
+	       the foreign-event queue, or x_menu_wait_for_events
+	       calling XNextEvent through a timer that tries to wait
+	       for input.
+
+	       In that case, XGetEventData will return True, but
+	       cookie->data will be NULL.  Since handling such input
+	       events is not really important, we can afford to
+	       discard them.
+
+	       The way Xlib is currently implemented makes calling
+	       XFreeEventData unnecessary in this case, but call it
+	       anyway, since not doing so may lead to a memory leak in
+	       the future.  */
+
+	    if (must_free_data)
+	      XFreeEventData (dpyinfo->display, &event->xcookie);
 	    goto OTHER;
 	  }
 
@@ -20683,7 +20815,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	  case XI_Leave:
 	    {
-	      XILeaveEvent *leave = (XILeaveEvent *) xi_event;
+	      XILeaveEvent *leave;
+	      struct xi_device_t *device;
+
+	      leave = (XILeaveEvent *) xi_event;
 #ifdef USE_GTK
 	      struct xi_device_t *source;
 	      XMotionEvent ev;
@@ -20700,6 +20835,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef USE_GTK
 	      source = xi_device_from_id (dpyinfo, leave->sourceid);
 #endif
+	      device = xi_device_from_id (dpyinfo, leave->deviceid);
+
+	      if (device)
+		xi_report_motion_window_clear (device);
 
 	      /* This allows us to catch LeaveNotify events generated by
 		 popup menu grabs.  FIXME: this is right when there is a
@@ -21119,6 +21258,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 #endif /* HAVE_XINPUT2_1 */
 
+	      if (!xi_position_changed (device, xev))
+		goto XI_OTHER;
+
 	      ev.x = lrint (xev->event_x);
 	      ev.y = lrint (xev->event_y);
 	      ev.window = xev->event;
@@ -21191,26 +21333,26 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      /* Also remember the mouse glyph and set
 			 mouse_moved.  */
 		      if (f != dpyinfo->last_mouse_glyph_frame
-			  || xev->event_x < r->x
-			  || xev->event_x >= r->x + r->width
-			  || xev->event_y < r->y
-			  || xev->event_y >= r->y + r->height)
+			  || lrint (xev->event_x) < r->x
+			  || lrint (xev->event_x) >= r->x + r->width
+			  || lrint (xev->event_y) < r->y
+			  || lrint (xev->event_y) >= r->y + r->height)
 			{
 			  f->mouse_moved = true;
 			  f->last_mouse_device = (source ? source->name
 						  : Qnil);
 			  dpyinfo->last_mouse_scroll_bar = NULL;
 
-			  remember_mouse_glyph (f, xev->event_x,
-						xev->event_y, r);
+			  remember_mouse_glyph (f, lrint (xev->event_x),
+						lrint (xev->event_y), r);
 			  dpyinfo->last_mouse_glyph_frame = f;
 			}
 		    }
 
 		  if (xev->root == dpyinfo->root_window)
 		    target = x_dnd_get_target_window (dpyinfo,
-						      xev->root_x,
-						      xev->root_y,
+						      lrint (xev->root_x),
+						      lrint (xev->root_y),
 						      &target_proto,
 						      &motif_style,
 						      &toplevel,
@@ -21348,14 +21490,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  if (x_dnd_last_window_is_frame && target != None)
 		    x_dnd_note_self_position (dpyinfo, target,
-					      xev->root_x, xev->root_y);
+					      lrint (xev->root_x),
+					      lrint (xev->root_y));
 		  else if (x_dnd_last_protocol_version != -1 && target != None)
 		    {
 		      dnd_state = xi_convert_event_state (xev);
 
 		      x_dnd_send_position (x_dnd_frame, target,
 					   x_dnd_last_protocol_version,
-					   xev->root_x, xev->root_y,
+					   lrint (xev->root_x),
+					   lrint (xev->root_y),
 					   x_dnd_selection_timestamp,
 					   x_dnd_wanted_action, 0,
 					   dnd_state);
@@ -21563,7 +21707,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 			  x_dnd_note_self_wheel (dpyinfo,
 						 x_dnd_last_seen_window,
-						 xev->root_x, xev->root_y,
+						 lrint (xev->root_x),
+						 lrint (xev->root_y),
 						 xev->detail, dnd_state,
 						 xev->time);
 			}
@@ -21571,7 +21716,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			x_dnd_send_position (x_dnd_frame,
 					     x_dnd_last_seen_window,
 					     x_dnd_last_protocol_version,
-					     xev->root_x, xev->root_y,
+					     lrint (xev->root_x),
+					     lrint (xev->root_y),
 					     xev->time, x_dnd_wanted_action,
 					     xev->detail, dnd_state);
 
@@ -21614,7 +21760,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			    {
 			      x_dnd_waiting_for_finish = false;
 			      x_dnd_note_self_drop (dpyinfo, x_dnd_last_seen_window,
-						    xev->root_x, xev->root_y, xev->time);
+						    lrint (xev->root_x),
+						    lrint (xev->root_y), xev->time);
 			    }
 			  else if (x_dnd_last_seen_window != None
 				   && x_dnd_last_protocol_version != -1)
@@ -21689,12 +21836,14 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 				x_dnd_send_unsupported_drop (dpyinfo, (x_dnd_last_seen_toplevel != None
 								       ? x_dnd_last_seen_toplevel
 								       : x_dnd_last_seen_window),
-							     xev->root_x, xev->root_y, xev->time);
+							     lrint (xev->root_x),
+							     lrint (xev->root_y), xev->time);
 			    }
 			  else if (x_dnd_last_seen_toplevel != None)
 			    x_dnd_send_unsupported_drop (dpyinfo,
 							 x_dnd_last_seen_toplevel,
-							 xev->root_x, xev->root_y,
+							 lrint (xev->root_x),
+							 lrint (xev->root_y),
 							 xev->time);
 
 			  x_dnd_last_protocol_version = -1;
@@ -27024,7 +27173,7 @@ x_free_frame_resources (struct frame *f)
 	XFreeCursor (FRAME_X_DISPLAY (f), f->output_data.x->bottom_left_corner_cursor);
 
       /* Free sync fences.  */
-#if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK
+#if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
       x_sync_free_fences (f);
 #endif
     }
@@ -27737,6 +27886,42 @@ xi_select_hierarchy_events (struct x_display_info *dpyinfo)
 
 #endif
 
+#if defined HAVE_XINPUT2 && defined HAVE_GTK3
+
+/* Look up whether or not GTK already initialized the X input
+   extension.
+
+   Value is 0 if GTK was not built with the input extension, or if it
+   was explictly disabled, 1 if GTK enabled the input extension and
+   the version was successfully determined, and 2 if that information
+   could not be determined.  */
+
+static int
+xi_check_toolkit (Display *display)
+{
+  GdkDisplay *gdpy;
+  GdkDeviceManager *manager;
+
+  gdpy = gdk_x11_lookup_xdisplay (display);
+  eassume (gdpy);
+  manager = gdk_display_get_device_manager (gdpy);
+
+  if (!strcmp (G_OBJECT_TYPE_NAME (manager),
+	       "GdkX11DeviceManagerXI2"))
+    return 1;
+
+  if (!strcmp (G_OBJECT_TYPE_NAME (manager),
+	       "GdkX11DeviceManagerCore"))
+    return 0;
+
+  /* Something changed in GDK so this information is no longer
+     available.  */
+
+  return 2;
+}
+
+#endif
+
 /* Open a connection to X display DISPLAY_NAME, and return
    the structure that describes the open display.
    If we cannot contact the display, return null.  */
@@ -28281,6 +28466,17 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
   dpyinfo->client_pointer_device = -1;
 
+#ifdef HAVE_GTK3
+  /* GTK gets a chance to request use of the input extension first.
+     If we later try to enable it if GDK did not, then GTK will not
+     get the resulting extension events.  */
+
+  rc = xi_check_toolkit (dpyinfo->display);
+
+  if (!rc)
+    goto skip_xi_setup;
+#endif
+
   if (XQueryExtension (dpyinfo->display, "XInputExtension",
 		       &dpyinfo->xi2_opcode, &xi_first_event,
 		       &xi_first_error))
@@ -28377,9 +28573,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     }
 
   dpyinfo->xi2_version = minor;
-#ifndef HAVE_GTK3
  skip_xi_setup:
-#endif
   ;
 #endif
 

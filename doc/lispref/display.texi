@@ -2623,14 +2623,17 @@ Draw a box with lines of width 1, in the foreground color.
 Draw a box with lines of width 1, in color @var{color}.
 
 @item @code{(:line-width (@var{vwidth} . @var{hwidth}) :color @var{color} :style @var{style})}
-This way you can explicitly specify all aspects of the box.  The values
-@var{vwidth} and @var{hwidth} specifies respectively the width of the
-vertical and horizontal lines to draw; they default to (1 . 1).
-A negative horizontal or vertical width @minus{}@var{n} means to draw a line
-of width @var{n} that occupies the space of the underlying text, thus
-avoiding any increase in the character height or width. For simplification
-the width could be specified with only a single number @var{n} instead
-of a list, such case is equivalent to @code{((abs @var{n}) . @var{n})}.
+You can explicitly specify all aspects of the box with a plist on this
+form.  Any element in this plist can be omitted.
+
+The values @var{vwidth} and @var{hwidth} specifies respectively the
+width of the vertical and horizontal lines to draw; they default to (1
+. 1).  A negative horizontal or vertical width @minus{}@var{n} means
+to draw a line of width @var{n} that occupies the space of the
+underlying text, thus avoiding any increase in the character height or
+width. For simplification the width could be specified with only a
+single number @var{n} instead of a list, such case is equivalent to
+@code{((abs @var{n}) . @var{n})}.
 
 The value @var{style} specifies whether to draw a 3D box.  If it is
 @code{released-button}, the box looks like a 3D button that is not
@@ -5886,6 +5889,14 @@ When you click the mouse when the mouse pointer is over a hot-spot, an
 event is composed by combining the @var{id} of the hot-spot with the
 mouse event; for instance, @code{[area4 mouse-1]} if the hot-spot's
 @var{id} is @code{area4}.
+
+Note that the map's coordinates should reflect the displayed image
+after all transforms have been done (rotation, scaling and so on), and
+also note that Emacs (by default) performs auto-scaling of images, so
+to make things match up, you should either specify @code{:scale 1.0}
+when creating the image, or use the result of
+@code{image-compute-scaling-factor} to compute the elements of the
+map.
 @end table
 
 @defun image-mask-p spec &optional frame
@@ -8531,7 +8542,11 @@ hexadecimal notation.
 
 @item an @acronym{ASCII} string
 Display a box containing that string.  The string should contain at
-most 6 @acronym{ASCII} characters.
+most 6 @acronym{ASCII} characters.  As an exception, if the string
+includes just one character, on text-mode terminals that character
+will be displayed without a box; this allows to handle such
+``acronyms'' as a replacement character for characters that cannot be
+displayed by the terminal.
 
 @item a cons cell @code{(@var{graphical} . @var{text})}
 Display with @var{graphical} on graphical displays, and with
@@ -8548,7 +8563,7 @@ square brackets, @samp{[]}.
 The char-table has one extra slot, which determines how to display any
 character that cannot be displayed with any available font, or cannot
 be encoded by the terminal's coding system.  Its value should be one
-of the above display methods, except @code{zero-width} or a cons cell.
+of the above display methods, except @code{zero-width}.
 
 If a character has a non-@code{nil} entry in an active display table,
 the display table takes effect; in this case, Emacs does not consult
