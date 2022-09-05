@@ -229,7 +229,7 @@ interactive command."
                (lambda (f) (if want-command
                           (commandp f)
                         (or (fboundp f) (get f 'function-documentation))))
-               t nil nil
+               'confirm nil nil
                (and fn (symbol-name fn)))))
     (unless (equal val "")
       (setq fn (intern val)))
@@ -510,13 +510,15 @@ the C sources, too."
 	     (src-file (locate-library file-name t nil 'readable)))
 	(and src-file (file-readable-p src-file) src-file))))))
 
-(defun help-fns--key-bindings (function)
+(defun help-fns--key-bindings (function orig-buffer)
   (when (commandp function)
     (let ((pt2 (with-current-buffer standard-output (point)))
           (remapped (command-remapping function)))
       (unless (memq remapped '(ignore undefined))
-        (let* ((all-keys (where-is-internal
-                          (or remapped function) overriding-local-map nil nil))
+        (let* ((all-keys
+                (with-current-buffer (or orig-buffer (current-buffer))
+                  (where-is-internal
+                   (or remapped function) overriding-local-map nil nil)))
                (seps (seq-group-by
                       (lambda (key)
                         (and (vectorp key)
@@ -1129,7 +1131,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
          (string-match "\\([^\\]=\\|[^=]\\|\\`\\)\\\\[[{<]" doc-raw)
          (autoload-do-load real-def))
 
-    (help-fns--key-bindings function)
+    (help-fns--key-bindings function describe-function-orig-buffer)
     (with-current-buffer standard-output
       (let ((doc (condition-case nil
                      ;; FIXME: Maybe `help-fns--signature' should return `doc'
@@ -2179,8 +2181,7 @@ documentation for the major and minor modes of that buffer."
 	;; Document the minor modes fully.
         (insert (buttonize
                  (propertize pretty-minor-mode 'help-minor-mode mode)
-                 (lambda (mode)
-                   (describe-function mode))
+                 #'describe-function
                  mode))
         (let ((indicator
                (format-mode-line (assq mode minor-mode-alist))))
@@ -2189,7 +2190,8 @@ documentation for the major and minor modes of that buffer."
 			      "no indicator"
 			    (format "indicator%s"
 				    indicator)))))
-	(insert (help-split-fundoc (documentation mode) nil 'doc)))))
+	(insert (or (help-split-fundoc (documentation mode) nil 'doc)
+	            "No docstring")))))
   (forward-line -1)
   (fill-paragraph nil)
   (forward-paragraph 1)

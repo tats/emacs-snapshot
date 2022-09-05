@@ -1913,8 +1913,10 @@ be a list of the form returned by `event-start' and `event-end'."
 (defalias 'mkdir #'make-directory)
 
 ;; These were the XEmacs names, now obsolete:
-(define-obsolete-function-alias 'point-at-eol #'line-end-position "29.1")
-(define-obsolete-function-alias 'point-at-bol #'line-beginning-position "29.1")
+(defalias 'point-at-eol #'line-end-position)
+(make-obsolete 'point-at-eol "use `line-end-position' or `pos-eol' instead." "29.1")
+(defalias 'point-at-bol #'line-beginning-position)
+(make-obsolete 'point-at-bol "use `line-beginning-position' or `pos-bol' instead." "29.1")
 (define-obsolete-function-alias 'user-original-login-name #'user-login-name "28.1")
 
 ;; These are in obsolete/autoload.el, but are commonly used by
@@ -6990,32 +6992,32 @@ CONDITION is either:
         (lambda (conditions)
           (catch 'match
             (dolist (condition conditions)
-              (when (cond
-                     ((eq condition t))
-                     ((stringp condition)
-                      (string-match-p condition (buffer-name buffer)))
-                     ((functionp condition)
-                      (if (eq 1 (cdr (func-arity condition)))
-                          (funcall condition buffer)
-                        (funcall condition buffer arg)))
-                     ((eq (car-safe condition) 'major-mode)
-                      (eq
-                       (buffer-local-value 'major-mode buffer)
-                       (cdr condition)))
-                     ((eq (car-safe condition) 'derived-mode)
-                      (provided-mode-derived-p
-                       (buffer-local-value 'major-mode buffer)
-                       (cdr condition)))
-                     ((eq (car-safe condition) 'not)
-                      (not (funcall match (cdr condition))))
-                     ((eq (car-safe condition) 'or)
-                      (funcall match (cdr condition)))
-                     ((eq (car-safe condition) 'and)
-                      (catch 'fail
-                        (dolist (c (cdr conditions))
-                          (unless (funcall match c)
-                            (throw 'fail nil)))
-                        t)))
+              (when (pcase condition
+                      ('t t)
+                      ((pred stringp)
+                       (string-match-p condition (buffer-name buffer)))
+                      ((pred functionp)
+                       (if (eq 1 (cdr (func-arity condition)))
+                           (funcall condition buffer)
+                         (funcall condition buffer arg)))
+                      (`(major-mode . ,mode)
+                       (eq
+                        (buffer-local-value 'major-mode buffer)
+                        mode))
+                      (`(derived-mode . ,mode)
+                       (provided-mode-derived-p
+                        (buffer-local-value 'major-mode buffer)
+                        mode))
+                      (`(not . ,cond)
+                       (not (funcall match cond)))
+                      (`(or . ,args)
+                       (funcall match args))
+                      (`(and . ,args)
+                       (catch 'fail
+                         (dolist (c args)
+                           (unless (funcall match (list c))
+                             (throw 'fail nil)))
+                         t)))
                 (throw 'match t)))))))
     (funcall match (list condition))))
 

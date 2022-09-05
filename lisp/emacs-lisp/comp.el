@@ -462,7 +462,7 @@ Useful to hook into pass checkers.")
     (marker-buffer (function (marker) (or buffer null)))
     (markerp (function (t) boolean))
     (max (function ((or number marker) &rest (or number marker)) number))
-    (max-char (function () fixnum))
+    (max-char (function (&optional t) fixnum))
     (member (function (t list) list))
     (memory-limit (function () integer))
     (memq (function (t list) list))
@@ -3935,8 +3935,11 @@ display a message."
          when (or native-comp-always-compile
                   load ; Always compile when the compilation is
                        ; commanded for late load.
-                  (file-newer-than-file-p
-                   source-file (comp-el-to-eln-filename source-file)))
+                  ;; Skip compilation if `comp-el-to-eln-filename' fails
+                  ;; to find a writable directory.
+                  (with-demoted-errors "Async compilation :%S"
+                    (file-newer-than-file-p
+                     source-file (comp-el-to-eln-filename source-file))))
          do (let* ((expr `((require 'comp)
                            (setq comp-async-compilation t)
                            (setq warning-fill-column most-positive-fixnum)

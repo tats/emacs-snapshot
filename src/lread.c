@@ -2905,19 +2905,17 @@ digit_to_number (int character, int base)
   return digit < base ? digit : -1;
 }
 
-/* Size of the fixed-size buffer used during reading.
-   It should be at least big enough for `invalid_radix_integer' but
-   can usefully be much bigger than that.  */
-enum { stackbufsize = 1024 };
-
 static void
-invalid_radix_integer (EMACS_INT radix, char stackbuf[VLA_ELEMS (stackbufsize)],
-		       Lisp_Object readcharfun)
+invalid_radix_integer (EMACS_INT radix, Lisp_Object readcharfun)
 {
-  int n = snprintf (stackbuf, stackbufsize, "integer, radix %"pI"d", radix);
-  eassert (n < stackbufsize);
-  invalid_syntax (stackbuf, readcharfun);
+  char buf[64];
+  int n = snprintf (buf, sizeof buf, "integer, radix %"pI"d", radix);
+  eassert (n < sizeof buf);
+  invalid_syntax (buf, readcharfun);
 }
+
+/* Size of the fixed-size buffer used during reading.  */
+enum { stackbufsize = 1024 };
 
 /* Read an integer in radix RADIX using READCHARFUN to read
    characters.  RADIX must be in the interval [2..36].  Use STACKBUF
@@ -2976,7 +2974,7 @@ read_integer (Lisp_Object readcharfun, int radix,
   UNREAD (c);
 
   if (valid != 1)
-    invalid_radix_integer (radix, stackbuf, readcharfun);
+    invalid_radix_integer (radix, readcharfun);
 
   *p = '\0';
   return unbind_to (count, string_to_number (read_buffer, radix, NULL));
@@ -3686,6 +3684,12 @@ read_stack_push (struct read_stack_entry e)
   rdstack.stack[rdstack.sp++] = e;
 }
 
+static void
+read_stack_reset (intmax_t sp)
+{
+  eassert (sp <= rdstack.sp);
+  rdstack.sp = sp;
+}
 
 /* Read a Lisp object.
    If LOCATE_SYMS is true, symbols are read with position.  */
@@ -3696,9 +3700,12 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
   char *heapbuf = NULL;
-  specpdl_ref count = SPECPDL_INDEX ();
 
+  specpdl_ref base_pdl = SPECPDL_INDEX ();
   ptrdiff_t base_sp = rdstack.sp;
+  record_unwind_protect_intmax (read_stack_reset, base_sp);
+
+  specpdl_ref count = SPECPDL_INDEX ();
 
   bool uninterned_symbol;
   bool skip_shorthand;
@@ -3980,7 +3987,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		  {
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
-		      invalid_radix_integer (n, stackbuf, readcharfun);
+		      invalid_radix_integer (n, readcharfun);
 		    obj = read_integer (readcharfun, n, stackbuf);
 		    break;
 		  }
@@ -4347,7 +4354,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	}
     }
 
-  return unbind_to (count, obj);
+  return unbind_to (base_pdl, obj);
 }
 
 

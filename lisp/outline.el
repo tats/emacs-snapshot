@@ -288,8 +288,7 @@ The value should be a `buffer-match-p' condition.
 These buttons can be used to hide and show the body under the heading.
 Note that this feature is not meant to be used in editing
 buffers (yet) -- that will be amended in a future version."
-  ;; FIXME -- is there a `buffer-match-p' defcustom type somewhere?
-  :type 'sexp
+  :type 'buffer-predicate
   :safe #'booleanp
   :version "29.1")
 
@@ -427,15 +426,14 @@ outline font-lock faces to those of major mode."
     (goto-char (point-min))
     (let ((regexp (concat "^\\(?:" outline-regexp "\\).*$")))
       (while (re-search-forward regexp nil t)
-        (let ((overlay (make-overlay (match-beginning 0)
-                                     (match-end 0))))
+        (let ((overlay (make-overlay (match-beginning 0) (match-end 0))))
           (overlay-put overlay 'outline-overlay t)
-          (when (or (eq outline-minor-mode-highlight 'override)
+          ;; FIXME: Is it possible to override all underlying face attributes?
+          (when (or (memq outline-minor-mode-highlight '(append override))
                     (and (eq outline-minor-mode-highlight t)
-                         (goto-char (match-beginning 0))
-                         (not (get-text-property (point) 'face))))
+                         (not (get-text-property (match-beginning 0) 'face))))
             (overlay-put overlay 'face (outline-font-lock-face)))
-          (when (and (outline--use-buttons-p) (outline-on-heading-p))
+          (when (outline--use-buttons-p)
             (outline--insert-open-button)))
         (goto-char (match-end 0))))))
 
@@ -445,17 +443,19 @@ outline font-lock faces to those of major mode."
 
 See the command `outline-mode' for more information on this mode."
   :lighter " Outl"
-  :keymap (easy-mmode-define-keymap
-           `(([menu-bar] . ,outline-minor-mode-menu-bar-map)
-             (,outline-minor-mode-prefix . ,outline-mode-prefix-map))
-           :inherit outline-minor-mode-cycle-map)
+  :keymap (define-keymap
+            :parent outline-minor-mode-cycle-map
+            "<menu-bar>" outline-minor-mode-menu-bar-map
+            (key-description outline-minor-mode-prefix) outline-mode-prefix-map)
   (if outline-minor-mode
       (progn
         (when outline-minor-mode-highlight
-          (when (and global-font-lock-mode (font-lock-specified-p major-mode))
-            (font-lock-add-keywords nil outline-font-lock-keywords t)
-            (font-lock-flush))
-          (outline-minor-mode-highlight-buffer))
+          (if (and global-font-lock-mode (font-lock-specified-p major-mode))
+              (progn
+                (font-lock-add-keywords nil outline-font-lock-keywords t)
+                (font-lock-flush)
+                (outline--fix-up-all-buttons))
+            (outline-minor-mode-highlight-buffer)))
 	;; Turn off this mode if we change major modes.
 	(add-hook 'change-major-mode-hook
 		  (lambda () (outline-minor-mode -1))
@@ -1005,7 +1005,8 @@ If non-nil, EVENT should be a mouse event."
         (put-text-property (point) (1+ (point)) 'face (plist-get icon 'face)))
       (when-let ((image (plist-get icon 'image)))
         (overlay-put o 'display image))
-      (overlay-put o 'display (plist-get icon 'string))
+      (overlay-put o 'display (concat (plist-get icon 'string)
+                                      (string (char-after (point)))))
       (overlay-put o 'face (plist-get icon 'face)))
     o))
 
