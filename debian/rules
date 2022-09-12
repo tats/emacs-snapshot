@@ -67,7 +67,7 @@ etc_files := DEVEL.HUMOR JOKES
 deb_patches := $(addprefix debian/patches/,$(shell cat debian/patches/series))
 
 %:
-	dh $@ --parallel
+	dh $@
 
 # For now, assumes there are no "|" characters in the expansions.
 debian/autogen.sed: debian/rules debian/changelog
