@@ -1,52 +1,63 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Emacs
-Upstream-Contact: bug-gnu-emacs@gnu.org
-Upstream-Contact: emacs-devel@gnu.org
+Upstream-Contact: bug-gnu-emacs@gnu.org emacs-devel@gnu.org
 Source: https://savannah.gnu.org/projects/emacs
 Comment:
   This package is derived from the main Emacs packages which were
   debianized by Rob Browning <rlb@defaultvalue.org> on Tue, 16 Dec 1997
   00:05:45 -0600.
-
+  .
   The original source for this package can be found at
   git://git.savannah.gnu.org/emacs.git under the
   emacs-28.1 tag.  That tag was used to create the
   Debian upstream archive (emacs-non-free_1:28.1+1.orig.tar.xz)
   after making the adjustments to comply with the DFSG detailed below.
-
+  .
   Please see /usr/share/doc/emacs-common-non-dfsg/README.Debian for a
   description of the Debian specific differences from the upstream
   version.
-
+  .
   This package contains files which have been deemed unsuitable for
   Debian main because their licenses do not appear to satisfy the
   requirements of the Debian Free Software Guidelines (DFSG).  See
   http://www.debian.org/social_contract.
-
+  .
   In particular, some of the info pages included in this package are
   covered under the GNU Free Documentation License (GFDL), which Debian
   has decided does not satisfy the DFSG in cases where "Invariant
   Sections" are specified.  See this Debian General Resolution on the
   topic: http://www.debian.org/vote/2006/vote_001.
-
+  .
   Some other files are included here because their license only allows
   verbatim copying, or because there was some other question regarding
   their license.
-
+  .
   Please see the files themselves for the relevant Copyright dates.
 
 Files: *
 License: GPL-3+
+  On Debian systems, the full text of the GNU General Public License
+  version 3 can be found in the file /usr/share/common-licenses/GPL-3.
 
 Files: debian/rules
-License: GPL plus Ian
+License: GPL-plus-Ian
   This file is licensed under the terms of the Gnu Public License.
   With the one additional provision that Ian Jackson's name may not be
   removed from the file.
 
 Files: *.texi
 License: GFDL-1.3+
+  On Debian systems, the full text of the GNU Free Documentation
+  License (GFDL) version 1.3, can be found in the file
+  /usr/share/common-licenses/GFDL-1.3.
 
-Files: etc/DEVEL.HUMOR etc/JOKES
-License:
-  These files appear to have no explicit copyright statement.
+Files: etc/DEVEL.HUMOR
+License: none-humor
+  The Free Software Foundation claims no copyright on this file,
+  compiled from the public emacs-devel mailing list.
+
+Files: etc/JOKES
+License: none-jokes
+  The Free Software Foundation claims no copyright on this file,
+  compiled largely from postings to public newsgroups and mailing
+  lists, and the GNU project email archives.
