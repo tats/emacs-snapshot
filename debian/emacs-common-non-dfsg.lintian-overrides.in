@@ -1,2 +1,4 @@
+# We mention the GFDL in the explanation
+emacs-common-non-dfsg: copyright-not-using-common-license-for-gfdl
 # This is not a license file
 emacs-common-non-dfsg: extra-license-file usr/share/emacs/@UPSTREAM_VERSION@/etc/copying.paper
