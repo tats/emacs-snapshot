@@ -311,29 +311,13 @@ Then evaluate RESULT to get return value, default nil.
     (signal 'wrong-type-argument (list 'consp spec)))
   (unless (<= 2 (length spec) 3)
     (signal 'wrong-number-of-arguments (list '(2 . 3) (length spec))))
-  ;; It would be cleaner to create an uninterned symbol,
-  ;; but that uses a lot more space when many functions in many files
-  ;; use dolist.
-  ;; FIXME: This cost disappears in byte-compiled lexical-binding files.
-  (let ((temp '--dolist-tail--))
-    ;; This test does not matter much because both semantics are acceptable,
-    ;; but one is slightly faster with dynamic scoping and the other is
-    ;; slightly faster (and has cleaner semantics) with lexical scoping.
-    (if lexical-binding
-        `(let ((,temp ,(nth 1 spec)))
-           (while ,temp
-             (let ((,(car spec) (car ,temp)))
-               ,@body
-               (setq ,temp (cdr ,temp))))
-           ,@(cdr (cdr spec)))
-      `(let ((,temp ,(nth 1 spec))
-             ,(car spec))
-         (while ,temp
-           (setq ,(car spec) (car ,temp))
+  (let ((tail (make-symbol "tail")))
+    `(let ((,tail ,(nth 1 spec)))
+       (while ,tail
+         (let ((,(car spec) (car ,tail)))
            ,@body
-           (setq ,temp (cdr ,temp)))
-         ,@(if (cdr (cdr spec))
-               `((setq ,(car spec) nil) ,@(cdr (cdr spec))))))))
+           (setq ,tail (cdr ,tail))))
+       ,@(cdr (cdr spec)))))
 
 (defmacro dotimes (spec &rest body)
   "Loop a certain number of times.
@@ -346,33 +330,19 @@ in compilation warnings about unused variables.
 
 \(fn (VAR COUNT [RESULT]) BODY...)"
   (declare (indent 1) (debug dolist))
-  ;; It would be cleaner to create an uninterned symbol,
-  ;; but that uses a lot more space when many functions in many files
-  ;; use dotimes.
-  ;; FIXME: This cost disappears in byte-compiled lexical-binding files.
-  (let ((temp '--dotimes-limit--)
-	(start 0)
-	(end (nth 1 spec)))
-    ;; This test does not matter much because both semantics are acceptable,
-    ;; but one is slightly faster with dynamic scoping and the other has
-    ;; cleaner semantics.
-    (if lexical-binding
-        (let ((counter '--dotimes-counter--))
-          `(let ((,temp ,end)
-                 (,counter ,start))
-             (while (< ,counter ,temp)
-               (let ((,(car spec) ,counter))
-                 ,@body)
-               (setq ,counter (1+ ,counter)))
-             ,@(if (cddr spec)
-                   ;; FIXME: This let often leads to "unused var" warnings.
-                   `((let ((,(car spec) ,counter)) ,@(cddr spec))))))
-      `(let ((,temp ,end)
-             (,(car spec) ,start))
-         (while (< ,(car spec) ,temp)
-           ,@body
-           (setq ,(car spec) (1+ ,(car spec))))
-         ,@(cdr (cdr spec))))))
+  (let ((var (nth 0 spec))
+        (end (nth 1 spec))
+        (upper-bound (make-symbol "upper-bound"))
+        (counter (make-symbol "counter")))
+    `(let ((,upper-bound ,end)
+           (,counter 0))
+       (while (< ,counter ,upper-bound)
+         (let ((,var ,counter))
+           ,@body)
+         (setq ,counter (1+ ,counter)))
+       ,@(if (cddr spec)
+             ;; FIXME: This let often leads to "unused var" warnings.
+             `((let ((,var ,counter)) ,@(cddr spec)))))))
 
 (defmacro declare (&rest _specs)
   "Do not evaluate any arguments, and return nil.
@@ -1823,8 +1793,6 @@ be a list of the form returned by `event-start' and `event-end'."
 
 
 ;;;; Obsolescent names for functions.
-
-(make-obsolete 'buffer-has-markers-at nil "24.3")
 
 (make-obsolete 'invocation-directory "use the variable of the same name."
                "27.1")
@@ -3788,10 +3756,6 @@ This finishes the change group by reverting all of its changes."
 
 ;;;; Display-related functions.
 
-;; For compatibility.
-(define-obsolete-function-alias 'redraw-modeline
-  #'force-mode-line-update "24.3")
-
 (defun momentary-string-display (string pos &optional exit-char message)
   "Momentarily display STRING in the buffer at POS.
 Display remains until next event is input.
@@ -4255,15 +4219,17 @@ Comparisons and replacements are done with fixed case."
         (error "End after end of buffer"))
     (setq end (point-max)))
   (save-excursion
-    (let ((matches 0)
-          (case-fold-search nil))
-      (goto-char start)
-      (while (search-forward string end t)
-        (delete-region (match-beginning 0) (match-end 0))
-        (insert replacement)
-        (setq matches (1+ matches)))
-      (and (not (zerop matches))
-           matches))))
+    (goto-char start)
+    (save-restriction
+      (narrow-to-region start end)
+      (let ((matches 0)
+            (case-fold-search nil))
+        (while (search-forward string nil t)
+          (delete-region (match-beginning 0) (match-end 0))
+          (insert replacement)
+          (setq matches (1+ matches)))
+        (and (not (zerop matches))
+             matches)))))
 
 (defun replace-regexp-in-region (regexp replacement &optional start end)
   "Replace REGEXP with REPLACEMENT in the region from START to END.
@@ -4290,14 +4256,16 @@ REPLACEMENT can use the following special elements:
         (error "End after end of buffer"))
     (setq end (point-max)))
   (save-excursion
-    (let ((matches 0)
-          (case-fold-search nil))
-      (goto-char start)
-      (while (re-search-forward regexp end t)
-        (replace-match replacement t)
-        (setq matches (1+ matches)))
-      (and (not (zerop matches))
-           matches))))
+    (goto-char start)
+    (save-restriction
+      (narrow-to-region start end)
+      (let ((matches 0)
+            (case-fold-search nil))
+          (while (re-search-forward regexp nil t)
+          (replace-match replacement t)
+          (setq matches (1+ matches)))
+        (and (not (zerop matches))
+             matches)))))
 
 (defun yank-handle-font-lock-face-property (face start end)
   "If `font-lock-defaults' is nil, apply FACE as a `face' property.
@@ -4986,10 +4954,6 @@ If `default-directory' is already an existing directory, it's not changed."
 
 ;;; Matching and match data.
 
-;; We use save-match-data-internal as the local variable because
-;; that works ok in practice (people should not use that variable elsewhere).
-;; We used to use an uninterned symbol; the compiler handles that properly
-;; now, but it generates slower code.
 (defmacro save-match-data (&rest body)
   "Execute the BODY forms, restoring the global value of the match data.
 The value returned is the value of the last form in BODY.
@@ -5001,13 +4965,12 @@ rather than your caller's match data."
   ;; because that makes a bootstrapping problem
   ;; if you need to recompile all the Lisp files using interpreted code.
   (declare (indent 0) (debug t))
-  (list 'let
-	'((save-match-data-internal (match-data)))
-	(list 'unwind-protect
-	      (cons 'progn body)
-	      ;; It is safe to free (evaporate) markers immediately here,
-	      ;; as Lisp programs should not copy from save-match-data-internal.
-	      '(set-match-data save-match-data-internal 'evaporate))))
+  (let ((saved-match-data (make-symbol "saved-match-data")))
+    (list 'let
+	  (list (list saved-match-data '(match-data)))
+	  (list 'unwind-protect
+	        (cons 'progn body)
+	        (list 'set-match-data saved-match-data t)))))
 
 (defun match-string (num &optional string)
   "Return the string of text matched by the previous search or regexp operation.
@@ -5244,6 +5207,8 @@ Modifies the match data; use `save-match-data' if necessary."
     (funcall push-one)
 
     (nreverse list)))
+
+(defalias 'string-split #'split-string)
 
 (defun combine-and-quote-strings (strings &optional separator)
   "Concatenate the STRINGS, adding the SEPARATOR (default \" \").

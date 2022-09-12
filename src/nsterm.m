@@ -5607,17 +5607,6 @@ ns_term_init (Lisp_Object display_name)
 
   NSTRACE_MSG ("Versions");
 
-  {
-#ifdef NS_IMPL_GNUSTEP
-    Vwindow_system_version = build_string (gnustep_base_version);
-#else
-    /* PSnextrelease (128, c); */
-    char c[DBL_BUFSIZE_BOUND];
-    int len = dtoastr (c, sizeof c, 0, 0, NSAppKitVersionNumber);
-    Vwindow_system_version = make_unibyte_string (c, len);
-#endif
-  }
-
   delete_keyboard_wait_descriptor (0);
 
   ns_app_name = [[NSProcessInfo processInfo] processName];
@@ -7912,22 +7901,28 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
   NSRect r = [win frame];
   NSArray *screens = [NSScreen screens];
   NSScreen *screen = [screens objectAtIndex: 0];
+  struct input_event ie;
 
   NSTRACE ("[EmacsView windowDidMove:]");
 
   if (!emacsframe->output_data.ns)
     return;
+
   if (screen != nil)
     {
-      emacsframe->left_pos = NSMinX (r) - NS_PARENT_WINDOW_LEFT_POS (emacsframe);
-      emacsframe->top_pos = NS_PARENT_WINDOW_TOP_POS (emacsframe) - NSMaxY (r);
+      emacsframe->left_pos = (NSMinX (r)
+			      - NS_PARENT_WINDOW_LEFT_POS (emacsframe));
+      emacsframe->top_pos = (NS_PARENT_WINDOW_TOP_POS (emacsframe)
+			     - NSMaxY (r));
 
-      // FIXME: after event part below didExitFullScreen is not received
-      // if (emacs_event)
-      //   {
-      //     emacs_event->kind = MOVE_FRAME_EVENT;
-      //     EV_TRAILER ((id)nil);
-      //   }
+      if (emacs_event)
+	{
+	  ie.kind = MOVE_FRAME_EVENT;
+	  XSETFRAME (ie.frame_or_window, emacsframe);
+	  XSETINT (ie.x, emacsframe->left_pos);
+	  XSETINT (ie.y, emacsframe->top_pos);
+	  kbd_buffer_store_event (&ie);
+	}
     }
 }
 

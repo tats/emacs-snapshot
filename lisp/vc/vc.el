@@ -1050,7 +1050,8 @@ Within directories, only files already under version control are noticed."
 	((derived-mode-p 'log-edit-mode) log-edit-vc-backend)
 	((derived-mode-p 'diff-mode)     diff-vc-backend)
         ;; Maybe we could even use comint-mode rather than shell-mode?
-	((derived-mode-p 'dired-mode 'shell-mode 'compilation-mode)
+	((derived-mode-p
+          'dired-mode 'shell-mode 'eshell-mode 'compilation-mode)
 	 (ignore-errors (vc-responsible-backend default-directory)))
 	(vc-mode (vc-backend buffer-file-name))))
 
@@ -1807,7 +1808,8 @@ in the output buffer."
     (setq buffer-read-only t)
     (diff-mode)
     (setq-local diff-vc-backend (vc-responsible-backend default-directory))
-    (setq-local revert-buffer-function (lambda (_ _) (vc-diff-patch-string)))
+    (setq-local revert-buffer-function
+                (lambda (_ _) (vc-diff-patch-string patch-string)))
     (setq-local vc-patch-string patch-string)
     (pop-to-buffer (current-buffer))
     (vc-run-delayed (vc-diff-finish (current-buffer) nil))))
@@ -3273,8 +3275,6 @@ to provide the `find-revision' operation instead."
 
 
 ;; These things should probably be generally available
-(define-obsolete-function-alias 'vc-string-prefix-p 'string-prefix-p "24.3")
-
 (defun vc-file-tree-walk (dirname func &rest args)
   "Walk recursively through DIRNAME.
 Invoke FUNC f ARGS on each VC-managed file f underneath it."

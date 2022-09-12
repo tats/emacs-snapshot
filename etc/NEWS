@@ -145,6 +145,11 @@ reaches the end of the script, Emacs will exit with an exit code from
 the value of the final form.
 
 +++
+** New function 'substitute-quotes'.
+This function works like 'substitute-command-keys' but only
+substitutes quote characters.
+
++++
 ** Emacs now supports setting 'user-emacs-directory' via '--init-directory'.
 
 +++
@@ -944,6 +949,11 @@ non-nil in 'special-mode' and its derivatives.
 ** Windows
 
 +++
+*** New commands 'split-root-window-below' and 'split-root-window-right'.
+These commands split the root window in to, and are are bound to 'C-x
+7' and 'C-x 9' respectively.
+
++++
 *** New user option 'display-buffer-avoid-small-windows'.
 If non-nil, this should be a window height, a number.  Windows smaller
 than this will be avoided by 'display-buffer', if possible.
@@ -998,9 +1008,14 @@ suspicious and could be malicious.
 ** Emacs server and client changes
 
 +++
-*** New command-line option '-r' for emacsclient.
+*** New command-line option '-r'/'--reuse-frame' for emacsclient.
 With this command-line option, Emacs reuses an existing graphical client
 frame if one exists; otherwise it creates a new frame.
+
++++
+*** New command-line option '-w N'/'--timeout=N' for emacsclient.
+With this command-line option, emacsclient will exit if Emacs does not
+respond within N seconds.  The default is to wait forever.
 
 +++
 *** 'server-stop-automatically' can be used to automatically stop the server.
@@ -1203,6 +1218,12 @@ change the input method's translation rules, customize the user option
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
+** ecomplete
+
+---
+*** New user option 'ecomplete-auto-select'.
+If non-nil and there's only one matching option, auto-select that.
+
 ** Dired
 
 +++
@@ -1329,6 +1350,11 @@ contents.
 Sets the value of the buffer-local variable 'whitespace-style' in
 'diff-mode' buffers.  By default, this variable is '(face trailing)',
 which preserves behavior from previous Emacs versions.
+
++++
+*** New user option 'diff-add-log-use-relative-names'.
+If non-nil insert file names in ChangeLog skeletons relative to the
+VC root directory.
 
 ** Ispell
 
@@ -1643,6 +1669,12 @@ directory in "~/foo/bar", using 'C-x v v' on a new, unregistered file
 "~/foo/bar/zot" would register it in the SVN repository in "~/" instead of
 in the Git repository in "~/foo/bar".  This makes this command
 consistent with 'vc-responsible-backend'.
+
+---
+*** Log Edit now font locks long Git commit summary lines.
+Writing shorter summary lines avoids truncation in contexts in which
+Git commands display summary lines.  See the two new variables
+'vc-git-log-edit-summary-target-len' and 'vc-git-log-edit-summary-max-len'.
 
 ** Message
 
@@ -2418,6 +2450,11 @@ when visiting JSON files.
 
 * Incompatible Lisp Changes in Emacs 29.1
 
++++
+** 'format-prompt' now uses 'substitute-command-keys'.
+This means that both the prompt and 'minibuffer-default-prompt-format'
+will have key definitions and single quotes handled specially.
+
 ---
 ** 'find-image' now uses 'create-image'.
 This means that images found through 'find-image' also have
@@ -2594,55 +2631,102 @@ but switching to `ash` is generally much preferable.
 
 ---
 ** Some functions and variables obsolete since Emacs 24 have been removed:
+'Buffer-menu-buffer+size-width', 'Electric-buffer-menu-mode',
 'Info-edit-map', 'allout-abbreviate-flattened-numbering',
-'allout-mode-deactivate-hook', 'ansi-color-unfontify-region',
-'auth-source-forget-user-or-password', 'auth-source-hide-passwords',
-'auth-source-user-or-password', 'bibtex-complete',
-'bibtex-entry-field-alist', 'buffer-substring-filters',
-'byte-compile-disable-print-circle', 'cfengine-mode-abbrevs',
-'chart-map', 'comint-dynamic-complete',
-'comint-dynamic-complete-as-filename',
-'comint-dynamic-simple-complete', 'command-history-map',
-'compilation-parse-errors-function', 'completion-annotate-function',
-'condition-case-no-debug', 'count-lines-region', 'data-debug-map',
-'deferred-action-list', 'deferred-action-function',
-'dired-x-submit-report', 'eieio-defgeneric', 'eieio-defmethod',
-'emacs-lock-from-exiting', 'erc-complete-word',
-'eshell-cmpl-suffix-list', 'eshell-for', 'font-lock-maximum-size',
+'allout-exposure-change-hook', 'allout-mode-deactivate-hook',
+'allout-structure-added-hook', 'allout-structure-deleted-hook',
+'allout-structure-shifted-hook', 'ansi-color-unfontify-region',
+'archive-extract-hooks', 'auth-source-forget-user-or-password',
+'auth-source-hide-passwords', 'auth-source-user-or-password',
+'automatic-hscrolling', 'automount-dir-prefix', 'bibtex-complete',
+'bibtex-entry-field-alist', 'buffer-has-markers-at',
+'buffer-substring-filters', 'byte-compile-disable-print-circle',
+'c-prepare-bug-report-hooks', 'cfengine-mode-abbrevs',
+'change-log-acknowledgement', 'chart-map',
+'checkdoc-comment-style-hooks', 'comint--unquote&expand-filename',
+'comint-dynamic-complete', 'comint-dynamic-complete-as-filename',
+'comint-dynamic-simple-complete', 'comint-unquote-filename',
+'command-history-map', 'compilation-parse-errors-function',
+'completion-annotate-function', 'condition-case-no-debug',
+'count-lines-region', 'crisp-mode-modeline-string',
+'custom-print-functions', 'custom-print-functions',
+'cvs-string-prefix-p', 'data-debug-map', 'deferred-action-function',
+'deferred-action-list', 'dired-pop-to-buffer', 'dired-shrink-to-fit',
+'dired-sort-set-modeline', 'dired-x-submit-report',
+'display-buffer-function',
+'ediff-choose-window-setup-function-automatically',
+'eieio-defgeneric', 'eieio-defmethod', 'emacs-lock-from-exiting',
+'erc-complete-word', 'erc-dcc-chat-filter-hook',
+'eshell-add-to-window-buffer-names', 'eshell-cmpl-suffix-list',
+'eshell-for', 'eshell-remove-from-window-buffer-names',
+'eshell-status-in-modeline', 'filesets-cache-fill-content-hooks',
+'font-list-limit', 'font-lock-maximum-size',
 'font-lock-reference-face', 'gnus-carpal',
 'gnus-debug-exclude-variables', 'gnus-debug-files',
 'gnus-local-domain', 'gnus-outgoing-message-group',
-'gnus-secondary-servers', 'gnus-registry-user-format-function-M',
+'gnus-registry-user-format-function-M', 'gnus-secondary-servers',
+'gnus-subscribe-newsgroup-hooks', 'gud-inhibit-global-bindings',
+'hangul-input-method-inactivate', 'hfy-post-html-hooks',
 'image-extension-data', 'image-library-alist',
+'inactivate-current-input-method-function', 'inactivate-input-method',
 'inhibit-first-line-modes-regexps',
-'inhibit-first-line-modes-suffixes', 'intdos',
-'mail-complete-function', 'mail-completion-at-point-function',
+'inhibit-first-line-modes-suffixes', 'input-method-inactivate-hook',
+'intdos', 'javascript-generic-mode', 'javascript-generic-mode-hook',
+'latex-string-prefix-p', 'macro-declaration-function' (function),
+'macro-declaration-function' (variable), 'mail-complete-function',
+'mail-completion-at-point-function',
 'mail-mailer-swallows-blank-line', 'mail-sent-via', 'make-register',
 'makefile-complete', 'menu-bar-kill-ring-save',
 'meta-complete-symbol', 'meta-mode-map',
+'mh-kill-folder-suppress-prompt-hooks',
 'minibuffer-completing-symbol',
 'minibuffer-local-filename-must-match-map', 'mode25', 'mode4350',
-'msb-after-load-hooks', 'nnimap-split-rule', 'nntp-authinfo-file',
-'ns-alternatives-map', 'ns-store-cut-buffer-internal',
-'package-menu-view-commentary', 'pascal-last-completions',
-'pascal-show-completions', 'pascal-toggle-completions',
-'prolog-char-quote-workaround', 'read-filename-at-point',
+'mpc-string-prefix-p', 'msb-after-load-hooks',
+'nndiary-request-accept-article-hooks',
+'nndiary-request-create-group-hooks',
+'nndiary-request-update-info-hooks', 'nnimap-split-rule',
+'nntp-authinfo-file', 'ns-alternatives-map',
+'ns-store-cut-buffer-internal', 'package-menu-view-commentary',
+'pascal-last-completions', 'pascal-show-completions',
+'pascal-toggle-completions', 'pcomplete-arg-quote-list',
+'pcomplete-quote-argument', 'prolog-char-quote-workaround',
+'python-buffer, 'python-guess-indent', 'python-indent',
+'python-info-ppss-comment-or-string-p', 'python-info-ppss-context',
+'python-info-ppss-context-type', 'python-preoutput-result',
+'python-proc', 'python-send-receive', 'python-send-string',
+'python-use-skeletons', 'quail-inactivate', 'quail-inactivate-hook',
+'query-replace-interactive', 'rcirc-activity-hooks',
+'rcirc-print-hooks', 'rcirc-receive-message-hooks',
+'rcirc-sentinel-hooks', 'read-filename-at-point', 'redraw-modeline',
 'reftex-index-map', 'reftex-index-phrases-map',
 'reftex-select-bib-map', 'reftex-select-label-map', 'reftex-toc-map',
-'register-name-alist', 'register-value',
+'register-name-alist', 'register-value', 'report-emacs-bug-info',
 'report-emacs-bug-pretest-address',
 'rmail-default-dont-reply-to-names', 'rmail-dont-reply-to',
-'rmail-dont-reply-to-names', 'rst-block-face', 'rst-comment-face',
+'rmail-dont-reply-to-names', 'robin-inactivate',
+'robin-inactivate-hook', 'rst-block-face', 'rst-comment-face',
 'rst-definition-face', 'rst-directive-face', 'rst-emphasis1-face',
 'rst-emphasis2-face', 'rst-external-face', 'rst-literal-face',
-'rst-reference-face', 'semantic-grammar-map',
-'semantic-grammar-syntax-table', 'set-register-value',
-'speedbar-key-map', 'speedbar-syntax-table',
-'starttls-any-program-available', 'strokes-report-bug',
+'rst-reference-face', 'semantic-change-hooks',
+'semantic-edits-delete-change-hooks',
+'semantic-edits-new-change-hooks',
+'semantic-edits-reparse-change-hooks', 'semantic-grammar-map',
+'semantic-grammar-syntax-table', 'semantic-lex-reset-hooks',
+'semanticdb-elisp-sym-function-arglist',
+'semanticdb-save-database-hooks', 'set-face-underline-p',
+'set-register-value', 'sh-maybe-here-document', 'speedbar-key-map',
+'speedbar-syntax-table', 'starttls-any-program-available',
+'strokes-modeline-string', 'strokes-report-bug',
+'term-default-bg-color', 'term-default-fg-color',
+'tex-string-prefix-p', 'timeclock-modeline-display',
+'timeclock-modeline-display', 'timeclock-update-modeline',
 'toggle-emacs-lock', 'tooltip-use-echo-area', 'turn-on-cwarn-mode',
-'turn-on-iimage-mode', 'vc-toggle-read-only', 'view-return-to-alist',
+'turn-on-iimage-mode', 'ucs-input-inactivate', 'ucs-insert',
+'url-recreate-url-attributes', 'user-variable-p',
+'vc-string-prefix-p', 'vc-toggle-read-only', 'view-return-to-alist',
 'view-return-to-alist-update', 'w32-default-color-map' (function),
-'which-func-mode' (function), 'x-cut-buffer-or-selection-value'.
+'which-func-mode' (function), 'window-system-version',
+'winner-mode-leave-hook', 'x-cut-buffer-or-selection-value'.
 
 ---
 ** Some functions and variables obsolete since Emacs 23 have been removed:
@@ -3605,6 +3689,8 @@ to preserve the old behavior, apply
 '(take N LIST)' returns the first N elements of LIST; 'ntake' does
 the same but works by modifying LIST destructively.
 
+---
+** 'string-split' is now an alias for 'split-string'.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems

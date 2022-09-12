@@ -510,13 +510,14 @@ the C sources, too."
 	     (src-file (locate-library file-name t nil 'readable)))
 	(and src-file (file-readable-p src-file) src-file))))))
 
-(defun help-fns--key-bindings (function orig-buffer)
+(defun help-fns--key-bindings (function)
   (when (commandp function)
     (let ((pt2 (with-current-buffer standard-output (point)))
           (remapped (command-remapping function)))
       (unless (memq remapped '(ignore undefined))
         (let* ((all-keys
-                (with-current-buffer (or orig-buffer (current-buffer))
+                (with-current-buffer
+                    (or describe-function-orig-buffer (current-buffer))
                   (where-is-internal
                    (or remapped function) overriding-local-map nil nil)))
                (seps (seq-group-by
@@ -711,13 +712,13 @@ the C sources, too."
                           (get function
                                'derived-mode-parent))))
     (when parent-mode
-      (insert (substitute-command-keys "  Parent mode: `"))
+      (insert (substitute-quotes "  Parent mode: `"))
       (let ((beg (point)))
         (insert (format "%s" parent-mode))
         (make-text-button beg (point)
                           'type 'help-function
                           'help-args (list parent-mode)))
-      (insert (substitute-command-keys "'.\n")))))
+      (insert (substitute-quotes "'.\n")))))
 
 (defun help-fns--obsolete (function)
   ;; Ignore lambda constructs, keyboard macros, etc.
@@ -1131,7 +1132,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
          (string-match "\\([^\\]=\\|[^=]\\|\\`\\)\\\\[[{<]" doc-raw)
          (autoload-do-load real-def))
 
-    (help-fns--key-bindings function describe-function-orig-buffer)
+    (help-fns--key-bindings function)
     (with-current-buffer standard-output
       (let ((doc (condition-case nil
                      ;; FIXME: Maybe `help-fns--signature' should return `doc'
@@ -1558,7 +1559,7 @@ This cancels value editing without updating the value."
     (princ "  This variable may be risky if used as a \
 file-local variable.\n")
     (when (assq variable safe-local-variable-values)
-      (princ (substitute-command-keys
+      (princ (substitute-quotes
               "  However, you have added it to \
 `safe-local-variable-values'.\n")))))
 
@@ -1608,8 +1609,8 @@ variable.\n")))
 	          (insert-text-button
 	           file 'type 'help-dir-local-var-def
                    'help-args (list variable file)))
-	        (princ (substitute-command-keys "'.\n"))))
-          (princ (substitute-command-keys
+                (princ (substitute-quotes "'.\n"))))
+          (princ (substitute-quotes
 	          "  This variable's value is file-local.\n")))))))
 
 (add-hook 'help-fns-describe-variable-functions #'help-fns--var-watchpoints)
@@ -1689,10 +1690,10 @@ variable.\n")))
      ((not permanent-local))
      ((bufferp locus)
       (princ
-       (substitute-command-keys
+       (substitute-quotes
         "  This variable's buffer-local value is permanent.\n")))
      (t
-      (princ (substitute-command-keys
+      (princ (substitute-quotes
 	      "  This variable's value is permanent \
 if it is given a local binding.\n"))))))
 
@@ -1769,9 +1770,9 @@ If FRAME is omitted or nil, use the selected frame."
                     (setq help-mode--current-data (list :symbol f))
                   (setq help-mode--current-data (list :symbol f
                                                       :file file-name))
-		  (princ (substitute-command-keys "Defined in `"))
+                (princ (substitute-quotes "Defined in `"))
 		  (princ (help-fns-short-filename file-name))
-		  (princ (substitute-command-keys "'"))
+                (princ (substitute-quotes "'"))
 		  ;; Make a hyperlink to the library.
 		  (save-excursion
 		    (re-search-backward

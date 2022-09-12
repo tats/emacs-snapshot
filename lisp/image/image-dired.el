@@ -767,7 +767,7 @@ according to `image-dired-marking-shows-next'."
      ,(when maybe-next
         '(if image-dired-marking-shows-next
              (image-dired-display-next-thumbnail-original)
-           (image-dired-next-line)))))
+           (image-dired-forward-image)))))
 
 (defun image-dired-mark-thumb-original-file ()
   "Mark original image file in associated Dired buffer."
@@ -1126,7 +1126,8 @@ and a confirmation is needed before the original image files is
 overwritten.  This confirmation can be turned off using
 `image-dired-rotate-original-ask-before-overwrite'."
   (interactive nil image-dired-thumbnail-mode)
-  (image-dired-rotate-original "270"))
+  (image-dired--with-marked
+   (image-dired-rotate-original "270")))
 
 (defun image-dired-rotate-original-right ()
   "Rotate original image right (clockwise) 90 degrees.
@@ -1135,7 +1136,8 @@ and a confirmation is needed before the original image files is
 overwritten.  This confirmation can be turned off using
 `image-dired-rotate-original-ask-before-overwrite'."
   (interactive nil image-dired-thumbnail-mode)
-  (image-dired-rotate-original "90"))
+  (image-dired--with-marked
+   (image-dired-rotate-original "90")))
 
 (defun image-dired-display-next-thumbnail-original (&optional arg)
   "Move to the next image in the thumbnail buffer and display it.
@@ -1445,6 +1447,8 @@ of the thumbnail file."
   :version "29.1"
   :type '(repeat (string :tag "Argument")))
 (make-obsolete-variable 'image-dired-cmd-rotate-thumbnail-options nil "29.1")
+
+(declare-function clear-image-cache "image.c" (&optional filter))
 
 (defun image-dired-rotate-thumbnail (degrees)
   "Rotate thumbnail DEGREES degrees."

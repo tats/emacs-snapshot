@@ -1481,8 +1481,8 @@ Markers are implemented as a non-sorted singly linked list of markers.
 This makes them scale badly when thousands of markers are created in a
 buffer for some purpose, because some low-level primitives in Emacs
 traverse the markers' list (e.g., when converting between character
-and byte positions), and also because searching for a marker (e.g.,
-with 'buffer-has-markers-at') becomes very slow.
+and byte positions), and also because searching for a marker becomes
+very slow.
 
 **** Explore whether overlay-recenter can cure overlays performance problems
 
@@ -1732,7 +1732,11 @@ https://lists.gnu.org/r/emacs-devel/2012-06/msg00354.html
 ** Maybe replace lib-src/rcs2log with a Lisp implementation
 It wouldn't have to be a complete replacement, just enough
 for vc-rcs-update-changelog.
-
+** Allow Emacs to use the bottom-right corner of a TTY
+Emacs doesn't use the bottom-right corner of a TTY when terminfo
+capability "am" (auto_right_margin) is defined.  It could use the
+bottom-right corner nonetheless when certain other capabilities are
+defined.  See bug#57607.
 * Other known bugs
 
 ** 'make-frame' forgets unhandled parameters, at least for X11 frames
