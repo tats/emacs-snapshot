@@ -13,7 +13,7 @@ Package: emacs-common-non-dfsg
 Section: non-free/editors
 Priority: optional
 Architecture: all
-Depends: ${shlibs:Depends}, dpkg (>= 1.15.4) | install-info
+Depends: dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Conflicts:
   emacs21-common-non-dfsg,
   emacs22-common-non-dfsg,
