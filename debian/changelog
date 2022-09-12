@@ -1,10 +1,38 @@
-emacs-non-dfsg (1:28.1+1-1~1.gbpa66ad7) UNRELEASED; urgency=medium
+emacs-non-dfsg (1:28.1+1-1) unstable; urgency=medium
 
-  ** SNAPSHOT build @a66ad70750a404872f728bd364cc79a4b98aa780 **
+  * Merge upstream version 28.1.
 
-  * UNRELEASED
+  * Update debian/copyright for 28.1.
 
- -- Rob Browning <rlb@defaultvalue.org>  Thu, 14 Jul 2022 19:37:55 -0500
+  * Build org.info from org.org without emacs source tree.
+
+  * Set the org version in debian/rules to side-step missing org.el.
+    Emacs 28+ builds org.info from org.org using emacs itself, and reads
+    the version from org.el.  Since we don't have org.el in this package,
+    manually set the org version in debian/rules for now, and pass it to
+    the org.info build via DEB_EMACS_BUILD_ORG_DOC_VERSION.
+    cf. 0736ab81f1be76c373f9bd5b30f06705f3c4cfed
+
+  * Add emacs-nox or emacs (>= 1:28) build dep for org doc generation.
+    cf. 0736ab81f1be76c373f9bd5b30f06705f3c4cfed
+
+  * debian/rules: clean up intermediate org->info texi files.
+
+  * Add lintian override for GFDL mention in debian/copyright comments.
+
+  * Fix debian/copyright DEP-5 issues noted by lintian.
+
+  * debian/control: remove obsolete autotools-dev build-dep debhelper 10+
+    should handle this for us.
+
+  * debian/rules: remove unnecessary dh --parallel argument.  Current
+    debhelper versions should handle this automatically.
+
+  * debian/control: add ${misc:Depends} build dep for debhelper.
+
+  * debian/rules: rely on dpkg pkg-info.mk for src_name and debian_ver.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 12 Sep 2022 14:22:58 -0500
 
 emacs-non-dfsg (1:27.1+1-2) unstable; urgency=medium
 
