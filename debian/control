@@ -3,7 +3,6 @@ Section: non-free/editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
 Build-Depends:
- autotools-dev,
  debhelper (>= 10),
  dpkg-dev (>> 1.10.0),
  emacs-nox (>= 1:28) | emacs (>= 1:28),
