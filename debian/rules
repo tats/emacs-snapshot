@@ -165,6 +165,10 @@ override_dh_testdir:
 	  doc/emacs/emacs.texi
 
 override_dh_clean: $(persistent_autogen_install_files)
+	rm -f \
+	  doc/emacs/emacsver.texi \
+	  doc/misc/modus-themes.texi \
+	  doc/misc/org.texi
 	rm -rf \
 	  debian/*.tmp \
 	  doc/emacs/Makefile \
