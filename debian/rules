@@ -548,6 +548,10 @@ override_dh_auto_install: $(autogen_install_files)
 	rm -rf $(install_dir_nox)
 	rm -rf $(install_dir_lucid)
 
+# Install the per-user systemd unit in a disabled state by default.
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable
+
 # This won't be necessary once strip-nondeterminism is fixed.
 .PHONY: override_dh_strip_nondeterminism
 override_dh_strip_nondeterminism:
