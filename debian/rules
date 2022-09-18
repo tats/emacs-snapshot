@@ -263,7 +263,11 @@ confflags += --enable-locallisppath=$(local_lpath)
 confflags += --with-sound=alsa
 confflags += --without-gconf
 confflags += --with-mailutils
-confflags += --with-native-compilation
+# At the moment, there's no mips64el libgccjitN-dev
+ifneq ($(DEB_HOST_ARCH),mips64el)
+  deb_native_compilation_enabled := 1
+  confflags += --with-native-compilation
+endif
 
 # x configure flags
 confflags_gtk := $(confflags)
@@ -335,6 +339,14 @@ override_dh_auto_test:
 	$(MAKE) -C debian/build-gtk check
   endif
 
+ifdef deb_native_compilation_enabled
+  define maybe_install_native_lisp
+    install -d $(2)/usr/lib/emacs/$(runtime_ver)
+    cp -a $(1)/usr/lib/emacs/$(runtime_ver)/native-lisp \
+      $(2)/usr/lib/emacs/$(runtime_ver)
+  endef
+endif
+
 define install_common_binpkg_bits
   # args: (1) srcdir (2) pkgdir (3) pkgname (4) bin-suffix
 
@@ -346,9 +358,7 @@ define install_common_binpkg_bits
   install -d $(2)/$(libexec_dir_emacs)
   cp -a $(1)/$(libexec_dir_emacs)/emacs.pdmp $(2)/$(libexec_dir_emacs)/
 
-  install -d $(2)/usr/lib/emacs/$(runtime_ver)
-  cp -a $(1)/usr/lib/emacs/$(runtime_ver)/native-lisp \
-	$(2)/usr/lib/emacs/$(runtime_ver)
+  $(call maybe_install_native_lisp,$(1),$(2))
 
   install -d $(2)/usr/share/emacs/$(runtime_ver)/etc
   cp -a $(1)/usr/share/emacs/$(runtime_ver)/etc/DOC \
@@ -389,7 +399,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  cd $(pkgdir_common)/usr \
 	    && rmdir --parents libexec/emacs/$(runtime_ver)/$(DEB_HOST_GNU_TYPE)
 
+  ifdef deb_native_compilation_enabled
 	rm -r $(pkgdir_common)/usr/lib/emacs/$(runtime_ver)/native-lisp
+  endif
 
 	cd $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc \
 	  && test -f DOC
