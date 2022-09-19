@@ -3,6 +3,7 @@
 ;; Copyright (C) 2005-2022 Free Software Foundation, Inc.
 
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
+;; Maintainer: Stefan Kangas <stefankangas@gmail.com>
 ;; Keywords: multimedia
 
 ;; This file is part of GNU Emacs.
@@ -21,6 +22,8 @@
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
+
+;; See the description of the `image-dired' package.
 
 ;;; Code:
 
@@ -66,7 +69,7 @@ previous -ARG, if ARG<0) files."
          thumb-file
          overlay)
      (when (and image-file
-                (string-match-p (image-file-name-regexp) image-file))
+                (string-match-p (image-dired--file-name-regexp) image-file))
        (setq thumb-file (image-dired-get-thumbnail-image image-file))
        ;; If image is not already added, then add it.
        (let ((thumb-ov (cl-loop for ov in (overlays-in (point) (1+ (point)))
@@ -370,7 +373,7 @@ matching tag will be marked in the Dired buffer."
   (let* ((file (dired-get-filename))
          (file-name (file-name-nondirectory file))
          (dired-buf (buffer-name (current-buffer)))
-         (props (mapconcat #'identity (image-dired-list-tags file) ", "))
+         (props (string-join (image-dired-list-tags file) ", "))
          (comment (image-dired-get-comment file))
          (message-log-max nil))
     (if file-name

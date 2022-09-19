@@ -292,16 +292,20 @@ buffers (yet) -- that will be amended in a future version."
   :safe #'booleanp
   :version "29.1")
 
-(define-icon outline-open button
-  '((emoji "🔽")
+(define-icon outline-open nil
+  '((image "outline-open.svg" "outline-open.pbm"
+           :height 15 :ascent center)
+    (emoji "🔽")
     (symbol " ▼ ")
     (text " open "))
   "Icon used for buttons for opening a section in outline buffers."
   :version "29.1"
   :help-echo "Open this section")
 
-(define-icon outline-close button
-  '((emoji "▶️")
+(define-icon outline-close nil
+  '((image "outline-close.svg" "outline-close.pbm"
+           :height 15 :ascent center)
+    (emoji "▶️")
     (symbol " ▶ ")
     (text " close "))
   "Icon used for buttons for closing a section in outline buffers."
@@ -337,6 +341,10 @@ data reflects the `outline-regexp'.")
   :safe #'booleanp
   :version "22.1")
 
+(defvar outline-imenu-generic-expression
+  (list (list nil (concat "^\\(?:" outline-regexp "\\).*$") 0))
+  "Value for `imenu-generic-expression' in Outline mode.")
+
 ;;;###autoload
 (define-derived-mode outline-mode text-mode "Outline"
   "Set major mode for editing outlines with selective display.
@@ -371,8 +379,7 @@ Turning on outline mode calls the value of `text-mode-hook' and then of
               (concat paragraph-separate "\\|\\(?:" outline-regexp "\\)"))
   (setq-local font-lock-defaults
               '(outline-font-lock-keywords t nil nil backward-paragraph))
-  (setq-local imenu-generic-expression
-	      (list (list nil (concat "^\\(?:" outline-regexp "\\).*$") 0)))
+  (setq-local imenu-generic-expression outline-imenu-generic-expression)
   (add-hook 'change-major-mode-hook #'outline-show-all nil t)
   (add-hook 'hack-local-variables-hook #'outline-apply-default-state nil t))
 
@@ -982,8 +989,6 @@ If non-nil, EVENT should be a mouse event."
   (interactive (list last-nonmenu-event))
   (when (mouse-event-p event)
     (mouse-set-point event))
-  (when (outline--use-buttons-p)
-    (outline--insert-close-button))
   (outline-flag-subtree t))
 
 (defun outline--make-button-overlay (type)
@@ -1003,11 +1008,11 @@ If non-nil, EVENT should be a mouse event."
       ;; movement commands work more logically.
       (when (derived-mode-p 'special-mode)
         (put-text-property (point) (1+ (point)) 'face (plist-get icon 'face)))
-      (when-let ((image (plist-get icon 'image)))
-        (overlay-put o 'display image))
-      (overlay-put o 'display (concat (plist-get icon 'string)
-                                      (string (char-after (point)))))
-      (overlay-put o 'face (plist-get icon 'face)))
+      (if-let ((image (plist-get icon 'image)))
+          (overlay-put o 'display image)
+        (overlay-put o 'display (concat (plist-get icon 'string)
+                                        (string (char-after (point)))))
+        (overlay-put o 'face (plist-get icon 'face))))
     o))
 
 (defun outline--insert-open-button ()
@@ -1041,19 +1046,19 @@ If non-nil, EVENT should be a mouse event."
                          "<mouse-2>" #'outline-show-subtree))))))
 
 (defun outline--fix-up-all-buttons (&optional from to)
-  (when from
-    (save-excursion
-      (goto-char from)
-      (setq from (line-beginning-position))))
   (when (outline--use-buttons-p)
+    (when from
+      (save-excursion
+        (goto-char from)
+        (setq from (line-beginning-position))))
     (outline-map-region
      (lambda ()
-       ;; `outline--cycle-state' will fail if we're in a totally
-       ;; collapsed buffer -- but in that case, we're not in a
-       ;; `show-all' situation.
-       (if (eq (ignore-errors (outline--cycle-state)) 'show-all)
-           (outline--insert-open-button)
-         (outline--insert-close-button)))
+       (if (save-excursion
+             (outline-end-of-heading)
+             (seq-some (lambda (o) (eq (overlay-get o 'invisible) 'outline))
+                       (overlays-at (point))))
+           (outline--insert-close-button)
+         (outline--insert-open-button)))
      (or from (point-min)) (or to (point-max)))))
 
 (define-obsolete-function-alias 'hide-subtree #'outline-hide-subtree "25.1")
@@ -1076,8 +1081,6 @@ If non-nil, EVENT should be a mouse event."
   (interactive (list last-nonmenu-event))
   (when (mouse-event-p event)
     (mouse-set-point event))
-  (when (outline--use-buttons-p)
-    (outline--insert-open-button))
   (outline-flag-subtree nil))
 
 (define-obsolete-function-alias 'show-subtree #'outline-show-subtree "25.1")
@@ -1627,19 +1630,18 @@ With a prefix argument, show headings up to that LEVEL."
       (message "Show all")))
     (outline--fix-up-all-buttons)))
 
-(defvar outline-navigation-repeat-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-b") #'outline-backward-same-level)
-    (define-key map (kbd "b") #'outline-backward-same-level)
-    (define-key map (kbd "C-f") #'outline-forward-same-level)
-    (define-key map (kbd "f") #'outline-forward-same-level)
-    (define-key map (kbd "C-n") #'outline-next-visible-heading)
-    (define-key map (kbd "n") #'outline-next-visible-heading)
-    (define-key map (kbd "C-p") #'outline-previous-visible-heading)
-    (define-key map (kbd "p") #'outline-previous-visible-heading)
-    (define-key map (kbd "C-u") #'outline-up-heading)
-    (define-key map (kbd "u") #'outline-up-heading)
-    map))
+
+(defvar-keymap outline-navigation-repeat-map
+  "C-b" #'outline-backward-same-level
+  "b"   #'outline-backward-same-level
+  "C-f" #'outline-forward-same-level
+  "f"   #'outline-forward-same-level
+  "C-n" #'outline-next-visible-heading
+  "n"   #'outline-next-visible-heading
+  "C-p" #'outline-previous-visible-heading
+  "p"   #'outline-previous-visible-heading
+  "C-u" #'outline-up-heading
+  "u"   #'outline-up-heading)
 
 (dolist (command '(outline-backward-same-level
                    outline-forward-same-level
@@ -1648,17 +1650,15 @@ With a prefix argument, show headings up to that LEVEL."
                    outline-up-heading))
   (put command 'repeat-map 'outline-navigation-repeat-map))
 
-(defvar outline-editing-repeat-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-v") #'outline-move-subtree-down)
-    (define-key map (kbd "v") #'outline-move-subtree-down)
-    (define-key map (kbd "C-^") #'outline-move-subtree-up)
-    (define-key map (kbd "^") #'outline-move-subtree-up)
-    (define-key map (kbd "C->") #'outline-demote)
-    (define-key map (kbd ">") #'outline-demote)
-    (define-key map (kbd "C-<") #'outline-promote)
-    (define-key map (kbd "<") #'outline-promote)
-    map))
+(defvar-keymap outline-editing-repeat-map
+  "C-v" #'outline-move-subtree-down
+  "v"   #'outline-move-subtree-down
+  "C-^" #'outline-move-subtree-up
+  "^"   #'outline-move-subtree-up
+  "C->" #'outline-demote
+  ">"   #'outline-demote
+  "C-<" #'outline-promote
+  "<"   #'outline-promote)
 
 (dolist (command '(outline-move-subtree-down
                    outline-move-subtree-up
@@ -1666,6 +1666,7 @@ With a prefix argument, show headings up to that LEVEL."
                    outline-promote))
   (put command 'repeat-map 'outline-editing-repeat-map))
 
+
 (provide 'outline)
 (provide 'noutline)
 

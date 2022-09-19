@@ -3,6 +3,7 @@
 ;; Copyright (C) 2005-2022 Free Software Foundation, Inc.
 
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
+;; Maintainer: Stefan Kangas <stefankangas@gmail.com>
 ;; Keywords: multimedia
 
 ;; This file is part of GNU Emacs.
@@ -21,6 +22,8 @@
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
+
+;; See the description of the `image-dired' package.
 
 ;;; Code:
 
@@ -106,8 +109,8 @@ FILE-TAGS is an alist in the following form:
           (when (search-forward-regexp
                  (format "\\(;%s\\)\\($\\|;\\)" tag) end t)
             (delete-region (match-beginning 1) (match-end 1))
-            ;; Check if file should still be in the database. If
-            ;; it has no tags or comments, it will be removed.
+            ;; Check if file should still be in the database.
+            ;; If it has no tags or comments, it will be removed.
             (end-of-line)
             (setq end (point))
             (beginning-of-line)

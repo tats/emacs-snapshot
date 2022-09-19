@@ -970,8 +970,8 @@ static const struct x_atom_ref x_atom_refs[] =
     /* Ghostscript support.  */
     ATOM_REFS_INIT ("DONE", Xatom_DONE)
     ATOM_REFS_INIT ("PAGE", Xatom_PAGE)
-    ATOM_REFS_INIT ("SCROLLBAR", Xatom_Scrollbar)
-    ATOM_REFS_INIT ("HORIZONTAL_SCROLLBAR", Xatom_Horizontal_Scrollbar)
+    ATOM_REFS_INIT ("_EMACS_SCROLLBAR", Xatom_Scrollbar)
+    ATOM_REFS_INIT ("_EMACS_HORIZONTAL_SCROLLBAR", Xatom_Horizontal_Scrollbar)
     ATOM_REFS_INIT ("_XEMBED", Xatom_XEMBED)
     /* EWMH */
     ATOM_REFS_INIT ("_NET_WM_STATE", Xatom_net_wm_state)
@@ -6131,7 +6131,7 @@ x_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
 
   unbind_to (count, Qnil);
 
-  return CALLN (Fapply, intern ("concat"), Fnreverse (acc));
+  return CALLN (Fapply, Qconcat, Fnreverse (acc));
 }
 
 #endif	/* USE_CAIRO */
@@ -17152,8 +17152,6 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	      x_dnd_waiting_for_finish = false;
 	      target = None;
 	    }
-
-	  x_dnd_last_seen_toplevel = toplevel;
 	}
 
       if (target != x_dnd_last_seen_window)
@@ -17184,6 +17182,7 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 	    }
 
 	  x_dnd_action = None;
+	  x_dnd_last_seen_toplevel = toplevel;
 	  x_dnd_last_seen_window = target;
 	  x_dnd_last_protocol_version = target_proto;
 	  x_dnd_last_motif_style = motif_style;
@@ -17211,6 +17210,8 @@ x_dnd_update_state (struct x_display_info *dpyinfo, Time timestamp)
 						 target, &emsg);
 	    }
 	}
+      else
+	x_dnd_last_seen_toplevel = toplevel;
 
       if (x_dnd_last_window_is_frame && target != None)
 	x_dnd_note_self_position (dpyinfo, target, root_x, root_y);
@@ -17627,6 +17628,12 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   int dx, dy;
   USE_SAFE_ALLOCA;
 
+  /* This function is not reentrant, so input should be blocked before
+     it is called.  */
+
+  if (!input_blocked_p ())
+    emacs_abort ();
+
   *finish = X_EVENT_NORMAL;
 
   EVENT_INIT (inev.ie);
@@ -17676,7 +17683,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (x_dnd_last_protocol_version != -1
 		&& x_dnd_in_progress
-		&& target == x_dnd_last_seen_window
+		&& target == x_dnd_last_seen_toplevel
 		/* The XDND documentation is not very clearly worded.
 		   But this should be the correct behavior, since
 		   "kDNDStatusSendHereFlag" in the reference
@@ -18096,12 +18103,24 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         if (event->xclient.message_type == dpyinfo->Xatom_Scrollbar)
           {
             x_scroll_bar_to_input_event (event, &inev.ie);
+
+	    /* Unprotect the first window to be sent in a
+	       ClientMessage event, since it is now on the stack and
+	       thereby subject to garbage collection.  */
+	    x_unprotect_window_for_callback (dpyinfo);
+
 	    *finish = X_EVENT_GOTO_OUT;
             goto done;
           }
         else if (event->xclient.message_type == dpyinfo->Xatom_Horizontal_Scrollbar)
           {
             x_horizontal_scroll_bar_to_input_event (event, &inev.ie);
+
+	    /* Unprotect the first window to be sent in a
+	       ClientMessage event, since it is now on the stack and
+	       thereby subject to garbage collection.  */
+	    x_unprotect_window_for_callback (dpyinfo);
+
 	    *finish = X_EVENT_GOTO_OUT;
             goto done;
           }
@@ -18490,6 +18509,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 during the start of save-set processing.  */
 
 	      FRAME_X_OUTPUT (f)->explicit_parent = false;
+
+	      /* Remove the leftover XEMBED_INFO property.  */
+	      XDeleteProperty (dpyinfo->display, FRAME_OUTER_WINDOW (f),
+			       dpyinfo->Xatom_XEMBED_INFO);
 	      x_make_frame_visible (f);
 	    }
 #endif
@@ -18521,11 +18544,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      Window root;
 	      unsigned int dummy_uint;
 
-	      block_input ();
 	      XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 			    &root, &f->left_pos, &f->top_pos,
 			    &dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
-	      unblock_input ();
 	    }
 
           x_set_frame_alpha (f);
@@ -18550,7 +18571,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         {
           if (!FRAME_VISIBLE_P (f))
             {
-              block_input ();
 	      /* By default, do not set the frame's visibility here, see
 		 https://lists.gnu.org/archive/html/emacs-devel/2017-02/msg00133.html.
 		 The default behavior can be overridden by setting
@@ -18569,7 +18589,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
               f->output_data.x->has_been_visible = true;
               SET_FRAME_GARBAGED (f);
-              unblock_input ();
             }
           else if (FRAME_GARBAGED_P (f))
 	    {
@@ -19675,8 +19694,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    x_dnd_waiting_for_finish = false;
 		    target = None;
 		  }
-
-		x_dnd_last_seen_toplevel = toplevel;
 	      }
 
 	    if (target != x_dnd_last_seen_window)
@@ -19728,6 +19745,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  }
 
 		x_dnd_action = None;
+		x_dnd_last_seen_toplevel = toplevel;
 		x_dnd_last_seen_window = target;
 		x_dnd_last_protocol_version = target_proto;
 		x_dnd_last_motif_style = motif_style;
@@ -19756,6 +19774,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 						       target, &emsg);
 		  }
 	      }
+	    else
+	      x_dnd_last_seen_toplevel = toplevel;
 
 	    if (x_dnd_last_window_is_frame && target != None)
 	      x_dnd_note_self_position (dpyinfo, target,
@@ -20063,12 +20083,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
          flicker.  Don't try to optimize these calls by looking only
          for size changes: that's not sufficient.  We miss some
          surface invalidations and flicker.  */
-      block_input ();
 #ifdef HAVE_XDBE
       if (f && FRAME_X_DOUBLE_BUFFERED_P (f))
         x_drop_xrender_surfaces (f);
 #endif
-      unblock_input ();
 #if defined USE_CAIRO && !defined USE_GTK
       if (f)
 	x_cr_update_surface_desired_size (f, configureEvent.xconfigure.width,
@@ -20098,10 +20116,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       f->new_width, f->new_height);
 
 #ifdef HAVE_XDBE
-	  block_input ();
           if (FRAME_X_DOUBLE_BUFFERED_P (f))
             x_drop_xrender_surfaces (f);
-          unblock_input ();
 #endif
           xg_frame_resized (f, configureEvent.xconfigure.width,
                             configureEvent.xconfigure.height);
@@ -20191,11 +20207,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  Window root;
 		  unsigned int dummy_uint;
 
-		  block_input ();
 		  XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				&root, &f->left_pos, &f->top_pos,
 				&dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
-		  unblock_input ();
 		}
 
 	      if (!FRAME_TOOLTIP_P (f)
@@ -20373,7 +20387,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		    else if (x_dnd_last_seen_window != None
 			&& x_dnd_last_protocol_version != -1)
 		      {
-			x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			x_dnd_pending_finish_target = x_dnd_last_seen_toplevel;
 			x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
 			x_dnd_waiting_for_finish
@@ -20480,12 +20494,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 	      {
-		block_input ();
 		XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				RevertToParent, event->xbutton.time);
 		if (FRAME_PARENT_FRAME (f))
 		  XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
-		unblock_input ();
 	      }
 	  }
 
@@ -21546,8 +21558,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  x_dnd_waiting_for_finish = false;
 			  target = None;
 			}
-
-		      x_dnd_last_seen_toplevel = toplevel;
 		    }
 
 		  if (target != x_dnd_last_seen_window)
@@ -21601,6 +21611,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			}
 
 		      x_dnd_action = None;
+		      x_dnd_last_seen_toplevel = toplevel;
 		      x_dnd_last_seen_window = target;
 		      x_dnd_last_protocol_version = target_proto;
 		      x_dnd_last_motif_style = motif_style;
@@ -21629,6 +21640,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 							     target, &emsg);
 			}
 		    }
+		  else
+		    x_dnd_last_seen_toplevel = toplevel;
 
 		  if (x_dnd_last_window_is_frame && target != None)
 		    x_dnd_note_self_position (dpyinfo, target,
@@ -21910,7 +21923,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			  else if (x_dnd_last_seen_window != None
 				   && x_dnd_last_protocol_version != -1)
 			    {
-			      x_dnd_pending_finish_target = x_dnd_last_seen_window;
+			      x_dnd_pending_finish_target = x_dnd_last_seen_toplevel;
 			      x_dnd_waiting_for_finish_proto = x_dnd_last_protocol_version;
 
 			      x_dnd_waiting_for_finish
@@ -22145,7 +22158,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 		    {
-		      block_input ();
 #if defined HAVE_GTK3 || (!defined USE_GTK && !defined USE_X_TOOLKIT)
 		      if (device)
 			{
@@ -22168,7 +22180,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 		      if (FRAME_PARENT_FRAME (f))
 			XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
-		      unblock_input ();
 		    }
 		}
 
@@ -23673,7 +23684,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
     OTHER:
 #ifdef USE_X_TOOLKIT
-      block_input ();
       if (*finish != X_EVENT_DROP)
 	{
 	  /* Ignore some obviously bogus ConfigureNotify events that
@@ -23690,7 +23700,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 	    }
 	}
-      unblock_input ();
 #endif /* USE_X_TOOLKIT */
 #if defined USE_GTK && !defined HAVE_GTK3 && defined HAVE_XINPUT2
       if (*finish != X_EVENT_DROP && copy)
@@ -23711,12 +23720,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       kbd_buffer_store_buffered_event (&inev, hold_quit);
       count++;
     }
-
-#ifdef USE_TOOLKIT_SCROLL_BARS
-  if (event->xany.type == ClientMessage
-      && inev.ie.kind == SCROLL_BAR_CLICK_EVENT)
-    x_unprotect_window_for_callback (dpyinfo);
-#endif
 
   if (do_help
       && !(hold_quit && hold_quit->kind != NO_EVENT))
@@ -27347,6 +27350,16 @@ x_free_frame_resources (struct frame *f)
   if (f == hlinfo->mouse_face_mouse_frame)
     reset_mouse_highlight (hlinfo);
 
+#ifdef HAVE_XINPUT2
+  /* Consider a frame being unfocused with no following FocusIn event
+     while an older focus from another seat exists.  The client
+     pointer should then revert to the other seat, so handle potential
+     focus changes.  */
+
+  if (dpyinfo->supports_xi2)
+    xi_handle_focus_change (dpyinfo);
+#endif
+
   unblock_input ();
 }
 
@@ -29820,6 +29833,9 @@ syms_of_xterm (void)
 
   x_dnd_unsupported_drop_data = Qnil;
   staticpro (&x_dnd_unsupported_drop_data);
+
+  /* Used by x_cr_export_frames.  */
+  DEFSYM (Qconcat, "concat");
 
   DEFSYM (Qvendor_specific_keysyms, "vendor-specific-keysyms");
   DEFSYM (Qlatin_1, "latin-1");

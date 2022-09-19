@@ -457,7 +457,9 @@ the C sources, too."
 		     load-path '(".el" ".elc") 'readable))))))))
 
     (cond
-     ((and (not file-name) (subrp type))
+     ((and (not file-name)
+           (subrp type)
+           (not (subr-native-elisp-p type)))
       ;; A built-in function.  The form is from `describe-function-1'.
       (if (or (get-buffer " *DOC*")
               (and also-c-source
@@ -1159,7 +1161,8 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
 (add-hook 'help-fns-describe-function-functions #'help-fns--compiler-macro 100)
 
 (defun help-fns--generalized-variable (function)
-  (when (and (get function 'gv-expander)
+  (when (and (symbolp function)
+             (get function 'gv-expander)
              ;; Don't mention obsolete generalized variables.
              (not (get function 'byte-obsolete-generalized-variable)))
     (insert (format-message "  `%s' is also a " function)

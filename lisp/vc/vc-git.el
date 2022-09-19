@@ -82,7 +82,7 @@
 ;; - annotate-time ()                              OK
 ;; - annotate-current-time ()                      NOT NEEDED
 ;; - annotate-extract-revision-at-line ()          OK
-;; TAG SYSTEM
+;; TAG/BRANCH SYSTEM
 ;; - create-tag (dir name branchp)                 OK
 ;; - retrieve-tag (dir name update)                OK
 ;; MISCELLANEOUS
@@ -119,14 +119,6 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
 		 (repeat :tag "Argument List" :value ("") string))
   :version "23.1")
 
-;;;###autoload
-(defun vc-git-annotate-switches-safe-p (switches)
-  "Check if local value of `vc-git-annotate-switches' is safe.
-Currently only \"-w\" (ignore whitespace) is considered safe, but
-this list might be extended in the future."
-  ;; TODO: Probably most options are perfectly safe.
-  (equal switches "-w"))
-
 (defcustom vc-git-annotate-switches nil
   "String or list of strings specifying switches for Git blame under VC.
 If nil, use the value of `vc-annotate-switches'.  If t, use no switches."
@@ -135,7 +127,12 @@ If nil, use the value of `vc-annotate-switches'.  If t, use no switches."
 		 (string :tag "Argument String")
 		 (repeat :tag "Argument List" :value ("") string))
   :version "25.1")
-;;;###autoload(put 'vc-git-annotate-switches 'safe-local-variable #'vc-git-annotate-switches-safe-p)
+
+;; Check if local value of `vc-git-annotate-switches' is safe.
+;; Currently only "-w" (ignore whitespace) is considered safe, but
+;; this list might be extended in the future (probably most options
+;; are perfectly safe.)
+;;;###autoload(put 'vc-git-annotate-switches 'safe-local-variable (lambda (switches) (equal switches "-w")))
 
 (defcustom vc-git-log-switches nil
   "String or list of strings specifying switches for Git log under VC."
@@ -1572,13 +1569,25 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
 		    (expand-file-name fname (vc-git-root default-directory))))
 	  revision)))))
 
-;;; TAG SYSTEM
+;;; TAG/BRANCH SYSTEM
+
+(declare-function vc-read-revision "vc"
+                  (prompt &optional files backend default initial-input))
 
 (defun vc-git-create-tag (dir name branchp)
-  (let ((default-directory dir))
-    (and (vc-git-command nil 0 nil "update-index" "--refresh")
+  (let ((default-directory dir)
+        (start-point (when branchp (vc-read-revision
+                                    (format-prompt "Start point"
+                                                   (car (vc-git-branches)))
+                                    (list dir) 'Git))))
+    (and (or (zerop (vc-git-command nil t nil "update-index" "--refresh"))
+             (y-or-n-p "Modified files exist.  Proceed? ")
+             (user-error (format "Can't create %s with modified files"
+                                 (if branchp "branch" "tag"))))
          (if branchp
-             (vc-git-command nil 0 nil "checkout" "-b" name)
+             (vc-git-command nil 0 nil "checkout" "-b" name
+                             (when (and start-point (not (eq start-point "")))
+                               start-point))
            (vc-git-command nil 0 nil "tag" name)))))
 
 (defun vc-git-retrieve-tag (dir name _update)

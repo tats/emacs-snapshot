@@ -130,8 +130,10 @@ been set up by `rfn-eshadow-setup-minibuffer'."
   ;; Remove last element of `(exec-path)', which is `exec-directory'.
   ;; Use `path-separator' as it does eshell.
   (setq eshell-path-env
-	(mapconcat
-	 #'identity (butlast (tramp-compat-exec-path)) path-separator)))
+        (if (file-remote-p default-directory)
+            (mapconcat
+	     #'identity (butlast (tramp-compat-exec-path)) path-separator)
+          (getenv "PATH"))))
 
 (with-eval-after-load 'esh-util
   (add-hook 'eshell-mode-hook
@@ -217,12 +219,12 @@ NAME must be equal to `tramp-current-connection'."
   (info-lookup-maybe-add-help
    :mode 'tramp-info-lookup-mode :topic 'symbol
    :regexp (rx (+ (not (any "\t\n \"'(),[]`‘’"))))
-   :doc-spec '(("(tramp)Function Index" nil
-		(rx bol blank (+ "-") blank (* nonl) ": ")
-		(rx (| blank eol)))
+   :doc-spec `(("(tramp)Function Index" nil
+		,(rx bol blank (+ "-") blank (* nonl) ":" blank)
+		,(rx (| blank eol)))
 	       ("(tramp)Variable Index" nil
-		(rx bol blank (+ "-") blank (* nonl) ": ")
-		(rx (| blank eol)))))
+		,(rx bol blank (+ "-") blank (* nonl) ":" blank)
+		,(rx (| blank eol)))))
 
   (add-hook
    'tramp-integration-unload-hook

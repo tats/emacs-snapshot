@@ -3,6 +3,7 @@
 ;; Copyright (C) 2005-2022 Free Software Foundation, Inc.
 
 ;; Author: Mathias Dahl <mathias.rem0veth1s.dahl@gmail.com>
+;; Maintainer: Stefan Kangas <stefankangas@gmail.com>
 
 ;; This file is part of GNU Emacs.
 
@@ -21,6 +22,8 @@
 
 ;;; Commentary:
 
+;; See the description of the `image-dired' package.
+
 ;;; Code:
 
 (require 'xdg)
@@ -37,7 +40,7 @@
 (defvar image-dired-debug nil
   "Non-nil means enable debug messages.")
 
-(defun image-dired-debug-message (&rest args)
+(defun image-dired-debug (&rest args)
   "Display debug message ARGS when `image-dired-debug' is non-nil."
   (when image-dired-debug
     (apply #'message args)))
@@ -45,8 +48,9 @@
 (defun image-dired-dir ()
   "Return the current thumbnail directory (from variable `image-dired-dir').
 Create the thumbnail directory if it does not exist."
-  (let ((image-dired-dir (file-name-as-directory
-                          (expand-file-name image-dired-dir))))
+  (let ((image-dired-dir
+         (file-name-as-directory
+          (expand-file-name image-dired-dir))))
     (unless (file-directory-p image-dired-dir)
       (with-file-modes #o700
         (make-directory image-dired-dir t))
@@ -77,7 +81,9 @@ See also `image-dired-thumbnail-storage'."
             ;; MD5 is mandated by the Thumbnail Managing Standard.
             (concat (md5 (concat "file://" (expand-file-name file))) ".png")
             (expand-file-name thumbdir (xdg-cache-home)))))
-        ((eq 'use-image-dired-dir image-dired-thumbnail-storage)
+        ((or (eq 'image-dired image-dired-thumbnail-storage)
+             ;; Maintained for backwards compatibility:
+             (eq 'use-image-dired-dir image-dired-thumbnail-storage))
          (let* ((f (expand-file-name file))
                 (hash
                  (md5 (file-name-as-directory (file-name-directory f)))))

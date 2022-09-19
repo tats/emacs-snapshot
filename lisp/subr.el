@@ -4026,6 +4026,13 @@ system's shell."
 Otherwise, return nil."
   (or (stringp object) (null object)))
 
+(defun list-of-strings-p (object)
+  "Return t if OBJECT is nil or a list of strings."
+  (declare (pure t) (side-effect-free error-free))
+  (while (and (consp object) (stringp (car object)))
+    (setq object (cdr object)))
+  (null object))
+
 (defun booleanp (object)
   "Return t if OBJECT is one of the two canonical boolean values: t or nil.
 Otherwise, return nil."
@@ -4823,16 +4830,26 @@ the function `undo--wrap-and-run-primitive-undo'."
       (let ((undo--combining-change-calls t))
 	(if (not inhibit-modification-hooks)
 	    (run-hook-with-args 'before-change-functions beg end))
-	(let (;; (inhibit-modification-hooks t)
-              (before-change-functions
-               ;; Ugly Hack: if the body uses syntax-ppss/syntax-propertize
-               ;; (e.g. via a regexp-search or sexp-movement triggering
-               ;; on-the-fly syntax-propertize), make sure that this gets
-               ;; properly refreshed after subsequent changes.
-               (if (memq #'syntax-ppss-flush-cache before-change-functions)
-                   '(syntax-ppss-flush-cache)))
-              after-change-functions)
-	  (setq result (funcall body)))
+	(let ((bcf before-change-functions)
+	      (acf after-change-functions)
+	      (local-bcf (local-variable-p 'before-change-functions))
+	      (local-acf (local-variable-p 'after-change-functions)))
+	  (unwind-protect
+              ;; FIXME: WIBNI we could just use `inhibit-modification-hooks'?
+              (progn
+                ;; Ugly Hack: if the body uses syntax-ppss/syntax-propertize
+                ;; (e.g. via a regexp-search or sexp-movement triggering
+                ;; on-the-fly syntax-propertize), make sure that this gets
+                ;; properly refreshed after subsequent changes.
+	        (setq-local before-change-functions
+                            (if (memq #'syntax-ppss-flush-cache bcf)
+                                '(syntax-ppss-flush-cache)))
+                (setq-local after-change-functions nil)
+	        (setq result (funcall body)))
+	    (if local-bcf (setq before-change-functions bcf)
+	      (kill-local-variable 'before-change-functions))
+	    (if local-acf (setq after-change-functions acf)
+	      (kill-local-variable 'after-change-functions))))
         (when (not (eq buffer-undo-list t))
           (let ((ap-elt
 		 (list 'apply

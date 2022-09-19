@@ -107,7 +107,7 @@ as was already the case for all the non-preloaded files.
 ** Emacs Sessions (Desktop)
 
 +++
-*** New option to load a locked desktop if locking Emacs is not running.
+*** New user option to load a locked desktop if locking Emacs is not running.
 The option 'desktop-load-locked-desktop' can now be set to the value
 'check-pid', which means to allow loading a locked ".emacs.desktop"
 file if the Emacs process which locked it is no longer running on the
@@ -180,6 +180,11 @@ of 'user-emacs-directory'.
 
 * Incompatible changes in Emacs 29.1
 
++++
+*** bookmarks no longer include context for encrypted files.
+If you're visiting an encrypted file, setting a bookmark no longer
+includes excerpts from that buffer in the bookmarks file.
+
 ---
 *** 'show-paren-mode' is now disabled in 'special-mode' buffers.
 In Emacs versions previous to Emacs 28.1, 'show-paren-mode' defaulted
@@ -189,7 +194,7 @@ buffers, but not in buffers that inherit from 'special-mode'.  To get
 back to how things worked in Emacs 28.1, put the following in your
 init file:
 
-  (setopt show-paren-predicate t)
+    (setopt show-paren-predicate t)
 
 +++
 *** Explicitly-set read-only state is preserved when reverting a buffer.
@@ -423,6 +428,9 @@ option) and can be set to nil to disable Just-in-time Lock mode.
 
 
 * Changes in Emacs 29.1
+
+---
+** Emacs now supports Unicode Standard version 15.0.
 
 ---
 ** New user option 'electric-quote-replace-consecutive'.
@@ -774,6 +782,16 @@ doesn't support.  It is most useful with the Linux console and similar
 terminals, where Emacs has a reliable way of determining which
 characters have glyphs in the font loaded into the terminal's memory.
 
+---
+*** New functions to set terminal output buffer size.
+The new functions 'tty--set-output-buffer-size' and
+'tty--output-buffer-size' allow setting and retrieving the output
+buffer size of a terminal device.  The default buffer size is and has
+always been BUFSIZ, which is defined in your system's stdio.h.  When
+you set a buffer size with 'tty--set-output-buffer-size', this also
+prevents Emacs from explicitly flushing the tty output stream, except
+at the end of display update.
+
 ** ERT
 
 +++
@@ -950,8 +968,9 @@ non-nil in 'special-mode' and its derivatives.
 
 +++
 *** New commands 'split-root-window-below' and 'split-root-window-right'.
-These commands split the root window in to, and are are bound to 'C-x
-7' and 'C-x 9' respectively.
+These commands split the root window in two, and are bound to 'C-x w 2'
+and 'C-x w 3', respectively.  A number of other useful window-related
+commands are now available on the 'C-x w' prefix.
 
 +++
 *** New user option 'display-buffer-avoid-small-windows'.
@@ -1587,7 +1606,7 @@ Non-nil means that the default definitions of equivalent characters
 are overridden.
 
 *** New command 'describe-char-fold-equivalences'.
-It displays character equivalences used by `char-fold-to-regexp'.
+It displays character equivalences used by 'char-fold-to-regexp'.
 
 +++
 *** New command 'isearch-emoji-by-name'.
@@ -1647,6 +1666,13 @@ info node.  This command only works for the Emacs and Emacs Lisp manuals.
 ** VC
 
 +++
+*** 'C-x v b' prefix key is used now for branch commands.
+'vc-print-branch-log' is bound to 'C-x v b l', and new commands are
+'vc-create-branch' ('C-x v b c') and 'vc-switch-branch' ('C-x v b s').
+The VC Directory buffer now uses the prefix 'b' for these branch-related
+commands.
+
++++
 *** New command '%' ('vc-dir-mark-by-regexp').
 This command marks files based on a regexp.  If given a prefix
 argument, unmark instead.
@@ -1673,7 +1699,7 @@ consistent with 'vc-responsible-backend'.
 ---
 *** Log Edit now font locks long Git commit summary lines.
 Writing shorter summary lines avoids truncation in contexts in which
-Git commands display summary lines.  See the two new variables
+Git commands display summary lines.  See the two new user options
 'vc-git-log-edit-summary-target-len' and 'vc-git-log-edit-summary-max-len'.
 
 ** Message
@@ -1943,11 +1969,16 @@ as opposed to via the command-line.
 *** New command 'image-transform-fit-to-window'.
 This command fits the image to the current window by scaling down or
 up as necessary.  Unlike 'image-transform-fit-both', this does not
-only scale the image down, but up as well.  It is bound to "s w" in
+only scale the image down, but up as well.  It is bound to 's w' in
 Image Mode by default.
 
+---
+*** New command 'image-mode-wallpaper-set'.
+This command sets the desktop background to the current image.  It is
+bound to 'W' by default.
+
 +++
-*** 'image-transform-fit-to-(height|width)' are now obsolete.
+*** 'image-transform-fit-to-{height,width}' are now obsolete.
 Use the new command 'image-transform-fit-to-window' instead.
 The keybinding for 'image-transform-fit-to-width' is now 's i'.
 
@@ -1973,7 +2004,15 @@ These commands horizontally and vertically flip the image under point.
 +++
 *** New command 'image-transform-set-percent'.
 It allows setting the image size to a percentage of its original size,
-and is bound to "s p" in Image mode.
+and is bound to 's p' in Image mode.
+
++++
+*** 'image-transform-original' renamed to 'image-transform-reset-to-original'.
+The old name was confusing, and is now an obsolete function alias.
+
++++
+*** 'image-transform-reset' renamed to 'image-transform-reset-to-initial'.
+The old name was confusing, and is now an obsolete function alias.
 
 ** Images
 
@@ -1988,37 +2027,58 @@ This is done via 'image-converter-add-handler'.
 This avoids converting images in the background, and makes Image-Dired
 noticeably faster.  New keybindings from 'image-mode' are now
 available in the "*image-dired-display-image*" buffer; press '?' or
-'h' in that buffer to see the full list.  Finally, some commands and
-user options that are no longer needed are now obsolete:
-'image-dired-cmd-create-temp-image-options',
-'image-dired-cmd-create-temp-image-program',
-'image-dired-display-current-image-full',
-'image-dired-display-current-image-sized',
-'image-dired-display-window-height-correction',
-'image-dired-display-window-width-correction',
-'image-dired-temp-image-file'.
+'h' in that buffer to see the full list.
 
 ---
 *** Navigation and marking commands now work in image display buffer.
 The following new bindings have been added:
-
-    n or SPC  image-dired-display-next-thumbnail-original
-    p or DEL  image-dired-display-previous-thumbnail-original
-    m         image-dired-mark-thumb-original-file
-    d         image-dired-flag-thumb-original-file
-    u         image-dired-unmark-thumb-original-file
-
----
-*** Reduce dependency on external "exiftool" command.
-The 'image-dired-copy-with-exif-file-name' no longer requires an
-external "exiftool" command to be available.  The user options
-'image-dired-cmd-read-exif-data-program' and
-'image-dired-cmd-read-exif-data-options' are now obsolete.
+- 'n', 'SPC' => 'image-dired-display-next-thumbnail-original'
+- 'p', 'DEL' => 'image-dired-display-previous-thumbnail-original'
+- 'm'        => 'image-dired-mark-thumb-original-file'
+- 'd'        => 'image-dired-flag-thumb-original-file'
+- 'u'        => 'image-dired-unmark-thumb-original-file'
 
 ---
-*** New command for the thumbnail buffer.
-The new command 'image-dired-unmark-all-marks' has been added.  It is
-bound to 'U' in the thumbnail and display buffer.
+*** New command 'image-dired-unmark-all-marks'.
+It removes all marks from all files in the thumbnail and the
+associated Dired buffer, and is bound to 'U' in the thumbnail and
+display buffer.
+
+---
+*** New command 'image-dired-wallpaper-set'.
+This command sets the desktop background to the image at point in the
+thumbnail buffer.  It is bound to 'W' by default.
+
+---
+*** 'image-dired-slideshow-start' is now bound to 'S'.
+It is bound in both the thumbnail and display buffer.
+
+---
+*** New user option 'image-dired-marking-shows-next'.
+If this option is non-nil (the default), marking, unmarking or
+flagging an image in either the thumbnail or display buffer shows the
+next image.
+
+---
+*** New face 'image-dired-thumb-flagged'.
+If 'image-dired-thumb-mark' is non-nil (the default), this face is
+used for images that are flagged for deletion in the Dired buffer
+associated with Image-Dired.
+
+---
+*** Image information is now shown in the header line.
+This replaces the message most navigation commands in the thumbnail
+buffer used to show at the bottom of the screen.
+
+---
+*** PDF support.
+Image-Dired now displays thumbnails for PDF files.  Type 'RET' on a
+PDF file in the thumbnail buffer to visit the corresponding PDF.
+
+---
+*** Support GraphicsMagick command line tools.
+Support for the GraphicsMagick command line tool ("gm") has been
+added, and is used instead of ImageMagick when it is available.
 
 ---
 *** Support Thumbnail Managing Standard v0.9.0 (Dec 2020).
@@ -2028,19 +2088,17 @@ programs.  Version 0.9.0 adds two larger thumbnail sizes: 512x512 and
 to use it; it is not enabled by default.
 
 ---
-*** Support GraphicsMagick command line tools.
-Support for the GraphicsMagick command line tool ("gm") has been
-added, and is used instead of ImageMagick when it is available.
+*** Reduce dependency on external "exiftool" command.
+The 'image-dired-copy-with-exif-file-name' no longer requires an
+external "exiftool" command to be available.  The user options
+'image-dired-cmd-read-exif-data-program' and
+'image-dired-cmd-read-exif-data-options' are now obsolete.
 
 ---
-*** New face 'image-dired-thumb-flagged'.
-If 'image-dired-thumb-mark' is non-nil (the default), this face is
-used for images that are flagged for deletion in the Dired buffer
-associated with Image-Dired.
-
----
-*** 'image-dired-slideshow-start' is now bound to 'S'.
-It is bound in both the thumbnail and display buffer.
+*** Support for bookmark.el.
+The command 'bookmark-set' (bound to 'C-x r m') is now supported in
+the thumbnail view, and will create a bookmark that opens the current
+directory in Image-Dired.
 
 ---
 *** The 'image-dired-slideshow-start' command no longer prompts.
@@ -2051,21 +2109,10 @@ argument to prompt for a delay.  Customize the user option
 'image-dired-slideshow-delay' to change the default from 5 seconds.
 
 ---
-*** Support for bookmark.el.
-The command 'bookmark-set' (bound to 'C-x r m') is now supported in
-the thumbnail view, and will create a bookmark that opens the current
-directory in Image-Dired.
+*** 'image-dired-display-properties-format' default has changed.
+If you prefer the old format, add this to your Init file:
 
----
-*** New user option 'image-dired-marking-shows-next'.
-If this option is non-nil (the default), marking, unmarking or
-flagging an image in either the thumbnail or display buffer shows the
-next image.
-
----
-*** Image information is now shown in the header line.
-This replaces the message most navigation commands in the thumbnail
-buffer used to show at the bottom of the screen.
+    (setopt image-dired-display-properties-format "%b: %f (%t): %c")
 
 +++
 *** 'image-dired-show-all-from-dir-max-files' increased to 1000.
@@ -2076,10 +2123,12 @@ important as it used to be.  You can now also customize this option to
 nil to disable this confirmation completely.
 
 ---
-*** 'image-dired-rotate-thumbnail-(left|right)' is now obsolete.
-Instead, use commands 'image-dired-refresh-thumb' to generate a new
-thumbnail, or 'image-rotate' to rotate the thumbnail without updating
-the thumbnail file.
+*** 'image-dired-thumb-size' increased to 128.
+
+---
+*** 'image-dired-thumb-(height|width)' are now obsolete.
+Customize 'image-dired-thumb-size' instead, which will set both the
+height and width.
 
 ---
 *** HTML image gallery generation is now obsolete.
@@ -2087,6 +2136,25 @@ The 'image-dired-gallery-generate' command and these user options are
 now obsolete: 'image-dired-gallery-thumb-image-root-url',
 'image-dired-gallery-hidden-tags', 'image-dired-gallery-dir',
 'image-dired-gallery-image-root-url'.
+
+---
+*** 'image-dired-rotate-thumbnail-{left,right}' are now obsolete.
+Instead, use commands 'image-dired-refresh-thumb' to generate a new
+thumbnail, or 'image-rotate' to rotate the thumbnail without updating
+the thumbnail file.
+
++++
+*** Some commands and user options are now obsolete.
+Since Image-Dired no longer converts images in the background before
+displaying them, some commands and user options that are no longer
+needed are now obsolete:
+'image-dired-cmd-create-temp-image-options',
+'image-dired-cmd-create-temp-image-program',
+'image-dired-display-current-image-full',
+'image-dired-display-current-image-sized',
+'image-dired-display-window-height-correction',
+'image-dired-display-window-width-correction',
+'image-dired-temp-image-file'.
 
 ** Dired
 
@@ -2141,9 +2209,9 @@ recently set.
 It is bound to the new command 'bookmark-edit-annotation-cancel'.
 
 ---
-*** New option 'bookmark-fringe-mark'.
+*** New user option 'bookmark-fringe-mark'.
 This option controls the bitmap used to indicate bookmarks in the
-fringe (or 'nil' to disable showing this marker).
+fringe (or nil to disable showing this marker).
 
 ** Exif
 
@@ -2245,7 +2313,7 @@ in the project root directory and is shared among all project buffers.
 
 Without a prefix argument, the kind of shell (buffer-dedicated,
 project-dedicated or global) is specified by the new
-'python-shell-dedicated' variable.
+'python-shell-dedicated' user option.
 
 ** Ruby Mode
 
@@ -2271,14 +2339,15 @@ automatically insert the Tramp prefix.  The automatic insertion
 applies only when 'default-directory' is remote and the command is a
 Lisp function.  This frees you from having to keep track of whether
 commands are Lisp function or external when supplying absolute file
-name arguments.  See "Electric forward slash" in the Eshell manual.
+name arguments.  See the "(eshell) Electric forward slash" node in the
+Eshell manual for details.
 
 +++
 *** Improved support for redirection operators in Eshell.
 Eshell now supports a wider variety of redirection operators.  For
 example, you can now redirect both stdout and stderr via '&>' or
 duplicate one output handle to another via 'NEW-FD>&OLD-FD'.  For more
-information, see "Redirections" in the Eshell manual.
+information, see the "(eshell) Redirection" node in the Eshell manual.
 
 +++
 *** Double-quoting an Eshell expansion now treats the result as a single string.
@@ -2371,6 +2440,18 @@ Enabling this minor mode turns on hiding header material, like
 'elide-head' does; disabling it shows the header.  The commands
 'elide-head' and 'elide-head-show' are now obsolete.
 
+*** New package 'osc'.
+Support for OSC ("Operating System Command") escape sequences has been
+extracted from 'comint.el' in order to provide interpretation of OSC
+sequences in compilation buffers.
+
+Adding the new function 'osc-compilation-filter' to
+'compilation-filter-hook' enables interpretation of OSC escape
+sequences in compilation buffers.  By default, all sequences are
+filtered out.
+
+A handler for OSC 2, the command to set a window title, is provided.
+
 +++
 *** New user option 'project-vc-include-untracked'.
 If non-nil, files untracked by a VCS are considered to be part of
@@ -2397,7 +2478,7 @@ instead of also trying to ping it.  Customize the user option
 *** The 'run-dig' command is now obsolete; use 'dig' instead.
 
 ---
-*** Some `bib-mode' commands and variables have been renamed.
+*** Some 'bib-mode' commands and variables have been renamed.
 To respect Emacs naming conventions, the variable 'unread-bib-file'
 has been renamed to 'bib-unread-file'.  The following commands have
 also been renamed:
@@ -2418,8 +2499,31 @@ remote host are shown.  Alternatively, the user option
 *** 'outlineify-sticky' command is renamed to 'allout-outlinify-sticky'.
 The old name is still available as an obsolete function alias.
 
+---
+*** 'edit-abbrevs' now uses font-locking.
+The new face 'abbrev-table-name' is used to display the abbrev table
+name.
+
 
 * New Modes and Packages in Emacs 29.1
+
++++
+** New commands 'image-crop' and 'image-cut.
+These commands allow interactively cropping/cutting the image at
+point.  The commands are bound to keys 'c' and 'x' (respectively) in
+the local keymap over images.  They rely on external programs, by
+default "convert" from ImageMagick, to do the actual cropping/eliding
+of the image file.
+
+---
+** New package 'wallpaper'.
+This package provides the command 'wallpaper-set', which sets the
+desktop background image.  Depending on the system and the desktop,
+this may require an external program (such as "swaybg", "gm",
+"display" or "xloadimage").  If so, a suitable command should be
+detected automatically in most cases.  It can also be customized
+manually if needed, using the new user options 'wallpaper-command' and
+'wallpaper-command-args'.
 
 +++
 ** New package 'oclosure'.
@@ -2627,7 +2731,7 @@ It's been obsolete since Emacs-22.1, actually.
 negative arguments, and is generally slower than 'ash', which should be
 used instead.  This warning can be suppressed by surrounding calls to
 'lsh' with the construct '(with-suppressed-warnings ((suspicious lsh)) ...)',
-but switching to `ash` is generally much preferable.
+but switching to 'ash' is generally much preferable.
 
 ---
 ** Some functions and variables obsolete since Emacs 24 have been removed:
@@ -2690,7 +2794,7 @@ but switching to `ash` is generally much preferable.
 'pascal-last-completions', 'pascal-show-completions',
 'pascal-toggle-completions', 'pcomplete-arg-quote-list',
 'pcomplete-quote-argument', 'prolog-char-quote-workaround',
-'python-buffer, 'python-guess-indent', 'python-indent',
+'python-buffer', 'python-guess-indent', 'python-indent',
 'python-info-ppss-comment-or-string-p', 'python-info-ppss-context',
 'python-info-ppss-context-type', 'python-preoutput-result',
 'python-proc', 'python-send-receive', 'python-send-string',
@@ -2777,12 +2881,12 @@ patcomp.el, pc-mode.el, pc-select.el, s-region.el, and sregex.el.
 Emacs has a number of rather obscure generalized variables defined,
 that, for instance, allowed you to say things like:
 
-   (setf (point-min) 4)
+    (setf (point-min) 4)
 
 These never caught on and have been made obsolete.  The form above,
 for instance, is the same as saying
 
-   (narrow-to-region 4 (point-max))
+    (narrow-to-region 4 (point-max))
 
 The following generalized variables have been made obsolete:
 'buffer-file-name', 'buffer-local-value', 'buffer-modified-p',
@@ -3424,11 +3528,21 @@ This means the vscroll will not be reset when set on a window that is
 ** XDG support
 
 ---
-*** New function 'xdg-state-home' returns 'XDG_STATE_HOME' environment variable.
-This new location, introduced in the XDG Base Directory Specification
-version 0.8 (8th May 2021), "contains state data that should persist
+*** New function 'xdg-state-home'.
+It returns the new 'XDG_STATE_HOME' environment variable.  It should
+point to a file name that "contains state data that should persist
 between (application) restarts, but that is not important or portable
 enough to the user that it should be stored in $XDG_DATA_HOME".
+(This variable was introduced in the XDG Base Directory Specification
+version 0.8 released on May 8, 2021.)
+
+---
+*** New function 'xdg-current-desktop'.
+It returns a list of strings, corresponding to the colon-separated
+list of names in the 'XDG_CURRENT_DESKTOP' environment variable, which
+identify the current desktop environment.
+(This variable was introduced in XDG Desktop Entry Specification
+version 1.2.)
 
 +++
 ** New macro 'with-delayed-message'.
