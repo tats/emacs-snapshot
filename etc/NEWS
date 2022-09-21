@@ -181,7 +181,7 @@ of 'user-emacs-directory'.
 * Incompatible changes in Emacs 29.1
 
 +++
-*** bookmarks no longer include context for encrypted files.
+*** Bookmarks no longer include context for encrypted files.
 If you're visiting an encrypted file, setting a bookmark no longer
 includes excerpts from that buffer in the bookmarks file.
 
@@ -388,6 +388,12 @@ Emacs will now display a warning when setting it to that value.
 The user options 'url-gateway-rlogin-host',
 'url-gateway-rlogin-parameters', and 'url-gateway-rlogin-user-name'
 are also obsolete.
+
+---
+** The linum.el library is now obsolete.
+We recommend using either the built-in `display-line-numbers-mode', or
+the `nlinum' package from GNU ELPA instead.  The former has better
+performance, but the latter is closer to a drop-in replacement.
 
 ---
 ** The autoarg.el library is now marked obsolete.
@@ -962,7 +968,14 @@ or is itself too long.
 *** New user option 'outline-minor-mode-use-buttons'.
 If non-nil, Outline Minor Mode will use buttons to hide/show outlines
 in addition to the ellipsis.  The default is nil in editing modes, but
-non-nil in 'special-mode' and its derivatives.
+non-nil in 'help-mode' and its derivatives.
+
++++
+*** New user option 'outline-minor-mode-use-margins'.
+If non-nil, Outline Minor Mode will use the window margins to
+hide/show outlines in addition to the ellipsis.  The default is
+non-nil in 'special-mode' and its derivatives, and it can be used in
+editing modes.
 
 ** Windows
 
@@ -1052,6 +1065,22 @@ are met.  The conditions are given by the argument, which can be
 Rcirc will use the default 'completion-at-point' mechanism.  The
 conventional IRC behavior of completing by cycling through the
 available options can be restored by enabling this option.
+
++++
+*** New user option 'rcirc-bridge-bot-alist'.
+If you are in a channel where a bot is responsible for bridging
+between networks, you can use this variable to make these messages
+appear more native.  For example you might set the option to:
+
+    (setq rcirc-bridge-bot-alist '(("bridge" . "{\\(.+?\\)}[[:space:]]+")))
+
+for messages like
+
+    09:47 <bridge> {john} I am not on IRC
+
+to be reformatted into
+
+    09:47 <john> I am not on IRC
 
 ** Imenu
 
@@ -1489,8 +1518,8 @@ characters instead of just 'SPC' and 'TAB'.
 This mode adds some highlighting, fixes the 'M-q' command, and has
 commands for doing maintenance of the Emacs NEWS files.  In addition,
 this mode turns on 'outline-minor-mode', and thus displays
-customizable icons (see 'icon-preference') on heading lines.  To
-disable these icons, customize 'outline-minor-mode-use-buttons' to a
+customizable icons (see 'icon-preference') in the margins.  To
+disable these icons, customize 'outline-minor-mode-use-margins' to a
 nil value.
 
 ---
@@ -2450,7 +2479,9 @@ Adding the new function 'osc-compilation-filter' to
 sequences in compilation buffers.  By default, all sequences are
 filtered out.
 
-A handler for OSC 2, the command to set a window title, is provided.
+The list of handlers (already covering OSC 7 and 8) has been extended
+with a handler for OSC 2, the command to set a window title.
+
 
 +++
 *** New user option 'project-vc-include-untracked'.
@@ -3805,6 +3836,12 @@ the same but works by modifying LIST destructively.
 
 ---
 ** 'string-split' is now an alias for 'split-string'.
+
++++
+** The variable 'max-specpdl-size' has been made obsolete.
+Now 'max-lisp-eval-depth' alone is used for limiting Lisp recursion
+and stack usage.  'max-specpdl-size' is still present as a plain
+variable for compatibility but its limiting powers have been taken away.
 
 
 * Changes in Emacs 29.1 on Non-Free Operating Systems
