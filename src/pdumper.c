@@ -265,7 +265,11 @@ struct dump_table_locator
 enum
   {
    DUMP_RELOC_TYPE_BITS = 5,
+#ifdef __mc68000__
+   DUMP_RELOC_ALIGNMENT_BITS = 1,
+#else
    DUMP_RELOC_ALIGNMENT_BITS = 2,
+#endif
 
    /* Minimum alignment required by dump file format.  */
    DUMP_RELOCATION_ALIGNMENT = 1 << DUMP_RELOC_ALIGNMENT_BITS,

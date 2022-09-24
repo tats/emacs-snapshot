@@ -6,3 +6,4 @@
 0006-Don-t-try-to-build-src-macuvs.h-via-IVD_Sequences.tx.patch
 0007-Kill-gpg-agent-in-package-test.el-to-avoid-a-race.patch
 0008-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
+0009-pdumper-set-DUMP_RELOC_ALIGNMENT_BITS-1-for-m68k.patch
