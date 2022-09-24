@@ -264,7 +264,7 @@ confflags += --with-sound=alsa
 confflags += --without-gconf
 confflags += --with-mailutils
 # At the moment, there's no mips64el libgccjitN-dev
-ifneq ($(DEB_HOST_ARCH),mips64el)
+ifeq (,$(filter $(DEB_HOST_ARCH),mips64el s390x))
   deb_native_compilation_enabled := 1
   confflags += --with-native-compilation
 endif
