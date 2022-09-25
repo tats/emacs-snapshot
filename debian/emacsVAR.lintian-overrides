@@ -1,2 +1,4 @@
 # dpkg-maintscript-helper does not work due to arch:all to arch:any switch
 maintainer-script-may-use-dir_to_symlink_helper
+
+shared-library-lacks-prerequisites [*.eln]
