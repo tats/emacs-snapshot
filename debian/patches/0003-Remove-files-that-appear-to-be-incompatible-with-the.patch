@@ -28,7 +28,7 @@ Status: new
  4 files changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 79a1d42..3fb78b2 100644
+index c6a2e50..3477f5f 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -174,7 +174,9 @@ man1dir=
@@ -42,7 +42,7 @@ index 79a1d42..3fb78b2 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -975,8 +977,7 @@ $(1)_$(2):
+@@ -977,8 +979,7 @@ $(1)_$(2):
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -52,7 +52,7 @@ index 79a1d42..3fb78b2 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -1094,11 +1095,11 @@ test/%:
+@@ -1096,11 +1097,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -69,7 +69,7 @@ index 79a1d42..3fb78b2 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1129,9 +1130,6 @@ info-dir:
+@@ -1131,9 +1132,6 @@ info-dir:
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -79,7 +79,7 @@ index 79a1d42..3fb78b2 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1153,14 +1151,10 @@ ${srcdir}/info/dir:
+@@ -1155,14 +1153,10 @@ ${srcdir}/info/dir:
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -98,7 +98,7 @@ index 79a1d42..3fb78b2 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1178,14 +1172,10 @@ install-pdf:
+@@ -1180,14 +1174,10 @@ install-pdf:
  install-ps: $(INSTALL_PS)
  
  
@@ -174,7 +174,7 @@ index 1d881a5..b1fc978 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index 0ec5b9c..672467e 100644
+index b4b9120..032da96 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -362,6 +362,14 @@ view-help-file
