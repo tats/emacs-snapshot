@@ -70,7 +70,8 @@ previous -ARG, if ARG<0) files."
          overlay)
      (when (and image-file
                 (string-match-p (image-dired--file-name-regexp) image-file))
-       (setq thumb-file (image-dired-get-thumbnail-image image-file))
+       (setq thumb-file (create-image
+                         (image-dired--get-create-thumbnail-file image-file)))
        ;; If image is not already added, then add it.
        (let ((thumb-ov (cl-loop for ov in (overlays-in (point) (1+ (point)))
                                 if (overlay-get ov 'thumb-file) return ov)))
@@ -165,7 +166,7 @@ but the other way around."
         (when found
           (if (setq window (image-dired-thumbnail-window))
               (set-window-point window (point)))
-          (image-dired-update-header-line))))))
+          (image-dired--update-header-line))))))
 
 (defun image-dired-dired-next-line (&optional arg)
   "Call `dired-next-line', then track thumbnail.
@@ -200,29 +201,15 @@ With prefix argument, move ARG lines."
 
 (defvar-keymap image-dired-minor-mode-map
   :doc "Keymap for `image-dired-minor-mode'."
-  ;; Hijack previous and next line movement.  Let C-p and C-b be
-  ;; though...
-  "p"      #'image-dired-dired-previous-line
-  "n"      #'image-dired-dired-next-line
-  "<up>"   #'image-dired-dired-previous-line
-  "<down>" #'image-dired-dired-next-line
-
+  "<remap> <dired-previous-line>" #'image-dired-dired-previous-line
+  "<remap> <dired-next-line>"     #'image-dired-dired-next-line
   "C-S-n"  #'image-dired-next-line-and-display
   "C-S-p"  #'image-dired-previous-line-and-display
   "C-S-m"  #'image-dired-mark-and-display-next
-
-  "C-t d"  #'image-dired-display-thumbs
   "<tab>"  #'image-dired-jump-thumbnail-buffer
-  "C-t i"  #'image-dired-dired-display-image
-  "C-t x"  #'image-dired-dired-display-external
-  "C-t a"  #'image-dired-display-thumbs-append
-  "C-t ."  #'image-dired-display-thumb
-  "C-t c"  #'image-dired-dired-comment-files
-  "C-t f"  #'image-dired-mark-tagged-files)
 
-(easy-menu-define image-dired-minor-mode-menu image-dired-minor-mode-map
-  "Menu for `image-dired-minor-mode'."
-  '("Image-dired"
+  :menu
+  '("Image-Dired"
     ["Display thumb for next file" image-dired-next-line-and-display]
     ["Display thumb for previous file" image-dired-previous-line-and-display]
     ["Mark and display next" image-dired-mark-and-display-next]
@@ -251,9 +238,39 @@ With prefix argument, move ARG lines."
 
 ;;;###autoload
 (define-minor-mode image-dired-minor-mode
-  "Setup easy-to-use keybindings for the commands to be used in Dired mode.
-Note that n, p and <down> and <up> will be hijacked and bound to
-`image-dired-dired-next-line' and `image-dired-dired-previous-line'."
+  "Setup easy-to-use keybindings for Image-Dired in Dired mode.
+
+This minor mode adds these additional bindings:
+\\<image-dired-minor-mode-map>
+  \\[image-dired-next-line-and-display]		Move to next line and display \
+thumbnail image.
+  \\[image-dired-previous-line-and-display]		Move to previous line \
+and display thumbnail image.
+  \\[image-dired-mark-and-display-next]		Mark current file and display \
+next thumbnail image.
+  \\[image-dired-jump-thumbnail-buffer]		Jump to thumbnail buffer.
+
+For reference, these are the default Image-Dired bindings that
+are always available in Dired:
+\\<dired-mode-map>
+  \\[image-dired-display-thumbs]		Display thumbnails of all marked files.
+  \\[image-dired-tag-files]		Tag marked file(s).
+  \\[image-dired-delete-tag]		Remove tag for selected file(s).
+  \\[image-dired-jump-thumbnail-buffer]		Jump to thumbnail buffer.
+  \\[image-dired-dired-display-image]		Display current image file.
+  \\[image-dired-dired-display-external]		Display file at point \
+using an external viewer.
+  \\[image-dired-display-thumbs-append]		Append thumbnails to \
+thumbnail buffer.
+  \\[image-dired-display-thumb]		Display thumbnails of all marked files.
+  \\[image-dired-dired-comment-files]		Add comment to current or \
+marked files in Dired.
+  \\[image-dired-mark-tagged-files]		Use REGEXP to mark files with \
+matching tag.
+  \\[image-dired-dired-toggle-marked-thumbs]	Toggle thumbnails in \
+front of file names.
+  \\[image-dired-dired-edit-comment-and-tags]		Edit comment and tags \
+of marked images."
   :keymap image-dired-minor-mode-map)
 
 (declare-function clear-image-cache "image.c" (&optional filter))
@@ -370,17 +387,18 @@ matching tag will be marked in the Dired buffer."
 (defun image-dired-dired-display-properties ()
   "Display properties for Dired file in the echo area."
   (interactive nil dired-mode)
-  (let* ((file (dired-get-filename))
-         (file-name (file-name-nondirectory file))
+  (let* ((file-name (dired-get-filename))
          (dired-buf (buffer-name (current-buffer)))
-         (props (string-join (image-dired-list-tags file) ", "))
-         (comment (image-dired-get-comment file))
+         (image-count "")               ; TODO
+         (props (string-join (image-dired-list-tags file-name) ", "))
+         (comment (image-dired-get-comment file-name))
          (message-log-max nil))
     (if file-name
         (message "%s"
                  (image-dired-format-properties-string
                   dired-buf
                   file-name
+                  image-count
                   props
                   comment)))))
 

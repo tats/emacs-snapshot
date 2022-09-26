@@ -3087,8 +3087,8 @@ interpreter is run.  Variables
 `python-shell-font-lock-enable',
 `python-shell-completion-setup-code',
 `python-shell-completion-string-code',
-`python-eldoc-setup-code', `python-eldoc-string-code',
-`python-ffap-setup-code' and `python-ffap-string-code' can
+`python-eldoc-setup-code',
+`python-ffap-setup-code' can
 customize this mode for different Python interpreters.
 
 This mode resets `comint-output-filter-functions' locally, so you
@@ -5505,11 +5505,11 @@ operator."
   "Check if point is at `beginning-of-defun' using SYNTAX-PPSS.
 When CHECK-STATEMENT is non-nil, the current statement is checked
 instead of the current physical line."
-  (and (not (python-syntax-context-type (or syntax-ppss (syntax-ppss))))
-       (save-excursion
-         (when check-statement
-           (python-nav-beginning-of-statement))
-         (beginning-of-line 1)
+  (save-excursion
+    (when check-statement
+      (python-nav-beginning-of-statement))
+    (beginning-of-line 1)
+    (and (not (python-syntax-context-type (or syntax-ppss (syntax-ppss))))
          (looking-at python-nav-beginning-of-defun-regexp))))
 
 (defun python-info-looking-at-beginning-of-block ()

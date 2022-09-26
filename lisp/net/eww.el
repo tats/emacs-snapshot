@@ -415,13 +415,11 @@ For more information, see Info node `(eww) Top'."
 (defun eww-retrieve (url callback cbargs)
   (cond
    ((null eww-retrieve-command)
-    (url-retrieve url #'eww-render
-                  (list url nil (current-buffer))))
+    (url-retrieve url #'eww-render cbargs))
    ((eq eww-retrieve-command 'sync)
-    (let ((orig-buffer (current-buffer))
-          (data-buffer (url-retrieve-synchronously url)))
+    (let ((data-buffer (url-retrieve-synchronously url)))
       (with-current-buffer data-buffer
-        (eww-render nil url nil orig-buffer))))
+        (apply #'eww-render nil url cbargs))))
    (t
     (let ((buffer (generate-new-buffer " *eww retrieve*"))
           (error-buffer (generate-new-buffer " *eww error*")))
@@ -1181,7 +1179,27 @@ the like."
   (setq-local bookmark-make-record-function #'eww-bookmark-make-record)
   (buffer-disable-undo)
   (setq-local shr-url-transformer #'eww--transform-url)
+  ;; Also rescale images when rescaling the text.
+  (add-hook 'text-scale-mode-hook #'eww--rescale-images nil t)
   (setq buffer-read-only t))
+
+(defvar text-scale-mode)
+(defvar text-scale-mode-amount)
+(defun eww--rescale-images ()
+  (let ((scaling (if text-scale-mode
+                     (+ 1 (* text-scale-mode-amount 0.1))
+                   1))
+        match)
+    (save-excursion
+      (goto-char (point-min))
+      (while (setq match (text-property-search-forward 'display))
+        (let ((image (prop-match-value match)))
+          (when (imagep image)
+            (unless (image-property image :original-scale)
+              (setf (image-property image :original-scale)
+                    (or (image-property image :scale) 1)))
+            (setf (image-property image :scale)
+                  (* (image-property image :original-scale) scaling))))))))
 
 (defun eww--url-at-point ()
   "`thing-at-point' provider function."
@@ -1611,7 +1629,7 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
     (unless (= start (point))
       (put-text-property start (1+ start) 'help-echo "Input field")
       ;; Mark this as an element we can TAB to.
-      (put-text-property start (1+ start) 'shr-url dom))))
+      (put-text-property start (1+ start) 'shr-tab-stop t))))
 
 (defun eww-tag-select (dom)
   (shr-ensure-paragraph)

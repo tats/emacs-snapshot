@@ -193,7 +193,7 @@ Nil means to not interpolate such scrolls."
   :type 'float
   :version "29.1")
 
-(defcustom pixel-scroll-precision-interpolation-factor 4.0
+(defcustom pixel-scroll-precision-interpolation-factor 2.0
   "A factor to apply to the distance of an interpolated scroll."
   :group 'mouse
   :type 'float
@@ -603,19 +603,25 @@ the height of the current window."
       (when (< delta 0)
         (set-window-vscroll nil (- delta) t t)))))
 
-(defun pixel-scroll-precision-interpolate (delta &optional old-window)
+(defun pixel-scroll-precision-interpolate (delta &optional old-window factor)
   "Interpolate a scroll of DELTA pixels.
 OLD-WINDOW is the window which will be selected when redisplay
 takes place, or nil for the current window.  This results in the
-window being scrolled by DELTA pixels with an animation."
+window being scrolled by DELTA pixels with an animation.  FACTOR
+is a scale by which DELTA will be modified.  If nil, it defaults
+to `pixel-scroll-precision-interpolation-factor'."
   (let ((percentage 0)
         (total-time pixel-scroll-precision-interpolation-total-time)
-        (factor pixel-scroll-precision-interpolation-factor)
+        (factor (or factor pixel-scroll-precision-interpolation-factor))
         (last-time (float-time))
-        (time-elapsed 0.0)
+        (time-elapsed 0)
         (between-scroll pixel-scroll-precision-interpolation-between-scroll)
         (rem (window-parameter nil 'interpolated-scroll-remainder))
-        (time (window-parameter nil 'interpolated-scroll-remainder-time)))
+        (time (window-parameter nil 'interpolated-scroll-remainder-time))
+        (last-delta 0))
+    (unless (or (not rem) (eq (< delta 0) (< rem 0)))
+      ;; The direction changed.  Clear the remainder.
+      (setq rem nil))
     (when (and rem time
                (< (- (float-time) time) 1.0)
                (eq (< delta 0) (< rem 0)))
@@ -629,18 +635,19 @@ window being scrolled by DELTA pixels with an animation."
                                           (selected-window))
                   (redisplay t))
                 (sleep-for between-scroll)
-                (setq time-elapsed (+ time-elapsed
-                                      (- (float-time) last-time))
-                      percentage (/ time-elapsed total-time))
-                (let ((throw-on-input nil))
-                  (if (< delta 0)
-                      (pixel-scroll-precision-scroll-down
-                       (ceiling (abs (* (* delta factor)
-                                        (/ between-scroll total-time)))))
-                    (pixel-scroll-precision-scroll-up
-                     (ceiling (* (* delta factor)
-                                 (/ between-scroll total-time))))))
-                (setq last-time (float-time)))
+                (let ((time (float-time)))
+                  (setq time-elapsed (+ time-elapsed
+                                        (- time last-time))
+                        percentage (/ time-elapsed total-time))
+                  (let* ((throw-on-input nil)
+                         (absolute-delta (* (min 1 percentage) delta factor))
+                         (relative-delta (abs
+                                          (round (- absolute-delta last-delta)))))
+                    (setq last-delta absolute-delta)
+                    (if (< delta 0)
+                        (pixel-scroll-precision-scroll-down relative-delta)
+                      (pixel-scroll-precision-scroll-up relative-delta)))
+                  (setq last-time time)))
             (if (< percentage 1)
                 (progn
                   (set-window-parameter nil 'interpolated-scroll-remainder
@@ -819,14 +826,20 @@ It is a vector of the form [ VELOCITY TIME SIGN ]."
   "Interpolate a scroll downwards by one page."
   (interactive)
   (if pixel-scroll-precision-interpolate-page
-      (pixel-scroll-precision-interpolate (- (window-text-height nil t)))
+      (pixel-scroll-precision-interpolate (- (window-text-height nil t))
+                                          ;; Don't use an
+                                          ;; interpolation factor,
+                                          ;; since we want exactly 1
+                                          ;; page to be scrolled.
+                                          nil 1)
     (cua-scroll-up)))
 
 (defun pixel-scroll-interpolate-up ()
   "Interpolate a scroll upwards by one page."
   (interactive)
   (if pixel-scroll-precision-interpolate-page
-      (pixel-scroll-precision-interpolate (window-text-height nil t))
+      (pixel-scroll-precision-interpolate (window-text-height nil t)
+                                          nil 1)
     (cua-scroll-down)))
 
 ;;;###autoload

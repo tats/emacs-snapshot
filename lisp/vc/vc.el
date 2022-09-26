@@ -808,12 +808,12 @@ not specific to any particular backend."
 (defcustom vc-annotate-switches nil
   "A string or list of strings specifying switches for annotate under VC.
 When running annotate under a given BACKEND, VC uses the first
-non-nil value of `vc-BACKEND-annotate-switches', `vc-annotate-switches',
-and `annotate-switches', in that order.  Since nil means to check the
-next variable in the sequence, either of the first two may use
-the value t to mean no switches at all.  `vc-annotate-switches'
-should contain switches that are specific to version control, but
-not specific to any particular backend.
+non-nil value of `vc-BACKEND-annotate-switches' and
+`vc-annotate-switches', in that order.  Since nil means to check
+the next variable in the sequence, setting the first to the value
+t means no switches at all.  `vc-annotate-switches' should
+contain switches that are specific to version control, but not
+specific to any particular backend.
 
 As very few switches (if any) are used across different VC tools,
 please consider using the specific `vc-BACKEND-annotate-switches'
@@ -2744,17 +2744,28 @@ with its diffs (if the underlying VCS supports that)."
     (setq vc-parent-buffer-name nil)))
 
 ;;;###autoload
-(defun vc-print-branch-log (branch)
-  "Show the change log for BRANCH root in a window."
+(defun vc-print-branch-log (branch &optional arg)
+  "Show the change log for BRANCH root in a window.
+Optional prefix ARG non-nil requests an opportunity for the user
+to edit the VC shell command that will be run to generate the
+log."
+  ;; The original motivation for ARG was to make it possible to
+  ;; produce a log of more than one Git branch without modifying the
+  ;; print-log VC API.  The user can append the other branches to the
+  ;; command line arguments to 'git log'.  See bug#57807.
   (interactive
    (let* ((backend (vc-responsible-backend default-directory))
           (rootdir (vc-call-backend backend 'root default-directory)))
      (list
-      (vc-read-revision "Branch to log: " (list rootdir) backend))))
+      (vc-read-revision "Branch to log: " (list rootdir) backend)
+      current-prefix-arg)))
   (when (equal branch "")
     (error "No branch specified"))
   (let* ((backend (vc-responsible-backend default-directory))
-         (rootdir (vc-call-backend backend 'root default-directory)))
+         (rootdir (vc-call-backend backend 'root default-directory))
+         (vc-filter-command-function (if arg
+                                         #'vc-user-edit-command
+                                       vc-filter-command-function)))
     (vc-print-log-internal backend
                            (list rootdir) branch t
                            (when (> vc-log-show-limit 0) vc-log-show-limit))))
@@ -2964,6 +2975,28 @@ It also signals an error in a Bazaar bound branch."
     (if (vc-find-backend-function backend 'push)
         (vc-call-backend backend 'push arg)
       (user-error "VC push is unsupported for `%s'" backend))))
+
+;;;###autoload
+(defun vc-pull-and-push (&optional arg)
+  "First pull, and then push the current branch.
+The push will only be performed if the pull operation was successful.
+
+You must be visiting a version controlled file, or in a `vc-dir' buffer.
+
+On a distributed version control system, this runs a \"pull\"
+operation on the current branch, prompting for the precise
+command if required.  Optional prefix ARG non-nil forces a prompt
+for the VCS command to run.  If this is successful, a \"push\"
+operation will then be done.
+
+On a non-distributed version control system, this signals an error.
+It also signals an error in a Bazaar bound branch."
+  (interactive "P")
+  (let* ((vc-fileset (vc-deduce-fileset t))
+	 (backend (car vc-fileset)))
+    (if (vc-find-backend-function backend 'pull-and-push)
+        (vc-call-backend backend 'pull-and-push arg)
+      (user-error "VC pull-and-push is unsupported for `%s'" backend))))
 
 (defun vc-version-backup-file (file &optional rev)
   "Return name of backup file for revision REV of FILE.

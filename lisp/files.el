@@ -3593,7 +3593,6 @@ asking you for confirmation."
 	inhibit-quit
 	load-path
 	max-lisp-eval-depth
-	max-specpdl-size
 	minor-mode-map-alist
 	minor-mode-overriding-map-alist
 	mode-line-format
@@ -5174,7 +5173,7 @@ On most systems, this will be true:
           (setq filename nil))))
     components))
 
-(defun file-parent-directory (filename)
+(defun file-name-parent-directory (filename)
   "Return the directory name of the parent directory of FILENAME.
 If FILENAME is at the root of the filesystem, return nil.
 If FILENAME is relative, it is interpreted to be relative

@@ -610,7 +610,10 @@ DEFUN ("append", Fappend, Sappend, 0, MANY, 0,
        doc: /* Concatenate all the arguments and make the result a list.
 The result is a list whose elements are the elements of all the arguments.
 Each argument may be a list, vector or string.
-The last argument is not copied, just used as the tail of the new list.
+
+All arguments except the last argument are copied.  The last argument
+is just used as the tail of the new list.
+
 usage: (append &rest SEQUENCES)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -1412,6 +1415,7 @@ are shared, however.
 Elements of ALIST that are not conses are also shared.  */)
   (Lisp_Object alist)
 {
+  CHECK_LIST (alist);
   if (NILP (alist))
     return alist;
   alist = Fcopy_sequence (alist);
