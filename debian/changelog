@@ -1,10 +1,32 @@
-emacs (1:28.1+1-4~1.gbp9a6290) UNRELEASED; urgency=medium
+emacs (1:28.1+1-4) unstable; urgency=medium
 
-  ** SNAPSHOT build @9a6290a8be5f37e0ea3057da6a6ec7a2a463d7dc **
+  [ Rob Browning ]
+  * debian/rules: don't set debian CFLAGS to -O0 on arm64 anymore.  It
+    looks like this may be fixed now.  Let's see.
 
-  * UNRELEASED
+  * Disable debian mips64el native compilation given ABI incompatibility.
+    Currently ./configure fails on eller.debian.org (mipsel host with
+    mips64 sbuild chroot) with this in the config.log: Error: -march=mips1
+    is not compatible with the selected ABI.
 
- -- Rob Browning <rlb@defaultvalue.org>  Sun, 18 Sep 2022 14:02:32 -0500
+  * Disable debian s390x native compilation to avoid build crashes.
+    cf. https://debbugs.gnu.org/57789
+
+  * Fix pdumper alignment problem causing m68k build failures.  Add
+    0009-pdumper-set-DUMP_RELOC_ALIGNMENT_BITS-1-for-m68k.patch to address
+    the issue.  Thanks to John Paul Adrian Glaubitz for the
+    patch. (Closes: 1019130)
+
+  * Ignore lintian shared-library-lacks-prerequisites for eln files.
+
+  * Don't crash when the ~/.emacs.d/eln-cache isn't writable.  Add
+    0010-Emacs-should-no-longer-crash-when-the-eln-cache-isn-.patch to fix
+    the problem.  Thanks to David Bremner for helping pursue the issue.
+
+  [ Nicholas D Steeves ]
+  * Don't enable Debian systemd unit by default.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 26 Sep 2022 20:27:06 -0500
 
 emacs (1:28.1+1-3) unstable; urgency=medium
 
