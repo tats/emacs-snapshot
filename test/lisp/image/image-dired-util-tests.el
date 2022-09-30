@@ -48,9 +48,12 @@
                (file-name-directory (image-dired-thumb-name "foo.jpg"))
                (file-name-directory (image-dired-thumb-name "/tmp/foo.jpg"))))
       (should (equal (file-name-nondirectory
-                      ;; The checksum is based on the directory name.
+                      ;; The checksum is based on the file name.
                       (image-dired-thumb-name "/some/path/foo.jpg"))
-                     "foo_45fff7fcc4a0945679b7b11dec36a82d.thumb.jpg")))))
+                     "dc4e6f7068157023e7f2e8362d15bdd2e3ca89e4.jpg"))
+      (should (equal (file-name-extension
+                      (image-dired-thumb-name "foo.gif"))
+                     "jpg")))))
 
 (ert-deftest image-dired-thumb-name/per-directory ()
   (let ((image-dired-thumbnail-storage 'per-directory))
@@ -60,9 +63,9 @@
              (file-name-nondirectory (image-dired-thumb-name "foo.jpg"))
              (file-name-nondirectory (image-dired-thumb-name "/tmp/foo.jpg"))))
     (should (equal (file-name-split (image-dired-thumb-name "/tmp/foo.jpg"))
-                   '("" "tmp" ".image-dired" "foo.thumb.jpg")))
+                   '("" "tmp" ".image-dired" "foo.jpg.thumb.jpg")))
     (should (equal (file-name-nondirectory
                     (image-dired-thumb-name "foo.jpg"))
-                   "foo.thumb.jpg"))))
+                   "foo.jpg.thumb.jpg"))))
 
 ;;; image-dired-util-tests.el ends here

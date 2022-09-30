@@ -291,16 +291,17 @@
 	(tai-xuan-jing-symbol #x1D300)
 	(counting-rod-numeral #x1D360)
 	(nyiakeng-puachue-hmong #x1e100)
-	(toto #x1E290)
-	(wancho #x1e2c0)
+	(toto #x1E290 #x1E295 #x1E2AD)
+	(wancho #x1E2C0 #x1E2E8 #x1E2EF)
         (nag-mundari #x1E4D0 #x1E4EB #x1E4F0)
-	(mende-kikakui #x1E810)
-	(adlam #x1E900)
-	(indic-siyaq-number #x1ec71)
-	(ottoman-siyaq-number #x1ed01)
+	(mende-kikakui #x1E810 #x1E8A6)
+	(adlam #x1E900 #x1E943)
+	(indic-siyaq-number #x1EC71 #x1EC9F)
+	(ottoman-siyaq-number #x1ED01 #x1ED27)
 	(mahjong-tile #x1F000)
 	(domino-tile #x1F030)
-        (emoji #x1F300 #x1F600)))
+        (emoji #x1F300 #x1F600)
+        (chess-symbol . [#x1FA00 #x1FA67])))
 
 (defvar otf-script-alist)
 
@@ -831,12 +832,17 @@
 		    tai-xuan-jing-symbol
 		    counting-rod-numeral
                     toto
+                    wancho
                     nag-mundari
+                    mende-kikakui
 		    adlam
                     tai-tham
+                    indic-siyaq-number
+                    ottoman-siyaq-number
 		    mahjong-tile
 		    domino-tile
-                    emoji))
+                    emoji
+                    chess-symbol))
     (set-fontset-font "fontset-default"
 		      script (font-spec :registry "iso10646-1" :script script)
 		      nil 'append))

@@ -214,6 +214,28 @@ are available (see Info node `(emacs)Document View')."
   :type 'boolean
   :version "29.1")
 
+(defcustom doc-view-imenu-enabled (and (executable-find "mutool") t)
+  "Whether to generate an imenu outline when \"mutool\" is available."
+  :type 'boolean
+  :version "29.1")
+
+(defcustom doc-view-imenu-title-format "%t (%p)"
+  "Format spec for imenu's display of section titles from docview documents.
+
+The special markers '%t' and '%p' are replaced by the section
+title and page number in this format string, which uses
+`format-spec'.
+
+For instance, setting this variable to \"%t\" will produce items
+showing only titles and no page number."
+  :type 'string
+  :version "29.1")
+
+(defcustom doc-view-imenu-flatten nil
+  "Whether to flatten the list of sections in an imenu or show it nested."
+  :type 'boolean
+  :version "29.1")
+
 (defcustom doc-view-svg-background "white"
   "Background color for svg images.
 See `doc-view-mupdf-use-svg'."
@@ -1874,6 +1896,81 @@ If BACKWARD is non-nil, jump to the previous match."
 	     (y-or-n-p "No more matches before current page.  Wrap to last match? "))
 	(doc-view-goto-page (caar (last doc-view--current-search-matches)))))))
 
+;;;; Imenu support
+(defconst doc-view--outline-rx
+  "[^\t]+\\(\t+\\)\"\\(.+\\)\"\t#\\(?:page=\\)?\\([0-9]+\\)")
+
+(defvar-local doc-view--outline nil
+  "Cached PDF outline, so that it is only computed once per document.")
+
+(defun doc-view--pdf-outline (&optional file-name)
+  "Return a list describing the outline of FILE-NAME.
+Return a list describing the current file if FILE-NAME is nil.
+
+Each element in the returned list contains information about a section's
+title, nesting level and page number.  The list is flat: its tree
+structure is extracted by `doc-view--imenu-subtree'."
+  (let ((fn (or file-name (buffer-file-name))))
+    (when fn
+      (let ((outline nil)
+            (fn (shell-quote-argument (expand-file-name fn))))
+        (with-temp-buffer
+          (insert (shell-command-to-string (format "mutool show %s outline" fn)))
+          (goto-char (point-min))
+          (while (re-search-forward doc-view--outline-rx nil t)
+            (push `((level . ,(length (match-string 1)))
+                    (title . ,(replace-regexp-in-string "\\\\[rt]" " "
+                                                        (match-string 2)))
+                    (page . ,(string-to-number (match-string 3))))
+                  outline)))
+        (nreverse outline)))))
+
+(defun doc-view--imenu-subtree (outline act)
+  "Construct a tree of imenu items for the given outline list and action.
+
+This auxliary function constructs recursively all the items for
+the first node in the outline and all its siblings at the same
+level.  Returns that imenu alist together with any other pending outline
+entries at an upper level."
+  (let ((level (alist-get 'level (car outline)))
+        (nested (not doc-view-imenu-flatten))
+        (index nil))
+    (while (and (car outline)
+                (or (not nested)
+                    (<= level (alist-get 'level (car outline)))))
+      (let-alist (car outline)
+        (let ((title (format-spec doc-view-imenu-title-format
+                                  `((?t . ,.title) (?p . ,.page)))))
+          (if (and nested (> .level level))
+              (let ((sub (doc-view--imenu-subtree outline act))
+                    (fst (car index)))
+                (setq index (cdr index))
+                (push (cons (car fst) (cons fst (car sub))) index)
+                (setq outline (cdr sub)))
+            (push `(,title 0 ,act ,.page) index)
+            (setq outline (cdr outline))))))
+    (cons (nreverse index) outline)))
+
+(defun doc-view-imenu-index (&optional file-name goto-page-fn)
+  "Create an imenu index using \"mutool\" to extract its outline.
+
+For extensibility, callers can specify a FILE-NAME to indicate
+the buffer other than the current buffer, and a jumping function
+GOTO-PAGE-FN other than `doc-view-goto-page'."
+  (let* ((goto (or goto-page-fn 'doc-view-goto-page))
+         (act (lambda (_name _pos page) (funcall goto page)))
+         (outline (or doc-view--outline (doc-view--pdf-outline file-name))))
+    (car (doc-view--imenu-subtree outline act))))
+
+(defun doc-view-imenu-setup ()
+  "Set up local state in the current buffer for imenu, if needed."
+  (when (and doc-view-imenu-enabled (executable-find "mutool"))
+    (setq-local imenu-create-index-function #'doc-view-imenu-index
+                imenu-submenus-on-top nil
+                imenu-sort-function nil
+                doc-view--outline (doc-view--pdf-outline))
+    (when doc-view--outline (imenu-add-to-menubar "Outline"))))
+
 ;;;; User interface commands and the mode
 
 (put 'doc-view-mode 'mode-class 'special)
@@ -2047,7 +2144,7 @@ If BACKWARD is non-nil, jump to the previous match."
   "Major mode in DocView buffers.
 
 DocView Mode is an Emacs document viewer.  It displays PDF, PS
-and DVI files (as PNG images) in Emacs buffers.
+and DVI files (as PNG or SVG images) in Emacs buffers.
 
 You can use \\<doc-view-mode-map>\\[doc-view-toggle-display] to
 toggle between displaying the document or editing it as text.
@@ -2142,6 +2239,7 @@ toggle between displaying the document or editing it as text.
     (setq mode-name "DocView"
 	  buffer-read-only t
 	  major-mode 'doc-view-mode)
+    (doc-view-imenu-setup)
     (doc-view-initiate-display)
     ;; Switch off view-mode explicitly, because doc-view-mode is the
     ;; canonical view mode for PDF/PS/DVI files.  This could be

@@ -162,12 +162,12 @@ List killed groups (@code{gnus-group-list-killed}).
 List zombie groups (@code{gnus-group-list-zombies}).
 
 @kindex u @r{(Gnus Group mode)}
-@findex gnus-group-toggle-subscription
+@findex gnus-group-toggle-subscription-at-point
 @cindex subscribe groups
 @cindex unsubscribe groups
 @item u
 Toggle the subscription status of the group
-(@code{gnus-group-toggle-subscription}) on the current line.
+(@code{gnus-group-toggle-subscription-at-point}) on the current line.
 Invoking this on a killed or zombie group turns it into an
 unsubscribed group.
 
@@ -245,7 +245,7 @@ buffer and typed @kbd{C-s} (@pxref{Incremental Search}).
 
 @kindex M-s M-s @r{(Gnus Summary mode)}
 @findex gnus-summary-search-article-forward
-@item M-s @var{regexp} @key{RET}
+@item M-s M-s @var{regexp} @key{RET}
 Search forward for articles containing a match for @var{regexp}
 (@code{gnus-summary-search-article-forward}).
 
@@ -583,6 +583,18 @@ you instead want the image to be re-rendered at the new size, set
 @code{doc-view-scale-internally} to @code{nil}.  To specify the
 default size for DocView, customize the variable
 @code{doc-view-resolution}.
+
+@vindex doc-view-imenu-enabled
+@vindex doc-view-imenu-flatten
+@vindex doc-view-imenu-format
+  When the @command{mutool} program is available, DocView will use it
+to generate entries for an outline menu, making it accessible via the
+@code{imenu} facility (@pxref{Imenu}).  To disable this functionality
+even when @command{mutool} can be found on your system, customize the
+variable @code{doc-view-imenu-enabled} to the @code{nil} value.  You
+can further customize how @code{imenu} items are formatted and
+displayed using the variables @code{doc-view-imenu-format} and
+@code{doc-view-flatten}.
 
 @node DocView Searching
 @subsection DocView Searching

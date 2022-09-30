@@ -3016,6 +3016,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\|SQUASHFS\\)\\'" .
      ("[cC]hange[lL]og[-.][-0-9a-z]+\\'" . change-log-mode)
      ;; either user's dot-files or under /etc or some such
      ("/\\.?\\(?:gitconfig\\|gnokiirc\\|hgrc\\|kde.*rc\\|mime\\.types\\|wgetrc\\)\\'" . conf-mode)
+     ("/\\.mailmap\\'" . conf-unix-mode)
      ;; alas not all ~/.*rc files are like this
      ("/\\.\\(?:asound\\|enigma\\|fetchmail\\|gltron\\|gtk\\|hxplayer\\|mairix\\|mbsync\\|msmtp\\|net\\|neverball\\|nvidia-settings-\\|offlineimap\\|qt/.+\\|realplayer\\|reportbug\\|rtorrent\\.\\|screen\\|scummvm\\|sversion\\|sylpheed/.+\\|xmp\\)rc\\'" . conf-mode)
      ("/\\.\\(?:gdbtkinit\\|grip\\|mpdconf\\|notmuch-config\\|orbital/.+txt\\|rhosts\\|tuxracer/options\\)\\'" . conf-mode)
@@ -4865,6 +4866,14 @@ Interactively, this prompts for NEW-LOCATION."
                            (expand-file-name
                             (file-name-nondirectory (buffer-name))
                             default-directory)))))
+  ;; If the user has given a directory name, the file should be moved
+  ;; there (under the same file name).
+  (when (file-directory-p new-location)
+    (unless buffer-file-name
+      (user-error "Can't rename buffer to a directory file name"))
+    (setq new-location (expand-file-name
+                        (file-name-nondirectory buffer-file-name)
+                        new-location)))
   (when (and buffer-file-name
              (file-exists-p buffer-file-name))
     (rename-file buffer-file-name new-location))
@@ -6127,16 +6136,17 @@ recent files are first."
   (let* ((filename (file-name-sans-versions
 		    (make-backup-file-name (expand-file-name filename))))
          (dir (file-name-directory filename)))
-    (sort
-     (seq-filter
-      (lambda (candidate)
-        (and (backup-file-name-p candidate)
-             (string= (file-name-sans-versions candidate) filename)))
-      (mapcar
-       (lambda (file)
-         (concat dir file))
-       (file-name-all-completions (file-name-nondirectory filename) dir)))
-     #'file-newer-than-file-p)))
+    (when (file-directory-p dir)
+      (sort
+       (seq-filter
+        (lambda (candidate)
+          (and (backup-file-name-p candidate)
+               (string= (file-name-sans-versions candidate) filename)))
+        (mapcar
+         (lambda (file)
+           (concat dir file))
+         (file-name-all-completions (file-name-nondirectory filename) dir)))
+       #'file-newer-than-file-p))))
 
 (defun rename-uniquely ()
   "Rename current buffer to a similar name not already taken.

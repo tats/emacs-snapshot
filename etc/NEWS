@@ -381,6 +381,15 @@ startup.  Previously, these functions ignored
 'initial-scratch-message' and left "*scratch*" in 'fundamental-mode'.
 
 ---
+** Naming of Image-Dired thumbnail files has changed.
+Names of thumbnail files generated when 'image-dired-thumbnail-storage'
+is 'image-dired' now always end in ".jpg".  This fixes various issues
+on different platforms, but means that thumbnails generated in Emacs 28
+will not be used in Emacs 29, and vice-versa.  If disk space is an
+issue, consider deleting the 'image-dired-dir' directory after
+upgrading (usually "~/.emacs.d/image-dired/").
+
+---
 ** The 'rlogin' method in the URL library is now obsolete.
 Emacs will now display a warning if you request a URL like
 "rlogin://foo@example.org".
@@ -1205,6 +1214,14 @@ When nil, this prevents comint from deleting the current input when
 inserting previous input using '<mouse-2>'.  The default is t, to
 preserve past behavior.
 
+---
+*** New minor mode 'comint-fontify-input-mode'.
+This minor mode is enabled by default in "*shell*" and "*ielm*"
+buffers.  It fontifies input text according to 'shell-mode' or
+'emacs-lisp-mode' font-lock rules.  Customize the user options
+'shell-fontify-input-enable' and 'ielm-fontify-input-enable' to nil if
+you don't want to enable input fontification by default.
+
 ** Mwheel
 
 ---
@@ -1229,10 +1246,10 @@ to edit such sequences by allowing point to "enter" the sequence.
 *** Support for many old scripts and writing systems.
 Emacs now supports and has language-environments and input methods for
 several dozens of old scripts that were used in the past for various
-languages in South and South-East Asia.  For each such script Emacs
-now has font-selection and character composition rules, a language
-environment, and an input method.  The newly-added scripts and the
-corresponding language environments are:
+languages.  For each such script Emacs now has font-selection and
+character composition rules, a language environment, and an input
+method.  The newly-added scripts and the corresponding language
+environments are:
 
 Tai Tham script and the Northern Thai language environment
 Brahmi script and language environment
@@ -1259,6 +1276,10 @@ Grantha script and language environment
 Kharoshthi script and language environment
 Lepcha script and language environment
 Meetei Mayek script and language environment
+Adlam script and language environment
+Mende Kikakui script and language environment
+Wancho script and language environment
+Toto script and language environment
 
 ---
 *** The "Oriya" language environment was renamed to "Odia".
@@ -1741,6 +1762,13 @@ commands.
 This command marks files based on a regexp.  If given a prefix
 argument, unmark instead.
 
++++
+*** New command 'C-x v !' ('vc-edit-next-command')
+This prefix command requests editing of the next VC shell command
+before execution.  For example, in a Git repository, you can produce a
+log of more than one branch by typing 'C-x v ! C-x v b l' and then
+appending additional branch names to the 'git log' command.
+
 ---
 *** 'C-x v v' in a diffs buffer allows to commit only some of the changes.
 This command is intended to allow you to commit only some of the
@@ -2112,6 +2140,12 @@ The following new bindings have been added:
 It removes all marks from all files in the thumbnail and the
 associated Dired buffer, and is bound to 'U' in the thumbnail and
 display buffer.
+
+---
+*** New command 'image-dired-do-flagged-delete'.
+It deletes all flagged files, and is bound to 'x' in the thumbnail
+buffer.  It replaces the command 'image-dired-delete-marked', which is
+now an obsolete alias.
 
 ---
 *** New command 'image-dired-copy-filename-as-kill'.
@@ -2493,6 +2527,12 @@ behavior, customize the new 'eshell-lisp-form-nil-is-failure' option.
 *** New user option 'shell-kill-buffer-on-exit'.
 Enabling this will automatically kill a "*shell*" buffer as soon as
 the shell session terminates.
+
+---
+*** New minor mode 'shell-highlight-undef-mode'
+Customize 'shell-highlight-undef-enable' to t if you want to enable
+this minor mode in "*shell*" buffers.  It will highlight undefined
+commands with a warning face as you type.
 
 ** Calc
 
@@ -3002,6 +3042,10 @@ The following generalized variables have been made obsolete:
 
 
 * Lisp Changes in Emacs 29.1
+
++++
+** New macro 'while-let'.
+This is like 'when-let', but repeats until a binding form is nil.
 
 +++
 ** New function 'make-obsolete-generalized-variable'.
@@ -3909,6 +3953,12 @@ the same but works by modifying LIST destructively.
 
 ---
 ** 'string-split' is now an alias for 'split-string'.
+
++++
+** 'format-spec' now accepts functions in the replacement.
+The function is called only when used in the format string.  This is
+useful to avoid side-effects such as prompting, when the value is not
+actually being used for anything.
 
 +++
 ** The variable 'max-specpdl-size' has been made obsolete.

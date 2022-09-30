@@ -1909,8 +1909,11 @@ The default status is as follows:
 
 (reset-language-environment)
 
-(defun set-display-table-and-terminal-coding-system (language-name &optional coding-system display)
-  "Set up the display table and terminal coding system for LANGUAGE-NAME."
+(defun set-display-table-and-terminal-coding-system (language-name
+                                                     &optional coding-system
+                                                     display inhibit-refresh)
+  "Set up the display table and terminal coding system for LANGUAGE-NAME.
+If INHIBIT-REFRESH, don't redraw the current frame."
   (let ((coding (get-language-info language-name 'unibyte-display)))
     (if (and coding
 	     (or (not coding-system)
@@ -1923,7 +1926,8 @@ The default status is as follows:
       (when standard-display-table
 	(dotimes (i 128)
 	  (aset standard-display-table (+ i 128) nil))))
-    (set-terminal-coding-system (or coding-system coding) display)))
+    (set-terminal-coding-system (or coding-system coding) display
+                                inhibit-refresh)))
 
 (defun set-language-environment (language-name)
   "Set up multilingual environment for using LANGUAGE-NAME.
@@ -2666,11 +2670,11 @@ For example, translate \"swedish\" into \"sv_SE.ISO8859-1\"."
     `(let ((,current current-locale-environment))
        (unwind-protect
            (progn
-             (set-locale-environment ,locale-name)
+             (set-locale-environment ,locale-name nil t)
              ,@body)
-         (set-locale-environment ,current)))))
+         (set-locale-environment ,current nil t)))))
 
-(defun set-locale-environment (&optional locale-name frame)
+(defun set-locale-environment (&optional locale-name frame inhibit-refresh)
   "Set up multilingual environment for using LOCALE-NAME.
 This sets the language environment, the coding system priority,
 the default input method and sometimes other things.
@@ -2698,6 +2702,9 @@ touch session-global parameters like the language environment.
 This function sets the `current-locale-environment' variable.  To
 change the locale temporarily, `with-locale-environment' can be
 used.
+
+By default, this function will redraw the current frame.  If
+INHIBIT-REFRESH is non-nil, this isn't done.
 
 See also `locale-charset-language-names', `locale-language-names',
 `locale-preferred-coding-systems' and `locale-coding-system'."
@@ -2808,7 +2815,7 @@ See also `locale-charset-language-names', `locale-language-names',
 	    (set-language-environment language-name))
 
 	  (set-display-table-and-terminal-coding-system
-	   language-name coding-system frame)
+	   language-name coding-system frame inhibit-refresh)
 
 	  ;; Set the `keyboard-coding-system' if appropriate (tty
 	  ;; only).  At least X and MS Windows can generate
@@ -2865,7 +2872,7 @@ See also `locale-charset-language-names', `locale-language-names',
           (or output-coding (setq output-coding code-page-coding))
 	  (unless frame (setq locale-coding-system locale-coding))
 	  (set-keyboard-coding-system code-page-coding frame)
-	  (set-terminal-coding-system output-coding frame)
+	  (set-terminal-coding-system output-coding frame inhibit-refresh)
 	  (setq default-file-name-coding-system ansi-code-page-coding))))
 
     (when (eq system-type 'darwin)
@@ -2876,7 +2883,7 @@ See also `locale-charset-language-names', `locale-language-names',
       ;; the locale.
       (when (and (null window-system)
 		 (equal (getenv "TERM_PROGRAM" frame) "Apple_Terminal"))
-	(set-terminal-coding-system 'utf-8)
+	(set-terminal-coding-system 'utf-8 nil inhibit-refresh)
 	(set-keyboard-coding-system 'utf-8)))
 
     ;; Default to A4 paper if we're not in a C, POSIX or US locale.
