@@ -10709,11 +10709,6 @@ move_it_vertically_backward (struct it *it, int dy)
 
   /* Estimate how many newlines we must move back.  */
   nlines = max (1, dy / default_line_pixel_height (it->w));
-  /* Move one line more back, for the (rare) situation where we have
-     bidi-reordered continued lines, and we start from the top-most
-     screen line, which is the last in logical order.  */
-  if (it->bidi_p && dy == 0)
-    nlines++;
   if (it->line_wrap == TRUNCATE || nchars_per_row == 0)
     pos_limit = BEGV;
   else
@@ -10775,8 +10770,6 @@ move_it_vertically_backward (struct it *it, int dy)
 
   if (dy == 0)
     {
-      /* Adjust nlines for increasing it at the beginning.  */
-      nlines -= !!it->bidi_p;
       /* DY == 0 means move to the start of the screen line.  The
 	 value of nlines is > 0 if continuation lines were involved,
 	 or if the original IT position was at start of a line.  */
@@ -10968,7 +10961,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
     {
       struct it it2;
       void *it2data = NULL;
-      ptrdiff_t start_charpos, i;
+      ptrdiff_t start_charpos, orig_charpos, i;
       int nchars_per_row
 	= (it->last_visible_x - it->first_visible_x) / FRAME_COLUMN_WIDTH (it->f);
       bool hit_pos_limit = false;
@@ -10978,7 +10971,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	 position.  This may actually move vertically backwards,
          in case of overlays, so adjust dvpos accordingly.  */
       dvpos += it->vpos;
-      start_charpos = IT_CHARPOS (*it);
+      orig_charpos = IT_CHARPOS (*it);
       move_it_vertically_backward (it, 0);
       dvpos -= it->vpos;
 
@@ -11031,8 +11024,9 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
 	  RESTORE_IT (&it2, &it2, it2data);
 	  SAVE_IT (it2, *it, it2data);
 	  move_it_to (it, -1, -1, -1, it->vpos + delta, MOVE_TO_VPOS);
-	  /* Move back again if we got too far ahead.  */
-	  if (it->vpos - it2.vpos > delta)
+	  /* Move back again if we got too far ahead,
+	     or didn't move at all.  */
+	  if (it->vpos - it2.vpos > delta || IT_CHARPOS (*it) == orig_charpos)
 	    RESTORE_IT (it, &it2, it2data);
 	  else
 	    bidi_unshelve_cache (it2data, true);
