@@ -4826,6 +4826,7 @@ maybe_defer_native_compilation (Lisp_Object function_name,
     return;
 
   if (!native_comp_deferred_compilation
+      || !NILP (Vinhibit_native_compilation)
       || noninteractive
       || !NILP (Vpurify_flag)
       || !COMPILEDP (definition)
@@ -5336,6 +5337,13 @@ syms_of_comp (void)
 {
 #ifdef HAVE_NATIVE_COMP
   /* Compiler control customizes.  */
+  DEFVAR_LISP ("inhibit-native-compilation", Vinhibit_native_compilation,
+	       doc: /* If non-nil, inhibit automatic native compilation of loaded .elc files.
+
+After compilation, each function definition is updated to the native
+compiled one.  */);
+  Vinhibit_native_compilation = Qnil;
+
   DEFVAR_BOOL ("native-comp-deferred-compilation",
 	       native_comp_deferred_compilation,
 	       doc: /* If non-nil compile loaded .elc files asynchronously.
