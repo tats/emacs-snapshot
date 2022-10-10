@@ -2379,16 +2379,15 @@ the various files."
                                          'buffer-file-name buffer)))
                               (and file (file-exists-p file))))))))
 	;; Let user know if there is a buffer with the same truename.
-	(if other
-	    (progn
-	      (or nowarn
-		  find-file-suppress-same-file-warnings
-		  (string-equal filename (buffer-file-name other))
-		  (files--message "%s and %s are the same file"
-                                  filename (buffer-file-name other)))
-	      ;; Optionally also find that buffer.
-	      (if (or find-file-existing-other-name find-file-visit-truename)
-		  (setq buf other))))
+        (when other
+          (or nowarn
+              find-file-suppress-same-file-warnings
+              (string-equal filename (buffer-file-name other))
+              (files--message "%s and %s are the same file"
+                         filename (buffer-file-name other)))
+          ;; Optionally also find that buffer.
+          (if (or find-file-existing-other-name find-file-visit-truename)
+              (setq buf other)))
 	;; Check to see if the file looks uncommonly large.
 	(when (not (or buf nowarn))
           (when (eq (abort-if-file-too-large
@@ -3333,6 +3332,7 @@ checks if it uses an interpreter listed in `interpreter-mode-alist',
 matches the buffer beginning against `magic-mode-alist',
 compares the file name against the entries in `auto-mode-alist',
 then matches the buffer beginning against `magic-fallback-mode-alist'.
+It also obeys `major-mode-remap-alist'.
 
 If `enable-local-variables' is nil, or if the file name matches
 `inhibit-local-variables-regexps', this function does not check
@@ -3470,6 +3470,17 @@ we don't actually set it to the same mode the buffer already has."
     (unless done
       (set-buffer-major-mode (current-buffer)))))
 
+(defvar-local set-auto-mode--last nil
+  "Remember the mode we have set via `set-auto-mode-0'.")
+
+(defcustom major-mode-remap-alist nil
+  "Alist mapping file-specified mode to actual mode.
+Every entry is of the form (MODE . FUNCTION) which means that in order
+to activate the major mode MODE (specified via something like
+`auto-mode-alist', file-local variables, ...) we should actually call
+FUNCTION instead."
+  :type '(alist (symbol) (function)))
+
 ;; When `keep-mode-if-same' is set, we are working on behalf of
 ;; set-visited-file-name.  In that case, if the major mode specified is the
 ;; same one we already have, don't actually reset it.  We don't want to lose
@@ -3480,10 +3491,15 @@ If optional arg KEEP-MODE-IF-SAME is non-nil, MODE is chased of
 any aliases and compared to current major mode.  If they are the
 same, do nothing and return nil."
   (unless (and keep-mode-if-same
-	       (eq (indirect-function mode)
-		   (indirect-function major-mode)))
+	       (or (eq (indirect-function mode)
+		       (indirect-function major-mode))
+		   (and set-auto-mode--last
+		        (eq mode (car set-auto-mode--last))
+		        (eq major-mode (cdr set-auto-mode--last)))))
     (when mode
-      (funcall mode)
+      (funcall (alist-get mode major-mode-remap-alist mode))
+      (unless (eq mode major-mode)
+        (setq set-auto-mode--last (cons mode major-mode)))
       mode)))
 
 (defvar file-auto-mode-skip "^\\(#!\\|'\\\\\"\\)"
@@ -3513,7 +3529,8 @@ have no effect."
                             ;; interpreter invocation.  The same holds
                             ;; for '\" in man pages (preprocessor
                             ;; magic for the `man' program).
-                            (and (looking-at file-auto-mode-skip) 2)) t)
+                            (and (looking-at file-auto-mode-skip) 2))
+                     t)
      (progn
        (skip-chars-forward " \t")
        (setq beg (point))
@@ -6327,9 +6344,10 @@ If FILE1 or FILE2 does not exist, the return value is unspecified."
 	     (equal f1-attr f2-attr))))))
 
 (defun file-in-directory-p (file dir)
-  "Return non-nil if FILE is in DIR or a subdirectory of DIR.
-A directory is considered to be \"in\" itself.
-Return nil if DIR is not an existing directory."
+  "Return non-nil if DIR is a parent directory of FILE.
+Value is non-nil if FILE is inside DIR or inside a subdirectory of DIR.
+A directory is considered to be a \"parent\" of itself.
+DIR must be an existing directory, otherwise the function returns nil."
   (let ((handler (or (find-file-name-handler file 'file-in-directory-p)
                      (find-file-name-handler dir  'file-in-directory-p))))
     (if handler

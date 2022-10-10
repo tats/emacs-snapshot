@@ -907,10 +907,25 @@ session.
 @cindex method @option{docker}
 @cindex @option{docker} method
 
-Integration for Docker containers.  A container is accessed via
-@file{@trampfn{docker,user@@container,/path/to/file}}, where
-@samp{user} is the (optional) user that you want to use, and
-@samp{container} is the id or name of the container.
+Integration for Docker containers.  The host name may be either a
+running container's name or ID, as returned by @samp{docker ps}.
+
+@item @option{podman}
+@cindex method @option{podman}
+@cindex @option{podman} method
+
+Podman is an alternative to @option{docker} which may be run rootless,
+if desired.
+
+@item @option{kubernetes}
+@cindex method @option{kubernetes}
+@cindex @option{kubernetes} method
+
+Integration for containers in Kubernetes pods.  The host name is a pod
+name returned by @samp{kubectl get pods}.  The first container in a
+pod is used.
+
+This method does not support user names.
 
 @end table
 
@@ -1771,15 +1786,6 @@ They can be installed with Emacs's Package Manager.  This includes
 
 @c @item ibuffer-tramp.el
 @c Contact Svend Sorensen <svend@@ciffer.net>
-
-@item kubernetes-tramp
-@cindex method @option{kubectl}
-@cindex @option{kubectl} method
-Integration for Docker containers deployed in a Kubernetes cluster.  A
-container is accessed via
-@file{@trampfn{kubectl,user@@container,/path/to/file}}, @samp{user}
-and @samp{container} have the same meaning as with the @option{docker}
-method.
 
 @item lxc-tramp
 @cindex method @option{lxc}

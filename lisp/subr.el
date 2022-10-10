@@ -1837,7 +1837,12 @@ be a list of the form returned by `event-start' and `event-end'."
 (set-advertised-calling-convention 'time-convert '(time form) "29.1")
 
 ;;;; Obsolescence declarations for variables, and aliases.
-
+(make-obsolete-variable
+ 'inhibit-point-motion-hooks
+ "use `cursor-intangible-mode' or `cursor-sensor-mode' instead"
+ ;; It's been announced as obsolete in NEWS and in the docstring since Emacs-25,
+ ;; but it's only been marked for compilation warnings since Emacs-29.
+ "25.1")
 (make-obsolete-variable 'redisplay-dont-pause nil "24.5")
 (make-obsolete-variable 'operating-system-release nil "28.1")
 (make-obsolete-variable 'inhibit-changing-match-data 'save-match-data "29.1")
@@ -1877,7 +1882,7 @@ instead; it will indirectly limit the specpdl stack size as well.")
 (make-obsolete-variable 'max-specpdl-size nil "29.1")
 
 (make-obsolete-variable 'native-comp-deferred-compilation
-                        'inhibit-native-compilation "29.1")
+                        'inhibit-automatic-native-compilation "29.1")
 
 
 ;;;; Alternate names for functions - these are not being phased out.
@@ -3547,11 +3552,12 @@ like) while `y-or-n-p' is running)."
 			    (if (or (zerop l) (eq ?\s (aref prompt (1- l))))
 				"" " ")
 			    (if dialog ""
-                              (if help-form
-                                  (format "(y, n or %s) "
-		                          (key-description
-                                           (vector help-char)))
-                                "(y or n) "))))))
+                              (substitute-command-keys
+                               (if help-form
+                                   (format "(\\`y', \\`n' or \\`%s') "
+                                           (key-description
+                                            (vector help-char)))
+                                 "(\\`y' or \\`n') ")))))))
         ;; Preserve the actual command that eventually called
         ;; `y-or-n-p' (otherwise `repeat' will be repeating
         ;; `exit-minibuffer').

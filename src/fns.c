@@ -433,6 +433,21 @@ If string STR1 is greater, the value is a positive number N;
   return Qt;
 }
 
+/* Check whether the platform allows access to unaligned addresses for
+   size_t integers without trapping or undue penalty (a few cycles is OK).
+
+   This whitelist is incomplete but since it is only used to improve
+   performance, omitting cases is safe.  */
+#if defined __x86_64__|| defined __amd64__	\
+    || defined __i386__ || defined __i386	\
+    || defined __arm64__ || defined __aarch64__	\
+    || defined __powerpc__ || defined __powerpc	\
+    || defined __ppc__ || defined __ppc
+#define HAVE_FAST_UNALIGNED_ACCESS 1
+#else
+#define HAVE_FAST_UNALIGNED_ACCESS 0
+#endif
+
 DEFUN ("string-lessp", Fstring_lessp, Sstring_lessp, 2, 2, 0,
        doc: /* Return non-nil if STRING1 is less than STRING2 in lexicographic order.
 Case is significant.
@@ -454,23 +469,55 @@ Symbols are also allowed; their print names are used instead.  */)
       && (!STRING_MULTIBYTE (string2) || SCHARS (string2) == SBYTES (string2)))
     {
       /* Each argument is either unibyte or all-ASCII multibyte:
-	 we can compare bytewise.
-	 (Arbitrary multibyte strings cannot be compared bytewise because
-	 that would give a different order for raw bytes 80..FF.)  */
+	 we can compare bytewise.  */
       int d = memcmp (SSDATA (string1), SSDATA (string2), n);
       return d < 0 || (d == 0 && n < SCHARS (string2)) ? Qt : Qnil;
     }
   else if (STRING_MULTIBYTE (string1) && STRING_MULTIBYTE (string2))
     {
-      ptrdiff_t i1 = 0, i1_byte = 0, i2 = 0, i2_byte = 0;
-      while (i1 < n)
+      /* Two arbitrary multibyte strings: we cannot use memcmp because
+	 the encoding for raw bytes would sort those between U+007F and U+0080
+	 which isn't where we want them.
+	 Instead, we skip the longest common prefix and look at
+	 what follows.  */
+      ptrdiff_t nb1 = SBYTES (string1);
+      ptrdiff_t nb2 = SBYTES (string2);
+      ptrdiff_t nb = min (nb1, nb2);
+      ptrdiff_t b = 0;
+
+      /* String data is normally allocated with word alignment, but
+	 there are exceptions (notably pure strings) so we restrict the
+	 wordwise skipping to safe architectures.  */
+      if (HAVE_FAST_UNALIGNED_ACCESS)
 	{
-	  int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
-	  int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
-	  if (c1 != c2)
-	    return c1 < c2 ? Qt : Qnil;
+	  /* First compare entire machine words.  */
+	  typedef size_t word_t;
+	  int ws = sizeof (word_t);
+	  const word_t *w1 = (const word_t *) SDATA (string1);
+	  const word_t *w2 = (const word_t *) SDATA (string2);
+	  while (b < nb - ws + 1 && w1[b / ws] == w2[b / ws])
+	    b += ws;
 	}
-      return i1 < SCHARS (string2) ? Qt : Qnil;
+
+      /* Scan forward to the differing byte.  */
+      while (b < nb && SREF (string1, b) == SREF (string2, b))
+	b++;
+
+      if (b >= nb)
+	/* One string is a prefix of the other.  */
+	return b < nb2 ? Qt : Qnil;
+
+      /* Now back up to the start of the differing characters:
+	 it's the last byte not having the bit pattern 10xxxxxx.  */
+      while ((SREF (string1, b) & 0xc0) == 0x80)
+	b--;
+
+      /* Compare the differing characters.  */
+      ptrdiff_t i1 = 0, i2 = 0;
+      ptrdiff_t i1_byte = b, i2_byte = b;
+      int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
+      int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
+      return c1 < c2 ? Qt : Qnil;
     }
   else if (STRING_MULTIBYTE (string1))
     {

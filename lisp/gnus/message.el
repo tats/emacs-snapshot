@@ -2172,8 +2172,7 @@ If FIRST is non-nil, only the first value is returned.
 
 The buffer is expected to be narrowed to just the header of the message;
 see `message-narrow-to-headers-or-head'."
-  (let* ((inhibit-point-motion-hooks t)
-	 (value (mail-fetch-field header nil (not first))))
+  (let* ((value (mail-fetch-field header nil (not first))))
     (when value
       (while (string-match "\n[\t ]+" value)
 	(setq value (replace-match " " t t value)))
@@ -3208,7 +3207,8 @@ Like `text-mode', but with these additional commands:
   ;;
   (setq-local syntax-propertize-function #'message--syntax-propertize)
   (setq-local parse-sexp-ignore-comments t)
-  (setq-local message-encoded-mail-cache nil))
+  (setq-local message-encoded-mail-cache nil)
+  (setq-local image-crop-buffer-text-function #'message--update-image-crop))
 
 (defun message-setup-fill-variables ()
   "Setup message fill variables."
@@ -7308,7 +7308,6 @@ specified by FUNCTIONS, if non-nil, or by the variable
   (let ((cur (current-buffer))
 	from subject date
 	references message-id follow-to
-	(inhibit-point-motion-hooks t)
 	(message-this-is-mail t)
 	gnus-warning)
     (save-restriction
@@ -7369,7 +7368,6 @@ If TO-NEWSGROUPS, use that as the new Newsgroups line."
   (let ((cur (current-buffer))
 	from subject date reply-to mrt mct
 	references message-id follow-to
-	(inhibit-point-motion-hooks t)
 	(message-this-is-news t)
 	followup-to distribution newsgroups gnus-warning posted-to)
     (save-restriction
@@ -8608,7 +8606,6 @@ From headers in the original article."
   (let ((regexps (if (stringp message-hidden-headers)
 		     (list message-hidden-headers)
 		   message-hidden-headers))
-	(inhibit-point-motion-hooks t)
 	(inhibit-modification-hooks t)
 	end-of-headers)
     (when regexps
@@ -8927,18 +8924,25 @@ used to take the screenshot."
 		 :max-width (truncate (* (frame-pixel-width) 0.8))
 		 :max-height (truncate (* (frame-pixel-height) 0.8))
 		 :scale 1)
-   (format "<#part type=\"%s\" disposition=inline data-encoding=base64 raw=t>\n%s\n<#/part>"
-           type
-	   ;; Get a base64 version of the image -- this avoids later
-	   ;; complications if we're auto-saving the buffer and
-	   ;; restoring from a file.
-	   (with-temp-buffer
-	     (set-buffer-multibyte nil)
-	     (insert image)
-	     (base64-encode-region (point-min) (point-max) t)
-	     (buffer-string)))
+   (message--image-part-string type image)
    nil nil t)
   (insert "\n\n"))
+
+(defun message--image-part-string (type image)
+  (format "<#part type=\"%s\" disposition=inline data-encoding=base64 raw=t>\n%s\n<#/part>"
+          type
+	  ;; Get a base64 version of the image -- this avoids later
+	  ;; complications if we're auto-saving the buffer and
+	  ;; restoring from a file.
+	  (with-temp-buffer
+	    (set-buffer-multibyte nil)
+	    (insert image)
+	    (base64-encode-region (point-min) (point-max) t)
+	    (buffer-string))))
+
+(declare-function image-crop--content-type "image-crop")
+(defun message--update-image-crop (_text image)
+  (message--image-part-string (image-crop--content-type image) image))
 
 (declare-function gnus-url-unhex-string "gnus-util")
 

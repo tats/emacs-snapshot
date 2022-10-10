@@ -7601,11 +7601,25 @@ static void x_check_font (struct frame *, struct font *);
    user time.  We don't sanitize timestamps from events sent by the X
    server itself because some Lisp might have set the user time to a
    ridiculously large value, and this way a more reasonable timestamp
-   can be obtained upon the next event.  */
+   can be obtained upon the next event.
+
+   SET_PROPERTY specifies whether or not to change the user time
+   property for the active frame.  The important thing is to not set
+   the last user time upon leave events; on Metacity and GNOME Shell,
+   mapping a new frame on top of the old frame potentially causes
+   LeaveNotify or XI_Leave to be sent to the old frame if it contains
+   the pointer, as the new frame will initially stack above the old
+   frame.  If _NET_WM_USER_TIME is changed at that point, then GNOME
+   may get notified about the user time change on the old frame before
+   it tries to focus the new frame, which will make it consider the
+   new frame (whose user time property will not have been updated at
+   that point, due to not being focused) as having been mapped
+   out-of-order, and lower the new frame, which is typically not what
+   users want.  */
 
 static void
 x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
-			      bool send_event)
+			      bool send_event, bool set_property)
 {
 #if defined HAVE_XSYNC && !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   uint_fast64_t monotonic_time;
@@ -7678,7 +7692,8 @@ x_display_set_last_user_time (struct x_display_info *dpyinfo, Time time,
 
 #ifndef USE_GTK
   /* Don't waste bandwidth if the time hasn't actually changed.  */
-  if (focus_frame && old_time != dpyinfo->last_user_time)
+  if (focus_frame && old_time != dpyinfo->last_user_time
+      && set_property)
     {
       time = dpyinfo->last_user_time;
 
@@ -7719,6 +7734,7 @@ x_set_gtk_user_time (struct frame *f, Time time)
    itself.  */
 
 #ifndef USE_GTK
+
 static void
 x_update_frame_user_time_window (struct frame *f)
 {
@@ -7782,13 +7798,14 @@ x_update_frame_user_time_window (struct frame *f)
 	}
     }
 }
+
 #endif
 
 void
 x_set_last_user_time_from_lisp (struct x_display_info *dpyinfo,
 				Time time)
 {
-  x_display_set_last_user_time (dpyinfo, time, true);
+  x_display_set_last_user_time (dpyinfo, time, true, true);
 }
 
 
@@ -12758,11 +12775,21 @@ xi_focus_handle_for_device (struct x_display_info *dpyinfo,
   switch (event->evtype)
     {
     case XI_FocusIn:
+      /* The last-focus-change time of the device changed, so update the
+	 frame's user time.  */
+      x_display_set_last_user_time (dpyinfo, event->time,
+				    event->send_event, true);
+
       device->focus_frame = mentioned_frame;
       device->focus_frame_time = event->time;
       break;
 
     case XI_FocusOut:
+      /* The last-focus-change time of the device changed, so update the
+	 frame's user time.  */
+      x_display_set_last_user_time (dpyinfo, event->time,
+				    event->send_event, false);
+
       device->focus_frame = NULL;
 
       /* So, unfortunately, the X Input Extension is implemented such
@@ -14143,7 +14170,8 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		< dpyinfo->last_mouse_movement_time))
 	  x_display_set_last_user_time (dpyinfo,
 					dpyinfo->last_mouse_movement_time,
-					dpyinfo->last_mouse_movement_time_send_event);
+					dpyinfo->last_mouse_movement_time_send_event,
+					true);
 
 	if ((!f1 || FRAME_TOOLTIP_P (f1))
 	    && (EQ (track_mouse, Qdropping)
@@ -14759,7 +14787,8 @@ xg_scroll_callback (GtkRange *range, GtkScrollType scroll,
   dpyinfo = FRAME_DISPLAY_INFO (f);
 
   if (time != GDK_CURRENT_TIME)
-    x_display_set_last_user_time (dpyinfo, time, true);
+    x_display_set_last_user_time (dpyinfo, time, true,
+				  true);
 
   switch (scroll)
     {
@@ -17701,6 +17730,53 @@ x_coords_from_dnd_message (struct x_display_info *dpyinfo,
   return false;
 }
 
+static void
+x_handle_wm_state (struct frame *f, struct input_event *ie)
+{
+  Atom type;
+  int format;
+  unsigned long nitems, bytes_after;
+  unsigned char *data;
+  unsigned long *state;
+
+  data = NULL;
+
+  if (XGetWindowProperty (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			  FRAME_DISPLAY_INFO (f)->Xatom_wm_state, 0, 2,
+			  False, AnyPropertyType, &type, &format, &nitems,
+			  &bytes_after, &data) != Success)
+    return;
+
+  if (!data || nitems != 2 || format != 32)
+    {
+      if (data)
+	XFree (data);
+
+      return;
+    }
+
+  state = (unsigned long *) data;
+
+  if (state[0] == NormalState && FRAME_ICONIFIED_P (f))
+    {
+      /* The frame has been deiconified.  It has not been withdrawn
+	 and is now visible.  */
+      SET_FRAME_VISIBLE (f, 1);
+      SET_FRAME_ICONIFIED (f, false);
+      f->output_data.x->has_been_visible = true;
+
+      ie->kind = DEICONIFY_EVENT;
+      XSETFRAME (ie->frame_or_window, f);
+    }
+
+  /* state[0] can also be WithdrawnState, meaning that the window has
+     been withdrawn and is no longer iconified.  However, Emacs sets
+     the correct flags upon withdrawing the window, so there is no
+     need to do anything here.  */
+
+  XFree (data);
+}
+
 /* Handles the XEvent EVENT on display DPYINFO.
 
    *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
@@ -18030,6 +18106,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                   }
                 /* Not certain about handling scroll bars here */
 #endif
+		/* Set the provided time as the user time, which is
+		   required for SetInputFocus to work correctly after
+		   taking the input focus.  */
+		x_display_set_last_user_time (dpyinfo, event->xclient.data.l[1],
+					      true, true);
 		goto done;
               }
 
@@ -18488,6 +18569,19 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      XSETFRAME (inev.ie.frame_or_window, f);
 	    }
 	}
+
+      if (f && event->xproperty.atom == dpyinfo->Xatom_wm_state
+	  && !FRAME_X_EMBEDDED_P (f) && !FRAME_PARENT_FRAME (f))
+	/* Handle WM_STATE.  We use this to clear the iconified flag
+	   on a frame if it is set.
+
+	   GTK builds ignore deiconifying frames on FocusIn or Expose
+	   by default, and cannot wait for the window manager to
+	   remove _NET_WM_STATE_HIDDEN, as it is ambiguous when not
+	   set.  Handling UnmapNotify also checks for
+	   _NET_WM_STATE_HIDDEN, and thus suffers from the same
+	   problem.  */
+	x_handle_wm_state (f, &inev.ie);
 
       if (f && FRAME_X_OUTPUT (f)->alpha_identical_p
 	  && (event->xproperty.atom
@@ -19004,7 +19098,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case KeyPress:
       x_display_set_last_user_time (dpyinfo, event->xkey.time,
-				    event->xkey.send_event);
+				    event->xkey.send_event,
+				    true);
       ignore_next_mouse_click_timeout = 0;
 
       coding = Qlatin_1;
@@ -19483,7 +19578,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case EnterNotify:
       x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
-				    event->xcrossing.send_event);
+				    event->xcrossing.send_event, true);
 
 #ifdef HAVE_XINPUT2
       /* For whatever reason, the X server continues to deliver
@@ -19606,7 +19701,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
     case LeaveNotify:
       x_display_set_last_user_time (dpyinfo, event->xcrossing.time,
-				    event->xcrossing.send_event);
+				    event->xcrossing.send_event, false);
 
 #ifdef HAVE_XINPUT2
       /* For whatever reason, the X server continues to deliver
@@ -20421,7 +20516,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       {
 	if (event->xbutton.type == ButtonPress)
 	  x_display_set_last_user_time (dpyinfo, event->xbutton.time,
-					event->xbutton.send_event);
+					event->xbutton.send_event, true);
 
 #ifdef HAVE_XWIDGETS
 	struct xwidget_view *xvw = xwidget_view_from_window (event->xbutton.window);
@@ -20473,7 +20568,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	    if (event->type == ButtonPress)
 	      {
 		x_display_set_last_user_time (dpyinfo, event->xbutton.time,
-					      event->xbutton.send_event);
+					      event->xbutton.send_event, true);
 
 		dpyinfo->grabbed |= (1 << event->xbutton.button);
 		dpyinfo->last_mouse_frame = f;
@@ -21030,7 +21125,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      ev.send_event = enter->send_event;
 
 	      x_display_set_last_user_time (dpyinfo, enter->time,
-					    enter->send_event);
+					    enter->send_event, true);
 
 #ifdef USE_MOTIF
 	      use_copy = true;
@@ -21216,7 +21311,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 	      x_display_set_last_user_time (dpyinfo, leave->time,
-					    leave->send_event);
+					    leave->send_event, false);
 
 #ifdef HAVE_XWIDGETS
 	      {
@@ -21491,7 +21586,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  state = xi_convert_event_state (xev);
 		  x_display_set_last_user_time (dpyinfo, xev->time,
-						xev->send_event);
+						xev->send_event, true);
 
 		  if (found_valuator)
 		    xwidget_scroll (xv, xev->event_x, xev->event_y,
@@ -21511,7 +21606,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  if (found_valuator)
 		    {
 		      x_display_set_last_user_time (dpyinfo, xev->time,
-						    xev->send_event);
+						    xev->send_event, true);
 
 
 #if defined USE_GTK && !defined HAVE_GTK3
@@ -22002,7 +22097,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		      if (xev->evtype == XI_ButtonPress)
 			{
 			  x_display_set_last_user_time (dpyinfo, xev->time,
-							xev->send_event);
+							xev->send_event, true);
 
 			  dpyinfo->grabbed |= (1 << xev->detail);
 			  dpyinfo->last_mouse_frame = f;
@@ -22045,7 +22140,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 			  if (xev->flags & XIPointerEmulated)
 			    x_display_set_last_user_time (dpyinfo, xev->time,
-							  xev->send_event);
+							  xev->send_event, true);
 #endif
 			  x_dnd_note_self_wheel (dpyinfo,
 						 x_dnd_last_seen_window,
@@ -22281,7 +22376,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	      if (xev->evtype == XI_ButtonPress)
 		x_display_set_last_user_time (dpyinfo, xev->time,
-					      xev->send_event);
+					      xev->send_event, true);
 
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
@@ -22660,7 +22755,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
 
 	      x_display_set_last_user_time (dpyinfo, xev->time,
-					    xev->send_event);
+					    xev->send_event, true);
 	      ignore_next_mouse_click_timeout = 0;
 
 	      f = x_any_window_to_frame (dpyinfo, xev->event);
@@ -23299,7 +23394,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 	      x_display_set_last_user_time (dpyinfo, xev->time,
-					    xev->send_event);
+					    xev->send_event, true);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -23397,7 +23492,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 	      x_display_set_last_user_time (dpyinfo, xev->time,
-					    xev->send_event);
+					    xev->send_event, true);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -23444,7 +23539,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      device = xi_device_from_id (dpyinfo, xev->deviceid);
 	      source = xi_device_from_id (dpyinfo, xev->sourceid);
 	      x_display_set_last_user_time (dpyinfo, xev->time,
-					    xev->send_event);
+					    xev->send_event, true);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -23485,7 +23580,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      device = xi_device_from_id (dpyinfo, pev->deviceid);
 	      source = xi_device_from_id (dpyinfo, pev->sourceid);
 	      x_display_set_last_user_time (dpyinfo, pev->time,
-					    pev->send_event);
+					    pev->send_event, true);
 
 	      if (!device)
 		goto XI_OTHER;
@@ -25451,6 +25546,39 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 
 #ifdef HAVE_X11R6
 
+/* If preedit text is set on F, cancel preedit, free the text, and
+   generate the appropriate events to cancel the preedit display.
+
+   This is mainly useful when the connection to the IM server is
+   dropped during preconversion.  */
+
+static void
+x_maybe_clear_preedit (struct frame *f)
+{
+  struct x_output *output;
+  struct input_event ie;
+
+  output = FRAME_X_OUTPUT (f);
+
+  if (!output->preedit_chars)
+    return;
+
+  EVENT_INIT (ie);
+  ie.kind = PREEDIT_TEXT_EVENT;
+  ie.arg = Qnil;
+  XSETFRAME (ie.frame_or_window, f);
+  XSETINT (ie.x, 0);
+  XSETINT (ie.y, 0);
+  kbd_buffer_store_event (&ie);
+
+  xfree (output->preedit_chars);
+
+  output->preedit_size = 0;
+  output->preedit_active = false;
+  output->preedit_chars = NULL;
+  output->preedit_caret = 0;
+}
+
 /* XIM destroy callback function, which is called whenever the
    connection to input method XIM dies.  CLIENT_DATA contains a
    pointer to the x_display_info structure corresponding to XIM.  */
@@ -25471,6 +25599,9 @@ xim_destroy_callback (XIM xim, XPointer client_data, XPointer call_data)
 	{
 	  FRAME_XIC (f) = NULL;
           xic_free_xfontset (f);
+
+	  /* Free the preedit text if necessary.  */
+	  x_maybe_clear_preedit (f);
 	}
     }
 
@@ -26925,8 +27056,22 @@ x_focus_frame (struct frame *f, bool noactivate)
 
       /* Ignore any BadMatch error this request might result in.  */
       x_ignore_errors_for_next_request (dpyinfo);
-      XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-		      RevertToParent, CurrentTime);
+      if (NILP (Vx_no_window_manager))
+	XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			/* It is invalid to use CurrentTime according to
+			   the ICCCM:
+
+			   Clients that use a SetInputFocus request must
+			   set the time field to the timestamp of the
+			   event that caused them to make the
+			   attempt. [...] Note that clients must not use
+			   CurrentTime in the time field. */
+			RevertToParent, dpyinfo->last_user_time);
+      else
+	XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			/* But when no window manager is in use, we
+			   don't care.  */
+			RevertToParent, CurrentTime);
       x_stop_ignoring_errors (dpyinfo);
     }
 }
@@ -29192,7 +29337,11 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
 
 #ifdef HAVE_X_I18N
-  xim_initialize (dpyinfo, resource_name);
+  /* Avoid initializing input methods if the X library does not
+     support Emacs's locale.  When the current locale is not
+     supported, decoding input method strings becomes undefined.  */
+  if (XSupportsLocale ())
+    xim_initialize (dpyinfo, resource_name);
 #endif
 
   xsettings_initialize (dpyinfo);
