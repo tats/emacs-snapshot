@@ -1,4 +1,4 @@
-From 43fb7a766a21ab7d8acd0d2945221775ab202e10 Mon Sep 17 00:00:00 2001
+From e21814a4d5ce13e8ad489c9712699a4bf0959269 Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Tue, 21 Oct 2014 19:10:17 -0500
 Subject: Don't try to build src/macuvs.h (via IVD_Sequences.txt)
@@ -13,7 +13,7 @@ diff --git a/admin/unidata/Makefile.in b/admin/unidata/Makefile.in
 index 2b0215dde4f..a464dc3933d 100644
 --- a/admin/unidata/Makefile.in
 +++ b/admin/unidata/Makefile.in
-@@ -40,7 +40,7 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
+@@ -40,7 +40,7 @@ unifiles =
  
  .PHONY: all
  
