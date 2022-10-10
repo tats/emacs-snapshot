@@ -2,6 +2,7 @@ Source: emacs
 Section: editors
 Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
+Uploaders: Sean Whitton <spwhitton@spwhitton.name>
 Build-Depends:
  bsd-mailx | mailx,
  ca-certificates,
