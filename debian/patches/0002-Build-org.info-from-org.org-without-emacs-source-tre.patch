@@ -1,4 +1,4 @@
-From 0736ab81f1be76c373f9bd5b30f06705f3c4cfed Mon Sep 17 00:00:00 2001
+From 4987c48eec4104f730befb8623584286da30dd3c Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Fri, 15 Jul 2022 14:45:11 -0500
 Subject: Build org.info from org.org without emacs source tree
@@ -12,7 +12,7 @@ diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
 index 3a45f7d18bd..386171a4922 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -219,7 +219,7 @@ ${buildinfodir}/tramp.info tramp.html: ${srcdir}/trampver.texi
+@@ -219,7 +219,7 @@ ${buildinfodir}/tramp.info tramp.html:
  
  
  abs_top_builddir = @abs_top_builddir@
@@ -21,7 +21,7 @@ index 3a45f7d18bd..386171a4922 100644
  emacs = "${EMACS}" -batch --no-site-file --no-site-lisp --eval '(setq load-prefer-newer t)'
  
  # Generated .texi files go in srcdir so they can be included in the
-@@ -227,7 +227,7 @@ emacs = "${EMACS}" -batch --no-site-file --no-site-lisp --eval '(setq load-prefe
+@@ -227,7 +227,7 @@ emacs =
  # Work in srcdir (and use abs_top_builddir) so that +setupfile and
  # things like org-setup's "version" macro work.  Sigh.
  define org_template
