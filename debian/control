@@ -9,6 +9,7 @@ Build-Depends:
  emacs-nox (>= 1:28) | emacs (>= 1:28),
  texinfo
 Standards-Version: 3.7.2
+XS-Autobuild: yes
 
 Package: emacs-common-non-dfsg
 Section: non-free/editors
