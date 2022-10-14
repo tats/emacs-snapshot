@@ -18,7 +18,7 @@ Comment:
   version.
   .
   This package contains files which have been deemed unsuitable for
-  Debian main because their licenses do not appear to satisfy the
+  Debian GNU/Linux because their licenses do not appear to satisfy the
   requirements of the Debian Free Software Guidelines (DFSG).  See
   http://www.debian.org/social_contract.
   .
