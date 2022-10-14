@@ -1,6 +1,8 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Emacs
-Upstream-Contact: bug-gnu-emacs@gnu.org emacs-devel@gnu.org
+Upstream-Contact:
+ bug-gnu-emacs@gnu.org
+ emacs-devel@gnu.org
 Source: https://savannah.gnu.org/projects/emacs
 Comment:
   This package was debianized by Rob Browning <rlb@defaultvalue.org>
