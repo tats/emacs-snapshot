@@ -68,6 +68,9 @@ debian_rev := $(shell $(pf); echo $(debian_ver) | perl -pe 's/.*-//o')
 # before the last '-'
 debsrc_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
 
+# Everything before the last '-' minus epoch
+deborig_ver := $(shell echo $(debsrc_ver) | sed 's/^[0-9]\+://')
+
 ######################################################################
 # Customizable variables
 
@@ -181,6 +184,7 @@ define deb_sub
     -e "s|\@DEBIAN_REV\@|$(deb_rev)|go;" \
     -e "s|\@UPSTREAM_VERSION\@|$(upstream_ver)|go;" \
     -e "s|\@DEBSRC_VERSION\@|$(debsrc_ver)|go;" \
+    -e "s|\@DEBORIG_VERSION\@|$(deborig_ver)|go;" \
     -e "s|\@MENU_VERSION\@|$(menu_ver)|go;" \
     -e "s|\@X_SUPPORT\@|$(xsupport)|go;" \
     -e "s|\@BIN_PRIORITY\@|$(bin_priority)|go;" \
@@ -195,6 +199,7 @@ check-vars:
 	@echo "upstream_ver: $(upstream_ver)"
 	@echo "debian_ver: $(debian_ver)"
 	@echo "debsrc_ver: $(debsrc_ver)"
+	@echo "deborig_ver: $(deborig_ver)"
 	@echo "debian_rev: $(debian_rev)"
 	@echo "runtime_ver: $(runtime_ver)"
 	@echo "major_ver: $(major_ver)"
