@@ -1,3 +1,11 @@
+emacs-non-dfsg (1:28.2+1-2~1.gbp97d676) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @97d6764b1c22549a1cc2f3affac96a902df5dcea **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Fri, 14 Oct 2022 13:17:06 -0700
+
 emacs-non-dfsg (1:28.2+1-1) unstable; urgency=medium
 
   * Merge upstream version 28.2.
