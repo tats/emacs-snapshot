@@ -12,8 +12,6 @@ Standards-Version: 3.7.2
 XS-Autobuild: yes
 
 Package: emacs-common-non-dfsg
-Section: non-free/editors
-Priority: optional
 Architecture: all
 Depends: dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Conflicts:
