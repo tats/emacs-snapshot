@@ -4119,6 +4119,7 @@ the deferred compilation mechanism."
 LOAD and SELECTOR work as described in `native--compile-async'."
   ;; Make sure we are not already compiling `file' (bug#40838).
   (or (gethash file comp-async-compilations)
+      (gethash (file-name-with-extension file "elc") comp--no-native-compile)
       (cond
        ((null selector) nil)
        ((functionp selector) (not (funcall selector file)))
@@ -4166,7 +4167,8 @@ bytecode definition was not changed in the meantime)."
     (error "LOAD must be nil, t or 'late"))
   (unless (listp files)
     (setf files (list files)))
-  (let (file-list)
+  (let ((added-something nil)
+        file-list)
     (dolist (file-or-dir files)
       (cond ((file-directory-p file-or-dir)
              (dolist (file (if recursively
@@ -4194,15 +4196,30 @@ bytecode definition was not changed in the meantime)."
               (make-directory out-dir t))
             (if (file-writable-p out-filename)
                 (setf comp-files-queue
-                      (append comp-files-queue `((,file . ,load))))
+                      (append comp-files-queue `((,file . ,load)))
+                      added-something t)
               (display-warning 'comp
                                (format "No write access for %s skipping."
                                        out-filename)))))))
-    (when (zerop (comp-async-runnings))
+    ;; Perhaps nothing passed `native-compile-async-skip-p'?
+    (when (and added-something
+               ;; Don't start if there's one already running.
+               (zerop (comp-async-runnings)))
       (comp-run-async-workers))))
 
 
 ;;; Compiler entry points.
+
+(defun comp-compile-all-trampolines ()
+  "Pre-compile AOT all trampolines."
+  (let ((comp-running-batch-compilation t)
+        ;; We want to target only the 'native-lisp' directory.
+        (native-compile-target-directory
+         (car (last native-comp-eln-load-path))))
+    (mapatoms (lambda (f)
+                (when (subr-primitive-p (symbol-function f))
+                  (message "Compiling trampoline for: %s" f)
+                  (comp-trampoline-compile f))))))
 
 ;;;###autoload
 (defun comp-lookup-eln (filename)
@@ -4317,13 +4334,15 @@ of (commands) to run simultaneously."
     ;; `invocation-directory'.
     (setq dir (expand-file-name dir invocation-directory))
     (when (file-exists-p dir)
-      (dolist (subdir (directory-files dir t))
+      (dolist (subdir (seq-filter
+                       (lambda (f) (not (string-match (rx "/." (? ".") eos) f)))
+                       (directory-files dir t)))
         (when (and (file-directory-p subdir)
                    (file-writable-p subdir)
                    (not (equal (file-name-nondirectory
                                 (directory-file-name subdir))
                                comp-native-version-dir)))
-          (message "Deleting %s..." subdir)
+          (message "Deleting `%s'..." subdir)
           ;; We're being overly cautious here -- there shouldn't be
           ;; anything but .eln files in these directories.
           (dolist (eln (directory-files subdir t "\\.eln\\(\\.tmp\\)?\\'"))
