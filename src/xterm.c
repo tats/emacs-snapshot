@@ -17855,9 +17855,9 @@ x_handle_wm_state (struct frame *f, struct input_event *ie)
 
 #ifdef HAVE_XFIXES
 
-static void
+static bool
 x_handle_selection_monitor_event (struct x_display_info *dpyinfo,
-				  XEvent *event)
+				  const XEvent *event)
 {
   XFixesSelectionNotifyEvent *notify;
   int i;
@@ -17865,7 +17865,7 @@ x_handle_selection_monitor_event (struct x_display_info *dpyinfo,
   notify = (XFixesSelectionNotifyEvent *) event;
 
   if (notify->window != dpyinfo->selection_tracking_window)
-    return;
+    return false;
 
   for (i = 0; i < dpyinfo->n_monitored_selections; ++i)
     {
@@ -17873,6 +17873,8 @@ x_handle_selection_monitor_event (struct x_display_info *dpyinfo,
       if (notify->selection == dpyinfo->monitored_selections[i].name)
 	dpyinfo->monitored_selections[i].owner = notify->owner;
     }
+
+  return true;
 }
 
 Window
@@ -17938,7 +17940,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
   GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (dpyinfo->display);
 #endif
   int dx, dy;
+
+  /* Avoid warnings when SAFE_ALLOCA is not actually used.  */
+#if defined HAVE_XINPUT2 || defined HAVE_XKB || defined HAVE_X_I18N
   USE_SAFE_ALLOCA;
+#endif
 
   /* This function is not reentrant, so input should be blocked before
      it is called.  */
@@ -24141,8 +24147,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef HAVE_XFIXES
       if (dpyinfo->xfixes_supported_p
 	  && event->type == (dpyinfo->xfixes_event_base
-			     + XFixesSelectionNotify))
-	x_handle_selection_monitor_event (dpyinfo, event);
+			     + XFixesSelectionNotify)
+	  && x_handle_selection_monitor_event (dpyinfo, event))
+	/* GTK 3 crashes if an XFixesSelectionNotify arrives with a
+	   window other than the root window, because it wants to know
+	   the screen in order to determine the compositing manager
+	   selection name.  (bug#58584) */
+	*finish = X_EVENT_DROP;
 #endif
     OTHER:
 #ifdef USE_X_TOOLKIT
@@ -24213,7 +24224,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       count++;
     }
 
+#if defined HAVE_XINPUT2 || defined HAVE_XKB || defined HAVE_X_I18N
   SAFE_FREE ();
+#endif
+
   return count;
 }
 
@@ -25684,6 +25698,14 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 
 #ifdef HAVE_X11R6
 
+/* HAVE_X11R6 means Xlib conforms to the R6 specification or later.
+   HAVE_X11R6_XIM, OTOH, means that Emacs should try to use R6-style
+   callback driven input method initialization.  They are separate
+   because Sun apparently ships buggy Xlib with some versions of
+   Solaris... */
+
+#ifdef HAVE_X11R6_XIM
+
 /* If preedit text is set on F, cancel preedit, free the text, and
    generate the appropriate events to cancel the preedit display.
 
@@ -25748,6 +25770,8 @@ xim_destroy_callback (XIM xim, XPointer client_data, XPointer call_data)
   XFree (dpyinfo->xim_styles);
   unblock_input ();
 }
+
+#endif
 
 #endif /* HAVE_X11R6 */
 
@@ -30274,7 +30298,7 @@ mark_xterm (void)
 {
   Lisp_Object val;
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
-  || defined HAVE_XRANDR || defined USE_GTK
+  || defined HAVE_XRANDR || defined USE_GTK || defined HAVE_X_I18N
   struct x_display_info *dpyinfo;
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS
   int i;
@@ -30498,8 +30522,14 @@ x_get_keyboard_modifiers (struct x_display_info *dpyinfo)
   /* This sometimes happens when the function is called during display
      initialization, which can happen while obtaining vendor specific
      keysyms.  */
+
+#ifdef HAVE_XKB
   if (!dpyinfo->xkb_desc && !dpyinfo->modmap)
     x_find_modifier_meanings (dpyinfo);
+#else
+  if (!dpyinfo->modmap)
+    x_find_modifier_meanings (dpyinfo);
+#endif
 
   return list5 (make_uint (dpyinfo->hyper_mod_mask),
 		make_uint (dpyinfo->super_mod_mask),

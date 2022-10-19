@@ -9055,7 +9055,8 @@ multi-line strings (but not C++, for example)."
     (c-forward-<>-arglist t)
     (c-forward-syntactic-ws))
 
-  (let ((start (point)) pos res name-res id-start id-end id-range)
+  (let ((start (point)) pos res name-res id-start id-end id-range
+	post-prefix-pos)
 
     ;; Skip leading type modifiers.  If any are found we know it's a
     ;; prefix of a type.
@@ -9067,6 +9068,7 @@ multi-line strings (but not C++, for example)."
 	(c-forward-syntactic-ws)
 	(or (eq res 'no-id)
 	    (setq res 'prefix))))
+    (setq post-prefix-pos (point))
 
     (cond
      ((looking-at c-typeof-key) ; e.g. C++'s "decltype".
@@ -9099,9 +9101,14 @@ multi-line strings (but not C++, for example)."
       (setq name-res (c-forward-name))
       (setq res (not (null name-res)))
       (when (eq name-res t)
-	;; In many languages the name can be used without the
-	;; prefix, so we add it to `c-found-types'.
-	(c-add-type pos (point))
+	;; With some keywords the name can be used without the prefix, so we
+	;; add the name to `c-found-types' when this is the case.
+	(when (save-excursion
+		(goto-char post-prefix-pos)
+		(looking-at c-self-contained-typename-key))
+	  (c-add-type pos (save-excursion
+			    (c-backward-syntactic-ws)
+			    (point))))
 	(when (and c-record-type-identifiers
 		   c-last-identifier-range)
 	  (c-record-type-id c-last-identifier-range)))
@@ -9186,7 +9193,10 @@ multi-line strings (but not C++, for example)."
 	     (goto-char id-end)
 	     (if (or res c-promote-possible-types)
 		 (progn
-		   (c-add-type id-start id-end)
+		   (c-add-type id-start (save-excursion
+					  (goto-char id-end)
+					  (c-backward-syntactic-ws)
+					  (point)))
 		   (when (and c-record-type-identifiers id-range)
 		     (c-record-type-id id-range))
 		   (unless res
@@ -10757,8 +10767,16 @@ This function might do hidden buffer changes."
 			 (setq backup-if-not-cast t)
 			 (throw 'at-decl-or-cast t)))
 
-		     (setq backup-if-not-cast t)
-		     (throw 'at-decl-or-cast t)))
+		     ;; If we're in declaration or template delimiters, or one
+		     ;; of a certain set of characters follows, we've got a
+		     ;; type and variable.
+		     (if (or (memq context '(decl <>))
+			     (memq (char-after) '(?\; ?, ?= ?\( ?{ ?:)))
+			 (progn
+			   (setq backup-if-not-cast t)
+			   (throw 'at-decl-or-cast t))
+		       ;; We're probably just typing a statement.
+		       (throw 'at-decl-or-cast nil))))
 
 		 ;; CASE 4
 		 (when (and got-suffix
@@ -10874,8 +10892,13 @@ This function might do hidden buffer changes."
 
 	 ;; CASE 10
 	 (when at-decl-or-cast
-	   ;; By now we've located the type in the declaration that we know
-	   ;; we're in.
+	   ;; By now we've located the type in the declaration that we think
+	   ;; we're in.  Do we have enough evidence to promote the putative
+	   ;; type to a found type?  The user may be halfway through typing
+	   ;; a statement beginning with an identifier.
+	   (when (and (eq at-type 'maybe)
+		      (not (eq context 'top)))
+	     (setq c-record-type-identifiers nil))
 	   (throw 'at-decl-or-cast t))
 
 	 ;; CASE 11
@@ -11118,7 +11141,10 @@ This function might do hidden buffer changes."
 		    (not (c-on-identifier)))))))))
 
       ;; Handle the cast.
-      (when (and c-record-type-identifiers at-type (not (eq at-type t)))
+      (when (and c-record-type-identifiers
+		 at-type
+		 (not (memq at-type '(t maybe)))) ; 'maybe isn't strong enough
+					; evidence to promote the type.
 	(let ((c-promote-possible-types t))
 	  (goto-char type-start)
 	  (c-forward-type)))
