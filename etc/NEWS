@@ -1362,6 +1362,11 @@ change the input method's translation rules, customize the user option
 This supports the keyboard layout specifically designed for the Tamil
 language.
 
+---
+*** New input method 'slovak-qwerty'.
+This is a variant of the 'slovak' input method, which corresponds to
+the QWERTY Slovak keyboards.
+
 
 * Changes in Specialized Modes and Packages in Emacs 29.1
 
@@ -2753,6 +2758,13 @@ name.
 
 
 * New Modes and Packages in Emacs 29.1
+
++++
+** Eglot: Emacs Client for the Language Server Protocol.
+Emacs now comes with the Eglot package, which enhances various Emacs
+features, such as completion, documentation, error detection, etc.,
+based on data provided by language servers using the Language Server
+Protocol (LSP).
 
 +++
 ** New commands 'image-crop' and 'image-cut.
