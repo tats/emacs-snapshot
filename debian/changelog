@@ -1,3 +1,11 @@
+emacs (1:28.2+1-2~1.gbp47c2ff) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @47c2ff112ad00b19a5ffc3bc06785d640837c73b **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 25 Oct 2022 18:36:40 -0700
+
 emacs (1:28.2+1-1) unstable; urgency=medium
 
   * Merge upstream version 28.2.
