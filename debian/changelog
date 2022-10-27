@@ -1,3 +1,11 @@
+emacs (1:28.2+1-3~1.gbp71b9a8) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @71b9a81874025a4f98cfb40960057b6fdd37eb78 **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 27 Oct 2022 15:31:14 -0700
+
 emacs (1:28.2+1-2) unstable; urgency=medium
 
   * Avoid fork bomb caused by native compilation.  Add
