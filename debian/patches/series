@@ -8,3 +8,4 @@
 0008-Mark-vc-bzr-test-fauilt-bzr-autoloads-as-unstable-fo.patch
 0009-pdumper-set-DUMP_RELOC_ALIGNMENT_BITS-1-for-m68k.patch
 0010-Avoid-fork-bomb-caused-by-native-compilation.patch
+0011-Avoid-fork-bomb-caused-by-native-compilation-trampol.patch
