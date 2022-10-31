@@ -1059,8 +1059,8 @@ subform.
 
 These are all valid arguments to the @code{rx} macro.  All forms are
 defined by their described semantics; the corresponding string regexps
-is provided for orientation, where @var{A}, @var{B}, @dots{}  denote
-(suitably bracketed) string regexp subexpressions.
+are provided for ease of understanding only.  @var{A}, @var{B}, @dots{}
+denote (suitably bracketed) string regexp subexpressions therein.
 
 @subsubheading Literals
 
@@ -1294,12 +1294,12 @@ Match any character that has whitespace syntax
 
 @item @code{lower}, @code{lower-case}
 Match anything lower-case, as determined by the current case table.
-If @code{case-fold-search} is non-nil, this also matches any
+If @code{case-fold-search} is non-@code{nil}, this also matches any
 upper-case letter.
 
 @item @code{upper}, @code{upper-case}
 Match anything upper-case, as determined by the current case table.
-If @code{case-fold-search} is non-nil, this also matches any
+If @code{case-fold-search} is non-@code{nil}, this also matches any
 lower-case letter.
 
 @item @code{graph}, @code{graphic}
