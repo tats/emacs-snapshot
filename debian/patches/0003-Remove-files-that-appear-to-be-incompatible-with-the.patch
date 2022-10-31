@@ -118,7 +118,7 @@ index 45b4a59..6026f55 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 2d84344..b12a06e 100644
+index 63cb9c4..52c83f4 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -6697,7 +6697,7 @@ AC_DEFUN
@@ -130,7 +130,7 @@ index 2d84344..b12a06e 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6762,15 +6762,6 @@ m4_define
+@@ -6763,15 +6763,6 @@ m4_define
  fi
  ])
  
@@ -174,10 +174,10 @@ index b6eef7e..b1fc978 100644
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index d48b866..3d060b9 100644
+index b25a8ce..814149e 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -498,6 +498,14 @@ view-help-file
+@@ -500,6 +500,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
