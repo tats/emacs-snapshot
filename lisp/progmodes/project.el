@@ -353,7 +353,10 @@ Also quote LOCAL-FILES if `default-directory' is quoted."
               local-files))))
 
 (cl-defgeneric project-buffers (project)
-  "Return the list of all live buffers that belong to PROJECT."
+  "Return the list of all live buffers that belong to PROJECT.
+
+The default implementation matches each buffer to PROJECT root using
+the buffer's value of `default-directory'."
   (let ((root (expand-file-name (file-name-as-directory (project-root project))))
         bufs)
     (dolist (buf (buffer-list))
@@ -1222,11 +1225,14 @@ displayed."
 
 (defcustom project-kill-buffer-conditions
   '(buffer-file-name    ; All file-visiting buffers are included.
-    ;; Most of the temp buffers in the background:
-    (major-mode . fundamental-mode)
+    ;; Most of temp and logging buffers (aside from hidden ones):
+    (and
+     (major-mode . fundamental-mode)
+     "\\`[^ ]")
     ;; non-text buffer such as xref, occur, vc, log, ...
     (and (derived-mode . special-mode)
-         (not (major-mode . help-mode)))
+         (not (major-mode . help-mode))
+         (not (derived-mode . gnus-mode)))
     (derived-mode . compilation-mode)
     (derived-mode . dired-mode)
     (derived-mode . diff-mode)
@@ -1667,9 +1673,10 @@ to directory DIR."
   (let ((command (if (symbolp project-switch-commands)
                      project-switch-commands
                    (project--switch-project-command))))
-    (let ((default-directory dir)
-          (project-current-inhibit-prompt t))
-      (call-interactively command))))
+    (with-temp-buffer
+      (let ((default-directory dir)
+            (project-current-inhibit-prompt t))
+        (call-interactively command)))))
 
 (provide 'project)
 ;;; project.el ends here

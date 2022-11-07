@@ -275,6 +275,62 @@ with parameters from the *Messages* buffer modification."
   (with-temp-buffer
     (should (eq (buffer-base-buffer (current-buffer)) nil))))
 
+(ert-deftest buffer-tests--overlays-indirect-bug58928 ()
+  (with-temp-buffer
+    (insert "hello world")
+    (let* ((base (current-buffer))
+           (ol1 (make-overlay (+ 2 (point-min)) (+ 8 (point-min))))
+           (ib (make-indirect-buffer
+                base (generate-new-buffer-name "bug58928")))
+           (ol2 (with-current-buffer ib
+                  (make-overlay (+ 2 (point-min)) (+ 8 (point-min))))))
+      (should (equal (overlay-start ol1) (overlay-start ol2)))
+      (should (equal (overlay-end ol1) (overlay-end ol2)))
+      (goto-char (+ 3 (point-min)))
+      (insert "a") (delete-char 2)
+      (should (equal (overlay-start ol1) (overlay-start ol2)))
+      (should (equal (overlay-end ol1) (overlay-end ol2)))
+      (with-current-buffer ib
+        (goto-char (+ 4 (point-min)))
+        (insert "a") (delete-char 2))
+      (should (equal (overlay-start ol1) (overlay-start ol2)))
+      (should (equal (overlay-end ol1) (overlay-end ol2))))))
+
+(ert-deftest buffer-tests--overlays-indirect-evaporate ()
+  "Verify that deleting text evaporates overlays in every related buffer.
+
+Deleting characters from either a base or an indirect buffer
+should evaporate overlays in both."
+  ;; Loop twice, erasing from the base buffer the first time and the
+  ;; indirect buffer the second.
+  (dolist (erase-where '(base indirect))
+    (ert-info ((format "erase-where %S" erase-where))
+      (with-temp-buffer
+        (insert "xxx")
+        (let* ((beg 2)
+               (end 3)
+               (base (current-buffer))
+               (base-overlay (make-overlay beg end base))
+               (indirect (make-indirect-buffer
+                          base
+                          (generate-new-buffer-name
+                           (concat (buffer-name base) "-indirect"))))
+               (indirect-overlay (make-overlay beg end indirect)))
+          (overlay-put base-overlay 'evaporate t)
+          (overlay-put indirect-overlay 'evaporate t)
+          (with-current-buffer (pcase-exhaustive erase-where
+                                 (`base base)
+                                 (`indirect indirect))
+            (delete-region beg end))
+          (ert-info ((prin1-to-string
+                      `(,base ,base-overlay ,indirect ,indirect-overlay)))
+            (should (not (buffer-live-p (overlay-buffer base-overlay))))
+            (should (not (buffer-live-p (overlay-buffer indirect-overlay))))
+            (should (equal nil (with-current-buffer base
+                                 (overlays-in (point-min) (point-max)))))
+            (should (equal nil (with-current-buffer indirect
+                                 (overlays-in (point-min) (point-max)))))))))))
+
 (ert-deftest overlay-evaporation-after-killed-buffer ()
   (let* ((ols (with-temp-buffer
                 (insert "toto")
@@ -1272,7 +1328,51 @@ Regression test for bug#58706."
       (delete-overlay left)
       (should (= 2 (length (overlays-in 1 (point-max))))))))
 
+;; +==========================================================================+
+;; | Moving overlays with insert-before-markers
+;; +==========================================================================+
 
+(ert-deftest test-overlay-insert-before-markers-at-start ()
+  "`insert-before-markers' always advances an overlay's start.
+Test both front-advance and non-front-advance overlays."
+  (dolist (front-advance '(nil t))
+    (ert-info ((format "front-advance %S" front-advance))
+      (with-temp-buffer
+        (insert "1234")
+        (let* ((beg (1+ (point-min)))
+               (end (1+ beg))
+               (overlay (make-overlay beg end nil front-advance nil)))
+          (goto-char beg)
+          (insert-before-markers "x")
+          (should (equal (1+ beg) (overlay-start overlay)))
+          (should (equal (1+ end) (overlay-end overlay))))))))
+
+(ert-deftest test-overlay-insert-before-markers-at-end ()
+  "`insert-before-markers' always advances an overlay's end.
+Test both rear-advance and non-rear-advance overlays."
+  (dolist (rear-advance '(nil t))
+    (ert-info ((format "rear-advance %S" rear-advance))
+      (with-temp-buffer
+        (insert "1234")
+        (let* ((beg (1+ (point-min)))
+               (end (1+ beg))
+               (overlay (make-overlay beg end nil nil rear-advance)))
+          (goto-char end)
+          (insert-before-markers "x")
+          (should (equal beg (overlay-start overlay)))
+          (should (equal (1+ end) (overlay-end overlay))))))))
+
+(ert-deftest test-overlay-insert-before-markers-empty ()
+  (dolist (advance-args '((nil nil) (t nil) (nil t) (t t)))
+    (ert-info ((format "advance args %S" advance-args))
+      (with-temp-buffer
+        (insert "1234")
+        (let* ((pos (1+ (point-min)))
+               (overlay (apply #'make-overlay pos pos nil advance-args)))
+          (goto-char pos)
+          (insert-before-markers "x")
+          (should (equal (1+ pos) (overlay-start overlay)))
+          (should (equal (1+ pos) (overlay-end overlay))))))))
 
 ;; +==========================================================================+
 ;; | Moving by deletions

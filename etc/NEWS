@@ -370,6 +370,11 @@ node in the Eshell manual for more details.
 *** Eshell pipelines now only pipe stdout by default.
 To pipe both stdout and stderr, use the '|&' operator instead of '|'.
 
+*** New eshell built-in command 'doas'.
+The privilege-escalation program 'doas' has been added to the existing
+'su' and 'sudo' commands from the 'eshell-tramp' module.  The external
+command may still be accessed by using '*doas'.
+
 ---
 ** The 'delete-forward-char' command now deletes by grapheme clusters.
 This command is by default bound to the <Delete> function key
@@ -1077,6 +1082,13 @@ the corresponding deleted frame.
 ** Tab Bars and Tab Lines
 
 ---
+*** New user option 'tab-bar-auto-width' to automatically determine tab width.
+This option is non-nil by default, which resizes tab-bar tabs so that
+their width is evenly distributed across the tab bar.  A companion
+option 'tab-bar-auto-width-max' controls the maximum width of a tab
+before its name on display is truncated.
+
+---
 *** 'C-x t RET' creates a new tab when the provided tab name doesn't exist.
 
 ---
@@ -1548,6 +1560,36 @@ These commands can be useful if the ".elc" files are out of date
 If no packages are marked, 'x' will install the package under point if
 it isn't already, and remove it if it is installed.
 
++++
+*** New command 'package-vc-install'
+Packages can now be installed directly from source by cloning from a
+repository.
+
++++
+*** New command 'package-vc-install-from-checkout'
+An existing checkout can now be loaded via package.el, by creating a
+symbolic link from the usual package directory to the checkout.
+
++++
+*** New command 'package-vc-checkout'
+Used to fetch the source of a package by cloning a repository without
+activating the package.
+
++++
+*** New command 'package-vc-prepare-patch'
+This command allows you to send patches to package maintainers, for
+packages checked out using 'package-vc-install'.
+
++++
+*** New command 'package-report-bug'
+This command helps you compose an email for sending bug reports to
+package maintainers.
+
++++
+*** New user option 'package-vc-selected-packages'
+By customising this user option you can specify specific packages to
+install.
+
 ** Emacs Sessions (Desktop)
 
 +++
@@ -1857,8 +1899,6 @@ with the changes against the last commit, e.g. with 'C-x v D'
 ('vc-root-diff').  Then edit the diffs to remove the hunks you don't
 want to commit.  Finally, type 'C-x v v' in that diff buffer to commit
 only part of your changes, those whose hunks were left in the buffer.
-
-Currently this feature works only with the Git as 'vc-backend'.
 
 ---
 *** 'C-x v v' on an unregistered file will now use the most specific backend.
@@ -4252,5 +4292,5 @@ Local variables:
 coding: utf-8
 mode: outline
 mode: emacs-news
-paragraph-separate: "[ 	]*$"
+paragraph-separate: "[ 	]"
 end:

@@ -5301,6 +5301,7 @@ x_free_xi_devices (struct x_display_info *dpyinfo)
 }
 
 #ifdef HAVE_XINPUT2_1
+
 struct xi_known_valuator
 {
   /* The current value of this valuator.  */
@@ -5312,20 +5313,21 @@ struct xi_known_valuator
   /* The next valuator whose value we already know.  */
   struct xi_known_valuator *next;
 };
+
 #endif
 
 static void
-xi_populate_device_from_info (struct xi_device_t *xi_device,
+xi_populate_device_from_info (struct x_display_info *dpyinfo,
+			      struct xi_device_t *xi_device,
 			      XIDeviceInfo *device)
 {
 #ifdef HAVE_XINPUT2_1
   struct xi_scroll_valuator_t *valuator;
   struct xi_known_valuator *values, *tem;
-  int actual_valuator_count;
+  int actual_valuator_count, c;
   XIScrollClassInfo *info;
   XIValuatorClassInfo *val_info;
 #endif
-  int c;
 #ifdef HAVE_XINPUT2_2
   XITouchClassInfo *touch_info;
 #endif
@@ -5334,30 +5336,90 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
   USE_SAFE_ALLOCA;
 #endif
 
+  /* Initialize generic information about the device: its ID, which
+     buttons are currently pressed and thus presumably actively
+     grabbing the device, what kind of device it is (master pointer,
+     master keyboard, slave pointer, slave keyboard, or floating
+     slave), and its attachment.
+
+     Here is a brief description of what device uses and attachments
+     are.  Under XInput 2, user input from individual input devices is
+     multiplexed into specific seats before being delivered, with each
+     seat corresponding to a single on-screen mouse pointer and having
+     its own keyboard focus.  Each seat consists of two virtual
+     devices: the master keyboard and the master pointer, the first of
+     which is used to report all keyboard input, with the other used
+     to report all other input.
+
+     Input from each physical device (mouse, trackpad or keyboard) is
+     then associated with that slave device's paired master device.
+     For example, moving the device "Logitech USB Optical Mouse",
+     enslaved by the master pointer device "Virtual core pointer",
+     will result in movement of the mouse pointer associated with that
+     master device's seat.  If the pointer moves over an Emacs frame,
+     then the frame will receive XI_Enter and XI_Motion events from
+     that master pointer.
+
+     Likewise, keyboard input from the device "AT Translated Set 2
+     keyboard", enslaved by the master keyboard device "Virtual core
+     keyboard", will be reported to its seat's input focus window.
+
+     The device use describes what the device is.  The meanings of
+     MasterPointer, MasterKeyboard, SlavePointer and SlaveKeyboard
+     should be obvious.  FloatingSlave means the device is a slave
+     device that is not associated with any seat, and thus generates
+     no input.
+
+     The device attachment is a device ID whose meaning varies
+     depending on the device use.  If the device is a master device,
+     then the attachment is the device ID of the other device in its
+     seat (the master keyboard for master pointer devices, and vice
+     versa).  Otherwise, it is the ID of the master device the slave
+     device is attached to.  For slave devices not attached to any
+     seat, its value is undefined.  */
+
   xi_device->device_id = device->deviceid;
   xi_device->grab = 0;
-
-#ifdef HAVE_XINPUT2_1
-  actual_valuator_count = 0;
-  xi_device->valuators = xmalloc (sizeof *xi_device->valuators
-				  * device->num_classes);
-  values = NULL;
-#endif
-
   xi_device->use = device->use;
   xi_device->name = build_string (device->name);
   xi_device->attachment = device->attachment;
+
+  /* Clear the list of active touch points on the device, which are
+     individual touches tracked by a touchscreen.  */
 
 #ifdef HAVE_XINPUT2_2
   xi_device->touchpoints = NULL;
   xi_device->direct_p = false;
 #endif
 
+#ifdef HAVE_XINPUT2_1
+  if (!dpyinfo->xi2_version)
+    {
+      /* Skip everything below as there are no classes of interest on
+	 XI 2.0 servers.  */
+      xi_device->valuators = NULL;
+      xi_device->scroll_valuator_count = 0;
+
+      SAFE_FREE ();
+      return;
+    }
+
+  actual_valuator_count = 0;
+  xi_device->valuators = xnmalloc (device->num_classes,
+				   sizeof *xi_device->valuators);
+  values = NULL;
+
+  /* Initialize device info based on a list of "device classes".
+     Device classes are little pieces of information associated with a
+     device.  Emacs is interested in scroll valuator information and
+     touch handling information, which respectively describe the axes
+     (if any) along which the device's scroll wheel rotates, and how
+     the device reports touch input.  */
+
   for (c = 0; c < device->num_classes; ++c)
     {
       switch (device->classes[c]->type)
 	{
-#ifdef HAVE_XINPUT2_1
 	case XIScrollClass:
 	  {
 	    info = (XIScrollClassInfo *) device->classes[c];
@@ -5385,7 +5447,6 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 	    values = tem;
 	    break;
 	  }
-#endif
 
 #ifdef HAVE_XINPUT2_2
 	case XITouchClass:
@@ -5399,7 +5460,6 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 	}
     }
 
-#ifdef HAVE_XINPUT2_1
   xi_device->scroll_valuator_count = actual_valuator_count;
 
   /* Now look through all the valuators whose values are already known
@@ -5413,7 +5473,9 @@ xi_populate_device_from_info (struct xi_device_t *xi_device,
 	  if (xi_device->valuators[c].number == tem->number)
 	    {
 	      xi_device->valuators[c].invalid_p = false;
-	      xi_device->valuators[c].current_value = tem->current_value;
+	      xi_device->valuators[c].current_value
+		= tem->current_value;
+	      xi_device->valuators[c].emacs_value = 0.0;
 	    }
 	}
     }
@@ -5475,7 +5537,8 @@ x_cache_xi_devices (struct x_display_info *dpyinfo)
   for (i = 0; i < ndevices; ++i)
     {
       if (infos[i].enabled)
-	xi_populate_device_from_info (&dpyinfo->devices[actual_devices++],
+	xi_populate_device_from_info (dpyinfo,
+				      &dpyinfo->devices[actual_devices++],
 				      &infos[i]);
     }
 
@@ -5610,8 +5673,11 @@ static void
 xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo,
 					 int id)
 {
-  struct xi_device_t *device = xi_device_from_id (dpyinfo, id);
+  struct xi_device_t *device;
   struct xi_scroll_valuator_t *valuator;
+  int i;
+
+  device = xi_device_from_id (dpyinfo, id);
 
   if (!device)
     return;
@@ -5619,7 +5685,7 @@ xi_reset_scroll_valuators_for_device_id (struct x_display_info *dpyinfo,
   if (!device->scroll_valuator_count)
     return;
 
-  for (int i = 0; i < device->scroll_valuator_count; ++i)
+  for (i = 0; i < device->scroll_valuator_count; ++i)
     {
       valuator = &device->valuators[i];
       valuator->invalid_p = true;
@@ -11414,15 +11480,18 @@ x_new_focus_frame (struct x_display_info *dpyinfo, struct frame *frame)
   x_frame_rehighlight (dpyinfo);
 }
 
+#ifdef HAVE_XFIXES
+
 /* True if the display in DPYINFO supports a version of Xfixes
    sufficient for pointer blanking.  */
-#ifdef HAVE_XFIXES
+
 static bool
-x_probe_xfixes_extension (struct x_display_info *dpyinfo)
+x_fixes_pointer_blanking_supported (struct x_display_info *dpyinfo)
 {
   return (dpyinfo->xfixes_supported_p
 	  && dpyinfo->xfixes_major >= 4);
 }
+
 #endif /* HAVE_XFIXES */
 
 /* Toggle mouse pointer visibility on frame F using the XFixes
@@ -11493,7 +11562,7 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
   /* But if Xfixes is available, try using it instead.  */
   if (dpyinfo->invisible_cursor == None)
     {
-      if (x_probe_xfixes_extension (dpyinfo))
+      if (x_fixes_pointer_blanking_supported (dpyinfo))
 	{
 	  dpyinfo->fixes_pointer_blanking = true;
 	  xfixes_toggle_visible_pointer (f, invisible);
@@ -11521,7 +11590,7 @@ XTtoggle_invisible_pointer (struct frame *f, bool invisible)
   block_input ();
 #ifdef HAVE_XFIXES
   if (FRAME_DISPLAY_INFO (f)->fixes_pointer_blanking
-      && x_probe_xfixes_extension (FRAME_DISPLAY_INFO (f)))
+      && x_fixes_pointer_blanking_supported (FRAME_DISPLAY_INFO (f)))
     xfixes_toggle_visible_pointer (f, invisible);
   else
 #endif
@@ -11529,13 +11598,16 @@ XTtoggle_invisible_pointer (struct frame *f, bool invisible)
   unblock_input ();
 }
 
-/* Handle FocusIn and FocusOut state changes for FRAME.
-   If FRAME has focus and there exists more than one frame, puts
-   a FOCUS_IN_EVENT into *BUFP.  */
+/* Handle FocusIn and FocusOut state changes for FRAME.  If FRAME has
+   focus and there exists more than one frame, puts a FOCUS_IN_EVENT
+   into *BUFP.  Note that this code is not used to handle focus
+   changes on builds that can use the X Input extension for handling
+   input focus when it is available (currently the no toolkit and GTK
+   3 toolkits).  */
 
 static void
-x_focus_changed (int type, int state, struct x_display_info *dpyinfo, struct frame *frame,
-		 struct input_event *bufp)
+x_focus_changed (int type, int state, struct x_display_info *dpyinfo,
+		 struct frame *frame, struct input_event *bufp)
 {
   if (type == FocusIn)
     {
@@ -13017,6 +13089,105 @@ xi_get_scroll_valuator (struct xi_device_t *device, int number)
   return NULL;
 }
 
+/* Check if EVENT, a DeviceChanged event, contains any scroll
+   valuators.  */
+
+static bool
+xi_has_scroll_valuators (XIDeviceChangedEvent *event)
+{
+  int i;
+
+  for (i = 0; i < event->num_classes; ++i)
+    {
+      if (event->classes[i]->type == XIScrollClass)
+	return true;
+    }
+
+  return false;
+}
+
+/* Repopulate the information (touchpoint tracking information, scroll
+   valuators, etc) in DEVICE with the device classes provided in
+   CLASSES.  This is called upon receiving a DeviceChanged event.
+
+   This function is not present on XI 2.0 as there are no worthwhile
+   classes there.  */
+
+static void
+xi_handle_new_classes (struct x_display_info *dpyinfo, struct xi_device_t *device,
+		       XIAnyClassInfo **classes, int num_classes)
+{
+  XIScrollClassInfo *scroll;
+  struct xi_scroll_valuator_t *valuator;
+  XIValuatorClassInfo *valuator_info;
+  int i;
+#ifdef HAVE_XINPUT2_2
+  XITouchClassInfo *touch;
+#endif
+
+  if (dpyinfo->xi2_version < 1)
+    /* Emacs is connected to an XI 2.0 server, which reports no
+       classes of interest.  */
+    return;
+
+  device->valuators = xnmalloc (num_classes,
+				sizeof *device->valuators);
+  device->scroll_valuator_count = 0;
+#ifdef HAVE_XINPUT2_2
+  device->direct_p = false;
+#endif
+
+  for (i = 0; i < num_classes; ++i)
+    {
+      switch (classes[i]->type)
+	{
+	case XIScrollClass:
+	  scroll = (XIScrollClassInfo *) classes[i];
+
+	  valuator = &device->valuators[device->scroll_valuator_count++];
+	  valuator->horizontal = (scroll->scroll_type
+				  == XIScrollTypeHorizontal);
+	  valuator->invalid_p = true;
+	  valuator->emacs_value = 0;
+	  valuator->increment = scroll->increment;
+	  valuator->number = scroll->number;
+	  break;
+
+#ifdef HAVE_XINPUT2_2
+	case XITouchClass:
+	  touch = (XITouchClassInfo *) classes[i];
+
+	  if (touch->mode == XIDirectTouch)
+	    device->direct_p = true;
+	  break;
+#endif
+	}
+    }
+
+  /* Restore the values of any scroll valuators that we already
+     know about.  */
+
+  for (i = 0; i < num_classes; ++i)
+    {
+      switch (classes[i]->type)
+	{
+	case XIValuatorClass:
+	  valuator_info = (XIValuatorClassInfo *) classes[i];
+
+	  valuator = xi_get_scroll_valuator (device,
+					     valuator_info->number);
+	  if (valuator)
+	    {
+	      valuator->invalid_p = false;
+	      valuator->current_value = valuator_info->value;
+	      valuator->emacs_value = 0;
+	    }
+
+	  break;
+	}
+    }
+}
+
 #endif
 
 /* Handle EVENT, a DeviceChanged event.  Look up the device that
@@ -13028,110 +13199,65 @@ xi_handle_device_changed (struct x_display_info *dpyinfo,
 			  XIDeviceChangedEvent *event)
 {
 #ifdef HAVE_XINPUT2_1
+  int ndevices;
   XIDeviceInfo *info;
-  XIScrollClassInfo *scroll;
-  int i, ndevices;
-  struct xi_scroll_valuator_t *valuator;
-  XIValuatorClassInfo *valuator_info;
 #endif
 #ifdef HAVE_XINPUT2_2
   struct xi_touch_point_t *tem, *last;
-  XITouchClassInfo *touch;
 #endif
 
 #ifdef HAVE_XINPUT2_1
-  /* When a DeviceChange event is received for a master device, we
-     don't get any scroll valuators along with it.  This is possibly
-     an X server bug but I really don't want to dig any further, so
-     fetch the scroll valuators manually.  (bug#57020) */
-
-  x_catch_errors (dpyinfo->display);
-  info = XIQueryDevice (dpyinfo->display, event->deviceid,
-			/* ndevices is always 1 if a deviceid is
-			   specified.  If the request fails, NULL will
-			   be returned.  */
-			&ndevices);
-  x_uncatch_errors ();
-
-  if (info)
+  if (xi_has_scroll_valuators (event))
+    /* Scroll valuators are provided by this event.  Use the values
+       provided in this event to populate the device's new scroll
+       valuator list: if this event is a SlaveSwitch event caused by
+       wheel movement, then querying for the device info will probably
+       return the value after the wheel movement, leading to a delta
+       of 0 being computed upon handling the subsequent XI_Motion
+       event.  (bug#58980) */
+    xi_handle_new_classes (dpyinfo, device, event->classes,
+			   event->num_classes);
+  else
     {
-      device->valuators = xrealloc (device->valuators,
-				    (info->num_classes
-				     * sizeof *device->valuators));
-      device->scroll_valuator_count = 0;
-#ifdef HAVE_XINPUT2_2
-      device->direct_p = false;
+      /* When a DeviceChange event is received for a master device,
+	 the X server sometimes does not send any scroll valuators
+	 along with it.  This is possibly an X server bug but I really
+	 don't want to dig any further, so fetch the scroll valuators
+	 manually.  (bug#57020) */
+
+      x_catch_errors (dpyinfo->display);
+      info = XIQueryDevice (dpyinfo->display, event->deviceid,
+			    /* ndevices is always 1 if a deviceid is
+			       specified.  If the request fails, NULL will
+			       be returned.  */
+			    &ndevices);
+      x_uncatch_errors ();
+
+      if (!info)
+	return;
+
+      /* info contains the classes currently associated with the
+	 event.  Apply them.  */
+      xi_handle_new_classes (dpyinfo, device, info->classes,
+			     info->num_classes);
+    }
 #endif
 
-      for (i = 0; i < info->num_classes; ++i)
-	{
-	  switch (info->classes[i]->type)
-	    {
-	    case XIScrollClass:
-	      scroll = (XIScrollClassInfo *) info->classes[i];
-
-	      valuator = &device->valuators[device->scroll_valuator_count++];
-	      valuator->horizontal = (scroll->scroll_type
-				      == XIScrollTypeHorizontal);
-	      valuator->invalid_p = true;
-	      valuator->emacs_value = DBL_MIN;
-	      valuator->increment = scroll->increment;
-	      valuator->number = scroll->number;
-	      break;
-
 #ifdef HAVE_XINPUT2_2
-	    case XITouchClass:
-	      touch = (XITouchClassInfo *) info->classes[i];
+  /* The device is no longer a DirectTouch device, so remove any
+     touchpoints that we might have recorded.  */
+  if (!device->direct_p)
+    {
+      tem = device->touchpoints;
 
-	      if (touch->mode == XIDirectTouch)
-		device->direct_p = true;
-	      break;
-#endif
-	    }
-	}
-
-      /* Restore the values of any scroll valuators that we already
-	 know about.  */
-
-      for (i = 0; i < info->num_classes; ++i)
+      while (tem)
 	{
-	  switch (info->classes[i]->type)
-	    {
-	    case XIValuatorClass:
-	      valuator_info = (XIValuatorClassInfo *) info->classes[i];
-
-	      valuator = xi_get_scroll_valuator (device,
-						 valuator_info->number);
-	      if (valuator)
-		{
-		  valuator->invalid_p = false;
-		  valuator->current_value = valuator_info->value;
-		}
-
-	      break;
-	    }
+	  last = tem;
+	  tem = tem->next;
+	  xfree (last);
 	}
 
-#ifdef HAVE_XINPUT2_2
-      /* The device is no longer a DirectTouch device, so
-	 remove any touchpoints that we might have
-	 recorded.  */
-      if (!device->direct_p)
-	{
-	  tem = device->touchpoints;
-
-	  while (tem)
-	    {
-	      last = tem;
-	      tem = tem->next;
-	      xfree (last);
-	    }
-
-	  device->touchpoints = NULL;
-	}
-#endif
-
-      XIFreeDeviceInfo (info);
+      device->touchpoints = NULL;
     }
 #endif
 }
@@ -21393,6 +21519,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 related to those grabs arrive.  The only way to
 		 remedy this is to never reset scroll valuators on a
 		 grab-related crossing event.  (bug#57476) */
+
 	      if (enter->mode != XINotifyUngrab
 		  && enter->mode != XINotifyGrab
 		  && enter->mode != XINotifyPassiveGrab
@@ -21522,17 +21649,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		 was very complicated and kept running into server
 		 bugs.  */
 #ifdef HAVE_XINPUT2_1
-	      if (any
-		  /* xfwm4 selects for button events on the frame
-		     window, resulting in passive grabs being
-		     generated along with the delivery of emulated
-		     button events; this then interferes with
-		     scrolling, since device valuators will constantly
-		     be reset as the crossing events related to those
-		     grabs arrive.  The only way to remedy this is to
-		     never reset scroll valuators on a grab-related
-		     crossing event.  (bug#57476) */
-		  && leave->mode != XINotifyUngrab
+	      /* xfwm4 selects for button events on the frame window,
+		 resulting in passive grabs being generated along with
+		 the delivery of emulated button events; this then
+		 interferes with scrolling, since device valuators
+		 will constantly be reset as the crossing events
+		 related to those grabs arrive.  The only way to
+		 remedy this is to never reset scroll valuators on a
+		 grab-related crossing event.  (bug#57476) */
+
+	      if (leave->mode != XINotifyUngrab
 		  && leave->mode != XINotifyGrab
 		  && leave->mode != XINotifyPassiveUngrab
 		  && leave->mode != XINotifyPassiveGrab)
@@ -21568,19 +21694,6 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      /* On Xt builds that have XI2, the enter and leave event
 		 masks are set on the frame widget's window.  */
 	      f = x_window_to_frame (dpyinfo, leave->event);
-
-	      /* Also do this again here, since the test for `any'
-		 above may not have found a frame, as that usually
-		 just looks up a top window on Xt builds.  */
-
-#ifdef HAVE_XINPUT2_1
-	      if (f && leave->mode != XINotifyUngrab
-		  && leave->mode != XINotifyGrab
-		  && leave->mode != XINotifyPassiveUngrab
-		  && leave->mode != XINotifyPassiveGrab)
-		xi_reset_scroll_valuators_for_device_id (dpyinfo,
-							 leave->deviceid);
-#endif
 
 	      if (!f)
 		f = x_top_window_to_frame (dpyinfo, leave->event);
@@ -23558,7 +23671,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			      memset (dpyinfo->devices + dpyinfo->num_devices - 1,
 				      0, sizeof *dpyinfo->devices);
 			      device = &dpyinfo->devices[dpyinfo->num_devices - 1];
-			      xi_populate_device_from_info (device, info);
+			      xi_populate_device_from_info (dpyinfo, device, info);
 			    }
 
 			  if (info)
@@ -29559,11 +29672,10 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 	  xi_select_hierarchy_events (dpyinfo);
 #endif
 
+	  dpyinfo->xi2_version = minor;
 	  x_cache_xi_devices (dpyinfo);
 	}
     }
-
-  dpyinfo->xi2_version = minor;
  skip_xi_setup:
   ;
 #endif
@@ -29778,21 +29890,30 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   {
     XrmValue d, fr, to;
     Font font;
+    XFontStruct *query_result;
 
     dpy = dpyinfo->display;
-    d.addr = (XPointer)&dpy;
+    d.addr = (XPointer) &dpy;
     d.size = sizeof (Display *);
     fr.addr = (char *) XtDefaultFont;
     fr.size = sizeof (XtDefaultFont);
     to.size = sizeof (Font *);
-    to.addr = (XPointer)&font;
+    to.addr = (XPointer) &font;
     x_catch_errors (dpy);
     if (!XtCallConverter (dpy, XtCvtStringToFont, &d, 1, &fr, &to, NULL))
       emacs_abort ();
-    if (x_had_errors_p (dpy) || !XQueryFont (dpy, font))
+    query_result = XQueryFont (dpy, font);
+
+    /* Set the dialog font to some fallback (here, 9x15) if the font
+       specified is invalid.  */
+    if (x_had_errors_p (dpy) || !font)
       XrmPutLineResource (&xrdb, "Emacs.dialog.*.font: 9x15");
-    /* Do not free XFontStruct returned by the above call to XQueryFont.
-       This leads to X protocol errors at XtCloseDisplay (Bug#18403).  */
+
+    /* Do not destroy the font struct returned above with XFreeFont;
+       that also destroys the font, leading to to X protocol errors at
+       XtCloseDisplay.  Just free the font info structure.
+       (Bug#18403) */
+    XFreeFontInfo (NULL, query_result, 1);
     x_uncatch_errors ();
   }
 #endif

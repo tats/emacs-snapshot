@@ -963,7 +963,134 @@ on the tab bar instead."
 
 (defun tab-bar-make-keymap-1 ()
   "Generate an actual keymap from `tab-bar-map', without caching."
-  (append tab-bar-map (tab-bar-format-list tab-bar-format)))
+  (let ((items (tab-bar-format-list tab-bar-format)))
+    (when tab-bar-auto-width
+      (setq items (tab-bar-auto-width items)))
+    (append tab-bar-map items)))
+
+
+(defcustom tab-bar-auto-width t
+  "Automatically resize width of tabs on tab bar to fill available tab-bar space.
+When non-nil, the widths of the tabs on the tab bar are
+automatically resized so that their width is evenly distributed
+across the tab bar.  This keeps the widths of the tabs
+independent of the length of the buffer names shown on each tab;
+the tab widths change only when tabs are added or deleted, or
+when the frame's dimensions change.  This also avoids as much as
+possible wrapping a long tab bar to a second tab-bar line.
+
+The automatic resizing of tabs takes place as long as tabs are no
+wider than allowed by the value of `tab-bar-fixed-width-max', and
+at least as wide as specified by the value of
+`tab-bar-fixed-width-min'.
+
+When this variable is nil, the width of each tab is determined by the
+length of the tab's name."
+  :type 'boolean
+  :group 'tab-bar
+  :version "29.1")
+
+(defcustom tab-bar-auto-width-max '(220 20)
+  "Maximum width for automatic resizing of width of tab-bar tabs.
+This determines the maximum width of tabs before their names will be
+truncated on display.
+The value should be a list of two numbers: the first is the maximum
+width of tabs in pixels for GUI frames, the second is the maximum
+width of tabs in characters on TTY frames.
+If the value of this variable is nil, there is no limit on maximum
+width.
+This variable has effect only when `tab-bar-auto-width' is non-nil."
+  :type '(choice
+          (const :tag "No limit" nil)
+          (list (integer :tag "Max width (pixels)" :value 220)
+                (integer :tag "Max width (chars)" :value 20)))
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (setq tab-bar--fixed-width-hash nil))
+  :group 'tab-bar
+  :version "29.1")
+
+(defvar tab-bar-auto-width-min '(20 2)
+  "Minimum width of tabs for automatic resizing under `tab-bar-auto-width'.
+The value should be a list of two numbers, giving the minimum width
+as the number of pixels for GUI frames and the number of characters
+for text-mode frames.  Tabs whose width is smaller than this will not
+be narrowed.
+It's not recommended to change this value since with larger values, the
+tab bar might wrap to the second line when it shouldn't.")
+
+(defvar tab-bar-auto-width-faces
+  '( tab-bar-tab tab-bar-tab-inactive
+     tab-bar-tab-ungrouped
+     tab-bar-tab-group-inactive)
+  "Resize tabs only with these faces.")
+
+(defvar tab-bar--fixed-width-hash nil
+  "Memoization table for `tab-bar-auto-width'.")
+
+(defun tab-bar-auto-width (items)
+  "Return tab-bar items with resized tab names."
+  (unless tab-bar--fixed-width-hash
+    (define-hash-table-test 'tab-bar--fixed-width-hash-test
+                            #'equal-including-properties
+                            #'sxhash-equal-including-properties)
+    (setq tab-bar--fixed-width-hash
+          (make-hash-table :test 'tab-bar--fixed-width-hash-test)))
+  (let ((tabs nil)    ;; list of resizable tabs
+        (non-tabs "") ;; concatenated names of non-resizable tabs
+        (width 0))    ;; resize tab names to this width
+    (dolist (item items)
+      (when (and (eq (nth 1 item) 'menu-item) (stringp (nth 2 item)))
+        (if (memq (get-text-property 0 'face (nth 2 item))
+                  tab-bar-auto-width-faces)
+            (push item tabs)
+          (unless (eq (nth 0 item) 'align-right)
+            (setq non-tabs (concat non-tabs (nth 2 item)))))))
+    (when tabs
+      (setq width (/ (- (frame-pixel-width)
+                        (string-pixel-width
+                         (propertize non-tabs 'face 'tab-bar)))
+                     (length tabs)))
+      (when tab-bar-auto-width-min
+        (setq width (max width (if window-system
+                                   (nth 0 tab-bar-auto-width-min)
+                                 (nth 1 tab-bar-auto-width-min)))))
+      (when tab-bar-auto-width-max
+        (setq width (min width (if window-system
+                                   (nth 0 tab-bar-auto-width-max)
+                                 (nth 1 tab-bar-auto-width-max)))))
+      (dolist (item tabs)
+        (setf (nth 2 item)
+              (with-memoization (gethash (cons width (nth 2 item))
+                                         tab-bar--fixed-width-hash)
+                (let* ((name (nth 2 item))
+                       (len (length name))
+                       (close-p (get-text-property (1- len) 'close-tab name))
+                       (pixel-width (string-pixel-width
+                                     (propertize name 'face 'tab-bar-tab))))
+                  (cond
+                   ((< pixel-width width)
+                    (let* ((space (apply 'propertize " " (text-properties-at 0 name)))
+                           (space-width (string-pixel-width (propertize space 'face 'tab-bar)))
+                           (ins-pos (- len (if close-p 1 0))))
+                      (while (<= (+ pixel-width space-width) width)
+                        (setf (substring name ins-pos ins-pos) space)
+                        (setq pixel-width (string-pixel-width
+                                           (propertize name 'face 'tab-bar-tab))))))
+                   ((> pixel-width width)
+                    (let (del-pos)
+                      (while (> pixel-width width)
+                        (setq len (length name)
+                              del-pos (- len (if close-p 1 0)))
+                        (setf (substring name (1- del-pos) del-pos) "")
+                        (setq pixel-width (string-pixel-width
+                                           (propertize name 'face 'tab-bar-tab))))
+                      (add-face-text-property (max (- del-pos 3) 1)
+                                              (1- del-pos)
+                                              'shadow nil name))))
+                  name)))))
+    items))
 
 
 ;; Some window-configuration parameters don't need to be persistent.
