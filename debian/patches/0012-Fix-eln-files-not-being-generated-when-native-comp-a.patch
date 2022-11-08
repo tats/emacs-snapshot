@@ -1,0 +1,40 @@
+From 376678555b3b216784b61a0a2f2088f416c4e336 Mon Sep 17 00:00:00 2001
+From: Andrea Corallo <akrl@sdf.org>
+Date: Wed, 19 Oct 2022 22:08:41 +0200
+Subject: Fix eln files not being generated when native-comp-async runs
+
+This upstream patch has been incorporated to fix the problem:
+
+  * Fix async native compilation (bug#58637)
+
+  * lisp/emacs-lisp/comp.el (comp--native-compile): Fix gate condition.
+  (comp-run-async-workers): Add assetion.
+
+Origin: upstream, commit: 56c63ca21b3e5e2d0bb05d3897ea287a754c5b29
+Bug-Debian: https://bugs.debian.org/1023440
+Forwarded: not-needed
+---
+ lisp/emacs-lisp/comp.el | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/lisp/emacs-lisp/comp.el b/lisp/emacs-lisp/comp.el
+index fb0d3805da4..8a3429c9b67 100644
+--- a/lisp/emacs-lisp/comp.el
++++ b/lisp/emacs-lisp/comp.el
+@@ -3916,6 +3916,7 @@ comp-run-async-workers
+   "Start compiling files from `comp-files-queue' asynchronously.
+ When compilation is finished, run `native-comp-async-all-done-hook' and
+ display a message."
++  (cl-assert (null comp-no-spawn))
+   (if (or comp-files-queue
+           (> (comp-async-runnings) 0))
+       (unless (>= (comp-async-runnings) (comp-effective-async-max-jobs))
+@@ -4022,7 +4023,7 @@ comp--native-compile
+               (stringp function-or-file))
+     (signal 'native-compiler-error
+             (list "Not a function symbol or file" function-or-file)))
+-  (unless comp-no-spawn
++  (when (or (null comp-no-spawn) comp-async-compilation)
+     (catch 'no-native-compile
+       (let* ((data function-or-file)
+              (comp-native-compiling t)

@@ -9,3 +9,4 @@
 0009-pdumper-set-DUMP_RELOC_ALIGNMENT_BITS-1-for-m68k.patch
 0010-Avoid-fork-bomb-caused-by-native-compilation.patch
 0011-Avoid-fork-bomb-caused-by-native-compilation-trampol.patch
+0012-Fix-eln-files-not-being-generated-when-native-comp-a.patch
