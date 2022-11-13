@@ -1,10 +1,10 @@
-emacs (1:28.2+1-5~1.gbpa86f99) UNRELEASED; urgency=medium
+emacs (1:28.2+1-5) unstable; urgency=medium
 
-  ** SNAPSHOT build @a86f9900531b10497d9d08b2b0d92b8ff2d67ba0 **
+  * Fix large core dumps from background processes.
+    Add 0013-Fix-large-core-dumps-from-background-processes.patch to fix
+    the problem. (Closes: #1017711)
 
-  * UNRELEASED
-
- -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Nov 2022 17:00:44 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 13 Nov 2022 13:44:02 -0700
 
 emacs (1:28.2+1-4) unstable; urgency=medium
 
