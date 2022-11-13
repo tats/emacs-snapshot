@@ -1,0 +1,37 @@
+From d91aca70c4f6837be713fad769d6cbc35f8e531d Mon Sep 17 00:00:00 2001
+From: Eli Zaretskii <eliz@gnu.org>
+Date: Thu, 10 Nov 2022 12:12:56 +0200
+Subject: Fix large core dumps from background processes
+
+This upstream patch has been incorporated to fix the problem:
+
+  Avoid dumping core upon SIGHUP in non-interactive sessions
+
+  * src/emacs.c (terminate_due_to_signal): Don't special-case
+  SIGINT.  Patch by Paul Eggert <eggert@cs.ucla.edu>.  (Bug#58956)
+
+Origin: upstream, commit: 25b4cec31d580353995d87fe19ae4dab6e6e37de
+Bug: https://debbugs.gnu.org/58956
+Bug-Debian: https://bugs.debian.org/1017711
+Forwarded: not-needed
+---
+ src/emacs.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/emacs.c b/src/emacs.c
+index 3e75cd3622e..3fb1c45cc44 100644
+--- a/src/emacs.c
++++ b/src/emacs.c
+@@ -410,9 +410,9 @@ terminate_due_to_signal (int sig, int backtrace_limit)
+           if (sig == SIGTERM || sig == SIGHUP || sig == SIGINT)
+ 	    {
+ 	      /* Avoid abort in shut_down_emacs if we were interrupted
+-		 by SIGINT in noninteractive usage, as in that case we
+-		 don't care about the message stack.  */
+-	      if (sig == SIGINT && noninteractive)
++		 in noninteractive usage, as in that case we don't
++		 care about the message stack.  */
++	      if (noninteractive)
+ 		clear_message_stack ();
+ 	      Fkill_emacs (make_fixnum (sig));
+ 	    }
