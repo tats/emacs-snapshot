@@ -6052,7 +6052,7 @@ comment at the start of cc-engine.el for more info."
 ;; the like.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The approximate interval at which we cache the value of the brace stack.
-(defconst c-bs-interval 5000)
+(defconst c-bs-interval 2000)
 ;; The list of cached values of the brace stack.  Each value in the list is a
 ;; cons of the position it is valid for and the value of the stack as
 ;; described above.
@@ -7356,7 +7356,7 @@ multi-line strings (but not C++, for example)."
 (defun c-ml-string-opener-intersects-region (&optional start finish)
   ;; If any part of the region [START FINISH] is inside an ml-string opener,
   ;; return a dotted list of the start, end and double-quote position of that
-  ;; opener.  That list wlll not include any "context characters" before or
+  ;; opener.  That list will not include any "context characters" before or
   ;; after the opener.  If an opener is found, the match-data will indicate
   ;; it, with (match-string 1) being the entire delimiter, and (match-string
   ;; 2) the "main" double-quote.  Otherwise, the match-data is undefined.
@@ -10208,7 +10208,11 @@ This function might do hidden buffer changes."
 	(save-rec-ref-ids c-record-ref-identifiers)
 	;; Set when we parse a declaration which might also be an expression,
 	;; such as "a *b".  See CASE 16 and CASE 17.
-	maybe-expression)
+	maybe-expression
+	;; Set for the type when `c-forward-type' returned `maybe', and we
+	;; want to fontify it as a type, but aren't confident enough to enter
+	;; it into `c-found-types'.
+	unsafe-maybe)
 
     (save-excursion
       (goto-char preceding-token-end)
@@ -10769,7 +10773,15 @@ This function might do hidden buffer changes."
 			((eq at-decl-or-cast t)
 			 (throw 'at-decl-or-cast t))
 			((and c-has-bitfields
-			      (eq at-decl-or-cast 'ids)) ; bitfield.
+			      ;; Check for a bitfield.
+			      (eq at-decl-or-cast 'ids)
+			      (save-excursion
+				(forward-char) ; Over the :
+				(c-forward-syntactic-ws)
+				(and (looking-at "[[:alnum:]]")
+				     (progn (c-forward-token-2)
+					    (c-forward-syntactic-ws)
+					    (memq (char-after) '(?\; ?,))))))
 			 (setq backup-if-not-cast t)
 			 (throw 'at-decl-or-cast t)))
 
@@ -10904,7 +10916,7 @@ This function might do hidden buffer changes."
 	   ;; a statement beginning with an identifier.
 	   (when (and (eq at-type 'maybe)
 		      (not (eq context 'top)))
-	     (setq c-record-type-identifiers nil))
+	     (setq unsafe-maybe t))
 	   (throw 'at-decl-or-cast t))
 
 	 ;; CASE 11
@@ -11067,6 +11079,11 @@ This function might do hidden buffer changes."
 	     ;; `got-parens' or `got-suffix' is set it's "a()", "a[]", "a()[]",
 	     ;; or similar, which we accept only if the context rules out
 	     ;; expressions.
+	     ;;
+	     ;; If we've got at-type 'maybe, we cannot confidently promote the
+	     ;; possible type to a found type.
+	     (when (and (eq at-type 'maybe))
+	       (setq unsafe-maybe t))
 	     (throw 'at-decl-or-cast t)))
 
 	 ;; If we had a complete symbol table here (which rules out
@@ -11207,7 +11224,8 @@ This function might do hidden buffer changes."
 		 ;; fontification just because it's "a known type that can't
 		 ;; be a name or other expression".  2013-09-18.
 		 )
-	(let ((c-promote-possible-types t))
+	(let ((c-promote-possible-types
+	       (if unsafe-maybe 'just-one t)))
 	  (save-excursion
 	    (goto-char type-start)
 	    (c-forward-type))))

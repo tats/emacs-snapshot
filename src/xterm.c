@@ -912,11 +912,6 @@ struct x_selection_request_event
 
 struct x_selection_request_event *pending_selection_requests;
 
-/* Compare two request serials A and B with OP, handling
-   wraparound.  */
-#define X_COMPARE_SERIALS(a, op ,b) \
-  (((long) (a) - (long) (b)) op 0)
-
 struct x_atom_ref
 {
   /* Atom name.  */
@@ -5245,7 +5240,9 @@ xi_convert_button_state (XIButtonState *in, unsigned int *out)
     }
 }
 
-/* Return the modifier state in XEV as a standard X modifier mask.  */
+/* Return the modifier state in XEV as a standard X modifier mask.
+   This should be used for non-keyboard events, where the group does
+   not matter.  */
 
 #ifdef USE_GTK
 static
@@ -5261,6 +5258,17 @@ xi_convert_event_state (XIDeviceEvent *xev)
   xi_convert_button_state (&xev->buttons, &buttons);
 
   return mods | buttons;
+}
+
+/* Like the above.  However, buttons are not converted, while the
+   group is.  This should be used for key events being passed to the
+   likes of input methods and Xt.  */
+
+static unsigned int
+xi_convert_event_keyboard_state (XIDeviceEvent *xev)
+{
+  return ((xev->mods.effective & ~(1 << 13 | 1 << 14))
+	  | (xev->group.effective << 13));
 }
 
 /* Free all XI2 devices on DPYINFO.  */
@@ -5326,7 +5334,7 @@ xi_populate_device_from_info (struct x_display_info *dpyinfo,
   struct xi_known_valuator *values, *tem;
   int actual_valuator_count, c;
   XIScrollClassInfo *info;
-  XIValuatorClassInfo *val_info;
+  XIValuatorClassInfo *valuator_info;
 #endif
 #ifdef HAVE_XINPUT2_2
   XITouchClassInfo *touch_info;
@@ -5437,12 +5445,23 @@ xi_populate_device_from_info (struct x_display_info *dpyinfo,
 
 	case XIValuatorClass:
 	  {
-	    val_info = (XIValuatorClassInfo *) device->classes[c];
+	    valuator_info = (XIValuatorClassInfo *) device->classes[c];
 	    tem = SAFE_ALLOCA (sizeof *tem);
 
+	    /* Avoid restoring bogus values if some driver
+	       accidentally specifies relative values in scroll
+	       valuator classes how the input extension spec says they
+	       should be, but allow restoring values when a value is
+	       set, which is how the input extension actually
+	       behaves.  */
+
+	    if (valuator_info->value == 0.0
+		&& valuator_info->mode != XIModeAbsolute)
+	      continue;
+
 	    tem->next = values;
-	    tem->number = val_info->number;
-	    tem->current_value = val_info->value;
+	    tem->number = valuator_info->number;
+	    tem->current_value = valuator_info->value;
 
 	    values = tem;
 	    break;
@@ -13169,22 +13188,32 @@ xi_handle_new_classes (struct x_display_info *dpyinfo, struct xi_device_t *devic
 
   for (i = 0; i < num_classes; ++i)
     {
-      switch (classes[i]->type)
-	{
-	case XIValuatorClass:
-	  valuator_info = (XIValuatorClassInfo *) classes[i];
+      if (classes[i]->type != XIValuatorClass)
+	continue;
 
-	  valuator = xi_get_scroll_valuator (device,
-					     valuator_info->number);
-	  if (valuator)
-	    {
-	      valuator->invalid_p = false;
-	      valuator->current_value = valuator_info->value;
-	      valuator->emacs_value = 0;
-	    }
+      valuator_info = (XIValuatorClassInfo *) classes[i];
 
-	  break;
-	}
+      /* Avoid restoring bogus values if some driver accidentally
+	 specifies relative values in scroll valuator classes how the
+	 input extension spec says they should be, but allow restoring
+	 values when a value is set, which is how the input extension
+	 actually behaves.  */
+
+      if (valuator_info->value == 0.0
+	  && valuator_info->mode != XIModeAbsolute)
+	continue;
+
+      valuator = xi_get_scroll_valuator (device,
+					 valuator_info->number);
+
+      if (!valuator)
+	continue;
+
+      valuator->invalid_p = false;
+      valuator->current_value = valuator_info->value;
+      valuator->emacs_value = 0;
+
+      break;
     }
 }
 
@@ -13509,7 +13538,7 @@ x_find_modifier_meanings (struct x_display_info *dpyinfo)
 #ifdef HAVE_XKB
   int i;
   int found_meta_p = false;
-  uint vmodmask;
+  unsigned int vmodmask;
 #endif
 
   dpyinfo->meta_mod_mask = 0;
@@ -18746,7 +18775,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	/* If drag-and-drop or another modal dialog/menu is in
 	   progress, handle SelectionRequest events immediately, by
-	   pushing it onto the selecction queue.  */
+	   pushing it onto the selection queue.  */
 
 	if (x_use_pending_selection_requests)
 	  {
@@ -21106,8 +21135,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 	    if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 	      {
+		x_ignore_errors_for_next_request (dpyinfo);
 		XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				RevertToParent, event->xbutton.time);
+	        x_stop_ignoring_errors (dpyinfo);
+
 		if (FRAME_PARENT_FRAME (f))
 		  XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
 	      }
@@ -22809,9 +22841,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 			}
 #else
 		      /* Non-no toolkit builds without GTK 3 use core
-			 events to handle focus.  */
+			 events to handle focus.  Errors are still
+			 caught here in case the window is not
+			 viewable.  */
+		      x_ignore_errors_for_next_request (dpyinfo);
 		      XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 				      RevertToParent, xev->time);
+		      x_stop_ignoring_errors (dpyinfo);
 #endif
 		      if (FRAME_PARENT_FRAME (f))
 			XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
@@ -23066,7 +23102,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      char *copy_bufptr = copy_buffer;
 	      int copy_bufsiz = sizeof (copy_buffer);
 	      ptrdiff_t i;
-	      uint old_state;
+	      unsigned int old_state;
 	      struct xi_device_t *device, *source;
 
 	      coding = Qlatin_1;
@@ -23092,8 +23128,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  copy.xkey.root = xev->root;
 		  copy.xkey.subwindow = xev->child;
 		  copy.xkey.time = xev->time;
-		  copy.xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
-				     | (xev->group.effective << 13));
+		  copy.xkey.state = xi_convert_event_keyboard_state (xev);
 		  xi_convert_button_state (&xev->buttons, &copy.xkey.state);
 
 		  copy.xkey.x = lrint (xev->event_x);
@@ -23149,8 +23184,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      xkey.root = xev->root;
 	      xkey.subwindow = xev->child;
 	      xkey.time = xev->time;
-	      xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
-			    | (xev->group.effective << 13));
+	      xkey.state = xi_convert_event_keyboard_state (xev);
 
 	      xkey.x = lrint (xev->event_x);
 	      xkey.y = lrint (xev->event_y);
@@ -23214,8 +23248,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #ifdef HAVE_XKB
 	      if (dpyinfo->xkb_desc)
 		{
-		  uint xkb_state = state;
-		  xkb_state &= ~(1 << 13 | 1 << 14);
+		  unsigned int xkb_state;
+
+		  xkb_state = state & ~(1 << 13 | 1 << 14);
 		  xkb_state |= xev->group.effective << 13;
 
 		  if (!XkbTranslateKeyCode (dpyinfo->xkb_desc, keycode,
@@ -23568,8 +23603,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      xkey.root = xev->root;
 	      xkey.subwindow = xev->child;
 	      xkey.time = xev->time;
-	      xkey.state = ((xev->mods.effective & ~(1 << 13 | 1 << 14))
-			    | (xev->group.effective << 13));
+	      xkey.state = xi_convert_event_keyboard_state (xev);
 	      xkey.x = lrint (xev->event_x);
 	      xkey.y = lrint (xev->event_y);
 	      xkey.x_root = lrint (xev->root_x);
@@ -25052,6 +25086,48 @@ static struct x_error_message_stack *x_error_message;
 /* The amount of items (depth) in that stack.  */
 int x_error_message_count;
 
+/* Compare various request serials while handling wraparound.  Treat a
+   difference of more than X_ULONG_MAX / 2 as wraparound.
+
+   Note that these functions truncate serials to 32 bits before
+   comparison.  */
+
+static bool
+x_is_serial_more_than (unsigned int a, unsigned int b)
+{
+  if (a > b)
+    return true;
+
+  return (b - a > X_ULONG_MAX / 2);
+}
+
+static bool
+x_is_serial_more_than_or_equal_to (unsigned int a, unsigned int b)
+{
+  if (a >= b)
+    return true;
+
+  return (b - a > X_ULONG_MAX / 2);
+}
+
+static bool
+x_is_serial_less_than (unsigned int a, unsigned int b)
+{
+  if (a < b)
+    return true;
+
+  return (a - b > X_ULONG_MAX / 2);
+}
+
+static bool
+x_is_serial_less_than_or_equal_to (unsigned int a, unsigned int b)
+{
+  if (a <= b)
+    return true;
+
+  return (a - b > X_ULONG_MAX / 2);
+}
+
 static struct x_error_message_stack *
 x_find_error_handler (Display *dpy, XErrorEvent *event)
 {
@@ -25061,8 +25137,8 @@ x_find_error_handler (Display *dpy, XErrorEvent *event)
 
   while (stack)
     {
-      if (X_COMPARE_SERIALS (event->serial, >=,
-			     stack->first_request)
+      if (x_is_serial_more_than_or_equal_to (event->serial,
+					     stack->first_request)
 	  && dpy == stack->dpy)
 	return stack;
 
@@ -25165,11 +25241,11 @@ x_request_can_fail (struct x_display_info *dpyinfo,
        failable_requests < dpyinfo->next_failable_request;
        failable_requests++)
     {
-      if (X_COMPARE_SERIALS (request, >=,
-			     failable_requests->start)
+      if (x_is_serial_more_than_or_equal_to (request,
+					     failable_requests->start)
 	  && (!failable_requests->end
-	      || X_COMPARE_SERIALS (request, <=,
-				    failable_requests->end)))
+	      || x_is_serial_less_than_or_equal_to (request,
+						    failable_requests->end)))
 	return failable_requests;
     }
 
@@ -25187,11 +25263,11 @@ x_clean_failable_requests (struct x_display_info *dpyinfo)
 
   for (first = dpyinfo->failable_requests; first < last; first++)
     {
-      if (X_COMPARE_SERIALS (first->start, >,
-			     LastKnownRequestProcessed (dpyinfo->display))
+      if (x_is_serial_more_than (first->start,
+				 LastKnownRequestProcessed (dpyinfo->display))
 	  || !first->end
-	  || X_COMPARE_SERIALS (first->end, >,
-				LastKnownRequestProcessed (dpyinfo->display)))
+	  || x_is_serial_more_than (first->end,
+				    LastKnownRequestProcessed (dpyinfo->display)))
 	break;
     }
 
@@ -25270,8 +25346,7 @@ x_stop_ignoring_errors (struct x_display_info *dpyinfo)
   /* Abort if no request was made since
      `x_ignore_errors_for_next_request'.  */
 
-  if (X_COMPARE_SERIALS (range->end, <,
-			 range->start))
+  if (x_is_serial_less_than (range->end, range->start))
     emacs_abort ();
 
 #ifdef HAVE_GTK3
@@ -27490,6 +27565,25 @@ x_get_focus_frame (struct frame *f)
   return lisp_focus;
 }
 
+/* Return the toplevel parent of F, if it is a child frame.
+   Otherwise, return NULL.  */
+
+static struct frame *
+x_get_toplevel_parent (struct frame *f)
+{
+  struct frame *parent;
+
+  if (!FRAME_PARENT_FRAME (f))
+    return NULL;
+
+  parent = FRAME_PARENT_FRAME (f);
+
+  while (FRAME_PARENT_FRAME (parent))
+    parent = FRAME_PARENT_FRAME (parent);
+
+  return parent;
+}
+
 /* In certain situations, when the window manager follows a
    click-to-focus policy, there seems to be no way around calling
    XSetInputFocus to give another frame the input focus.
@@ -27515,6 +27609,18 @@ x_focus_frame (struct frame *f, bool noactivate)
   else
     {
       if (!noactivate
+	  /* If F is override-redirect, use SetInputFocus instead.
+	     Override-redirect frames are not subject to window
+	     management.  */
+	  && !FRAME_OVERRIDE_REDIRECT (f)
+	  /* If F is a child frame, use SetInputFocus instead.  This
+	     may not work if its parent is not activated.  */
+	  && !FRAME_PARENT_FRAME (f)
+	  /* If the focus is being transferred from a child frame to
+	     its toplevel parent, also use SetInputFocus.  */
+	  && (!dpyinfo->x_focus_frame
+	      || (x_get_toplevel_parent (dpyinfo->x_focus_frame)
+		  != f))
 	  && x_wm_supports (f, dpyinfo->Xatom_net_active_window))
 	{
 	  /* When window manager activation is possible, use it
@@ -29025,10 +29131,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
   int i;
 
+#if defined HAVE_XFIXES && defined USE_XCB
   USE_SAFE_ALLOCA;
-
-  /* Avoid warnings when SAFE_ALLOCA is not actually used.  */
-  ((void) SAFE_ALLOCA (0));
+#endif
 
   block_input ();
 
@@ -29182,7 +29287,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
       unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
       SAFE_FREE ();
+#endif
       return 0;
     }
 
@@ -29202,7 +29309,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
       unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
       SAFE_FREE ();
+#endif
       return 0;
     }
 #endif
@@ -30087,7 +30196,9 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
   unblock_input ();
 
+#if defined HAVE_XFIXES && defined USE_XCB
   SAFE_FREE ();
+#endif
   return dpyinfo;
 }
 
