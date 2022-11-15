@@ -1,3 +1,11 @@
+emacs (1:28.2+1-6~1.gbp644820) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @6448206ba60ad0293dc7c4927e44d8074e2acaa4 **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 15 Nov 2022 15:51:43 -0700
+
 emacs (1:28.2+1-5) unstable; urgency=medium
 
   * Fix large core dumps from background processes.
