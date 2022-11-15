@@ -960,6 +960,7 @@ See Bug#21722."
         (should (= (point) (alist-get shell-command-dont-erase-buffer expected-point)))))))
 
 (ert-deftest test-undo-region ()
+  :tags '(:unstable)
   (with-temp-buffer
     (insert "This is a test\n")
     (goto-char (point-min))

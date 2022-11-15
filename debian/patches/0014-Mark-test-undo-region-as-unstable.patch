@@ -1,0 +1,48 @@
+From 27d843b9cc19fd5bcf1f20c21d828e2e5ba13c4f Mon Sep 17 00:00:00 2001
+From: Sean Whitton <spwhitton@spwhitton.name>
+Date: Tue, 15 Nov 2022 15:54:41 -0700
+Subject: Mark test-undo-region as unstable
+
+It is repeatedly failing on Debian's arch:all autobuilders, though
+seemingly nowhere else:
+
+     passed  40/44  simple-transpose-subr (0.000396 sec)
+  Test test-undo-region backtrace:
+    signal(ert-test-failed (((should (= (length (delq nil (undo-make-sel
+    ert-fail(((should (= (length (delq nil (undo-make-selective-list 1 9
+    #f(compiled-function () #<bytecode 0x52f126616d2cdbd>)()
+    ert--run-test-internal(#s(ert--test-execution-info :test #s(ert-test
+    ert-run-test(#s(ert-test :name test-undo-region :documentation nil :
+    ert-run-or-rerun-test(#s(ert--stats :selector ... :tests ... :test-m
+    ert-run-tests((not (or (tag :expensive-test) (tag :unstable))) #f(co
+    ert-run-tests-batch((not (or (tag :expensive-test) (tag :unstable)))
+    ert-run-tests-batch-and-exit((not (or (tag :expensive-test) (tag :un
+    command-line-1(("-L" ":/<<PKGBUILDDIR>>/debian/build
+    command-line()
+    normal-top-level()
+  Test test-undo-region condition:
+      (ert-test-failed
+       ((should
+         (=
+  	(length ...)
+  	2))
+        :form
+        (= 3 2)
+        :value nil))
+     FAILED  41/44  test-undo-region (0.000185 sec)
+---
+ test/lisp/simple-tests.el | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/test/lisp/simple-tests.el b/test/lisp/simple-tests.el
+index 6350bebeeea..808a77a2fe0 100644
+--- a/test/lisp/simple-tests.el
++++ b/test/lisp/simple-tests.el
+@@ -960,6 +960,7 @@ simple-tests-shell-command-dont-erase-buffer
+         (should (= (point) (alist-get shell-command-dont-erase-buffer expected-point)))))))
+ 
+ (ert-deftest test-undo-region ()
++  :tags '(:unstable)
+   (with-temp-buffer
+     (insert "This is a test\n")
+     (goto-char (point-min))

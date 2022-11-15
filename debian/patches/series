@@ -11,3 +11,5 @@
 0011-Avoid-fork-bomb-caused-by-native-compilation-trampol.patch
 0012-Fix-eln-files-not-being-generated-when-native-comp-a.patch
 0013-Fix-large-core-dumps-from-background-processes.patch
+0014-Mark-test-undo-region-as-unstable.patch
+0015-Mark-flaky-test-process-tests-multiple-threads-waiti.patch

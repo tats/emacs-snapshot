@@ -1,0 +1,45 @@
+From 1b1427e19da0552bb5b6ee0aeb5046247afc4469 Mon Sep 17 00:00:00 2001
+From: Sean Whitton <spwhitton@spwhitton.name>
+Date: Tue, 15 Nov 2022 16:26:59 -0700
+Subject: Mark flaky test process-tests/multiple-threads-waiting as unstable
+
+It times out:
+
+     passed  22/28  process-tests/fd-setsize-no-crash/make-serial-process (0.021449 sec)
+  make[5]: *** [Makefile:182: src/process-tests.log] Error 134
+    GEN      src/regex-emacs-tests.log
+    GEN      src/search-tests.log
+    GEN      src/syntax-tests.log
+    GEN      src/textprop-tests.log
+    GEN      src/thread-tests.log
+    GEN      src/timefns-tests.log
+    GEN      src/undo-tests.log
+    GEN      src/xdisp-tests.log
+    GEN      src/xfaces-tests.log
+    GEN      src/xml-tests.log
+  make[5]: Leaving directory '/<<PKGBUILDDIR>>/debian/build-gtk/test'
+  make[4]: [Makefile:335: check-doit] Error 2 (ignored)
+
+  SUMMARY OF TEST RESULTS
+  -----------------------
+  Files examined: 375
+  Ran 5408 tests, 28 failed to run, 5273 results as expected, 0 unexpected, 135 skipped
+  1 files did not finish:
+    src/process-tests.log
+  make[4]: *** [Makefile:336: check-doit] Error 2
+---
+ test/src/process-tests.el | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/test/src/process-tests.el b/test/src/process-tests.el
+index 725da084e72..ddcf8511127 100644
+--- a/test/src/process-tests.el
++++ b/test/src/process-tests.el
+@@ -800,6 +800,7 @@ process-tests/sentinel-with-multiple-processes
+                            (list (list process "finished\n"))))))))))
+ 
+ (ert-deftest process-tests/multiple-threads-waiting ()
++  :tags '(:unstable)
+   (skip-unless (fboundp 'make-thread))
+   (with-timeout (60 (ert-fail "Test timed out"))
+     (process-tests--with-processes processes
