@@ -1,10 +1,11 @@
-emacs (1:28.2+1-6~1.gbp644820) UNRELEASED; urgency=medium
+emacs (1:28.2+1-6) unstable; urgency=medium
 
-  ** SNAPSHOT build @6448206ba60ad0293dc7c4927e44d8074e2acaa4 **
+  * Mark two flaky tests as unstable.
+    test-undo-region is failing on Debian arch:all autobuilders, and
+    process-tests/multiple-threads-waiting randomly fails locally and on
+    autobuilders. (Closes: #1024060)
 
-  * UNRELEASED
-
- -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 15 Nov 2022 15:51:43 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 17 Nov 2022 13:13:12 -0700
 
 emacs (1:28.2+1-5) unstable; urgency=medium
 
