@@ -1,3 +1,11 @@
+emacs (1:28.2+1-7~1.gbpd64070) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @d64070b8d9d8d82b58f326ea9696658769d5cc75 **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 27 Nov 2022 13:12:40 -0700
+
 emacs (1:28.2+1-6) unstable; urgency=medium
 
   * Mark two flaky tests as unstable.
