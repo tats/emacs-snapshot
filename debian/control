@@ -4,39 +4,48 @@ Priority: optional
 Maintainer: Rob Browning <rlb@defaultvalue.org>
 Uploaders: Sean Whitton <spwhitton@spwhitton.name>
 Build-Depends:
- bsd-mailx | mailx,
- ca-certificates,
- libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev,
- dbus-x11,
- git,
- gnupg-agent,
- libgif-dev,
- libtiff-dev,
- libsystemd-dev,
- liblcms2-dev,
- procps,
- xaw3dg-dev,
- libpng-dev, libjpeg-dev, libm17n-dev, libotf-dev,
- libgpm-dev [linux-any], libdbus-1-dev,
  autoconf,
  automake,
- dpkg-dev (>> 1.10.0),
- quilt (>= 0.42),
+ bsd-mailx | mailx,
+ ca-certificates,
+ dbus-x11,
  debhelper (>= 10),
- libxaw7-dev,
- sharutils,
+ dpkg-dev (>> 1.10.0),
+ git,
+ gnupg-agent,
  imagemagick,
+ libacl1-dev,
+ libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64],
  libcairo-dev,
+ libdbus-1-dev,
  libgccjit-12-dev,
+ libgif-dev,
  libgmp-dev,
+ libgnutls28-dev,
+ libgpm-dev [linux-any],
  libgtk-3-dev,
- libgnutls28-dev, libxml2-dev, libselinux1-dev [linux-any],
  libharfbuzz-dev,
  libjansson-dev,
- libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64],
- libacl1-dev,
+ libjpeg-dev,
+ liblcms2-dev,
+ liblockfile-dev,
+ libm17n-dev,
+ libncurses5-dev,
  liboss4-salsa-dev [hurd-i386 kfreebsd-i386 kfreebsd-amd64],
- zlib1g-dev
+ libotf-dev,
+ libpng-dev,
+ librsvg2-dev,
+ libselinux1-dev [linux-any],
+ libsystemd-dev,
+ libtiff-dev,
+ libxaw7-dev,
+ libxml2-dev,
+ procps,
+ quilt (>= 0.42),
+ sharutils,
+ texinfo,
+ xaw3dg-dev,
+ zlib1g-dev,
 Homepage: https://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 Vcs-Browser: https://salsa.debian.org/rlb/deb-emacs
@@ -45,8 +54,8 @@ Vcs-Git: https://salsa.debian.org/rlb/deb-emacs.git
 Package: emacs
 Architecture: all
 Depends:
-  emacs-gtk (>= 1:27.1) | emacs-lucid (>= 1:27.1) | emacs-nox (>= 1:27.1),
-  ${misc:Depends}
+ emacs-gtk (>= 1:27.1) | emacs-lucid (>= 1:27.1) | emacs-nox (>= 1:27.1),
+ ${misc:Depends},
 Description: GNU Emacs editor (metapackage)
  GNU Emacs is the extensible self-documenting text editor.
  This is a metapackage that will always depend on the latest
@@ -55,14 +64,15 @@ Description: GNU Emacs editor (metapackage)
 Package: emacs-lucid
 Architecture: any
 Depends:
-  emacs-bin-common (= ${binary:Version}),
-  emacs-common (= ${source:Version}),
-  ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
+ emacs-bin-common (= ${binary:Version}),
+ emacs-common (= ${source:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Provides: editor, emacs, emacsen, info-browser, mail-reader, news-reader
 Recommends: fonts-noto-color-emoji
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-gtk, emacs-nox
-Replaces: emacs-gtk, emacs-nox,
+Replaces: emacs-gtk, emacs-nox
 Description: GNU Emacs editor (with Lucid GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs with support for a graphical user
@@ -77,13 +87,14 @@ Description: GNU Emacs editor (with Lucid GUI support)
 Package: emacs-nox
 Architecture: any
 Depends:
-  emacs-bin-common (= ${binary:Version}),
-  emacs-common (= ${source:Version}),
-  ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
+ emacs-bin-common (= ${binary:Version}),
+ emacs-common (= ${source:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Provides: editor, emacs, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-gtk, emacs-lucid
-Replaces: emacs-gtk, emacs-lucid,
+Replaces: emacs-gtk, emacs-lucid
 Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
@@ -92,14 +103,15 @@ Description: GNU Emacs editor (without GUI support)
 Package: emacs-gtk
 Architecture: any
 Depends:
-  emacs-bin-common (= ${binary:Version}),
-  emacs-common (= ${source:Version}),
-  ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs, emacsen, editor, info-browser, mail-reader, news-reader
+ emacs-bin-common (= ${binary:Version}),
+ emacs-common (= ${source:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Provides: editor, emacs, emacsen, info-browser, mail-reader, news-reader
 Recommends: fonts-noto-color-emoji
 Suggests: emacs-common-non-dfsg
 Conflicts: emacs-lucid, emacs-nox
-Replaces: emacs-lucid, emacs-nox,
+Replaces: emacs-lucid, emacs-nox
 Description: GNU Emacs editor (with GTK+ GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs with a graphical user interface
@@ -108,7 +120,7 @@ Description: GNU Emacs editor (with GTK+ GUI support)
 
 Package: emacs-bin-common
 Architecture: any
-Depends: emacs-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: emacs-common (= ${source:Version}), ${misc:Depends}, ${shlibs:Depends}
 Recommends: mailutils
 Description: GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
@@ -117,11 +129,19 @@ Description: GNU Emacs editor's shared, architecture dependent files
 
 Package: emacs-common
 Architecture: all
-Depends: emacsen-common (>= 3.0.0), emacs-el, install-info, ${misc:Depends}
+Depends: emacs-el, emacsen-common (>= 3.0.0), install-info, ${misc:Depends}
 Recommends: emacs-el
 Suggests: emacs-common-non-dfsg, ncurses-term
-Conflicts: emacs-el (<< ${source:Version}), cedet, eieio, speedbar, gnus-bonus-el
+Conflicts:
+ cedet,
+ eieio,
+ emacs-el (<< ${source:Version}),
+ gnus-bonus-el,
+ speedbar,
 Breaks:
+ apel (<< 10.8+0.20120427-4),
+ edb (<< 1.32),
+ egg (<< 4.2.0-2),
  emacs (<< 1:25),
  emacs-gtk (<< 1:25),
  emacs-lucid (<< 1:25),
@@ -140,9 +160,6 @@ Breaks:
  emacs25,
  emacs25-lucid,
  emacs25-nox,
- apel (<< 10.8+0.20120427-4),
- edb (<< 1.32),
- egg (<< 4.2.0-2),
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
