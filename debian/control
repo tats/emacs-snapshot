@@ -8,7 +8,6 @@ Build-Depends:
  ca-certificates,
  libncurses5-dev, texinfo, liblockfile-dev, librsvg2-dev,
  dbus-x11,
- gcc-12,
  git,
  gnupg-agent,
  libgif-dev,
@@ -34,7 +33,6 @@ Build-Depends:
  libharfbuzz-dev,
  libjansson-dev,
  libasound2-dev [!hurd-i386 !kfreebsd-i386 !kfreebsd-amd64],
- libmagick++-6.q16-dev,
  libacl1-dev,
  liboss4-salsa-dev [hurd-i386 kfreebsd-i386 kfreebsd-amd64],
  zlib1g-dev
