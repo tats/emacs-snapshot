@@ -13,6 +13,7 @@ Build-Depends:
  libgif-dev,
  libtiff-dev,
  libsystemd-dev,
+ liblcms2-dev,
  procps,
  xaw3dg-dev,
  libpng-dev, libjpeg-dev, libm17n-dev, libotf-dev,
