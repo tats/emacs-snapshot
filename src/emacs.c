@@ -137,6 +137,10 @@ extern char etext;
 #include <sys/resource.h>
 #endif
 
+/* We don't guard this with HAVE_TREE_SITTER because treesit.o is
+   always compiled (to provide treesit-available-p).  */
+#include "treesit.h"
+
 #include "pdumper.h"
 #include "fingerprint.h"
 #include "epaths.h"
@@ -291,6 +295,7 @@ Initialization options:\n\
 --no-site-lisp, -nsl        do not add site-lisp directories to load-path\n\
 --no-splash                 do not display a splash screen on startup\n\
 --no-window-system, -nw     do not communicate with X, ignoring $DISPLAY\n\
+--init-directory=DIR        use DIR when looking for the Emacs init files.\n\
 ",
     "\
 --quick, -Q                 equivalent to:\n\
@@ -2266,7 +2271,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_MODULES
       syms_of_module ();
 #endif
-
+      /* We don't guard this with HAVE_TREE_SITTER because treesit.o
+	 is always compiled (to provide treesit-available-p).  */
+      syms_of_treesit ();
 #ifdef HAVE_SOUND
       syms_of_sound ();
 #endif
