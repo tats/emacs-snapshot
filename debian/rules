@@ -76,7 +76,7 @@ debsrc_ver := $(shell $(pf); echo $(debian_ver) | perl -pe 's/-[^-]+$$//o')
 flavor := $(src_name)
 flavor_other_native_comp := $(if $(filter emacs29,$(flavor)),emacs29-no-native-comp,emacs29)
 
-info_subdir := emacs-$(major_ver)
+info_subdir := emacs-$(major_ver).$(minor_ver)
 
 ######################################################################
 # Customizable variables
@@ -215,7 +215,7 @@ endef
 define emacs_inst
   $(MAKE) -C debian/$(1) install \
     DESTDIR=$(2) \
-    infodir=/usr/share/info/emacs-$(major_ver) \
+    infodir=/usr/share/info/emacs-$(major_ver).$(minor_ver) \
     localstatedir=/var
 endef
 
@@ -527,8 +527,8 @@ override_dh_auto_install: $(autogen_install_files)
 
 	  # Remove extraneous info dir files.  These may not exist if dpkg
 	  # is 1.5.4 or newer.
-	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir
-	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver)/dir.old
+	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver).$(minor_ver)/dir
+	  rm -f $(pkgdir_common)/usr/share/info/emacs-$(major_ver).$(minor_ver)/dir.old
 
         endif
 
