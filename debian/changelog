@@ -1,3 +1,11 @@
+emacs (1:28.2+1-8~1.gbpbd13a2) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @bd13a2a2ef8383a71e36a3840c832ea3c41eca7d **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 01 Dec 2022 18:11:01 -0700
+
 emacs (1:28.2+1-7) unstable; urgency=medium
 
   * Drop unused gcc-12 and libmagick++-6.q16-dev build-deps.
