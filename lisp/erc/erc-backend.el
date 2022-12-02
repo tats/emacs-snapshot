@@ -205,7 +205,8 @@
 ;;;; Variables and options
 
 (defvar-local erc-session-password nil
-  "The password used for the current session.")
+  "The password used for the current session.
+This should be a string or a function returning a string.")
 
 (defvar erc-server-responses (make-hash-table :test #'equal)
   "Hash table mapping server responses to their handler hooks.")
@@ -299,6 +300,9 @@ function `erc-server-process-alive' instead.")
 (defvar-local erc--server-last-reconnect-count 0
   "Snapshot of reconnect count when the connection was established.")
 
+(defvar-local erc--server-reconnect-timer nil
+  "Auto-reconnect timer for a network context.")
+
 (defvar-local erc-server-quitting nil
   "Non-nil if the user requests a quit.")
 
@@ -308,8 +312,13 @@ current IRC process is still alive.")
 (make-obsolete-variable 'erc-server-reconnecting
                         "see `erc--server-reconnecting'" "29.1")
 
-(defvar-local erc--server-reconnecting nil
-  "Non-nil when reconnecting.")
+(defvar erc--server-reconnecting nil
+  "An alist of buffer-local vars and their values when reconnecting.
+This is for the benefit of local modules and `erc-mode-hook'
+members so they can access buffer-local data from the previous
+session when reconnecting.  Once `erc-reuse-buffers' is retired
+and fully removed, modules can switch to leveraging the
+`permanent-local' property instead.")
 
 (defvar-local erc-server-timed-out nil
   "Non-nil if the IRC server failed to respond to a ping.")
@@ -400,6 +409,16 @@ This only has an effect if `erc-server-auto-reconnect' is non-nil."
 
 If a key is pressed while ERC is waiting, it will stop waiting."
   :type 'number)
+
+(defcustom erc-server-reconnect-function 'erc-server-delayed-reconnect
+  "Function called by the reconnect timer to create a new connection.
+Called with a server buffer as its only argument.  Potential uses
+include exponential backoff and probing for connectivity prior to
+dialing.  Use `erc-schedule-reconnect' to instead try again later
+and optionally alter the attempts tally."
+  :package-version '(ERC . "5.4.1") ; FIXME on next release
+  :type '(choice (function-item erc-server-delayed-reconnect)
+                 function))
 
 (defcustom erc-split-line-length 440
   "The maximum length of a single message.
@@ -625,12 +644,22 @@ The current buffer is given by BUFFER."
   (let ((p (plist-put parameters :nowait t)))
     (apply #'open-network-stream name buffer host service p)))
 
+(cl-defmethod erc--register-connection ()
+  "Perform opening IRC protocol exchange with server."
+  (erc-login))
+
+(defvar erc--server-connect-dumb-ipv6-regexp
+  ;; Not for validation (gives false positives).
+  (rx bot "[" (group (+ (any xdigit digit ":.")) (? "%" (+ alnum))) "]" eot))
+
 (defun erc-server-connect (server port buffer &optional client-certificate)
   "Perform the connection and login using the specified SERVER and PORT.
 We will store server variables in the buffer given by BUFFER.
 CLIENT-CERTIFICATE may optionally be used to specify a TLS client
 certificate to use for authentication when connecting over
 TLS (see `erc-session-client-certificate' for more details)."
+  (when (string-match erc--server-connect-dumb-ipv6-regexp server)
+    (setq server (match-string 1 server)))
   (let ((msg (erc-format-message 'connect ?S server ?p port)) process
         (args `(,(format "erc-%s-%s" server port) nil ,server ,port)))
     (when client-certificate
@@ -645,7 +674,7 @@ TLS (see `erc-session-client-certificate' for more details)."
       (setq erc-server-process process)
       (setq erc-server-quitting nil)
       (setq erc-server-reconnecting nil
-            erc--server-reconnecting nil)
+            erc--server-reconnect-timer nil)
       (setq erc-server-timed-out nil)
       (setq erc-server-banned nil)
       (setq erc-server-error-occurred nil)
@@ -673,7 +702,7 @@ TLS (see `erc-session-client-certificate' for more details)."
         ;; waiting for a non-blocking connect - keep the user informed
         (erc-display-message nil nil buffer "Opening connection..\n")
       (message "%s...done" msg)
-      (erc-login)) ))
+      (erc--register-connection))))
 
 (defun erc-server-reconnect ()
   "Reestablish the current IRC connection.
@@ -689,7 +718,8 @@ Make sure you are in an ERC buffer when running this."
       (setq erc-server-last-sent-time 0)
       (setq erc-server-lines-sent 0)
       (let ((erc-server-connect-function (or erc-session-connector
-                                             #'erc-open-network-stream)))
+                                             #'erc-open-network-stream))
+            (erc--server-reconnecting (buffer-local-variables)))
         (erc-open erc-session-server erc-session-port erc-server-current-nick
                   erc-session-user-full-name t erc-session-password
                   nil nil nil erc-session-client-certificate
@@ -758,37 +788,58 @@ EVENT is the message received from the closed connection process."
         erc-server-reconnecting)
       (erc--server-reconnect-p event)))
 
+(defconst erc--mode-line-process-reconnecting
+  '(:eval (erc-with-server-buffer
+            (and erc--server-reconnect-timer
+                 (format ": reconnecting in %.1fs"
+                         (- (timer-until erc--server-reconnect-timer
+                                         (current-time)))))))
+  "Mode-line construct showing seconds until next reconnect attempt.
+Move point around to refresh.")
+
+(defun erc--cancel-auto-reconnect-timer ()
+  (when erc--server-reconnect-timer
+    (cancel-timer erc--server-reconnect-timer)
+    (erc-display-message nil 'notice nil 'reconnect-canceled
+                         ?u (buffer-name)
+                         ?c (- (timer-until erc--server-reconnect-timer
+                                            (current-time))))
+    (setq erc--server-reconnect-timer nil)
+    (erc-update-mode-line)))
+
+(defun erc-schedule-reconnect (buffer &optional incr)
+  "Create and return a reconnect timer for BUFFER.
+When `erc-server-reconnect-attempts' is a number, increment
+`erc-server-reconnect-count' by INCR unconditionally."
+  (let ((count (and (integerp erc-server-reconnect-attempts)
+                    (- erc-server-reconnect-attempts
+                       (cl-incf erc-server-reconnect-count (or incr 1))))))
+    (erc-display-message nil 'error (current-buffer) 'reconnecting
+                         ?m erc-server-reconnect-timeout
+                         ?i (if count erc-server-reconnect-count "N")
+                         ?n (if count erc-server-reconnect-attempts "A"))
+    (setq erc-server-reconnecting nil
+          erc--server-reconnect-timer
+          (run-at-time erc-server-reconnect-timeout nil
+                       erc-server-reconnect-function buffer))))
+
 (defun erc-process-sentinel-2 (event buffer)
   "Called when `erc-process-sentinel-1' has detected an unexpected disconnect."
-  (if (not (buffer-live-p buffer))
-      (erc-update-mode-line)
+  (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (let ((reconnect-p (erc--server-reconnect-p event)) message delay)
+      (let ((reconnect-p (erc--server-reconnect-p event)) message)
         (setq message (if reconnect-p 'disconnected 'disconnected-noreconnect))
         (erc-display-message nil 'error (current-buffer) message)
         (if (not reconnect-p)
             ;; terminate, do not reconnect
             (progn
-              (setq erc--server-reconnecting nil)
+              (setq erc--server-reconnect-timer nil)
               (erc-display-message nil 'error (current-buffer)
                                    'terminated ?e event)
-              ;; Update mode line indicators
-              (erc-update-mode-line)
               (set-buffer-modified-p nil))
           ;; reconnect
-          (condition-case nil
-              (progn
-                (setq erc-server-reconnecting nil
-                      erc--server-reconnecting t
-                      erc-server-reconnect-count (1+ erc-server-reconnect-count))
-                (setq delay erc-server-reconnect-timeout)
-                (run-at-time delay nil
-                             #'erc-server-delayed-reconnect buffer))
-            (error (unless (integerp erc-server-reconnect-attempts)
-                     (message "%s ... %s"
-                              "Reconnecting until we succeed"
-                              "kill the ERC server buffer to stop"))
-                   (erc-server-delayed-reconnect buffer))))))))
+          (erc-schedule-reconnect buffer))))
+    (erc-update-mode-line)))
 
 (defun erc-process-sentinel-1 (event buffer)
   "Called when `erc-process-sentinel' has decided that we're disconnecting.
@@ -851,7 +902,7 @@ Conditionally try to reconnect and take appropriate action."
                   cproc (process-status cproc) event erc-server-quitting))
         (if (string-match "^open" event)
             ;; newly opened connection (no wait)
-            (erc-login)
+            (erc--register-connection)
           ;; assume event is 'failed
           (erc-with-all-buffers-of-server cproc nil
                                           (setq erc-server-connected nil))
@@ -1085,8 +1136,37 @@ See also `erc-server-send'."
 
 ;;;; Handling responses
 
+(defcustom erc-tags-format 'overridable
+  "Shape of the `tags' alist in `erc-response' objects.
+When set to `legacy', pre-5.5 parsing behavior takes effect for
+the tags portion of every message.  The resulting alist contains
+conses of the form (STRING . LIST), in which LIST is comprised of
+at most one, possibly empty string.  When set to nil, ERC only
+parses tags if an active module defines an implementation.  It
+otherwise ignores them.  In such cases, each alist element is a
+cons of a symbol and an optional, nonempty string.
+
+With the default value of `overridable', ERC behaves as it does
+with `legacy' except that it emits a warning whenever first
+encountering a message containing tags in a given Emacs session.
+But it only does so when a module implementing overriding,
+non-legacy behavior isn't already active in the current network
+context.
+
+Note that future bundled modules providing IRCv3 functionality
+will not be compatible with the legacy format.  User code should
+eventually transition to expecting this \"5.5+ variant\" and set
+this option to nil."
+  :package-version '(ERC . "5.4.1") ; FIXME increment on next release
+  :type '(choice (const nil)
+                 (const legacy)
+                 (const overridable)))
+
 (defun erc-parse-tags (string)
   "Parse IRCv3 tags list in STRING to a (tag . value) alist."
+  (erc--parse-message-tags string))
+
+(defun erc--parse-tags (string)
   (let ((tags)
         (tag-strings (split-string string ";")))
     (dolist (tag-string tag-strings tags)
@@ -1095,6 +1175,28 @@ See also `erc-server-send'."
                   pair
                 `(,pair))
               tags)))))
+
+;; A benefit of this function being internal is not having to define a
+;; separate method just to ensure an `erc-tags-format' value of
+;; `legacy' always wins.  A downside is that module code must take
+;; care to preserve that promise manually.
+
+(cl-defgeneric erc--parse-message-tags (string)
+  "Parse STRING into an alist of (TAG . VALUE) conses.
+Expect TAG to be a symbol and VALUE nil or a nonempty string.
+Don't split composite raw-input values containing commas;
+instead, leave them as a single string."
+  (when erc-tags-format
+    (unless (or (eq erc-tags-format 'legacy)
+                (get 'erc-parse-tags 'erc-v3-warned-p))
+      (put 'erc-parse-tags 'erc-v3-warned-p t)
+      (display-warning
+       'ERC
+       (concat
+        "Legacy ERC tags behavior is currently in effect, but other modules,"
+        " including those bundled with ERC, may override this in future"
+        " releases.  See `erc-tags-format' for more info.")))
+    (erc--parse-tags string)))
 
 (defun erc-parse-server-response (proc string)
   "Parse and act upon a complete line from an IRC server.
@@ -1105,9 +1207,9 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
       (let* ((tag-list (when (eq (aref string 0) ?@)
                          (substring string 1
                                     (string-search " " string))))
-             (msg (make-erc-response :unparsed string :tags (when tag-list
-                                                              (erc-parse-tags
-                                                               tag-list))))
+             (msg (make-erc-response :unparsed string :tags
+                                     (when tag-list
+                                       (erc--parse-message-tags tag-list))))
              (string (if tag-list
                          (substring string (+ 1 (string-search " " string)))
                        string))
@@ -1525,7 +1627,7 @@ add things to `%s' instead."
         (cl-pushnew (erc-server-buffer) bufs)
         (erc-set-current-nick nn)
         ;; Rename session, possibly rename server buf and all targets
-        (when (erc-network)
+        (when erc-server-connected
           (erc-networks--id-reload erc-networks--id proc parsed))
         (erc-update-mode-line)
         (setq erc-nick-change-attempt-count 0)
@@ -1535,6 +1637,8 @@ add things to `%s' instead."
          'NICK-you ?n nick ?N nn)
         (run-hook-with-args 'erc-nick-changed-functions nn nick))
        (t
+        (when erc-server-connected
+          (erc-networks--id-reload erc-networks--id proc parsed))
         (erc-handle-user-status-change 'nick (list nick login host) (list nn))
         (erc-display-message parsed 'notice bufs 'NICK ?n nick
                              ?u login ?h host ?N nn))))))
@@ -2161,6 +2265,8 @@ See `erc-display-server-message'." nil
 
 (define-erc-response-handler (433)
   "Login-time \"nick in use\"." nil
+  (when erc-server-connected
+    (erc-networks--id-reload erc-networks--id proc parsed))
   (erc-nickname-in-use (cadr (erc-response.command-args parsed))
                        "already in use"))
 
@@ -2228,6 +2334,15 @@ See `erc-display-server-message'." nil
         (securemsg (erc-response.contents parsed)))
     (erc-display-message parsed 'notice 'active 's671
                          ?n nick ?a securemsg)))
+
+(define-erc-response-handler (900)
+  "Handle a \"RPL_LOGGEDIN\" server command.
+Some servers don't consider this SASL-specific but rather just an
+indication of a server-side state change from logged-out to
+logged-in." nil
+  ;; Whenever ERC starts caring about user accounts, it should record
+  ;; the session as being logged here.
+  (erc-display-message parsed 'notice proc (erc-response.contents parsed)))
 
 (define-erc-response-handler (431 445 446 451 462 463 464 481 483 484 485
                                   491 501 502)

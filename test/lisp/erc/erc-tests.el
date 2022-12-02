@@ -530,6 +530,28 @@
   (when noninteractive
     (kill-buffer "*#fake*")))
 
+(ert-deftest erc--debug-irc-protocol-mask-secrets ()
+  (should-not erc-debug-irc-protocol)
+  (should erc--debug-irc-protocol-mask-secrets)
+  (with-temp-buffer
+    (setq erc-server-process (start-process "fake" (current-buffer) "true")
+          erc-server-current-nick "tester"
+          erc-session-server "myproxy.localhost"
+          erc-session-port 6667)
+    (let ((inhibit-message noninteractive))
+      (erc-toggle-debug-irc-protocol)
+      (erc-log-irc-protocol
+       (concat "PASS :" (erc--unfun (lambda () "changeme")) "\r\n")
+       'outgoing)
+      (set-process-query-on-exit-flag erc-server-process nil))
+    (with-current-buffer "*erc-protocol*"
+      (goto-char (point-min))
+      (search-forward "\r\n\r\n")
+      (search-forward "myproxy.localhost:6667 >> PASS :????????" (pos-eol)))
+    (when noninteractive
+      (kill-buffer "*erc-protocol*")
+      (should-not erc-debug-irc-protocol))))
+
 (ert-deftest erc-log-irc-protocol ()
   (should-not erc-debug-irc-protocol)
   (with-temp-buffer
@@ -952,5 +974,386 @@
     (should-not calls)
     (kill-buffer "ExampleNet")
     (kill-buffer "#chan")))
+
+(defvar erc-tests--ipv6-examples
+  '("1:2:3:4:5:6:7:8"
+    "::ffff:10.0.0.1" "::ffff:1.2.3.4" "::ffff:0.0.0.0"
+    "1:2:3:4:5:6:77:88" "::ffff:255.255.255.255"
+    "fe08::7:8" "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+    "1:2:3:4:5:6:7:8" "1::" "1:2:3:4:5:6:7::" "1::8"
+    "1:2:3:4:5:6::8" "1:2:3:4:5:6::8" "1::7:8" "1:2:3:4:5::7:8"
+    "1:2:3:4:5::8" "1::6:7:8" "1:2:3:4::6:7:8" "1:2:3:4::8"
+    "1::5:6:7:8" "1:2:3::5:6:7:8" "1:2:3::8" "1::4:5:6:7:8"
+    "1:2::4:5:6:7:8" "1:2::8" "1::3:4:5:6:7:8" "1::3:4:5:6:7:8"
+    "1::8" "::2:3:4:5:6:7:8" "::2:3:4:5:6:7:8" "::8"
+    "::" "fe08::7:8%eth0" "fe08::7:8%1" "::255.255.255.255"
+    "::ffff:255.255.255.255" "::ffff:0:255.255.255.255"
+    "2001:db8:3:4::192.0.2.33" "64:ff9b::192.0.2.33"))
+
+(ert-deftest erc--server-connect-dumb-ipv6-regexp ()
+  (dolist (a erc-tests--ipv6-examples)
+    (should-not (string-match erc--server-connect-dumb-ipv6-regexp a))
+    (should (string-match erc--server-connect-dumb-ipv6-regexp
+                          (concat "[" a "]")))))
+
+(ert-deftest erc-select-read-args ()
+
+  (ert-info ("Defaults to TLS")
+    (should (equal (ert-simulate-keys "\r\r\r\r"
+                     (erc-select-read-args))
+                   (list :server "irc.libera.chat"
+                         :port 6697
+                         :nick (user-login-name)
+                         :password nil))))
+
+  (ert-info ("Override default TLS")
+    (should (equal (ert-simulate-keys "irc://irc.libera.chat\r\r\r\r"
+                     (erc-select-read-args))
+                   (list :server "irc.libera.chat"
+                         :port 6667
+                         :nick (user-login-name)
+                         :password nil))))
+
+  (ert-info ("Address includes port")
+    (should (equal (ert-simulate-keys
+                       "localhost:6667\rnick\r\r"
+                     (erc-select-read-args))
+                   (list :server "localhost"
+                         :port 6667
+                         :nick "nick"
+                         :password nil))))
+
+  (ert-info ("Address includes nick, password skipped via option")
+    (should (equal (ert-simulate-keys "nick@localhost:6667\r"
+                     (let (erc-prompt-for-password)
+                       (erc-select-read-args)))
+                   (list :server "localhost"
+                         :port 6667
+                         :nick "nick"
+                         :password nil))))
+
+  (ert-info ("Address includes nick and password")
+    (should (equal (ert-simulate-keys "nick:sesame@localhost:6667\r"
+                     (erc-select-read-args))
+                   (list :server "localhost"
+                         :port 6667
+                         :nick "nick"
+                         :password "sesame"))))
+
+  (ert-info ("IPv6 address plain")
+    (should (equal (ert-simulate-keys "::1\r\r\r\r"
+                     (erc-select-read-args))
+                   (list :server "[::1]"
+                         :port 6667
+                         :nick (user-login-name)
+                         :password nil))))
+
+  (ert-info ("IPv6 address with port")
+    (should (equal (ert-simulate-keys "[::1]:6667\r\r\r"
+                     (erc-select-read-args))
+                   (list :server "[::1]"
+                         :port 6667
+                         :nick (user-login-name)
+                         :password nil))))
+
+  (ert-info ("IPv6 address includes nick")
+    (should (equal (ert-simulate-keys "nick@[::1]:6667\r\r"
+                     (erc-select-read-args))
+                   (list :server "[::1]"
+                         :port 6667
+                         :nick "nick"
+                         :password nil)))))
+
+(ert-deftest erc-tls ()
+  (let (calls)
+    (cl-letf (((symbol-function 'user-login-name)
+               (lambda (&optional _) "tester"))
+              ((symbol-function 'erc-open)
+               (lambda (&rest r) (push r calls))))
+
+      (ert-info ("Defaults")
+        (erc-tls)
+        (should (equal (pop calls)
+                       '("irc.libera.chat" 6697 "tester" "unknown" t
+                         nil nil nil nil nil "user" nil))))
+
+      (ert-info ("Full")
+        (erc-tls :server "irc.gnu.org"
+                 :port 7000
+                 :user "bobo"
+                 :nick "bob"
+                 :full-name "Bob's Name"
+                 :password "bob:changeme"
+                 :client-certificate t
+                 :id 'GNU.org)
+        (should (equal (pop calls)
+                       '("irc.gnu.org" 7000 "bob" "Bob's Name" t
+                         "bob:changeme" nil nil nil t "bobo" GNU.org))))
+
+      ;; Values are often nil when called by lisp code, which leads to
+      ;; null params.  This is why `erc-open' recomputes almost
+      ;; everything.
+      (ert-info ("Fallback")
+        (let ((erc-nick "bob")
+              (erc-server "irc.gnu.org")
+              (erc-email-userid "bobo")
+              (erc-user-full-name "Bob's Name"))
+          (erc-tls :server nil
+                   :port 7000
+                   :nick nil
+                   :password "bob:changeme"))
+        (should (equal (pop calls)
+                       '(nil 7000 nil "Bob's Name" t
+                             "bob:changeme" nil nil nil nil "bobo" nil)))))))
+
+(defun erc-tests--make-server-buf (name)
+  (with-current-buffer (get-buffer-create name)
+    (erc-mode)
+    (setq erc-server-process (start-process "sleep" (current-buffer)
+                                            "sleep" "1")
+          erc-session-server (concat "irc." name ".org")
+          erc-session-port 6667
+          erc-network (intern name))
+    (set-process-query-on-exit-flag erc-server-process nil)
+    (current-buffer)))
+
+(defun erc-tests--make-client-buf (server name)
+  (unless (bufferp server)
+    (setq server (get-buffer server)))
+  (with-current-buffer (get-buffer-create name)
+    (erc-mode)
+    (setq erc--target (erc--target-from-string name))
+    (dolist (v '(erc-server-process
+                 erc-session-server
+                 erc-session-port
+                 erc-network))
+      (set v (buffer-local-value v server)))
+    (current-buffer)))
+
+(ert-deftest erc-handle-irc-url ()
+  (let* (calls
+         rvbuf
+         erc-networks-alist
+         erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook
+         (erc-url-connect-function
+          (lambda (&rest r)
+            (push r calls)
+            (if (functionp rvbuf) (funcall rvbuf) rvbuf))))
+
+    (cl-letf (((symbol-function 'erc-cmd-JOIN)
+               (lambda (&rest r) (push r calls))))
+
+      (with-current-buffer (erc-tests--make-server-buf "foonet")
+        (setq rvbuf (current-buffer)))
+      (erc-tests--make-server-buf "barnet")
+      (erc-tests--make-server-buf "baznet")
+
+      (ert-info ("Unknown network")
+        (erc-handle-irc-url "irc.foonet.org" 6667 "#chan" nil nil "irc")
+        (should (equal '("#chan" nil) (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Unknown network, no port")
+        (erc-handle-irc-url "irc.foonet.org" nil "#chan" nil nil "irc")
+        (should (equal '("#chan" nil) (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Known network, no port")
+        (setq erc-networks-alist '((foonet "irc.foonet.org")))
+        (erc-handle-irc-url "irc.foonet.org" nil "#chan" nil nil "irc")
+        (should (equal '("#chan" nil) (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Known network, different port")
+        (erc-handle-irc-url "irc.foonet.org" 6697 "#chan" nil nil "irc")
+        (should (equal '("#chan" nil) (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Known network, existing chan with key")
+        (erc-tests--make-client-buf "foonet" "#chan")
+        (erc-handle-irc-url "irc.foonet.org" nil "#chan?sec" nil nil "irc")
+        (should (equal '("#chan" "sec") (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Unknown network, connect, no chan")
+        (erc-handle-irc-url "irc.gnu.org" nil nil nil nil "irc")
+        (should (equal '("irc" :server "irc.gnu.org") (pop calls)))
+        (should-not calls))
+
+      (ert-info ("Unknown network, connect, chan")
+        (with-current-buffer "foonet"
+          (should-not (local-variable-p 'erc-after-connect)))
+        (setq rvbuf (lambda () (erc-tests--make-server-buf "gnu")))
+        (erc-handle-irc-url "irc.gnu.org" nil "#spam" nil nil "irc")
+        (should (equal '("irc" :server "irc.gnu.org") (pop calls)))
+        (should-not calls)
+        (with-current-buffer "gnu"
+          (should (local-variable-p 'erc-after-connect))
+          (funcall (car erc-after-connect))
+          (should (equal '("#spam" nil) (pop calls)))
+          (should-not (local-variable-p 'erc-after-connect)))
+        (should-not calls))))
+
+  (when noninteractive
+    (kill-buffer "foonet")
+    (kill-buffer "barnet")
+    (kill-buffer "baznet")
+    (kill-buffer "#chan")))
+
+(ert-deftest erc-migrate-modules ()
+  (should (equal (erc-migrate-modules '(autojoin timestamp button))
+                 '(autojoin stamp button)))
+  ;; Default unchanged
+  (should (equal (erc-migrate-modules erc-modules) erc-modules)))
+
+(ert-deftest erc--update-modules ()
+  (let (calls
+        erc-modules
+        erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook)
+    (cl-letf (((symbol-function 'require)
+               (lambda (s &rest _) (push s calls)))
+
+              ;; Local modules
+              ((symbol-function 'erc-fake-bar-mode)
+               (lambda (n) (push (cons 'fake-bar n) calls)))
+
+              ;; Global modules
+              ((symbol-function 'erc-fake-foo-mode)
+               (lambda (n) (push (cons 'fake-foo n) calls)))
+              ((get 'erc-fake-foo-mode 'standard-value) 'ignore)
+              ((symbol-function 'erc-autojoin-mode)
+               (lambda (n) (push (cons 'autojoin n) calls)))
+              ((get 'erc-autojoin-mode 'standard-value) 'ignore)
+              ((symbol-function 'erc-networks-mode)
+               (lambda (n) (push (cons 'networks n) calls)))
+              ((get 'erc-networks-mode 'standard-value) 'ignore)
+              ((symbol-function 'erc-completion-mode)
+               (lambda (n) (push (cons 'completion n) calls)))
+              ((get 'erc-completion-mode 'standard-value) 'ignore))
+
+      (ert-info ("Local modules")
+        (setq erc-modules '(fake-foo fake-bar))
+        (should (equal (erc--update-modules) '(erc-fake-bar-mode)))
+        ;; Bar the feature is still required but the mode is not activated
+        (should (equal (nreverse calls)
+                       '(erc-fake-foo (fake-foo . 1) erc-fake-bar)))
+        (setq calls nil))
+
+      (ert-info ("Module name overrides")
+        (setq erc-modules '(completion autojoin networks))
+        (should-not (erc--update-modules)) ; no locals
+        (should (equal (nreverse calls) '( erc-pcomplete (completion . 1)
+                                           erc-join (autojoin . 1)
+                                           erc-networks (networks . 1))))
+        (setq calls nil)))))
+
+(ert-deftest erc--merge-local-modes ()
+
+  (ert-info ("No existing modes")
+    (let ((old '((a) (b . t)))
+          (new '(erc-c-mode erc-d-mode)))
+      (should (equal (erc--merge-local-modes new old)
+                     '((erc-c-mode erc-d-mode))))))
+
+  (ert-info ("Active existing added, inactive existing removed, deduped")
+    (let ((old '((a) (erc-b-mode) (c . t) (erc-d-mode . t) (erc-e-mode . t)))
+          (new '(erc-b-mode erc-d-mode)))
+      (should (equal (erc--merge-local-modes new old)
+                     '((erc-d-mode erc-e-mode) . (erc-b-mode)))))))
+
+(ert-deftest define-erc-module--global ()
+  (let ((global-module '(define-erc-module mname malias
+                          "Some docstring"
+                          ((ignore a) (ignore b))
+                          ((ignore c) (ignore d)))))
+
+    (should (equal (macroexpand global-module)
+                   `(progn
+
+                      (define-minor-mode erc-mname-mode
+                        "Toggle ERC mname mode.
+With a prefix argument ARG, enable mname if ARG is positive,
+and disable it otherwise.  If called from Lisp, enable the mode
+if ARG is omitted or nil.
+Some docstring"
+                        :global t
+                        :group 'erc-mname
+                        (if erc-mname-mode
+                            (erc-mname-enable)
+                          (erc-mname-disable)))
+
+                      (defun erc-mname-enable ()
+                        "Enable ERC mname mode."
+                        (interactive)
+                        (cl-pushnew 'mname erc-modules)
+                        (setq erc-mname-mode t)
+                        (ignore a) (ignore b))
+
+                      (defun erc-mname-disable ()
+                        "Disable ERC mname mode."
+                        (interactive)
+                        (setq erc-modules (delq 'mname erc-modules))
+                        (setq erc-mname-mode nil)
+                        (ignore c) (ignore d))
+
+                      (defalias 'erc-malias-mode #'erc-mname-mode)
+
+                      (put 'erc-mname-mode 'definition-name 'mname)
+                      (put 'erc-mname-enable 'definition-name 'mname)
+                      (put 'erc-mname-disable 'definition-name 'mname))))))
+
+(ert-deftest define-erc-module--local ()
+  (let* ((global-module '(define-erc-module mname malias
+                           "Some docstring"
+                           ((ignore a) (ignore b))
+                           ((ignore c) (ignore d))
+                           'local))
+         (got (macroexpand global-module))
+         (arg-en (cadr (nth 2 (nth 2 got))))
+         (arg-dis (cadr (nth 2 (nth 3 got)))))
+
+    (should (equal got
+                   `(progn
+                      (define-minor-mode erc-mname-mode
+                        "Toggle ERC mname mode.
+With a prefix argument ARG, enable mname if ARG is positive,
+and disable it otherwise.  If called from Lisp, enable the mode
+if ARG is omitted or nil.
+Some docstring"
+                        :global nil
+                        :group 'erc-mname
+                        (if erc-mname-mode
+                            (erc-mname-enable)
+                          (erc-mname-disable)))
+
+                      (defun erc-mname-enable (&optional ,arg-en)
+                        "Enable ERC mname mode.
+With ARG, do so in all buffers for the current connection."
+                        (interactive "p")
+                        (when (derived-mode-p 'erc-mode)
+                          (if ,arg-en
+                              (erc-with-all-buffers-of-server
+                                  erc-server-process nil
+                                (erc-mname-enable))
+                            (setq erc-mname-mode t)
+                            (ignore a) (ignore b))))
+
+                      (defun erc-mname-disable (&optional ,arg-dis)
+                        "Disable ERC mname mode.
+With ARG, do so in all buffers for the current connection."
+                        (interactive "p")
+                        (when (derived-mode-p 'erc-mode)
+                          (if ,arg-dis
+                              (erc-with-all-buffers-of-server
+                                  erc-server-process nil
+                                (erc-mname-disable))
+                            (setq erc-mname-mode nil)
+                            (ignore c) (ignore d))))
+
+                      (defalias 'erc-malias-mode #'erc-mname-mode)
+
+                      (put 'erc-mname-mode 'definition-name 'mname)
+                      (put 'erc-mname-enable 'definition-name 'mname)
+                      (put 'erc-mname-disable 'definition-name 'mname))))))
 
 ;;; erc-tests.el ends here

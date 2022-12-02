@@ -183,21 +183,32 @@ It must be supported by libarchive(3).")
 ;; The definition of `tramp-archive-file-name-regexp' contains calls
 ;; to `regexp-opt', which cannot be autoloaded while loading
 ;; loaddefs.el.  So we use a macro, which is evaluated only when needed.
+;; Emacs 26 and earlier cannot use the autoload form
+;; `tramp-compat-rx'.  So we refrain from using `rx'.
 ;;;###autoload
 (progn (defmacro tramp-archive-autoload-file-name-regexp ()
   "Regular expression matching archive file names."
+  (if (<= emacs-major-version 26)
+  '(concat
+    "\\`" "\\(" ".+" "\\."
+      ;; Default suffixes ...
+      (regexp-opt tramp-archive-suffixes)
+      ;; ... with compression.
+      "\\(?:" "\\." (regexp-opt tramp-archive-compression-suffixes) "\\)*"
+    "\\)" ;; \1
+    "\\(" "/" ".*" "\\)" "\\'") ;; \2
   `(rx
     bos
     ;; This group is used in `tramp-archive-file-name-archive'.
     (group
      (+ nonl)
      ;; Default suffixes ...
-     "." ,(cons '| tramp-archive-suffixes)
+     "." (| ,@tramp-archive-suffixes)
      ;; ... with compression.
-     (? "." ,(cons '| tramp-archive-compression-suffixes)))
+     (? "." (| ,@tramp-archive-compression-suffixes)))
     ;; This group is used in `tramp-archive-file-name-localname'.
     (group "/" (* nonl))
-    eos)))
+    eos))))
 
 (put #'tramp-archive-autoload-file-name-regexp 'tramp-autoload t)
 
@@ -286,6 +297,7 @@ It must be supported by libarchive(3).")
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
     (make-process . ignore)
     (make-symbolic-link . tramp-archive-handle-not-implemented)
+    ;; `memory-info' performed by default handler.
     (process-attributes . ignore)
     (process-file . ignore)
     (rename-file . tramp-archive-handle-not-implemented)
@@ -330,10 +342,6 @@ arguments to pass to the OPERATION."
 	 (inhibit-file-name-operation operation))
     (apply operation args))))
 
-;; Starting with Emacs 29, `tramp-archive-file-name-handler' is
-;; autoloaded.  But it must still be in tramp-loaddefs.el for older
-;; versions of Emacs.
-;;;###autoload(autoload 'tramp-archive-file-name-handler "tramp-archive")
 ;;;###tramp-autoload
 (defun tramp-archive-file-name-handler (operation &rest args)
   "Invoke the file archive related OPERATION.
@@ -396,30 +404,30 @@ arguments to pass to the OPERATION."
 (put #'tramp-archive-autoload-file-name-handler 'tramp-autoload t)
 
 ;;;###autoload
-(progn (defun tramp-register-archive-file-name-handler ()
+(progn (defun tramp-register-archive-autoload-file-name-handler ()
   "Add archive file name handler to `file-name-handler-alist'."
   (when (and tramp-archive-enabled
              (not
-              (rassq #'tramp-archive-file-name-handler file-name-handler-alist)))
+              (rassq 'tramp-archive-file-name-handler file-name-handler-alist)))
     (add-to-list 'file-name-handler-alist
 	         (cons (tramp-archive-autoload-file-name-regexp)
 		       #'tramp-archive-autoload-file-name-handler))
     (put #'tramp-archive-autoload-file-name-handler 'safe-magic t))))
 
-(put #'tramp-register-archive-file-name-handler 'tramp-autoload t)
+(put #'tramp-register-archive-autoload-file-name-handler 'tramp-autoload t)
 
 ;;;###autoload
 (progn
-  (add-hook 'after-init-hook #'tramp-register-archive-file-name-handler)
+  (add-hook 'after-init-hook #'tramp-register-archive-autoload-file-name-handler)
   (add-hook
    'tramp-archive-unload-hook
    (lambda ()
      (remove-hook
-      'after-init-hook #'tramp-register-archive-file-name-handler))))
+      'after-init-hook #'tramp-register-archive-autoload-file-name-handler))))
 
 ;; In older Emacsen (prior 27.1), the autoload above does not exist.
 ;; So we call it again; it doesn't hurt.
-(tramp-register-archive-file-name-handler)
+(tramp-register-archive-autoload-file-name-handler)
 
 ;; Mark `operations' the handler is responsible for.
 (put #'tramp-archive-file-name-handler 'operations

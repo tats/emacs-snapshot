@@ -747,14 +747,15 @@ or a buffer name."
           (setq-local outline-level (lambda () 1))
           (setq-local outline-minor-mode-cycle t
                       outline-minor-mode-highlight t
-                      outline-minor-mode-use-buttons 'insert)
+                      outline-minor-mode-use-buttons 'insert
+                      ;; Hide the longest body.
+                      outline-default-state 1
+                      outline-default-rules
+                      '((match-regexp . "Key translations")))
           (outline-minor-mode 1)
           (save-excursion
             (goto-char (point-min))
             (let ((inhibit-read-only t))
-              ;; Hide the longest body.
-              (when (re-search-forward "Key translations" nil t)
-		(outline-hide-subtree))
               ;; Hide ^Ls.
               (while (search-forward "\n\f\n" nil t)
 		(put-text-property (1+ (match-beginning 0)) (1- (match-end 0))
@@ -1945,10 +1946,7 @@ of a horizontal combination, restrain its new size by
 `fit-window-to-buffer-horizontally' can inhibit resizing.
 
 If WINDOW is the root window of its frame, resize the frame
-provided `fit-frame-to-buffer' is non-nil.
-
-This function may call `preserve-window-size' to preserve the
-size of WINDOW."
+provided `fit-frame-to-buffer' is non-nil."
   (setq window (window-normalize-window window t))
   (let* ((buffer (window-buffer window))
          (height (if (functionp temp-buffer-max-height)

@@ -1910,10 +1910,14 @@ safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
 
   specbind (Qinhibit_quit, Qt);
 
-  if (current_buffer->long_line_optimizations_p)
-    narrow_to_region_internal (make_fixnum (get_narrowed_begv (w, PT)),
-			       make_fixnum (get_narrowed_zv (w, PT)),
-			       true);
+  if (current_buffer->long_line_optimizations_p
+      && long_line_locked_narrowing_region_size > 0)
+    {
+      ptrdiff_t begv = get_locked_narrowing_begv (PT);
+      ptrdiff_t zv = get_locked_narrowing_zv (PT);
+      if (begv != BEG || zv != Z)
+	narrow_to_region_locked (make_fixnum (begv), make_fixnum (zv), hook);
+    }
 
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}),
                       safe_run_hook_funcall);
@@ -5720,6 +5724,29 @@ make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
 		builtin_lisp_symbol (scroll_bar_parts[ev->part]));
 }
 
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+
+/* Return whether or not the coordinates X and Y are inside the
+   box of the menu-bar window of frame F.  */
+
+static bool
+coords_in_menu_bar_window (struct frame *f, int x, int y)
+{
+  struct window *window;
+
+  if (!WINDOWP (f->menu_bar_window))
+    return false;
+
+  window = XWINDOW (f->menu_bar_window);
+
+  return (y >= WINDOW_TOP_EDGE_Y (window)
+	  && x >= WINDOW_LEFT_EDGE_X (window)
+	  && y <= WINDOW_BOTTOM_EDGE_Y (window)
+	  && x <= WINDOW_RIGHT_EDGE_X (window));
+}
+
+#endif
+
 /* Given a struct input_event, build the lisp event which represents
    it.  If EVENT is 0, build a mouse movement event from the mouse
    movement buffer, which should have a movement event in it.
@@ -5972,10 +5999,32 @@ make_lispy_event (struct input_event *event)
 	       and ROW are set to frame relative glyph coordinates
 	       which are then used to determine whether this click is
 	       in a menu (non-toolkit version).  */
-	    if (!toolkit_menubar_in_use (f))
+	    if (!toolkit_menubar_in_use (f)
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+		/* Don't process events for menu bars if they are not
+		   in the menu bar window.  */
+		&& (!FRAME_WINDOW_P (f)
+		    || coords_in_menu_bar_window (f, XFIXNUM (event->x),
+						  XFIXNUM (event->y)))
+#endif
+		)
 	      {
-		pixel_to_glyph_coords (f, XFIXNUM (event->x), XFIXNUM (event->y),
-				       &column, &row, NULL, 1);
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+		if (FRAME_WINDOW_P (f))
+		  {
+		    struct window *menu_w = XWINDOW (f->menu_bar_window);
+		    int x, y, dummy;
+
+		    x = FRAME_TO_WINDOW_PIXEL_X (menu_w, XFIXNUM (event->x));
+		    y = FRAME_TO_WINDOW_PIXEL_Y (menu_w, XFIXNUM (event->y));
+
+		    x_y_to_hpos_vpos (XWINDOW (f->menu_bar_window), x, y, &column, &row,
+				      NULL, NULL, &dummy);
+		  }
+		else
+#endif
+		  pixel_to_glyph_coords (f, XFIXNUM (event->x), XFIXNUM (event->y),
+					 &column, &row, NULL, 1);
 
 		/* In the non-toolkit version, clicks on the menu bar
 		   are ordinary button events in the event buffer.
@@ -5985,7 +6034,7 @@ make_lispy_event (struct input_event *event)
 		   menu bar and Emacs doesn't know about it until
 		   after the user makes a selection.)  */
 		if (row >= 0 && row < FRAME_MENU_BAR_LINES (f)
-		  && (event->modifiers & down_modifier))
+		    && (event->modifiers & down_modifier))
 		  {
 		    Lisp_Object items, item;
 
@@ -12682,8 +12731,9 @@ the error might happen repeatedly and make Emacs nonfunctional.
 
 Note that, when the current buffer contains one or more lines whose
 length is above `long-line-threshold', these hook functions are called
-with the buffer narrowed to a small portion around point, and the
-narrowing is locked (see `narrow-to-region'), so that these hook
+with the buffer narrowed to a small portion around point (whose size
+is specified by `long-line-locked-narrowing-region-size'), and the
+narrowing is locked (see `narrowing-lock'), so that these hook
 functions cannot use `widen' to gain access to other portions of
 buffer text.
 
@@ -12703,8 +12753,9 @@ avoid making Emacs unresponsive while the user types.
 
 Note that, when the current buffer contains one or more lines whose
 length is above `long-line-threshold', these hook functions are called
-with the buffer narrowed to a small portion around point, and the
-narrowing is locked (see `narrow-to-region'), so that these hook
+with the buffer narrowed to a small portion around point (whose size
+is specified by `long-line-locked-narrowing-region-size'), and the
+narrowing is locked (see `narrowing-lock'), so that these hook
 functions cannot use `widen' to gain access to other portions of
 buffer text.
 
