@@ -329,12 +329,24 @@ See Bug#30460."
                                                   invocation-directory))
                  :stop t)))
 
-;; All the following tests require working DNS, which appears not to
-;; be the case for hydra.nixos.org, so disable them there for now.
+;; Check if the Internet seems to be working.  Mainly to pacify
+;; Debian's CI system.
+;;
+;; XXX DEBIAN COMMENT: We explicitly set this variable to nil because
+;; we know that there is no internet connection during build time.
+;; Also, our version of 'dns-query' does not properly return 'nil'
+;; when the interface is configured but there is no DNS configured.
+;; Although this has been fixed upstream (see commit 00f7744c1b0f), I
+;; chose not to backport the patch because it's a non-trivial change
+;; of behaviour.
+(defvar internet-is-working nil)
+;; (progn
+;;   (require 'dns)
+;;   (dns-query "google.com")))
 
 (ert-deftest lookup-family-specification ()
   "network-lookup-address-info should only accept valid family symbols."
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless internet-is-working)
   (should-error (network-lookup-address-info "google.com" 'both))
   (should (network-lookup-address-info "google.com" 'ipv4))
   (when (featurep 'make-network-process '(:family ipv6))
@@ -342,18 +354,18 @@ See Bug#30460."
 
 (ert-deftest lookup-unicode-domains ()
   "Unicode domains should fail"
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless internet-is-working)
   (should-error (network-lookup-address-info "faß.de"))
   (should (network-lookup-address-info (puny-encode-domain "faß.de"))))
 
 (ert-deftest unibyte-domain-name ()
   "Unibyte domain names should work"
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless internet-is-working)
   (should (network-lookup-address-info (string-to-unibyte "google.com"))))
 
 (ert-deftest lookup-google ()
   "Check that we can look up google IP addresses"
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless internet-is-working)
   (let ((addresses-both (network-lookup-address-info "google.com"))
         (addresses-v4 (network-lookup-address-info "google.com" 'ipv4)))
     (should addresses-both)
@@ -362,7 +374,7 @@ See Bug#30460."
     (should (network-lookup-address-info "google.com" 'ipv6))))
 
 (ert-deftest non-existent-lookup-failure ()
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless internet-is-working)
   "Check that looking up non-existent domain returns nil"
   (should (eq nil (network-lookup-address-info "emacs.invalid"))))
 
