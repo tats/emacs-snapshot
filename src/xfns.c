@@ -5723,13 +5723,13 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
     = xcb_get_property (dpyinfo->xcb_connection, 0,
 			(xcb_window_t) dpyinfo->root_window,
 			(xcb_atom_t) dpyinfo->Xatom_net_current_desktop,
-			XCB_ATOM_CARDINAL, 0, 1);
+			XA_CARDINAL, 0, 1);
 
   workarea_cookie
     = xcb_get_property (dpyinfo->xcb_connection, 0,
 			(xcb_window_t) dpyinfo->root_window,
 			(xcb_atom_t) dpyinfo->Xatom_net_workarea,
-			XCB_ATOM_CARDINAL, 0, UINT32_MAX);
+			XA_CARDINAL, 0, UINT32_MAX);
 
   reply = xcb_get_property_reply (dpyinfo->xcb_connection,
 				  current_desktop_cookie, &error);
@@ -5740,7 +5740,7 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
   else
     {
       if (xcb_get_property_value_length (reply) != 4
-	  || reply->type != XCB_ATOM_CARDINAL || reply->format != 32)
+	  || reply->type != XA_CARDINAL || reply->format != 32)
 	rc = false;
       else
 	current_workspace = *(uint32_t *) xcb_get_property_value (reply);
@@ -5755,7 +5755,7 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
     free (error), rc = false;
   else
     {
-      if (rc && reply->type == XCB_ATOM_CARDINAL && reply->format == 32
+      if (rc && reply->type == XA_CARDINAL && reply->format == 32
 	  && (xcb_get_property_value_length (reply) / sizeof (uint32_t)
 	      >= current_workspace + 4))
 	{
@@ -7079,8 +7079,8 @@ that mouse buttons are being held down, such as immediately after a
   /* Catch errors since interning lots of targets can potentially
      generate a BadAlloc error.  */
   x_catch_errors (FRAME_X_DISPLAY (f));
-  XInternAtoms (FRAME_X_DISPLAY (f), target_names,
-		ntargets, False, target_atoms);
+  x_intern_atoms (FRAME_DISPLAY_INFO (f), target_names,
+		  ntargets, target_atoms);
   x_check_errors (FRAME_X_DISPLAY (f),
 		  "Failed to intern target atoms: %s");
   x_uncatch_errors_after_check ();
@@ -7377,20 +7377,6 @@ If TERMINAL is omitted or nil, that stands for the selected frame's display.  */
   return Qnil;
 }
 
-/* Wait for responses to all X commands issued so far for frame F.  */
-
-void
-x_sync (struct frame *f)
-{
-  block_input ();
-#ifndef USE_XCB
-  XSync (FRAME_X_DISPLAY (f), False);
-#else
-  xcb_aux_sync (FRAME_DISPLAY_INFO (f)->xcb_connection);
-#endif
-  unblock_input ();
-}
-
 
 /***********************************************************************
                            Window properties
@@ -7484,7 +7470,7 @@ silently ignored.  */)
       elsize = element_format == 32 ? sizeof (long) : element_format >> 3;
       data = xnmalloc (nelements, elsize);
 
-      x_fill_property_data (FRAME_X_DISPLAY (f), value, data, nelements,
+      x_fill_property_data (FRAME_DISPLAY_INFO (f), value, data, nelements,
                             element_format);
     }
   else

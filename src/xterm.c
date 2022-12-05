@@ -574,7 +574,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef USE_XCB
 #include <xcb/xproto.h>
 #include <xcb/xcb.h>
-#include <xcb/xcb_aux.h>
 #endif
 
 /* If we have Xfixes extension, use it for pointer blanking.  */
@@ -1052,6 +1051,20 @@ static const struct x_atom_ref x_atom_refs[] =
     /* Old OffiX (a.k.a. old KDE) drop protocol support.  */
     ATOM_REFS_INIT ("DndProtocol", Xatom_DndProtocol)
     ATOM_REFS_INIT ("_DND_PROTOCOL", Xatom_DND_PROTOCOL)
+    /* Here are some atoms that are not actually used from C, just
+       defined to make replying to selection requests fast.  */
+    ATOM_REFS_INIT ("text/plain;charset=utf-8", Xatom_text_plain_charset_utf_8)
+    ATOM_REFS_INIT ("LENGTH", Xatom_LENGTH)
+    ATOM_REFS_INIT ("FILE_NAME", Xatom_FILE_NAME)
+    ATOM_REFS_INIT ("CHARACTER_POSITION", Xatom_CHARACTER_POSITION)
+    ATOM_REFS_INIT ("LINE_NUMBER", Xatom_LINE_NUMBER)
+    ATOM_REFS_INIT ("COLUMN_NUMBER", Xatom_COLUMN_NUMBER)
+    ATOM_REFS_INIT ("OWNER_OS", Xatom_OWNER_OS)
+    ATOM_REFS_INIT ("HOST_NAME", Xatom_HOST_NAME)
+    ATOM_REFS_INIT ("USER", Xatom_USER)
+    ATOM_REFS_INIT ("CLASS", Xatom_CLASS)
+    ATOM_REFS_INIT ("NAME", Xatom_NAME)
+    ATOM_REFS_INIT ("SAVE_TARGETS", Xatom_SAVE_TARGETS)
   };
 
 enum
@@ -3058,7 +3071,7 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 				     0, 0);
       get_property_cookies[i]
 	= xcb_get_property (dpyinfo->xcb_connection, 0, (xcb_window_t) toplevels[i],
-			    (xcb_atom_t) dpyinfo->Xatom_wm_state, XCB_ATOM_ANY,
+			    (xcb_atom_t) dpyinfo->Xatom_wm_state, 0,
 			    0, 2);
       xm_property_cookies[i]
 	= xcb_get_property (dpyinfo->xcb_connection, 0, (xcb_window_t) toplevels[i],
@@ -3069,7 +3082,7 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 	= xcb_get_property (dpyinfo->xcb_connection, 0,
 			    (xcb_window_t) toplevels[i],
 			    (xcb_atom_t) dpyinfo->Xatom_net_frame_extents,
-			    XCB_ATOM_CARDINAL, 0, 4);
+			    XA_CARDINAL, 0, 4);
       get_geometry_cookies[i]
 	= xcb_get_geometry (dpyinfo->xcb_connection, (xcb_window_t) toplevels[i]);
 
@@ -3197,7 +3210,7 @@ x_dnd_compute_toplevels (struct x_display_info *dpyinfo)
 	{
 	  if (xcb_get_property_value_length (extent_property_reply) == 16
 	      && extent_property_reply->format == 32
-	      && extent_property_reply->type == XCB_ATOM_CARDINAL)
+	      && extent_property_reply->type == XA_CARDINAL)
 	    {
 	      fextents = xcb_get_property_value (extent_property_reply);
 	      frame_extents[0] = fextents[0];
@@ -3571,13 +3584,13 @@ x_dnd_get_proxy_proto (struct x_display_info *dpyinfo, Window wdesc,
     xdnd_proxy_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 					  (xcb_window_t) wdesc,
 					  (xcb_atom_t) dpyinfo->Xatom_XdndProxy,
-					  XCB_ATOM_WINDOW, 0, 1);
+					  XA_WINDOW, 0, 1);
 
   if (proto_out)
     xdnd_proto_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 					  (xcb_window_t) wdesc,
 					  (xcb_atom_t) dpyinfo->Xatom_XdndAware,
-					  XCB_ATOM_ATOM, 0, 1);
+					  XA_ATOM, 0, 1);
 
   if (proxy_out)
     {
@@ -3589,7 +3602,7 @@ x_dnd_get_proxy_proto (struct x_display_info *dpyinfo, Window wdesc,
       else
 	{
 	  if (reply->format == 32
-	      && reply->type == XCB_ATOM_WINDOW
+	      && reply->type == XA_WINDOW
 	      && (xcb_get_property_value_length (reply) >= 4))
 	    *proxy_out = *(xcb_window_t *) xcb_get_property_value (reply);
 
@@ -3607,7 +3620,7 @@ x_dnd_get_proxy_proto (struct x_display_info *dpyinfo, Window wdesc,
       else
 	{
 	  if (reply->format == 32
-	      && reply->type == XCB_ATOM_ATOM
+	      && reply->type == XA_ATOM
 	      && (xcb_get_property_value_length (reply) >= 4))
 	    *proto_out = (int) *(xcb_atom_t *) xcb_get_property_value (reply);
 
@@ -3791,15 +3804,15 @@ x_dnd_get_wm_state_and_proto (struct x_display_info *dpyinfo,
   wmstate_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 				     (xcb_window_t) window,
 				     (xcb_atom_t) dpyinfo->Xatom_wm_state,
-				     XCB_ATOM_ANY, 0, 2);
+				     0, 0, 2);
   xdnd_proto_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 					(xcb_window_t) window,
 					(xcb_atom_t) dpyinfo->Xatom_XdndAware,
-					XCB_ATOM_ATOM, 0, 1);
+					XA_ATOM, 0, 1);
   xdnd_proxy_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 					(xcb_window_t) window,
 					(xcb_atom_t) dpyinfo->Xatom_XdndProxy,
-					XCB_ATOM_WINDOW, 0, 1);
+					XA_WINDOW, 0, 1);
   xm_style_cookie = xcb_get_property (dpyinfo->xcb_connection, 0,
 				      (xcb_window_t) window,
 				      (xcb_atom_t) dpyinfo->Xatom_MOTIF_DRAG_RECEIVER_INFO,
@@ -3846,7 +3859,7 @@ x_dnd_get_wm_state_and_proto (struct x_display_info *dpyinfo,
   else
     {
       if (reply->format == 32
-	  && reply->type == XCB_ATOM_WINDOW
+	  && reply->type == XA_WINDOW
 	  && (xcb_get_property_value_length (reply) >= 4))
 	*proxy_out = *(xcb_window_t *) xcb_get_property_value (reply);
 
@@ -10991,6 +11004,31 @@ x_clear_frame (struct frame *f)
   unblock_input ();
 }
 
+/* Send a message to frame F telling the event loop to track whether
+   or not an hourglass is being displayed.  This is required to ignore
+   the right events when the hourglass is mapped without callig XSync
+   after displaying or hiding the hourglass.  */
+
+static void
+x_send_hourglass_message (struct frame *f, bool hourglass_enabled)
+{
+  struct x_display_info *dpyinfo;
+  XEvent msg;
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+  memset (&msg, 0, sizeof msg);
+
+  msg.xclient.type = ClientMessage;
+  msg.xclient.message_type
+    = dpyinfo->Xatom_EMACS_TMP;
+  msg.xclient.format = 8;
+  msg.xclient.window = FRAME_X_WINDOW (f);
+  msg.xclient.data.b[0] = hourglass_enabled ? 1 : 0;
+
+  XSendEvent (dpyinfo->display, FRAME_X_WINDOW (f),
+	      False, NoEventMask, &msg);
+}
+
 /* RIF: Show hourglass cursor on frame F.  */
 
 static void
@@ -11011,14 +11049,14 @@ x_show_hourglass (struct frame *f)
       if (popup_activated ())
 	return;
 
+      x_send_hourglass_message (f, true);
+
 #ifdef USE_X_TOOLKIT
       if (x->widget)
 #else
       if (FRAME_OUTER_WINDOW (f))
 #endif
        {
-         x->hourglass_p = true;
-
          if (!x->hourglass_window)
            {
 #ifndef USE_XCB
@@ -11085,15 +11123,11 @@ x_hide_hourglass (struct frame *f)
     {
 #ifndef USE_XCB
       XUnmapWindow (FRAME_X_DISPLAY (f), x->hourglass_window);
-      /* Sync here because XTread_socket looks at the
-	 hourglass_p flag that is reset to zero below.  */
-      XSync (FRAME_X_DISPLAY (f), False);
 #else
       xcb_unmap_window (FRAME_DISPLAY_INFO (f)->xcb_connection,
 			(xcb_window_t) x->hourglass_window);
-      xcb_aux_sync (FRAME_DISPLAY_INFO (f)->xcb_connection);
 #endif
-      x->hourglass_p = false;
+      x_send_hourglass_message (f, false);
     }
 }
 
@@ -11564,7 +11598,7 @@ x_new_focus_frame (struct x_display_info *dpyinfo, struct frame *frame)
   x_frame_rehighlight (dpyinfo);
 }
 
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
 
 /* True if the display in DPYINFO supports a version of Xfixes
    sufficient for pointer blanking.  */
@@ -11576,11 +11610,12 @@ x_fixes_pointer_blanking_supported (struct x_display_info *dpyinfo)
 	  && dpyinfo->xfixes_major >= 4);
 }
 
-#endif /* HAVE_XFIXES */
+#endif /* HAVE_XFIXES && XFIXES_VERSION >= 40000 */
 
 /* Toggle mouse pointer visibility on frame F using the XFixes
    extension.  */
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
+
 static void
 xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
 
@@ -11591,6 +11626,7 @@ xfixes_toggle_visible_pointer (struct frame *f, bool invisible)
     XFixesShowCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
   f->pointer_invisible = invisible;
 }
+
 #endif /* HAVE_XFIXES */
 
 /* Create invisible cursor on the X display referred by DPYINFO.  */
@@ -11639,7 +11675,7 @@ x_toggle_visible_pointer (struct frame *f, bool invisible)
   if (dpyinfo->invisible_cursor == None)
     dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
 
-#ifndef HAVE_XFIXES
+#if !defined HAVE_XFIXES || XFIXES_VERSION < 40000
   if (dpyinfo->invisible_cursor == None)
     invisible = false;
 #else
@@ -11672,7 +11708,7 @@ static void
 XTtoggle_invisible_pointer (struct frame *f, bool invisible)
 {
   block_input ();
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
   if (FRAME_DISPLAY_INFO (f)->fixes_pointer_blanking
       && x_fixes_pointer_blanking_supported (FRAME_DISPLAY_INFO (f)))
     xfixes_toggle_visible_pointer (f, invisible);
@@ -18604,6 +18640,16 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      }
 	  }
 
+	if (event->xclient.message_type == dpyinfo->Xatom_EMACS_TMP
+	    && event->xclient.format == 8)
+	  {
+	    /* This is actually an hourglass message.  Set whether or
+	       not events from here on have the hourglass enabled.  */
+
+	    if (any)
+	      FRAME_X_OUTPUT (any)->hourglass_p = event->xclient.data.b[0];
+	  }
+
         if (event->xclient.message_type == dpyinfo->Xatom_wm_protocols
             && event->xclient.format == 32)
           {
@@ -19192,7 +19238,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		= xcb_get_property (dpyinfo->xcb_connection, 0,
 				    (xcb_window_t) FRAME_OUTER_WINDOW (f),
 				    (xcb_atom_t) dpyinfo->Xatom_net_wm_window_opacity,
-				    XCB_ATOM_CARDINAL, 0, 1);
+				    XA_CARDINAL, 0, 1);
 	      opacity_reply
 		= xcb_get_property_reply (dpyinfo->xcb_connection,
 					  opacity_cookie, &error);
@@ -19201,9 +19247,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		free (error), rc = false;
 	      else
 		rc = (opacity_reply->format == 32
-		      && (opacity_reply->type == XCB_ATOM_CARDINAL
-			  || opacity_reply->type == XCB_ATOM_ATOM
-			  || opacity_reply->type == XCB_ATOM_WINDOW)
+		      && (opacity_reply->type == XA_CARDINAL
+			  || opacity_reply->type == XA_ATOM
+			  || opacity_reply->type == XA_WINDOW)
 		      && (xcb_get_property_value_length (opacity_reply) >= 4));
 
 	      if (rc)
@@ -26768,13 +26814,14 @@ x_wm_supports_1 (struct x_display_info *dpyinfo, Atom want_atom)
 
       if (rc != Success || actual_type != XA_ATOM || x_had_errors_p (dpy))
         {
-          if (tmp_data) XFree (tmp_data);
+          if (tmp_data)
+	    XFree (tmp_data);
           x_uncatch_errors ();
           unblock_input ();
           return false;
         }
 
-      dpyinfo->net_supported_atoms = (Atom *)tmp_data;
+      dpyinfo->net_supported_atoms = (Atom *) tmp_data;
       dpyinfo->nr_net_supported_atoms = actual_size;
       dpyinfo->net_supported_window = wmcheck_window;
     }
@@ -27187,13 +27234,12 @@ do_ewmh_fullscreen (struct frame *f)
 static void
 XTfullscreen_hook (struct frame *f)
 {
-  if (FRAME_VISIBLE_P (f))
-    {
-      block_input ();
-      x_check_fullscreen (f);
-      x_sync (f);
-      unblock_input ();
-    }
+  if (!FRAME_VISIBLE_P (f))
+    return;
+
+  block_input ();
+  x_check_fullscreen (f);
+  unblock_input ();
 }
 
 
@@ -27287,10 +27333,7 @@ x_check_fullscreen (struct frame *f)
       if (FRAME_VISIBLE_P (f))
 	x_wait_for_event (f, ConfigureNotify);
       else
-	{
-	  change_frame_size (f, width, height, false, true, false);
-	  x_sync (f);
-	}
+	change_frame_size (f, width, height, false, true, false);
     }
 
   /* `x_net_wm_state' might have reset the fullscreen frame parameter,
@@ -27504,8 +27547,6 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
       adjust_frame_size (f, FRAME_PIXEL_TO_TEXT_WIDTH (f, width),
 			 FRAME_PIXEL_TO_TEXT_HEIGHT (f, height),
 			 5, 0, Qx_set_window_size_1);
-
-      x_sync (f);
     }
 }
 
@@ -28262,7 +28303,7 @@ x_make_frame_invisible (struct frame *f)
 	error ("Can't notify window manager of window withdrawal");
       }
 
-  x_sync (f);
+  XSync (FRAME_X_DISPLAY (f), False);
 
   /* We can't distinguish this from iconification
      just by the event that we get from the server.
@@ -28858,6 +28899,53 @@ x_get_atom_name (struct x_display_info *dpyinfo, Atom atom,
     }
 
   return value;
+}
+
+/* Intern an array of atoms, and do so quickly, avoiding extraneous
+   roundtrips to the X server.
+
+   Avoid sending atoms that have already been found to the X server.
+   This cannot do anything that will end up triggering garbage
+   collection.  */
+
+void
+x_intern_atoms (struct x_display_info *dpyinfo, char **names, int count,
+		Atom *atoms_return)
+{
+  int i, j, indices[256];
+  char *new_names[256];
+  Atom results[256], candidate;
+
+  if (count > 256)
+    /* Atoms array too big to inspect reasonably, just send it to the
+       server and back.  */
+    XInternAtoms (dpyinfo->display, new_names, count, False, atoms_return);
+  else
+    {
+      for (i = 0, j = 0; i < count; ++i)
+	{
+	  candidate = x_intern_cached_atom (dpyinfo, names[i],
+					    true);
+
+	  if (candidate)
+	    atoms_return[i] = candidate;
+	  else
+	    {
+	      indices[j++] = i;
+	      new_names[j - 1] = names[i];
+	    }
+	}
+
+      if (!j)
+	return;
+
+      /* Now, get the results back from the X server.  */
+      XInternAtoms (dpyinfo->display, new_names, j, False,
+		    results);
+
+      for (i = 0; i < j; ++i)
+	atoms_return[indices[i]] = results[i];
+    }
 }
 
 #ifndef USE_GTK
@@ -30271,7 +30359,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 				   1, 0, 1);
 
   dpyinfo->invisible_cursor = make_invisible_cursor (dpyinfo);
-#ifdef HAVE_XFIXES
+#if defined HAVE_XFIXES && XFIXES_VERSION >= 40000
   dpyinfo->fixes_pointer_blanking = egetenv ("EMACS_XFIXES");
 #endif
 
@@ -30599,7 +30687,12 @@ x_delete_display (struct x_display_info *dpyinfo)
       last = ie;
     }
 
+  /* Delete selection requests bound for dpyinfo from the keyboard
+     buffer.  */
   x_delete_selection_requests (dpyinfo);
+
+  /* And remove any outstanding selection transfers.  */
+  x_remove_selection_transfers (dpyinfo);
 
   if (next_noop_dpyinfo == dpyinfo)
     next_noop_dpyinfo = dpyinfo->next;
@@ -30629,6 +30722,9 @@ x_delete_display (struct x_display_info *dpyinfo)
 	  xfree (color_entry);
 	}
     }
+
+  if (dpyinfo->net_supported_atoms)
+    XFree (dpyinfo->net_supported_atoms);
 
   xfree (dpyinfo->color_names);
   xfree (dpyinfo->color_names_length);
@@ -30741,7 +30837,11 @@ static struct redisplay_interface x_redisplay_interface =
 void
 x_delete_terminal (struct terminal *terminal)
 {
-  struct x_display_info *dpyinfo = terminal->display_info.x;
+  struct x_display_info *dpyinfo;
+  struct frame *f;
+  Lisp_Object tail, frame;
+
+  dpyinfo = terminal->display_info.x;
 
   /* Protect against recursive calls.  delete_frame in
      delete_terminal calls us back when it deletes our last frame.  */
@@ -30749,6 +30849,19 @@ x_delete_terminal (struct terminal *terminal)
     return;
 
   block_input ();
+
+  /* Delete all remaining frames on the display that is going away.
+     Otherwise, font backends assume the display is still up, and
+     xftfont_end_for_frame crashes.  */
+  FOR_EACH_FRAME (tail, frame)
+    {
+      f = XFRAME (frame);
+
+      if (FRAME_LIVE_P (f) && f->terminal == terminal)
+	/* Pass Qnoelisp rather than Qt.  */
+	delete_frame (frame, Qnoelisp);
+    }
+
 #ifdef HAVE_X_I18N
   /* We must close our connection to the XIM server before closing the
      X display.  */
@@ -30761,6 +30874,10 @@ x_delete_terminal (struct terminal *terminal)
     {
       image_destroy_all_bitmaps (dpyinfo);
       XSetCloseDownMode (dpyinfo->display, DestroyAll);
+
+      /* Delete the scratch cursor GC, should it exist.  */
+      if (dpyinfo->scratch_cursor_gc)
+	XFreeGC (dpyinfo->display, dpyinfo->scratch_cursor_gc);
 
       /* Get rid of any drag-and-drop operation that might be in
 	 progress as well.  */
