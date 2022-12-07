@@ -43,7 +43,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef USE_XCB
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
-#include <xcb/xcb_aux.h>
 #endif
 
 #include "bitmaps/gray.xbm"
@@ -2643,12 +2642,18 @@ append_wm_protocols (struct x_display_info *dpyinfo,
   if (existing)
     XFree (existing);
 
-  if (!found_wm_ping)
-    protos[num_protos++] = dpyinfo->Xatom_net_wm_ping;
+  if (!dpyinfo->untrusted)
+    {
+      /* Untrusted clients cannot use these protocols which require
+	 communicating with the window manager.  */
+
+      if (!found_wm_ping)
+	protos[num_protos++] = dpyinfo->Xatom_net_wm_ping;
 #if !defined HAVE_GTK3 && defined HAVE_XSYNC
-  if (!found_wm_sync_request && dpyinfo->xsync_supported_p)
-    protos[num_protos++] = dpyinfo->Xatom_net_wm_sync_request;
+      if (!found_wm_sync_request && dpyinfo->xsync_supported_p)
+	protos[num_protos++] = dpyinfo->Xatom_net_wm_sync_request;
 #endif
+    }
 
   if (num_protos)
     XChangeProperty (dpyinfo->display,
