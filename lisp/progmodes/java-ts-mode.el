@@ -9,19 +9,18 @@
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -58,6 +57,11 @@
     (modify-syntax-entry ?|  "."     table)
     (modify-syntax-entry ?\' "\""    table)
     (modify-syntax-entry ?\240 "."   table)
+    (modify-syntax-entry ?/  ". 124b" table)
+    (modify-syntax-entry ?*  ". 23"   table)
+    (modify-syntax-entry ?\n "> b"  table)
+    (modify-syntax-entry ?\^m "> b" table)
+    (modify-syntax-entry ?@ "'" table)
     table)
   "Syntax table for `java-ts-mode'.")
 
@@ -114,14 +118,14 @@
     "static" "strictfp" "switch" "synchronized"
     "throw" "throws" "to" "transient" "transitive"
     "try" "uses" "volatile" "while" "with" "record")
-  "C keywords for tree-sitter font-locking.")
+  "Java keywords for tree-sitter font-locking.")
 
 (defvar java-ts-mode--operators
   '("+" ":" "++" "-" "--" "&" "&&" "|" "||" "="
     "!=" "==" "*" "/" "%" "<" "<=" ">" ">="
     "-=" "+=" "*=" "/=" "%=" "->" "^" "^="
     "|=" "~" ">>" ">>>" "<<" "::" "?" "&=")
-  "C operators for tree-sitter font-locking.")
+  "Java operators for tree-sitter font-locking.")
 
 (defvar java-ts-mode--font-lock-settings
   (treesit-font-lock-rules
@@ -238,7 +242,7 @@
    :language 'java
    :feature 'delimiter
    '((["," ":" ";"]) @font-lock-delimiter-face))
-  "Tree-sitter font-lock settings.")
+  "Tree-sitter font-lock settings for `java-ts-mode'.")
 
 (defun java-ts-mode--imenu-1 (node)
   "Helper for `java-ts-mode--imenu'.
@@ -309,6 +313,11 @@ the subtrees."
                   (group (or (syntax comment-end)
                              (seq (+ "*") "/")))))
 
+  (setq-local treesit-text-type-regexp
+              (regexp-opt '("line_comment"
+                            "block_comment"
+                            "text_block")))
+
   ;; Indent.
   (setq-local treesit-simple-indent-rules java-ts-mode--indent-rules)
 
@@ -317,7 +326,15 @@ the subtrees."
               (append "{}():;," electric-indent-chars))
 
   ;; Navigation.
-  (setq-local treesit-defun-type-regexp "declaration")
+  (setq-local treesit-defun-type-regexp
+              (regexp-opt '("method_declaration"
+                            "class_declaration"
+                            "record_declaration"
+                            "interface_declaration"
+                            "enum_declaration"
+                            "import_declaration"
+                            "package_declaration"
+                            "module_declaration")))
 
   ;; Font-lock.
   (setq-local treesit-font-lock-settings java-ts-mode--font-lock-settings)

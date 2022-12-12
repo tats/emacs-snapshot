@@ -3545,6 +3545,20 @@ This function is intended for use in `after-change-functions'."
 
    :language 'javascript
    :override t
+   :feature 'property
+   ;; This needs to be before function-name feature, because methods
+   ;; can be both property and function-name, and we want them in
+   ;; function-name face.
+   `((property_identifier) @font-lock-property-face
+
+     (pair value: (identifier) @font-lock-variable-name-face)
+
+     ((shorthand_property_identifier) @font-lock-property-face)
+
+     ((shorthand_property_identifier_pattern) @font-lock-property-face))
+
+   :language 'javascript
+   :override t
    :feature 'expression
    `((assignment_expression
       left: [(identifier) @font-lock-function-name-face
@@ -3611,18 +3625,7 @@ This function is intended for use in `after-change-functions'."
    :language 'javascript
    :feature 'escape-sequence
    :override t
-   '((escape_sequence) @font-lock-escape-face)
-
-   :language 'javascript
-   :override t
-   :feature 'property
-   `((property_identifier) @font-lock-property-face
-
-     (pair value: (identifier) @font-lock-variable-name-face)
-
-     ((shorthand_property_identifier) @font-lock-property-face)
-
-     ((shorthand_property_identifier_pattern) @font-lock-property-face)))
+   '((escape_sequence) @font-lock-escape-face))
   "Tree-sitter font-lock settings.")
 
 (defun js--fontify-template-string (node override start end &rest _)
@@ -3857,6 +3860,11 @@ Currently there are `js-mode' and `js-ts-mode'."
                     (group (or (syntax comment-end)
                                (seq (+ "*") "/")))))
     (setq-local comment-multi-line t)
+
+    (setq-local treesit-text-type-regexp
+                (regexp-opt '("comment"
+                              "template_string")))
+
     ;; Electric-indent.
     (setq-local electric-indent-chars
 	        (append "{}():;," electric-indent-chars)) ;FIXME: js2-mode adds "[]*".

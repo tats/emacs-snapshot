@@ -14,11 +14,15 @@ echo "Building ${lang}"
 
 ### Retrieve sources
 
+namespace="tree-sitter"
 repo="tree-sitter-${lang}"
 sourcedir="tree-sitter-${lang}/src"
 grammardir="tree-sitter-${lang}"
 
 case "${lang}" in
+    "dockerfile")
+        namespace="camdencheek"
+        ;;
     "typescript")
         sourcedir="tree-sitter-typescript/typescript/src"
         grammardir="tree-sitter-typescript/typescript"
@@ -30,11 +34,11 @@ case "${lang}" in
         ;;
 esac
 
-git clone "https://github.com/tree-sitter/${repo}.git" \
+git clone "https://github.com/${namespace}/${repo}.git" \
     --depth 1 --quiet
 cp "${grammardir}"/grammar.js "${sourcedir}"
 # We have to go into the source directory to compile, because some
-# C files referes to files like "../../common/scanner.h".
+# C files refer to files like "../../common/scanner.h".
 cd "${sourcedir}"
 
 ### Build

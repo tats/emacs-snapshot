@@ -12308,6 +12308,13 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   struct xi_device_t *device;
 #endif
 
+  if (FRAME_DISPLAY_INFO (f)->untrusted)
+    /* Untrusted clients cannot send messages to trusted clients or
+       read the window tree, so drag and drop will likely not work at
+       all.  */
+    error ("Drag-and-drop is not possible when the client is"
+	   " not trusted by the X server.");
+
   base = SPECPDL_INDEX ();
 
   /* Bind this here to avoid juggling bindings and SAFE_FREE in
@@ -26041,9 +26048,11 @@ For details, see etc/PROBLEMS.\n",
 	  if (!ioerror && dpyinfo)
 	    {
 	      /* Dump the list of error handlers for debugging
-		 purposes.  */
+		 purposes if the list exists.  */
 
-	      fprintf (stderr, "X error handlers currently installed:\n");
+	      if ((dpyinfo->failable_requests
+		   != dpyinfo->next_failable_request) || x_error_message)
+		fprintf (stderr, "X error handlers currently installed:\n");
 
 	      for (failable = dpyinfo->failable_requests;
 		   failable < dpyinfo->next_failable_request;
@@ -26684,38 +26693,43 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 	       modified_left, modified_top);
 #endif
 
-  /* 'x_sync_with_move' is too costly for dragging child frames.  */
-  if (!FRAME_PARENT_FRAME (f)
-      /* If no window manager exists, just calling XSync will be
-	 sufficient to ensure that the window geometry has been
-	 updated.  */
-      && NILP (Vx_no_window_manager))
+  /* The following code is too slow over a latent network
+     connection.  */
+  if (NILP (Vx_lax_frame_positioning))
     {
-      x_sync_with_move (f, f->left_pos, f->top_pos,
-			FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
+      /* 'x_sync_with_move' is too costly for dragging child frames.  */
+      if (!FRAME_PARENT_FRAME (f)
+	  /* If no window manager exists, just calling XSync will be
+	     sufficient to ensure that the window geometry has been
+	     updated.  */
+	  && NILP (Vx_no_window_manager))
+	{
+	  x_sync_with_move (f, f->left_pos, f->top_pos,
+			    FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
 
-      /* change_gravity is non-zero when this function is called from Lisp to
-	 programmatically move a frame.  In that case, we call
-	 x_check_expected_move to discover if we have a "Type A" or "Type B"
-	 window manager, and, for a "Type A" window manager, adjust the position
-	 of the frame.
+	  /* change_gravity is non-zero when this function is called from Lisp to
+	     programmatically move a frame.  In that case, we call
+	     x_check_expected_move to discover if we have a "Type A" or "Type B"
+	     window manager, and, for a "Type A" window manager, adjust the position
+	     of the frame.
 
-	 We call x_check_expected_move if a programmatic move occurred, and
-	 either the window manager type (A/B) is unknown or it is Type A but we
-	 need to compute the top/left offset adjustment for this frame.  */
+	     We call x_check_expected_move if a programmatic move occurred, and
+	     either the window manager type (A/B) is unknown or it is Type A but we
+	     need to compute the top/left offset adjustment for this frame.  */
 
-      if (change_gravity != 0
-	  && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
-	      || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
-		  && (FRAME_X_OUTPUT (f)->move_offset_left == 0
-		      && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
-	x_check_expected_move (f, modified_left, modified_top);
+	  if (change_gravity != 0
+	      && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
+		  || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
+		      && (FRAME_X_OUTPUT (f)->move_offset_left == 0
+			  && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
+	    x_check_expected_move (f, modified_left, modified_top);
+	}
+      /* Instead, just wait for the last ConfigureWindow request to
+	 complete.  No window manager is involved when moving child
+	 frames.  */
+      else
+	XSync (FRAME_X_DISPLAY (f), False);
     }
-  /* Instead, just wait for the last ConfigureWindow request to
-     complete.  No window manager is involved when moving child
-     frames.  */
-  else
-    XSync (FRAME_X_DISPLAY (f), False);
 
   unblock_input ();
 }
@@ -27524,6 +27538,12 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
      we have to make sure to do it here.  */
   SET_FRAME_GARBAGED (f);
 
+  /* The following code is too slow over a latent network
+     connection, so skip it when the user says so.  */
+
+  if (!NILP (Vx_lax_frame_positioning))
+    return;
+
   /* Now, strictly speaking, we can't be sure that this is accurate,
      but the window manager will get around to dealing with the size
      change request eventually, and we'll hear how it went when the
@@ -27949,11 +27969,16 @@ x_focus_frame (struct frame *f, bool noactivate)
   struct x_display_info *dpyinfo;
   Time time;
 
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  if (dpyinfo->untrusted)
+    /* The X server ignores all input focus related requests from
+       untrusted clients.  */
+    return;
+
   /* The code below is not reentrant wrt to dpyinfo->x_focus_frame and
      friends being set.  */
   block_input ();
-
-  dpyinfo = FRAME_DISPLAY_INFO (f);
 
   if (FRAME_X_EMBEDDED_P (f))
     /* For Xembedded frames, normally the embedder forwards key
@@ -31845,4 +31870,15 @@ check whether or not a resulting Access error is generated by the X
 server.  If the X server reports the error, Emacs will disable certain
 features that do not work for untrusted clients.  */);
   Vx_detect_server_trust = Qnil;
+
+  DEFVAR_LISP ("x-lax-frame-geometry", Vx_lax_frame_positioning,
+    doc: /* If non-nil nil, Emacs won't compensate for WM geometry behavior.
+
+Setting this to non-nil is useful when the compensation proves to be
+too slow, which is usually true when the X server is located over a
+network connection with high latency.  Doing so will make frame
+creation and placement faster at the cost of reducing the accuracy of
+frame placement via frame properties, `set-frame-position', and
+`set-frame-size'.  */);
+  Vx_lax_frame_positioning = Qnil;
 }

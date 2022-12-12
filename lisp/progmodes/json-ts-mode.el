@@ -9,19 +9,18 @@
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -46,9 +45,7 @@
 
 (defvar json-ts-mode--syntax-table
   (let ((table (make-syntax-table)))
-    ;; Taken from the cc-langs version
     (modify-syntax-entry ?_  "_"     table)
-    (modify-syntax-entry ?$ "_"      table)
     (modify-syntax-entry ?\\ "\\"    table)
     (modify-syntax-entry ?+  "."     table)
     (modify-syntax-entry ?-  "."     table)
@@ -58,8 +55,12 @@
     (modify-syntax-entry ?>  "."     table)
     (modify-syntax-entry ?&  "."     table)
     (modify-syntax-entry ?|  "."     table)
-    (modify-syntax-entry ?` "\""     table)
+    (modify-syntax-entry ?\' "\""    table)
     (modify-syntax-entry ?\240 "."   table)
+    (modify-syntax-entry ?/  ". 124b" table)
+    (modify-syntax-entry ?*  ". 23"   table)
+    (modify-syntax-entry ?\n "> b"  table)
+    (modify-syntax-entry ?\^m "> b" table)
     table)
   "Syntax table for `json-ts-mode'.")
 

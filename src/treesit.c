@@ -384,7 +384,18 @@ init_treesit_functions (void)
    mysteriously drops.  3) what if a user uses so many stuff that the
    default cache size (20) is not enough and we end up thrashing?
    These are all imaginary scenarios but they are not impossible
-   :-) */
+   :-)
+
+   Parsers in indirect buffers: We make indirect buffers to share the
+   parser of its base buffer.  Indirect buffers and their base buffer
+   share the same buffer content but not other buffer attributes.  If
+   they have separate parser lists, changes made in an indirect buffer
+   will only update parsers of that indirect buffer, and not parsers
+   in the base buffer or other indirect buffers, and vice versa.  We
+   could keep track of all the base and indirect buffers, and update
+   all of their parsers, but ultimately decide to take a simpler
+   approach, which is to make indirect buffers share their base
+   buffer's parser list.  The discussion can be found in bug#59693.  */
 
 
 /*** Initialization */
@@ -697,9 +708,10 @@ void
 treesit_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 		       ptrdiff_t new_end_byte)
 {
-  Lisp_Object parser_list;
-
-  parser_list = BVAR (current_buffer, ts_parser_list);
+  struct buffer *base_buffer = current_buffer;
+  if (current_buffer->base_buffer)
+    base_buffer = current_buffer->base_buffer;
+  Lisp_Object parser_list = BVAR (base_buffer, ts_parser_list);
 
   FOR_EACH_TAIL_SAFE (parser_list)
     {
@@ -1252,12 +1264,16 @@ DEFUN ("treesit-parser-create",
        1, 3, 0,
        doc: /* Create and return a parser in BUFFER for LANGUAGE.
 
-The parser is automatically added to BUFFER's parser list, as
-returned by `treesit-parser-list'.
-LANGUAGE is a language symbol.  If BUFFER is nil or omitted, it
-defaults to the current buffer.  If BUFFER already has a parser for
-LANGUAGE, return that parser, but if NO-REUSE is non-nil, always
-create a new parser.  */)
+The parser is automatically added to BUFFER's parser list, as returned
+by `treesit-parser-list'.  LANGUAGE is a language symbol.  If BUFFER
+is nil or omitted, it defaults to the current buffer.  If BUFFER
+already has a parser for LANGUAGE, return that parser, but if NO-REUSE
+is non-nil, always create a new parser.
+
+If that buffer is an indirect buffer, its base buffer is used instead.
+That is, indirect buffers use their base buffer's parsers.  Lisp
+programs should widen as necessary should they want to use a parser in
+an indirect buffer.  */)
   (Lisp_Object language, Lisp_Object buffer, Lisp_Object no_reuse)
 {
   treesit_initialize ();
@@ -1271,16 +1287,21 @@ create a new parser.  */)
       CHECK_BUFFER (buffer);
       buf = XBUFFER (buffer);
     }
+  if (buf->base_buffer)
+    buf = buf->base_buffer;
+
   treesit_check_buffer_size (buf);
 
   /* See if we can reuse a parser.  */
-  for (Lisp_Object tail = BVAR (buf, ts_parser_list);
-       NILP (no_reuse) && !NILP (tail);
-       tail = XCDR (tail))
+  if (NILP (no_reuse))
     {
-      struct Lisp_TS_Parser *parser = XTS_PARSER (XCAR (tail));
-      if (EQ (parser->language_symbol, language))
-	return XCAR (tail);
+      Lisp_Object tail = BVAR (buf, ts_parser_list);
+      FOR_EACH_TAIL (tail)
+      {
+	struct Lisp_TS_Parser *parser = XTS_PARSER (XCAR (tail));
+	if (EQ (parser->language_symbol, language))
+	  return XCAR (tail);
+      }
     }
 
   /* Load language.  */
@@ -1329,7 +1350,10 @@ DEFUN ("treesit-parser-list",
        Ftreesit_parser_list, Streesit_parser_list,
        0, 1, 0,
        doc: /* Return BUFFER's parser list.
-BUFFER defaults to the current buffer.  */)
+
+BUFFER defaults to the current buffer.  If that buffer is an indirect
+buffer, its base buffer is used instead.  That is, indirect buffers
+use their base buffer's parsers.  */)
   (Lisp_Object buffer)
 {
   struct buffer *buf;
@@ -1340,6 +1364,9 @@ BUFFER defaults to the current buffer.  */)
       CHECK_BUFFER (buffer);
       buf = XBUFFER (buffer);
     }
+  if (buf->base_buffer)
+    buf = buf->base_buffer;
+
   /* Return a fresh list so messing with that list doesn't affect our
      internal data.  */
   Lisp_Object return_list = Qnil;
@@ -1640,6 +1667,17 @@ treesit_check_node (Lisp_Object obj)
   CHECK_TS_NODE (obj);
   if (!treesit_node_uptodate_p (obj))
     xsignal1 (Qtreesit_node_outdated, obj);
+}
+
+/* Checks that OBJ is a positive integer and it is within the visible
+   portion of BUF. */
+static void
+treesit_check_position (Lisp_Object obj, struct buffer *buf)
+{
+  treesit_check_positive_integer (obj);
+  ptrdiff_t pos = XFIXNUM (obj);
+  if (pos < BUF_BEGV (buf) || pos > BUF_ZV (buf))
+    xsignal1 (Qargs_out_of_range, obj);
 }
 
 bool
@@ -1990,14 +2028,12 @@ Note that this function returns an immediate child, not the smallest
   if (NILP (node))
     return Qnil;
   treesit_check_node (node);
-  treesit_check_positive_integer (pos);
 
   struct buffer *buf = XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t visible_beg = XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_pos = buf_charpos_to_bytepos (buf, XFIXNUM (pos));
 
-  if (byte_pos < BUF_BEGV_BYTE (buf) || byte_pos > BUF_ZV_BYTE (buf))
-    xsignal1 (Qargs_out_of_range, pos);
+  treesit_check_position (pos, buf);
 
   treesit_initialize ();
 
@@ -2028,19 +2064,14 @@ If NODE is nil, return nil.  */)
 {
   if (NILP (node)) return Qnil;
   treesit_check_node (node);
-  CHECK_INTEGER (beg);
-  CHECK_INTEGER (end);
 
   struct buffer *buf = XBUFFER (XTS_PARSER (XTS_NODE (node)->parser)->buffer);
   ptrdiff_t visible_beg = XTS_PARSER (XTS_NODE (node)->parser)->visible_beg;
   ptrdiff_t byte_beg = buf_charpos_to_bytepos (buf, XFIXNUM (beg));
   ptrdiff_t byte_end = buf_charpos_to_bytepos (buf, XFIXNUM (end));
 
-  /* Checks for BUFFER_BEG <= BEG <= END <= BUFFER_END.  */
-  if (!(BUF_BEGV_BYTE (buf) <= byte_beg
-	&& byte_beg <= byte_end
-	&& byte_end <= BUF_ZV_BYTE (buf)))
-    xsignal2 (Qargs_out_of_range, beg, end);
+  treesit_check_position (beg, buf);
+  treesit_check_position (end, buf);
 
   treesit_initialize ();
 
@@ -2426,21 +2457,24 @@ the query.  */)
   (Lisp_Object node, Lisp_Object query,
    Lisp_Object beg, Lisp_Object end, Lisp_Object node_only)
 {
-  if (!NILP (beg))
-    CHECK_INTEGER (beg);
-  if (!NILP (end))
-    CHECK_INTEGER (end);
-
   if (!(TS_COMPILED_QUERY_P (query)
 	|| CONSP (query) || STRINGP (query)))
     wrong_type_argument (Qtreesit_query_p, query);
 
+  treesit_initialize ();
+
   /* Resolve NODE into an actual node.  */
   Lisp_Object lisp_node;
   if (TS_NODEP (node))
-    lisp_node = node;
+    {
+      treesit_check_node (node); /* Check if up-to-date.  */
+      lisp_node = node;
+    }
   else if (TS_PARSERP (node))
-    lisp_node = Ftreesit_parser_root_node (node);
+    {
+      treesit_check_parser (node); /* Check if deleted.  */
+      lisp_node = Ftreesit_parser_root_node (node);
+    }
   else if (SYMBOLP (node))
     {
       Lisp_Object parser
@@ -2452,8 +2486,6 @@ the query.  */)
 	      list4 (Qor, Qtreesit_node_p, Qtreesit_parser_p, Qsymbolp),
 	      node);
 
-  treesit_initialize ();
-
   /* Extract C values from Lisp objects.  */
   TSNode treesit_node
     = XTS_NODE (lisp_node)->node;
@@ -2463,6 +2495,13 @@ the query.  */)
     = XTS_PARSER (XTS_NODE (lisp_node)->parser)->visible_beg;
   const TSLanguage *lang
     = ts_parser_language (XTS_PARSER (lisp_parser)->parser);
+
+  /* Check BEG and END.  */
+  struct buffer *buf = XBUFFER (XTS_PARSER (lisp_parser)->buffer);
+  if (!NILP (beg))
+    treesit_check_position (beg, buf);
+  if (!NILP (end))
+    treesit_check_position (end, buf);
 
   /* Initialize query objects.  At the end of this block, we should
      have a working TSQuery and a TSQueryCursor.  */

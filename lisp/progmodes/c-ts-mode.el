@@ -9,19 +9,18 @@
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -79,6 +78,8 @@ follows the form of `treesit-simple-indent-rules'."
     (modify-syntax-entry ?\240 "."   table)
     (modify-syntax-entry ?/  ". 124b" table)
     (modify-syntax-entry ?*  ". 23"   table)
+    (modify-syntax-entry ?\n "> b"  table)
+    (modify-syntax-entry ?\^m "> b" table)
     table)
   "Syntax table for `c-ts-mode'.")
 
@@ -233,13 +234,14 @@ MODE is either `c' or `cpp'."
      (false) @font-lock-constant-face
      (null) @font-lock-constant-face
      ,@(when (eq mode 'cpp)
-         '((this) @font-lock-constant-face)))
+         '((nullptr) @font-lock-constant-face)))
 
    :language mode
    :feature 'keyword
    `([,@(c-ts-mode--keywords mode)] @font-lock-keyword-face
      ,@(when (eq mode 'cpp)
-         '((auto) @font-lock-keyword-face)))
+         '((auto) @font-lock-keyword-face
+           (this) @font-lock-keyword-face)))
 
    :language mode
    :feature 'operator
@@ -517,9 +519,30 @@ the subtrees."
       (if (looking-at "\\s<\\|\n")
 	  (forward-line 1)))))
 
+(defun c-ts-mode-indent-defun ()
+  "Indent the current top-level declaration syntactically.
+
+`treesit-defun-type-regexp' defines what constructs to indent."
+  (interactive "*")
+  (let ((orig-point (point-marker)))
+    ;; If `treesit-beginning-of-defun' returns nil, we are not in a
+    ;; defun, so don't indent anything.
+    (when (treesit-beginning-of-defun)
+      (let ((start (point)))
+        (treesit-end-of-defun)
+        (indent-region start (point))))
+    (goto-char orig-point)))
+
+(defvar-keymap c-ts-mode-map
+  :doc "Keymap for the C language with tree-sitter"
+  :parent prog-mode-map
+  "C-c C-q" #'c-ts-mode-indent-defun)
+
 ;;;###autoload
 (define-derived-mode c-ts-base-mode prog-mode "C"
-  "Major mode for editing C, powered by tree-sitter."
+  "Major mode for editing C, powered by tree-sitter.
+
+\\{c-ts-mode-map}"
   :syntax-table c-ts-mode--syntax-table
 
   ;; Navigation.
@@ -603,6 +626,10 @@ the subtrees."
               (rx (* (syntax whitespace))
                   (group (or (syntax comment-end)
                              (seq (+ "*") "/")))))
+
+  (setq-local treesit-text-type-regexp
+              (regexp-opt '("comment"
+                            "raw_string_literal")))
 
   (treesit-parser-create 'cpp)
 
