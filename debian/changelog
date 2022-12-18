@@ -1,3 +1,11 @@
+emacs (1:28.2+1-9~1.gbpdc7021) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @dc702148d5d34b4f7edf7dbb1b175e935fa48607 **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 18 Dec 2022 14:31:39 -0700
+
 emacs (1:28.2+1-8) unstable; urgency=high
 
   * Fix ctags local command execution vulnerability (CVE-2022-45939)
