@@ -1,10 +1,10 @@
-emacs (1:28.2+1-9~1.gbpdc7021) UNRELEASED; urgency=medium
+emacs (1:28.2+1-9) unstable; urgency=medium
 
-  ** SNAPSHOT build @dc702148d5d34b4f7edf7dbb1b175e935fa48607 **
+  * Backport inhibit-automatic-native-compilation from Emacs 29.
+    We intend to use the EMACS_INHIBIT_AUTOMATIC_NATIVE_COMPILATION
+    environment variable to address bugs like #1021842.
 
-  * UNRELEASED
-
- -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 18 Dec 2022 14:31:39 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 18 Dec 2022 15:36:53 -0700
 
 emacs (1:28.2+1-8) unstable; urgency=high
 
