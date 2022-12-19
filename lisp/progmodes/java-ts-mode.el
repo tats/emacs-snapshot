@@ -73,6 +73,7 @@
      ((node-is "]") parent-bol 0)
      ((and (parent-is "comment") comment-end) comment-start -1)
      ((parent-is "comment") comment-start-skip 0)
+     ((parent-is "text_block") no-indent)
      ((parent-is "class_body") parent-bol java-ts-mode-indent-offset)
      ((parent-is "interface_body") parent-bol java-ts-mode-indent-offset)
      ((parent-is "constructor_body") parent-bol java-ts-mode-indent-offset)
@@ -85,6 +86,7 @@
      ((parent-is "method_invocation") parent-bol java-ts-mode-indent-offset)
      ((parent-is "switch_rule") parent-bol java-ts-mode-indent-offset)
      ((parent-is "ternary_expression") parent-bol java-ts-mode-indent-offset)
+     ((parent-is "lambda_expression") parent-bol java-ts-mode-indent-offset)
      ((parent-is "element_value_array_initializer") parent-bol java-ts-mode-indent-offset)
      ((parent-is "function_definition") parent-bol 0)
      ((parent-is "conditional_expression") first-sibling 0)
@@ -143,9 +145,10 @@
    :language 'java
    :override t
    :feature 'keyword
-   `([,@java-ts-mode--keywords] @font-lock-keyword-face
-     (labeled_statement
-      (identifier) @font-lock-keyword-face))
+   `([,@java-ts-mode--keywords
+      (this)] @font-lock-keyword-face
+      (labeled_statement
+       (identifier) @font-lock-keyword-face))
    :language 'java
    :override t
    :feature 'operator
@@ -162,7 +165,8 @@
    :language 'java
    :override t
    :feature 'string
-   `((string_literal) @font-lock-string-face)
+   `((string_literal) @font-lock-string-face
+     (text_block) @font-lock-string-face)
    :language 'java
    :override t
    :feature 'literal

@@ -157,15 +157,15 @@ HEADER         : String for header for first line or a function
                  which calculates column title.
 MINIMUM-LENGTH : Minimum width of column (number or name of function).
                  The function must return a positive integer.
-MAXIMUM-LENGTH : Maximum width of column (number or name of function)
-                 (currently ignored).
+MAXIMUM-LENGTH : Ignored.
 ALIGNMENT      : Alignment of column (`left', `right', `middle').
 FUN-OR-STRING  : Name of a function for calculating the value or a
                  string for a constant value.
 
-The function gets as parameter the buffer where we have started
-buffer selection and the list of all buffers to show.  The function must
-return a string representing the column's value."
+Functions for HEADER and MINIMUM-LENGTH are called with no arguments.
+FUN-OR-STRING gets as argument the buffer where we have started
+buffer selection and the list of all buffers to show.  The function
+must return a string representing the column's value."
   :group 'bs-appearance
   :type '(repeat sexp))
 
@@ -321,7 +321,7 @@ Must be a string used in `bs-configurations' for naming a configuration."
   :group 'bs-appearance
   :type 'string)
 
-(defcustom bs-string-show-normally  " "
+(defcustom bs-string-show-normally " "
   "String added in column 1 indicating an unmarked buffer."
   :group 'bs-appearance
   :type 'string)
@@ -384,12 +384,12 @@ don't highlight."
   "Define a new function for buffer sorting in Buffer Selection Menu.
 NAME specifies the sort order defined by function FUN.
 A value of nil for FUN means don't sort the buffer list.  Otherwise the
-functions must have two parameters - the buffers to compare.
+function must have two arguments - the buffers to compare.
 REGEXP-FOR-SORTING is a regular expression which describes the
 column title to highlight.
 FACE is a face used to fontify the sorted column title.  A value of nil means
 don't highlight.
-The new sort aspect will be inserted into list `bs-sort-functions'."
+The new sort aspect will be inserted into the list `bs-sort-functions'."
   (let ((tuple (assoc name bs-sort-functions)))
     (if tuple
         (setcdr tuple (list fun regexp-for-sorting face))
@@ -488,7 +488,9 @@ Used internally, only.")
   "<mouse-2>" #'bs-mouse-select
   "<mouse-3>" #'bs-mouse-select-other-frame)
 
-(defcustom bs-default-action-list '((display-buffer-below-selected)
+(defcustom bs-default-action-list '((display-buffer-reuse-window
+				     display-buffer-below-selected)
+				    (reusable-frames . nil)
 				    (window-height . window-min-height))
   "Default action list for showing the '*bs-selection*' buffer.
 
@@ -503,7 +505,7 @@ ALIST.  See `display-buffer' for details."
   :version "30.1"
   :group 'bs)
 
-; ----------------------------------------------------------------------
+;; ----------------------------------------------------------------------
 ;; Functions
 ;; ----------------------------------------------------------------------
 
@@ -513,8 +515,8 @@ LIST is a list of buffers to test for appearance in Buffer Selection Menu.
 The result list depends on the global variables `bs-dont-show-regexp',
 `bs-must-show-regexp', `bs-dont-show-function', `bs-must-show-function'
 and `bs-buffer-sort-function'.
-If SORT-DESCRIPTION isn't nil the list will be sorted by
-a special function.  SORT-DESCRIPTION is an element of `bs-sort-functions'."
+If SORT-DESCRIPTION isn't nil the list will be sorted by a special
+function.  SORT-DESCRIPTION is an element of `bs-sort-functions'."
   (setq sort-description (or sort-description bs--current-sort-function)
 	list (or list (buffer-list)))
   (let ((result nil))
@@ -580,9 +582,9 @@ SORT-DESCRIPTION is an element of `bs-sort-functions'."
     (beginning-of-line)))
 
 (defun bs--goto-current-buffer ()
-  "Goto line which represents the current buffer;
-actually the line which begins with character in `bs-string-current' or
-`bs-string-current-marked'."
+  "Go to line which represents the current buffer.
+Actually, it goes to the line which begins with the character
+in `bs-string-current' or `bs-string-current-marked'."
   (let ((regexp (concat "^"
 			(regexp-quote bs-string-current)
 			"\\|^"
@@ -601,21 +603,6 @@ actually the line which begins with character in `bs-string-current' or
       "Show all buffers."
     (format "Show buffer by configuration %S"
 	    bs-current-configuration)))
-
-(defun bs--track-window-changes (frame)
-  "Track window changes to refresh the buffer list.
-Used from `window-size-change-functions'."
-  (let ((win (get-buffer-window "*buffer-selection*" frame)))
-    (when win
-      (with-selected-window win
-	(bs--set-window-height)))))
-
-(defun bs--remove-hooks ()
-  "Remove `bs--track-window-changes' and auxiliary hooks."
-  (remove-hook 'window-size-change-functions 'bs--track-window-changes)
-  ;; Remove itself
-  (remove-hook 'kill-buffer-hook 'bs--remove-hooks t)
-  (remove-hook 'change-major-mode-hook 'bs--remove-hooks t))
 
 (put 'bs-mode 'mode-class 'special)
 
@@ -675,10 +662,7 @@ apply it.
   (setq-local font-lock-defaults '(bs-mode-font-lock-keywords t))
   (setq-local font-lock-verbose nil)
   (setq-local font-lock-global-modes '(not bs-mode))
-  (setq-local revert-buffer-function 'bs-refresh)
-  (add-hook 'window-size-change-functions 'bs--track-window-changes)
-  (add-hook 'kill-buffer-hook 'bs--remove-hooks nil t)
-  (add-hook 'change-major-mode-hook 'bs--remove-hooks nil t))
+  (setq-local revert-buffer-function 'bs-refresh))
 
 (defun bs-kill ()
   "Let buffer disappear and reset window configuration."
@@ -708,7 +692,9 @@ Arguments are IGNORED (for `revert-buffer')."
 (defun bs--set-window-height ()
   "Change the height of the selected window to suit the current buffer list."
   (unless (one-window-p t)
-    (fit-window-to-buffer (selected-window) bs-max-window-height)))
+    (fit-window-to-buffer (selected-window) bs-max-window-height nil nil nil
+			  ;; preserve-size
+			  t)))
 
 (defun bs--current-buffer ()
   "Return buffer on current line.
@@ -850,9 +836,8 @@ See `visit-tags-table'."
 
 (defun bs-set-current-buffer-to-show-always (&optional not-to-show-p)
   "Toggle status of buffer on line to `always shown'.
-NOT-TO-SHOW-P: prefix argument.
-With no prefix argument the buffer on current line is marked to show
-always.  Otherwise it is marked to show never."
+With prefix argument NOT-TO-SHOW-P, the buffer on current line
+is marked to never show instead."
   (interactive "P")
   (if not-to-show-p
       (bs-set-current-buffer-to-show-never)
@@ -1261,8 +1246,6 @@ by buffer configuration `bs-cycle-configuration-name'."
 					bs--cycle-list)))
              (next (car tuple))
              (cycle-list (cdr tuple)))
-        ;; We don't want the frame iconified if the only window in the frame
-        ;; happens to be dedicated.
         (bury-buffer (current-buffer))
 	(switch-to-buffer next nil t)
 	(setq bs--cycle-list (append (cdr cycle-list)
@@ -1363,11 +1346,11 @@ ALL-BUFFERS is the list of buffers appearing in Buffer Selection Menu."
               'help-echo "mouse-2: select this buffer, mouse-3: select in other frame"
               'mouse-face 'highlight))
 
-(defun bs--get-mode-name (start-buffer _all-buffers)
+(defun bs--get-mode-name (_start-buffer _all-buffers)
   "Return the name of mode of current buffer for Buffer Selection Menu.
 START-BUFFER is the buffer where we started buffer selection.
 ALL-BUFFERS is the list of buffers appearing in Buffer Selection Menu."
-  (format-mode-line mode-name nil nil start-buffer))
+  (format-mode-line mode-name nil nil nil))
 
 (defun bs--get-file-name (_start-buffer _all-buffers)
   "Return string for column `File' in Buffer Selection Menu.
@@ -1458,7 +1441,7 @@ for buffer selection."
 (defun bs--configuration-name-for-prefix-arg (prefix)
   "Convert prefix argument PREFIX to a name of a buffer configuration.
 If PREFIX is nil return `bs-default-configuration'.
-If PREFIX is an integer return PREFIX element of `bs-configurations'.
+If PREFIX is an integer return PREFIXth element of `bs-configurations'.
 Otherwise return `bs-alternative-configuration'."
   (cond ;; usually activation
    ((null prefix)

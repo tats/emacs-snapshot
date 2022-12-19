@@ -70,10 +70,14 @@
      ((node-is "}") parent-bol 0)
      ((node-is ")") parent-bol 0)
      ((node-is "]") parent-bol 0)
-     ((parent-is "object") parent-bol json-ts-mode-indent-offset))))
+     ((parent-is "object") parent-bol json-ts-mode-indent-offset)
+     ((parent-is "array") parent-bol json-ts-mode-indent-offset))))
 
 (defvar json-ts-mode--font-lock-settings
   (treesit-font-lock-rules
+   :language 'json
+   :feature 'comment
+   '((comment) @font-lock-comment-face)
    :language 'json
    :feature 'bracket
    '((["[" "]" "{" "}"]) @font-lock-bracket-face)
@@ -161,7 +165,7 @@ the subtrees."
   ;; Font-lock.
   (setq-local treesit-font-lock-settings json-ts-mode--font-lock-settings)
   (setq-local treesit-font-lock-feature-list
-              '((constant number pair string)
+              '((comment constant number pair string)
                 (escape-sequence)
                 (bracket delimiter error)))
 

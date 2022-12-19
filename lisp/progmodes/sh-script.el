@@ -1611,7 +1611,9 @@ with your script for an edit-interpret-debug cycle."
   "Major mode for editing Bash shell scripts.
 This mode automatically falls back to `sh-mode' if the buffer is
 not written in Bash or sh."
+  :syntax-table sh-mode-syntax-table
   (when (treesit-ready-p 'bash)
+    (treesit-parser-create 'bash)
     (setq-local treesit-font-lock-feature-list
                 '(( comment function)
                   ( command declaration-command keyword string)
@@ -1623,6 +1625,7 @@ not written in Bash or sh."
                 (regexp-opt '("comment"
                               "heredoc_start"
                               "heredoc_body")))
+    (setq-local treesit-defun-type-regexp "function_definition")
     (treesit-major-mode-setup)))
 
 (advice-add 'bash-ts-mode :around #'sh--redirect-bash-ts-mode

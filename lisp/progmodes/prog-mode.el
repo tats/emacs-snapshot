@@ -33,6 +33,7 @@
                    (require 'subr-x)
                    (require 'treesit))
 
+(declare-function treesit-available-p "treesit.c")
 (declare-function treesit-parser-list "treesit.c")
 (declare-function treesit-node-type "treesit.c")
 
@@ -151,12 +152,13 @@ instead."
 If the point is in a string or a comment, fill the paragraph that
 contains point or follows point.
 
-Otherwise, reindent the definition that contains point or follows
-point."
+Otherwise, reindent the function definition that contains point
+or follows point."
   (interactive "P")
   (save-excursion
     (let ((treesit-text-node
-           (and (treesit-parser-list)
+           (and (treesit-available-p)
+                (treesit-parser-list)
                 (string-match-p
                  treesit-text-type-regexp
                  (treesit-node-type (treesit-node-at (point)))))))
