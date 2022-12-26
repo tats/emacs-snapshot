@@ -4540,7 +4540,7 @@ Commands that must finish the tracking session are listed in
   (when (and python-pdbtrack-tracked-buffer
              ;; Empty input is sent by C-d or `comint-send-eof'
              (or (string-empty-p input)
-                 ;; "n some text" is "n" command for pdb. Split input and get firs part
+                 ;; "n some text" is "n" command for pdb. Split input and get first part
                  (let* ((command (car (split-string (string-trim input) " "))))
                    (setq python-pdbtrack-prev-command-continue
                          (or (member command python-pdbtrack-continue-command)
@@ -5448,6 +5448,16 @@ To this:
 
 ;;; Tree-sitter imenu
 
+(defun python--treesit-defun-name (node)
+  "Return the defun name of NODE.
+Return nil if there is no name or if NODE is not a defun node."
+  (pcase (treesit-node-type node)
+    ((or "function_definition" "class_definition")
+     (treesit-node-text
+      (treesit-node-child-by-field-name
+       node "name")
+      t))))
+
 (defun python--imenu-treesit-create-index-1 (node)
   "Given a sparse tree, create an imenu alist.
 
@@ -5473,9 +5483,8 @@ definition*\"."
                  ("class_definition" 'class)))
          ;; The root of the tree could have a nil ts-node.
          (name (when ts-node
-                 (treesit-node-text
-                  (treesit-node-child-by-field-name
-                   ts-node "name") t)))
+                 (or (treesit-defun-name ts-node)
+                     "Anonymous")))
          (marker (when ts-node
                    (set-marker (make-marker)
                                (treesit-node-start ts-node)))))
@@ -6643,6 +6652,8 @@ implementations: `python-mode' and `python-ts-mode'."
                 #'python-imenu-treesit-create-index)
     (setq-local treesit-defun-type-regexp (rx (or "function" "class")
                                               "_definition"))
+    (setq-local treesit-defun-name-function
+                #'python--treesit-defun-name)
     (treesit-major-mode-setup)
 
     (when python-indent-guess-indent-offset

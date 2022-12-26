@@ -346,6 +346,20 @@ The default value is the function that clears the message displayed in
 an active minibuffer.
 @end defvar
 
+@defopt set-message-functions
+The value of this user option is a list of functions to be called for
+handling display of echo-area messages.  Each function is called with
+one argument, the text of the message to display.  If the function
+returns a string, that string replaces the original message, and the
+next function in the list is called with the new message text.  If the
+function returns @code{nil}, the next function in the list is called
+with the same text; if the last function in the list returns
+@code{nil}, the message text is displayed in the echo area.  If the
+function returns a non-@code{nil} value that is not a string, the
+message is considered to be handled, and no further functions in the
+list are called.
+@end defopt
+
 @defvar inhibit-message
 When this variable is non-@code{nil}, @code{message} and related functions
 will not use the Echo Area to display messages.
@@ -6280,7 +6294,7 @@ embedding large images, comparing to @code{svg-embed}, because all the
 work is done directly by librsvg.
 
 @lisp
-;; Embeding /tmp/subdir/rms.jpg and /tmp/another/rms.jpg
+;; Embedding /tmp/subdir/rms.jpg and /tmp/another/rms.jpg
 (svg-embed-base-uri-image svg "subdir/rms.jpg"
            :width "100px" :height "100px"
            :x "50px" :y "75px")
