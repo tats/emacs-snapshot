@@ -9,19 +9,18 @@
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -34,6 +33,7 @@
 (declare-function treesit-parser-create "treesit.c")
 (declare-function treesit-induce-sparse-tree "treesit.c")
 (declare-function treesit-node-start "treesit.c")
+(declare-function treesit-node-type "treesit.c")
 (declare-function treesit-node-child-by-field-name "treesit.c")
 
 
@@ -46,9 +46,7 @@
 
 (defvar json-ts-mode--syntax-table
   (let ((table (make-syntax-table)))
-    ;; Taken from the cc-langs version
     (modify-syntax-entry ?_  "_"     table)
-    (modify-syntax-entry ?$ "_"      table)
     (modify-syntax-entry ?\\ "\\"    table)
     (modify-syntax-entry ?+  "."     table)
     (modify-syntax-entry ?-  "."     table)
@@ -58,8 +56,12 @@
     (modify-syntax-entry ?>  "."     table)
     (modify-syntax-entry ?&  "."     table)
     (modify-syntax-entry ?|  "."     table)
-    (modify-syntax-entry ?` "\""     table)
+    (modify-syntax-entry ?\' "\""    table)
     (modify-syntax-entry ?\240 "."   table)
+    (modify-syntax-entry ?/  ". 124b" table)
+    (modify-syntax-entry ?*  ". 23"   table)
+    (modify-syntax-entry ?\n "> b"  table)
+    (modify-syntax-entry ?\^m "> b" table)
     table)
   "Syntax table for `json-ts-mode'.")
 
@@ -69,10 +71,14 @@
      ((node-is "}") parent-bol 0)
      ((node-is ")") parent-bol 0)
      ((node-is "]") parent-bol 0)
-     ((parent-is "object") parent-bol json-ts-mode-indent-offset))))
+     ((parent-is "object") parent-bol json-ts-mode-indent-offset)
+     ((parent-is "array") parent-bol json-ts-mode-indent-offset))))
 
 (defvar json-ts-mode--font-lock-settings
   (treesit-font-lock-rules
+   :language 'json
+   :feature 'comment
+   '((comment) @font-lock-comment-face)
    :language 'json
    :feature 'bracket
    '((["[" "]" "{" "}"]) @font-lock-bracket-face)
@@ -93,38 +99,25 @@
    :override t
    '((escape_sequence) @font-lock-escape-face)
    :language 'json
+   :feature 'pair
+   :override t ; Needed for overriding string face on keys.
+   '((pair key: (_) @font-lock-variable-name-face))
+   :language 'json
    :feature 'error
    :override t
    '((ERROR) @font-lock-warning-face))
   "Font-lock settings for JSON.")
 
-(defun json-ts-mode--imenu-1 (node)
-  "Helper for `json-ts-mode--imenu'.
-Find string representation for NODE and set marker, then recurse
-the subtrees."
-  (let* ((ts-node (car node))
-         (subtrees (mapcan #'json-ts-mode--imenu-1 (cdr node)))
-         (name (when ts-node
-                 (treesit-node-text
-                  (treesit-node-child-by-field-name
-                   ts-node "key")
-                  t)))
-         (marker (when ts-node
-                   (set-marker (make-marker)
-                               (treesit-node-start ts-node)))))
-    (cond
-     ((null ts-node) subtrees)
-     (subtrees
-      `((,name ,(cons name marker) ,@subtrees)))
-     (t
-      `((,name . ,marker))))))
-
-(defun json-ts-mode--imenu ()
-  "Return Imenu alist for the current buffer."
-  (let* ((node (treesit-buffer-root-node))
-         (tree (treesit-induce-sparse-tree
-                node "pair" nil 1000)))
-    (json-ts-mode--imenu-1 tree)))
+(defun json-ts-mode--defun-name (node)
+  "Return the defun name of NODE.
+Return nil if there is no name or if NODE is not a defun node."
+  (pcase (treesit-node-type node)
+    ((or "pair" "object")
+     (string-trim (treesit-node-text
+                   (treesit-node-child-by-field-name
+                    node "key")
+                   t)
+                  "\"" "\""))))
 
 ;;;###autoload
 (define-derived-mode json-ts-mode prog-mode "JSON"
@@ -152,17 +145,18 @@ the subtrees."
   ;; Navigation.
   (setq-local treesit-defun-type-regexp
               (rx (or "pair" "object")))
+  (setq-local treesit-defun-name-function #'json-ts-mode--defun-name)
 
   ;; Font-lock.
   (setq-local treesit-font-lock-settings json-ts-mode--font-lock-settings)
   (setq-local treesit-font-lock-feature-list
-              '((constant number string)
+              '((comment constant number pair string)
                 (escape-sequence)
                 (bracket delimiter error)))
 
   ;; Imenu.
-  (setq-local imenu-create-index-function #'json-ts-mode--imenu)
-  (setq-local which-func-functions nil) ;; Piggyback on imenu
+  (setq-local treesit-simple-imenu-settings
+              '((nil "\\`pair\\'" nil nil)))
 
   (treesit-major-mode-setup))
 

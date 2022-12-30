@@ -2605,12 +2605,14 @@ Must be handled by the callers."
 	      file-selinux-context file-symlink-p file-truename
 	      file-writable-p find-backup-file-name get-file-buffer
 	      insert-directory insert-file-contents load
-	      make-directory make-directory-internal set-file-acl
-	      set-file-modes set-file-selinux-context set-file-times
+	      make-directory set-file-acl set-file-modes
+	      set-file-selinux-context set-file-times
 	      substitute-in-file-name unhandled-file-name-directory
 	      vc-registered
 	      ;; Emacs 27+ only.
 	      file-system-info
+	      ;; Emacs 28- only.
+	      make-directory-internal
 	      ;; Emacs 28+ only.
 	      file-locked-p lock-file make-lock-file-name unlock-file
 	      ;; Emacs 29+ only.
@@ -2949,7 +2951,7 @@ They are completed by \"M-x TAB\" only if the current buffer is remote."
   (tramp-tramp-file-p (tramp-get-default-directory buffer)))
 
 (defun tramp-connectable-p (vec-or-filename)
-  "Check, whether it is possible to connect the remote host w/o side-effects.
+  "Check if it is possible to connect the remote host without side-effects.
 This is true, if either the remote host is already connected, or if we are
 not in completion mode."
   (let ((tramp-verbose 0)
@@ -3535,6 +3537,27 @@ BODY is the backend specific code."
 	;; Trigger the `file-missing' error.
 	(signal 'error nil)))))
 
+(defmacro tramp-skeleton-make-directory (dir &optional parents &rest body)
+  "Skeleton for `tramp-*-handle-make-directory'.
+BODY is the backend specific code."
+  ;; Since Emacs 29.1, PARENTS isn't propagated to the handlers
+  ;; anymore.  And the return values are specified since then as well.
+  (declare (indent 2) (debug t))
+  `(let* ((dir (directory-file-name (expand-file-name ,dir)))
+	  (par (file-name-directory dir)))
+     (with-parsed-tramp-file-name dir nil
+       (when (and (null ,parents) (file-exists-p dir))
+	 (tramp-error v 'file-already-exists dir))
+       ;; Make missing directory parts.
+       (when ,parents
+	 (unless (file-directory-p par)
+	   (make-directory par ,parents)))
+       ;; Just do it.
+       (if (file-exists-p dir) t
+	 (tramp-flush-file-properties v localname)
+	 ,@body
+	 nil))))
+
 (defmacro tramp-skeleton-set-file-modes-times-uid-gid
     (filename &rest body)
   "Skeleton for `tramp-*-set-file-{modes,times,uid-gid}'.
@@ -3999,7 +4022,7 @@ Let-bind it when necessary.")
    ((not (file-exists-p file1)) nil)
    ((not (file-exists-p file2)) t)
    ;; Tramp reads and writes timestamps on second level.  So we round
-   ;; the timestamps to seconds w/o fractions.
+   ;; the timestamps to seconds without fractions.
    ;; `time-convert' has been introduced with Emacs 27.1.
    ((fboundp 'time-convert)
     (time-less-p
@@ -5416,7 +5439,7 @@ Wait, until the connection buffer changes."
 	;; Hide message in buffer.
 	(narrow-to-region (point-max) (point-max))
 	;; Wait for new output.
-	(while (not (tramp-compat-ignore-error 'file-error
+	(while (not (tramp-compat-ignore-error file-error
 		      (tramp-wait-for-regexp
 		       proc 0.1 tramp-security-key-confirmed-regexp)))
 	  (when (tramp-check-for-regexp proc tramp-security-key-timeout-regexp)

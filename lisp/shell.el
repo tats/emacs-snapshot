@@ -71,7 +71,7 @@
 ;; c-c c-o comint-delete-output		   Delete last batch of process output
 ;; c-c c-r comint-show-output		   Show last batch of process output
 ;; c-c c-l comint-dynamic-list-input-ring  List input history
-;;         comint-send-invisible           Read line w/o echo & send to proc
+;;         comint-send-invisible           Read line without echo & send to proc
 ;;         comint-continue-subjob	   Useful if you accidentally suspend
 ;;					        top-level job
 ;; comint-mode-hook is the comint mode hook.
@@ -395,11 +395,9 @@ Useful for shells like zsh that has this feature."
 
 (defvar-keymap shell-repeat-map
   :doc "Keymap to repeat shell key sequences.  Used in `repeat-mode'."
+  :repeat t
   "C-f" #'shell-forward-command
   "C-b" #'shell-backward-command)
-
-(put #'shell-forward-command 'repeat-map 'shell-repeat-map)
-(put #'shell-backward-command 'repeat-map 'shell-repeat-map)
 
 (defcustom shell-mode-hook '()
   "Hook for customizing Shell mode."
@@ -1162,6 +1160,7 @@ line output and parses it to form the new directory stack."
          (dlsl nil)
          (pos 0)
          (ds nil))
+    (setq dls (string-trim-right dls "[ ]+"))
     ;; Split the dirlist into whitespace and non-whitespace chunks.
     ;; dlsl will be a reversed list of tokens.
     (while (string-match "\\(\\S-+\\|\\s-+\\)" dls pos)

@@ -193,7 +193,7 @@ and how is entirely up to the behavior of the
   "If non-nil, allow effects in `pcomplete-parse-arguments-function'.
 For the `pcomplete' command, it was common for functions in
 `pcomplete-parse-arguments-function' to make modifications to the
-buffer, like expanding variables are such.
+buffer, like expanding variables and such.
 For `completion-at-point-functions', this is not an option any more, so
 this variable is used to tell `pcomplete-parse-arguments-function'
 whether it can do the modifications like it used to, or whether
@@ -645,13 +645,26 @@ parts of the list.
 
 The OFFSET argument is added to/taken away from the index that will be
 used.  This is really only useful with `first' and `last', for
-accessing absolute argument positions."
-  (nth (+ (pcase index
-	   ('first 0)
-	   ('last  pcomplete-last)
-	   (_      (- pcomplete-index (or index 0))))
-	  (or offset 0))
-       pcomplete-args))
+accessing absolute argument positions.
+
+When the argument has been transformed into something that is not
+a string by `pcomplete-parse-arguments-function', the text
+representation of the argument, namely what the user actually
+typed in, is returned, and the value of the argument is stored in
+the pcomplete-arg-value text property of that string."
+  (let ((arg
+         (nth (+ (pcase index
+	           ('first 0)
+	           ('last  pcomplete-last)
+	           (_      (- pcomplete-index (or index 0))))
+	         (or offset 0))
+              pcomplete-args)))
+    (if (stringp arg)
+        arg
+      (propertize
+       (buffer-substring (pcomplete-begin index offset)
+                         (pcomplete-begin (1- (or index 0)) offset))
+       'pcomplete-arg-value arg))))
 
 (defun pcomplete-begin (&optional index offset)
   "Return the beginning position of the INDEXth argument.
@@ -1456,7 +1469,7 @@ COMMAND and ARGS as arguments."
                            (pcomplete-match-string 1 0)))
           ((string-prefix-p "-" (pcomplete-arg 0))
            (pcomplete-here (apply #'pcomplete-from-help command args)))
-          (t (pcomplete-here (pcomplete-entries))))))
+          (t (pcomplete-here* (pcomplete-entries))))))
 
 (provide 'pcomplete)
 

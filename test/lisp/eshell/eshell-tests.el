@@ -105,37 +105,6 @@
      (format template "format \"%s\" eshell-in-pipeline-p")
      "nil")))
 
-(ert-deftest eshell-test/escape-nonspecial ()
-  "Test that \"\\c\" and \"c\" are equivalent when \"c\" is not a
-special character."
-  (with-temp-eshell
-   (eshell-match-command-output "echo he\\llo"
-                                "hello\n")))
-
-(ert-deftest eshell-test/escape-nonspecial-unicode ()
-  "Test that \"\\c\" and \"c\" are equivalent when \"c\" is a
-unicode character (unicode characters are nonspecial by
-definition)."
-  (with-temp-eshell
-   (eshell-match-command-output "echo Vid\\éos"
-                                "Vidéos\n")))
-
-(ert-deftest eshell-test/escape-nonspecial-quoted ()
-  "Test that the backslash is preserved for escaped nonspecial
-chars"
-  (with-temp-eshell
-   (eshell-match-command-output "echo \"h\\i\""
-                                ;; Backslashes are doubled for regexp.
-                                "h\\\\i\n")))
-
-(ert-deftest eshell-test/escape-special-quoted ()
-  "Test that the backslash is not preserved for escaped special
-chars"
-  (with-temp-eshell
-   (eshell-match-command-output "echo \"\\\"hi\\\\\""
-                                ;; Backslashes are doubled for regexp.
-                                "\\\"hi\\\\\n")))
-
 (ert-deftest eshell-test/command-running-p ()
   "Modeline should show no command running"
   (with-temp-eshell
@@ -159,16 +128,17 @@ chars"
        (delete-region (point) (point-max))))))
 
 (ert-deftest eshell-test/queue-input ()
-  "Test queuing command input"
+  "Test queuing command input.
+This should let the current command finish, then automatically
+insert the queued one at the next prompt, and finally run it."
   (with-temp-eshell
-   (eshell-insert-command "sleep 2")
-   (eshell-insert-command "echo alpha" 'eshell-queue-input)
-   (let ((count 10))
-     (while (and eshell-current-command
-                 (> count 0))
-       (sit-for 1)
-       (setq count (1- count))))
-   (should (eshell-match-output "alpha\n"))))
+   (eshell-insert-command "sleep 1; echo slept")
+   (eshell-insert-command "echo alpha" #'eshell-queue-input)
+   (let ((start (marker-position (eshell-beginning-of-output))))
+     (eshell-wait-for (lambda () (not eshell-current-command)))
+     (should (string-match "^slept\n.*echo alpha\nalpha\n$"
+                           (buffer-substring-no-properties
+                            start (eshell-end-of-output)))))))
 
 (ert-deftest eshell-test/flush-output ()
   "Test flushing of previous output"

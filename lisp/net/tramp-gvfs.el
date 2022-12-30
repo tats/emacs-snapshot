@@ -690,7 +690,7 @@ It has been changed in GVFS 1.14.")
     ("gvfs-set-attribute" . "set"))
   "List of cons cells, mapping \"gvfs-<command>\" to \"gio <command>\".")
 
-;; <http://www.pygtk.org/docs/pygobject/gio-constants.html>
+;; <https://www.pygtk.org/docs/pygobject/gio-constants.html>
 (eval-and-compile
   (defconst tramp-gvfs-file-attributes
     '("name"
@@ -1560,27 +1560,13 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 
 (defun tramp-gvfs-handle-make-directory (dir &optional parents)
   "Like `make-directory' for Tramp files."
-  (setq dir (directory-file-name (expand-file-name dir)))
-  (with-parsed-tramp-file-name dir nil
-    (when (and (null parents) (file-exists-p dir))
-      (tramp-error v 'file-already-exists dir))
-    (tramp-flush-directory-properties v localname)
+  (tramp-skeleton-make-directory dir parents
     (save-match-data
-      (let ((ldir (file-name-directory dir)))
-	;; Make missing directory parts.  "gvfs-mkdir -p ..." does not
-	;; work robust.
-	(when (and parents (not (file-directory-p ldir)))
-	  (make-directory ldir parents))
-	;; Just do it.
-	(or (when-let ((mkdir-succeeded
-			(and
-			 (tramp-gvfs-send-command
-			  v "gvfs-mkdir" (tramp-gvfs-url-file-name dir))
-			 (tramp-gvfs-info dir))))
-	      (set-file-modes dir (default-file-modes))
-	      mkdir-succeeded)
-	    (and parents (file-directory-p dir))
-	    (tramp-error v 'file-error "Couldn't make directory %s" dir))))))
+      (if (and (tramp-gvfs-send-command
+		v "gvfs-mkdir" (tramp-gvfs-url-file-name dir))
+	       (tramp-gvfs-info dir))
+	  (set-file-modes dir (default-file-modes))
+	(tramp-error v 'file-error "Couldn't make directory %s" dir)))))
 
 (defun tramp-gvfs-handle-rename-file
   (filename newname &optional ok-if-already-exists)

@@ -6281,13 +6281,16 @@ static ptrdiff_t
 string_buffer_position (Lisp_Object string, ptrdiff_t around_charpos)
 {
   const int MAX_DISTANCE = 1000;
+  ptrdiff_t forward_limit = min (around_charpos + MAX_DISTANCE, ZV);
   ptrdiff_t found = string_buffer_position_lim (string, around_charpos,
-						around_charpos + MAX_DISTANCE,
-						false);
+						forward_limit, false);
 
   if (!found)
-    found = string_buffer_position_lim (string, around_charpos,
-					around_charpos - MAX_DISTANCE, true);
+    {
+      ptrdiff_t backward_limit = max (around_charpos - MAX_DISTANCE, BEGV);
+      found = string_buffer_position_lim (string, around_charpos,
+					  backward_limit, true);
+    }
   return found;
 }
 
@@ -12935,7 +12938,7 @@ clear_garbaged_frames (void)
 	{
 	  struct frame *f = XFRAME (frame);
 
-	  if (FRAME_VISIBLE_P (f) && FRAME_GARBAGED_P (f))
+	  if (FRAME_REDISPLAY_P (f) && FRAME_GARBAGED_P (f))
 	    {
 	      if (f->resized_p
 		  /* It makes no sense to redraw a non-selected TTY
@@ -12984,7 +12987,7 @@ echo_area_display (bool update_frame_p)
   f = XFRAME (WINDOW_FRAME (w));
 
   /* Don't display if frame is invisible or not yet initialized.  */
-  if (!FRAME_VISIBLE_P (f) || !f->glyphs_initialized_p)
+  if (!FRAME_REDISPLAY_P (f) || !f->glyphs_initialized_p)
     return;
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -13540,7 +13543,7 @@ prepare_menu_bars (void)
 		     TTY frames to be completely redrawn, when there
 		     are more than one of them, even though nothing
 		     should be changed on display.  */
-		  || (FRAME_VISIBLE_P (f) == 2 && FRAME_WINDOW_P (f))))
+		  || (FRAME_REDISPLAY_P (f) && FRAME_WINDOW_P (f))))
 	    gui_consider_frame_title (frame);
 	}
     }
@@ -14268,12 +14271,14 @@ redisplay_tab_bar (struct frame *f)
 	frame_default_tab_bar_height = new_height;
     }
 
-  /* If new_height or new_nrows indicate that we need to enlarge the
-     tab-bar window, we can return right away.  */
+  /* If new_height or new_nrows indicate that we need to enlarge or
+     shrink the tab-bar window, we can return right away.  */
   if (new_nrows > f->n_tab_bar_rows
       || (EQ (Vauto_resize_tab_bars, Qgrow_only)
 	  && !f->minimize_tab_bar_window_p
-	  && new_height > WINDOW_PIXEL_HEIGHT (w)))
+	  && new_height > WINDOW_PIXEL_HEIGHT (w))
+      || (! EQ (Vauto_resize_tab_bars, Qgrow_only)
+	  && new_height < WINDOW_PIXEL_HEIGHT (w)))
     {
       if (FRAME_TERMINAL (f)->change_tab_bar_height_hook)
 	FRAME_TERMINAL (f)->change_tab_bar_height_hook (f, new_height);
@@ -16427,7 +16432,7 @@ redisplay_internal (void)
     {
       struct frame *f = XFRAME (frame);
 
-      if (FRAME_VISIBLE_P (f))
+      if (FRAME_REDISPLAY_P (f))
 	{
 	  ++number_of_visible_frames;
 	  /* Adjust matrices for visible frames only.  */
@@ -16569,7 +16574,7 @@ redisplay_internal (void)
       && !w->update_mode_line
       && !current_buffer->clip_changed
       && !current_buffer->prevent_redisplay_optimizations_p
-      && FRAME_VISIBLE_P (XFRAME (w->frame))
+      && FRAME_REDISPLAY_P (XFRAME (w->frame))
       && !FRAME_OBSCURED_P (XFRAME (w->frame))
       && !XFRAME (w->frame)->cursor_type_changed
       && !XFRAME (w->frame)->face_change
@@ -16835,14 +16840,20 @@ redisplay_internal (void)
 		/* Only GC scrollbars when we redisplay the whole frame.  */
 		= f->redisplay || !REDISPLAY_SOME_P ();
 	      bool f_redisplay_flag = f->redisplay;
+
+	      /* The X error handler may have deleted that frame
+		 before we went back to retry_frame.  This must come
+		 before any accesses to f->terminal.  */
+	      if (!FRAME_LIVE_P (f))
+		continue;
+
 	      /* Mark all the scroll bars to be removed; we'll redeem
 		 the ones we want when we redisplay their windows.  */
 	      if (gcscrollbars && FRAME_TERMINAL (f)->condemn_scroll_bars_hook)
 		FRAME_TERMINAL (f)->condemn_scroll_bars_hook (f);
 
-	      if (FRAME_VISIBLE_P (f) && !FRAME_OBSCURED_P (f))
+	      if (FRAME_REDISPLAY_P (f) && !FRAME_OBSCURED_P (f))
 		{
-
 		  /* Don't allow freeing images and faces for this
 		     frame as long as the frame's update wasn't
 		     completed.  This prevents crashes when some Lisp
@@ -16867,7 +16878,7 @@ redisplay_internal (void)
 	      if (gcscrollbars && FRAME_TERMINAL (f)->judge_scroll_bars_hook)
 		FRAME_TERMINAL (f)->judge_scroll_bars_hook (f);
 
-	      if (FRAME_VISIBLE_P (f) && !FRAME_OBSCURED_P (f))
+	      if (FRAME_REDISPLAY_P (f) && !FRAME_OBSCURED_P (f))
 		{
 		  /* If fonts changed on visible frame, display again.  */
 		  if (f->fonts_changed)
@@ -16973,7 +16984,7 @@ redisplay_internal (void)
 	    }
 	}
     }
-  else if (FRAME_VISIBLE_P (sf) && !FRAME_OBSCURED_P (sf))
+  else if (FRAME_REDISPLAY_P (sf) && !FRAME_OBSCURED_P (sf))
     {
       sf->inhibit_clear_image_cache = true;
       displayed_buffer = XBUFFER (XWINDOW (selected_window)->contents);
@@ -17024,7 +17035,7 @@ redisplay_internal (void)
 	unrequest_sigio ();
       STOP_POLLING;
 
-      if (FRAME_VISIBLE_P (sf) && !FRAME_OBSCURED_P (sf))
+      if (FRAME_REDISPLAY_P (sf) && !FRAME_OBSCURED_P (sf))
 	{
           if (hscroll_retries <= MAX_HSCROLL_RETRIES
               && hscroll_windows (selected_window))
@@ -17123,7 +17134,7 @@ redisplay_internal (void)
 
       FOR_EACH_FRAME (tail, frame)
 	{
-	  if (XFRAME (frame)->visible)
+	  if (FRAME_REDISPLAY_P (XFRAME (frame)))
 	    new_count++;
 	}
 
@@ -17264,7 +17275,6 @@ mark_window_display_accurate_1 (struct window *w, bool accurate_p)
 
       BUF_UNCHANGED_MODIFIED (b) = BUF_MODIFF (b);
       BUF_OVERLAY_UNCHANGED_MODIFIED (b) = BUF_OVERLAY_MODIFF (b);
-      BUF_CHARS_UNCHANGED_MODIFIED (b) = BUF_CHARS_MODIFF (b);
       BUF_BEG_UNCHANGED (b) = BUF_GPT (b) - BUF_BEG (b);
       BUF_END_UNCHANGED (b) = BUF_Z (b) - BUF_GPT (b);
 
@@ -19430,6 +19440,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	    blank_row (w, row, y);
 	  goto finish_scroll_bars;
 	}
+      else if (minibuf_level >= 1)
+	{
+	  /* We could have a message produced by set-minibuffer-message
+	     displayed in the mini-window as an overlay, so resize the
+	     mini-window if needed.  */
+	  resize_mini_window (w, false);
+	}
 
       clear_glyph_matrix (w->desired_matrix);
     }
@@ -19535,7 +19552,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Check whether the buffer to be displayed contains long lines.  */
   if (!NILP (Vlong_line_threshold)
       && !current_buffer->long_line_optimizations_p
-      && CHARS_MODIFF - CHARS_UNCHANGED_MODIFIED > 8)
+      && (CHARS_MODIFF - UNCHANGED_MODIFIED > 8
+	  || current_buffer->clip_changed))
     {
       ptrdiff_t cur, next, found, max = 0, threshold;
       threshold = XFIXNUM (Vlong_line_threshold);
@@ -22616,7 +22634,8 @@ usage: (trace-to-stderr STRING &rest OBJECTS)  */)
  ***********************************************************************/
 
 /* Return a temporary glyph row holding the glyphs of an overlay arrow.
-   Used for non-window-redisplay windows, and for windows w/o left fringe.  */
+   Used for non-window-redisplay windows, and for windows without left
+   fringe.  */
 
 static struct glyph_row *
 get_overlay_arrow_glyph_row (struct window *w, Lisp_Object overlay_arrow_string)
@@ -26310,16 +26329,17 @@ display_menu_bar (struct window *w)
   it.first_visible_x = 0;
   it.last_visible_x = FRAME_PIXEL_WIDTH (f);
 #elif defined (HAVE_X_WINDOWS) /* X without toolkit.  */
+  struct window *menu_window = NULL;
+  struct face *face = FACE_FROM_ID (f, MENU_FACE_ID);
+
   if (FRAME_WINDOW_P (f))
     {
       /* Menu bar lines are displayed in the desired matrix of the
 	 dummy window menu_bar_window.  */
-      struct window *menu_w;
-      menu_w = XWINDOW (f->menu_bar_window);
-      init_iterator (&it, menu_w, -1, -1, menu_w->desired_matrix->rows,
+      menu_window = XWINDOW (f->menu_bar_window);
+      init_iterator (&it, menu_window, -1, -1,
+		     menu_window->desired_matrix->rows,
 		     MENU_FACE_ID);
-      it.first_visible_x = 0;
-      it.last_visible_x = FRAME_PIXEL_WIDTH (f);
     }
   else
 #endif /* not USE_X_TOOLKIT and not USE_GTK */
@@ -26373,6 +26393,50 @@ display_menu_bar (struct window *w)
 
   /* Compute the total height of the lines.  */
   compute_line_metrics (&it);
+  it.glyph_row->full_width_p = true;
+  it.glyph_row->continued_p = false;
+  it.glyph_row->truncated_on_left_p = false;
+  it.glyph_row->truncated_on_right_p = false;
+
+#if defined (HAVE_X_WINDOWS) && !defined (USE_X_TOOLKIT) && !defined (USE_GTK)
+  /* Make a 3D menu bar have a shadow at its right end.  */
+  extend_face_to_end_of_line (&it);
+  if (face->box != FACE_NO_BOX)
+    {
+      struct glyph *last = (it.glyph_row->glyphs[TEXT_AREA]
+			    + it.glyph_row->used[TEXT_AREA] - 1);
+      int box_thickness = face->box_vertical_line_width;
+      last->right_box_line_p = true;
+      /* Add back the space for the right box line we subtracted in
+	 init_iterator, since the right_box_line_p flag will make the
+	 glyph wider.  We actually add only as much space as is
+	 available for the last glyph of the menu bar and whatever
+	 space is left beyond it, since that glyph could be only
+	 partially visible.  */
+      if (box_thickness > 0)
+	last->pixel_width += max (0, (box_thickness
+				      - (it.current_x - it.last_visible_x)));
+    }
+
+  /* With the non-toolkit version, modify the menu bar window height
+     accordingly.  */
+  if (FRAME_WINDOW_P (it.f) && menu_window)
+    {
+      struct glyph_row *row;
+      int delta_height;
+
+      row = it.glyph_row;
+      delta_height
+	= ((row->y + row->height)
+	   - WINDOW_BOX_HEIGHT_NO_MODE_LINE (menu_window));
+
+      if (delta_height != 0)
+        {
+	  FRAME_MENU_BAR_HEIGHT (it.f) += delta_height;
+	  adjust_frame_size (it.f, -1, -1, 3, false, Qmenu_bar_lines);
+	}
+    }
+#endif
 }
 
 /* Deep copy of a glyph row, including the glyphs.  */
@@ -33194,7 +33258,7 @@ display_and_set_cursor (struct window *w, bool on,
      windows and frames; in the latter case, the frame or window may
      be in the midst of changing its size, and x and y may be off the
      window.  */
-  if (! FRAME_VISIBLE_P (f)
+  if (! FRAME_REDISPLAY_P (f)
       || vpos >= w->current_matrix->nrows
       || hpos >= w->current_matrix->matrix_w)
     return;
@@ -33355,7 +33419,7 @@ gui_update_cursor (struct frame *f, bool on_p)
 void
 gui_clear_cursor (struct window *w)
 {
-  if (FRAME_VISIBLE_P (XFRAME (w->frame)) && w->phys_cursor_on_p)
+  if (FRAME_REDISPLAY_P (XFRAME (w->frame)) && w->phys_cursor_on_p)
     update_window_cursor (w, false);
 }
 

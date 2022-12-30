@@ -1353,9 +1353,26 @@ for determining whether point is within a selector."
    :language 'css
    '((string_value) @font-lock-string-face)
 
+   :feature 'keyword
+   :language 'css
+   '(["@media"
+      "@import"
+      "@charset"
+      "@namespace"
+      "@keyframes"] @font-lock-builtin-face
+      ["and"
+       "or"
+       "not"
+       "only"
+       "selector"] @font-lock-keyword-face)
+
    :feature 'variable
    :language 'css
    '((plain_value) @font-lock-variable-name-face)
+
+   :language 'css
+   :feature 'operator
+   `(["=" "~=" "^=" "|=" "*=" "$="] @font-lock-operator-face)
 
    :feature 'selector
    :language 'css
@@ -1377,46 +1394,36 @@ for determining whether point is within a selector."
    :language 'css
    '((integer_value) @font-lock-number-face
      (float_value) @font-lock-number-face
-     (unit) @font-lock-constant-face)
+     (unit) @font-lock-constant-face
+     (important) @font-lock-builtin-face)
+
+   :feature 'query
+   :language 'css
+   '((keyword_query) @font-lock-property-face
+     (feature_name) @font-lock-property-face)
+
+
+   :feature 'bracket
+   :language 'css
+   '((["(" ")" "[" "]" "{" "}"]) @font-lock-bracket-face)
 
    :feature 'error
    :language 'css
    '((ERROR) @error))
   "Tree-sitter font-lock settings for `css-ts-mode'.")
 
-(defun css--treesit-imenu-1 (node)
-  "Helper for `css--treesit-imenu'.
-Find string representation for NODE and set marker, then recurse
-the subtrees."
-  (let* ((ts-node (car node))
-         (subtrees (mapcan #'css--treesit-imenu-1 (cdr node)))
-         (name (when ts-node
-                 (pcase (treesit-node-type ts-node)
-                   ("rule_set" (treesit-node-text
-                                (treesit-node-child ts-node 0) t))
-                   ("media_statement"
-                    (let ((block (treesit-node-child ts-node -1)))
-                      (string-trim
-                       (buffer-substring-no-properties
-                        (treesit-node-start ts-node)
-                        (treesit-node-start block))))))))
-         (marker (when ts-node
-                   (set-marker (make-marker)
-                               (treesit-node-start ts-node)))))
-    (cond
-     ((or (null ts-node) (null name)) subtrees)
-     (subtrees
-      `((,name ,(cons name marker) ,@subtrees)))
-     (t
-      `((,name . ,marker))))))
-
-(defun css--treesit-imenu ()
-  "Return Imenu alist for the current buffer."
-  (let* ((node (treesit-buffer-root-node))
-         (tree (treesit-induce-sparse-tree
-                node (rx (or "rule_set" "media_statement"))
-                nil 1000)))
-    (css--treesit-imenu-1 tree)))
+(defun css--treesit-defun-name (node)
+  "Return the defun name of NODE.
+Return nil if there is no name or if NODE is not a defun node."
+  (pcase (treesit-node-type node)
+    ("rule_set" (treesit-node-text
+                 (treesit-node-child node 0) t))
+    ("media_statement"
+     (let ((block (treesit-node-child node -1)))
+       (string-trim
+        (buffer-substring-no-properties
+         (treesit-node-start node)
+         (treesit-node-start block)))))))
 
 ;;; Completion
 
@@ -1794,30 +1801,32 @@ Use `\\[fill-paragraph]' to reformat CSS declaration blocks.  It
 can also be used to fill comments.
 
 \\{css-mode-map}"
+  :syntax-table css-mode-syntax-table
   (when (treesit-ready-p 'css)
     ;; Borrowed from `css-mode'.
+    (setq-local syntax-propertize-function
+                css-syntax-propertize-function)
     (add-hook 'completion-at-point-functions
               #'css-completion-at-point nil 'local)
     (setq-local fill-paragraph-function #'css-fill-paragraph)
     (setq-local adaptive-fill-function #'css-adaptive-fill)
-    (setq-local add-log-current-defun-function #'css-current-defun-name)
+    ;; `css--fontify-region' first calls the default function, which
+    ;; will call tree-sitter's function, then it fontifies colors.
+    (setq-local font-lock-fontify-region-function #'css--fontify-region)
 
     ;; Tree-sitter specific setup.
     (treesit-parser-create 'css)
     (setq-local treesit-simple-indent-rules css--treesit-indent-rules)
     (setq-local treesit-defun-type-regexp "rule_set")
+    (setq-local treesit-defun-name-function #'css--treesit-defun-name)
     (setq-local treesit-font-lock-settings css--treesit-settings)
     (setq-local treesit-font-lock-feature-list
-                '((selector comment)
+                '((selector comment query keyword)
                   (property constant string)
-                  (error variable function)))
-    ;; Tree-sitter-css, for whatever reason, cannot reliably return
-    ;; the captured nodes in a given range (it instead returns the
-    ;; nodes preceding range).  Before this is fixed in
-    ;; tree-sitter-css, use this heuristic as a temporary fix.
-    (setq-local treesit--font-lock-query-expand-range (cons 80 80))
-    (setq-local imenu-create-index-function #'css--treesit-imenu)
-    (setq-local which-func-functions nil)
+                  (error variable function operator bracket)))
+    (setq-local treesit-simple-imenu-settings
+                `(( nil ,(rx bos (or "rule_set" "media_statement") eos)
+                    nil nil)))
     (treesit-major-mode-setup)))
 
 ;;;###autoload

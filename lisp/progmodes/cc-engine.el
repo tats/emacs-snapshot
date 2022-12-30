@@ -7757,7 +7757,7 @@ multi-line strings (but not C++, for example)."
 			       (1- (match-end 1)) ; 1- For the inserted ".
 			     eoll))))
 
-	      ;; ...and clear `syntax-table' text propertes from the
+	      ;; ...and clear `syntax-table' text properties from the
 	      ;; following raw strings.
 	      (c-depropertize-ml-strings-in-region (point) (1+ eoll)))
 	  ;; Remove the temporary string delimiter.
@@ -10678,6 +10678,8 @@ This function might do hidden buffer changes."
 	(c-forward-syntactic-ws))
 
       (when (and (not got-identifier)
+		 (or backup-at-type
+		     (not (memq context '(arglist decl))))
 		 (or (and new-style-auto
 			  (looking-at c-auto-ops-re))
 		     (and (or maybe-typeless backup-maybe-typeless)

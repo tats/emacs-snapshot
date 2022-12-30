@@ -1259,6 +1259,12 @@ please check its value")
 	  (setq init-file-user nil))
 	 ((member argi '("-init-directory"))
 	  (setq user-emacs-directory (or argval (pop args))
+                user-emacs-directory (if (stringp user-emacs-directory)
+                                         (file-name-as-directory
+                                          (expand-file-name
+                                           user-emacs-directory
+                                           command-line-default-directory))
+                                       user-emacs-directory)
                 argval nil))
 	 ((member argi '("-u" "-user"))
 	  (setq init-file-user (or argval (pop args))
@@ -2915,7 +2921,7 @@ nil default-directory" name)
        (when (looking-at "#!")
          (forward-line))
        (let (value form)
-         (while (ignore-error 'end-of-file
+         (while (ignore-error end-of-file
                   (setq form (read (current-buffer))))
            (setq value (eval form t)))
          (kill-emacs (if (numberp value)

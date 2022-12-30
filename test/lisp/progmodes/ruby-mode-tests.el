@@ -578,6 +578,45 @@ VALUES-PLIST is a list with alternating index and value elements."
     (search-backward "_")
     (should (string= (ruby-add-log-current-method) "M::C#foo"))))
 
+(ert-deftest ruby-add-log-current-method-after-inner-class-outside-methods ()
+  (ruby-with-temp-buffer (ruby-test-string
+                          "module M
+                          |  class C
+                          |    class D
+                          |    end
+                          |
+                          |_
+                          |  end
+                          |end")
+    (search-backward "_")
+    (delete-char 1)
+    (should (string= (ruby-add-log-current-method) "M::C"))))
+
+(ert-deftest ruby-add-log-current-method-after-inner-class-outside-methods-with-text ()
+  (ruby-with-temp-buffer (ruby-test-string
+                          "module M
+                          |  class C
+                          |    class D
+                          |    end
+                          |
+                          |    FOO = 5
+                          |  end
+                          |end")
+    (search-backward "FOO")
+    (should (string= (ruby-add-log-current-method) "M::C"))))
+
+(ert-deftest ruby-add-log-current-method-after-endless-method ()
+  (ruby-with-temp-buffer (ruby-test-string
+                          "module M
+                          |  class C
+                          |    def foo =
+                          |      4_
+                          |  end
+                          |end")
+    (search-backward "_")
+    (delete-char 1)
+    (should (string= (ruby-add-log-current-method) "M::C#foo"))))
+
 (defvar ruby-block-test-example
   (ruby-test-string
    "class C
@@ -904,16 +943,20 @@ VALUES-PLIST is a list with alternating index and value elements."
                      "Blub#bye"
                      "Blub#hiding")))))
 
-(ert-deftest ruby--indent/converted-from-manual-test ()
-  :tags '(:expensive-test)
-  ;; Converted from manual test.
-  (let ((buf (find-file-noselect (ert-resource-file "ruby.rb"))))
-    (unwind-protect
-        (with-current-buffer buf
-          (let ((orig (buffer-string)))
-            (indent-region (point-min) (point-max))
-            (should (equal (buffer-string) orig))))
-      (kill-buffer buf))))
+(defmacro ruby-deftest-indent (file)
+  `(ert-deftest ,(intern (format "ruby-indent-test/%s" file)) ()
+     ;; :tags '(:expensive-test)
+     (let ((buf (find-file-noselect (ert-resource-file ,file))))
+       (unwind-protect
+           (with-current-buffer buf
+             (let ((orig (buffer-string)))
+               ;; Indent and check that we get the original text.
+               (indent-region (point-min) (point-max))
+               (should (equal (buffer-string) orig))))
+         (kill-buffer buf)))))
+
+(ruby-deftest-indent "ruby.rb")
+(ruby-deftest-indent "ruby-method-params-indent.rb")
 
 (ert-deftest ruby--test-chained-indentation ()
   (with-temp-buffer

@@ -333,7 +333,10 @@ as the new values of the bound variables in the recursive invocation."
 ;;;###autoload
 (defun string-glyph-split (string)
   "Split STRING into a list of strings representing separate glyphs.
-This takes into account combining characters and grapheme clusters."
+This takes into account combining characters and grapheme clusters:
+if compositions are enbaled, each sequence of characters composed
+on display into a single grapheme cluster is treated as a single
+indivisible unit."
   (let ((result nil)
         (start 0)
         comp)
@@ -370,7 +373,8 @@ this defaults to the current buffer."
                                                    (min end (point-max)))))
       (if (not (setq disp (get-text-property sub-start 'display object)))
           ;; No old properties in this range.
-          (put-text-property sub-start sub-end 'display (list prop value))
+          (put-text-property sub-start sub-end 'display (list prop value)
+                             object)
         ;; We have old properties.
         (let ((vector nil))
           ;; Make disp into a list.
@@ -390,7 +394,7 @@ this defaults to the current buffer."
           (when vector
             (setq disp (seq-into disp 'vector)))
           ;; Finally update the range.
-          (put-text-property sub-start sub-end 'display disp)))
+          (put-text-property sub-start sub-end 'display disp object)))
       (setq sub-start sub-end))))
 
 ;;;###autoload
@@ -398,7 +402,7 @@ this defaults to the current buffer."
   "Query the user for a process and return the process object."
   ;; Currently supports only the PROCESS argument.
   ;; Must either return a list containing a process, or signal an error.
-  ;; (Returning `nil' would mean the current buffer's process.)
+  ;; (Returning nil would mean the current buffer's process.)
   (unless (fboundp 'process-list)
     (error "Asynchronous subprocesses are not supported on this system"))
   ;; Local function to return cons of a complete-able name, and the

@@ -76,6 +76,7 @@ buffer.")
   "C-n"  #'view-emacs-news
   "C-o"  #'describe-distribution
   "C-p"  #'view-emacs-problems
+  "C-q"  #'help-quick-toggle
   "C-s"  #'search-forward-help-for-help
   "C-t"  #'view-emacs-todo
   "C-w"  #'describe-no-warranty
@@ -116,7 +117,7 @@ buffer.")
   "v"    #'describe-variable
   "w"    #'where-is
   "x"    #'describe-command
-  "q"    #'help-quit-or-quick)
+  "q"    #'help-quit)
 
 (define-key global-map (char-to-string help-char) 'help-command)
 (define-key global-map [help] 'help-command)
@@ -243,7 +244,17 @@ buffer.")
       ;; ... and shrink it immediately.
       (fit-window-to-buffer))
     (message
-     (substitute-command-keys "Toggle the quick help buffer using \\[help-quit-or-quick]."))))
+     (substitute-command-keys "Toggle the quick help buffer using \\[help-quick-toggle]."))))
+
+(defun help-quick-toggle ()
+  "Toggle the quick-help window."
+  (interactive)
+  (if (and-let* ((window (get-buffer-window "*Quick Help*")))
+        (quit-window t window))
+      ;; Clear the message we may have gotten from `C-h' and then
+      ;; waiting before hitting `q'.
+      (message "")
+    (help-quick)))
 
 (defalias 'cheat-sheet #'help-quick)
 
@@ -251,21 +262,6 @@ buffer.")
   "Just exit from the Help command's command loop."
   (interactive)
   nil)
-
-(defun help-quit-or-quick ()
-  "Call `help-quit' or  `help-quick' depending on the context."
-  (interactive)
-  (cond
-   (help-buffer-under-preparation
-    ;; FIXME: There should be a better way to detect if we are in the
-    ;;        help command loop.
-    (help-quit))
-   ((and-let* ((window (get-buffer-window "*Quick Help*")))
-      (quit-window t window)
-      ;; Clear the message we may have gotten from `C-h' and then
-      ;; waiting before hitting `q'.
-      (message "")))
-   ((help-quick))))
 
 (defvar help-return-method nil
   "What to do to \"exit\" the help buffer.
@@ -416,7 +412,7 @@ Do not call this in the scope of `with-help-window'."
        ("describe-package" "Describe a specific Emacs package")
        ""
        ("help-with-tutorial" "Start the Emacs tutorial")
-       ("help-quick-or-quit" "Display the quick help buffer.")
+       ("help-quick-toggle" "Display the quick help buffer.")
        ("view-echo-area-messages"
         "Show recent messages (from echo area)")
        ("view-lossage" ,(format "Show last %d input keystrokes (lossage)"
@@ -861,11 +857,13 @@ in the selected window."
 	 (mouse-msg (if (or (memq 'click modifiers) (memq 'down modifiers)
 			    (memq 'drag modifiers))
                         " at that spot" ""))
+         (click-pos (event-end event))
          ;; Use `posn-set-point' to handle the case when a menu item
          ;; is selected from the context menu that should describe KEY
          ;; at the position of mouse click that opened the context menu.
-         ;; When no mouse was involved, don't use `posn-set-point'.
-         (defn (if buffer
+         ;; When no mouse was involved, or the event doesn't provide a
+         ;; valid position, don't use `posn-set-point'.
+         (defn (if (or buffer (not (consp click-pos)))
                    (key-binding key t)
                  (save-excursion (posn-set-point (event-end event))
                                  (key-binding key t)))))

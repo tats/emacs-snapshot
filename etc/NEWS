@@ -30,12 +30,84 @@ applies, and please also update docstrings as needed.
 
 * Changes in Emacs 30.1
 
+** X selection requests are now handled much faster and asynchronously.
+This means it should be less necessary to disable the likes of
+`select-active-regions' when Emacs is running over a slow network
+connection.
+
+** Emacs now updates invisible frames that are made visible by a compositor.
+If an invisible or an iconified frame is shown to the user by the
+compositing manager, Emacs will now redisplay such a frame even though
+'frame-visible-' returns nil or 'icon' for it.  This can happen, for
+example, as part of preview for iconified frames.
+
 
 * Editing Changes in Emacs 30.1
 
+** New helper 'transpose-sexps-function'
+Emacs now can set this defvar to customize the behavior of the
+'transpose-sexps' function.
+
+** New function 'treesit-transpose-sexps'
+treesit.el now unconditionally sets 'transpose-sexps-function' for all
+Tree-sitter modes.  This functionality utilizes the new
+'transpose-sexps-function'.
+
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
+---
+** Variable order and truncation can now be configured in gdb-many-window mode.
+The new variable 'gdb-locals-table-row-config' allows users to
+configure the order and max length of various properties in the local
+variables buffer when using 'gdb-many-windows'.
 
+By default, this variable is set to write the properties in the order:
+name, type and value, where the name and type are truncated to 20
+characters, and the value is truncated according to the value of
+'gdb-locals-value-limit'.
+
+If you want to get back the old behavior, set
+'gdb-locals-table-row-config' to  the value
+
+  ((type . 0)(name . 0)(value . ,gdb-locals-value-limit)).
+
+** VC
+
+---
+*** New user option 'vc-git-shortlog-switches'.
+This is a string or a list of strings that specifies the Git log
+switches for shortlogs, such as the one produced by 'C-x v L'.
+'vc-git-log-switches' is no longer used for shortlogs.
+
+** bs
+
+---
+*** New user option 'bs-default-action-list'.
+You can now configure how to display the "*buffer-selection*" buffer
+using this new option.  (Or set 'display-buffer-alist' directly.)
+
+** Eshell
+
++++
+*** New splice operator for Eshell dollar expansions.
+Dollar expansions in Eshell now let you splice the elements of the
+expansion in-place using '$@expr'.  This makes it easier to fill lists
+of arguments into a command, such as when defining aliases.  For more
+information, see the "(eshell) Dollars Expansion" node in the Eshell
+manual.
+
++++
+*** 'eshell-read-aliases-list' is now an interactive command.
+After manually editing 'eshell-aliases-file', you can use
+'M-x eshell-read-aliases-list' to load the edited aliases.
+
+** Prog Mode
++++
+*** New command 'prog-fill-reindent-defun'
+This command either fills a single paragraph in a defun, such as a
+doc-string, or a comment, or (re)indents the surrounding defun if
+point is not in a comment or a string.  It is by default bound to
+'M-q' in 'prog-mode' and all its descendants.
 
 * New Modes and Packages in Emacs 30.1
 
@@ -44,6 +116,53 @@ applies, and please also update docstrings as needed.
 
 
 * Lisp Changes in Emacs 30.1
+
+** New or changed byte-compilation warnings
+
+---
+*** Warn about empty bodies for more special forms and macros.
+The compiler now warns about an empty body argument to 'when',
+'unless', 'ignore-error' and 'with-suppressed-warnings' in addition to
+the existing warnings for 'let' and 'let*'.  Example:
+
+  (when (> x 2))
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'empty-body'.
+
+---
+*** Warn about quoted error names in 'condition-case' and 'ignore-error'.
+The compiler now warns about quoted condition (error) names
+in 'condition-case' and 'ignore-error'.  Example:
+
+  (condition-case nil
+      (/ x y)
+    ('arith-error "division by zero"))
+
+Quoting them adds the error name 'quote' to those handled or ignored
+respectively, which was probably not intended.
+
+---
+*** Warn about comparison with literal constants without defined identity.
+The compiler now warns about comparisons by identity with a literal
+string, cons, vector, record, function, large integer or float as this
+may not match any value at all.  Example:
+
+  (eq x "hello")
+
+Only literals for symbols and small integers (fixnums), including
+characters, are guaranteed to have a consistent (unique) identity.
+This warning applies to 'eq', 'eql', 'memq', 'memql', 'assq', 'rassq',
+'remq' and 'delq'.
+
+To compare by (structural) value, use 'equal', 'member', 'assoc',
+'rassoc', 'remove' or 'delete' instead.  Floats and bignums can also
+be compared using 'eql', '=' and 'memql'.  Function literals cannot be
+compared reliably at all.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'suspicious'.
+
 
 
 * Changes in Emacs 30.1 on Non-Free Operating Systems
@@ -64,3 +183,11 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+
+
+Local variables:
+coding: utf-8
+mode: outline
+mode: emacs-news
+paragraph-separate: "[	 ]"
+end:

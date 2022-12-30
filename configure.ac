@@ -1841,7 +1841,9 @@ AC_CHECK_HEADERS_ONCE(
   coff.h pty.h
   sys/resource.h
   sys/utsname.h pwd.h utmp.h util.h
-  sanitizer/lsan_interface.h])
+  sanitizer/lsan_interface.h
+  sanitizer/asan_interface.h
+  sanitizer/common_interface_defs.h])
 
 AC_CACHE_CHECK([for ADDR_NO_RANDOMIZE],
   [emacs_cv_personality_addr_no_randomize],
@@ -2693,39 +2695,6 @@ if test "${HAVE_X11}" = "yes"; then
     export LD_RUN_PATH
   fi
 
-  if test "${opsys}" = "gnu-linux"; then
-    AC_CACHE_CHECK([whether X on GNU/Linux needs -b to link], [emacs_cv_b_link],
-    [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],
-     [[XOpenDisplay ("foo");]])],
-     [xgnu_linux_first_failure=no],
-     [xgnu_linux_first_failure=yes])
-    if test "${xgnu_linux_first_failure}" = "yes"; then
-      OLD_CPPFLAGS="$CPPFLAGS"
-      OLD_LIBS="$LIBS"
-      CPPFLAGS="$CPPFLAGS -b i486-linuxaout"
-      LIBS="$LIBS -b i486-linuxaout"
-      AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],
-       [[XOpenDisplay ("foo");]])],
-       [xgnu_linux_second_failure=no],
-       [xgnu_linux_second_failure=yes])
-      if test "${xgnu_linux_second_failure}" = "yes"; then
-	# If we get the same failure with -b, there is no use adding -b.
-	# So leave it out.  This plays safe.
-        emacs_cv_b_link=no
-      else
-        emacs_cv_b_link=yes
-      fi
-      CPPFLAGS=$OLD_CPPFLAGS
-      LIBS=$OLD_LIBS
-    else
-      emacs_cv_b_link=no
-    fi])
-    if test "x$emacs_cv_b_link" = xyes ; then
-      LD_SWITCH_X_SITE="$LD_SWITCH_X_SITE -b i486-linuxaout"
-      C_SWITCH_X_SITE="$C_SWITCH_X_SITE -b i486-linuxaout"
-    fi
-  fi
-
   # Reportedly, some broken Solaris systems have XKBlib.h but are missing
   # header files included from there.
   AC_CACHE_CHECK([for Xkb], [emacs_cv_xkb],
@@ -3220,6 +3189,7 @@ AC_SUBST([JSON_OBJ])
 
 HAVE_TREE_SITTER=no
 TREE_SITTER_OBJ=
+NEED_DYNLIB=no
 
 if test "${with_tree_sitter}" != "no"; then
    dnl Tree-sitter 0.20.2 added support to change the malloc it uses
@@ -3245,6 +3215,7 @@ if test "${with_tree_sitter}" != "no"; then
       LIBS=$OLD_LIBS
       if test "$ac_cv_func_ts_set_allocator" = yes; then
         AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
+	NEED_DYNLIB=yes
       else
         AC_MSG_ERROR([Tree-sitter library exists but its version is too old]);
         TREE_SITTER_CFLAGS=
@@ -3933,21 +3904,10 @@ if test "${HAVE_X11}" = "yes"; then
   if test "${HAVE_XCB}" = "yes"; then
     AC_CHECK_LIB([X11-xcb], [XGetXCBConnection], [HAVE_X11_XCB=yes])
     if test "${HAVE_X11_XCB}" = "yes"; then
-      AC_CHECK_LIB([xcb-util], [xcb_aux_sync], [HAVE_XCB_UTIL=yes])
-      if test "${HAVE_XCB_UTIL}" = "yes"; then
-	AC_DEFINE([USE_XCB], [1],
+      AC_DEFINE([USE_XCB], [1],
 [Define to 1 if you have the XCB library and X11-XCB library for mixed
-  X11/XCB programming.])
-        XCB_LIBS="-lX11-xcb -lxcb -lxcb-util"
-      else
-	AC_CHECK_LIB([xcb-aux], [xcb_aux_sync], [HAVE_XCB_AUX=yes])
-        if test "${HAVE_XCB_AUX}" = "yes"; then
-	  AC_DEFINE([USE_XCB], [1],
-[Define to 1 if you have the XCB library and X11-XCB library for mixed
- X11/XCB programming.])
-          XCB_LIBS="-lX11-xcb -lxcb -lxcb-aux"
-        fi
-      fi
+X11/XCB programming.])
+      XCB_LIBS="-lX11-xcb -lxcb"
     fi
   fi
 fi
@@ -4154,7 +4114,6 @@ AC_SUBST(DYNAMIC_LIB_SECONDARY_SUFFIX)
 LIBMODULES=
 HAVE_MODULES=no
 MODULES_OBJ=
-NEED_DYNLIB=no
 MODULES_SUFFIX="${DYNAMIC_LIB_SUFFIX}"
 MODULES_SECONDARY_SUFFIX="${DYNAMIC_LIB_SECONDARY_SUFFIX}"
 
@@ -4704,7 +4663,7 @@ AC_SUBST([XINERAMA_LIBS])
 ### Use Xfixes (-lXfixes) if available
 HAVE_XFIXES=no
 if test "${HAVE_X11}" = "yes"; then
-  XFIXES_REQUIRED=4.0.0
+  XFIXES_REQUIRED=1.0.0
   XFIXES_MODULES="xfixes >= $XFIXES_REQUIRED"
   EMACS_CHECK_MODULES([XFIXES], [$XFIXES_MODULES])
   if test $HAVE_XFIXES = no; then
@@ -5008,6 +4967,7 @@ pthread_sigmask strsignal setitimer \
 sendto recvfrom getsockname getifaddrs freeifaddrs \
 gai_strerror sync \
 getpwent endpwent getgrent endgrent \
+renameat2 \
 cfmakeraw cfsetspeed __executable_start log2 pthread_setname_np \
 pthread_set_name_np])
 LIBS=$OLD_LIBS
@@ -5249,6 +5209,7 @@ AC_CACHE_CHECK([whether signals can be handled on alternate stack],
 	       [emacs_cv_alternate_stack],
   [AC_COMPILE_IFELSE(
      [AC_LANG_PROGRAM([[#include <signal.h>
+			#include <stdlib.h>
 		      ]],
 		      [[stack_t ss;
 			struct sigaction sa;
@@ -6000,7 +5961,7 @@ case $opsys in
   gnu-linux | gnu-kfreebsd )
     AC_DEFINE([USG], [])
     AC_DEFINE([GNU_LINUX], [],
-      [Define if ths system is compatible with GNU/Linux.])
+      [Define if this system is compatible with GNU/Linux.])
     ;;
 
   hpux*)

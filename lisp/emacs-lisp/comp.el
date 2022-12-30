@@ -3716,7 +3716,7 @@ Prepare every function for final compilation and drive the C back-end."
               (if (zerop
                    (call-process (expand-file-name invocation-name
                                                    invocation-directory)
-				 nil t t "-no-comp-spawn" "--batch" "-l"
+				 nil t t "-no-comp-spawn" "-Q" "--batch" "-l"
                                  temp-file))
                   (progn
                     (delete-file temp-file)
@@ -4005,8 +4005,11 @@ display a message."
                              :command (list
                                        (expand-file-name invocation-name
                                                          invocation-directory)
-                                       "-no-comp-spawn" "--batch" "-l"
-                                       temp-file)
+                                       "-no-comp-spawn" "-Q" "--batch"
+                                       "--eval"
+                                       ;; Suppress Abort dialogs on MS-Windows
+                                       "(setq w32-disable-abort-dialog t)"
+                                       "-l" temp-file)
                              :sentinel
                              (lambda (process _event)
                                (run-hook-with-args
@@ -4115,7 +4118,6 @@ the deferred compilation mechanism."
                      comp-ctxt
                      (comp-ctxt-output comp-ctxt)
                      (file-exists-p (comp-ctxt-output comp-ctxt)))
-            (message "Deleting %s" (comp-ctxt-output comp-ctxt))
             (delete-file (comp-ctxt-output comp-ctxt))))))))
 
 (defun native-compile-async-skip-p (file load selector)

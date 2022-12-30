@@ -279,7 +279,7 @@ See `tramp-actions-before-shell' for more info.")
     (lock-file . tramp-handle-lock-file)
     (make-auto-save-file-name . tramp-handle-make-auto-save-file-name)
     (make-directory . tramp-smb-handle-make-directory)
-    (make-directory-internal . tramp-smb-handle-make-directory-internal)
+    (make-directory-internal . ignore)
     (make-lock-file-name . tramp-handle-make-lock-file-name)
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
     (make-process . ignore)
@@ -1172,26 +1172,19 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 
 (defun tramp-smb-handle-make-directory (dir &optional parents)
   "Like `make-directory' for Tramp files."
-  (setq dir (directory-file-name (expand-file-name dir)))
-  (unless (file-name-absolute-p dir)
-    (setq dir (expand-file-name dir default-directory)))
-  (with-parsed-tramp-file-name dir nil
-    (when (and (null parents) (file-exists-p dir))
-      (tramp-error v 'file-already-exists dir))
-    (let* ((ldir (file-name-directory dir)))
-      ;; Make missing directory parts.
-      (when (and parents
-		 (tramp-smb-get-share v)
-		 (not (file-directory-p ldir)))
-	(make-directory ldir parents))
-      ;; Just do it.
-      (when (file-directory-p ldir)
-	(make-directory-internal dir))
-      (unless (file-directory-p dir)
-	(tramp-error v 'file-error "Couldn't make directory %s" dir)))))
+  (tramp-skeleton-make-directory dir parents
+    (tramp-smb-send-command
+     v (if (tramp-smb-get-cifs-capabilities v)
+	   (format "posix_mkdir %s %o"
+		   (tramp-smb-shell-quote-localname v) (default-file-modes))
+	 (format "mkdir %s" (tramp-smb-shell-quote-localname v))))
+    (unless (file-directory-p dir)
+      (tramp-error v 'file-error "Couldn't make directory %s" dir))))
 
+;; This is not used anymore.
 (defun tramp-smb-handle-make-directory-internal (directory)
   "Like `make-directory-internal' for Tramp files."
+  (declare (obsolete nil "29.1"))
   (setq directory (directory-file-name (expand-file-name directory)))
   (unless (file-name-absolute-p directory)
     (setq directory (expand-file-name directory default-directory)))
