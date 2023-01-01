@@ -1,6 +1,6 @@
 ;;; c-ts-mode.el --- tree-sitter support for C and C++  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022 Free Software Foundation, Inc.
+;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
 
 ;; Author     : Theodor Thornhill <theo@thornhill.no>
 ;; Maintainer : Theodor Thornhill <theo@thornhill.no>
@@ -63,6 +63,8 @@ follows the form of `treesit-simple-indent-rules'."
                  (function :tag "A function for user customized style" ignore))
   :group 'c)
 
+;;; Syntax table
+
 (defvar c-ts-mode--syntax-table
   (let ((table (make-syntax-table)))
     ;; Taken from the cc-langs version
@@ -85,13 +87,27 @@ follows the form of `treesit-simple-indent-rules'."
     table)
   "Syntax table for `c-ts-mode'.")
 
-(defvar c++-ts-mode--syntax-table
-  (let ((table (make-syntax-table c-ts-mode--syntax-table)))
-    ;; Template delimiters.
-    (modify-syntax-entry ?<  "("     table)
-    (modify-syntax-entry ?>  ")"     table)
-    table)
-  "Syntax table for `c++-ts-mode'.")
+(defun c-ts-mode--syntax-propertize (beg end)
+  "Apply syntax text property to template delimiters between BEG and END.
+
+< and > are usually punctuation, e.g., in ->.  But when used for
+templates, they should be considered pairs.
+
+This function checks for < and > in the changed RANGES and apply
+appropriate text property to alter the syntax of template
+delimiters < and >'s."
+  (goto-char beg)
+  (while (re-search-forward (rx (or "<" ">")) end t)
+    (pcase (treesit-node-type
+            (treesit-node-parent
+             (treesit-node-at (match-beginning 0))))
+      ("template_argument_list"
+       (put-text-property (match-beginning 0)
+                          (match-end 0)
+                          'syntax-table
+                          (pcase (char-before)
+                            (?< '(4 . ?>))
+                            (?> '(5 . ?<))))))))
 
 ;;; Indent
 
@@ -102,7 +118,7 @@ MODE is either `c' or `cpp'."
          `(((parent-is "translation_unit") parent-bol 0)
            ((node-is ")") parent 1)
            ((node-is "]") parent-bol 0)
-           ((node-is "}") (and parent parent-bol) 0)
+           ((node-is "}") c-ts-mode--bracket-children-anchor 0)
            ((node-is "else") parent-bol 0)
            ((node-is "case") parent-bol 0)
            ((node-is "preproc_arg") no-indent)
@@ -117,7 +133,8 @@ MODE is either `c' or `cpp'."
            ((match "#endif" "preproc_if") point-min 0)
            ((match "preproc_function_def" "compound_statement") point-min 0)
            ((match "preproc_call" "compound_statement") point-min 0)
-           ((parent-is "compound_statement") (and parent parent-bol) c-ts-mode-indent-offset)
+           ((parent-is "compound_statement")
+            c-ts-mode--bracket-children-anchor c-ts-mode-indent-offset)
            ((parent-is "function_definition") parent-bol 0)
            ((parent-is "conditional_expression") first-sibling 0)
            ((parent-is "assignment_expression") parent-bol c-ts-mode-indent-offset)
@@ -172,6 +189,21 @@ MODE is either `c' or `cpp'."
              ('bsd   (alist-get 'bsd (c-ts-mode--indent-styles mode)))
              ('linux (alist-get 'linux (c-ts-mode--indent-styles mode)))))))
     `((,mode ,@style))))
+
+(defun c-ts-mode--bracket-children-anchor (_n parent &rest _)
+  "This anchor is used for children of a compound_statement.
+So anything inside a {} block.  PARENT should be the
+compound_statement.  This anchor looks at the {, if itson its own
+line, anchor at it, if it has stuff before it, anchor at the
+beginning of grandparent."
+  (save-excursion
+    (goto-char (treesit-node-start parent))
+    (let ((bol (line-beginning-position)))
+      (skip-chars-backward " \t")
+      (treesit-node-start
+       (if (< bol (point))
+           (treesit-node-parent parent)
+         parent)))))
 
 (defun c-ts-mode--looking-at-star (&rest _)
   "A tree-sitter simple indent matcher.
@@ -487,92 +519,44 @@ For NODE, OVERRIDE, START, and END, see
 
 (defun c-ts-mode--defun-name (node)
   "Return the name of the defun NODE.
-Return nil if NODE is not a defun node, return an empty string if
-NODE doesn't have a name."
+Return nil if NODE is not a defun node or doesn't have a name."
   (treesit-node-text
    (pcase (treesit-node-type node)
      ((or "function_definition" "declaration")
       (c-ts-mode--declarator-identifier
        (treesit-node-child-by-field-name node "declarator")))
-     ("struct_specifier"
+     ((or "struct_specifier" "enum_specifier"
+          "union_specifier" "class_specifier")
       (treesit-node-child-by-field-name node "name")))
    t))
 
-(defun c-ts-mode--imenu-1 (node)
-  "Helper for `c-ts-mode--imenu'.
-Find string representation for NODE and set marker, then recurse
-the subtrees."
-  (let* ((ts-node (car node))
-         (subtrees (mapcan #'c-ts-mode--imenu-1 (cdr node)))
-         (name (when ts-node
-                 (treesit-defun-name ts-node)))
-         (marker (when ts-node
-                   (set-marker (make-marker)
-                               (treesit-node-start ts-node)))))
-    (cond
-     ;; A struct_specifier could be inside a parameter list, another
-     ;; struct definition, a variable declaration, a function
-     ;; declaration.  In those cases we don't include it.
-     ((string-match-p
-       (rx (or "parameter_declaration" "field_declaration"
-               "declaration" "function_definition"))
-       (or (treesit-node-type (treesit-node-parent ts-node))
-           ""))
-      nil)
-     ;; Ignore function local variable declarations.
-     ((and (equal (treesit-node-type ts-node) "declaration")
-           (not (equal (treesit-node-type (treesit-node-parent ts-node))
-                       "translation_unit")))
-      nil)
-     ((or (null ts-node) (null name)) subtrees)
-     (subtrees
-      `((,name ,(cons name marker) ,@subtrees)))
-     (t
-      `((,name . ,marker))))))
-
-(defun c-ts-mode--imenu ()
-  "Return Imenu alist for the current buffer."
-  (let* ((node (treesit-buffer-root-node))
-         (func-tree (treesit-induce-sparse-tree
-                     node "^function_definition$" nil 1000))
-         (var-tree (treesit-induce-sparse-tree
-                    node "^declaration$" nil 1000))
-         (struct-tree (treesit-induce-sparse-tree
-                       node "^struct_specifier$" nil 1000))
-         (func-index (c-ts-mode--imenu-1 func-tree))
-         (var-index (c-ts-mode--imenu-1 var-tree))
-         (struct-index (c-ts-mode--imenu-1 struct-tree)))
-    (append
-     (when struct-index `(("Struct" . ,struct-index)))
-     (when var-index `(("Variable" . ,var-index)))
-     (when func-index `(("Function" . ,func-index))))))
-
 ;;; Defun navigation
 
-(defun c-ts-mode--end-of-defun ()
-  "`end-of-defun-function' of `c-ts-mode'."
-  ;; A struct/enum/union_specifier node doesn't include the ; at the
-  ;; end, so we manually skip it.
-  (treesit-end-of-defun)
-  (when (looking-at (rx (* " ") ";"))
-    (goto-char (match-end 0))
-    ;; This part is copied from `end-of-defun'.
-    (unless (bolp)
-      (skip-chars-forward " \t")
-      (if (looking-at "\\s<\\|\n")
-	  (forward-line 1)))))
-
 (defun c-ts-mode--defun-valid-p (node)
-  (if (string-match-p
-       (rx (or "struct_specifier"
-               "enum_specifier"
-               "union_specifier"))
-       (treesit-node-type node))
-      (null
-       (treesit-node-top-level
-        node (rx (or "function_definition"
-                     "type_definition"))))
-    t))
+  "Return non-nil if NODE is a valid defun node.
+Ie, NODE is not nested."
+  (not (or (and (member (treesit-node-type node)
+                        '("struct_specifier"
+                          "enum_specifier"
+                          "union_specifier"
+                          "declaration"))
+                ;; If NODE's type is one of the above, make sure it is
+                ;; top-level.
+                (treesit-node-top-level
+                 node (rx (or "function_definition"
+                              "type_definition"
+                              "struct_specifier"
+                              "enum_specifier"
+                              "union_specifier"
+                              "declaration"))))
+
+           (and (equal (treesit-node-type node) "declaration")
+                ;; If NODE is a declaration, make sure it is not a
+                ;; function declaration.
+                (equal (treesit-node-type
+                        (treesit-node-child-by-field-name
+                         node "declarator"))
+                       "function_declarator")))))
 
 (defun c-ts-mode--defun-skipper ()
   "Custom defun skipper for `c-ts-mode' and friends.
@@ -611,7 +595,9 @@ ARG is passed to `fill-paragraph'."
            (start-marker nil)
            (end-marker nil)
            (end-len 0))
-      (when (equal (treesit-node-type node) "comment")
+      ;; These covers C/C++, Java, JavaScript, TypeScript, Rust, C#.
+      (when (member (treesit-node-type node)
+                    '("comment" "line_comment" "block_comment"))
         ;; We mask "/*" and the space before "*/" like
         ;; `c-fill-paragraph' does.
         (atomic-change-group
@@ -622,6 +608,10 @@ ARG is passed to `fill-paragraph'."
             (goto-char (match-beginning 1))
             (setq start-marker (point-marker))
             (replace-match " " nil nil nil 1))
+          ;; Include whitespaces before /*.
+          (goto-char start)
+          (beginning-of-line)
+          (setq start (point))
           ;; Mask spaces before "*/" if it is attached at the end
           ;; of a sentence rather than on its own line.
           (goto-char end)
@@ -660,6 +650,66 @@ ARG is passed to `fill-paragraph'."
       ;; itself.
       t)))
 
+(defun c-ts-mode-comment-setup ()
+  "Set up local variables for C-like comment.
+
+Set up:
+ - `comment-start'
+ - `comment-end'
+ - `comment-start-skip'
+ - `comment-end-skip'
+ - `adaptive-fill-mode'
+ - `adaptive-fill-first-line-regexp'
+ - `paragraph-start'
+ - `paragraph-separate'
+ - `fill-paragraph-function'"
+  (setq-local comment-start "// ")
+  (setq-local comment-end "")
+  (setq-local comment-start-skip (rx (or (seq "/" (+ "/"))
+                                         (seq "/" (+ "*")))
+                                     (* (syntax whitespace))))
+  (setq-local comment-end-skip
+              (rx (* (syntax whitespace))
+                  (group (or (syntax comment-end)
+                             (seq (+ "*") "/")))))
+  (setq-local adaptive-fill-mode t)
+  ;; This matches (1) empty spaces (the default), (2) "//", (3) "*",
+  ;; but do not match "/*", because we don't want to use "/*" as
+  ;; prefix when filling.  (Actually, it doesn't matter, because
+  ;; `comment-start-skip' matches "/*" which will cause
+  ;; `fill-context-prefix' to use "/*" as a prefix for filling, that's
+  ;; why we mask the "/*" in `c-ts-mode--fill-paragraph'.)
+  (setq-local adaptive-fill-regexp
+              (concat (rx (* (syntax whitespace))
+                          (group (or (seq "/" (+ "/")) (* "*"))))
+                      adaptive-fill-regexp))
+  ;; Note the missing * comparing to `adaptive-fill-regexp'.  The
+  ;; reason for its absence is a bit convoluted to explain.  Suffice
+  ;; to say that without it, filling a single line paragraph that
+  ;; starts with /* doesn't insert * at the beginning of each
+  ;; following line, and filling a multi-line paragraph whose first
+  ;; two lines start with * does insert * at the beginning of each
+  ;; following line.  If you know how does adaptive filling works, you
+  ;; know what I mean.
+  (setq-local adaptive-fill-first-line-regexp
+              (rx bos
+                  (seq (* (syntax whitespace))
+                       (group (seq "/" (+ "/")))
+                       (* (syntax whitespace)))
+                  eos))
+  ;; Same as `adaptive-fill-regexp'.
+  (setq-local paragraph-start
+              (rx (or (seq (* (syntax whitespace))
+                           (group (or (seq "/" (+ "/")) (* "*")))
+                           (* (syntax whitespace))
+                           ;; Add this eol so that in
+                           ;; `fill-context-prefix', `paragraph-start'
+                           ;; doesn't match the prefix.
+                           eol)
+                      "\f")))
+  (setq-local paragraph-separate paragraph-start)
+  (setq-local fill-paragraph-function #'c-ts-mode--fill-paragraph))
+
 ;;; Modes
 
 (defvar-keymap c-ts-mode-map
@@ -694,44 +744,25 @@ ARG is passed to `fill-paragraph'."
   (when (eq c-ts-mode-indent-style 'linux)
     (setq-local indent-tabs-mode t))
 
-  (setq-local adaptive-fill-mode t)
-  ;; This matches (1) empty spaces (the default), (2) "//", (3) "*",
-  ;; but do not match "/*", because we don't want to use "/*" as
-  ;; prefix when filling.  (Actually, it doesn't matter, because
-  ;; `comment-start-skip' matches "/*" which will cause
-  ;; `fill-context-prefix' to use "/*" as a prefix for filling, that's
-  ;; why we mask the "/*" in `c-ts-mode--fill-paragraph'.)
-  (setq-local adaptive-fill-regexp
-              (concat (rx (* (syntax whitespace))
-                          (group (or (seq "/" (+ "/")) (* "*"))))
-                      adaptive-fill-regexp))
-  ;; Same as `adaptive-fill-regexp'.
-  (setq-local adaptive-fill-first-line-regexp
-              (rx bos
-                  (seq (* (syntax whitespace))
-                       (group (or (seq "/" (+ "/")) (* "*")))
-                       (* (syntax whitespace)))
-                  eos))
-  ;; Same as `adaptive-fill-regexp'.
-  (setq-local paragraph-start
-              (rx (or (seq (* (syntax whitespace))
-                           (group (or (seq "/" (+ "/")) (* "*")))
-                           (* (syntax whitespace))
-                           ;; Add this eol so that in
-                           ;; `fill-context-prefix', `paragraph-start'
-                           ;; doesn't match the prefix.
-                           eol)
-                      "\f")))
-  (setq-local paragraph-separate paragraph-start)
-  (setq-local fill-paragraph-function #'c-ts-mode--fill-paragraph)
+  ;; Comment
+  (c-ts-mode-comment-setup)
 
   ;; Electric
   (setq-local electric-indent-chars
               (append "{}():;," electric-indent-chars))
 
   ;; Imenu.
-  (setq-local imenu-create-index-function #'c-ts-mode--imenu)
-  (setq-local which-func-functions nil)
+  (setq-local treesit-simple-imenu-settings
+              (let ((pred #'c-ts-mode--defun-valid-p))
+                `(("Struct" ,(rx bos (or "struct" "enum" "union")
+                                 "_specifier" eos)
+                   ,pred nil)
+                  ("Variable" ,(rx bos "declaration" eos) ,pred nil)
+                  ("Function" "\\`function_definition\\'" ,pred nil)
+                  ("Class" ,(rx bos (or "class_specifier"
+                                        "function_definition")
+                                eos)
+                   ,pred nil))))
 
   (setq-local treesit-font-lock-feature-list
               '(( comment definition)
@@ -752,13 +783,6 @@ ARG is passed to `fill-paragraph'."
   ;; Comments.
   (setq-local comment-start "/* ")
   (setq-local comment-end " */")
-  (setq-local comment-start-skip (rx (or (seq "/" (+ "/"))
-                                         (seq "/" (+ "*")))
-                                     (* (syntax whitespace))))
-  (setq-local comment-end-skip
-              (rx (* (syntax whitespace))
-                  (group (or (syntax comment-end)
-                             (seq (+ "*") "/")))))
 
   (setq-local treesit-simple-indent-rules
               (c-ts-mode--set-indent-style 'c))
@@ -766,37 +790,23 @@ ARG is passed to `fill-paragraph'."
   ;; Font-lock.
   (setq-local treesit-font-lock-settings (c-ts-mode--font-lock-settings 'c))
 
-  (treesit-major-mode-setup)
-
-  ;; Override default value of end-of-defun-function set by
-  ;; `treesit-major-mode-setup'.
-  (setq-local end-of-defun-function #'c-ts-mode--end-of-defun))
+  (treesit-major-mode-setup))
 
 ;;;###autoload
 (define-derived-mode c++-ts-mode c-ts-base-mode "C++"
   "Major mode for editing C++, powered by tree-sitter."
   :group 'c++
-  :syntax-table c++-ts-mode--syntax-table
 
   (unless (treesit-ready-p 'cpp)
     (error "Tree-sitter for C++ isn't available"))
-
-  ;; Comments.
-  (setq-local comment-start "// ")
-  (setq-local comment-end "")
-  (setq-local comment-start-skip (rx (or (seq "/" (+ "/"))
-                                         (seq "/" (+ "*")))
-                                     (* (syntax whitespace))))
-  (setq-local comment-end-skip
-              (rx (* (syntax whitespace))
-                  (group (or (syntax comment-end)
-                             (seq (+ "*") "/")))))
 
   (setq-local treesit-text-type-regexp
               (regexp-opt '("comment"
                             "raw_string_literal")))
 
   (treesit-parser-create 'cpp)
+  (setq-local syntax-propertize-function
+              #'c-ts-mode--syntax-propertize)
 
   (setq-local treesit-simple-indent-rules
               (c-ts-mode--set-indent-style 'cpp))
@@ -804,11 +814,7 @@ ARG is passed to `fill-paragraph'."
   ;; Font-lock.
   (setq-local treesit-font-lock-settings (c-ts-mode--font-lock-settings 'cpp))
 
-  (treesit-major-mode-setup)
-
-  ;; Override default value of end-of-defun-function set by
-  ;; `treesit-major-mode-setup'.
-  (setq-local end-of-defun-function #'c-ts-mode--end-of-defun))
+  (treesit-major-mode-setup))
 
 (provide 'c-ts-mode)
 

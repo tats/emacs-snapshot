@@ -1,6 +1,6 @@
 ;;; css-mode.el --- Major mode to edit CSS files  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2023 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Maintainer: Simen Heggestøyl <simenheg@gmail.com>
@@ -1425,33 +1425,6 @@ Return nil if there is no name or if NODE is not a defun node."
          (treesit-node-start node)
          (treesit-node-start block)))))))
 
-(defun css--treesit-imenu-1 (node)
-  "Helper for `css--treesit-imenu'.
-Find string representation for NODE and set marker, then recurse
-the subtrees."
-  (let* ((ts-node (car node))
-         (subtrees (mapcan #'css--treesit-imenu-1 (cdr node)))
-         (name (when ts-node
-                 (or (treesit-defun-name ts-node)
-                     "Anonymous")))
-         (marker (when ts-node
-                   (set-marker (make-marker)
-                               (treesit-node-start ts-node)))))
-    (cond
-     ((or (null ts-node) (null name)) subtrees)
-     (subtrees
-      `((,name ,(cons name marker) ,@subtrees)))
-     (t
-      `((,name . ,marker))))))
-
-(defun css--treesit-imenu ()
-  "Return Imenu alist for the current buffer."
-  (let* ((node (treesit-buffer-root-node))
-         (tree (treesit-induce-sparse-tree
-                node (rx (or "rule_set" "media_statement"))
-                nil 1000)))
-    (css--treesit-imenu-1 tree)))
-
 ;;; Completion
 
 (defun css--complete-property ()
@@ -1831,11 +1804,15 @@ can also be used to fill comments.
   :syntax-table css-mode-syntax-table
   (when (treesit-ready-p 'css)
     ;; Borrowed from `css-mode'.
+    (setq-local syntax-propertize-function
+                css-syntax-propertize-function)
     (add-hook 'completion-at-point-functions
               #'css-completion-at-point nil 'local)
     (setq-local fill-paragraph-function #'css-fill-paragraph)
     (setq-local adaptive-fill-function #'css-adaptive-fill)
-    (setq-local add-log-current-defun-function #'css-current-defun-name)
+    ;; `css--fontify-region' first calls the default function, which
+    ;; will call tree-sitter's function, then it fontifies colors.
+    (setq-local font-lock-fontify-region-function #'css--fontify-region)
 
     ;; Tree-sitter specific setup.
     (treesit-parser-create 'css)
@@ -1847,8 +1824,9 @@ can also be used to fill comments.
                 '((selector comment query keyword)
                   (property constant string)
                   (error variable function operator bracket)))
-    (setq-local imenu-create-index-function #'css--treesit-imenu)
-    (setq-local which-func-functions nil)
+    (setq-local treesit-simple-imenu-settings
+                `(( nil ,(rx bos (or "rule_set" "media_statement") eos)
+                    nil nil)))
     (treesit-major-mode-setup)))
 
 ;;;###autoload

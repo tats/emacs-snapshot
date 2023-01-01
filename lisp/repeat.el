@@ -1,6 +1,6 @@
 ;;; repeat.el --- convenient way to repeat the previous command  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998, 2001-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1998, 2001-2023 Free Software Foundation, Inc.
 
 ;; Author: Will Mengarini <seldon@eskimo.com>
 ;; Created: Mo 02 Mar 98
@@ -399,7 +399,8 @@ but the property value is `t', then check the last key."
 (defcustom repeat-echo-function #'repeat-echo-message
   "Function to display a hint about available keys.
 Function is called after every repeatable command with one argument:
-a repeating map, or nil after deactivating the transient repeating mode."
+a repeating map, or nil after deactivating the transient repeating mode.
+You can use `add-function' for multiple functions simultaneously."
   :type '(choice (const :tag "Show hints in the echo area"
                         repeat-echo-message)
                  (const :tag "Show indicator in the mode line"

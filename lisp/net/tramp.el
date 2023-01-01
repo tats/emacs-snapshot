@@ -1,6 +1,6 @@
 ;;; tramp.el --- Transparent Remote Access, Multiple Protocol  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2023 Free Software Foundation, Inc.
 
 ;; Author: Kai Großjohann <kai.grossjohann@gmx.net>
 ;;         Michael Albinus <michael.albinus@gmx.de>
@@ -5439,7 +5439,7 @@ Wait, until the connection buffer changes."
 	;; Hide message in buffer.
 	(narrow-to-region (point-max) (point-max))
 	;; Wait for new output.
-	(while (not (tramp-compat-ignore-error 'file-error
+	(while (not (tramp-compat-ignore-error file-error
 		      (tramp-wait-for-regexp
 		       proc 0.1 tramp-security-key-confirmed-regexp)))
 	  (when (tramp-check-for-regexp proc tramp-security-key-timeout-regexp)

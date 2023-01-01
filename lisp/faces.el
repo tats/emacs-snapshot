@@ -1,6 +1,6 @@
 ;;; faces.el --- Lisp faces -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2023 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -689,6 +689,10 @@ default attributes.  To avoid that, i.e. to cause ATTRIBUTE's value
 be reset to `unspecified' when creating new frames, disregarding
 what the FACE's face spec says, call this function with FRAME set to
 t and the ATTRIBUTE's value set to `unspecified'.
+
+Note that the ATTRIBUTE VALUE pairs are evaluated in the order
+they are specified, except that the `:family' and `:foundry'
+attributes are evaluated first.
 
 The following attributes are recognized:
 
