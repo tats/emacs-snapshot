@@ -11,7 +11,7 @@ Added-by: Rob Browning <rlb@defaultvalue.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lisp/version.el b/lisp/version.el
-index 7e36020..0fc94e7 100644
+index 9cadc59..f5e9a29 100644
 --- a/lisp/version.el
 +++ b/lisp/version.el
 @@ -67,7 +67,7 @@ emacs-version

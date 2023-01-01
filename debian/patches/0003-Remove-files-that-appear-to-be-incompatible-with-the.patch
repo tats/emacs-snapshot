@@ -28,7 +28,7 @@ Status: new
  4 files changed, 30 insertions(+), 45 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 93609a4..625a98b 100644
+index 2fb7754..98b0346 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -174,7 +174,9 @@ man1dir=
@@ -118,10 +118,10 @@ index 93609a4..625a98b 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 2770694..6f5156f 100644
+index 7833ed3..b9702e7 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6758,7 +6758,7 @@ AC_DEFUN
+@@ -6730,7 +6730,7 @@ AC_DEFUN
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index 2770694..6f5156f 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6824,15 +6824,6 @@ m4_define
+@@ -6796,15 +6796,6 @@ m4_define
  fi
  ])
  
@@ -147,7 +147,7 @@ index 2770694..6f5156f 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index a7dbbbb..b1fc978 100644
+index 1831bbb..c7a6da5 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -63,18 +63,14 @@ INSTALL_DATA =
@@ -161,23 +161,23 @@ index a7dbbbb..b1fc978 100644
  DOCMISC_W32 = @DOCMISC_W32@
  
  ## Info files to build and install on all platforms.
--INFO_COMMON = auth autotype bovine calc ccmode cl \
--	dbus dired-x ebrowse ede ediff edt efaq eglot eieio \
--	emacs-gnutls emacs-mime epa erc ert eshell eudc eww \
--	flymake forms gnus htmlfontify idlwave ido info.info \
--	mairix-el message mh-e modus-themes newsticker nxml-mode \
--	octave-mode org pcl-cvs pgg rcirc reftex remember sasl \
--	sc semantic ses sieve smtpmail speedbar srecode todo-mode \
--	tramp transient url vhdl-mode vip viper vtable widget wisent woman
+-INFO_COMMON = auth autotype bovine calc ccmode cl dbus dired-x		\
+-	ebrowse ede ediff edt efaq eglot eieio emacs-gnutls		\
+-	emacs-mime epa erc ert eshell eudc eww flymake forms gnus	\
+-	htmlfontify idlwave ido info.info mairix-el message mh-e	\
+-	modus-themes newsticker nxml-mode octave-mode org pcl-cvs pgg	\
+-	rcirc reftex remember sasl sc semantic ses sieve smtpmail	\
+-	speedbar srecode todo-mode tramp transient url use-package	\
+-	vhdl-mode vip viper vtable widget wisent woman
 +INFO_COMMON = efaq
  
  ## Info files to install on current platform.
  INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
 diff --git a/lisp/help.el b/lisp/help.el
-index b709062..ea6d7bb 100644
+index 83be85b..a847e35 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -500,6 +500,14 @@ view-help-file
+@@ -496,6 +496,14 @@ view-help-file
    (goto-address-mode 1)
    (goto-char (point-min)))
  
