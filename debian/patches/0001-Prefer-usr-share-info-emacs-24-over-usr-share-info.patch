@@ -21,7 +21,7 @@ index 02dde50..de4eb16 100644
      (if (not (eq system-type 'windows-nt))
 -	dirs
 +        ;; Debian: add per-flavor info directory in front.
-+        (cons (format "/usr/share/info/emacs-%d" emacs-major-version) dirs)
++        (cons (format "/usr/share/info/emacs-%s" emacs-version) dirs)
        ;; Include the info directory near where Emacs executable was installed.
        (let* ((instdir (file-name-directory invocation-directory))
  	     (dir1 (expand-file-name "../info/" instdir))
