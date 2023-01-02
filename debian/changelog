@@ -1,12 +1,14 @@
-emacs-snapshot (2:20221128+emacs-28.2-161730-g7939184f8e0-0.1) UNRELEASED; urgency=medium
+emacs-snapshot (2:20221230+emacs-28.2-163351-g9d0f5909afc-0.1) UNRELEASED; urgency=medium
 
   * New snapshot
   * Adjust debian/patches/0003*.patch
   * Disable debian/patches/000{4,5,6}*.patch
   * Mention the Savannah site instead of the FTP sites in debian/copyright
   * Generate debian/copyright with debian-sync
+  * Add transient.info
+  * Add minor_ver to infodir
 
- -- Tatsuya Kinoshita <tats@debian.org>  Fri, 02 Dec 2022 19:45:28 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 02 Jan 2023 20:44:01 +0900
 
 emacs-snapshot (2:20221114+emacs-28.2-161031-g723ceaca1d7-1) unstable; urgency=medium
 
