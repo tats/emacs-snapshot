@@ -6336,6 +6336,12 @@ RECURSIVE if DIRECTORY is nonempty."
 		  directory-exists))
 	(files--force recursive #'delete-directory-internal directory))))))
 
+(defcustom remote-file-name-inhibit-delete-by-moving-to-trash nil
+  "Whether remote files shall be moved to the Trash.
+This overrules any setting of `delete-by-moving-to-trash'."
+  :version "30.1"
+  :type 'boolean)
+
 (defun file-equal-p (file1 file2)
   "Return non-nil if files FILE1 and FILE2 name the same file.
 If FILE1 or FILE2 does not exist, the return value is unspecified."
@@ -7414,9 +7420,9 @@ files, you could say something like:
 
   (\"src/emacs/[^/]+/\\\\(.*\\\\)\\\\\\='\" \"src/emacs/.*/\\\\1\\\\\\='\")
 
-In this example, if you're in src/emacs/emacs-27/lisp/abbrev.el,
-and you an src/emacs/emacs-28/lisp/abbrev.el file exists, it's
-now defined as a sibling."
+In this example, if you're in \"src/emacs/emacs-27/lisp/abbrev.el\",
+and a \"src/emacs/emacs-28/lisp/abbrev.el\" file exists, it's now
+defined as a sibling."
   :type 'sexp
   :version "29.1")
 
@@ -7645,7 +7651,7 @@ If DIR's free space cannot be obtained, this function returns nil."
 	 ;; This avoids recognizing `1 may 1997' as a date in the line:
 	 ;; -r--r--r--   1 may      1997        1168 Oct 19 16:49 README
 
-	 ;; The "[BkKMGTPEZY]?" below supports "ls -alh" output.
+	 ;; The "[BkKMGTPEZYRQ]?" below supports "ls -alh" output.
 
 	 ;; For non-iso date formats, we add the ".*" in order to find
 	 ;; the last possible match.  This avoids recognizing
@@ -7657,8 +7663,8 @@ If DIR's free space cannot be obtained, this function returns nil."
          ;; parentheses:
          ;; -rw-r--r-- (modified) 2005-10-22 21:25 files.el
          ;; This is not supported yet.
-    (purecopy (concat "\\([0-9][BkKMGTPEZY]? " iso
-		      "\\|.*[0-9][BkKMGTPEZY]? "
+    (purecopy (concat "\\([0-9][BkKMGTPEZYRQ]? " iso
+		      "\\|.*[0-9][BkKMGTPEZYRQ]? "
 	              "\\(" western "\\|" western-comma
                       "\\|" DD-MMM-YYYY "\\|" east-asian "\\)"
 		      "\\) +")))
