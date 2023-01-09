@@ -118,7 +118,7 @@ index 2fb7754..98b0346 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index 7833ed3..b9702e7 100644
+index 8c11414..0dad718 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -6730,7 +6730,7 @@ AC_DEFUN
