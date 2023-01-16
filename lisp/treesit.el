@@ -1143,20 +1143,17 @@ See `treesit-simple-indent-presets'.")
                   (point))))
         (cons 'prev-adaptive-prefix
               (lambda (_n parent &rest _)
-                (save-excursion
-                  (re-search-backward
-                   (rx (not (or " " "\t" "\n"))) nil t)
-                  (beginning-of-line)
-                  (and (>= (point) (treesit-node-start parent))
-                       ;; `adaptive-fill-regexp' will not match "/*",
-                       ;; so we need to also try `comment-start-skip'.
-                       (or (and adaptive-fill-regexp
-                                (looking-at adaptive-fill-regexp)
-                                (> (- (match-end 0) (match-beginning 0)) 0)
-                                (match-end 0))
-                           (and comment-start-skip
-                                (looking-at comment-start-skip)
-                                (match-end 0)))))))
+                (let ((comment-start-bol
+                       (save-excursion
+                         (goto-char (treesit-node-start parent))
+                         (line-beginning-position))))
+                  (save-excursion
+                    (forward-line -1)
+                    (and (>= (point) comment-start-bol)
+                         adaptive-fill-regexp
+                         (looking-at adaptive-fill-regexp)
+                         (> (match-end 0) (match-beginning 0))
+                         (match-end 0))))))
         ;; TODO: Document.
         (cons 'grand-parent
               (lambda (_n parent &rest _)
@@ -1187,9 +1184,12 @@ See `treesit-simple-indent-presets'.")
                          res))))
         (cons 'or (lambda (&rest fns)
                     (lambda (node parent bol &rest _)
-                      (seq-find
-                       (lambda (fn) (funcall fn node parent bol))
-                       fns))))
+                      (let (res)
+                        (catch 'break
+                          (dolist (fn fns)
+                            (setq res (funcall fn node parent bol))
+                            (and res (throw 'break t))))
+                        res))))
         (cons 'not (lambda (fn)
                      (lambda (node parent bol &rest _)
                        (not (funcall fn node parent bol)))))
@@ -1338,10 +1338,10 @@ and returns
     (ANCHOR . OFFSET).
 
 BOL is the position of the beginning of the line; NODE is the
-\"largest\" node that starts at BOL; PARENT is its parent; ANCHOR
-is a point (not a node), and OFFSET is a number.  Emacs finds the
-column of ANCHOR and adds OFFSET to it as the final indentation
-of the current line.")
+\"largest\" node that starts at BOL (and isn't a root node);
+PARENT is its parent; ANCHOR is a point (not a node), and OFFSET
+is a number.  Emacs finds the column of ANCHOR and adds OFFSET to
+it as the final indentation of the current line.")
 
 (defun treesit--indent-1 ()
   "Indent the current line.
@@ -1359,10 +1359,13 @@ Return (ANCHOR . OFFSET).  This function is used by
                 ((treesit-language-at (point))
                  (treesit-node-at bol (treesit-language-at (point))))
                 (t (treesit-node-at bol))))
+         (root (treesit-parser-root-node
+                (treesit-node-parser smallest-node)))
          (node (treesit-parent-while
                 smallest-node
                 (lambda (node)
-                  (eq bol (treesit-node-start node))))))
+                  (and (eq bol (treesit-node-start node))
+                       (not (treesit-node-eq node root)))))))
     (let*
         ((parser (if smallest-node
                      (treesit-node-parser smallest-node)
@@ -1508,10 +1511,15 @@ OFFSET."
                return
                (let ((anchor-pos
                       (treesit--simple-indent-eval
-                       (list anchor node parent bol))))
-                 (cons anchor-pos (if (symbolp offset)
-                                      (symbol-value offset)
-                                    offset)))
+                       (list anchor node parent bol)))
+                     (offset-val
+                      (cond ((numberp offset) offset)
+                            ((and (symbolp offset)
+                                  (boundp offset))
+                             (symbol-value offset))
+                            (t (treesit--simple-indent-eval
+                                (list offset node parent bol))))))
+                 (cons anchor-pos offset-val))
                finally return
                (progn (when treesit--indent-verbose
                         (message "No matched rule"))
@@ -1791,6 +1799,31 @@ comments and multiline string literals.  For example,
 \"(line|block)_comment\" in the case of a comment, or
 \"text_block\" in the case of a string.  This is used by
 `prog-fill-reindent-defun' and friends.")
+
+(defvar-local treesit-sentence-type-regexp nil
+  "A regexp that matches the node type of sentence nodes.
+
+A sentence node is a node that is bigger than a sexp, and
+delimits larger statements in the source code.  It is, however,
+smaller in scope than defuns.  This is used by
+`treesit-forward-sentence' and friends.")
+
+(defun treesit-forward-sentence (&optional arg)
+  "Tree-sitter `forward-sentence-function' function.
+
+ARG is the same as in `forward-sentence'.
+
+If inside comment or other nodes described in
+`treesit-sentence-type-regexp', use
+`forward-sentence-default-function', else move across nodes as
+described by `treesit-sentence-type-regexp'."
+  (if (string-match-p
+       treesit-text-type-regexp
+       (treesit-node-type (treesit-node-at (point))))
+      (funcall #'forward-sentence-default-function arg)
+    (funcall
+     (if (> arg 0) #'treesit-end-of-thing #'treesit-beginning-of-thing)
+     treesit-sentence-type-regexp (abs arg))))
 
 (defun treesit-default-defun-skipper ()
   "Skips spaces after navigating a defun.
@@ -2256,6 +2289,8 @@ before calling this function."
                 #'treesit-add-log-current-defun))
 
   (setq-local transpose-sexps-function #'treesit-transpose-sexps)
+  (when treesit-sentence-type-regexp
+    (setq-local forward-sentence-function #'treesit-forward-sentence))
 
   ;; Imenu.
   (when treesit-simple-imenu-settings
@@ -2447,11 +2482,15 @@ in the region."
                   (window-start) (window-end) treesit--explorer-language))
            ;; Only highlight the current top-level construct.
            ;; Highlighting the whole buffer is slow and unnecessary.
-           (top-level (treesit-node-first-child-for-pos
-                       root (if (eolp)
-                                (max (point-min) (1- (point)))
-                              (point))
-                       t))
+           ;; But if the buffer is small (ie, used in playground
+           ;; style), just highlight the whole buffer.
+           (top-level (if (< (buffer-size) 4000)
+                          root
+                        (treesit-node-first-child-for-pos
+                         root (if (eolp)
+                                  (max (point-min) (1- (point)))
+                                (point))
+                         t)))
            ;; Only highlight node when region is active, if we
            ;; highlight node at point the syntax tree is too jumpy.
            (nodes-hl

@@ -194,7 +194,13 @@ Argument LANGUAGE is either `typescript' or `tsx'."
       name: (array_pattern
              (identifier)
              (identifier) @font-lock-function-name-face)
-      value: (array (number) (function))))
+      value: (array (number) (function)))
+
+     (catch_clause
+      parameter: (identifier) @font-lock-variable-name-face)
+
+     (import_clause (identifier) @font-lock-variable-name-face)
+     (import_clause (named_imports (import_specifier (identifier)) @font-lock-variable-name-face)))
 
    :language language
    :override t
@@ -223,17 +229,7 @@ Argument LANGUAGE is either `typescript' or `tsx'."
       parameters:
       [(_ (identifier) @font-lock-variable-name-face)
        (_ (_ (identifier) @font-lock-variable-name-face))
-       (_ (_ (_ (identifier) @font-lock-variable-name-face)))])
-
-     (return_statement (identifier) @font-lock-variable-name-face)
-
-     (binary_expression left: (identifier) @font-lock-variable-name-face)
-     (binary_expression right: (identifier) @font-lock-variable-name-face)
-
-     (arguments (identifier) @font-lock-variable-name-face)
-
-     (parenthesized_expression (identifier) @font-lock-variable-name-face)
-     (parenthesized_expression (_ (identifier) @font-lock-variable-name-face)))
+       (_ (_ (_ (identifier) @font-lock-variable-name-face)))]))
 
    :language language
    :override t
@@ -244,8 +240,6 @@ Argument LANGUAGE is either `typescript' or `tsx'."
       name: (property_identifier) @font-lock-property-face)
 
      (pair key: (property_identifier) @font-lock-variable-name-face)
-
-     (pair value: (identifier) @font-lock-variable-name-face)
 
      ((shorthand_property_identifier) @font-lock-property-face)
 
@@ -318,6 +312,30 @@ Argument LANGUAGE is either `typescript' or `tsx'."
    :override t
    '((escape_sequence) @font-lock-escape-face)))
 
+(defvar typescript-ts-mode--sentence-nodes
+  '("import_statement"
+    "debugger_statement"
+    "expression_statement"
+    "if_statement"
+    "switch_statement"
+    "for_statement"
+    "for_in_statement"
+    "while_statement"
+    "do_statement"
+    "try_statement"
+    "with_statement"
+    "break_statement"
+    "continue_statement"
+    "return_statement"
+    "throw_statement"
+    "empty_statement"
+    "labeled_statement"
+    "variable_declaration"
+    "lexical_declaration"
+    "property_signature")
+  "Nodes that designate sentences in TypeScript.
+See `treesit-sentence-type-regexp' for more information.")
+
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
 
@@ -349,6 +367,9 @@ Argument LANGUAGE is either `typescript' or `tsx'."
                             "function_declaration"
                             "lexical_declaration")))
   (setq-local treesit-defun-name-function #'js--treesit-defun-name)
+
+  (setq-local treesit-sentence-type-regexp
+              (regexp-opt typescript-ts-mode--sentence-nodes))
 
   ;; Imenu (same as in `js-ts-mode').
   (setq-local treesit-simple-imenu-settings
@@ -407,6 +428,13 @@ Argument LANGUAGE is either `typescript' or `tsx'."
     ;; Indent.
     (setq-local treesit-simple-indent-rules
                 (typescript-ts-mode--indent-rules 'tsx))
+
+    ;; Navigation
+    (setq-local treesit-sentence-type-regexp
+                (regexp-opt (append
+                             typescript-ts-mode--sentence-nodes
+                             '("jsx_element"
+                               "jsx_self_closing_element"))))
 
     ;; Font-lock.
     (setq-local treesit-font-lock-settings

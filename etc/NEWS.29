@@ -25,10 +25,12 @@ applies, and please also update docstrings as needed.
 * Installation Changes in Emacs 29.1
 
 ---
-** Ahead-of-time native compilation can now be specified via configure.
-Use '--with-native-compilation=aot' to specify that all the Lisp files
+** Ahead-of-time native compilation can now be requested via configure.
+Use '--with-native-compilation=aot' to request that all the Lisp files
 in the Emacs tree should be natively compiled ahead of time.  (This is
 slow on most machines.)
+
+This feature existed in Emacs 28.1, but was less easy to request.
 
 +++
 ** Emacs can be built with the tree-sitter parsing library.
@@ -349,6 +351,15 @@ This means that if point is on a button, 'TAB' will take you to the
 next button, even if the mode has bound it to something else.  This
 also means that 'TAB' on a button in an 'outline-minor-mode' heading
 will move point instead of collapsing the outline.
+
+---
+** 'outline-minor-mode-cycle-map' is now parent of 'outline-minor-mode'.
+Instead of adding text property 'keymap' with 'outline-minor-mode-cycle'
+on outline headings in 'outline-minor-mode', the keymap
+'outline-minor-mode-cycle' is now active in the whole buffer.
+But keybindings in 'outline-minor-mode-cycle' still take effect
+only on outline headings because they are bound with the help of
+'outline-minor-mode-cycle--bind' that checks if point is on a heading.
 
 ---
 ** 'Info-default-directory-list' is no longer populated at Emacs startup.
@@ -797,10 +808,10 @@ filter/sentinel error has been handled.
 ** New faces for font-lock.
 These faces are primarily meant for use with tree-sitter.  They are:
 'font-lock-bracket-face', 'font-lock-delimiter-face',
-'font-lock-escape-face', 'font-lock-number-face',
-'font-lock-regexp-face',
-'font-lock-misc-punctuation-face', 'font-lock-operator-face',
-'font-lock-property-face', and 'font-lock-punctuation-face'.
+'font-lock-escape-face', 'font-lock-misc-punctuation-face',
+'font-lock-number-face', 'font-lock-operator-face',
+'font-lock-property-face', and 'font-lock-punctuation-face',
+'font-lock-regexp-face'.
 
 +++
 ** New face 'variable-pitch-text'.
@@ -1626,6 +1637,20 @@ randomness as before, or to use a bag).
 +++
 *** New user option 'battery-update-functions'.
 This can be used to trigger actions based on the battery status.
+
+** DocView
+
+---
+*** doc-view can now generate SVG images when viewing PDF files.
+If Emacs is built with SVG support, doc-view can generate SVG files
+when using MuPDF as the converter for PDF files, which generally leads
+to sharper images (especially when zooming), and allows customization
+of background and foreground color of the page via the new user
+options 'doc-view-svg-background' and 'doc-view-svg-foreground'.  To
+activate this behavior, set 'doc-view-mupdf-use-svg' to non-nil if
+your Emacs has SVG support.  Note that, with some versions of MuPDF,
+SVG generation is known to sometimes produce SVG files that are buggy
+or can take a long time to render.
 
 ** Enriched Mode
 
@@ -4312,15 +4337,21 @@ whose matches are to be replaced.  If these variables are nil (which
 is the default), 'query-replace' and 'query-replace-regexp' take the
 default value from the previous FROM-TO pair.
 
----
-** New user option 'pp-use-max-width'.
-If non-nil, 'pp' will attempt to limit the line length when formatting
-long lists and vectors.
+** Lisp pretty-printer ('pp')
 
 ---
-** New function 'pp-emacs-lisp-code'.
+*** New function 'pp-emacs-lisp-code'.
 'pp' formats general Lisp sexps.  This function does much the same,
-but applies formatting rules appropriate for Emacs Lisp code.
+but applies formatting rules appropriate for Emacs Lisp code.  Note
+that this could currently be quite slow, and is thus appropriate only
+for relatively small code fragments.
+
+---
+*** New user option 'pp-use-max-width'.
+If non-nil, 'pp' and all 'pp-*' commands that format the results, will
+attempt to limit the line length when formatting long lists and
+vectors.  This uses 'pp-emacs-lisp-code', and thus could be slow for
+large lists.
 
 +++
 ** New function 'file-has-changed-p'.

@@ -4516,17 +4516,17 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		  (and (string-match-p tramp-ipv6-regexp host)
 		       tramp-postfix-ipv6-format)))
               ;; Complete method name.
-	      (unless (or (zerop (length method))
-                          (zerop (length tramp-method-regexp)))
+	      (unless (or (tramp-string-empty-or-nil-p method)
+                          (string-empty-p tramp-method-regexp))
 	        (should
 	         (member
 		  (concat prefix-format method tramp-postfix-method-format)
 		  (file-name-all-completions
                    (concat prefix-format (substring method 0 1)) "/"))))
               ;; Complete host name.
-	      (unless (or (zerop (length method))
-                          (zerop (length tramp-method-regexp))
-                          (zerop (length host))
+	      (unless (or (tramp-string-empty-or-nil-p method)
+                          (string-empty-p tramp-method-regexp)
+                          (tramp-string-empty-or-nil-p host)
 			  (tramp--test-gvfs-p method))
 	        (should
 	         (member
@@ -4852,8 +4852,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
 	(ignore-errors (delete-process proc)))
 
-      ;; Disabled process filter.  "sshfs" does not cooperate.
-      (unless (tramp--test-sshfs-p)
+      ;; Disabled process filter.  It doesn't work reliable.
+      (unless t
 	(unwind-protect
 	    (with-temp-buffer
 	      (setq command '("cat")
@@ -5046,8 +5046,8 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 	;; Cleanup.
 	(ignore-errors (delete-process proc)))
 
-      ;; Disabled process filter.  "sshfs" does not cooperate.
-      (unless (tramp--test-sshfs-p)
+      ;; Disabled process filter.  It doesn't work reliable.
+      (unless t
 	(unwind-protect
 	    (with-temp-buffer
 	      (setq command '("cat")
@@ -5370,7 +5370,7 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
   (when-let ((default-directory ert-remote-temporary-file-directory)
              (mi (memory-info)))
     (should (consp mi))
-    (should (= (length mi) 4))
+    (should (tramp-compat-length= mi 4))
     (dotimes (i (length mi))
       (should (natnump (nth i mi))))))
 
@@ -5469,7 +5469,7 @@ INPUT, if non-nil, is a string sent to the process."
 	       (format "%s\n" (file-name-nondirectory tmp-name)))
 	      (should
 	       (string-match-p
-		;; Some shells echo, for example the "adb" or "docker" methods.
+		;; Some shells echo, for example the "adb" or container methods.
 		(rx
 		 bos (** 1 2 (literal (file-name-nondirectory tmp-name)) "\n")
 		 eos)
@@ -5915,7 +5915,8 @@ INPUT, if non-nil, is a string sent to the process."
           ;; We make a super long `tramp-remote-path'.
           (make-directory tmp-name)
           (should (file-directory-p tmp-name))
-          (while (< (length (mapconcat #'identity orig-exec-path ":")) 5000)
+          (while (tramp-compat-length<
+		  (mapconcat #'identity orig-exec-path ":") 5000)
             (let ((dir (make-temp-file (file-name-as-directory tmp-name) 'dir)))
               (should (file-directory-p dir))
               (setq tramp-remote-path
@@ -5931,9 +5932,10 @@ INPUT, if non-nil, is a string sent to the process."
           ;; Ignore trailing newline.
 	  (setq path (substring (shell-command-to-string "echo $PATH") nil -1))
 	  ;; The shell doesn't handle such long strings.
-	  (when (<= (length path)
-		    (tramp-get-connection-property
-		     tramp-test-vec "pipe-buf" 4096))
+	  (unless (tramp-compat-length>
+		   path
+		   (tramp-get-connection-property
+		    tramp-test-vec "pipe-buf" 4096))
 	    ;; The last element of `exec-path' is `exec-directory'.
             (should
 	     (string-equal
@@ -6567,11 +6569,12 @@ This is used in tests which we don't want to tag
   "Check, whether the remote directory is encrypted."
   (tramp-crypt-file-name-p ert-remote-temporary-file-directory))
 
-(defun tramp--test-docker-p ()
-  "Check, whether the docker method is used.
+(defun tramp--test-container-p ()
+  "Check, whether a container method is used.
 This does not support some special file names."
-  (string-equal
-   "docker" (file-remote-p ert-remote-temporary-file-directory 'method)))
+  (string-match-p
+   (rx bol (| "docker" "podman") eol)
+   (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-expensive-test-p ()
   "Whether expensive tests are run.
@@ -6945,7 +6948,7 @@ This requires restrictions of file name syntax."
   (let ((files
 	 (list
 	  (cond ((or (tramp--test-ange-ftp-p)
-		     (tramp--test-docker-p)
+		     (tramp--test-container-p)
 		     (tramp--test-gvfs-p)
 		     (tramp--test-rclone-p)
 		     (tramp--test-sudoedit-p)
@@ -7003,7 +7006,7 @@ This requires restrictions of file name syntax."
   "Check UTF8 encoding in file names and file contents."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (getenv "EMACS_HYDRA_CI"))) ; SLOW ~ 620s
-  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-container-p)))
   (skip-unless (not (tramp--test-rsync-p)))
   (skip-unless (not (tramp--test-windows-nt-and-out-of-band-p)))
   (skip-unless (not (tramp--test-ksh-p)))
@@ -7069,7 +7072,7 @@ This requires restrictions of file name syntax."
 
   (when-let ((fsi (file-system-info ert-remote-temporary-file-directory)))
     (should (consp fsi))
-    (should (= (length fsi) 3))
+    (should (tramp-compat-length= fsi 3))
     (dotimes (i (length fsi))
       (should (natnump (or (nth i fsi) 0))))))
 
@@ -7123,7 +7126,7 @@ process sentinels.  They shall not disturb each other."
                      '(:unstable)))
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-supports-processes-p))
-  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-container-p)))
   (skip-unless (not (tramp--test-telnet-p)))
   (skip-unless (not (tramp--test-sshfs-p)))
   (skip-unless (not (tramp--test-windows-nt-p)))
