@@ -1,0 +1,40 @@
+From 595617abab6964ac0c6e617bae3d82692bf298b9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Mattias=20Engdeg=C3=A5rd?= <mattiase@acm.org>
+Date: Sun, 1 Jan 2023 13:18:50 +0100
+Subject: Fix copyright tests for 2023 onwards
+
+This upstream patch has been incorporated to fix the problem:
+
+  ; * test/lisp/emacs-lisp/copyright-tests.el: Fix and future-safe.
+
+Origin: upstream, commit: da77d70deeb2798693ec4f28a291befeb8e43989
+Bug-Debian: https://bugs.debian.org/1028607
+Forwarded: not-needed
+---
+ test/lisp/emacs-lisp/copyright-tests.el | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/test/lisp/emacs-lisp/copyright-tests.el b/test/lisp/emacs-lisp/copyright-tests.el
+index abb0913a0d7..040071d90d0 100644
+--- a/test/lisp/emacs-lisp/copyright-tests.el
++++ b/test/lisp/emacs-lisp/copyright-tests.el
+@@ -59,7 +59,8 @@ test-end-chop
+                 "\nCopyright 2006, 2007, 2008 Foo Bar\n\n")
+         (copyright-update)
+         (buffer-substring (- (point-max) 42) (point-max))))
+-    "Copyright 2006, 2007, 2008, 2022 Foo Bar\n\n")))
++    (format "Copyright 2006, 2007, 2008, %s Foo Bar\n\n"
++            (format-time-string "%Y")))))
+ 
+ (ert-deftest test-correct-notice ()
+   (should (equal
+@@ -70,7 +71,8 @@ test-correct-notice
+                    (copyright-query nil))
+                (copyright-update))
+              (buffer-string))
+-           "Copyright 2021 FSF\nCopyright 2021, 2022 FSF\n")))
++           (format "Copyright 2021 FSF\nCopyright 2021, %s FSF\n"
++                   (format-time-string "%Y")))))
+ 
+ (provide 'copyright-tests)
+ ;;; copyright-tests.el ends here

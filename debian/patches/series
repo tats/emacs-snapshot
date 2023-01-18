@@ -16,3 +16,4 @@
 0016-Fix-ctags-local-command-execution-vulnerability-CVE-.patch
 0017-Add-inhibit-native-compilation.patch
 0018-Rename-to-inhibit-automatic-native-compilation.patch
+0019-Fix-copyright-tests-for-2023-onwards.patch
