@@ -1,10 +1,10 @@
-emacs (1:28.2+1-10~1.gbpf15d72) UNRELEASED; urgency=medium
+emacs (1:28.2+1-10) unstable; urgency=medium
 
-  ** SNAPSHOT build @f15d72ac21809b7adf00b5c7e72a8eb8c6f6b866 **
+  * Fix copyright tests for 2023 onwards.  Thanks to Mattias Engdegård for
+    the fix, and Vincent Lefevre for reporting the bug and posting the
+    patch to the Debian BTS (Closes: #1028607).
 
-  * UNRELEASED
-
- -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 17 Jan 2023 17:26:04 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 17 Jan 2023 17:32:40 -0700
 
 emacs (1:28.2+1-9) unstable; urgency=medium
 
