@@ -966,11 +966,15 @@ opening the first frame (e.g. open a connection to an X server).")
     ;;
 
     ;; Debian startup
-     (if site-run-file
+    (dolist (dir load-path)
+      (if (string-match "^/usr/share/emacs/site-lisp/" dir)
+          (setq load-path (delete dir load-path))))
+    (if site-run-file
         (progn
           ;; Load all the debian package snippets.
           ;; It's in here because we want -q to kill it too.
-          (if (load "debian-startup" t t nil)
+          (if (or (load "/usr/share/emacsen-common/debian-startup.el" t t t)
+                  (load "debian-startup" t t nil))
               (debian-startup debian-emacs-flavor))
           ;; Now the normal site file...
           (load site-run-file t t nil)))
