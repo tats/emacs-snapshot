@@ -206,24 +206,24 @@ persistent_autogen_install_files :=
 nonpersistent_autogen_install_files := \
   debian/$(flavor)-bin-common.postinst \
   debian/$(flavor)-bin-common.prerm \
-  debian/$(flavor)-common.README.Debian \
-  debian/$(flavor)-common.docs \
-  debian/$(flavor)-common.postinst \
-  debian/$(flavor)-common.prerm \
-  debian/$(flavor)-nox.README.Debian \
-  debian/$(flavor)-nox.menu \
-  debian/$(flavor)-nox.postinst \
-  debian/$(flavor)-nox.prerm \
-  debian/$(flavor)-gtk.README.Debian \
-  debian/$(flavor)-gtk.desktop \
-  debian/$(flavor)-gtk.menu \
-  debian/$(flavor)-gtk.postinst \
-  debian/$(flavor)-gtk.prerm \
-  debian/$(flavor).README.Debian \
-  debian/$(flavor).desktop \
-  debian/$(flavor).menu \
-  debian/$(flavor).postinst \
-  debian/$(flavor).prerm
+  debian/$(flavor)-share-common.README.Debian \
+  debian/$(flavor)-share-common.docs \
+  debian/$(flavor)-share-common.postinst \
+  debian/$(flavor)-share-common.prerm \
+  debian/$(flavor)-no-x.README.Debian \
+  debian/$(flavor)-no-x.menu \
+  debian/$(flavor)-no-x.postinst \
+  debian/$(flavor)-no-x.prerm \
+  debian/$(flavor)-x-gtk.README.Debian \
+  debian/$(flavor)-x-gtk.desktop \
+  debian/$(flavor)-x-gtk.menu \
+  debian/$(flavor)-x-gtk.postinst \
+  debian/$(flavor)-x-gtk.prerm \
+  debian/$(flavor)-x-lucid.README.Debian \
+  debian/$(flavor)-x-lucid.desktop \
+  debian/$(flavor)-x-lucid.menu \
+  debian/$(flavor)-x-lucid.postinst \
+  debian/$(flavor)-x-lucid.prerm
 
 autogen_build_files := \
   $(nonpersistent_autogen_build_files) $(persistent_autogen_build_files)
@@ -239,11 +239,11 @@ nonpersistent_autogen_files := \
 
 
 # Build directories
-pkgdir_common := $(CURDIR)/debian/$(flavor)-common
+pkgdir_common := $(CURDIR)/debian/$(flavor)-share-common
 pkgdir_bin_common := $(CURDIR)/debian/$(flavor)-bin-common
-pkgdir_x := $(CURDIR)/debian/$(flavor)
-pkgdir_nox := $(CURDIR)/debian/$(flavor)-nox
-pkgdir_gtk := $(CURDIR)/debian/$(flavor)-gtk
+pkgdir_x := $(CURDIR)/debian/$(flavor)-x-lucid
+pkgdir_nox := $(CURDIR)/debian/$(flavor)-no-x
+pkgdir_gtk := $(CURDIR)/debian/$(flavor)-x-gtk
 pkgdir_el := $(CURDIR)/debian/$(flavor)-el
 
 install_dir_x := $(CURDIR)/debian/install-x
@@ -428,14 +428,14 @@ debian-sync: $(persistent_autogen_files)
 
 .PHONY: force-debian-sync debian-sync
 
-debian/$(flavor).%: xsupport := "x"
-debian/$(flavor).%: pkg_name := $(flavor)
+debian/$(flavor)-x-lucid.%: xsupport := "lucid"
+debian/$(flavor)-x-lucid.%: pkg_name := $(flavor)-x-lucid
 
-debian/$(flavor)-nox.%: xsupport := "nox"
-debian/$(flavor)-nox.%: pkg_name := $(flavor)-nox
+debian/$(flavor)-no-x.%: xsupport := "nox"
+debian/$(flavor)-no-x.%: pkg_name := $(flavor)-no-x
 
-debian/$(flavor)-gtk.%: xsupport := "gtk"
-debian/$(flavor)-gtk.%: pkg_name := $(flavor)-gtk
+debian/$(flavor)-x-gtk.%: xsupport := "gtk"
+debian/$(flavor)-x-gtk.%: pkg_name := $(flavor)-x-gtk
 
 debian/%: debian/%.in debian/changelog
 	$(call deb_sub,$<,$@)
@@ -443,37 +443,37 @@ debian/%: debian/%.in debian/changelog
 debian/$(flavor)-bin-common.%: debian/emacsVER-bin-common.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-common.%: debian/emacsVER-common.% debian/changelog
+debian/$(flavor)-share-common.%: debian/emacsVER-share-common.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-el.%: debian/emacsVER-el.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor).%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-x-lucid.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-nox.%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-no-x.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-gtk.%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-x-gtk.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-common.README.Debian: \
-  debian/emacsVER-common.README debian/patches/*.diff debian/patches/series
+debian/$(flavor)-share-common.README.Debian: \
+  debian/emacsVER-share-common.README debian/patches/*.diff debian/patches/series
 	cd debian && \
-	  csplit -s -f emacsVER-common.README. \
-	  emacsVER-common.README '/@@PATCH_LIST_HERE@@/'
-	cp debian/emacsVER-common.README.00 debian/emacsVER-common.README.tmp
+	  csplit -s -f emacsVER-share-common.README. \
+	  emacsVER-share-common.README '/@@PATCH_LIST_HERE@@/'
+	cp debian/emacsVER-share-common.README.00 debian/emacsVER-share-common.README.tmp
 	for p in $$($(quilt) series); do $(quilt) header $$p; done \
-	  >> debian/emacsVER-common.README.tmp
+	  >> debian/emacsVER-share-common.README.tmp
 	tail -n +2 \
-	  < debian/emacsVER-common.README.01 \
-	  >> debian/emacsVER-common.README.tmp
-	mv debian/emacsVER-common.README.tmp $@
+	  < debian/emacsVER-share-common.README.01 \
+	  >> debian/emacsVER-share-common.README.tmp
+	mv debian/emacsVER-share-common.README.tmp $@
 
-deb_trash += debian/emacsVER-common.README.tmp
-deb_trash += debian/emacsVER-common.README.00
-deb_trash += debian/emacsVER-common.README.01
+deb_trash += debian/emacsVER-share-common.README.tmp
+deb_trash += debian/emacsVER-share-common.README.00
+deb_trash += debian/emacsVER-share-common.README.01
 
 debian/stamp/setup:
 	$(checkdir)
@@ -527,7 +527,7 @@ endef
 
 # For those who prefer the old-style non-toolkit scrollbars, just add
 # --without-toolkit-scroll-bars to the build-x cfg_tree line below.
-# The resulting emacsXY package will have the old scrollbars.
+# The resulting emacsXY-x-lucid package will have the old scrollbars.
 
 debian/stamp/configure: debian/stamp/setup
 	$(checkdir)
@@ -590,7 +590,7 @@ install: debian/stamp/build $(autogen_install_files)
 	$(call emacs_inst,build-x,$(install_dir_x))
 
         ##################################################
-        # emacsXY-common
+        # emacsXY-share-common
 
 	cp -a $(install_dir_x)/* $(pkgdir_common)
 
@@ -611,7 +611,7 @@ install: debian/stamp/build $(autogen_install_files)
         # etc., add-on package bits don't get left behind.
 	mv $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/site-lisp \
 		$(pkgdir_common)/usr/share/$(flavor)
-	dh_link -p$(flavor)-common usr/share/$(flavor)/site-lisp \
+	dh_link -p$(flavor)-share-common usr/share/$(flavor)/site-lisp \
 			usr/share/emacs/$(runtime_ver)/site-lisp
 
         # This is a duplicate of the file in FLAVOR/site-lisp
@@ -638,9 +638,9 @@ install: debian/stamp/build $(autogen_install_files)
         # At least etc/COPYING is needed by M-x describe-copying.
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
 	rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	dh_link -p$(flavor)-share-common /usr/share/common-licenses/GPL-3 \
 	  usr/share/emacs/$(runtime_ver)/etc/COPYING
-	dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	dh_link -p$(flavor)-share-common /usr/share/common-licenses/GPL-3 \
 	  usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
         # Install replacements for non-free files that can be reached
@@ -708,31 +708,31 @@ install: debian/stamp/build $(autogen_install_files)
 	done
 
         ##################################################
-        # emacsXY
+        # emacsXY-x-lucid
 	$(call install_common_binpkg_bits,\
-	  $(install_dir_x),$(pkgdir_x),$(flavor),x)
+	  $(install_dir_x),$(pkgdir_x),$(flavor)-x-lucid,lucid)
 
         # install desktop entry
 	install -d $(pkgdir_x)/usr/share/applications
 	install -m 0644 \
-	  debian/$(flavor).desktop $(pkgdir_x)/usr/share/applications/
+	  debian/$(flavor)-x-lucid.desktop $(pkgdir_x)/usr/share/applications/
 
         ##################################################
-        # emacsXY-nox
+        # emacsXY-no-x
 	$(call emacs_inst,build-nox,$(install_dir_nox))
 	$(call install_common_binpkg_bits,\
-	  $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
+	  $(install_dir_nox),$(pkgdir_nox),$(flavor)-no-x,nox)
 	rm -rf $(install_dir_nox)
 
         ##################################################
-        # emacsXY-gtk
+        # emacsXY-x-gtk
 	$(call emacs_inst,build-gtk,$(install_dir_gtk))
 	$(call install_common_binpkg_bits,\
-	  $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-gtk,gtk)
+	  $(install_dir_gtk),$(pkgdir_gtk),$(flavor)-x-gtk,gtk)
         # install desktop entry
 	install -d $(pkgdir_gtk)/usr/share/applications
 	install -m 0644 \
-	  debian/$(flavor)-gtk.desktop $(pkgdir_gtk)/usr/share/applications/
+	  debian/$(flavor)-x-gtk.desktop $(pkgdir_gtk)/usr/share/applications/
 	rm -rf $(install_dir_gtk)
 
         ##################################################
