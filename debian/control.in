@@ -23,7 +23,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk, w3-el
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-gtk
@@ -36,7 +36,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, w3-el
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox

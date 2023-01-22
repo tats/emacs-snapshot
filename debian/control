@@ -23,7 +23,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs22-common-non-dfsg
 Conflicts: emacs22, emacs22-gtk, w3-el
 Replaces: emacs22, emacs22-gtk
@@ -36,7 +36,7 @@ Section: editors
 Priority: optional
 Architecture: any
 Depends: emacs22-bin-common (= ${binary:Version}), ${shlibs:Depends}
-Provides: emacs22, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs22-common-non-dfsg
 Conflicts: emacs22, emacs22-nox, w3-el
 Replaces: emacs22, emacs22-nox
