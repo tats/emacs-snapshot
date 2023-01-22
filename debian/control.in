@@ -15,7 +15,7 @@ Standards-Version: 3.7.2
 Package: @DEB_FLAVOR@-lucid
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: @DEB_FLAVOR@, emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
@@ -26,7 +26,7 @@ Description: The GNU Emacs editor
 Package: @DEB_FLAVOR@-nox
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: @DEB_FLAVOR@, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
 Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
 Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk

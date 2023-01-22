@@ -15,7 +15,7 @@ Standards-Version: 3.7.2
 Package: emacs23-lucid
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs23, emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-nox, emacs23-gtk
 Replaces: emacs23, emacs23-nox, emacs23-gtk
@@ -26,7 +26,7 @@ Description: The GNU Emacs editor
 Package: emacs23-nox
 Architecture: any
 Depends: emacs23-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs23, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs23-common-non-dfsg
 Conflicts: emacs23, emacs23-lucid, emacs23-gtk
 Replaces: emacs23, emacs23-lucid, emacs23-gtk
