@@ -20,7 +20,7 @@ Standards-Version: 3.7.2
 Package: emacs24-lucid
 Architecture: any
 Depends: emacs24-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs24, emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs24-common-non-dfsg
 Conflicts: emacs24, emacs24-nox
 Replaces: emacs24, emacs24-nox
@@ -48,7 +48,7 @@ Description: Debugging symbols for emacs24-lucid
 Package: emacs24-nox
 Architecture: any
 Depends: emacs24-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs24, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs24-common-non-dfsg
 Conflicts: emacs24, emacs24-lucid
 Replaces: emacs24, emacs24-lucid
