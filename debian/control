@@ -25,7 +25,7 @@ Standards-Version: 3.7.2
 Package: emacs25-lucid
 Architecture: any
 Depends: emacs25-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs25, emacsen, editor, info-browser, mail-reader, news-reader
+Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs25-common-non-dfsg
 Conflicts: emacs25, emacs25-nox
 Replaces: emacs25, emacs25-nox
@@ -53,7 +53,7 @@ Description: Debugging symbols for emacs25-lucid
 Package: emacs25-nox
 Architecture: any
 Depends: emacs25-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Provides: emacs25, editor, emacsen, info-browser, mail-reader, news-reader
+Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs25-common-non-dfsg
 Conflicts: emacs25, emacs25-lucid
 Replaces: emacs25, emacs25-lucid
