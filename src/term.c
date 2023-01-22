@@ -640,7 +640,7 @@ encode_terminal_code (src, src_len, coding)
 		  continue;
 		if (char_charset (c, charset_list, NULL))
 		  {
-		    if (CHAR_WIDTH (c) == 0
+		    if (CHARACTER_WIDTH (c) == 0
 			&& i > 0 && COMPOSITION_GLYPH (cmp, i - 1) == '\t')
 		      /* Should be left-padded */
 		      {
@@ -1656,7 +1656,7 @@ produce_glyphs (it)
     }
   else
     {
-      it->pixel_width = CHAR_WIDTH (it->char_to_display);
+      it->pixel_width = CHARACTER_WIDTH (it->char_to_display);
       it->nglyphs = it->pixel_width;
 
       if (it->glyph_row)

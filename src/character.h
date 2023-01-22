@@ -592,7 +592,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
    columns C will occupy on the screen when displayed in the current
    buffer.  */
 
-#define CHAR_WIDTH(c)		\
+#define CHARACTER_WIDTH(c)		\
   (ASCII_CHAR_P (c)		\
    ? ASCII_CHAR_WIDTH (c)	\
    : XINT (CHAR_TABLE_REF (Vchar_width_table, c)))
