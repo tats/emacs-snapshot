@@ -130,26 +130,26 @@ nonpersistent_autogen_install_files := \
   debian/$(flavor)-bin-common.lintian-overrides \
   debian/$(flavor)-bin-common.postinst \
   debian/$(flavor)-bin-common.prerm \
-  debian/$(flavor)-common.README.Debian \
-  debian/$(flavor)-common.docs \
-  debian/$(flavor)-common.lintian-overrides \
-  debian/$(flavor)-common.postinst \
-  debian/$(flavor)-common.prerm \
+  debian/$(flavor)-share-common.README.Debian \
+  debian/$(flavor)-share-common.docs \
+  debian/$(flavor)-share-common.lintian-overrides \
+  debian/$(flavor)-share-common.postinst \
+  debian/$(flavor)-share-common.prerm \
   debian/$(flavor)-term.desktop \
-  debian/$(flavor)-nox.README.Debian \
-  debian/$(flavor)-nox.lintian-overrides \
-  debian/$(flavor)-nox.postinst \
-  debian/$(flavor)-nox.prerm \
-  debian/$(flavor)-lucid.README.Debian \
-  debian/$(flavor)-lucid.desktop \
-  debian/$(flavor)-lucid.lintian-overrides \
-  debian/$(flavor)-lucid.postinst \
-  debian/$(flavor)-lucid.prerm \
-  debian/$(flavor).README.Debian \
-  debian/$(flavor).desktop \
-  debian/$(flavor).lintian-overrides \
-  debian/$(flavor).postinst \
-  debian/$(flavor).prerm
+  debian/$(flavor)-no-x.README.Debian \
+  debian/$(flavor)-no-x.lintian-overrides \
+  debian/$(flavor)-no-x.postinst \
+  debian/$(flavor)-no-x.prerm \
+  debian/$(flavor)-x-lucid.README.Debian \
+  debian/$(flavor)-x-lucid.desktop \
+  debian/$(flavor)-x-lucid.lintian-overrides \
+  debian/$(flavor)-x-lucid.postinst \
+  debian/$(flavor)-x-lucid.prerm \
+  debian/$(flavor)-x.README.Debian \
+  debian/$(flavor)-x.desktop \
+  debian/$(flavor)-x.lintian-overrides \
+  debian/$(flavor)-x.postinst \
+  debian/$(flavor)-x.prerm
 
 autogen_build_files := \
   $(nonpersistent_autogen_build_files) $(persistent_autogen_build_files)
@@ -165,11 +165,11 @@ nonpersistent_autogen_files := \
 
 
 # Build directories
-pkgdir_common := $(CURDIR)/debian/$(flavor)-common
+pkgdir_common := $(CURDIR)/debian/$(flavor)-share-common
 pkgdir_bin_common := $(CURDIR)/debian/$(flavor)-bin-common
-pkgdir_x := $(CURDIR)/debian/$(flavor)
-pkgdir_nox := $(CURDIR)/debian/$(flavor)-nox
-pkgdir_lucid := $(CURDIR)/debian/$(flavor)-lucid
+pkgdir_x := $(CURDIR)/debian/$(flavor)-x
+pkgdir_nox := $(CURDIR)/debian/$(flavor)-no-x
+pkgdir_lucid := $(CURDIR)/debian/$(flavor)-x-lucid
 pkgdir_el := $(CURDIR)/debian/$(flavor)-el
 
 install_dir_x := $(CURDIR)/debian/install-x
@@ -239,16 +239,16 @@ debian-sync: $(persistent_autogen_files)
         # so dh pattern rule doesn't try to handle this target
 	true
 
-debian/$(flavor).%: xsupport := "x"
-debian/$(flavor).%: pkg_name := $(flavor)
+debian/$(flavor)-x.%: xsupport := "x"
+debian/$(flavor)-x.%: pkg_name := $(flavor)-x
 
-debian/$(flavor)-nox.%: xsupport := "nox"
-debian/$(flavor)-nox.%: pkg_name := $(flavor)-nox
+debian/$(flavor)-no-x.%: xsupport := "nox"
+debian/$(flavor)-no-x.%: pkg_name := $(flavor)-no-x
 
-debian/$(flavor)-lucid.%: xsupport := "lucid"
-debian/$(flavor)-lucid.%: pkg_name := $(flavor)-lucid
+debian/$(flavor)-x-lucid.%: xsupport := "lucid"
+debian/$(flavor)-x-lucid.%: pkg_name := $(flavor)-x-lucid
 
-debian/$(flavor)-common.%: pkg_name := $(flavor)-common
+debian/$(flavor)-share-common.%: pkg_name := $(flavor)-share-common
 debian/$(flavor)-bin-common.%: pkg_name := $(flavor)-bin-common
 
 debian/%: debian/%.in debian/changelog debian/rules
@@ -257,39 +257,39 @@ debian/%: debian/%.in debian/changelog debian/rules
 debian/$(flavor)-bin-common.%: debian/emacsVER-bin-common.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-common.%: debian/emacsVER-common.% debian/changelog
+debian/$(flavor)-share-common.%: debian/emacsVER-share-common.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-el.%: debian/emacsVER-el.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor).%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-x.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-nox.%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-no-x.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-lucid.%: debian/emacsVER.% debian/changelog
+debian/$(flavor)-x-lucid.%: debian/emacsVER.% debian/changelog
 	$(call deb_sub,$<,$@)
 
 debian/$(flavor)-term.desktop: debian/emacsVER-term.desktop debian/changelog
 	$(call deb_sub,$<,$@)
 
-debian/$(flavor)-common.README.Debian: \
-  debian/emacsVER-common.README debian/patches/*.patch debian/patches/series \
+debian/$(flavor)-share-common.README.Debian: \
+  debian/emacsVER-share-common.README debian/patches/*.patch debian/patches/series \
   debian/rules debian/patch-to-news
 	cd debian && \
-	  csplit -s -f emacsVER-common.README. \
-	  emacsVER-common.README '/@@PATCH_LIST_HERE@@/'
-	cp debian/emacsVER-common.README.00 debian/emacsVER-common.README.tmp
+	  csplit -s -f emacsVER-share-common.README. \
+	  emacsVER-share-common.README '/@@PATCH_LIST_HERE@@/'
+	cp debian/emacsVER-share-common.README.00 debian/emacsVER-share-common.README.tmp
 	for p in $$($(quilt) series); do \
-	  debian/patch-to-news "$$p" >> debian/emacsVER-common.README.tmp \
-	  && echo >> debian/emacsVER-common.README.tmp; \
+	  debian/patch-to-news "$$p" >> debian/emacsVER-share-common.README.tmp \
+	  && echo >> debian/emacsVER-share-common.README.tmp; \
 	done
 	tail -n +2 \
-	  < debian/emacsVER-common.README.01 \
-	  >> debian/emacsVER-common.README.tmp
-	mv debian/emacsVER-common.README.tmp $@
+	  < debian/emacsVER-share-common.README.01 \
+	  >> debian/emacsVER-share-common.README.tmp
+	mv debian/emacsVER-share-common.README.tmp $@
 
 debian/setup-stamp:
 	$(testdir)
@@ -404,8 +404,8 @@ override_dh_auto_install: $(autogen_install_files)
 	$(call emacs_inst,build-x,$(install_dir_x))
 
         ##################################################
-        # emacsXY-common
-        ifneq (,$(findstring $(flavor)-common, $(shell dh_listpackages)))
+        # emacsXY-share-common
+        ifneq (,$(findstring $(flavor)-share-common, $(shell dh_listpackages)))
 	  install -d $(pkgdir_common)
 	  cp -a $(install_dir_x)/* $(pkgdir_common)
 
@@ -429,7 +429,7 @@ override_dh_auto_install: $(autogen_install_files)
 	  # etc., add-on package bits don't get left behind.
 	  mv $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/site-lisp \
 		  $(pkgdir_common)/usr/share/$(flavor)
-	  dh_link -p$(flavor)-common usr/share/$(flavor)/site-lisp \
+	  dh_link -p$(flavor)-share-common usr/share/$(flavor)/site-lisp \
 			  usr/share/emacs/$(runtime_ver)/site-lisp
 
 	  # This is a duplicate of the file in FLAVOR/site-lisp
@@ -475,9 +475,9 @@ override_dh_auto_install: $(autogen_install_files)
 	  # At least etc/COPYING is needed by M-x describe-copying.
 	  rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/etc/COPYING
 	  rm $(pkgdir_common)/usr/share/emacs/$(runtime_ver)/lisp/COPYING
-	  dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	  dh_link -p$(flavor)-share-common /usr/share/common-licenses/GPL-3 \
 	    usr/share/emacs/$(runtime_ver)/etc/COPYING
-	  dh_link -p$(flavor)-common /usr/share/common-licenses/GPL-3 \
+	  dh_link -p$(flavor)-share-common /usr/share/common-licenses/GPL-3 \
 	    usr/share/emacs/$(runtime_ver)/lisp/COPYING
 
 	  $(pf); cd $(pkgdir_common) && \
@@ -535,25 +535,25 @@ override_dh_auto_install: $(autogen_install_files)
         endif
 
         ##################################################
-        # emacsXY
-        ifneq (,$(findstring $(flavor), $(shell dh_listpackages)))
+        # emacsXY-x
+        ifneq (,$(findstring $(flavor)-x, $(shell dh_listpackages)))
 	  $(call install_common_binpkg_bits,\
-	    $(install_dir_x),$(pkgdir_x),$(flavor),x)
+	    $(install_dir_x),$(pkgdir_x),$(flavor)-x,x)
 
           # install desktop entries
 	  install -d $(pkgdir_x)/usr/share/applications
 	  install -m 0644 \
-	    debian/$(flavor).desktop \
+	    debian/$(flavor)-x.desktop \
 	    debian/$(flavor)-term.desktop \
 	    $(pkgdir_x)/usr/share/applications/
         endif
 
         ##################################################
-        # emacsXY-nox
-        ifneq (,$(findstring $(flavor)-nox, $(shell dh_listpackages)))
+        # emacsXY-no-x
+        ifneq (,$(findstring $(flavor)-no-x, $(shell dh_listpackages)))
 	  $(call emacs_inst,build-nox,$(install_dir_nox))
 	  $(call install_common_binpkg_bits,\
-	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-nox,nox)
+	    $(install_dir_nox),$(pkgdir_nox),$(flavor)-no-x,nox)
           # install desktop entry
 	  install -d $(pkgdir_x)/usr/share/applications
 	  install -m 0644 \
@@ -562,16 +562,16 @@ override_dh_auto_install: $(autogen_install_files)
         endif
 
         ##################################################
-        # emacsXY-lucid
-        ifneq (,$(findstring $(flavor)-lucid, $(shell dh_listpackages)))
+        # emacsXY-x-lucid
+        ifneq (,$(findstring $(flavor)-x-lucid, $(shell dh_listpackages)))
 	  $(call emacs_inst,build-lucid,$(install_dir_lucid))
 	  $(call install_common_binpkg_bits,\
-	    $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-lucid,lucid)
+	    $(install_dir_lucid),$(pkgdir_lucid),$(flavor)-x-lucid,lucid)
 
           # install desktop entries
 	  install -d $(pkgdir_lucid)/usr/share/applications
 	  install -m 0644 \
-	    debian/$(flavor)-lucid.desktop \
+	    debian/$(flavor)-x-lucid.desktop \
 	    debian/$(flavor)-term.desktop \
 	    $(pkgdir_lucid)/usr/share/applications/
 	  rm -rf $(install_dir_lucid)
@@ -595,9 +595,9 @@ override_dh_auto_install: $(autogen_install_files)
 
 .PHONY: override_dh_strip
 override_dh_strip:
-	dh_strip -p$(flavor) --dbg-package=$(flavor)-dbg
-	dh_strip -p$(flavor)-lucid --dbg-package=$(flavor)-lucid-dbg
-	dh_strip -p$(flavor)-nox --dbg-package=$(flavor)-nox-dbg
+	dh_strip -p$(flavor)-x --dbg-package=$(flavor)-x-dbg
+	dh_strip -p$(flavor)-x-lucid --dbg-package=$(flavor)-x-lucid-dbg
+	dh_strip -p$(flavor)-no-x --dbg-package=$(flavor)-no-x-dbg
 	dh_strip
 
 # This won't be necessary once strip-nondeterminism is fixed.
@@ -656,8 +656,8 @@ override_dh_clean: $(persistent_autogen_files)
 	  debian/build-x \
 	  debian/elgz-canary \
 	  debian/elgz-info \
-	  debian/emacsVER-common.README.00 \
-	  debian/emacsVER-common.README.01 \
+	  debian/emacsVER-share-common.README.00 \
+	  debian/emacsVER-share-common.README.01 \
 	  debian/install-lucid \
 	  debian/install-nox \
 	  debian/install-x \
