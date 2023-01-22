@@ -12,48 +12,48 @@ Build-Depends: bsd-mailx | mailx, libncurses5-dev, texinfo, liblockfile-dev, lib
 Homepage: http://www.gnu.org/software/emacs/
 Standards-Version: 3.7.2
 
-Package: @DEB_FLAVOR@-lucid
+Package: @DEB_FLAVOR@-x-lucid
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
-Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-nox, emacs23-gtk
+Conflicts: @DEB_FLAVOR@-x, @DEB_FLAVOR@-no-x, emacs23-gtk
+Replaces: @DEB_FLAVOR@-x, @DEB_FLAVOR@-no-x, emacs23-gtk
 Description: The GNU Emacs editor
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a Lucid user interface.
 
-Package: @DEB_FLAVOR@-nox
+Package: @DEB_FLAVOR@-no-x
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
-Replaces: @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, emacs23-gtk
+Conflicts: @DEB_FLAVOR@-x, @DEB_FLAVOR@-x-lucid, emacs23-gtk
+Replaces: @DEB_FLAVOR@-x, @DEB_FLAVOR@-x-lucid, emacs23-gtk
 Description: The GNU Emacs editor (without X support)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs compiled without support for X.
 
-Package: @DEB_FLAVOR@
+Package: @DEB_FLAVOR@-x
 Architecture: any
 Depends: @DEB_FLAVOR@-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: editor, emacsen, info-browser, mail-reader, news-reader, emacs23-gtk
 Suggests: @DEB_FLAVOR@-common-non-dfsg
-Conflicts: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
-Replaces: @DEB_FLAVOR@-lucid, @DEB_FLAVOR@-nox, emacs23-gtk
+Conflicts: @DEB_FLAVOR@-x-lucid, @DEB_FLAVOR@-no-x, emacs23-gtk
+Replaces: @DEB_FLAVOR@-x-lucid, @DEB_FLAVOR@-no-x, emacs23-gtk
 Description: The GNU Emacs editor (with GTK+ user interface)
  GNU Emacs is the extensible self-documenting text editor.
  This package contains a version of Emacs with a GTK+ user interface.
 
 Package: @DEB_FLAVOR@-bin-common
 Architecture: any
-Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: @DEB_FLAVOR@-share-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: The GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
- that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
+ that's shared by @DEB_FLAVOR@-x, @DEB_FLAVOR@-x-lucid, and @DEB_FLAVOR@-no-x.
 
-Package: @DEB_FLAVOR@-common
+Package: @DEB_FLAVOR@-share-common
 Architecture: all
 Depends: emacsen-common (>= 1.4.10), dpkg (>= 1.15.4) | install-info, ${shlibs:Depends}, ${misc:Depends}
 Suggests: @DEB_FLAVOR@-el, @DEB_FLAVOR@-common-non-dfsg
@@ -61,11 +61,11 @@ Conflicts: @DEB_FLAVOR@-el (<< ${Source-Version}), cedet, eieio, speedbar
 Description: The GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
- that's shared by @DEB_FLAVOR@, @DEB_FLAVOR@-lucid, and @DEB_FLAVOR@-nox.
+ that's shared by @DEB_FLAVOR@-x, @DEB_FLAVOR@-x-lucid, and @DEB_FLAVOR@-no-x.
 
 Package: @DEB_FLAVOR@-el
 Architecture: all
-Depends: @DEB_FLAVOR@-common (= ${source:Version}), ${misc:Depends}
+Depends: @DEB_FLAVOR@-share-common (= ${source:Version}), ${misc:Depends}
 Description: GNU Emacs LISP (.el) files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the elisp sources for the convenience of users,
