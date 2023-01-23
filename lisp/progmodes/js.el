@@ -54,7 +54,7 @@
 (require 'json)
 (require 'prog-mode)
 (require 'treesit)
-(require 'c-ts-mode) ; For comment indent and filling.
+(require 'c-ts-common) ; For comment indent and filling.
 
 (eval-when-compile
   (require 'cl-lib)
@@ -3428,8 +3428,8 @@ This function is intended for use in `after-change-functions'."
        ((node-is ")") parent-bol 0)
        ((node-is "]") parent-bol 0)
        ((node-is ">") parent-bol 0)
-       ((and (parent-is "comment") c-ts-mode--looking-at-star)
-        c-ts-mode--comment-start-after-first-star -1)
+       ((and (parent-is "comment") c-ts-common-looking-at-star)
+        c-ts-common-comment-start-after-first-star -1)
        ((parent-is "comment") prev-adaptive-prefix 0)
        ((parent-is "ternary_expression") parent-bol js-indent-level)
        ((parent-is "member_expression") parent-bol js-indent-level)
@@ -3454,13 +3454,16 @@ This function is intended for use in `after-change-functions'."
        ((parent-is "statement_block") parent-bol js-indent-level)
 
        ;; JSX
-       ((node-is "jsx_fragment") parent typescript-ts-mode-indent-offset)
-       ((node-is "jsx_element") parent typescript-ts-mode-indent-offset)
-       ((node-is "jsx_expression") parent typescript-ts-mode-indent-offset)
-       ((node-is "jsx_self_closing_element") parent typescript-ts-mode-indent-offset)
+       ((match "<" "jsx_fragment") parent 0)
+       ((parent-is "jsx_fragment") parent js-indent-level)
        ((node-is "jsx_closing_element") parent 0)
-       ((node-is "/") parent 0)
-       ((node-is ">") parent 0)))))
+       ((node-is "jsx_element") parent js-indent-level)
+       ((parent-is "jsx_element") parent js-indent-level)
+       ((parent-is "jsx_opening_element") parent js-indent-level)
+       ((parent-is "jsx_expression") parent-bol js-indent-level)
+       ((match "/" "jsx_self_closing_element") parent 0)
+       ((parent-is "jsx_self_closing_element") parent js-indent-level)
+       (no-node parent-bol 0)))))
 
 (defvar js--treesit-keywords
   '("as" "async" "await" "break" "case" "catch" "class" "const" "continue"
@@ -3814,6 +3817,29 @@ Currently there are `js-mode' and `js-ts-mode'."
   "Nodes that designate sentences in JavaScript.
 See `treesit-sentence-type-regexp' for more information.")
 
+(defvar js--treesit-sexp-nodes
+  '("expression"
+    "pattern"
+    "array"
+    "function"
+    "string"
+    "escape"
+    "template"
+    "regex"
+    "number"
+    "identifier"
+    "this"
+    "super"
+    "true"
+    "false"
+    "null"
+    "undefined"
+    "arguments"
+    "pair"
+    "jsx")
+  "Nodes that designate sexps in JavaScript.
+See `treesit-sexp-type-regexp' for more information.")
+
 ;;;###autoload
 (define-derived-mode js-ts-mode js-base-mode "JavaScript"
   "Major mode for editing JavaScript.
@@ -3828,7 +3854,7 @@ See `treesit-sentence-type-regexp' for more information.")
     ;; Which-func.
     (setq-local which-func-imenu-joiner-function #'js--which-func-joiner)
     ;; Comment.
-    (c-ts-mode-comment-setup)
+    (c-ts-common-comment-setup)
     (setq-local comment-multi-line t)
 
     (setq-local treesit-text-type-regexp
@@ -3857,6 +3883,9 @@ See `treesit-sentence-type-regexp' for more information.")
     (setq-local treesit-sentence-type-regexp
                 (regexp-opt js--treesit-sentence-nodes))
 
+    (setq-local treesit-sexp-type-regexp
+                (regexp-opt js--treesit-sexp-nodes))
+
     ;; Fontification.
     (setq-local treesit-font-lock-settings js--treesit-font-lock-settings)
     (setq-local treesit-font-lock-feature-list
@@ -3874,7 +3903,10 @@ See `treesit-sentence-type-regexp' for more information.")
                                         "method_definition")
                                 eos)
                    nil nil)))
-    (treesit-major-mode-setup)))
+    (treesit-major-mode-setup)
+
+    (add-to-list 'auto-mode-alist
+                 '("\\(\\.js[mx]\\|\\.har\\)\\'" . js-ts-mode))))
 
 ;;;###autoload
 (define-derived-mode js-json-mode js-mode "JSON"

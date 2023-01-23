@@ -92,6 +92,19 @@ int main()
 }
 =-=-=
 
+Name: Concecutive blocks (GNU Style) (bug#60873)
+
+=-=
+int
+main (int   argc,
+      char *argv[])
+{
+  {
+    int i = 0;
+  }
+}
+=-=-=
+
 Name: Multiline Parameter List (bug#60398)
 
 =-=
@@ -130,6 +143,20 @@ Name: Multiline Block Comments 4 (bug#60270)
 =-=
 /*
  * Some comment
+ */
+=-=-=
+
+Name: Multiline Block Comments 5 (bug#60270)
+
+=-=
+/*
+line one
+line 2
+ */
+=-=
+/*
+  line one
+  line 2
  */
 =-=-=
 
