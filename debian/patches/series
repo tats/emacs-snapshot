@@ -8,3 +8,5 @@
 0008-Emacs-shouldn-t-segfault-when-gcc-expects-nopie.patch
 0009-openssl-s_client-is-no-longer-a-default-for-ssl-conn.patch
 0010-A-remote-execution-exploit-via-enriched-text-has-bee.patch
+0011-Port-alternate-signal-stack-to-upcoming-glibc-2.34.patch
+0012-Avoid-loading-.elc-under-usr-share-emacs-site-lisp.patch

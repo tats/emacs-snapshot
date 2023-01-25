@@ -23,7 +23,7 @@ diff --git a/test/automated/package-test.el b/test/automated/package-test.el
 index c4c856f3031..d0719588c89 100644
 --- a/test/automated/package-test.el
 +++ b/test/automated/package-test.el
-@@ -149,7 +149,14 @@ package-test-fake-contents-file
+@@ -149,7 +149,14 @@
                 ,@body)))
  
         (when (file-directory-p package-test-user-dir)

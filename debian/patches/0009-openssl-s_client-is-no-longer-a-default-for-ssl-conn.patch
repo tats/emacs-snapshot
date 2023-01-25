@@ -16,7 +16,7 @@ diff --git a/lisp/net/tls.el b/lisp/net/tls.el
 index f1219fdddbd..92a1a1306a1 100644
 --- a/lisp/net/tls.el
 +++ b/lisp/net/tls.el
-@@ -78,8 +78,7 @@ tls-end-of-info
+@@ -78,8 +78,7 @@ and `gnutls-cli' (version 2.0.1) output."
  
  (defcustom tls-program
    '("gnutls-cli --x509cafile %t -p %p %h"
@@ -26,7 +26,7 @@ index f1219fdddbd..92a1a1306a1 100644
    "List of strings containing commands to start TLS stream to a host.
  Each entry in the list is tried until a connection is successful.
  %h is replaced with the server hostname, %p with the port to
-@@ -94,20 +93,17 @@ tls-program
+@@ -94,20 +93,17 @@ successful negotiation."
    '(choice
      (const :tag "Default list of commands"
  	   ("gnutls-cli --x509cafile %t -p %p %h"
@@ -50,7 +50,7 @@ index f1219fdddbd..92a1a1306a1 100644
  	  (repeat :inline t :tag "Other" (string)))
      (list :tag "List of commands"
  	  (repeat :tag "Command" (string))))
-@@ -138,8 +134,7 @@ tls-checktrust
+@@ -138,8 +134,7 @@ consider trustworthy, e.g.:
  
  \(setq tls-program
        \\='(\"gnutls-cli --x509cafile /etc/ssl/certs/ca-certificates.crt -p %p %h\"
