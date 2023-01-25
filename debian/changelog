@@ -1,3 +1,16 @@
+emacs25 (25.1+1-4+deb9u1+0.1) UNRELEASED; urgency=medium
+
+  [ Paul Eggert ]
+  * Port alternate signal stack to upcoming glibc 2.34
+
+  [ Tatsuya Kinoshita ]
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Downgrade bin_priority to 26, less than emacs and emacs-snapshot
+  * Do not provide flavor name to avoid conflicts
+  * Rename package names to avoid conflicts
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Wed, 25 Jan 2023 19:57:04 +0900
+
 emacs25 (25.1+1-4+deb9u1) stretch-security; urgency=high
 
   * Block remote code execution via enriched text.  Add
