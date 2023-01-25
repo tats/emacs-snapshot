@@ -1,6 +1,6 @@
 ;;; css-mode.el --- Major mode to edit CSS files  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2018 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Maintainer: Simen Heggestøyl <simenheg@gmail.com>
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -498,6 +498,7 @@ further value candidates, since that list would be infinite.")
     ("red" . "#ff0000")
     ("purple" . "#800080")
     ("fuchsia" . "#ff00ff")
+    ("magenta" . "#ff00ff")
     ("green" . "#008000")
     ("lime" . "#00ff00")
     ("olive" . "#808000")
@@ -506,6 +507,7 @@ further value candidates, since that list would be infinite.")
     ("blue" . "#0000ff")
     ("teal" . "#008080")
     ("aqua" . "#00ffff")
+    ("cyan" . "#00ffff")
     ("orange" . "#ffa500")
     ("aliceblue" . "#f0f8ff")
     ("antiquewhite" . "#faebd7")
@@ -1037,7 +1039,7 @@ This recognizes CSS-color-4 extensions."
 STR is the incoming CSS hex color.
 This function simply drops any transparency."
   ;; Either #RGB or #RRGGBB, drop the "A" or "AA".
-  (if (> (length str) 4)
+  (if (> (length str) 5)
       (substring str 0 7)
     (substring str 0 4)))
 
@@ -1045,7 +1047,7 @@ This function simply drops any transparency."
   "Check whether STR, seen at point, is CSS named color.
 Returns STR if it is a valid color.  Special care is taken
 to exclude some SCSS constructs."
-  (when-let ((color (assoc str css--color-map)))
+  (when-let* ((color (assoc str css--color-map)))
     (save-excursion
       (goto-char start-point)
       (forward-comment (- (point)))
@@ -1149,12 +1151,12 @@ This function is intended to be good enough to help SMIE during
 tokenization, but should not be regarded as a reliable function
 for determining whether point is within a selector."
   (save-excursion
-    (re-search-forward "[{};)]" nil t)
+    (re-search-forward "[{};]" nil t)
     (eq (char-before) ?\{)))
 
 (defun css--colon-inside-funcall ()
   "Return t if point is inside a function call."
-  (when-let (opening-paren-pos (nth 1 (syntax-ppss)))
+  (when-let* ((opening-paren-pos (nth 1 (syntax-ppss))))
     (save-excursion
       (goto-char opening-paren-pos)
       (eq (char-after) ?\())))
@@ -1375,6 +1377,7 @@ tags, classes and IDs."
               :exit-function
               ,(lambda (string status)
                  (and (eq status 'finished)
+                      (eolp)
                       prop-table
                       (test-completion string prop-table)
                       (not (and sel-table
@@ -1578,7 +1581,7 @@ to look up will be substituted there."
   (goto-char (point-min))
   (let ((window (get-buffer-window (current-buffer) 'visible)))
     (when window
-      (when (re-search-forward "^Summary" nil 'move)
+      (when (re-search-forward "^\\(Summary\\|Syntax\\)" nil 'move)
         (beginning-of-line)
         (set-window-start window (point))))))
 
@@ -1659,14 +1662,13 @@ on what is seen near point."
       (setq symbol (concat ":" symbol)))
     (let ((url (format css-lookup-url-format symbol))
           (buffer (get-buffer-create "*MDN CSS*")))
-      (save-selected-window
-        ;; Make sure to display the buffer before calling `eww', as
-        ;; that calls `pop-to-buffer-same-window'.
-        (switch-to-buffer-other-window buffer)
-        (with-current-buffer buffer
-          (eww-mode)
-          (add-hook 'eww-after-render-hook #'css--mdn-after-render nil t)
-          (eww url))))))
+      ;; Make sure to display the buffer before calling `eww', as that
+      ;; calls `pop-to-buffer-same-window'.
+      (switch-to-buffer-other-window buffer)
+      (with-current-buffer buffer
+        (eww-mode)
+        (add-hook 'eww-after-render-hook #'css--mdn-after-render nil t)
+        (eww url)))))
 
 (provide 'css-mode)
 ;;; css-mode.el ends here

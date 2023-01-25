@@ -1,6 +1,6 @@
 ;;; gnus-agent.el --- unplugged support for Gnus
 
-;; Copyright (C) 1997-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2018 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is part of GNU Emacs.
@@ -16,7 +16,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -172,7 +172,7 @@ When found, offer to remove them."
 (defcustom gnus-agent-auto-agentize-methods nil
   "Initially, all servers from these methods are agentized.
 The user may remove or add servers using the Server buffer.
-See Info nodes `(gnus)Server Buffer', `(gnus)Agent Variables'."
+See Info node `(gnus)Server Buffer' and Info node `(gnus)Agent Variables'."
   :version "22.1"
   :type '(repeat symbol)
   :group 'gnus-agent)
@@ -451,7 +451,7 @@ manipulated as follows:
 (defvar gnus-agent-mode-status '(gnus-agent-mode " Plugged"))
 
 (defun gnus-agent-mode ()
-  "Minor mode for providing a agent support in Gnus buffers."
+  "Minor mode for providing agent support in Gnus buffers."
   (let* ((buffer (progn (string-match "^gnus-\\(.*\\)-mode$"
 				      (symbol-name major-mode))
 			(match-string 1 (symbol-name major-mode))))

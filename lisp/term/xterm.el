@@ -1,6 +1,6 @@
 ;;; xterm.el --- define function key sequences and standard colors for xterm  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1995, 2001-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2001-2018 Free Software Foundation, Inc.
 
 ;; Author: FSF
 ;; Keywords: terminals
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -610,7 +610,7 @@ Return the pasted text as a string."
 ;; Set up colors, for those versions of xterm that support it.
 (defvar xterm-standard-colors
   ;; The names in the comments taken from XTerm-col.ad in the xterm
-  ;; distribution, see ftp://dickey.his.com/xterm/.  RGB values are
+  ;; distribution, see https://invisible-island.net/xterm/.  RGB values are
   ;; from rgb.txt.
   '(("black"          0 (  0   0   0))	; black
     ("red"            1 (205   0   0))	; red3
@@ -670,8 +670,13 @@ Return the pasted text as a string."
         (when (and (> version 2000) (equal (match-string 1 str) "1"))
           ;; Hack attack!  bug#16988: gnome-terminal reports "1;NNNN;0"
           ;; with a large NNNN but is based on a rather old xterm code.
-          ;; Gnome terminal 3.6.1 reports 1;3406;0
           ;; Gnome terminal 2.32.1 reports 1;2802;0
+          ;; Gnome terminal 3.6.1 reports 1;3406;0
+          ;; Gnome terminal 3.22.2 reports 1;4601;0 and *does* support
+          ;; background color querying (Bug#29716).
+          (when (> version 4000)
+            (xterm--query "\e]11;?\e\\"
+                          '(("\e]11;" .  xterm--report-background-handler))))
           (setq version 200))
         (when (equal (match-string 1 str) "83")
           ;; `screen' (which returns 83;40003;0) seems to also lack support for

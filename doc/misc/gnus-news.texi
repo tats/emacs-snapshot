@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 
-@c Copyright (C) 2004-2017 Free Software Foundation, Inc.
+@c Copyright (C) 2004-2018 Free Software Foundation, Inc.
 
 @c    Permission is granted to anyone to make or distribute verbatim copies
 @c    of this document as received, in any medium, provided that the
@@ -143,7 +143,7 @@ with a WWW browser with @kbd{K H}.  @xref{MIME Commands}.
 @item International host names (@acronym{IDNA}) can now be decoded
 inside article bodies using @kbd{W i}
 (@code{gnus-summary-idna-message}).  This requires that GNU Libidn
-(@url{http://www.gnu.org/software/libidn/}) has been installed.
+(@url{https://www.gnu.org/software/libidn/}) has been installed.
 @c FIXME: Also mention @code{message-use-idna}?
 
 @item The non-@acronym{ASCII} group names handling has been much
@@ -324,7 +324,7 @@ messages are deleted again).
 @itemize @bullet
 
 @item The tool bar has been updated to use GNOME icons.
-You can also customize the tool bars: @kbd{M-x customize-apropos RET
+You can also customize the tool bars: @kbd{M-x customize-apropos @key{RET}
 -tool-bar$} should get you started.  (Only for Emacs, not in XEmacs.)
 @c FIXME: Document this in the manual
 

@@ -1,6 +1,6 @@
 ;;; shell.el --- specialized comint.el for running the shell -*- lexical-binding: t -*-
 
-;; Copyright (C) 1988, 1993-1997, 2000-2017 Free Software Foundation,
+;; Copyright (C) 1988, 1993-1997, 2000-2018 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Olin Shivers <shivers@cs.cmu.edu>
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -727,8 +727,8 @@ Otherwise, one argument `-i' is passed to the shell.
                (null explicit-shell-file-name)
                (null (getenv "ESHELL")))
           (set (make-local-variable 'explicit-shell-file-name)
-               (expand-file-name
-                (file-local-name
+               (file-local-name
+		(expand-file-name
                  (read-file-name
                   "Remote shell path: " default-directory shell-file-name
                   t shell-file-name)))))))

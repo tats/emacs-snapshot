@@ -1,6 +1,6 @@
 ;;; ox-latex.el --- LaTeX Back-End for Org Export Engine -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2011-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2018 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Goaziou <n.goaziou at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -102,7 +102,8 @@
   :filters-alist '((:filter-options . org-latex-math-block-options-filter)
 		   (:filter-paragraph . org-latex-clean-invalid-line-breaks)
 		   (:filter-parse-tree org-latex-math-block-tree-filter
-				       org-latex-matrices-tree-filter)
+				       org-latex-matrices-tree-filter
+				       org-latex-image-link-filter)
 		   (:filter-verse-block . org-latex-clean-invalid-line-breaks))
   :options-alist
   '((:latex-class "LATEX_CLASS" nil org-latex-default-class t)
@@ -726,7 +727,8 @@ environment."
   :safe #'stringp)
 
 (defcustom org-latex-inline-image-rules
-  '(("file" . "\\.\\(pdf\\|jpeg\\|jpg\\|png\\|ps\\|eps\\|tikz\\|pgf\\|svg\\)\\'"))
+  `(("file" . ,(regexp-opt
+		'("pdf" "jpeg" "jpg" "png" "ps" "eps" "tikz" "pgf" "svg"))))
   "Rules characterizing image files that can be inlined into LaTeX.
 
 A rule consists in an association whose key is the type of link
@@ -863,7 +865,7 @@ The function should return the string to be exported.
 
 The default function simply returns the value of CONTENTS."
   :group 'org-export-latex
-  :version "24.4"
+  :version "26.1"
   :package-version '(Org . "8.3")
   :type 'function)
 
@@ -918,15 +920,14 @@ using customize, or with
   (add-to-list \\='org-latex-packages-alist \\='(\"newfloat\" \"minted\"))
 
 In addition, it is necessary to install pygments
-\(http://pygments.org), and to configure the variable
+\(URL `http://pygments.org>'), and to configure the variable
 `org-latex-pdf-process' so that the -shell-escape option is
 passed to pdflatex.
 
 The minted choice has possible repercussions on the preview of
 latex fragments (see `org-preview-latex-fragment').  If you run
 into previewing problems, please consult
-
-  http://orgmode.org/worg/org-tutorials/org-latex-preview.html"
+URL `https://orgmode.org/worg/org-tutorials/org-latex-preview.html'."
   :group 'org-export-latex
   :type '(choice
 	  (const :tag "Use listings" t)
@@ -954,7 +955,7 @@ parameter for the listings package.  If the mode name and the
 listings name are the same, the language does not need an entry
 in this list - but it does not hurt if it is present."
   :group 'org-export-latex
-  :version "24.4"
+  :version "26.1"
   :package-version '(Org . "8.3")
   :type '(repeat
 	  (list
@@ -1310,14 +1311,19 @@ For non-floats, see `org-latex--wrap-label'."
      (t
       (format (if nonfloat "\\captionof{%s}%s{%s%s}\n"
 		"\\caption%s%s{%s%s}\n")
-	      (if nonfloat
-		  (cl-case type
-		    (paragraph "figure")
-		    (src-block (if (plist-get info :latex-listings)
-				   "listing"
-				 "figure"))
-		    (t (symbol-name type)))
-		"")
+	      (let ((type* (if (eq type 'latex-environment)
+			       (org-latex--environment-type element)
+			     type)))
+		(if nonfloat
+		    (cl-case type*
+		      (paragraph "figure")
+		      (image "figure")
+		      (special-block "figure")
+		      (src-block (if (plist-get info :latex-listings)
+				     "listing"
+				   "figure"))
+		      (t (symbol-name type*)))
+		  ""))
 	      (if short (format "[%s]" (org-export-data short info)) "")
 	      label
 	      (org-export-data main info))))))
@@ -1712,7 +1718,7 @@ holding export options."
      ;; Table of contents.
      (let ((depth (plist-get info :with-toc)))
        (when depth
-	 (concat (when (wholenump depth)
+	 (concat (when (integerp depth)
 		   (format "\\setcounter{tocdepth}{%d}\n" depth))
 		 (plist-get info :latex-toc-command))))
      ;; Document's body.
@@ -2118,7 +2124,7 @@ holding contextual information."
 
 (defun org-latex-format-inlinetask-default-function
     (todo _todo-type priority title tags contents _info)
-  "Default format function for a inlinetasks.
+  "Default format function for inlinetasks.
 See `org-latex-format-inlinetask-function' for details."
   (let ((full-title
 	 (concat (when todo (format "\\textbf{\\textsf{\\textsc{%s}}} " todo))
@@ -2173,19 +2179,16 @@ contextual information."
 			 (nth (1- level) '("i" "ii" "iii" "iv"))
 			 (1- count)))))
 	 (checkbox (cl-case (org-element-property :checkbox item)
-		     (on "$\\boxtimes$ ")
-		     (off "$\\square$ ")
-		     (trans "$\\boxminus$ ")))
+		     (on "$\\boxtimes$")
+		     (off "$\\square$")
+		     (trans "$\\boxminus$")))
 	 (tag (let ((tag (org-element-property :tag item)))
-		;; Check-boxes must belong to the tag.
-		(and tag (format "[{%s}] "
-				 (concat checkbox
-					 (org-export-data tag info)))))))
+		(and tag (org-export-data tag info)))))
     (concat counter
 	    "\\item"
 	    (cond
-	     (tag)
-	     (checkbox (concat " " checkbox))
+	     ((and checkbox tag) (format "[{%s %s}] " checkbox tag))
+	     ((or checkbox tag) (format "[{%s}] " (or checkbox tag)))
 	     ;; Without a tag or a check-box, if CONTENTS starts with
 	     ;; an opening square bracket, add "\relax" to "\item",
 	     ;; unless the brackets comes from an initial export
@@ -2250,23 +2253,61 @@ CONTENTS is nil.  INFO is a plist holding contextual information."
 
 ;;;; Latex Environment
 
+(defun org-latex--environment-type (latex-environment)
+  "Return the TYPE of LATEX-ENVIRONMENT.
+
+The TYPE is determined from the actual latex environment, and
+could be a member of `org-latex-caption-above' or `math'."
+  (let* ((latex-begin-re "\\\\begin{\\([A-Za-z0-9*]+\\)}")
+	 (value (org-remove-indentation
+		 (org-element-property :value latex-environment)))
+	 (env (or (and (string-match latex-begin-re value)
+		       (match-string 1 value))
+		  "")))
+    (cond
+     ((string-match-p org-latex-math-environments-re value) 'math)
+     ((string-match-p
+       (eval-when-compile
+	 (regexp-opt '("table" "longtable" "tabular" "tabu" "longtabu")))
+       env)
+      'table)
+     ((string-match-p "figure" env) 'image)
+     ((string-match-p
+       (eval-when-compile
+	 (regexp-opt '("lstlisting" "listing" "verbatim" "minted")))
+       env)
+      'src-block)
+     (t 'special-block))))
+
 (defun org-latex-latex-environment (latex-environment _contents info)
   "Transcode a LATEX-ENVIRONMENT element from Org to LaTeX.
 CONTENTS is nil.  INFO is a plist holding contextual information."
   (when (plist-get info :with-latex)
-    (let ((value (org-remove-indentation
-		  (org-element-property :value latex-environment))))
-      (if (not (org-element-property :name latex-environment)) value
+    (let* ((value (org-remove-indentation
+		   (org-element-property :value latex-environment)))
+	   (type (org-latex--environment-type latex-environment))
+	   (caption (if (eq type 'math)
+			(org-latex--label latex-environment info nil t)
+		      (org-latex--caption/label-string latex-environment info)))
+	   (caption-above-p
+	    (memq type (append (plist-get info :latex-caption-above) '(math)))))
+      (if (not (or (org-element-property :name latex-environment)
+		   (org-element-property :caption latex-environment)))
+	  value
 	;; Environment is labeled: label must be within the environment
 	;; (otherwise, a reference pointing to that element will count
-	;; the section instead).
+	;; the section instead).  Also insert caption if `latex-environment'
+	;; is not a math environment.
 	(with-temp-buffer
 	  (insert value)
-	  (goto-char (point-min))
-	  (forward-line)
-	  (insert (org-latex--label latex-environment info nil t))
+	  (if caption-above-p
+	      (progn
+		(goto-char (point-min))
+		(forward-line))
+	    (goto-char (point-max))
+	    (forward-line -1))
+	  (insert caption)
 	  (buffer-string))))))
-
 
 ;;;; Latex Fragment
 
@@ -2290,6 +2331,9 @@ CONTENTS is nil.  INFO is a plist holding contextual information."
 
 
 ;;;; Link
+
+(defun org-latex-image-link-filter (data _backend info)
+  (org-export-insert-image-links data info org-latex-inline-image-rules))
 
 (defun org-latex--inline-image (link info)
   "Return LaTeX code for an inline image.
@@ -3300,8 +3344,7 @@ This function assumes TABLE has `org' as its `:type' property and
 	 (contents
 	  (mapconcat
 	   (lambda (row)
-	     ;; Ignore horizontal rules.
-	     (when (eq (org-element-property :type row) 'standard)
+	     (if (eq (org-element-property :type row) 'rule) "\\hline"
 	       ;; Return each cell unmodified.
 	       (concat
 		(mapconcat

@@ -1,6 +1,6 @@
 ;;; xdg-tests.el --- tests for xdg.el -*- lexical-binding: t -*-
 
-;; Copyright (C) 2017  Free Software Foundation, Inc.
+;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Author: Mark Oteiza <mvoteiza@udel.edu>
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -40,9 +40,6 @@
     (should (equal (gethash "Name" tab1) "Test"))
     (should (eq 'default (gethash "Exec" tab1 'default)))
     (should (equal "frobnicate" (gethash "Exec" tab2))))
-  (should-error
-   (xdg-desktop-read-file
-    (expand-file-name "wrong.desktop" xdg-tests-data-dir)))
   (should-error
    (xdg-desktop-read-file
     (expand-file-name "malformed.desktop" xdg-tests-data-dir)))

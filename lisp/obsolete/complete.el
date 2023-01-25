@@ -1,6 +1,6 @@
 ;;; complete.el --- partial completion mechanism plus other goodies
 
-;; Copyright (C) 1990-1993, 1999-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 1999-2018 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 ;; Keywords: abbrev convenience
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -924,7 +924,7 @@ or properties are considered."
 			(or (boundp sym) (fboundp sym)
 			    (symbol-plist sym))))))
 	 (PC-not-minibuffer t))
-    ;; http://lists.gnu.org/archive/html/emacs-devel/2007-03/msg01211.html
+    ;; https://lists.gnu.org/r/emacs-devel/2007-03/msg01211.html
     ;;
     ;; This deals with cases like running PC-l-c-s on "M-: (n-f".
     ;; The first call to PC-l-c-s expands this to "(ne-f", and moves

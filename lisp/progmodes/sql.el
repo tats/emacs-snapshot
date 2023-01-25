@@ -1,12 +1,12 @@
 ;;; sql.el --- specialized comint.el for SQL interpreters  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2018 Free Software Foundation, Inc.
 
 ;; Author: Alex Schroeder <alex@gnu.org>
 ;; Maintainer: Michael Mauger <michael@mauger.com>
 ;; Version: 3.6
 ;; Keywords: comm languages processes
-;; URL: http://savannah.gnu.org/projects/emacs/
+;; URL: https://savannah.gnu.org/projects/emacs/
 
 ;; This file is part of GNU Emacs.
 
@@ -21,15 +21,15 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
 ;; Please send bug reports and bug fixes to the mailing list at
-;; help-gnu-emacs@gnu.org.  If you want to subscribe to the mailing
-;; list, see the web page at
-;; http://lists.gnu.org/mailman/listinfo/help-gnu-emacs for
-;; instructions.  I monitor this list actively.  If you send an e-mail
+;; bug-gnu-emacs@gnu.org.
+;; See also the general help list at
+;; https://lists.gnu.org/mailman/listinfo/help-gnu-emacs
+;; I monitor this list actively.  If you send an e-mail
 ;; to Alex Schroeder it usually makes it to me when Alex has a chance
 ;; to forward them along (Thanks, Alex).
 
@@ -292,6 +292,9 @@ file.  Since that is a plaintext file, this could be dangerous."
 
 ;; Login parameter type
 
+;; This seems too prescriptive.  It probably fails to match some of
+;; the possible combinations.  It would probably be better to just use
+;; plist for most of it.
 (define-widget 'sql-login-params 'lazy
   "Widget definition of the login parameters list"
   :tag "Login Parameters"
@@ -331,13 +334,17 @@ file.  Since that is a plaintext file, this could be dangerous."
                       (list :tag "file"
                             (const :format "" database)
                             (const :format "" :file)
-                            regexp)
+                            (choice (const nil) regexp)
+                            (const :format "" :must-match)
+                            (symbol :tag ":must-match"))
                       (list :tag "completion"
                             (const :format "" database)
+                            (const :format "" :default)
+                            (string :tag ":default")
                             (const :format "" :completion)
+                            (sexp :tag ":completion")
                             (const :format "" :must-match)
-                            (restricted-sexp
-                             :match-alternatives (listp stringp))))
+                            (symbol :tag ":must-match")))
               (const port)))
 
 ;; SQL Product support
@@ -1088,7 +1095,7 @@ add your name with a \"-U\" prefix (such as \"-Umark\") to the list."
     server)
   "List of login parameters needed to connect to Postgres."
   :type 'sql-login-params
-  :version "24.1"
+  :version "26.1"
   :group 'SQL)
 
 (defun sql-postgres-list-databases ()
@@ -2774,7 +2781,7 @@ local variable."
 
     ;; Our start must be between them
     (goto-char last)
-    ;; Find an beginning-of-stmt that's not in a comment
+    ;; Find a beginning-of-stmt that's not in a comment
     (while (and (re-search-forward regexp next t 1)
                 (nth 7 (syntax-ppss)))
       (goto-char (match-end 0)))
@@ -4225,7 +4232,7 @@ the call to \\[sql-product-interactive] with
                (symbolp product)) product)
          (t sql-product)))              ; Default to sql-product
 
-  ;; If we have a product and it has a interactive mode
+  ;; If we have a product and it has an interactive mode
   (if product
       (when (sql-get-product-feature product :sqli-comint-func)
         ;; If no new name specified, try to pop to an active SQL
@@ -4256,9 +4263,22 @@ the call to \\[sql-product-interactive] with
                 (funcall (sql-get-product-feature product :sqli-comint-func)
                          product
                          (sql-get-product-feature product :sqli-options)
-                         (if (and new-name (string-prefix-p "SQL" new-name t))
-                             new-name
-                           (concat "SQL: " new-name))))
+                         (cond
+                          ((null new-name)
+                           "*SQL*")
+                          ((stringp new-name)
+                           (if (string-prefix-p "*SQL: " new-name t)
+                               new-name
+                             (concat "*SQL: " new-name "*")))
+                          ((equal new-name '(4))
+                           (concat
+                            "*SQL: "
+                            (read-string
+                             "Buffer name (\"*SQL: XXX*\"; enter `XXX'): "
+                             sql-alternate-buffer-name)
+                            "*"))
+                          (t
+                           (format "*SQL: %s*" new-name)))))
 
               ;; Set SQLi mode.
               (let ((sql-interactive-product product))

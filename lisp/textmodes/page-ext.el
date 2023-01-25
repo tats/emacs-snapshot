@@ -1,6 +1,6 @@
 ;;; page-ext.el --- extended page handling commands
 
-;; Copyright (C) 1990-1991, 1993-1994, 2001-2017 Free Software
+;; Copyright (C) 1990-1991, 1993-1994, 2001-2018 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Robert J. Chassell <bob@gnu.org>
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -583,6 +583,7 @@ directory for only the accessible portion of the buffer."
     (with-output-to-temp-buffer pages-directory-buffer
       (with-current-buffer standard-output
         (pages-directory-mode)
+        (setq buffer-read-only nil)
         (insert
          "==== Pages Directory: use `C-c C-c' to go to page under cursor. ====" ?\n)
         (setq pages-buffer pages-target-buffer)
@@ -631,6 +632,7 @@ directory for only the accessible portion of the buffer."
                 )))))
 
       (set-buffer standard-output)
+      (setq buffer-read-only t)
       ;; Put positions in increasing order to go with buffer.
       (setq pages-pos-list (nreverse pages-pos-list))
       (if (called-interactively-p 'interactive)

@@ -1,6 +1,6 @@
 ;;; gnus.el --- a newsreader for GNU Emacs
 
-;; Copyright (C) 1987-1990, 1993-1998, 2000-2017 Free Software
+;; Copyright (C) 1987-1990, 1993-1998, 2000-2018 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -2629,11 +2629,11 @@ a string, be sure to use a valid format, see RFC 2616."
 
 ;; Propagate flags to server, with the following exceptions:
 ;; `seen' is private to each gnus installation
-;; `cache' is a internal gnus flag for each gnus installation
-;; `download' is a agent flag private to each gnus installation
+;; `cache' is an internal gnus flag for each gnus installation
+;; `download' is an agent flag private to each gnus installation
 ;; `unsend' are for nndraft groups only
 ;; `score' is not a proper mark
-;; `bookmark': don't propagated it, or fix the bug in update-mark.
+;; `bookmark': don't propagate it, or fix the bug in update-mark.
 (defconst gnus-article-unpropagated-mark-lists
   '(seen cache download unsend score bookmark unexist)
   "Marks that shouldn't be propagated to back ends.

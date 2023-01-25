@@ -1,6 +1,6 @@
 ;;; gitmerge.el --- help merge one Emacs branch into another
 
-;; Copyright (C) 2010-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2018 Free Software Foundation, Inc.
 
 ;; Authors: David Engster <deng@randomsample.de>
 ;;          Stefan Monnier <monnier@iro.umontreal.ca>
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -400,7 +400,7 @@ Throw an user-error if we cannot resolve automatically."
 		    "\n  - You can safely close this Emacs session and do this "
 		    "in a new one."
 		    "\n  - When running gitmerge again, remember that you must "
-		    "that from within the Emacs repo.\n")
+		    "do that from within the Emacs repo.\n")
 	    (pop-to-buffer (current-buffer)))
 	  (user-error "Resolve the conflicts manually"))))))
 

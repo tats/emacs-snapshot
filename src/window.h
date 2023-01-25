@@ -1,5 +1,5 @@
 /* Window definitions for GNU Emacs.
-   Copyright (C) 1985-1986, 1993, 1995, 1997-2017 Free Software
+   Copyright (C) 1985-1986, 1993, 1995, 1997-2018 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef WINDOW_H_INCLUDED
 #define WINDOW_H_INCLUDED
@@ -88,7 +88,7 @@ struct cursor_pos
 struct window
   {
     /* This is for Lisp; the terminal code does not refer to it.  */
-    struct vectorlike_header header;
+    union vectorlike_header header;
 
     /* The frame this window is on.  */
     Lisp_Object frame;
@@ -370,7 +370,8 @@ struct window
     bool_bf must_be_updated_p : 1;
 
     /* Flag indicating that this window is not a real one.
-       Currently only used for menu bar windows of frames.  */
+       Currently only used for menu bar windows, for tool bar windows,
+       and for tooltips.  */
     bool_bf pseudo_window_p : 1;
 
     /* True means fringes are drawn outside display margins.

@@ -1,6 +1,6 @@
 ;;; tramp-smb.el --- Tramp access functions for SMB servers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2018 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -253,8 +253,9 @@ See `tramp-actions-before-shell' for more info.")
     (file-readable-p . tramp-handle-file-exists-p)
     (file-regular-p . tramp-handle-file-regular-p)
     (file-remote-p . tramp-handle-file-remote-p)
-    ;; `file-selinux-context' performed by default handler.
+    (file-selinux-context . tramp-handle-file-selinux-context)
     (file-symlink-p . tramp-handle-file-symlink-p)
+    (file-system-info . tramp-smb-handle-file-system-info)
     (file-truename . tramp-handle-file-truename)
     (file-writable-p . tramp-smb-handle-file-writable-p)
     (find-backup-file-name . tramp-handle-find-backup-file-name)
@@ -414,6 +415,9 @@ pass to the OPERATION."
       (with-parsed-tramp-file-name (if t1 dirname newname) nil
 	(with-tramp-progress-reporter
 	    v 0 (format "Copying %s to %s" dirname newname)
+	  (when (and (file-directory-p newname)
+		     (not (tramp-compat-directory-name-p newname)))
+	    (tramp-error v 'file-already-exists newname))
 	  (cond
 	   ;; We must use a local temporary directory.
 	   ((and t1 t2)
@@ -425,14 +429,15 @@ pass to the OPERATION."
 	      (unwind-protect
 		  (progn
 		    (make-directory tmpdir)
-		    (copy-directory dirname tmpdir keep-date 'parents)
+		    (copy-directory
+		     dirname (file-name-as-directory tmpdir) keep-date 'parents)
 		    (copy-directory
 		     (expand-file-name (file-name-nondirectory dirname) tmpdir)
 		     newname keep-date parents))
 		(delete-directory tmpdir 'recursive))))
 
 	   ;; We can copy recursively.
-	   ;; Does not work reliably.
+	   ;; TODO: Does not work reliably.
 	   (nil ;(and (or t1 t2) (tramp-smb-get-cifs-capabilities v))
 	    (when (and (file-directory-p newname)
 		       (not (string-equal (file-name-nondirectory dirname)
@@ -531,7 +536,7 @@ pass to the OPERATION."
 		;; Reset the transfer process properties.
 		(tramp-set-connection-property v "process-name" nil)
 		(tramp-set-connection-property v "process-buffer" nil)
-		(when t1 (delete-directory tmpdir 'recurse))))
+		(when t1 (delete-directory tmpdir 'recursive))))
 
 	    ;; Handle KEEP-DATE argument.
 	    (when keep-date
@@ -569,8 +574,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
       0 (format "Copying %s to %s" filename newname)
 
     (if (file-directory-p filename)
-	(copy-directory
-	 filename newname keep-date 'parents 'copy-contents)
+	(copy-directory filename newname keep-date 'parents 'copy-contents)
 
       (let ((tmpfile (file-local-copy filename)))
 	(if tmpfile
@@ -582,7 +586,8 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	       (signal (car err) (cdr err))))
 
 	  ;; Remote newname.
-	  (when (file-directory-p newname)
+	  (when (and (file-directory-p newname)
+		     (tramp-compat-directory-name-p newname))
 	    (setq newname
 		  (expand-file-name (file-name-nondirectory filename) newname)))
 
@@ -950,6 +955,38 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		(nth 0 x))))
 	   (tramp-smb-get-file-entries directory))))))))
 
+(defun tramp-smb-handle-file-system-info (filename)
+  "Like `file-system-info' for Tramp files."
+  (ignore-errors
+    (unless (file-directory-p filename)
+      (setq filename (file-name-directory filename)))
+    (with-parsed-tramp-file-name (expand-file-name filename) nil
+      (tramp-message v 5 "file system info: %s" localname)
+      (tramp-smb-send-command v (format "du %s/*" (tramp-smb-get-localname v)))
+      (with-current-buffer (tramp-get-connection-buffer v)
+	(let (total avail blocksize)
+	  (goto-char (point-min))
+	  (forward-line)
+	  (when (looking-at
+		 (concat "[[:space:]]*\\([[:digit:]]+\\)"
+			 " blocks of size \\([[:digit:]]+\\)"
+			 "\\. \\([[:digit:]]+\\) blocks available"))
+	    (setq blocksize (string-to-number (concat (match-string 2) "e0"))
+		  total (* blocksize
+			   (string-to-number (concat (match-string 1) "e0")))
+		  avail (* blocksize
+			   (string-to-number (concat (match-string 3) "e0")))))
+	  (forward-line)
+	  (when (looking-at "Total number of bytes: \\([[:digit:]]+\\)")
+	    ;; The used number of bytes is not part of the result.  As
+	    ;; side effect, we store it as file property.
+	    (tramp-set-file-property
+	     v localname "used-bytes"
+	     (string-to-number (concat (match-string 1) "e0"))))
+	  ;; Result.
+	  (when (and total avail)
+	    (list total (- total avail) avail)))))))
+
 (defun tramp-smb-handle-file-writable-p (filename)
   "Like `file-writable-p' for Tramp files."
   (if (file-exists-p filename)
@@ -978,9 +1015,16 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
       (save-match-data
 	(let ((base (file-name-nondirectory filename))
 	      ;; We should not destroy the cache entry.
-	      (entries (copy-sequence
+	      (entries (copy-tree
 			(tramp-smb-get-file-entries
-			 (file-name-directory filename)))))
+			 (file-name-directory filename))))
+	      (avail (get-free-disk-space filename))
+	      ;; `get-free-disk-space' calls `file-system-info', which
+	      ;; sets file property "used-bytes" as side effect.
+	      (used
+	       (format
+		"%.0f"
+		(/ (tramp-get-file-property v localname "used-bytes" 0) 1024))))
 
 	  (when wildcard
 	    (string-match "\\." base)
@@ -1027,6 +1071,13 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		  ((char-equal ?x (string-to-char (nth 1 x)))
 		   (setcar x (concat (car x) "*"))))))
 	     entries))
+
+	  ;; Insert size information.
+	  (when full-directory-p
+	    (insert
+	     (if avail
+		 (format "total used in directory %s available %s\n" used avail)
+	       (format "total %s\n" used))))
 
 	  ;; Print entries.
 	  (mapc
@@ -1390,7 +1441,7 @@ component is used as the target of the symlink."
 		(tramp-set-connection-property
 		 v "process-buffer" (current-buffer))
 
-		;; Use an asynchronous processes.  By this, password can
+		;; Use an asynchronous process.  By this, password can
 		;; be handled.
 		(let ((p (apply
 			  'start-process
@@ -1405,6 +1456,9 @@ component is used as the target of the symlink."
 		  (set-process-query-on-exit-flag p nil)
 		  (tramp-process-actions p v nil tramp-smb-actions-set-acl)
 		  (goto-char (point-max))
+		  ;; This is meant for traces, and returning from the
+		  ;; function.  No error is propagated outside, due to
+		  ;; the `ignore-errors' closure.
 		  (unless (re-search-backward "tramp_exit_status [0-9]+" nil t)
 		    (tramp-error
 		     v 'file-error
@@ -1579,6 +1633,10 @@ If VEC has no cifs capabilities, exchange \"/\" by \"\\\\\"."
   "Read entries which match DIRECTORY.
 Either the shares are listed, or the `dir' command is executed.
 Result is a list of (LOCALNAME MODE SIZE MONTH DAY TIME YEAR)."
+  ;; If CIFS capabilities are enabled, symlinks are not listed
+  ;; by `dir'.  This is a consequence of
+  ;; <https://www.samba.org/samba/news/symlink_attack.html>.  See also
+  ;; <https://bugzilla.samba.org/show_bug.cgi?id=5116>.
   (with-parsed-tramp-file-name (file-name-as-directory directory) nil
     (setq localname (or localname "/"))
     (with-tramp-file-property v localname "file-entries"

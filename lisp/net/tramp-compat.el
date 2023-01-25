@@ -1,6 +1,6 @@
 ;;; tramp-compat.el --- Tramp compatibility functions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2018 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -19,12 +19,13 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
-;; Tramp's main Emacs version for development is Emacs 26.  This
-;; package provides compatibility functions for Emacs 24 and Emacs 25.
+;; Tramp's main Emacs version for development is Emacs 27.  This
+;; package provides compatibility functions for Emacs 24, Emacs 25 and
+;; Emacs 26.
 
 ;;; Code:
 
@@ -104,6 +105,10 @@ Add the extension of F, if existing."
    'tramp-error vec-or-proc
    (if (fboundp 'user-error) 'user-error 'error) format args))
 
+;; `default-toplevel-value' has been declared in Emacs 24.4.
+(unless (fboundp 'default-toplevel-value)
+  (defalias 'default-toplevel-value 'symbol-value))
+
 ;; `file-attribute-*' are introduced in Emacs 25.1.
 
 (if (fboundp 'file-attribute-type)
@@ -163,13 +168,22 @@ This is a floating point number if the size is too large for an integer."
 This is a string of ten letters or dashes as in ls -l."
     (nth 8 attributes)))
 
-;; `default-toplevel-value' has been declared in Emacs 24.4.
-(unless (fboundp 'default-toplevel-value)
-  (defalias 'default-toplevel-value 'symbol-value))
-
 ;; `format-message' is new in Emacs 25.1.
 (unless (fboundp 'format-message)
   (defalias 'format-message 'format))
+
+;; `directory-name-p' is new in Emacs 25.1.
+(if (fboundp 'directory-name-p)
+    (defalias 'tramp-compat-directory-name-p 'directory-name-p)
+  (defsubst tramp-compat-directory-name-p (name)
+    "Return non-nil if NAME ends with a directory separator character."
+    (let ((len (length name))
+          (lastc ?.))
+      (if (> len 0)
+          (setq lastc (aref name (1- len))))
+      (or (= lastc ?/)
+          (and (memq system-type '(windows-nt ms-dos))
+               (= lastc ?\\))))))
 
 ;; `file-missing' is introduced in Emacs 26.1.
 (defconst tramp-file-missing
@@ -196,8 +210,10 @@ If NAME is a remote file name, check the local part of NAME."
     (defsubst tramp-compat-file-name-quote (name)
       "Add the quotation prefix \"/:\" to file NAME.
 If NAME is a remote file name, the local part of NAME is quoted."
-      (concat
-       (file-remote-p name) "/:" (or (file-remote-p name 'localname) name))))
+      (if (tramp-compat-file-name-quoted-p name)
+	  name
+	(concat
+	 (file-remote-p name) "/:" (or (file-remote-p name 'localname) name)))))
 
   (if (fboundp 'file-name-unquote)
       (defalias 'tramp-compat-file-name-unquote 'file-name-unquote)
@@ -221,12 +237,11 @@ If NAME is a remote file name, the local part of NAME is unquoted."
 	((eq tramp-syntax 'sep) 'separate)
 	(t tramp-syntax)))
 
-;; Older Emacsen keep incompatible autoloaded values of `tramp-syntax'.
-(eval-after-load 'tramp
-  '(unless
-       (memq tramp-syntax (tramp-compat-funcall (quote tramp-syntax-values)))
-     (tramp-compat-funcall
-      (quote tramp-change-syntax) (tramp-compat-tramp-syntax))))
+;; `cl-struct-slot-info' has been introduced with Emacs 25.
+(defmacro tramp-compat-tramp-file-name-slots ()
+  (if (fboundp 'cl-struct-slot-info)
+      `(cdr (mapcar 'car (cl-struct-slot-info 'tramp-file-name)))
+    `(cdr (mapcar 'car (get 'tramp-file-name 'cl-struct-slots)))))
 
 (provide 'tramp-compat)
 

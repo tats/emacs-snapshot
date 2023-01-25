@@ -1,6 +1,6 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2018 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -22,7 +22,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -1759,8 +1759,8 @@ Leave point at end of new text.  Return length of inserted text."
 	   (condition-case ()
 	       (insert-file-contents filename nil)
 	     (file-error
-	      ;; Run find-file-not-found-hooks until one returns non-nil.
-	      ;; (run-hook-with-args-until-success 'find-file-not-found-hooks)
+	      ;; Run find-file-not-found-functions until one returns non-nil.
+	      ;; (run-hook-with-args-until-success 'find-file-not-found-functions)
 	      (insert "\n***** File " filename " not found! *****\n\n")))))))
 
 

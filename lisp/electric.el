@@ -1,6 +1,6 @@
 ;;; electric.el --- window maker and Command loop for `electric' modes
 
-;; Copyright (C) 1985-1986, 1995, 2001-2017 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1995, 2001-2018 Free Software Foundation,
 ;; Inc.
 
 ;; Author: K. Shane Hartman
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -227,7 +227,7 @@ Python does not lend itself to fully automatic indentation.")
     haskell-indentation-indent-line haskell-indent-cycle haskell-simple-indent
     yaml-indent-line)
   "List of indent functions that can't reindent.
-If `line-indent-function' is one of those, then `electric-indent-mode' will
+If `indent-line-function' is one of those, then `electric-indent-mode' will
 not try to reindent lines.  It is normally better to make the major
 mode set `electric-indent-inhibit', but this can be used as a workaround.")
 

@@ -1,6 +1,6 @@
 ;;; files-tests.el --- tests for files.el.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2012-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2018 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -135,25 +135,23 @@ form.")
 
 (ert-deftest files-test-local-variables ()
   "Test the file-local variables implementation."
-  (unwind-protect
-      (progn
-	(defadvice hack-local-variables-confirm (around files-test activate)
-	  (setq files-test-result 'query)
-	  nil)
-	(dolist (test files-test-local-variable-data)
-	  (let ((str (concat "text\n\n;; Local Variables:\n;; "
-			     (mapconcat 'identity (car test) "\n;; ")
-			     "\n;; End:\n")))
-	    (dolist (subtest (cdr test))
-	      (should (file-test--do-local-variables-test str subtest))))))
-    (ad-disable-advice 'hack-local-variables-confirm 'around 'files-test)))
+  (cl-letf (((symbol-function 'hack-local-variables-confirm)
+             (lambda (&rest _)
+               (setq files-test-result 'query)
+               nil)))
+    (dolist (test files-test-local-variable-data)
+      (let ((str (concat "text\n\n;; Local Variables:\n;; "
+                         (mapconcat 'identity (car test) "\n;; ")
+                         "\n;; End:\n")))
+        (dolist (subtest (cdr test))
+          (should (file-test--do-local-variables-test str subtest)))))))
 
 (defvar files-test-bug-18141-file
   (expand-file-name "data/files-bug18141.el.gz" (getenv "EMACS_TEST_DIRECTORY"))
   "Test file for bug#18141.")
 
 (ert-deftest files-test-bug-18141 ()
-  "Test for http://debbugs.gnu.org/18141 ."
+  "Test for https://debbugs.gnu.org/18141 ."
   (skip-unless (executable-find "gzip"))
   (let ((tempfile (make-temp-file "files-test-bug-18141" nil ".gz")))
     (unwind-protect
@@ -184,7 +182,7 @@ form.")
 
 
 (ert-deftest files-test-bug-21454 ()
-  "Test for http://debbugs.gnu.org/21454 ."
+  "Test for https://debbugs.gnu.org/21454 ."
   :expected-result :failed
   (let ((input-result
          '(("/foo/bar//baz/:/bar/foo/baz//" nil ("/foo/bar/baz/" "/bar/foo/baz/"))
@@ -344,6 +342,86 @@ be invoked with the right arguments."
         (cdr path-res)
         (insert-directory-wildcard-in-dir-p (car path-res)))))))
 
+(ert-deftest files-tests--make-directory ()
+  (let* ((dir (make-temp-file "files-mkdir-test" t))
+	 (dirname (file-name-as-directory dir))
+	 (file (concat dirname "file"))
+	 (subdir1 (concat dirname "subdir1"))
+	 (subdir2 (concat dirname "subdir2"))
+	 (a/b (concat dirname "a/b")))
+    (write-region "" nil file)
+    (should-error (make-directory "/"))
+    (should-not (make-directory "/" t))
+    (should-error (make-directory dir))
+    (should-not (make-directory dir t))
+    (should-error (make-directory dirname))
+    (should-not (make-directory dirname t))
+    (should-error (make-directory file))
+    (should-error (make-directory file t))
+    (should-not (make-directory subdir1))
+    (should-not (make-directory subdir2 t))
+    (should-error (make-directory a/b))
+    (should-not (make-directory a/b t))
+    (delete-directory dir 'recursive)))
+
+(ert-deftest files-test-no-file-write-contents ()
+  "Test that `write-contents-functions' permits saving a file.
+Usually `basic-save-buffer' will prompt for a file name if the
+current buffer has none.  It should first call the functions in
+`write-contents-functions', and if one of them returns non-nil,
+consider the buffer saved, without prompting for a file
+name (Bug#28412)."
+  (let ((read-file-name-function
+         (lambda (&rest _ignore)
+           (error "Prompting for file name"))))
+    ;; With contents function, and no file.
+    (with-temp-buffer
+      (setq write-contents-functions (lambda () t))
+      (set-buffer-modified-p t)
+      (should (null (save-buffer))))
+    ;; With no contents function and no file.  This should reach the
+    ;; `read-file-name' prompt.
+    (with-temp-buffer
+      (set-buffer-modified-p t)
+      (should-error (save-buffer) :type 'error))
+    ;; Then a buffer visiting a file: should save normally.
+    (files-tests--with-temp-file temp-file-name
+      (with-current-buffer (find-file-noselect temp-file-name)
+        (setq write-contents-functions nil)
+        (insert "p")
+        (should (null (save-buffer)))
+        (should (eq (buffer-size) 1))))))
+
+(ert-deftest files-tests--copy-directory ()
+  (let* ((dir (make-temp-file "files-mkdir-test" t))
+	 (dirname (file-name-as-directory dir))
+	 (source (concat dirname "source"))
+	 (dest (concat dirname "dest/new/directory/"))
+	 (file (concat (file-name-as-directory source) "file"))
+	 (source2 (concat dirname "source2"))
+	 (dest2 (concat dirname "dest/new2")))
+    (make-directory source)
+    (write-region "" nil file)
+    (copy-directory source dest t t t)
+    (should (file-exists-p (concat dest "file")))
+    (make-directory (concat (file-name-as-directory source2) "a") t)
+    (copy-directory source2 dest2)
+    (should (file-directory-p (concat (file-name-as-directory dest2) "a")))
+    (delete-directory dir 'recursive)))
+
+(ert-deftest files-test-abbreviated-home-dir ()
+  "Test that changing HOME does not confuse `abbreviate-file-name'.
+See <https://debbugs.gnu.org/19657#20>."
+  (let* ((homedir temporary-file-directory)
+         (process-environment (cons (format "HOME=%s" homedir)
+                                    process-environment))
+         (abbreviated-home-dir nil)
+         (testfile (expand-file-name "foo" homedir))
+         (old (file-truename (abbreviate-file-name testfile)))
+         (process-environment (cons (format "HOME=%s"
+                                            (expand-file-name "bar" homedir))
+                                    process-environment)))
+    (should (equal old (file-truename (abbreviate-file-name testfile))))))
 
 (provide 'files-tests)
 ;;; files-tests.el ends here

@@ -1,6 +1,6 @@
 ;;; dired-aux.el --- less commonly used parts of dired -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2017 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2018 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -794,15 +794,16 @@ can be produced by `dired-get-marked-files', for example."
           (and in-background (not sequentially) (not (eq system-type 'ms-dos))))
          (w32-shell (and (fboundp 'w32-shell-dos-semantics)
                          (w32-shell-dos-semantics)))
+         (file-remote (file-remote-p default-directory))
          ;; The way to run a command in background in Windows shells
          ;; is to use the START command.  The /B switch means not to
          ;; create a new window for the command.
-         (cmd-prefix (if w32-shell "start /b " ""))
+         (cmd-prefix (if (and w32-shell (not file-remote)) "start /b " ""))
          ;; Windows shells don't support chaining with ";", they use
          ;; "&" instead.
-         (cmd-sep (if (and (not w32-shell) (not parallel-in-background))
-                      ";"
-                    "&"))
+         (cmd-sep (if (and (or (not w32-shell) file-remote)
+			   (not parallel-in-background))
+		      ";" "&"))
 	 (stuff-it
 	  (if (dired--star-or-qmark-p command nil 'keep)
 	      (lambda (x)
@@ -974,8 +975,8 @@ command with a prefix argument (the value does not matter)."
     ;; "tar -zxf" isn't used because it's not available on the
     ;; Solaris10 version of tar. Solaris10 becomes obsolete in 2021.
     ;; Same thing on AIX 7.1.
-    ("\\.tar\\.gz\\'" "" "gzip -dc %i | tar -xv")
-    ("\\.tgz\\'" "" "gzip -dc %i | tar -xv")
+    ("\\.tar\\.gz\\'" "" "gzip -dc %i | tar -xf -")
+    ("\\.tgz\\'" "" "gzip -dc %i | tar -xf -")
     ("\\.gz\\'" "" "gunzip")
     ("\\.Z\\'" "" "uncompress")
     ;; For .z, try gunzip.  It might be an old gzip file,
@@ -990,7 +991,7 @@ command with a prefix argument (the value does not matter)."
     ;; This item controls naming for compression.
     ("\\.tar\\'" ".tgz" nil)
     ;; This item controls the compression of directories
-    (":" ".tar.gz" "tar -c %i | gzip -c9 > %o"))
+    (":" ".tar.gz" "tar -cf - %i | gzip -c9 > %o"))
   "Control changes in file name suffixes for compression and uncompression.
 Each element specifies one transformation rule, and has the form:
   (REGEXP NEW-SUFFIX PROGRAM)
@@ -1007,14 +1008,14 @@ Otherwise, the rule is a compression rule, and compression is done with gzip.
 ARGS are command switches passed to PROGRAM.")
 
 (defvar dired-compress-files-alist
-  '(("\\.tar\\.gz\\'" . "tar -c %i | gzip -c9 > %o")
-    ("\\.tar\\.bz2\\'" . "tar -c %i | bzip2 -c9 > %o")
-    ("\\.tar\\.xz\\'" . "tar -c %i | xz -c9 > %o")
+  '(("\\.tar\\.gz\\'" . "tar -cf - %i | gzip -c9 > %o")
+    ("\\.tar\\.bz2\\'" . "tar -cf - %i | bzip2 -c9 > %o")
+    ("\\.tar\\.xz\\'" . "tar -cf - %i | xz -c9 > %o")
     ("\\.zip\\'" . "zip %o -r --filesync %i"))
   "Control the compression shell command for `dired-do-compress-to'.
 
 Each element is (REGEXP . CMD), where REGEXP is the name of the
-archive to which you want to compress, and CMD the the
+archive to which you want to compress, and CMD is the
 corresponding command.
 
 Within CMD, %i denotes the input file(s), and %o denotes the
@@ -1821,7 +1822,8 @@ Optional arg HOW-TO determines how to treat the target.
       rfn-list  - list of the relative names for the marked files.
       fn-list   - list of the absolute names for the marked files.
       target    - the name of the target itself.
-      The rest of into-dir are optional arguments.
+    The rest of elements of the list returned by HOW-TO are optional
+    arguments for the function that is the first element of the list.
    For any other return value, TARGET is treated as a directory."
   (or op1 (setq op1 operation))
   (let* ((fn-list (dired-get-marked-files nil arg))
@@ -1965,6 +1967,7 @@ Optional arg HOW-TO determines how to treat the target.
 ;;;###autoload
 (defun dired-create-directory (directory)
   "Create a directory called DIRECTORY.
+Parent directories of DIRECTORY are created as needed.
 If DIRECTORY already exists, signal an error."
   (interactive
    (list (read-file-name "Create directory: " (dired-current-directory))))
@@ -2747,9 +2750,9 @@ Intended to be added to `isearch-mode-hook'."
   (remove-hook 'isearch-mode-end-hook 'dired-isearch-filenames-end t))
 
 (defun dired-isearch-filter-filenames (beg end)
-  "Test whether the current search hit is a file name.
-Return non-nil if the text from BEG to END is part of a file
-name (has the text property `dired-filename')."
+  "Test whether some part of the current search match is inside a file name.
+This function returns non-nil if some part of the text between BEG and END
+is part of a file name (i.e., has the text property `dired-filename')."
   (text-property-not-all (min beg end) (max beg end)
 			 'dired-filename nil))
 

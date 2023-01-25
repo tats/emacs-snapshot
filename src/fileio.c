@@ -1,6 +1,6 @@
 /* File IO for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-2017 Free Software Foundation, Inc.
+Copyright (C) 1985-1988, 1993-2018 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include <limits.h>
@@ -124,7 +124,7 @@ static mode_t auto_save_mode_bits;
 static bool auto_save_error_occurred;
 
 /* If VALID_TIMESTAMP_FILE_SYSTEM, then TIMESTAMP_FILE_SYSTEM is the device
-   number of a file system where time stamps were observed to to work.  */
+   number of a file system where time stamps were observed to work.  */
 static bool valid_timestamp_file_system;
 static dev_t timestamp_file_system;
 
@@ -595,24 +595,16 @@ DEFUN ("directory-name-p", Fdirectory_name_p, Sdirectory_name_p, 1, 1, 0,
   return IS_DIRECTORY_SEP (c) ? Qt : Qnil;
 }
 
-/* Return true if NAME must be that of a directory if it exists.
-   When NAME is a directory name, this avoids system calls compared to
-   just calling Ffile_directory_p.  */
-
-static bool
-directory_like (Lisp_Object name)
-{
-  return !NILP (Fdirectory_name_p (name)) || !NILP (Ffile_directory_p (name));
-}
-
-/* Return the expansion of NEWNAME, except that if NEWNAME is like a
-   directory then return the expansion of FILE's basename under
-   NEWNAME.  This is like how 'cp FILE NEWNAME' works.  */
+/* Return the expansion of NEWNAME, except that if NEWNAME is a
+   directory name then return the expansion of FILE's basename under
+   NEWNAME.  This resembles how 'cp FILE NEWNAME' works, except that
+   it requires NEWNAME to be a directory name (typically, by ending in
+   "/").  */
 
 static Lisp_Object
 expand_cp_target (Lisp_Object file, Lisp_Object newname)
 {
-  return (directory_like (newname)
+  return (!NILP (Fdirectory_name_p (newname))
 	  ? Fexpand_file_name (Ffile_name_nondirectory (file), newname)
 	  : Fexpand_file_name (newname, Qnil));
 }
@@ -1833,7 +1825,9 @@ clone_file (int dest, int source)
 DEFUN ("copy-file", Fcopy_file, Scopy_file, 2, 6,
        "fCopy file: \nGCopy %s to file: \np\nP",
        doc: /* Copy FILE to NEWNAME.  Both args must be strings.
-If NEWNAME names a directory, copy FILE there.
+If NEWNAME is a directory name, copy FILE to a like-named file under
+NEWNAME.  For NEWNAME to be recognized as a directory name, it should
+end in a slash.
 
 This function always sets the file modes of the output file to match
 the input file.
@@ -2053,7 +2047,7 @@ permissions.  */)
     {
       /* Set the modified context back to the file.  */
       bool fail = fsetfilecon (ofd, con) != 0;
-      /* See http://debbugs.gnu.org/11245 for ENOTSUP.  */
+      /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
       if (fail && errno != ENOTSUP)
 	report_file_error ("Doing fsetfilecon", newname);
 
@@ -2257,6 +2251,10 @@ DEFUN ("rename-file", Frename_file, Srename_file, 2, 3,
        "fRename file: \nGRename %s to file: \np",
        doc: /* Rename FILE as NEWNAME.  Both args must be strings.
 If file has names other than FILE, it continues to have those names.
+If NEWNAME is a directory name, rename FILE to a like-named file under
+NEWNAME.  For NEWNAME to be recognized as a directory name, it should
+end in a slash.
+
 Signal a `file-already-exists' error if a file NEWNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
 An integer third arg means request confirmation if NEWNAME already exists.
@@ -2264,8 +2262,7 @@ This is what happens in interactive use with M-x.  */)
   (Lisp_Object file, Lisp_Object newname, Lisp_Object ok_if_already_exists)
 {
   Lisp_Object handler;
-  Lisp_Object encoded_file, encoded_newname, symlink_target;
-  int dirp = -1;
+  Lisp_Object encoded_file, encoded_newname;
 
   file = Fexpand_file_name (file, Qnil);
 
@@ -2301,7 +2298,7 @@ This is what happens in interactive use with M-x.  */)
   bool plain_rename = (case_only_rename
 		       || (!NILP (ok_if_already_exists)
 			   && !INTEGERP (ok_if_already_exists)));
-  int rename_errno;
+  int rename_errno UNINIT;
   if (!plain_rename)
     {
       if (renameat_noreplace (AT_FDCWD, SSDATA (encoded_file),
@@ -2339,22 +2336,31 @@ This is what happens in interactive use with M-x.  */)
   if (rename_errno != EXDEV)
     report_file_errno ("Renaming", list2 (file, newname), rename_errno);
 
-  symlink_target = Ffile_symlink_p (file);
-  if (!NILP (symlink_target))
-    Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
+  struct stat file_st;
+  bool dirp = !NILP (Fdirectory_name_p (file));
+  if (!dirp)
+    {
+      if (lstat (SSDATA (encoded_file), &file_st) != 0)
+	report_file_error ("Renaming", list2 (file, newname));
+      dirp = S_ISDIR (file_st.st_mode) != 0;
+    }
+  if (dirp)
+    call4 (Qcopy_directory, file, newname, Qt, Qnil);
   else
     {
-      if (dirp < 0)
-	dirp = directory_like (file);
-      if (dirp)
-	call4 (Qcopy_directory, file, newname, Qt, Qnil);
+      Lisp_Object symlink_target
+	= (S_ISLNK (file_st.st_mode)
+	   ? emacs_readlinkat (AT_FDCWD, SSDATA (encoded_file))
+	   : Qnil);
+      if (!NILP (symlink_target))
+	Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
       else
 	Fcopy_file (file, newname, ok_if_already_exists, Qt, Qt, Qt);
     }
 
   ptrdiff_t count = SPECPDL_INDEX ();
   specbind (Qdelete_by_moving_to_trash, Qnil);
-  if (dirp && NILP (symlink_target))
+  if (dirp)
     call2 (Qdelete_directory, file, Qt);
   else
     Fdelete_file (file, Qnil);
@@ -2364,6 +2370,9 @@ This is what happens in interactive use with M-x.  */)
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
        "fAdd name to file: \nGName to add to %s: \np",
        doc: /* Give FILE additional name NEWNAME.  Both args must be strings.
+If NEWNAME is a directory name, give FILE a like-named new name under
+NEWNAME.
+
 Signal a `file-already-exists' error if a file NEWNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
 An integer third arg means request confirmation if NEWNAME already exists.
@@ -2412,11 +2421,13 @@ This is what happens in interactive use with M-x.  */)
 
 DEFUN ("make-symbolic-link", Fmake_symbolic_link, Smake_symbolic_link, 2, 3,
        "FMake symbolic link to file: \nGMake symbolic link to file %s: \np",
-       doc: /* Make a symbolic link to TARGET, named LINKNAME.
-Both args must be strings.
-Signal a `file-already-exists' error if a file LINKNAME already exists
+       doc: /* Make a symbolic link to TARGET, named NEWNAME.
+If NEWNAME is a directory name, make a like-named symbolic link under
+NEWNAME.
+
+Signal a `file-already-exists' error if a file NEWNAME already exists
 unless optional third argument OK-IF-ALREADY-EXISTS is non-nil.
-An integer third arg means request confirmation if LINKNAME already
+An integer third arg means request confirmation if NEWNAME already
 exists, and expand leading "~" or strip leading "/:" in TARGET.
 This happens for interactive use with M-x.  */)
   (Lisp_Object target, Lisp_Object linkname, Lisp_Object ok_if_already_exists)
@@ -2944,7 +2955,7 @@ or if Emacs was not compiled with SELinux support.  */)
 	  fail = (lsetfilecon (SSDATA (encoded_absname),
 			       context_str (parsed_con))
 		  != 0);
-          /* See http://debbugs.gnu.org/11245 for ENOTSUP.  */
+          /* See https://debbugs.gnu.org/11245 for ENOTSUP.  */
 	  if (fail && errno != ENOTSUP)
 	    report_file_error ("Doing lsetfilecon", absname);
 
@@ -3040,7 +3051,8 @@ support.  */)
       acl = acl_from_text (SSDATA (acl_string));
       if (acl == NULL)
 	{
-	  report_file_error ("Converting ACL", absname);
+	  if (acl_errno_valid (errno))
+	    report_file_error ("Converting ACL", absname);
 	  return Qnil;
 	}
 
@@ -3116,7 +3128,15 @@ symbolic notation, like the `chmod' command from GNU Coreutils.  */)
 DEFUN ("set-default-file-modes", Fset_default_file_modes, Sset_default_file_modes, 1, 1, 0,
        doc: /* Set the file permission bits for newly created files.
 The argument MODE should be an integer; only the low 9 bits are used.
-This setting is inherited by subprocesses.  */)
+On Posix hosts, this setting is inherited by subprocesses.
+
+This function works by setting the Emacs's file mode creation mask.
+Each bit that is set in the mask means that the corresponding bit
+in the permissions of newly created files will be disabled.
+
+Note that when `write-region' creates a file, it resets the
+execute bit, even if the mask set by this function allows that bit
+by having the corresponding bit in the mask reset.  */)
   (Lisp_Object mode)
 {
   mode_t oldrealmask, oldumask, newumask;

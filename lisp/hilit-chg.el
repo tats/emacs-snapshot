@@ -1,6 +1,6 @@
 ;;; hilit-chg.el --- minor mode displaying buffer changes with special face
 
-;; Copyright (C) 1998, 2000-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1998, 2000-2018 Free Software Foundation, Inc.
 
 ;; Author: Richard Sharman <rsharman@pobox.com>
 ;; Keywords: faces
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -300,9 +300,9 @@ modes only."
 
 (defcustom highlight-changes-global-changes-existing-buffers nil
   "If non-nil, toggling global Highlight Changes mode affects existing buffers.
-Normally, `global-highlight-changes' affects only new buffers (to be
+Normally, `global-highlight-changes-mode' affects only new buffers (to be
 created).  However, if `highlight-changes-global-changes-existing-buffers'
-is non-nil, then turning on `global-highlight-changes' will turn on
+is non-nil, then turning on `global-highlight-changes-mode' will turn on
 Highlight Changes mode in suitable buffers, and turning the mode off will
 remove it from existing buffers."
   :type 'boolean

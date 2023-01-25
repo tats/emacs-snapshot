@@ -1,5 +1,5 @@
 /* Manipulation of keymaps
-   Copyright (C) 1985-1988, 1993-1995, 1998-2017 Free Software
+   Copyright (C) 1985-1988, 1993-1995, 1998-2018 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Old BUGS:
    - [M-C-a] != [?\M-\C-a]
@@ -1278,7 +1278,7 @@ append_key (Lisp_Object key_sequence, Lisp_Object key)
   return CALLN (Fvconcat, key_sequence, key_list);
 }
 
-/* Given a event type C which is a symbol,
+/* Given an event type C which is a symbol,
    signal an error if is a mistake such as RET or M-RET or C-DEL, etc.  */
 
 static void

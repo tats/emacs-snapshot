@@ -1,6 +1,6 @@
 ;;; data-tests.el --- tests for src/data.c
 
-;; Copyright (C) 2013-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2018 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -101,7 +101,11 @@
   (should (= 3 (apply #'min '(3 8 3))))
   (should-error (min 9 8 'foo))
   (should-error (min (make-marker)))
-  (should (eql 1 (min (point-min-marker) 1))))
+  (should (eql 1 (min (point-min-marker) 1)))
+  (should (isnan (min 0.0e+NaN)))
+  (should (isnan (min 0.0e+NaN 1 2)))
+  (should (isnan (min 1.0 0.0e+NaN)))
+  (should (isnan (min 1.0 0.0e+NaN 1.1))))
 
 ;; Bool vector tests.  Compactly represent bool vectors as hex
 ;; strings.

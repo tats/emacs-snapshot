@@ -1,6 +1,6 @@
 ;;; cperl-mode.el --- Perl code editing commands for Emacs
 
-;; Copyright (C) 1985-1987, 1991-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1991-2018 Free Software Foundation, Inc.
 
 ;; Author: Ilya Zakharevich
 ;;	Bob Olson
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Corrections made by Ilya Zakharevich ilyaz@cpan.org
 
@@ -480,7 +480,7 @@ Font for POD headers."
 (defcustom cperl-highlight-variables-indiscriminately nil
   "Non-nil means perform additional highlighting on variables.
 Currently only changes how scalar variables are highlighted.
-Note that that variable is only read at initialization time for
+Note that the variable is only read at initialization time for
 the variable `cperl-font-lock-keywords-2', so changing it after you've
 entered CPerl mode the first time will have no effect."
   :type 'boolean
@@ -701,24 +701,7 @@ This way enabling/disabling of menu items is more correct."
 ;;; Short extra-docs.
 
 (defvar cperl-tips 'please-ignore-this-line
-  "Get maybe newer version of this package from
-  http://ilyaz.org/software/emacs
-Subdirectory `cperl-mode' may contain yet newer development releases and/or
-patches to related files.
-
-For best results apply to an older Emacs the patches from
-  ftp://ftp.math.ohio-state.edu/pub/users/ilya/cperl-mode/patches
-\(this upgrades syntax-parsing abilities of Emacsen v19.34 and
-v20.2 up to the level of Emacs v20.3 - a must for a good Perl
-mode.)  As of beginning of 2003, XEmacs may provide a similar ability.
-
-Get support packages choose-color.el (or font-lock-extra.el before
-19.30), imenu-go.el from the same place.  \(Look for other files there
-too... ;-).  Get a patch for imenu.el in 19.29.  Note that for 19.30 and
-later you should use choose-color.el *instead* of font-lock-extra.el
-\(and you will not get smart highlighting in C :-().
-
-Note that to enable Compile choices in the menu you need to install
+  "Note that to enable Compile choices in the menu you need to install
 mode-compile.el.
 
 If your Emacs does not default to `cperl-mode' on Perl files, and you
@@ -1913,7 +1896,9 @@ or as help on variables `cperl-tips', `cperl-problems',
   (if cperl-pod-here-scan
       (or cperl-syntaxify-by-font-lock
        (progn (or cperl-faces-init (cperl-init-faces-weak))
-	      (cperl-find-pods-heres)))))
+	      (cperl-find-pods-heres))))
+  ;; Setup Flymake
+  (add-hook 'flymake-diagnostic-functions 'perl-flymake nil t))
 
 ;; Fix for perldb - make default reasonable
 (defun cperl-db ()

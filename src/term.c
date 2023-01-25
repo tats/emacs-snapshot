@@ -1,5 +1,5 @@
 /* Terminal control module for terminals described by TERMCAP
-   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2017 Free Software
+   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2018 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* New redisplay, TTY faces by Gerd Moellmann <gerd@gnu.org>.  */
 
@@ -155,12 +155,16 @@ tty_ring_bell (struct frame *f)
 static void
 tty_send_additional_strings (struct terminal *terminal, Lisp_Object sym)
 {
-  Lisp_Object lisp_terminal;
-  Lisp_Object extra_codes;
+  /* Use only accessors like CDR_SAFE and assq_no_quit to avoid any
+     form of quitting or signaling an error, since this function can
+     run as part of the "emergency escape" procedure invoked in the
+     middle of GC, where quitting means crashing (Bug#17406).  */
+  if (! terminal->name)
+    return;
   struct tty_display_info *tty = terminal->display_info.tty;
 
-  XSETTERMINAL (lisp_terminal, terminal);
-  for (extra_codes = Fterminal_parameter (lisp_terminal, sym);
+  for (Lisp_Object extra_codes
+	 = CDR_SAFE (assq_no_quit (sym, terminal->param_alist));
        CONSP (extra_codes);
        extra_codes = XCDR (extra_codes))
     {
@@ -2053,7 +2057,7 @@ TERMINAL does not refer to a text terminal.  */)
 
 /* Declare here rather than in the function, as in the rest of Emacs,
    to work around an HPUX compiler bug (?). See
-   http://lists.gnu.org/archive/html/emacs-devel/2007-08/msg00410.html  */
+   https://lists.gnu.org/r/emacs-devel/2007-08/msg00410.html  */
 static int default_max_colors;
 static int default_no_color_video;
 static char *default_orig_pair;

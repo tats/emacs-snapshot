@@ -1,6 +1,6 @@
 ;;; hi-lock-tests.el --- Tests for hi-lock.el  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
 
 ;; Author: Tino Calancha <tino.calancha@gmail.com>
 ;; Keywords:
@@ -16,7 +16,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -24,7 +24,7 @@
 (require 'hi-lock)
 
 (ert-deftest hi-lock-bug26666 ()
-  "Test for http://debbugs.gnu.org/26666 ."
+  "Test for https://debbugs.gnu.org/26666 ."
   (let ((faces hi-lock-face-defaults))
     (with-temp-buffer
       (insert "a A b B\n")

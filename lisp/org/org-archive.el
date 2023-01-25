@@ -1,10 +1,10 @@
 ;;; org-archive.el --- Archiving for Org             -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2004-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2018 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
-;; Homepage: http://orgmode.org
+;; Homepage: https://orgmode.org
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;; Commentary:
@@ -340,14 +340,20 @@ direct children of this heading."
 		    (and (looking-at "[ \t\r\n]*")
 			 ;; datetree archives don't need so much spacing.
 			 (replace-match (if datetree-date "\n" "\n\n"))))
-		;; No specific heading, just go to end of file.
-		(goto-char (point-max))
-		;; Subtree narrowing can let the buffer end on
-		;; a headline.  `org-paste-subtree' then deletes it.
-		;; To prevent this, make sure visible part of buffer
-		;; always terminates on a new line, while limiting
-		;; number of blank lines in a date tree.
-		(unless (and datetree-date (bolp)) (insert "\n")))
+		;; No specific heading, just go to end of file, or to the
+		;; beginning, depending on `org-archive-reversed-order'.
+		(if org-archive-reversed-order
+		    (progn
+		      (goto-char (point-min))
+		      (unless (org-at-heading-p) (outline-next-heading))
+		      (insert "\n") (backward-char 1))
+		  (goto-char (point-max))
+		  ;; Subtree narrowing can let the buffer end on
+		  ;; a headline.  `org-paste-subtree' then deletes it.
+		  ;; To prevent this, make sure visible part of buffer
+		  ;; always terminates on a new line, while limiting
+		  ;; number of blank lines in a date tree.
+		  (unless (and datetree-date (bolp)) (insert "\n"))))
 	      ;; Paste
 	      (org-paste-subtree (org-get-valid-level level (and heading 1)))
 	      ;; Shall we append inherited tags?
@@ -375,10 +381,7 @@ direct children of this heading."
 		     (point)
 		     (concat "ARCHIVE_" (upcase (symbol-name item)))
 		     value))))
-	      (widen)
-	      ;; Save and kill the buffer, if it is not the same
-	      ;; buffer.
-	      (unless (eq this-buffer buffer) (save-buffer)))))
+	      (widen))))
 	;; Here we are back in the original buffer.  Everything seems
 	;; to have worked.  So now run hooks, cut the tree and finish
 	;; up.
@@ -426,7 +429,7 @@ Archiving time is retained in the ARCHIVE_TIME node property."
 	(looking-at org-outline-regexp)
 	(setq leader (match-string 0)
 	      level (funcall outline-level))
-	(setq pos (point))
+	(setq pos (point-marker))
 	(condition-case nil
 	    (outline-up-heading 1 t)
 	  (error (setq e (point-max)) (goto-char (point-min))))

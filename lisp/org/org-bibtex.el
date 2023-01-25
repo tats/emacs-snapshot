@@ -1,6 +1,6 @@
 ;;; org-bibtex.el --- Org links to BibTeX entries    -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 2007-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2018 Free Software Foundation, Inc.
 ;;
 ;; Authors: Bastien Guerry <bzg@gnu.org>
 ;;       Carsten Dominik <carsten dot dominik at gmail dot com>
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 ;;
 ;;; Commentary:
 ;;
@@ -236,6 +236,17 @@ a missing title field."
   :group 'org-bibtex
   :version "24.1"
   :type 'boolean)
+
+(defcustom org-bibtex-headline-format-function
+  (lambda (entry) (cdr (assq :title entry)))
+  "Function returning the headline text for `org-bibtex-write'.
+It should take a single argument, the bibtex entry (an alist as
+returned by `org-bibtex-read').  The default value simply returns
+the entry title."
+  :group 'org-bibtex
+  :version "26.1"
+  :package-version '(Org . "9.1")
+  :type 'function)
 
 (defcustom org-bibtex-export-arbitrary-fields nil
   "When converting to bibtex allow fields not defined in `org-bibtex-fields'.
@@ -678,7 +689,7 @@ Return the number of saved entries."
 	 (val (lambda (field) (cdr (assoc field entry))))
 	 (togtag (lambda (tag) (org-toggle-tag tag 'on))))
     (org-insert-heading)
-    (insert (funcall val :title))
+    (insert (funcall org-bibtex-headline-format-function entry))
     (org-bibtex-put "TITLE" (funcall val :title))
     (org-bibtex-put org-bibtex-type-property-name
 		    (downcase (funcall val :type)))

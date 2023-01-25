@@ -1,6 +1,6 @@
 ;;; map.el --- Map manipulation functions  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2018 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Petton <nicolas@petton.fr>
 ;; Keywords: convenience, map, hash-table, alist, array
@@ -22,7 +22,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -73,7 +73,8 @@ KEYS can also be a list of (KEY VARNAME) pairs, in which case
 KEY is an unquoted form.
 
 MAP can be a list, hash-table or array."
-  (declare (indent 2) (debug t))
+  (declare (indent 2)
+           (debug ((&rest &or symbolp ([form symbolp])) form body)))
   `(pcase-let ((,(map--make-pcase-patterns keys) ,map))
      ,@body))
 
@@ -206,7 +207,7 @@ MAP can be a list, hash-table or array."
 
 (defun map-do (function map)
   "Apply FUNCTION to each element of MAP and return nil.
-FUNCTION.is called with two arguments, the key and the value."
+FUNCTION is called with two arguments, the key and the value."
   (funcall (map--dispatch map
              :list #'map--do-alist
              :hash-table #'maphash

@@ -1,5 +1,5 @@
 GNU Emacs Installation Guide
-Copyright (C) 1992, 1994, 1996-1997, 2000-2017 Free Software Foundation,
+Copyright (C) 1992, 1994, 1996-1997, 2000-2018 Free Software Foundation,
 Inc.
 See the end of the file for license conditions.
 
@@ -24,7 +24,7 @@ find some things, or what options to use.
 'src/config.h' file containing system-dependent definitions.
 Running the 'make' utility then builds the package for your system.
 
-Building Emacs requires GNU make, <http://www.gnu.org/software/make/>.
+Building Emacs requires GNU make, <https://www.gnu.org/software/make/>.
 On most systems that Emacs supports, this is the default 'make' program.
 
 Here's the procedure to build Emacs using 'configure' on systems which
@@ -34,7 +34,7 @@ some of the steps manually.  The more detailed description in the other
 sections of this guide will help you do that, so please refer to those
 sections if you need to.
 
-  1. Unpacking the Emacs 25 release requires about 200 MB of free
+  1. Unpacking the Emacs release requires about 200 MB of free
   disk space.  Building Emacs uses about another 200 MB of space.
   The final installed Emacs uses about 150 MB of disk space.
   This includes the space-saving that comes from automatically
@@ -162,7 +162,7 @@ can be found (in the unlikely event that your distribution does not
 provide them).  By default, libraries marked with an X are required if
 X11 is being used.
 
-    libXaw3d          http://directory.fsf.org/project/xaw3d/
+    libXaw3d          https://directory.fsf.org/project/xaw3d/
   X libxpm for XPM:   http://www.x.org/releases/current/src/lib/
   X libpng for PNG:   http://www.libpng.org/
     libz (for PNG):   http://www.zlib.net/
@@ -187,7 +187,7 @@ them.
 On the GNU system, Emacs supports both X fonts and local fonts
 (i.e. fonts managed by the fontconfig library).  If you need more
 fonts than your distribution normally provides, you must install them
-yourself.  See <URL:http://www.gnu.org/software/freefont/> for a large
+yourself.  See <https://www.gnu.org/software/freefont/> for a large
 number of free Unicode fonts.
 
 * GNU/Linux development packages
@@ -273,8 +273,10 @@ a POP3 server by default.  Versions of the POP protocol older than
 POP3 are not supported.  While POP3 support is typically enabled,
 whether Emacs actually uses POP3 is controlled by individual users;
 see the Rmail chapter of the Emacs manual.  Unless --with-mailutils is
-in effect, it is a good idea to configure --without-pop so that users
-are less likely to inadvertently read email via insecure channels.
+in effect, it is a good idea to configure without POP3 support so that
+users are less likely to inadvertently read email via insecure
+channels.  On native MS-Windows, --with-pop is the default; on other
+platforms, --without-pop is the default.
 
 For image support you may have to download, build, and install the
 appropriate image support libraries for image types other than XBM and
@@ -678,4 +680,4 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.

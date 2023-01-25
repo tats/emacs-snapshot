@@ -1,6 +1,6 @@
 /* String search routines for GNU Emacs.
 
-Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2017 Free Software
+Copyright (C) 1985-1987, 1993-1994, 1997-1999, 2001-2018 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -16,7 +16,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
@@ -2233,8 +2233,11 @@ DEFUN ("re-search-backward", Fre_search_backward, Sre_search_backward, 1, 4,
 This function is almost identical to `re-search-forward', except that
 by default it searches backward instead of forward, and the sign of
 COUNT also indicates exactly the opposite searching direction.
+See `re-search-forward' for details.
 
-See `re-search-forward' for details.  */)
+Note that searching backwards may give a shorter match than expected,
+because REGEXP is still matched in the forward direction.  See Info
+anchor `(elisp) re-search-backward' for details.  */)
   (Lisp_Object regexp, Lisp_Object bound, Lisp_Object noerror, Lisp_Object count)
 {
   return search_command (regexp, bound, noerror, count, -1, 1, 0);

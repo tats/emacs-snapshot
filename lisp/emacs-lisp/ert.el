@@ -1,6 +1,6 @@
 ;;; ert.el --- Emacs Lisp Regression Testing  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2007-2008, 2010-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2008, 2010-2018 Free Software Foundation, Inc.
 
 ;; Author: Christian Ohler <ohler@gnu.org>
 ;; Keywords: lisp, tools
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -102,7 +102,7 @@ This is like `equal-including-properties' except that it compares
 the property values of text properties structurally (by
 recursing) rather than with `eq'.  Perhaps this is what
 `equal-including-properties' should do in the first place; see
-Emacs bug 6581 at URL `http://debbugs.gnu.org/cgi/bugreport.cgi?bug=6581'."
+Emacs bug 6581 at URL `https://debbugs.gnu.org/cgi/bugreport.cgi?bug=6581'."
   ;; This implementation is inefficient.  Rather than making it
   ;; efficient, let's hope bug 6581 gets fixed so that we can delete
   ;; it altogether.
@@ -298,8 +298,8 @@ It should only be stopped when ran from inside ert--run-test-internal."
            (error `(signal ',(car err) ',(cdr err))))))
     (cond
      ((or (atom form) (ert--special-operator-p (car form)))
-      (let ((value (cl-gensym "value-")))
-        `(let ((,value (cl-gensym "ert-form-evaluation-aborted-")))
+      (let ((value (gensym "value-")))
+        `(let ((,value (gensym "ert-form-evaluation-aborted-")))
            ,(funcall inner-expander
                      `(setq ,value ,form)
                      `(list ',whole :form ',form :value ,value)
@@ -312,10 +312,10 @@ It should only be stopped when ran from inside ert--run-test-internal."
                        (and (consp fn-name)
                             (eql (car fn-name) 'lambda)
                             (listp (cdr fn-name)))))
-        (let ((fn (cl-gensym "fn-"))
-              (args (cl-gensym "args-"))
-              (value (cl-gensym "value-"))
-              (default-value (cl-gensym "ert-form-evaluation-aborted-")))
+        (let ((fn (gensym "fn-"))
+              (args (gensym "args-"))
+              (value (gensym "value-"))
+              (default-value (gensym "ert-form-evaluation-aborted-")))
           `(let* ((,fn (function ,fn-name))
                   (,args (condition-case err
                              (let ((signal-hook-function #'ert--should-signal-hook))
@@ -357,7 +357,7 @@ FORM-DESCRIPTION-FORM before it has called INNER-FORM."
   (ert--expand-should-1
    whole form
    (lambda (inner-form form-description-form value-var)
-     (let ((form-description (cl-gensym "form-description-")))
+     (let ((form-description (gensym "form-description-")))
        `(let (,form-description)
           ,(funcall inner-expander
                     `(unwind-protect
@@ -435,8 +435,8 @@ failed."
    `(should-error ,form ,@keys)
    form
    (lambda (inner-form form-description-form value-var)
-     (let ((errorp (cl-gensym "errorp"))
-           (form-description-fn (cl-gensym "form-description-fn-")))
+     (let ((errorp (gensym "errorp"))
+           (form-description-fn (gensym "form-description-fn-")))
        `(let ((,errorp nil)
               (,form-description-fn (lambda () ,form-description-form)))
           (condition-case -condition-
@@ -742,9 +742,8 @@ run.  ARGS are the arguments to `debugger'."
               ;; backtrace ready for printing is important for batch
               ;; use.
               ;;
-              ;; Grab the frames starting from `signal', frames below
-              ;; that are all from the debugger.
-              (backtrace (backtrace-frames 'signal))
+              ;; Grab the frames above the debugger.
+              (backtrace (cdr (backtrace-frames debugger)))
               (infos (reverse ert--infos)))
          (setf (ert--test-execution-info-result info)
                (cl-ecase type
@@ -1626,7 +1625,7 @@ default (if any)."
 (defun ert-find-test-other-window (test-name)
   "Find, in another window, the definition of TEST-NAME."
   (interactive (list (ert-read-test-name-at-point "Find test definition: ")))
-  (find-function-do-it test-name 'ert-deftest 'switch-to-buffer-other-window))
+  (find-function-do-it test-name 'ert--test 'switch-to-buffer-other-window))
 
 (defun ert-delete-test (test-name)
   "Make the test TEST-NAME unbound.
@@ -2595,7 +2594,7 @@ To be used in the ERT results buffer."
 
 ;;; Actions on load/unload.
 
-(add-to-list 'find-function-regexp-alist '(ert-deftest . ert--find-test-regexp))
+(add-to-list 'find-function-regexp-alist '(ert--test . ert--find-test-regexp))
 (add-to-list 'minor-mode-alist '(ert--current-run-stats
                                  (:eval
                                   (ert--tests-running-mode-line-indicator))))

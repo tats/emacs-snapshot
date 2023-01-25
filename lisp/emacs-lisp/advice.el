@@ -1,6 +1,6 @@
 ;;; advice.el --- An overloading mechanism for Emacs Lisp functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1994, 2000-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1994, 2000-2018 Free Software Foundation, Inc.
 
 ;; Author: Hans Chalupsky <hans@cs.buffalo.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;; LCD Archive Entry:
 ;; advice|Hans Chalupsky|hans@cs.buffalo.edu|
@@ -502,7 +502,7 @@
 ;; important advantage is that it allows the implementation of forward advice.
 ;; Advice information for a certain function accumulates as the value of the
 ;; `advice-info' property of the function symbol.  This accumulation is
-;; completely independent of the fact that that function might not yet be
+;; completely independent of the fact that the function might not yet be
 ;; defined.  The macros `defun' and `defmacro' check whether the
 ;; function/macro they defined had advice information
 ;; associated with it.  If so and forward advice is enabled, the original

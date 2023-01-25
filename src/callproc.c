@@ -1,6 +1,6 @@
 /* Synchronous subprocess invocation for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-1995, 1999-2017 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1999-2018 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -16,7 +16,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
@@ -634,7 +634,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 #ifdef DARWIN_OS
       /* Work around a macOS bug, where SIGCHLD is apparently
 	 delivered to a vforked child instead of to its parent.  See:
-	 http://lists.gnu.org/archive/html/emacs-devel/2017-05/msg00342.html
+	 https://lists.gnu.org/r/emacs-devel/2017-05/msg00342.html
       */
       signal (SIGCHLD, SIG_DFL);
 #endif

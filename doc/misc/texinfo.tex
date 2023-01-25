@@ -3,7 +3,7 @@
 % Load plain if necessary, i.e., if running under initex.
 \expandafter\ifx\csname fmtname\endcsname\relax\input plain\fi
 %
-\def\texinfoversion{2017-07-04.16}
+\def\texinfoversion{2017-12-26.21}
 %
 % Copyright 1985, 1986, 1988, 1990, 1991, 1992, 1993, 1994, 1995,
 % 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
@@ -21,7 +21,7 @@
 % General Public License for more details.
 %
 % You should have received a copy of the GNU General Public License
-% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+% along with this program.  If not, see <https://www.gnu.org/licenses/>.
 %
 % As a special exception, when this file is read by TeX when processing
 % a Texinfo source document, you may use the result without
@@ -30,9 +30,9 @@
 %
 % Please try the latest version of texinfo.tex before submitting bug
 % reports; you can get the latest version from:
-%   http://ftp.gnu.org/gnu/texinfo/ (the Texinfo release area), or
-%   http://ftpmirror.gnu.org/texinfo/ (same, via a mirror), or
-%   http://www.gnu.org/software/texinfo/ (the Texinfo home page)
+%   https://ftp.gnu.org/gnu/texinfo/ (the Texinfo release area), or
+%   https://ftpmirror.gnu.org/texinfo/ (same, via a mirror), or
+%   https://www.gnu.org/software/texinfo/ (the Texinfo home page)
 % The texinfo.tex in any given distribution could well be out
 % of date, so if that's what you're using, please check.
 %
@@ -56,7 +56,7 @@
 % extent.  You can get the existing language-specific files from the
 % full Texinfo distribution.
 %
-% The GNU Texinfo home page is http://www.gnu.org/software/texinfo.
+% The GNU Texinfo home page is https://www.gnu.org/software/texinfo.
 
 
 \message{Loading texinfo [version \texinfoversion]:}
@@ -2619,26 +2619,11 @@ end
 % Markup style infrastructure.  \defmarkupstylesetup\INITMACRO will
 % define and register \INITMACRO to be called on markup style changes.
 % \INITMACRO can check \currentmarkupstyle for the innermost
-% style and the set of \ifmarkupSTYLE switches for all styles
-% currently in effect.
-\newif\ifmarkupvar
-\newif\ifmarkupsamp
-\newif\ifmarkupkey
-%\newif\ifmarkupfile % @file == @samp.
-%\newif\ifmarkupoption % @option == @samp.
-\newif\ifmarkupcode
-\newif\ifmarkupkbd
-%\newif\ifmarkupenv % @env == @code.
-%\newif\ifmarkupcommand % @command == @code.
-\newif\ifmarkuptex % @tex (and part of @math, for now).
-\newif\ifmarkupexample
-\newif\ifmarkupverb
-\newif\ifmarkupverbatim
+% style.
 
 \let\currentmarkupstyle\empty
 
 \def\setupmarkupstyle#1{%
-  \csname markup#1true\endcsname
   \def\currentmarkupstyle{#1}%
   \markupstylesetup
 }
@@ -2700,11 +2685,15 @@ end
 % lilypond developers report.  xpdf does work with the regular 0x27.
 %
 \def\codequoteright{%
-  \expandafter\ifx\csname SETtxicodequoteundirected\endcsname\relax
-    \expandafter\ifx\csname SETcodequoteundirected\endcsname\relax
-      '%
+  \ifmonospace
+    \expandafter\ifx\csname SETtxicodequoteundirected\endcsname\relax
+      \expandafter\ifx\csname SETcodequoteundirected\endcsname\relax
+        '%
+      \else \char'15 \fi
     \else \char'15 \fi
-  \else \char'15 \fi
+   \else
+     '%
+   \fi
 }
 %
 % and a similar option for the left quote char vs. a grave accent.
@@ -2712,13 +2701,17 @@ end
 % the code environments to do likewise.
 %
 \def\codequoteleft{%
-  \expandafter\ifx\csname SETtxicodequotebacktick\endcsname\relax
-    \expandafter\ifx\csname SETcodequotebacktick\endcsname\relax
-      % [Knuth] pp. 380,381,391
-      % \relax disables Spanish ligatures ?` and !` of \tt font.
-      \relax`%
+  \ifmonospace
+    \expandafter\ifx\csname SETtxicodequotebacktick\endcsname\relax
+      \expandafter\ifx\csname SETcodequotebacktick\endcsname\relax
+        % [Knuth] pp. 380,381,391
+        % \relax disables Spanish ligatures ?` and !` of \tt font.
+        \relax`%
+      \else \char'22 \fi
     \else \char'22 \fi
-  \else \char'22 \fi
+   \else
+     \relax`%
+   \fi
 }
 
 % Commands to set the quote options.
@@ -5696,10 +5689,13 @@ end
       \advance\dimen@ii by 1\dimen@i
       \ifdim\wd\boxA > \dimen@ii % If the entry doesn't fit in one line
       \ifdim\dimen@ > 0.8\dimen@ii   % due to long index text
-        \dimen@ = 0.7\dimen@ % Try to split the text roughly evenly
+        % Try to split the text roughly evenly.  \dimen@ will be the length of 
+        % the first line.
+        \dimen@ = 0.7\dimen@
         \dimen@ii = \hsize
         \ifnum\dimen@>\dimen@ii
-          % If the entry is too long, use the whole line
+          % If the entry is too long (for example, if it needs more than
+          % two lines), use all the space in the first line.
           \dimen@ = \dimen@ii
         \fi
         \advance\leftskip by 0pt plus 1fill % ragged right
@@ -5709,8 +5705,9 @@ end
         % instead of using \parshape with explicit line lengths, but TeX
         % doesn't seem to provide a way to do such a thing.
         %
-        \leftskip = 1em
-        \parindent = -1em
+        % Indent all lines but the first one.
+        \advance\leftskip by 1em
+        \advance\parindent by -1em
       \fi\fi
       \indent % start paragraph
       \unhbox\boxA
@@ -5965,24 +5962,30 @@ end
     % Split the last of the double-column material.
     \savemarks
     \balancecolumns
-    %
+  }%
+  \eject % call the \output just set
+  \ifdim\pagetotal=0pt
     % Having called \balancecolumns once, we do not
     % want to call it again.  Therefore, reset \output to its normal
     % definition right away.
     \global\output = {\onepageout{\pagecontents\PAGE}}%
-  }%
-  \eject
-  \endgroup % started in \begindoublecolumns
-  \restoremarks
-  % Leave the double-column material on the current page, no automatic
-  % page break.
-  \box\balancedcolumns
-  %
-  % \pagegoal was set to the doubled \vsize above, since we restarted
-  % the current page.  We're now back to normal single-column
-  % typesetting, so reset \pagegoal to the normal \vsize.
-  \global\vsize = \txipageheight %
-  \pagegoal = \txipageheight %
+    %
+    \endgroup % started in \begindoublecolumns
+    \restoremarks
+    % Leave the double-column material on the current page, no automatic
+    % page break.
+    \box\balancedcolumns
+    %
+    % \pagegoal was set to the doubled \vsize above, since we restarted
+    % the current page.  We're now back to normal single-column
+    % typesetting, so reset \pagegoal to the normal \vsize.
+    \global\vsize = \txipageheight %
+    \pagegoal = \txipageheight %
+  \else
+    % We had some left-over material.  This might happen when \doublecolumnout
+    % is called in \balancecolumns.  Try again.
+    \expandafter\enddoublecolumns
+  \fi
 }
 \newbox\balancedcolumns
 \setbox\balancedcolumns=\vbox{shouldnt see this}%
@@ -5997,6 +6000,7 @@ end
   \ifdim\dimen@<5\baselineskip
     % Don't split a short final column in two.
     \setbox2=\vbox{}%
+    \global\setbox\balancedcolumns=\vbox{\pagesofar}%
   \else
     \divide\dimen@ by 2 % target to split to
     \dimen@ii = \dimen@
@@ -6012,15 +6016,15 @@ end
       \repeat
     }%
     % Now the left column is in box 1, and the right column in box 3.
+    %
     % Check whether the left column has come out higher than the page itself.  
     % (Note that we have doubled \vsize for the double columns, so
     % the actual height of the page is 0.5\vsize).
     \ifdim2\ht1>\vsize
-      % Just split the last of the double column material roughly in half.
-      \setbox2=\box0
-      \setbox0 = \vsplit2 to \dimen@ii
-      \setbox0=\vbox to \dimen@ii {\unvbox0\vfill}%
-      \setbox2=\vbox to \dimen@ii {\unvbox2\vfill}%
+      % It appears that we have been called upon to balance too much material.
+      % Output some of it with \doublecolumnout, leaving the rest on the page.
+      \setbox\PAGE=\box0
+      \doublecolumnout
     \else
       % Compare the heights of the two columns.
       \ifdim4\ht1>5\ht3
@@ -6033,10 +6037,10 @@ end
         \setbox2=\vbox to\ht1{\unvbox3\unskip}%
         \setbox0=\vbox to\ht1{\unvbox1\unskip}%
       \fi
+      \global\setbox\balancedcolumns=\vbox{\pagesofar}%
     \fi
   \fi
   %
-  \global\setbox\balancedcolumns=\vbox{\pagesofar}%
 }
 \catcode`\@ = \other
 
@@ -6943,7 +6947,15 @@ end
 % exist, with an empty box.  Let's hope all the numbers have the same width.
 % Also ignore the page number, which is conventionally not printed.
 \def\numeralbox{\setbox0=\hbox{8}\hbox to \wd0{\hfil}}
-\def\partentry#1#2#3#4{\dochapentry{\numeralbox\labelspace#1}{}}
+\def\partentry#1#2#3#4{%
+  % Add stretch and a bonus for breaking the page before the part heading.
+  % This reduces the chance of the page being broken immediately after the
+  % part heading, before a following chapter heading.
+  \vskip 0pt plus 5\baselineskip
+  \penalty-300
+  \vskip 0pt plus -5\baselineskip
+  \dochapentry{\numeralbox\labelspace#1}{}%
+}
 %
 % Parts, in the short toc.
 \def\shortpartentry#1#2#3#4{%
@@ -9434,7 +9446,7 @@ end
 \newif\ifwarnednoepsf
 \newhelp\noepsfhelp{epsf.tex must be installed for images to
   work.  It is also included in the Texinfo distribution, or you can get
-  it from ftp://tug.org/tex/epsf.tex.}
+  it from https://ctan.org/texarchive/macros/texinfo/texinfo/doc/epsf.tex.}
 %
 \def\image#1{%
   \ifx\epsfbox\thisisundefined
@@ -11413,9 +11425,11 @@ directory should work if nowhere else does.}
   %
   \dimen0 = #1\relax
   \advance\dimen0 by \voffset
+  \advance\dimen0 by 1in % reference point for DVI is 1 inch from top of page
   %
   \dimen2 = \hsize
   \advance\dimen2 by \normaloffset
+  \advance\dimen2 by 1in % reference point is 1 inch from left edge of page
   %
   \internalpagesizes{#1}{\hsize}%
                     {\voffset}{\normaloffset}%

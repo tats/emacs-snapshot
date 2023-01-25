@@ -1,6 +1,6 @@
 ;;; css-mode-tests.el --- Test suite for CSS mode  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2018 Free Software Foundation, Inc.
 
 ;; Author: Simen Heggestøyl <simenheg@gmail.com>
 ;; Keywords: internal
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -58,7 +58,7 @@
 
   ;; Check that the `color' property doesn't cause infinite recursion
   ;; because it refers to the value class of the same name.
-  (should (= (length (css--property-values "color")) 152)))
+  (should (= (length (css--property-values "color")) 154)))
 
 (ert-deftest css-test-property-value-cache ()
   "Test that `css--property-value-cache' is in use."
@@ -79,6 +79,27 @@
   (should
    (equal (seq-sort #'string-lessp (css--value-class-lookup 'position))
           '("bottom" "calc()" "center" "left" "right" "top"))))
+
+(ert-deftest css-test-current-defun-name ()
+  (with-temp-buffer
+    (insert "body { top: 0; }")
+    (goto-char 7)
+    (should (equal (css-current-defun-name) "body"))
+    (goto-char 18)
+    (should (equal (css-current-defun-name) "body"))))
+
+(ert-deftest css-test-current-defun-name-nested ()
+  (with-temp-buffer
+    (insert "body > .main a { top: 0; }")
+    (goto-char 20)
+    (should (equal (css-current-defun-name) "body > .main a"))))
+
+(ert-deftest css-test-current-defun-name-complex ()
+  (with-temp-buffer
+    (insert "input[type=submit]:hover { color: red; }")
+    (goto-char 30)
+    (should (equal (css-current-defun-name)
+                   "input[type=submit]:hover"))))
 
 ;;; Completion
 
@@ -273,6 +294,12 @@
       (save-excursion
         (insert input ")"))
       (should (equal (css--hsl-color) "#ff0000")))))
+
+(ert-deftest css-test-hex-color ()
+  (should (equal (css--hex-color "#abc") "#abc"))
+  (should (equal (css--hex-color "#abcd") "#abc"))
+  (should (equal (css--hex-color "#aabbcc") "#aabbcc"))
+  (should (equal (css--hex-color "#aabbccdd") "#aabbcc")))
 
 (ert-deftest css-test-named-color ()
   (dolist (text '("@mixin black" "@include black"))

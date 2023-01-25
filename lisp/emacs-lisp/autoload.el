@@ -1,6 +1,6 @@
 ;; autoload.el --- maintain autoloads in loaddefs.el  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1991-1997, 2001-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1991-1997, 2001-2018 Free Software Foundation, Inc.
 
 ;; Author: Roland McGrath <roland@gnu.org>
 ;; Keywords: maint
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -497,6 +497,7 @@ Return non-nil in the case where no autoloads were added at point."
 Standard prefixes won't be registered anyway.  I.e. if a file \"foo.el\" defines
 variables or functions that use \"foo-\" as prefix, that will not be registered.
 But all other prefixes will be included.")
+(put 'autoload-compute-prefixes 'safe #'booleanp)
 
 (defconst autoload-def-prefixes-max-entries 5
   "Target length of the list of definition prefixes per file.
@@ -761,6 +762,7 @@ FILE's modification time."
                                      "def-edebug-spec"
                                      ;; Hmm... this is getting ugly:
                                      "define-widget"
+                                     "define-erc-module"
                                      "define-erc-response-handler"
                                      "defun-rcirc-command"))))
                     (push (match-string 2) defs))
@@ -898,7 +900,7 @@ FILE's modification time."
       (autoload--save-buffer))))
 
 ;; FIXME This command should be deprecated.
-;; See http://debbugs.gnu.org/22213#41
+;; See https://debbugs.gnu.org/22213#41
 ;;;###autoload
 (defun update-file-autoloads (file &optional save-after outfile)
   "Update the autoloads for FILE.
@@ -917,7 +919,7 @@ Return FILE if there was no autoload cookie in it, else nil."
   (let* ((generated-autoload-file (or outfile generated-autoload-file))
 	 (autoload-modified-buffers nil)
 	 ;; We need this only if the output file handles more than one input.
-	 ;; See http://debbugs.gnu.org/22213#38 and subsequent.
+	 ;; See https://debbugs.gnu.org/22213#38 and subsequent.
 	 (autoload-timestamps t)
          (no-autoloads (autoload-generate-file-autoloads file)))
     (if autoload-modified-buffers

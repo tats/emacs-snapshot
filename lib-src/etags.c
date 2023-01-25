@@ -28,7 +28,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2017 Free Software
+Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2018 Free Software
 Foundation, Inc.
 
 This file is not considered part of GNU Emacs.
@@ -44,7 +44,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 /* NB To comply with the above BSD license, copyright information is
@@ -462,6 +462,7 @@ static bool cplusplus;		/* .[hc] means C++, not C (undocumented) */
 static bool ignoreindent;	/* -I: ignore indentation in C */
 static int packages_only;	/* --packages-only: in Ada, only tag packages*/
 static int class_qualify;	/* -Q: produce class-qualified tags in C++/Java */
+static int debug;		/* --debug */
 
 /* STDIN is defined in LynxOS system headers */
 #ifdef STDIN
@@ -479,6 +480,7 @@ static struct option longopts[] =
   { "append",             no_argument,       NULL,               'a'   },
   { "packages-only",      no_argument,       &packages_only,     1     },
   { "c++",                no_argument,       NULL,               'C'   },
+  { "debug",              no_argument,       &debug,             1     },
   { "declarations",       no_argument,       &declarations,      1     },
   { "no-line-directive",  no_argument,       &no_line_directive, 1     },
   { "no-duplicates",      no_argument,       &no_duplicates,     1     },
@@ -628,6 +630,8 @@ static const char *Erlang_suffixes [] =
 static const char Erlang_help [] =
 "In Erlang code, the tags are the functions, records and macros\n\
 defined in the file.";
+static const char *Erlang_interpreters [] =
+  { "escript", NULL };
 
 const char *Forth_suffixes [] =
   { "fth", "tok", NULL };
@@ -664,6 +668,8 @@ static const char *Lua_suffixes [] =
   { "lua", "LUA", NULL };
 static const char Lua_help [] =
 "In Lua scripts, all functions are tags.";
+static const char *Lua_interpreters [] =
+  { "lua", NULL };
 
 static const char *Makefile_filenames [] =
   { "Makefile", "makefile", "GNUMakefile", "Makefile.in", "Makefile.am", NULL};
@@ -719,12 +725,16 @@ static const char *Prolog_suffixes [] =
 static const char Prolog_help [] =
 "In Prolog code, tags are predicates and rules at the beginning of\n\
 line.";
+static const char *Prolog_interpreters [] =
+  { "gprolog", "pl", "yap", "swipl", "prolog", NULL };
 
 static const char *Python_suffixes [] =
   { "py", NULL };
 static const char Python_help [] =
 "In Python code, 'def' or 'class' at the beginning of a line\n\
 generate a tag.";
+static const char *Python_interpreters [] =
+  { "python", NULL };
 
 static const char *Ruby_suffixes [] =
   { "rb", "ru", "rbw", NULL };
@@ -733,6 +743,8 @@ static const char *Ruby_filenames [] =
 static const char Ruby_help [] =
   "In Ruby code, 'def' or 'class' or 'module' at the beginning of\n\
 a line generate a tag.  Constants also generate a tag.";
+static const char *Ruby_interpreters [] =
+  { "ruby", NULL };
 
 /* Can't do the `SCM' or `scm' prefix with a version number. */
 static const char *Scheme_suffixes [] =
@@ -796,14 +808,15 @@ static language lang_names [] =
   { "c++",       Cplusplus_help, Cplusplus_entries, Cplusplus_suffixes },
   { "c*",        no_lang_help,   Cstar_entries,     Cstar_suffixes     },
   { "cobol",     Cobol_help,     Cobol_paragraphs,  Cobol_suffixes     },
-  { "erlang",    Erlang_help,    Erlang_functions,  Erlang_suffixes    },
+  { "erlang",    Erlang_help,    Erlang_functions,  Erlang_suffixes,
+                 NULL,           Erlang_interpreters },
   { "forth",     Forth_help,     Forth_words,       Forth_suffixes     },
   { "fortran",   Fortran_help,   Fortran_functions, Fortran_suffixes   },
   { "go",        Go_help,        Go_functions,      Go_suffixes        },
   { "html",      HTML_help,      HTML_labels,       HTML_suffixes      },
   { "java",      Cjava_help,     Cjava_entries,     Cjava_suffixes     },
   { "lisp",      Lisp_help,      Lisp_functions,    Lisp_suffixes      },
-  { "lua",       Lua_help,       Lua_functions,     Lua_suffixes       },
+  { "lua",       Lua_help,Lua_functions,Lua_suffixes,NULL,Lua_interpreters},
   { "makefile",  Makefile_help,Makefile_targets,NULL,Makefile_filenames},
   { "objc",      Objc_help,      plain_C_entries,   Objc_suffixes      },
   { "pascal",    Pascal_help,    Pascal_functions,  Pascal_suffixes    },
@@ -811,9 +824,12 @@ static language lang_names [] =
   { "php",       PHP_help,       PHP_functions,     PHP_suffixes       },
   { "postscript",PS_help,        PS_functions,      PS_suffixes        },
   { "proc",      no_lang_help,   plain_C_entries,   plain_C_suffixes   },
-  { "prolog",    Prolog_help,    Prolog_functions,  Prolog_suffixes    },
-  { "python",    Python_help,    Python_functions,  Python_suffixes    },
-  { "ruby",      Ruby_help,Ruby_functions,Ruby_suffixes,Ruby_filenames },
+  { "prolog",    Prolog_help,    Prolog_functions,  Prolog_suffixes,
+                 NULL,           Prolog_interpreters },
+  { "python",    Python_help,    Python_functions,  Python_suffixes,
+                 NULL,           Python_interpreters },
+  { "ruby",      Ruby_help,      Ruby_functions,    Ruby_suffixes,
+                 Ruby_filenames, Ruby_interpreters },
   { "scheme",    Scheme_help,    Scheme_functions,  Scheme_suffixes    },
   { "tex",       TeX_help,       TeX_commands,      TeX_suffixes       },
   { "texinfo",   Texinfo_help,   Texinfo_nodes,     Texinfo_suffixes   },
@@ -1528,7 +1544,7 @@ process_file_name (char *file, language *lang)
   fdesc *fdp;
   compressor *compr;
   char *compressed_name, *uncompressed_name;
-  char *ext, *real_name UNINIT, *tmp_name;
+  char *ext, *real_name UNINIT, *tmp_name UNINIT;
   int retval;
 
   canonicalize_filename (file);
@@ -1794,6 +1810,13 @@ find_entries (FILE *inf)
       else
 	lp = skip_spaces (lb.buffer + 2);
       cp = skip_non_spaces (lp);
+      /* If the "interpreter" turns out to be "env", the real interpreter is
+	 the next word.  */
+      if (cp > lp && strneq (lp, "env", cp - lp))
+	{
+	  lp = skip_spaces (cp);
+	  cp = skip_non_spaces (lp);
+	}
       *cp = '\0';
 
       if (strlen (lp) > 0)
@@ -1916,6 +1939,10 @@ make_tag (const char *name, 	/* tag name, or NULL if unnamed */
 {
   bool named = (name != NULL && namelen > 0);
   char *nname = NULL;
+
+  if (debug)
+    fprintf (stderr, "%s on %s:%d: %s\n",
+	     named ? name : "(unnamed)", curfdp->taggedfname, lno, linestart);
 
   if (!CTAGS && named)		/* maybe set named to false */
     /* Let's try to make an implicit tag name, that is, create an unnamed tag
@@ -4968,6 +4995,9 @@ Ruby_functions (FILE *inf)
 			memcpy (wr_name + name_len - 1, "=", 2);
 			pfnote (wr_name, true, lb.buffer, cp - lb.buffer + 1,
 				lineno, linecharno);
+			if (debug)
+			  fprintf (stderr, "%s on %s:%d: %s\n", wr_name,
+				   curfdp->taggedfname, lineno, lb.buffer);
 			continuation = false;
 		      }
 		    if (alias)
@@ -6547,9 +6577,16 @@ regex_tag_multiline (void)
 	      else /* make a named tag */
 		name = substitute (buffer, rp->name, &rp->regs);
 	      if (rp->force_explicit_name)
-		/* Force explicit tag name, if a name is there. */
-		pfnote (name, true, buffer + linecharno,
-			charno - linecharno + 1, lineno, linecharno);
+		{
+		  /* Force explicit tag name, if a name is there. */
+		  pfnote (name, true, buffer + linecharno,
+			  charno - linecharno + 1, lineno, linecharno);
+
+		  if (debug)
+		    fprintf (stderr, "%s on %s:%d: %s\n",
+			     name ? name : "(unnamed)", curfdp->taggedfname,
+			     lineno, buffer + linecharno);
+		}
 	      else
 		make_tag (name, strlen (name), true, buffer + linecharno,
 			  charno - linecharno + 1, lineno, linecharno);
@@ -6870,8 +6907,14 @@ readline (linebuffer *lbp, FILE *stream)
 	      else /* make a named tag */
 		name = substitute (lbp->buffer, rp->name, &rp->regs);
 	      if (rp->force_explicit_name)
-		/* Force explicit tag name, if a name is there. */
-		pfnote (name, true, lbp->buffer, match, lineno, linecharno);
+		{
+		  /* Force explicit tag name, if a name is there. */
+		  pfnote (name, true, lbp->buffer, match, lineno, linecharno);
+		  if (debug)
+		    fprintf (stderr, "%s on %s:%d: %s\n",
+			     name ? name : "(unnamed)", curfdp->taggedfname,
+			     lineno, lbp->buffer);
+		}
 	      else
 		make_tag (name, strlen (name), true,
 			  lbp->buffer, match, lineno, linecharno);
@@ -7046,14 +7089,16 @@ etags_mktmp (void)
       errno = temp_errno;
       templt = NULL;
     }
-
 #if defined (DOS_NT)
-  /* The file name will be used in shell redirection, so it needs to have
-     DOS-style backslashes, or else the Windows shell will barf.  */
-  char *p;
-  for (p = templt; *p; p++)
-    if (*p == '/')
-      *p = '\\';
+  else
+    {
+      /* The file name will be used in shell redirection, so it needs to have
+	 DOS-style backslashes, or else the Windows shell will barf.  */
+      char *p;
+      for (p = templt; *p; p++)
+	if (*p == '/')
+	  *p = '\\';
+    }
 #endif
 
   return templt;

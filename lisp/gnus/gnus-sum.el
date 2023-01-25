@@ -1,6 +1,6 @@
 ;;; gnus-sum.el --- summary mode commands for Gnus
 
-;; Copyright (C) 1996-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -9844,7 +9844,7 @@ IDNA encoded domain names looks like `xn--bar'.  If a string
 remain unencoded after running this function, it is likely an
 invalid IDNA string (`xn--bar' is invalid).
 
-You must have GNU Libidn (URL `http://www.gnu.org/software/libidn/')
+You must have GNU Libidn (URL `https://www.gnu.org/software/libidn/')
 installed for this command to work."
   (interactive "P")
   (gnus-summary-select-article)
@@ -10294,7 +10294,6 @@ latter case, they will be copied into the relevant groups."
   "Import an arbitrary file into a mail newsgroup."
   (interactive "fImport file: \nP")
   (let ((group gnus-newsgroup-name)
-	(now (current-time))
 	atts lines group-art)
     (unless (gnus-check-backend-function 'request-accept-article group)
       (error "%s does not support article importing" group))
@@ -10313,6 +10312,7 @@ latter case, they will be copied into the relevant groups."
 	    (goto-char (point-min))
 	    (unless (re-search-forward "^date:" nil t)
 	      (goto-char (point-max))
+	      (setq atts (file-attributes file))
 	      (insert "Date: " (message-make-date (nth 5 atts)) "\n")))
        ;; This doesn't look like an article, so we fudge some headers.
 	(setq atts (file-attributes file)

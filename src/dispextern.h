@@ -1,6 +1,6 @@
 /* Interface definitions for display code.
 
-Copyright (C) 1985, 1993-1994, 1997-2017 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1994, 1997-2018 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* New redisplay written by Gerd Moellmann <gerd@gnu.org>.  */
 
@@ -2420,7 +2420,7 @@ struct it
   /* Face to use.  */
   int face_id;
 
-  /* Setting of buffer-local variable selective-display-ellipsis.  */
+  /* Setting of buffer-local variable selective-display-ellipses.  */
   bool_bf selective_display_ellipsis_p : 1;
 
   /* True means control characters are translated into the form `^C'
@@ -3452,7 +3452,14 @@ void gamma_correct (struct frame *, COLORREF *);
 void x_implicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
 void x_change_tool_bar_height (struct frame *f, int);
 
+/* The frame used to display a tooltip.
+
+   Note: In a GTK build with non-zero x_gtk_use_system_tooltips, this
+   variable holds the frame that shows the tooltip, not the frame of
+   the tooltip itself, so checking whether a frame is a tooltip frame
+   cannot just compare the frame to what this variable holds.  */
 extern Lisp_Object tip_frame;
+
 extern Window tip_window;
 extern frame_parm_handler x_frame_parm_handlers[];
 

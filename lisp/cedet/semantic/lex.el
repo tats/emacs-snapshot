@@ -1,6 +1,6 @@
 ;;; semantic/lex.el --- Lexical Analyzer builder  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -17,7 +17,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -408,7 +408,7 @@ TYPE name does not exist.  Otherwise signal an error."
 SPECS must be a list of (TYPE . TOKENS) elements, where:
 
   TYPE is the name of the type symbol to define.
-  TOKENS is an list of (TOKSYM . MATCHER) elements, where:
+  TOKENS is a list of (TOKSYM . MATCHER) elements, where:
 
     TOKSYM is any lexical token symbol.
     MATCHER is a string or regexp a text must match to be a such
@@ -471,6 +471,7 @@ PROPERTY set."
 ;;; Lexical Analyzer framework settings
 ;;
 
+;; FIXME change to non-obsolete default.
 (defvar semantic-lex-analyzer 'semantic-flex
   "The lexical analyzer used for a given buffer.
 See `semantic-lex' for documentation.
@@ -1857,7 +1858,7 @@ end of the return token will be larger than END.  To truly restrict
 scanning, use `narrow-to-region'.
 The last argument, LENGTH specifies that `semantic-flex' should only
 return LENGTH tokens."
-  (message "`semantic-flex' is an obsolete function.  Use `define-lex' to create lexers.")
+  (declare (obsolete define-lex "23.2"))
   (if (not semantic-flex-keywords-obarray)
       (setq semantic-flex-keywords-obarray [ nil ]))
   (let ((ts nil)

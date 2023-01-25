@@ -1,6 +1,6 @@
 ;;; cl-generic.el --- CLOS-style generic functions for Elisp  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2018 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Version: 1.0
@@ -18,7 +18,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -204,7 +204,17 @@ OPTIONS-AND-METHODS currently understands:
 DEFAULT-BODY, if present, is used as the body of a default method.
 
 \(fn NAME ARGS [DOC-STRING] [OPTIONS-AND-METHODS...] &rest DEFAULT-BODY)"
-  (declare (indent 2) (doc-string 3))
+  (declare (indent 2) (doc-string 3)
+           (debug
+            (&define [&or name ("setf" name :name setf)] listp
+                     lambda-doc
+                     [&rest [&or
+                             ("declare" &rest sexp)
+                             (":argument-precedence-order" &rest sexp)
+                             (&define ":method" [&rest atom]
+                                      cl-generic-method-args lambda-doc
+                                      def-body)]]
+                     def-body)))
   (let* ((doc (if (stringp (car-safe options-and-methods))
                   (pop options-and-methods)))
          (declarations nil)
@@ -422,7 +432,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
                                     ; Like in CLOS spec, we support
                                     ; any non-list values.
              cl-generic-method-args     ; arguments
-             [ &optional stringp ]      ; documentation string
+             lambda-doc                 ; documentation string
              def-body)))                ; part to be debugged
   (let ((qualifiers nil))
     (while (not (listp args))

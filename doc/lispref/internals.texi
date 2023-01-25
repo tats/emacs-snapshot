@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1993, 1998-1999, 2001-2017 Free Software
+@c Copyright (C) 1990-1993, 1998-1999, 2001-2018 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node GNU Emacs Internals
@@ -248,7 +248,7 @@ of 8k bytes, and small vectors are packed into blocks of 4k bytes).
 @cindex storage of vector-like Lisp objects
   Beyond the basic vector, a lot of objects like window, buffer, and
 frame are managed as if they were vectors.  The corresponding C data
-structures include the @code{struct vectorlike_header} field whose
+structures include the @code{union vectorlike_header} field whose
 @code{size} member contains the subtype enumerated by @code{enum pvec_type}
 and an information about how many @code{Lisp_Object} fields this structure
 contains and what the size of the rest data is.  This information is
@@ -735,11 +735,11 @@ Lisp form.  For example:
 
 @example
 @group
-DEFUN ("foo", Ffoo, Sfoo, 0, UNEVALLED,
+DEFUN ("foo", Ffoo, Sfoo, 0, UNEVALLED, 0
        "(list (read-char-by-name \"Insert character: \")\
               (prefix-numeric-value current-prefix-arg)\
               t))",
-  doc: /* @dots{} /*)
+  doc: /* @dots{} */)
 @end group
 @end example
 
@@ -761,6 +761,43 @@ arguments.
 All the usual rules for documentation strings in Lisp code
 (@pxref{Documentation Tips}) apply to C code documentation strings
 too.
+
+The documentation string can be followed by a list of C function
+attributes for the C function that implements the primitive, like
+this:
+
+@example
+@group
+DEFUN ("bar", Fbar, Sbar, 0, UNEVALLED, 0
+  doc: /* @dots{} */
+  attributes: @var{attr1} @var{attr2} @dots{})
+@end group
+@end example
+
+@noindent
+You can specify more than a single attribute, one after the other.
+Currently, only the following attributes are recognized:
+
+@table @code
+@item noreturn
+Declares the C function as one that never returns.  This corresponds
+to the C11 keyword @code{_Noreturn} and to @w{@code{__attribute__
+((__noreturn__))}} attribute of GCC (@pxref{Function Attributes,,,
+gcc, Using the GNU Compiler Collection}).
+
+@item const
+Declares that the function does not examine any values except its
+arguments, and has no effects except the return value.  This
+corresponds to @w{@code{__attribute__ ((__const__))}} attribute of
+GCC.
+
+@item noinline
+This corresponds to @w{@code{__attribute__ ((__noinline__))}}
+attribute of GCC, which prevents the function from being considered
+for inlining.  This might be needed, e.g., to countermand effects of
+link-time optimizations on stack-based variables.
+@end table
+
 @end table
 
   After the call to the @code{DEFUN} macro, you must write the
@@ -843,7 +880,7 @@ defined with @code{DEFVAR_BOOL} are automatically added to the list
 @code{byte-boolean-vars} used by the byte compiler.
 
 @cindex defining customization variables in C
-  If you want to make a Lisp variables that is defined in C behave
+  If you want to make a Lisp variable that is defined in C behave
 like one declared with @code{defcustom}, add an appropriate entry to
 @file{cus-start.el}.
 
@@ -1085,7 +1122,7 @@ Some of the fields of @code{struct buffer} are:
 
 @table @code
 @item header
-A header of type @code{struct vectorlike_header} is common to all
+A header of type @code{union vectorlike_header} is common to all
 vectorlike objects.
 
 @item own_text

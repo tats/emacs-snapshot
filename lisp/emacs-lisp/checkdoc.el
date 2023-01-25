@@ -1,6 +1,6 @@
 ;;; checkdoc.el --- check documentation strings for style requirements  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-1998, 2001-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2001-2018 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Version: 0.6.2
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -1147,14 +1147,27 @@ Prefix argument is the same as for `checkdoc-defun'"
 ;; features and behaviors, so we need some ways of specifying
 ;; them, and making them easier to use in the wacked-out interfaces
 ;; people are requesting
-(defun checkdoc-create-error (text start end &optional unfixable)
-  "Used to create the return error text returned from all engines.
+(defvar checkdoc-create-error-function #'checkdoc--create-error-for-checkdoc
+  "Function called when Checkdoc encounters an error.
+Should accept as arguments (TEXT START END &optional UNFIXABLE).
+
 TEXT is the descriptive text of the error.  START and END define the region
 it is sensible to highlight when describing the problem.
 Optional argument UNFIXABLE means that the error has no auto-fix available.
 
 A list of the form (TEXT START END UNFIXABLE) is returned if we are not
-generating a buffered list of errors."
+generating a buffered list of errors.")
+
+(defun checkdoc-create-error (text start end &optional unfixable)
+  "Used to create the return error text returned from all engines.
+TEXT, START, END and UNFIXABLE conform to
+`checkdoc-create-error-function', which see."
+  (funcall checkdoc-create-error-function text start end unfixable))
+
+(defun checkdoc--create-error-for-checkdoc (text start end &optional unfixable)
+  "Create an error for Checkdoc.
+TEXT, START, END and UNFIXABLE conform to
+`checkdoc-create-error-function', which see."
   (if checkdoc-generate-compile-warnings-flag
       (progn (checkdoc-error start text)
 	     nil)

@@ -1,5 +1,5 @@
 /* Lisp functions for making directory listings.
-   Copyright (C) 1985-1986, 1993-1994, 1999-2017 Free Software
+   Copyright (C) 1985-1986, 1993-1994, 1999-2018 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
@@ -953,7 +953,14 @@ file_attributes (int fd, char const *name,
     {
       record_unwind_protect_int (close_file_unwind, namefd);
       if (fstat (namefd, &s) != 0)
-	err = errno;
+	{
+	  err = errno;
+	  /* The Linux kernel before version 3.6 does not support
+	     fstat on O_PATH file descriptors.  Handle this error like
+	     missing support for O_PATH.  */
+	  if (err == EBADF)
+	    err = EINVAL;
+	}
       else
 	{
 	  err = 0;

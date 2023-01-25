@@ -1,5 +1,5 @@
-# manywarnings.m4 serial 11
-dnl Copyright (C) 2008-2017 Free Software Foundation, Inc.
+# manywarnings.m4 serial 13
+dnl Copyright (C) 2008-2018 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -39,7 +39,8 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC],
 [_AC_LANG_DISPATCH([$0], _AC_LANG, $@)])
 
 # Specialization for _AC_LANG = C.
-AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
+# Use of m4_defun rather than AC_DEFUN works around a bug in autoconf < 2.63b.
+m4_defun([gl_MANYWARN_ALL_GCC(C)],
 [
   AC_LANG_PUSH([C])
 
@@ -266,18 +267,23 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
 
   # gcc --help=warnings outputs an unusual form for these options; list
   # them here so that the above 'comm' command doesn't report a false match.
-  # Would prefer "min (PTRDIFF_MAX, SIZE_MAX)", but it must be a literal
-  # and AC_COMPUTE_INT requires it to fit in a long:
+  # Would prefer "min (PTRDIFF_MAX, SIZE_MAX)", but it must be a literal.
+  # Also, AC_COMPUTE_INT requires it to fit in a long; it is 2**63 on
+  # the only platforms where it does not fit in a long, so make that
+  # a special case.
   AC_MSG_CHECKING([max safe object size])
   AC_COMPUTE_INT([gl_alloc_max],
-    [(LONG_MAX < PTRDIFF_MAX ? LONG_MAX : PTRDIFF_MAX) < (size_t) -1
-     ? (LONG_MAX < PTRDIFF_MAX ? LONG_MAX : PTRDIFF_MAX)
-     : (size_t) -1],
+    [LONG_MAX < (PTRDIFF_MAX < (size_t) -1 ? PTRDIFF_MAX : (size_t) -1)
+     ? -1
+     : PTRDIFF_MAX < (size_t) -1 ? (long) PTRDIFF_MAX : (long) (size_t) -1],
     [[#include <limits.h>
       #include <stddef.h>
       #include <stdint.h>
     ]],
     [gl_alloc_max=2147483647])
+  case $gl_alloc_max in
+    -1) gl_alloc_max=9223372036854775807;;
+  esac
   AC_MSG_RESULT([$gl_alloc_max])
   gl_manywarn_set="$gl_manywarn_set -Walloc-size-larger-than=$gl_alloc_max"
   gl_manywarn_set="$gl_manywarn_set -Warray-bounds=2"
@@ -316,7 +322,8 @@ AC_DEFUN([gl_MANYWARN_ALL_GCC(C)],
 ])
 
 # Specialization for _AC_LANG = C++.
-AC_DEFUN([gl_MANYWARN_ALL_GCC(C++)],
+# Use of m4_defun rather than AC_DEFUN works around a bug in autoconf < 2.63b.
+m4_defun([gl_MANYWARN_ALL_GCC(C++)],
 [
   gl_MANYWARN_ALL_GCC_CXX_IMPL([$1])
 ])

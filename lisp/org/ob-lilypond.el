@@ -1,10 +1,10 @@
 ;;; ob-lilypond.el --- Babel Functions for Lilypond  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2010-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2018 Free Software Foundation, Inc.
 
 ;; Author: Martyn Jago
 ;; Keywords: babel language, literate programming
-;; Homepage: http://orgmode.org/worg/org-contrib/babel/languages/ob-doc-lilypond.html
+;; Homepage: https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-lilypond.html
 
 ;; This file is part of GNU Emacs.
 
@@ -19,12 +19,12 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
 ;; Installation, ob-lilypond documentation, and examples are available at
-;; http://orgmode.org/worg/org-contrib/babel/languages/ob-doc-lilypond.html
+;; https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-lilypond.html
 ;;
 ;; Lilypond documentation can be found at
 ;; http://lilypond.org/manuals.html
@@ -89,7 +89,7 @@ you can leave the string empty on this case."
 	  (string :tag "Lilypond   ")
 	  (string :tag "PDF Viewer ")
 	  (string :tag "MIDI Player"))
-  :version "24.3"
+  :version "24.4"
   :package-version '(Org . "8.2.7")
   :set
   (lambda (_symbol value)

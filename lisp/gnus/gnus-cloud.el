@@ -1,6 +1,6 @@
 ;;; gnus-cloud.el --- storing and retrieving data via IMAP
 
-;; Copyright (C) 2014-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2018 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: mail
@@ -18,9 +18,13 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
+
+;; The name gnus-cloud parodizes but otherwise has little to do with
+;; "cloud computing", a misleading term normally best avoided.  See:
+;; https://www.gnu.org/philosophy/words-to-avoid.html#CloudComputing
 
 ;;; Code:
 
@@ -44,13 +48,18 @@
     "~/.authinfo.gpg"
     "~/.gnus.el"
     (:directory "~/News" :match ".*.SCORE\\'"))
-  "List of file regexps that should be kept up-to-date via the cloud."
+  "List of files that should be kept up-to-date via the cloud.
+Each element may be either a string or a property list.
+The latter should have a :directory element whose value is a string,
+and a :match element whose value is a regular expression to match
+against the basename of files in said directory."
   :group 'gnus-cloud
-  ;; FIXME this type does not match the default.  Nor does the documentation.
-  :type '(repeat regexp))
+  :type '(repeat (choice (string :tag "File")
+                         (plist :tag "Property list"))))
 
 (defcustom gnus-cloud-storage-method (if (featurep 'epg) 'epg 'base64-gzip)
   "Storage method for cloud data, defaults to EPG if that's available."
+  :version "26.1"
   :group 'gnus-cloud
   :type '(radio (const :tag "No encoding" nil)
                 (const :tag "Base64" base64)
@@ -59,6 +68,7 @@
 
 (defcustom gnus-cloud-interactive t
   "Whether Gnus Cloud changes should be confirmed."
+  :version "26.1"
   :group 'gnus-cloud
   :type 'boolean)
 
@@ -284,6 +294,8 @@ Use old data if FORCE-OLDER is not nil."
     (dolist (elem gnus-cloud-synced-files)
       (cond
        ((stringp elem)
+        ;; This seems fragile.  String comparison, with no
+        ;; expand-file-name to resolve ~, etc.
         (when (equal elem file-name)
           (setq matched t)))
        ((consp elem)

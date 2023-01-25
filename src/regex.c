@@ -2,7 +2,7 @@
    0.12.  (Implements POSIX draft P1003.2/D11.2, except for some of the
    internationalization features.)
 
-   Copyright (C) 1993-2017 Free Software Foundation, Inc.
+   Copyright (C) 1993-2018 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* TODO:
    - structure the opcode space into opcode+flag.
@@ -4038,8 +4038,7 @@ analyze_first (const_re_char *p, const_re_char *pend, char *fastmap,
 	    };
 	  /* Keep `p1' to allow the `on_failure_jump' we are jumping to
 	     to jump back to "just after here".  */
-	  /* Fallthrough */
-
+	  FALLTHROUGH;
 	case on_failure_jump:
 	case on_failure_keep_string_jump:
 	case on_failure_jump_nastyloop:
@@ -5792,7 +5791,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp, const_re_char *string1,
 
 	    EXTRACT_NUMBER (mcnt, p2 - 2);
 
-	    /* Ensure this is a indeed the trivial kind of loop
+	    /* Ensure this is indeed the trivial kind of loop
 	       we are expecting.  */
 	    assert (skip_one_char (p1) == p2 - 3);
 	    assert ((re_opcode_t) p2[-3] == jump && p2 + mcnt == p);

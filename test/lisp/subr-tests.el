@@ -1,6 +1,6 @@
 ;;; subr-tests.el --- Tests for subr.el
 
-;; Copyright (C) 2015-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2018 Free Software Foundation, Inc.
 
 ;; Author: Oleh Krehel <ohwoeowho@gmail.com>,
 ;;         Nicolas Petton <nicolas@petton.fr>
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -293,13 +293,36 @@ cf. Bug#25477."
                 :type 'wrong-type-argument))
 
 (ert-deftest subr-tests-bug22027 ()
-  "Test for http://debbugs.gnu.org/22027 ."
+  "Test for https://debbugs.gnu.org/22027 ."
   (let ((default "foo") res)
     (cl-letf (((symbol-function 'read-string)
                (lambda (_prompt _init _hist def) def)))
       (setq res (read-passwd "pass: " 'confirm (mapconcat #'string default "")))
       (should (string= default res)))))
 
+(ert-deftest subr-tests--gensym ()
+  "Test `gensym' behavior."
+  (should (equal (symbol-name (let ((gensym-counter 0)) (gensym)))
+                 "g0"))
+  (should (eq (string-to-char (symbol-name (gensym))) ?g))
+  (should (eq (string-to-char (symbol-name (gensym "X"))) ?X)))
+
+(ert-deftest shell-quote-argument-%-on-w32 ()
+  "Quoting of `%' in w32 shells isn't perfect.
+See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=19350."
+  :expected-result :failed
+  (skip-unless (and (fboundp 'w32-shell-dos-semantics)
+                    (w32-shell-dos-semantics)))
+  (let ((process-environment (append '("ca^=with-caret"
+                                       "ca=without-caret")
+                                     process-environment)))
+    ;; It actually results in
+    ;;    without-caret with-caret
+    (should (equal (shell-command-to-string
+                    (format "echo %s %s"
+                            "%ca%"
+                            (shell-quote-argument "%ca%")))
+                   "without-caret %ca%"))))
 
 (provide 'subr-tests)
 ;;; subr-tests.el ends here

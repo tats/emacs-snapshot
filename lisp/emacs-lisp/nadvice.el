@@ -1,6 +1,6 @@
 ;;; nadvice.el --- Light-weight advice primitives for Elisp functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2018 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: extensions, lisp, tools
@@ -17,7 +17,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -288,6 +288,9 @@ a special meaning:
 If PLACE is a symbol, its `default-value' will be affected.
 Use (local \\='SYMBOL) if you want to apply FUNCTION to SYMBOL buffer-locally.
 Use (var VAR) if you want to apply FUNCTION to the (lexical) VAR.
+If you are trying to modify an existing named function rather
+than a function value, you probably want to use `advice-add'
+instead (see Info node `(elisp) Advising Named Functions').
 
 If one of FUNCTION or OLDFUN is interactive, then the resulting function
 is also interactive.  There are 3 cases:

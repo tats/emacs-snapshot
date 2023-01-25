@@ -1,6 +1,6 @@
 ;;; esh-cmd.el --- command invocation  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -17,7 +17,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -80,7 +80,7 @@
 ;;
 ;;   echo x$(+ 1 2) "String $(+ 1 2)"
 ;;
-;; To pass a Lisp symbol as a argument, use the alternate quoting
+;; To pass a Lisp symbol as an argument, use the alternate quoting
 ;; syntax, since the single quote character is far too overused in
 ;; shell syntax:
 ;;

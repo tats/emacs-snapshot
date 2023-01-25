@@ -1,6 +1,6 @@
 ;;; edebug.el --- a source-level debugger for Emacs Lisp  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1988-1995, 1997, 1999-2017 Free Software Foundation,
+;; Copyright (C) 1988-1995, 1997, 1999-2018 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Daniel LaLiberte <liberte@holonexus.org>
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -641,7 +641,7 @@ list of a symbol.")
 
 (defun edebug-form-data-symbol ()
   "Return the edebug data symbol of the form where point is in.
-If point is not inside a edebuggable form, cause error."
+If point is not inside an edebuggable form, signal an error."
   (or (edebug--form-data-name (edebug-get-form-data-entry (point)))
       (error "Not inside instrumented form")))
 
@@ -950,7 +950,8 @@ circular objects.  Let `read' read everything else."
 
 ;;; Cursors for traversal of list and vector elements with offsets.
 
-(defvar edebug-dotted-spec nil)
+(defvar edebug-dotted-spec nil
+  "Set to t when matching after the dot in a dotted spec list.")
 
 (defun edebug-new-cursor (expressions offsets)
   ;; Return a new cursor for EXPRESSIONS with OFFSETS.
@@ -1193,7 +1194,7 @@ circular objects.  Let `read' read everything else."
   ;; Uses the dynamically bound vars edebug-def-name and edebug-def-args.
   ;; Do this after parsing since that may find a name.
   (setq edebug-def-name
-	(or edebug-def-name edebug-old-def-name (cl-gensym "edebug-anon")))
+	(or edebug-def-name edebug-old-def-name (gensym "edebug-anon")))
   `(edebug-enter
     (quote ,edebug-def-name)
     ,(if edebug-inside-func
@@ -1494,8 +1495,6 @@ expressions; a `progn' form will be returned enclosing these forms."
 
 ;;; Matching of specs.
 
-(defvar edebug-after-dotted-spec nil)
-
 (defvar edebug-matching-depth 0)  ;; initial value
 
 
@@ -1556,36 +1555,48 @@ expressions; a `progn' form will be returned enclosing these forms."
       (let ((edebug-dotted-spec t));; Containing spec list was dotted.
 	(edebug-match-specs cursor (list specs) remainder-handler)))
 
-     ;; Is the form dotted?
-     ((not (listp (edebug-cursor-expressions cursor)));; allow nil
+     ;; The reason for processing here &optional, &rest, and vectors
+     ;; which might contain them even when the form is dotted is to
+     ;; allow them to match nothing, so we can advance to the dotted
+     ;; part of the spec.
+     ((or (listp (edebug-cursor-expressions cursor))
+          (vectorp (car specs))
+          (memq (car specs) '(&optional &rest))) ; Process normally.
+      ;; (message "%scursor=%s specs=%s"
+      ;;          (make-string edebug-matching-depth ?|) cursor (car specs))
+      (let* ((spec (car specs))
+	     (rest)
+	     (first-char (and (symbolp spec) (aref (symbol-name spec) 0)))
+	     (match (cond
+		     ((eq ?& first-char);; "&" symbols take all following specs.
+		      (funcall (get-edebug-spec spec) cursor (cdr specs)))
+		     ((eq ?: first-char);; ":" symbols take one following spec.
+		      (setq rest (cdr (cdr specs)))
+		      (funcall (get-edebug-spec spec) cursor (car (cdr specs))))
+		     (t;; Any other normal spec.
+		      (setq rest (cdr specs))
+		      (edebug-match-one-spec cursor spec)))))
+        ;; The first match result may not be a list, which can happen
+        ;; when matching the tail of a dotted list.  In that case
+        ;; there is no remainder.
+	(if (listp match)
+	    (nconc match
+		   (funcall remainder-handler cursor rest remainder-handler))
+	  match)))
+
+     ;; Must be a dotted form, with no remaining &rest or &optional specs to
+     ;; match.
+     (t
       (if (not edebug-dotted-spec)
 	  (edebug-no-match cursor "Dotted spec required."))
       ;; Cancel dotted spec and dotted form.
       (let ((edebug-dotted-spec)
-	    (this-form (edebug-cursor-expressions cursor))
-	    (this-offset (edebug-cursor-offsets cursor)))
-	;; Wrap the form in a list, (by changing the cursor??)...
+            (this-form (edebug-cursor-expressions cursor))
+            (this-offset (edebug-cursor-offsets cursor)))
+	;; Wrap the form in a list, by changing the cursor.
 	(edebug-set-cursor cursor (list this-form) this-offset)
-	;; and process normally, then unwrap the result.
-	(car (edebug-match-specs cursor specs remainder-handler))))
-
-     (t;; Process normally.
-      (let* ((spec (car specs))
-	     (rest)
-	     (first-char (and (symbolp spec) (aref (symbol-name spec) 0))))
-	;;(message "spec = %s  first char = %s" spec first-char) (sit-for 1)
-	(nconc
-	 (cond
-	  ((eq ?& first-char);; "&" symbols take all following specs.
-	   (funcall (get-edebug-spec spec) cursor (cdr specs)))
-	  ((eq ?: first-char);; ":" symbols take one following spec.
-	   (setq rest (cdr (cdr specs)))
-	   (funcall (get-edebug-spec spec) cursor (car (cdr specs))))
-	  (t;; Any other normal spec.
-	   (setq rest (cdr specs))
-	   (edebug-match-one-spec cursor spec)))
-	 (funcall remainder-handler cursor rest remainder-handler)))))))
-
+	;; Process normally, then unwrap the result.
+	(car (edebug-match-specs cursor specs remainder-handler)))))))
 
 ;; Define specs for all the symbol specs with functions used to process them.
 ;; Perhaps we shouldn't be doing this with edebug-form-specs since the
@@ -1986,15 +1997,14 @@ expressions; a `progn' form will be returned enclosing these forms."
 (def-edebug-spec defvar (symbolp &optional form stringp))
 
 (def-edebug-spec defun
-  (&define name lambda-list
-	   [&optional stringp]
+  (&define name lambda-list lambda-doc
            [&optional ("declare" &rest sexp)]
 	   [&optional ("interactive" interactive)]
 	   def-body))
 (def-edebug-spec defmacro
   ;; FIXME: Improve `declare' so we can Edebug gv-expander and
   ;; gv-setter declarations.
-  (&define name lambda-list [&optional stringp]
+  (&define name lambda-list lambda-doc
            [&optional ("declare" &rest sexp)] def-body))
 
 (def-edebug-spec arglist lambda-list)  ;; deprecated - use lambda-list.
@@ -2004,6 +2014,10 @@ expressions; a `progn' form will be returned enclosing these forms."
     [&optional ["&optional" arg &rest arg]]
     &optional ["&rest" arg]
     )))
+
+(def-edebug-spec lambda-doc
+  (&optional [&or stringp
+                  (&define ":documentation" def-form)]))
 
 (def-edebug-spec interactive
   (&optional &or stringp def-form))
@@ -3204,15 +3218,6 @@ generated symbols for methods.  If a function or method to
 instrument cannot be found, signal an error."
   (let ((func-marker (get func 'edebug)))
     (cond
-     ((and (markerp func-marker) (marker-buffer func-marker))
-      ;; It is uninstrumented, so instrument it.
-      (with-current-buffer (marker-buffer func-marker)
-	(goto-char func-marker)
-	(edebug-eval-top-level-form)
-        (list func)))
-     ((consp func-marker)
-      (message "%s is already instrumented." func)
-      (list func))
      ((cl-generic-p func)
       (let ((method-defs (cl--generic-method-files func))
             symbols)
@@ -3227,6 +3232,15 @@ instrument cannot be found, signal an error."
               (edebug-eval-top-level-form)
               (push (edebug-form-data-symbol) symbols))))
         symbols))
+     ((and (markerp func-marker) (marker-buffer func-marker))
+      ;; It is uninstrumented, so instrument it.
+      (with-current-buffer (marker-buffer func-marker)
+	(goto-char func-marker)
+	(edebug-eval-top-level-form)
+        (list func)))
+     ((consp func-marker)
+      (message "%s is already instrumented." func)
+      (list func))
      (t
       (let ((loc (find-function-noselect func t)))
 	(unless (cdr loc)

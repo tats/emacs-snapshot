@@ -1,6 +1,6 @@
 ;;; unit tests for src/fileio.c      -*- lexical-binding: t; -*-
 
-;; Copyright 2017 Free Software Foundation, Inc.
+;; Copyright 2017-2018 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 (require 'ert)
 
@@ -29,12 +29,18 @@
 
 (defun fileio-tests--symlink-failure ()
   (let* ((dir (make-temp-file "fileio" t))
-         (link (expand-file-name "link" dir)))
+         (link (expand-file-name "link" dir))
+         (file-name-coding-system (if (and (eq system-type 'darwin)
+                                           (featurep 'ucs-normalize))
+                                      'utf-8-hfs-unix
+                                    file-name-coding-system)))
     (unwind-protect
         (let (failure
               (char 0))
           (while (and (not failure) (< char 127))
             (setq char (1+ char))
+            (when (and (eq system-type 'cygwin) (eq char 92))
+              (setq char (1+ char)))
             (setq failure (try-link (string char) link)))
           (or failure
               (try-link "/:" link)))

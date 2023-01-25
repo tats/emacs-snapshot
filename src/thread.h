@@ -1,5 +1,5 @@
 /* Thread definitions
-Copyright (C) 2012-2017 Free Software Foundation, Inc.
+Copyright (C) 2012-2018 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef THREAD_H
 #define THREAD_H
@@ -25,13 +25,17 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <sys/socket.h>
 #endif
 
+#ifdef MSDOS
+#include <signal.h>		/* sigset_t */
+#endif
+
 #include "sysselect.h"		/* FIXME */
 #include "systime.h"		/* FIXME */
 #include "systhread.h"
 
 struct thread_state
 {
-  struct vectorlike_header header;
+  union vectorlike_header header;
 
   /* The buffer in which the last search was performed, or
      Qt if the last search was done in a string;
@@ -158,6 +162,13 @@ struct thread_state
   bool m_waiting_for_input;
 #define waiting_for_input (current_thread->m_waiting_for_input)
 
+  /* For longjmp to where kbd input is being done.  This is per-thread
+     so that if more than one thread calls read_char, they don't
+     clobber each other's getcjmp, which will cause
+     quit_throw_to_read_char crash due to using a wrong stack.  */
+  sys_jmp_buf m_getcjmp;
+#define getcjmp (current_thread->m_getcjmp)
+
   /* The OS identifier for this thread.  */
   sys_thread_t thread_id;
 
@@ -219,7 +230,7 @@ typedef struct
 /* A mutex as a lisp object.  */
 struct Lisp_Mutex
 {
-  struct vectorlike_header header;
+  union vectorlike_header header;
 
   /* The name of the mutex, or nil.  */
   Lisp_Object name;
@@ -250,7 +261,7 @@ XMUTEX (Lisp_Object a)
 /* A condition variable as a lisp object.  */
 struct Lisp_CondVar
 {
-  struct vectorlike_header header;
+  union vectorlike_header header;
 
   /* The associated mutex.  */
   Lisp_Object mutex;

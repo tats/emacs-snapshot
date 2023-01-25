@@ -1,6 +1,6 @@
 ;;; browse-url.el --- pass a URL to a WWW browser
 
-;; Copyright (C) 1995-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2018 Free Software Foundation, Inc.
 
 ;; Author: Denis Howe <dbh@doc.ic.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -878,7 +878,21 @@ The optional NEW-WINDOW argument is not used."
 	   (error "Browsing URLs is not supported on this system")))
 	((eq system-type 'cygwin)
 	 (call-process "cygstart" nil nil nil url))
-	(t (w32-shell-execute "open" (url-unhex-string url)))))
+	(t
+         (w32-shell-execute "open"
+                            ;; w32-shell-execute passes file:// URLs
+                            ;; to APIs that expect file names, so we
+                            ;; need to unhex any %nn encoded
+                            ;; characters in the URL.  We don't do
+                            ;; that for other URLs; in particular,
+                            ;; default Windows mail client barfs on
+                            ;; quotes in the MAILTO URLs, so we prefer
+                            ;; to leave the URL with its embedded %nn
+                            ;; encoding intact.
+                            (if (eq t (compare-strings url nil 7
+                                                       "file://" nil nil))
+                                (url-unhex-string url)
+                              url)))))
 
 (defun browse-url-default-macosx-browser (url &optional _new-window)
   "Invoke the macOS system's default Web browser.
@@ -1317,7 +1331,7 @@ used instead of `browse-url-new-window-flag'."
               (if (file-exists-p
                    (setq pidfile (format "/tmp/Mosaic.%d" pid)))
                   (delete-file pidfile))
-              ;; http://debbugs.gnu.org/17428.  Use O_EXCL.
+              ;; https://debbugs.gnu.org/17428.  Use O_EXCL.
               (write-region nil nil pidfile nil 'silent nil 'excl)))
 	  ;; Send signal SIGUSR to Mosaic
 	  (message "Signaling Mosaic...")

@@ -1,6 +1,6 @@
 ;;; term.el --- general command interpreter in a window stuff
 
-;; Copyright (C) 1988, 1990, 1992, 1994-1995, 2001-2017 Free Software
+;; Copyright (C) 1988, 1990, 1992, 1994-1995, 2001-2018 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Per Bothner <per@bothner.com>
@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;; Marck 13 2001
 ;; Fixes for CJK support by Yong Lu <lyongu@yahoo.com>.
@@ -427,6 +427,8 @@ by moving term-home-marker.  It is set to t if there is a
 (defvar term-old-mode-line-format) ; Saves old mode-line-format while paging.
 (defvar term-pager-old-local-map nil "Saves old keymap while paging.")
 (defvar term-pager-old-filter) ; Saved process-filter while paging.
+(defvar-local term-line-mode-buffer-read-only nil
+  "The `buffer-read-only' state to set in `term-line-mode'.")
 
 (defcustom explicit-shell-file-name nil
   "If non-nil, is file name to use for explicitly requested inferior shell."
@@ -484,6 +486,41 @@ This variable is buffer-local."
 See also `term-read-input-ring' and `term-write-input-ring'.
 
 This variable is buffer-local, and is a good thing to set in mode hooks."
+  :type 'boolean
+  :group 'term)
+
+(defcustom term-char-mode-buffer-read-only t
+  "If non-nil, only the process filter may modify the buffer in char mode.
+
+A non-nil value makes the buffer read-only in `term-char-mode',
+which prevents editing commands from making the buffer state
+inconsistent with the state of the terminal understood by the
+inferior process.  Only the process filter is allowed to make
+changes to the buffer.
+
+Customize this option to nil if you want the previous behavior."
+  :version "26.1"
+  :type 'boolean
+  :group 'term)
+
+(defcustom term-char-mode-point-at-process-mark t
+  "If non-nil, keep point at the process mark in char mode.
+
+A non-nil value causes point to be moved to the current process
+mark after each command in `term-char-mode' (provided that the
+pre-command point position was also at the process mark).  This
+prevents commands that move point from making the buffer state
+inconsistent with the state of the terminal understood by the
+inferior process.
+
+Mouse events are not affected, so moving point and selecting text
+is still possible in char mode via the mouse, after which other
+commands can be invoked on the mouse-selected point or region,
+until the process filter (or user) moves point to the process
+mark once again.
+
+Customize this option to nil if you want the previous behavior."
+  :version "26.1"
   :type 'boolean
   :group 'term)
 
@@ -556,6 +593,9 @@ massage the input string, this is your hook.  This is called from
 the user command `term-send-input'.  `term-simple-send' just sends
 the string plus a newline.")
 
+(defvar term-partial-ansi-terminal-message nil
+  "Keep partial ansi terminal messages for future processing.")
+
 (defcustom term-eol-on-send t
   "Non-nil means go to the end of the line before sending input.
 See `term-send-input'."
@@ -572,8 +612,8 @@ This is run before the process is cranked up."
   "Called each time a process is exec'd by `term-exec'.
 This is called after the process is cranked up.  It is useful for things that
 must be done each time a process is executed in a term mode buffer (e.g.,
-`process-kill-without-query').  In contrast, `term-mode-hook' is only
-executed once when the buffer is created."
+`set-process-query-on-exit-flag').  In contrast, `term-mode-hook' is only
+executed once, when the buffer is created."
   :type 'hook
   :group 'term)
 
@@ -1040,6 +1080,8 @@ Entry to this mode runs the hooks on `term-mode-hook'."
   (make-local-variable 'ange-ftp-default-password)
   (make-local-variable 'ange-ftp-generate-anonymous-password)
 
+  (make-local-variable 'term-partial-ansi-terminal-message)
+
   ;; You may want to have different scroll-back sizes -mm
   (make-local-variable 'term-buffer-maximum-size)
 
@@ -1103,7 +1145,10 @@ Entry to this mode runs the hooks on `term-mode-hook'."
                 (lambda (size)
                   (when size
                     (term-reset-size (cdr size) (car size)))
-                  size))
+                  size)
+                '((name . term-maybe-reset-size)))
+
+  (add-hook 'read-only-mode-hook #'term-line-mode-buffer-read-only-update nil t)
 
   (easy-menu-add term-terminal-menu)
   (easy-menu-add term-signals-menu)
@@ -1121,6 +1166,11 @@ Entry to this mode runs the hooks on `term-mode-hook'."
       (setq term-current-row nil)
       (setq term-current-column nil)
       (term-set-scroll-region 0 height)
+      ;; `term-set-scroll-region' causes these to be set, we have to
+      ;; clear them again since we're changing point (Bug#30544).
+      (setq term-start-line-column nil)
+      (setq term-current-row nil)
+      (setq term-current-column nil)
       (goto-char point))))
 
 ;; Recursive routine used to check if any string in term-kill-echo-list
@@ -1246,6 +1296,13 @@ intervention from Emacs, except for the escape character (usually C-c)."
     (easy-menu-add term-terminal-menu)
     (easy-menu-add term-signals-menu)
 
+    ;; Don't allow changes to the buffer or to point which are not
+    ;; caused by the process filter.
+    (when term-char-mode-buffer-read-only
+      (setq buffer-read-only t))
+    (add-hook 'pre-command-hook #'term-set-goto-process-mark nil t)
+    (add-hook 'post-command-hook #'term-goto-process-mark-maybe nil t)
+
     ;; Send existing partial line to inferior (without newline).
     (let ((pmark (process-mark (get-buffer-process (current-buffer))))
 	  (save-input-sender term-input-sender))
@@ -1265,8 +1322,19 @@ This means that Emacs editing commands work as normally, until
 you type \\[term-send-input] which sends the current line to the inferior."
   (interactive)
   (when (term-in-char-mode)
+    (when term-char-mode-buffer-read-only
+      (setq buffer-read-only term-line-mode-buffer-read-only))
+    (remove-hook 'pre-command-hook #'term-set-goto-process-mark t)
+    (remove-hook 'post-command-hook #'term-goto-process-mark-maybe t)
     (use-local-map term-old-mode-map)
     (term-update-mode-line)))
+
+(defun term-line-mode-buffer-read-only-update ()
+  "Update the user-set state of `buffer-read-only' in `term-line-mode'.
+
+Called as a buffer-local `read-only-mode-hook' function."
+  (when (term-in-line-mode)
+    (setq term-line-mode-buffer-read-only buffer-read-only)))
 
 (defun term-update-mode-line ()
   (let ((term-mode
@@ -1416,6 +1484,9 @@ The main purpose is to get rid of the local keymap."
   (let ((buffer-read-only nil)
 	(omax (point-max))
 	(opoint (point)))
+    ;; Remove hooks to avoid errors due to dead process.
+    (remove-hook 'pre-command-hook #'term-set-goto-process-mark t)
+    (remove-hook 'post-command-hook #'term-goto-process-mark-maybe t)
     ;; Record where we put the message, so we can ignore it
     ;; later on.
     (goto-char omax)
@@ -1986,16 +2057,13 @@ After the process output mark, sends all text from the process mark to
 point as input to the process.  Before the process output mark, calls value
 of variable `term-get-old-input' to retrieve old input, copies it to the
 process mark, and sends it.  A terminal newline is also inserted into the
-buffer and sent to the process.  The list of function names contained in the
-value of `term-input-filter-functions' is called on the input before sending
-it.  The input is entered into the input history ring, if the value of variable
-`term-input-filter' returns non-nil when called on the input.
+buffer and sent to the process.  The functions in `term-input-filter-functions'
+are called on the input before sending it.
 
-Any history reference may be expanded depending on the value of the variable
-`term-input-autoexpand'.  The list of function names contained in the value
-of `term-input-filter-functions' is called on the input before sending it.
 The input is entered into the input history ring, if the value of variable
-`term-input-filter' returns non-nil when called on the input.
+`term-input-filter' returns non-nil when called on the input.  Any history
+reference may be expanded depending on the value of the variable
+`term-input-autoexpand'.
 
 If variable `term-eol-on-send' is non-nil, then point is moved to the
 end of line before sending the input.
@@ -2645,6 +2713,11 @@ See `term-prompt-regexp'."
 ;;difference ;-) -mm
 
 (defun term-handle-ansi-terminal-messages (message)
+  ;; Handle stored partial message
+  (when term-partial-ansi-terminal-message
+    (setq message (concat term-partial-ansi-terminal-message message))
+    (setq term-partial-ansi-terminal-message nil))
+
   ;; Is there a command here?
   (while (string-match "\eAnSiT.+\n" message)
     ;; Extract the command code and the argument.
@@ -2697,6 +2770,11 @@ See `term-prompt-regexp'."
 	  (setq ange-ftp-default-user nil)
 	  (setq ange-ftp-default-password nil)
 	  (setq ange-ftp-generate-anonymous-password nil)))))
+  ;; If there is a partial message at the end of the string, store it
+  ;; for future use.
+  (when (string-match "\eAnSiT.+$" message)
+    (setq term-partial-ansi-terminal-message (match-string 0 message))
+    (setq message (replace-match "" t t message)))
   message)
 
 
@@ -2711,6 +2789,7 @@ See `term-prompt-regexp'."
 	   count-bytes ; number of bytes
 	   decoded-substring
 	   save-point save-marker old-point temp win
+	   (inhibit-read-only t)
 	   (buffer-undo-list t)
 	   (selected (selected-window))
 	   last-win
@@ -3108,6 +3187,46 @@ See `term-prompt-regexp'."
     ;; like `sleep 5 | less -c' in more-or-less real time.
     (when (get-buffer-window (current-buffer))
       (redisplay))))
+
+(defvar-local term-goto-process-mark t
+  "Whether to reset point to the current process mark after this command.
+
+Set in `pre-command-hook' in char mode by `term-set-goto-process-mark'.")
+
+(defun term-set-goto-process-mark ()
+  "Sets `term-goto-process-mark'.
+
+Always set to nil if `term-char-mode-point-at-process-mark' is nil.
+
+Called as a buffer-local `pre-command-hook' function in
+`term-char-mode' so that when point is equal to the process mark
+at the pre-command stage, we know to restore point to the process
+mark at the post-command stage.
+
+See also `term-goto-process-mark-maybe'."
+  (setq term-goto-process-mark
+        (and term-char-mode-point-at-process-mark
+             (eq (point) (marker-position (term-process-mark))))))
+
+(defun term-goto-process-mark-maybe ()
+  "Move point to the term buffer's process mark upon keyboard input.
+
+Called as a buffer-local `post-command-hook' function in
+`term-char-mode' to prevent commands from putting the buffer into
+an inconsistent state by unexpectedly moving point.
+
+Mouse events are ignored so that mouse selection is unimpeded.
+
+Only acts when the pre-command position of point was equal to the
+process mark, and the `term-char-mode-point-at-process-mark'
+option is enabled.  See `term-set-goto-process-mark'."
+  (when term-goto-process-mark
+    (unless (mouse-event-p last-command-event)
+      (goto-char (term-process-mark)))))
+
+(defun term-process-mark ()
+  "The current `process-mark' for the term buffer process."
+  (process-mark (get-buffer-process (current-buffer))))
 
 (defun term-handle-deferred-scroll ()
   (let ((count (- (term-current-row) term-height)))
@@ -3648,7 +3767,7 @@ all pending output has been dealt with."))
   (let ((start-column (term-horizontal-column)))
     (when (and check-for-scroll (or term-scroll-with-delete term-pager-count))
       (setq down (term-handle-scroll down)))
-    (unless (and (= term-current-row 0) (< down 0))
+    (unless (and (= (term-current-row) 0) (< down 0))
       (term-adjust-current-row-cache down)
       (when (or (/= (point) (point-max)) (< down 0))
 	(setq down (- down (term-vertical-motion down)))))
@@ -3658,7 +3777,7 @@ all pending output has been dealt with."))
 	   (setq term-current-column 0)
 	   (setq term-start-line-column 0))
 	  (t
-	   (when (= term-current-row 0)
+	   (when (= (term-current-row) 0)
 	     ;; Insert lines if at the beginning.
 	     (save-excursion (term-insert-char ?\n (- down)))
 	     (save-excursion
@@ -4144,7 +4263,9 @@ the process.  Any more args are arguments to PROGRAM."
 
 ;;;###autoload
 (defun ansi-term (program &optional new-buffer-name)
-  "Start a terminal-emulator in a new buffer."
+  "Start a terminal-emulator in a new buffer.
+This is almost the same as `term' apart from always creating a new buffer,
+and `C-x' being marked as a `term-escape-char'. "
   (interactive (list (read-from-minibuffer "Run program: "
 					   (or explicit-shell-file-name
 					       (getenv "ESHELL")

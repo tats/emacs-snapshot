@@ -1,6 +1,6 @@
 ;;; org-protocol.el --- Intercept Calls from Emacsclient to Trigger Custom Actions -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 2008-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2018 Free Software Foundation, Inc.
 ;;
 ;; Authors: Bastien Guerry <bzg@gnu.org>
 ;;       Daniel M German <dmg AT uvic DOT org>
@@ -22,7 +22,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Commentary:
@@ -184,17 +184,24 @@ Possible properties are:
 Example:
 
    (setq org-protocol-project-alist
-       \\='((\"http://orgmode.org/worg/\"
+       \\='((\"https://orgmode.org/worg/\"
           :online-suffix \".php\"
           :working-suffix \".org\"
-          :base-url \"http://orgmode.org/worg/\"
+          :base-url \"https://orgmode.org/worg/\"
           :working-directory \"/home/user/org/Worg/\")
          (\"http://localhost/org-notes/\"
           :online-suffix \".html\"
           :working-suffix \".org\"
           :base-url \"http://localhost/org/\"
           :working-directory \"/home/user/org/\"
-          :rewrites ((\"org/?$\" . \"index.php\")))))
+          :rewrites ((\"org/?$\" . \"index.php\")))
+         (\"Hugo based blog\"
+          :base-url \"https://www.site.com/\"
+          :working-directory \"~/site/content/post/\"
+          :online-suffix \".html\"
+          :working-suffix \".md\"
+          :rewrites ((\"\\(https://site.com/[0-9]+/[0-9]+/[0-9]+/\\)\" . \".md\")))))
+
 
    The last line tells `org-protocol-open-source' to open
    /home/user/org/index.php, if the URL cannot be mapped to an existing
@@ -556,8 +563,12 @@ The location for a browser's bookmark should look like this:
 		      ;; Try to match a rewritten URL and map it to
 		      ;; a real file.  Compare redirects without
 		      ;; suffix.
-		      (when (string-match-p (car rewrite) f1)
-			(throw 'result (concat wdir (cdr rewrite))))))))
+		      (when (string-match (car rewrite) f1)
+			(let ((replacement
+			       (concat (directory-file-name
+					(replace-match "" nil nil f1 1))
+				       (cdr rewrite))))
+			  (throw 'result (concat wdir replacement))))))))
 	      ;; -- end of redirects --
 
               (if (file-readable-p the-file)
@@ -652,7 +663,7 @@ to deal with new-style links.")
 ;;; Org specific functions:
 
 (defun org-protocol-create-for-org ()
-  "Create a Org protocol project for the current file's project.
+  "Create an Org protocol project for the current file's project.
 The visited file needs to be part of a publishing project in
 `org-publish-project-alist' for this to work.  The function
 delegates most of the work to `org-protocol-create'."
@@ -677,7 +688,7 @@ the cdr of an element in `org-publish-project-alist', reuse
   (let ((working-dir (expand-file-name
 		      (or (plist-get project-plist :base-directory)
 			  default-directory)))
-        (base-url "http://orgmode.org/worg/")
+        (base-url "https://orgmode.org/worg/")
         (strip-suffix (or (plist-get project-plist :html-extension) ".html"))
         (working-suffix (if (plist-get project-plist :base-extension)
                             (concat "." (plist-get project-plist :base-extension))

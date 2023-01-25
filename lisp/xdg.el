@@ -1,6 +1,6 @@
 ;;; xdg.el --- XDG specification and standard support -*- lexical-binding: t -*-
 
-;; Copyright (C) 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
 
 ;; Author: Mark Oteiza <mvoteiza@udel.edu>
 ;; Created: 27 January 2017
@@ -19,7 +19,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs. If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs. If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -84,7 +84,7 @@
 
 (defun xdg-thumb-uri (filename)
   "Return the canonical URI for FILENAME.
-If FILENAME has absolute path /foo/bar.jpg, its canonical URI is
+If FILENAME has absolute file name /foo/bar.jpg, its canonical URI is
 file:///foo/bar.jpg"
   (concat "file://" (expand-file-name filename)))
 
@@ -93,8 +93,8 @@ file:///foo/bar.jpg"
   (concat (md5 (xdg-thumb-uri filename)) ".png"))
 
 (defun xdg-thumb-mtime (filename)
-  "Return modification time of FILENAME as integral seconds from the epoch."
-  (floor (float-time (nth 5 (file-attributes filename)))))
+  "Return modification time of FILENAME as an Emacs timestamp."
+  (file-attribute-modification-time (file-attributes filename)))
 
 
 ;; XDG User Directories
@@ -163,6 +163,7 @@ This should be called at the beginning of a line."
 ;; notion of l10n/i18n
 (defconst xdg-desktop-entry-regexp
   (rx (group-n 1 (+ (in "A-Za-z0-9-")))
+      ;; (? "[" (group-n 3 (+ nonl)) "]")
       (* blank) "=" (* blank)
       (group-n 2 (* nonl)))
   "Regexp matching desktop file entry key-value pairs.")
@@ -196,8 +197,6 @@ Optional argument GROUP defaults to the string \"Desktop Entry\"."
     (unless (looking-at xdg-desktop-group-regexp)
       (error "Expected group name!  Instead saw: %s"
              (buffer-substring (point) (point-at-eol))))
-    (unless (equal (match-string 1) "Desktop Entry")
-      (error "Wrong first group: %s" (match-string 1)))
     (when group
       (while (and (re-search-forward xdg-desktop-group-regexp nil t)
                   (not (equal (match-string 1) group)))))

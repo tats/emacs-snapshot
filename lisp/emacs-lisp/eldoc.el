@@ -1,6 +1,6 @@
 ;;; eldoc.el --- Show function arglist or variable docstring in echo area  -*- lexical-binding:t; -*-
 
-;; Copyright (C) 1996-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -256,7 +256,7 @@ Otherwise work like `message'."
       (progn
 	(add-hook 'minibuffer-exit-hook
 		  (lambda () (setq eldoc-mode-line-string nil
-			      ;; http://debbugs.gnu.org/16920
+			      ;; https://debbugs.gnu.org/16920
 			      eldoc-last-message nil))
 		  nil t)
 	(with-current-buffer
@@ -264,12 +264,13 @@ Otherwise work like `message'."
 	     (or (window-in-direction 'above (minibuffer-window))
 		 (minibuffer-selected-window)
 		 (get-largest-window)))
+    (when mode-line-format
 	  (unless (and (listp mode-line-format)
 		       (assq 'eldoc-mode-line-string mode-line-format))
 	    (setq mode-line-format
 		  (list "" '(eldoc-mode-line-string
 			     (" " eldoc-mode-line-string " "))
-			mode-line-format)))
+			mode-line-format))))
           (setq eldoc-mode-line-string
                 (when (stringp format-string)
                   (apply #'format-message format-string args)))

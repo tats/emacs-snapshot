@@ -1,6 +1,6 @@
 ;;; json-tests.el --- Test suite for json.el
 
-;; Copyright (C) 2015-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2018 Free Software Foundation, Inc.
 
 ;; Author: Dmitry Gutov <dgutov@yandex.ru>
 
@@ -15,7 +15,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -309,7 +309,8 @@ Point is moved to beginning of the buffer."
   (json-tests--with-temp-buffer ""
     (should-error (json-read) :type 'json-end-of-file))
   (json-tests--with-temp-buffer "xxx"
-    (should-error (json-read) :type 'json-readtable-error)))
+    (let ((err (should-error (json-read) :type 'json-readtable-error)))
+      (should (equal (cdr err) '(?x))))))
 
 (ert-deftest test-json-read-from-string ()
   (let ((json-string "{ \"a\": 1 }"))

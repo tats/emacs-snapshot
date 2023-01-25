@@ -1,6 +1,6 @@
 ;;; flyspell.el --- On-the-fly spell checker  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998, 2000-2017 Free Software Foundation, Inc.
+;; Copyright (C) 1998, 2000-2018 Free Software Foundation, Inc.
 
 ;; Author: Manuel Serrano <Manuel.Serrano@sophia.inria.fr>
 ;; Maintainer: emacs-devel@gnu.org
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -231,7 +231,7 @@ Ispell's ultimate default dictionary."
   "Non-nil means check even inside TeX math environment.
 TeX math environments are discovered by `texmathp', implemented
 inside AUCTeX package.  That package may be found at
-URL `http://www.gnu.org/software/auctex/'"
+URL `https://www.gnu.org/software/auctex/'"
   :group 'flyspell
   :type 'boolean)
 
@@ -1103,7 +1103,10 @@ If the optional argument FOLLOWING, or, when called interactively
 `ispell-following-word', is non-nil, checks the following (rather
 than preceding) word when the cursor is not over a word.  If
 optional argument KNOWN-MISSPELLING is non nil considers word a
-misspelling and skips redundant spell-checking step."
+misspelling and skips redundant spell-checking step.
+
+See `flyspell-get-word' for details of how this finds the word to
+spell-check."
   (interactive (list ispell-following-word))
   (ispell-set-spellchecker-params)    ; Initialize variables and dicts alists
   (save-excursion
@@ -1302,7 +1305,13 @@ misspelling and skips redundant spell-checking step."
 Optional argument FOLLOWING non-nil means to get the following
 \(rather than preceding) word when the cursor is not over a word.
 Optional second argument EXTRA-OTHERCHARS is a regexp of characters
-that may be included as part of a word (see `ispell-dictionary-alist')."
+that may be included as part of a word (see `ispell-dictionary-alist').
+
+This finds the word to spell-check by searching for CASECHARS defined
+in `ispell-dictionary-alist' for the current dictionary.  Thus, the
+word could be far away from point if point is inside whitespace or
+punctuation characters, or in text that belongs to a different
+language."
   (let* ((flyspell-casechars (flyspell-get-casechars))
 	 (flyspell-not-casechars (flyspell-get-not-casechars))
 	 (ispell-otherchars (ispell-get-otherchars))
@@ -1732,7 +1741,7 @@ FLYSPELL-BUFFER."
 ;;*---------------------------------------------------------------------*/
 ;;*    flyspell-properties-at-p ...                                     */
 ;;*    -------------------------------------------------------------    */
-;;*    Is there an highlight properties at position pos?                */
+;;*    Is there a highlight property at position pos?                   */
 ;;*---------------------------------------------------------------------*/
 (defun flyspell-properties-at-p (pos)
   "Return t if there is a text property at POS, not counting `local-map'.
@@ -1917,7 +1926,12 @@ before point that's highlighted as misspelled."
 ;;*---------------------------------------------------------------------*/
 (defun flyspell-auto-correct-word ()
   "Correct the current word.
-This command proposes various successive corrections for the current word."
+This command proposes various successive corrections for the
+current word.  If invoked repeatedly on the same position, it
+cycles through the possible corrections of the current word.
+
+See `flyspell-get-word' for details of how this finds the word to
+spell-check."
   (interactive)
   ;; If we are not in the construct where flyspell should be active,
   ;; invoke the original binding of M-TAB, if that was recorded.
@@ -1930,6 +1944,11 @@ This command proposes various successive corrections for the current word."
       (call-interactively flyspell--prev-meta-tab-binding)
     (let ((pos     (point))
           (old-max (point-max)))
+      ;; Flush a possibly stale cache from previous invocations of
+      ;; flyspell-auto-correct-word/flyspell-auto-correct-previous-word.
+      (if (not (memq last-command '(flyspell-auto-correct-word
+                                    flyspell-auto-correct-previous-word)))
+          (setq flyspell-auto-correct-region nil))
       ;; Use the correct dictionary.
       (flyspell-accept-buffer-local-defs)
       (if (and (eq flyspell-auto-correct-pos pos)
@@ -1997,7 +2016,7 @@ This command proposes various successive corrections for the current word."
                             (let ((new-word replace))
                               (if (not (equal new-word (car poss)))
                                   (progn
-                                    ;; the save the current replacements
+                                    ;; then save the current replacements
                                     (setq flyspell-auto-correct-region
                                           (cons start (length new-word)))
                                     (let ((l replacements))

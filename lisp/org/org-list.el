@@ -1,11 +1,11 @@
 ;;; org-list.el --- Plain lists for Org              -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 2004-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2018 Free Software Foundation, Inc.
 ;;
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;;	   Bastien Guerry <bzg@gnu.org>
 ;; Keywords: outlines, hypermedia, calendar, wp
-;; Homepage: http://orgmode.org
+;; Homepage: https://orgmode.org
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;; Commentary:
@@ -121,6 +121,7 @@
 (declare-function org-element-set-element "org-element" (old new))
 (declare-function org-element-type "org-element" (element))
 (declare-function org-element-update-syntax "org-element" ())
+(declare-function org-end-of-meta-data "org" (&optional full))
 (declare-function org-entry-get "org"
 		  (pom property &optional inherit literal-nil))
 (declare-function org-export-create-backend "ox" (&rest rest) t)
@@ -2250,6 +2251,7 @@ If CHECKBOX is non-nil, add a checkbox next to the bullet.
 
 Return t when things worked, nil when we are not in an item, or
 item is invisible."
+  (interactive "P")
   (let ((itemp (org-in-item-p))
 	(pos (point)))
     ;; If cursor isn't is a list or if list is invisible, return nil.
@@ -2355,27 +2357,23 @@ is an integer, 0 means `-', 1 means `+' etc.  If WHICH is
 
 (defun org-toggle-checkbox (&optional toggle-presence)
   "Toggle the checkbox in the current line.
-With prefix arg TOGGLE-PRESENCE, add or remove checkboxes.  With
-double prefix, set checkbox to [-].
+
+With prefix argument TOGGLE-PRESENCE, add or remove checkboxes.
+With a double prefix argument, set the checkbox to \"[-]\".
 
 When there is an active region, toggle status or presence of the
 first checkbox there, and make every item inside have the same
 status or presence, respectively.
 
-If the cursor is in a headline, apply this to all checkbox items
-in the text below the heading, taking as reference the first item
-in subtree, ignoring drawers."
+If point is on a headline, apply this to all checkbox items in
+the text below the heading, taking as reference the first item in
+subtree, ignoring planning line and any drawer following it."
   (interactive "P")
   (save-excursion
     (let* (singlep
 	   block-item
 	   lim-up
 	   lim-down
-	   (keyword-re (concat "^[ \t]*\\<\\(" org-scheduled-string
-			       "\\|" org-deadline-string
-			       "\\|" org-closed-string
-			       "\\|" org-clock-string "\\)"
-			       " *[[<]\\([^]>]+\\)[]>]"))
 	   (orderedp (org-entry-get nil "ORDERED"))
 	   (_bounds
 	    ;; In a region, start at first item in region.
@@ -2388,15 +2386,10 @@ in subtree, ignoring drawers."
 		  (error "No item in region"))
 		(setq lim-down (copy-marker limit))))
 	     ((org-at-heading-p)
-	      ;; On an heading, start at first item after drawers and
+	      ;; On a heading, start at first item after drawers and
 	      ;; time-stamps (scheduled, etc.).
 	      (let ((limit (save-excursion (outline-next-heading) (point))))
-		(forward-line 1)
-		(while (or (looking-at org-drawer-regexp)
-			   (looking-at keyword-re))
-		  (if (looking-at keyword-re)
-		      (forward-line 1)
-		    (re-search-forward "^[ \t]*:END:" limit nil)))
+		(org-end-of-meta-data t)
 		(if (org-list-search-forward (org-item-beginning-re) limit t)
 		    (setq lim-up (point-at-bol))
 		  (error "No item in subtree"))
@@ -2655,8 +2648,8 @@ Return t if successful."
 		 (= top (point-at-bol))
 		 (cdr (assq 'indent org-list-automatic-rules))
 		 (if no-subtree
-		     (error
-		      "First item of list cannot move without its subtree")
+		     (user-error
+		      "At first item: use S-M-<left/right> to move the whole list")
 		   t))))
       ;; Determine begin and end points of zone to indent.  If moving
       ;; more than one item, save them for subsequent moves.
@@ -3324,23 +3317,28 @@ Valid parameters are:
 
   Strings to start or end a list item, and to start a list item
   with a counter.  They can also be set to a function returning
-  a string or nil, which will be called with the depth of the
-  item, counting from 1.
+  a string or nil, which will be called with two arguments: the
+  type of list and the depth of the item, counting from 1.
 
 :icount
 
   Strings to start a list item with a counter.  It can also be
   set to a function returning a string or nil, which will be
-  called with two arguments: the depth of the item, counting from
-  1, and the counter.  Its value, when non-nil, has precedence
-  over `:istart'.
+  called with three arguments: the type of list, the depth of the
+  item, counting from 1, and the counter.  Its value, when
+  non-nil, has precedence over `:istart'.
 
 :isep
 
   String used to separate items.  It can also be set to
   a function returning a string or nil, which will be called with
-  the depth of the items, counting from 1.  It always start on
-  a new line.
+  two arguments: the type of list and the depth of the item,
+  counting from 1.  It always start on a new line.
+
+:ifmt
+
+  Function to be applied to the contents of every item.  It is
+  called with two arguments: the type of list and the contents.
 
 :cbon, :cboff, :cbtrans
 
@@ -3471,6 +3469,7 @@ PARAMS is a plist used to tweak the behavior of the transcoder."
 	(iend (plist-get params :iend))
 	(isep (plist-get params :isep))
 	(icount (plist-get params :icount))
+	(ifmt (plist-get params :ifmt))
 	(cboff (plist-get params :cboff))
 	(cbon  (plist-get params :cbon))
 	(cbtrans (plist-get params :cbtrans))
@@ -3484,9 +3483,9 @@ PARAMS is a plist used to tweak the behavior of the transcoder."
 	     (tag (org-element-property :tag item))
 	     (depth (org-list--depth item))
 	     (separator (and (org-export-get-next-element item info)
-			     (org-list--generic-eval isep depth)))
-	     (closing (pcase (org-list--generic-eval iend depth)
-			((or `nil `"") "\n")
+			     (org-list--generic-eval isep type depth)))
+	     (closing (pcase (org-list--generic-eval iend type depth)
+			((or `nil "") "\n")
 			((and (guard separator) s)
 			 (if (equal (substring s -1) "\n") s (concat s "\n")))
 			(s s))))
@@ -3503,10 +3502,10 @@ PARAMS is a plist used to tweak the behavior of the transcoder."
 	;; Build output.
 	(concat
 	 (let ((c (org-element-property :counter item)))
-	   (if c (org-list--generic-eval icount depth c)
-	     (org-list--generic-eval istart depth)))
+	   (if (and c icount) (org-list--generic-eval icount type depth c)
+	     (org-list--generic-eval istart type depth)))
 	 (let ((body
-		(if (or istart iend icount cbon cboff cbtrans (not backend)
+		(if (or istart iend icount ifmt cbon cboff cbtrans (not backend)
 			(and (eq type 'descriptive)
 			     (or dtstart dtend ddstart ddend)))
 		    (concat
@@ -3522,7 +3521,11 @@ PARAMS is a plist used to tweak the behavior of the transcoder."
 				    (org-element-interpret-data tag))
 				  dtend))
 		     (and tag ddstart)
-		     (if (= (length contents) 0) "" (substring contents 0 -1))
+		     (let ((contents
+			    (if (= (length contents) 0) ""
+			      (substring contents 0 -1))))
+		       (if ifmt (org-list--generic-eval ifmt type contents)
+			 contents))
 		     (and tag ddend))
 		  (org-export-with-backend backend item contents info))))
 	   ;; Remove final newline.
@@ -3555,6 +3558,25 @@ PARAMS is a property list with overruling parameters for
   (require 'ox-texinfo)
   (org-list-to-generic list (org-combine-plists '(:backend texinfo) params)))
 
+(defun org-list-to-org (list &optional params)
+  "Convert LIST into an Org plain list.
+LIST is as returned by `org-list-parse-list'.  PARAMS is a property list
+with overruling parameters for `org-list-to-generic'."
+  (let* ((make-item
+	  (lambda (type _depth &optional c)
+	    (concat (if (eq type 'ordered) "1. " "- ")
+		    (and c (format "[@%d] " c)))))
+	 (defaults
+	   (list :istart make-item
+		 :icount make-item
+		 :ifmt (lambda (_type contents)
+			 (replace-regexp-in-string "\n" "\n  " contents))
+		 :dtend " :: "
+		 :cbon "[X] "
+		 :cboff "[ ] "
+		 :cbtrans "[-] ")))
+    (org-list-to-generic list (org-combine-plists defaults params))))
+
 (defun org-list-to-subtree (list &optional params)
   "Convert LIST into an Org subtree.
 LIST is as returned by `org-list-to-lisp'.  PARAMS is a property
@@ -3566,7 +3588,7 @@ list with overruling parameters for `org-list-to-generic'."
 			   (org-previous-line-empty-p)))))
 	 (level (org-reduced-level (or (org-current-level) 0)))
 	 (make-stars
-	  (lambda (depth)
+	  (lambda (_type depth &optional _count)
 	    ;; Return the string for the heading, depending on DEPTH
 	    ;; of current sub-list.
 	    (let ((oddeven-level (+ level depth)))

@@ -832,7 +832,7 @@ This is *not* a user option, since Emerge uses it for its own processing.")
 (defun emerge-get-diff3-group (file)
   ;; This save-excursion allows emerge-get-diff3-group to be called for the
   ;; various groups of lines (1, 2, 3) in any order, and for the lines to
-  ;; appear in any order.  The reason this is necessary is that Gnu diff3
+  ;; appear in any order.  The reason this is necessary is that GNU diff3
   ;; can produce the groups in the order 1, 2, 3 or 1, 3, 2.
   (save-excursion
     (re-search-forward
@@ -3171,11 +3171,9 @@ See also `auto-save-file-name-p'."
       (setq limit (1+ (match-end 0)))))
   s)
 
-;; Metacharacters that have to be protected from the shell when executing
-;; a diff/diff3 command.
 (defcustom emerge-metachars nil
-  "Obsolete, emerge now uses `shell-quote-argument'."
-  :type 'regexp
+  "No longer used.  Emerge now uses `shell-quote-argument'."
+  :type '(choice (const nil) regexp)
   :group 'emerge)
 (make-obsolete-variable 'emerge-metachars nil "26.1")
 

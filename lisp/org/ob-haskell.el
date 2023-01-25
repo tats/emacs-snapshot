@@ -1,10 +1,10 @@
 ;;; ob-haskell.el --- Babel Functions for Haskell    -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2009-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2018 Free Software Foundation, Inc.
 
 ;; Author: Eric Schulte
 ;; Keywords: literate programming, reproducible research
-;; Homepage: http://orgmode.org
+;; Homepage: https://orgmode.org
 
 ;; This file is part of GNU Emacs.
 
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -59,14 +59,23 @@
 
 (defvar org-babel-haskell-eoe "\"org-babel-haskell-eoe\"")
 
+(defvar haskell-prompt-regexp)
+
 (defun org-babel-execute:haskell (body params)
   "Execute a block of Haskell code."
+  (require 'inf-haskell)
+  (add-hook 'inferior-haskell-hook
+            (lambda ()
+              (setq-local comint-prompt-regexp
+                          (concat haskell-prompt-regexp "\\|^λ?> "))))
   (let* ((session (cdr (assq :session params)))
          (result-type (cdr (assq :result-type params)))
          (full-body (org-babel-expand-body:generic
 		     body params
 		     (org-babel-variable-assignments:haskell params)))
          (session (org-babel-haskell-initiate-session session params))
+	 (comint-preoutput-filter-functions
+	       (cons 'ansi-color-filter-apply comint-preoutput-filter-functions))
          (raw (org-babel-comint-with-output
 		  (session org-babel-haskell-eoe t full-body)
                 (insert (org-trim full-body))

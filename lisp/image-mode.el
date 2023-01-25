@@ -1,6 +1,6 @@
 ;;; image-mode.el --- support for visiting image files  -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2005-2017 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2018 Free Software Foundation, Inc.
 ;;
 ;; Author: Richard Stallman <rms@gnu.org>
 ;; Keywords: multimedia
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -676,7 +676,7 @@ displays an image file as hex.  `image-minor-mode' provides the key
 to display an image file as the actual image.
 
 You can use `image-mode-as-hex' in `auto-mode-alist' when you want to
-to display an image file as hex initially.
+display an image file as hex initially.
 
 See commands `image-mode' and `image-minor-mode' for more information
 on these modes."

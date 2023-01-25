@@ -1,6 +1,6 @@
 ;;; bibtex.el --- BibTeX mode for GNU Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992, 1994-1999, 2001-2017 Free Software Foundation,
+;; Copyright (C) 1992, 1994-1999, 2001-2018 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Stefan Schoef <schoef@offis.uni-oldenburg.de>
@@ -25,7 +25,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -3871,7 +3871,7 @@ Otherwise display the beginning of entry."
 (defun bibtex-mark-entry ()
   "Put mark at beginning, point at end of current BibTeX entry."
   (interactive)
-  (push-mark (bibtex-beginning-of-entry))
+  (push-mark (bibtex-beginning-of-entry) :activate t)
   (bibtex-end-of-entry))
 
 (defun bibtex-count-entries (&optional count-string-entries)
@@ -4105,10 +4105,10 @@ A prefix arg negates the value of `bibtex-search-entry-globally'."
                     (setq buffer (pop buffer-list)))
           (with-current-buffer buffer
             (if (cdr (assoc-string key bibtex-reference-keys))
-                ;; `bibtex-search-entry' moves point if key found
                 (setq found (bibtex-search-entry key)))))
         (cond ((and found display)
 	       (switch-to-buffer buffer)
+               (goto-char found)
 	       (bibtex-reposition-window))
               (found (set-buffer buffer))
               (display (message "Key `%s' not found" key)))
