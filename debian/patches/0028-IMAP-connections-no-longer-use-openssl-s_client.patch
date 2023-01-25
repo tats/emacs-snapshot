@@ -1,4 +1,4 @@
-From 3a79c1cf4e45ac6e160e31d7fe4b18d9b500583e Mon Sep 17 00:00:00 2001
+From f03db7084fc84ee8616213cfe8e235c87962976d Mon Sep 17 00:00:00 2001
 From: Lars Ingebrigtsen <larsi@gnus.org>
 Date: Sat, 26 Dec 2015 21:45:51 +0100
 Subject: IMAP connections no longer use openssl s_client
@@ -19,7 +19,7 @@ Bug: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=21134
 Bug-Debian: https://bugs.debian.org/766397
 Forwarded: not-needed
 ---
- lisp/net/imap.el | 63 ++++++++++++++++----------------------------------------
+ lisp/net/imap.el | 63 ++++++++++++++----------------------------------
  1 file changed, 18 insertions(+), 45 deletions(-)
 
 diff --git a/lisp/net/imap.el b/lisp/net/imap.el

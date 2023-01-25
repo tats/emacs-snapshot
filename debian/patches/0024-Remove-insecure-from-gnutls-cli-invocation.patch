@@ -1,4 +1,4 @@
-From 235ecd401864645d6c14d0aa381af6a86f94a00c Mon Sep 17 00:00:00 2001
+From e5b545b8e73824cafc6ec7aa2f993931c3cbc789 Mon Sep 17 00:00:00 2001
 From: Lars Ingebrigtsen <larsi@gnus.org>
 Date: Tue, 29 Dec 2015 14:30:53 +0100
 Subject: Remove --insecure from gnutls-cli invocation

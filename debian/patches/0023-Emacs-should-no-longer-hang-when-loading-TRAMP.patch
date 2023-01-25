@@ -1,4 +1,4 @@
-From 95bb76711c2b6fa889d47d59b4173949e9a57200 Mon Sep 17 00:00:00 2001
+From 39120317d85097410a45ea7568857e411722f399 Mon Sep 17 00:00:00 2001
 From: Sean Whitton <spwhitton@spwhitton.name>
 Date: Sun, 10 Jan 2016 12:16:33 -0700
 Subject: Emacs should no longer hang when loading TRAMP
@@ -15,9 +15,9 @@ Forwarded: not-needed
 ---
  lisp/net/tramp-adb.el  |  2 ++
  lisp/net/tramp-gvfs.el |  2 ++
- lisp/net/tramp-sh.el   | 81 +++++++++++++++++++++++++++++++++++++++++++++-----
+ lisp/net/tramp-sh.el   | 81 ++++++++++++++++++++++++++++++++++++++----
  lisp/net/tramp-smb.el  |  6 ++++
- lisp/net/tramp.el      | 51 ++++---------------------------
+ lisp/net/tramp.el      | 51 +++-----------------------
  5 files changed, 89 insertions(+), 53 deletions(-)
 
 diff --git a/lisp/net/tramp-adb.el b/lisp/net/tramp-adb.el

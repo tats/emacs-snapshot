@@ -1,4 +1,4 @@
-From 9ca1f6e83aa65507f6f6c178821d5079ddc88bb5 Mon Sep 17 00:00:00 2001
+From be776683194b5a4e3451232df7c2a5cd58d14531 Mon Sep 17 00:00:00 2001
 From: Lars Ingebrigtsen <larsi@gnus.org>
 Date: Tue, 29 Dec 2015 14:39:53 +0100
 Subject: Refactor out gnutls-trustfiles

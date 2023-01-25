@@ -22,11 +22,11 @@ Author: Rob Browning <rlb@defaultvalue.org>
 Added-by: Rob Browning <rlb@defaultvalue.org>
 Status: new
 ---
- Makefile.in             |  54 ++--
+ Makefile.in             |  54 +--
  admin/update_autogen    |   3 +-
  build-aux/make-info-dir |   3 +-
  configure.ac            |   6 +-
- doc/misc/Makefile.in    | 706 +-----------------------------------------------
+ doc/misc/Makefile.in    | 706 +---------------------------------------
  lisp/help.el            |  10 +-
  6 files changed, 35 insertions(+), 747 deletions(-)
 

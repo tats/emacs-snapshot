@@ -1,4 +1,4 @@
-From d1daaa0d464b4610e0f74553c5a91d1e5193c2ab Mon Sep 17 00:00:00 2001
+From e341eace1e6cfbb82f41fc0b1dab6aed337ad2b3 Mon Sep 17 00:00:00 2001
 From: Paul Eggert <eggert@cs.ucla.edu>
 Date: Tue, 19 Jul 2016 15:23:14 +0200
 Subject: Emacs should (really) work with glibc 2.24 on ppc64

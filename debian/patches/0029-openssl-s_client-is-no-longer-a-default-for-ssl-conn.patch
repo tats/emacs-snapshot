@@ -1,4 +1,4 @@
-From 088b2e039897fcf9e2eea00f580a2c5d87eba781 Mon Sep 17 00:00:00 2001
+From 0fa2885c42b33fccd43c11cf705f387f00ac9ebe Mon Sep 17 00:00:00 2001
 From: Rob Browning <rlb@defaultvalue.org>
 Date: Sat, 22 Apr 2017 12:02:00 -0500
 Subject: openssl s_client is no longer a default for ssl connections

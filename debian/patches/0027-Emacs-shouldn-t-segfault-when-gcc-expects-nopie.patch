@@ -1,4 +1,4 @@
-From c91f2fca460e04c1d47ec1b5db1ca3b8130b95f8 Mon Sep 17 00:00:00 2001
+From 72db2dd83a887a8ae30b9884bb4e674be697a15c Mon Sep 17 00:00:00 2001
 From: Paul Eggert <eggert@cs.ucla.edu>
 Date: Sun, 16 Oct 2016 16:25:47 -0700
 Subject: Emacs shouldn't segfault when gcc expects -nopie

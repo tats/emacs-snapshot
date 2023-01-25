@@ -1,4 +1,4 @@
-From a3951c32e009143b12d90ea0b219b9019a0102c5 Mon Sep 17 00:00:00 2001
+From 194216e6a1e7e3b30adb1be0166b5ad9ca33dc06 Mon Sep 17 00:00:00 2001
 From: Lars Ingebrigtsen <larsi@gnus.org>
 Date: Tue, 29 Dec 2015 14:46:20 +0100
 Subject: Make tls.el use trustfiles by default

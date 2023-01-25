@@ -21,7 +21,7 @@ Bug: http://debbugs.gnu.org/20614
 Bug-Debian: http://bugs.debian.org/808347
 Added-by: Rob Browning <rlb@defaultvalue.org>
 ---
- src/unexelf.c | 96 ++++++++++++++++++-----------------------------------------
+ src/unexelf.c | 96 ++++++++++++++++-----------------------------------
  1 file changed, 29 insertions(+), 67 deletions(-)
 
 diff --git a/src/unexelf.c b/src/unexelf.c

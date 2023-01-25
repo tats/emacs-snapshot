@@ -1,4 +1,4 @@
-From d4a257411a7c23c2ed75c3e163243fd0e92dc2be Mon Sep 17 00:00:00 2001
+From 81c02902a3ae8e44fdc4e93751ac07a3ac0f2cf0 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Jan=20Dj=C3=A4rv?= <jan.h.d@swipnet.se>
 Date: Sat, 18 Oct 2014 18:19:53 +0200
 Subject: Emacs should show GTK+ icons again.
@@ -45,9 +45,9 @@ Bug-Debian: http://bugs.debian.org/828000
 Added-by: Rob Browning <rlb@defaultvalue.org>
 ---
  lisp/ChangeLog     |   6 +
- lisp/term/x-win.el |  63 ++++----
+ lisp/term/x-win.el |  63 +++----
  src/ChangeLog      |  31 ++++
- src/gtkutil.c      | 421 +++++++++++------------------------------------------
+ src/gtkutil.c      | 421 +++++++++------------------------------------
  src/gtkutil.h      |   2 -
  src/xmenu.c        |   6 -
  src/xterm.h        |   4 -

@@ -1,4 +1,4 @@
-From f07b5081dc17404b73acfc9da576d9746d276b7a Mon Sep 17 00:00:00 2001
+From 6a417ce5f2208bab8e8b3ac5827e3c3332800677 Mon Sep 17 00:00:00 2001
 From: Wolfgang Jenkner <wjenkner@inode.at>
 Date: Sat, 26 Dec 2015 12:12:02 -0800
 Subject: Emacs should work with gcc 5.2 and newer
