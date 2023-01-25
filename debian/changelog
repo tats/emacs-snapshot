@@ -1,3 +1,11 @@
+emacs26 (3:26.1+0.20180525-0.0) UNRELEASED; urgency=medium
+
+  [ Tatsuya Kinoshita ]
+  * New upstream version 26.1+0.20180525
+    - emacs-26 branch, emacs-26.1 on 2018-05-25
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Thu, 26 Jan 2023 01:09:25 +0900
+
 emacs-snapshot (2:20170910+emacs-25.1-129986-ge7165389112-1) unstable; urgency=medium
 
   * New snapshot
