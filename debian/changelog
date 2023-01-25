@@ -1,3 +1,12 @@
+emacs24 (24.5+1-11+0.1) UNRELEASED; urgency=medium
+
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Downgrade bin_priority to 26, less than emacs and emacs-snapshot
+  * Do not provide flavor name to avoid conflicts
+  * Rename package names to avoid conflicts
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Wed, 25 Jan 2023 21:25:54 +0900
+
 emacs24 (24.5+1-11) unstable; urgency=medium
 
   * emacs-common: add "Breaks: mell (<= 1.0.0-7)".  Apparently it was
