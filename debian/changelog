@@ -1,10 +1,30 @@
-emacs26 (3:26.1+0.20180525-0.0) UNRELEASED; urgency=medium
+emacs26 (3:26.1+0.20180525-0.1) UNRELEASED; urgency=medium
+
+  [ Rob Browning ]
+  * Install emacs.appdata.xml as $(flavor).appdata.xml
+  * Drop emacs23 icons to avoid future path conflicts
+
+  [ Dima Kogan ]
+  * Forcing quilt tp generate prefixes regardless of user config
+  * I build with systemd
+
+  [ Paul Eggert ]
+  * Port alternate signal stack to upcoming glibc 2.34
 
   [ Tatsuya Kinoshita ]
   * New upstream version 26.1+0.20180525
     - emacs-26 branch, emacs-26.1 on 2018-05-25
+  * Use flavor for emacs.service
+  * Update debian/changelog to emacs26
+  * Mention the Savannah site instead of the FTP sites in debian/copyright
+  * Generate debian/control and debian/copyright with debian-sync
+  * Rename emacs-snapshot to emacs26 for debian-emacs-flavor
+  * Remove unneeded patches
+  * Adjust patches
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Downgrade bin_priority to 26, less than emacs and emacs-snapshot
 
- -- Tatsuya Kinoshita <tats@debian.org>  Thu, 26 Jan 2023 01:09:25 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Thu, 26 Jan 2023 23:57:30 +0900
 
 emacs-snapshot (2:20170910+emacs-25.1-129986-ge7165389112-1) unstable; urgency=medium
 
