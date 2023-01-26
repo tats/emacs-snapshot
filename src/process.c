@@ -1,6 +1,6 @@
 /* Asynchronous subprocess control for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-1996, 1998-1999, 2001-2019 Free Software
+Copyright (C) 1985-1988, 1993-1996, 1998-1999, 2001-2020 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -6095,7 +6095,10 @@ read_process_output (Lisp_Object proc, int channel)
   if (nbytes <= 0)
     {
       if (nbytes < 0 || coding->mode & CODING_MODE_LAST_BLOCK)
-	return SAFE_FREE_UNBIND_TO (count, nbytes);
+	{
+	  SAFE_FREE_UNBIND_TO (count, Qnil);
+	  return nbytes;
+	}
       coding->mode |= CODING_MODE_LAST_BLOCK;
     }
 

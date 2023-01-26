@@ -1,6 +1,6 @@
 ;;; gnus-art.el --- article mode commands for Gnus
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -268,21 +268,15 @@ This can also be a list of the above values."
   :type 'plist
   :group 'gnus-article-hiding)
 
-;; Fixme: This isn't the right thing for mixed graphical and non-graphical
-;; frames in a session.
-(defcustom gnus-article-x-face-command
-  (if (gnus-image-type-available-p 'pbm)
-      'gnus-display-x-face-in-from
-    "{ echo \
-'/* Format_version=1, Width=48, Height=48, Depth=1, Valid_bits_per_item=16 */'\
-; uncompface; } | icontopbm | display -")
+(defcustom gnus-article-x-face-command (and (gnus-image-type-available-p 'pbm)
+					    'gnus-display-x-face-in-from)
   "String or function to be executed to display an X-Face header.
 If it is a string, the command will be executed in a sub-shell
 asynchronously.  The compressed face will be piped to this command."
   :type '(choice string
 		 (function-item gnus-display-x-face-in-from)
 		 function)
-  :version "21.1"
+  :version "27.1"
   :group 'gnus-picon
   :group 'gnus-article-washing)
 
@@ -7780,11 +7774,11 @@ also be Lisp expression evaluating to a string),
 BUTTON: is the number of the regexp grouping actually matching the button,
 FORM: is a Lisp expression which must eval to true for the button to
 be added,
-CALLBACK: is the function to call when the user push this button, and each
+CALLBACK: is the function to call when the user pushes this button, and each
 PAR: is a number of a regexp grouping whose text will be passed to CALLBACK.
 
-CALLBACK can also be a variable, in that case the value of that
-variable it the real callback function."
+CALLBACK can also be a variable, in which case the value of that
+variable is the real callback function."
   :group 'gnus-article-buttons
   :type '(repeat (list (choice regexp variable sexp)
 		       (integer :tag "Button")

@@ -1,6 +1,6 @@
 ;;; timer.el --- run a function with args at some time in future -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996, 2001-2020 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -378,7 +378,7 @@ This function returns a timer object which you can use in
                                  (decoded-time-year now)
                                  (decoded-time-zone now)))))))
 
-  (or (consp time)
+  (or (time-equal-p time time)
       (error "Invalid time format"))
 
   (let ((timer (timer-create)))

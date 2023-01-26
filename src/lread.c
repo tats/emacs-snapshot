@@ -1,6 +1,6 @@
 /* Lisp parsing and input streams.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2019 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1995, 1997-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -4919,7 +4919,7 @@ features required.  Each entry has the form `(provide . FEATURE)',
 `(defface . SYMBOL)', `(define-type . SYMBOL)',
 `(cl-defmethod METHOD SPECIALIZERS)', or `(t . SYMBOL)'.
 Entries like `(t . SYMBOL)' may precede a `(defun . FUNCTION)' entry,
-and means that SYMBOL was an autoload before this file redefined it
+and mean that SYMBOL was an autoload before this file redefined it
 as a function.  In addition, entries may also be single symbols,
 which means that symbol was defined by `defvar' or `defconst'.
 
@@ -5055,7 +5055,7 @@ that are loaded before your customizations are read!  */);
 If nil, `load' and `read' raise errors when encountering some
 old-style variants of backquote and comma.  If non-nil, these
 constructs are always interpreted as described in the Info node
-`(elisp)Backquotes', even if that interpretation is incompatible with
+`(elisp)Backquote', even if that interpretation is incompatible with
 previous versions of Emacs.  Setting this variable to non-nil makes
 Emacs compatible with the behavior planned for Emacs 28.  In Emacs 28,
 this variable will become obsolete.  */);

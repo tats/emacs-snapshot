@@ -1,6 +1,6 @@
 ;;; gv.el --- generalized variables  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2020 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: extensions
@@ -24,7 +24,7 @@
 ;;; Commentary:
 
 ;; This is a re-implementation of the setf machinery using a different
-;; underlying approach than the one used earlier in CL, which was based on
+;; underlying approach from the one used earlier in CL, which was based on
 ;; define-setf-expander.
 ;; `define-setf-expander' makes every "place-expander" return a 5-tuple
 ;;   (VARS VALUES STORES GETTER SETTER)
@@ -38,7 +38,7 @@
 ;;
 ;; Instead, we use here a higher-order approach: instead
 ;; of a 5-tuple, a place-expander returns a function.
-;; If you think about types, the old approach return things of type
+;; If you think about types, the old approach returns things of type
 ;;    {vars: List Var, values: List Exp,
 ;;     stores: List Var, getter: Exp, setter: Exp}
 ;; whereas the new approach returns a function of type

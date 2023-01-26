@@ -1,6 +1,6 @@
 /* NeXT/Open/GNUstep / macOS communication module.      -*- coding: utf-8 -*-
 
-Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2019 Free Software
+Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2020 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -1644,6 +1644,7 @@ ns_free_frame_resources (struct frame *f)
   [view release];
 
   xfree (f->output_data.ns);
+  f->output_data.ns = NULL;
 
   unblock_input ();
 }
@@ -2290,24 +2291,19 @@ ns_lisp_to_color (Lisp_Object color, NSColor **col)
 
 /* Convert an index into the color table into an RGBA value.  Used in
    xdisp.c:extend_face_to_end_of_line when comparing faces and frame
-   color values.  No-op on non-gui frames.  */
+   color values.  */
 
 unsigned long
 ns_color_index_to_rgba(int idx, struct frame *f)
 {
-  if (FRAME_DISPLAY_INFO (f))
-    {
-      NSColor *col;
-      col = ns_lookup_indexed_color (idx, f);
+  NSColor *col;
+  col = ns_lookup_indexed_color (idx, f);
 
-      EmacsCGFloat r, g, b, a;
-      [col getRed: &r green: &g blue: &b alpha: &a];
+  EmacsCGFloat r, g, b, a;
+  [col getRed: &r green: &g blue: &b alpha: &a];
 
-      return ARGB_TO_ULONG((int)(a*255),
-                           (int)(r*255), (int)(g*255), (int)(b*255));
-    }
-  else
-    return idx;
+  return ARGB_TO_ULONG((int)(a*255),
+                       (int)(r*255), (int)(g*255), (int)(b*255));
 }
 
 void
@@ -5136,6 +5132,13 @@ ns_initialize_display_info (struct ns_display_info *dpyinfo)
     reset_mouse_highlight (&dpyinfo->mouse_highlight);
 }
 
+/* This currently does nothing, since it's only really needed when
+   changing the font-backend, but macOS currently only has one
+   possible backend.  This may change if we add HarfBuzz support.  */
+static void
+ns_default_font_parameter (struct frame *f, Lisp_Object parms)
+{
+}
 
 /* This and next define (many of the) public functions in this file.  */
 /* gui_* are generic versions in xdisp.c that we, and other terms, get away
@@ -5171,7 +5174,8 @@ static struct redisplay_interface ns_redisplay_interface =
   ns_draw_window_divider,
   ns_shift_glyphs_for_insert,
   ns_show_hourglass,
-  ns_hide_hourglass
+  ns_hide_hourglass,
+  ns_default_font_parameter
 };
 
 
@@ -5808,6 +5812,21 @@ ns_term_shutdown (int sig)
 #endif
 
 #ifdef NS_IMPL_COCOA
+  /* Some functions/methods in CoreFoundation/Foundation increase the
+     maximum number of open files for the process in their first call.
+     We make dummy calls to them and then reduce the resource limit
+     here, since pselect cannot handle file descriptors that are
+     greater than or equal to FD_SETSIZE.  */
+  CFSocketGetTypeID ();
+  CFFileDescriptorGetTypeID ();
+  [[NSFileHandle alloc] init];
+  struct rlimit rlim;
+  if (getrlimit (RLIMIT_NOFILE, &rlim) == 0
+      && rlim.rlim_cur > FD_SETSIZE)
+    {
+      rlim.rlim_cur = FD_SETSIZE;
+      setrlimit (RLIMIT_NOFILE, &rlim);
+    }
   if ([NSApp activationPolicy] == NSApplicationActivationPolicyProhibited) {
     /* Set the app's activation policy to regular when we run outside
        of a bundle.  This is already done for us by Info.plist when we

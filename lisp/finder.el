@@ -1,6 +1,6 @@
 ;;; finder.el --- topic & keyword-based code finder
 
-;; Copyright (C) 1992, 1997-1999, 2001-2019 Free Software Foundation,
+;; Copyright (C) 1992, 1997-1999, 2001-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
@@ -188,7 +188,7 @@ from; the default is `load-path'."
   ;; Allow compressed files also.
   (setq package--builtins nil)
   (setq finder-keywords-hash (make-hash-table :test 'eq))
-  (let* ((el-file-regexp "^\\([^=].*\\)\\.el\\(\\.\\(gz\\|Z\\)\\)?$")
+  (let* ((el-file-regexp "\\`\\([^=].*\\)\\.el\\(\\.\\(gz\\|Z\\)\\)?\\'")
          (file-count 0)
          (files (cl-loop for d in (or dirs load-path)
                          when (file-exists-p (directory-file-name d))

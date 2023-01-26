@@ -1,6 +1,6 @@
 ;;; em-prompt.el --- command prompts  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -97,19 +97,7 @@ arriving, or after."
   :options '(eshell-show-maximum-output)
   :group 'eshell-prompt)
 
-(defvar eshell-prompt-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-n") #'eshell-next-prompt)
-    (define-key map (kbd "C-c C-p") #'eshell-previous-prompt)
-    map))
-
 ;;; Functions:
-
-(define-minor-mode eshell-prompt-mode
-  "Minor mode for eshell-prompt module.
-
-\\{eshell-prompt-mode-map}"
-  :keymap eshell-prompt-mode-map)
 
 (defun eshell-prompt-initialize ()  ;Called from `eshell-mode' via intern-soft!
   "Initialize the prompting code."
@@ -122,7 +110,9 @@ arriving, or after."
 
     (set (make-local-variable 'eshell-skip-prompt-function)
 	 'eshell-skip-prompt)
-    (eshell-prompt-mode)))
+
+    (define-key eshell-command-map [(control ?n)] 'eshell-next-prompt)
+    (define-key eshell-command-map [(control ?p)] 'eshell-previous-prompt)))
 
 (defun eshell-emit-prompt ()
   "Emit a prompt if eshell is being used interactively."
@@ -187,7 +177,7 @@ See `eshell-prompt-regexp'."
   "Move to end of Nth previous prompt in the buffer.
 See `eshell-prompt-regexp'."
   (interactive "p")
-  (beginning-of-line)            ; Don't count prompt on current line.
+  (forward-line 0)            ; Don't count prompt on current line.
   (eshell-next-prompt (- n)))
 
 (defun eshell-skip-prompt ()

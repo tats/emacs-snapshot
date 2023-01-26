@@ -12,7 +12,7 @@
 @footnotestyle end
 
 @copying
-Copyright @copyright{} 1999--2019 Free Software Foundation, Inc.
+Copyright @copyright{} 1999--2020 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -1687,10 +1687,11 @@ Integration for LXD containers.  A container is accessed via
 @item magit-tramp
 @cindex method @option{git}
 @cindex @option{git} method
-Browing git repositories with @code{magit}.  A versioned file is accessed via
-@file{@trampfn{git,rev@@root-dir,/path/to/file}}.  @samp{rev} is a git
-revision, and @samp{root-dir} is a virtual host name for the root
-directory, specified in @code{magit-tramp-hosts-alist}.
+Browsing git repositories with @code{magit}.  A versioned file is
+accessed via @file{@trampfn{git,rev@@root-dir,/path/to/file}}.
+@samp{rev} is a git revision, and @samp{root-dir} is a virtual host
+name for the root directory, specified in
+@code{magit-tramp-hosts-alist}.
 
 @item tramp-hdfs
 @cindex method @option{hdfs}
@@ -2022,6 +2023,12 @@ connection is disabled for security reasons, and must be
 reestablished.  A value of @code{nil} disables this feature.  Most of
 the methods do not set this property except the @option{sudo} and
 @option{doas} methods, which use predefined values.
+
+@item @t{"tmpdir"}
+
+The temporary directory on the remote host.  If not specified, the
+default value is @t{"/data/local/tmp"} for the @option{adb} method,
+@t{"/C$/Temp"} for the @option{smb} method, and @t{"/tmp"} otherwise.
 
 @item @t{"posix"}
 
@@ -3753,6 +3760,14 @@ It is even possible to access file archives in file archives, as
 @end group
 @end lisp
 
+@vindex tramp-archive-enabled
+In order to disable file archives, you could add the following form to
+your init file:
+
+@lisp
+(customize-set-variable 'tramp-archive-enabled nil)
+@end lisp
+
 
 @node Bug Reports
 @chapter Reporting Bugs and Problems
@@ -3799,7 +3814,11 @@ help the development team find the best solution and avoid unrelated
 detours.
 
 To exclude cache-related problems, flush all caches before running the
-test, @ref{Cleanup remote connections}.
+test, @ref{Cleanup remote connections}.  Alternatively, and often
+better for analysis, reproduce the problem in a clean Emacs session
+started with @command{emacs -Q}.  Then, @value{tramp} does not load
+the persistency file (@pxref{Connection caching}), and it does not use
+passwords from @file{auth-source.el} (@pxref{Password handling}).
 
 When including @value{tramp}'s messages in the bug report, increase
 the verbosity level to 6 (@pxref{Traces and Profiles, Traces}) in the
@@ -3807,7 +3826,8 @@ the verbosity level to 6 (@pxref{Traces and Profiles, Traces}) in the
 contents of the @file{*tramp/foo*} and @file{*debug tramp/foo*}
 buffers with the bug report.  Both buffers could contain
 non-@acronym{ASCII} characters which are relevant for analysis, append
-the buffers as attachments to the bug report.
+the buffers as attachments to the bug report.  This is also needed in
+order to avoid line breaks during mail transfer.
 
 @strong{Note} that a verbosity level greater than 6 is not necessary
 at this stage.  Also note that a verbosity level of 6 or greater, the
@@ -4080,6 +4100,31 @@ this @code{nil} setting:
 @lisp
 (customize-set-variable 'tramp-use-ssh-controlmaster-options nil)
 @end lisp
+
+
+@item
+On multi-hop connections, @value{tramp} does not use @command{ssh}
+@code{ControlMaster}
+
+In order to use the @code{ControlMaster} option, @value{tramp} must
+check whether the @command{ssh} client supports this option.  This is
+only possible on the local host, for the first hop.  @value{tramp}
+does not use this option on proxy hosts.
+
+If you want to use this option also for the other hops, you must
+configure @file{~/.ssh/config} on the proxy host:
+
+@example
+@group
+Host *
+     ControlMaster	auto
+     ControlPath	tramp.%C
+     ControlPersist	no
+@end group
+@end example
+
+Check @command{man ssh_config} whether these options are supported on
+your proxy host.
 
 
 @item
@@ -4604,6 +4649,12 @@ in @file{.emacs}:
 
 @lisp
 (customize-set-variable 'tramp-default-method "ftp")
+@end lisp
+
+If you want to enable Ange FTP's syntax, add the following form:
+
+@lisp
+(tramp-change-syntax 'simplified)
 @end lisp
 
 @item

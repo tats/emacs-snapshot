@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2019 Free Software Foundation, Inc.
+/* Copyright (C) 2018-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -4003,6 +4003,11 @@ types.  */)
      (Lisp_Object filename, Lisp_Object track_referrers)
 {
   eassert (initialized);
+
+  if (! noninteractive)
+    error ("Dumping Emacs currently works only in batch mode.  "
+           "If you'd like it to work interactively, please consider "
+           "contributing a patch to Emacs.");
 
   if (will_dump_with_unexec_p ())
     error ("This Emacs instance was started under the assumption "

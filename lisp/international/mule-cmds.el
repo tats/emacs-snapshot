@@ -1,6 +1,6 @@
 ;;; mule-cmds.el --- commands for multilingual environment  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2020 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -2988,7 +2988,9 @@ on encoding."
                (#x16FE0 . #x16FE3)
                ;; (#x17000 . #x187FF) Tangut Ideographs
                ;; (#x18800 . #x18AFF) Tangut Components
-	       ;; (#x18B00 . #x1AFFF) unused
+               ;; (#x18B00 . #x18CFF) Khitan Small Script
+               ;; (#x18D00 . #x18D0F) Tangut Ideograph Supplement
+	       ;; (#x18D10 . #x1AFFF) unused
 	       (#x1B000 . #x1B11F)
                ;; (#x1B120 . #x1B14F) unused
                (#x1B150 . #x1B16F)

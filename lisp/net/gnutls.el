@@ -1,6 +1,6 @@
 ;;; gnutls.el --- Support SSL/TLS connections through GnuTLS
 
-;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2020 Free Software Foundation, Inc.
 
 ;; Author: Ted Zlatanov <tzz@lifelogs.com>
 ;; Keywords: comm, tls, ssl, encryption
@@ -105,12 +105,13 @@ Security'."
 
 (defcustom gnutls-trustfiles
   '(
-    "/etc/ssl/certs/ca-certificates.crt"     ; Debian, Ubuntu, Gentoo and Arch Linux
+    "/etc/ssl/certs/ca-certificates.crt"     ; Debian, Ubuntu, Gentoo,
+                                             ; Arch, Guix, Parabola
     "/etc/pki/tls/certs/ca-bundle.crt"       ; Fedora and RHEL
     "/etc/ssl/ca-bundle.pem"                 ; Suse
     "/usr/ssl/certs/ca-bundle.crt"           ; Cygwin
     "/usr/local/share/certs/ca-root-nss.crt" ; FreeBSD
-    "/etc/ssl/cert.pem"                      ; macOS
+    "/etc/ssl/cert.pem"                      ; macOS, Dragora, Parabola
     "/etc/certs/ca-certificates.crt"         ; OpenIndiana
     )
   "List of CA bundle location filenames or a function returning said list.

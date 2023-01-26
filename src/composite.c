@@ -1,5 +1,5 @@
 /* Composite sequence support.
-   Copyright (C) 2001-2019 Free Software Foundation, Inc.
+   Copyright (C) 2001-2020 Free Software Foundation, Inc.
    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H14PRO021
@@ -818,6 +818,11 @@ fill_gstring_body (Lisp_Object gstring)
   Lisp_Object header = AREF (gstring, 0);
   ptrdiff_t len = LGSTRING_CHAR_LEN (gstring);
   ptrdiff_t i;
+  struct font *font = NULL;
+  unsigned int code;
+
+  if (FONT_OBJECT_P (font_object))
+    font = XFONT_OBJECT (font_object);
 
   for (i = 0; i < len; i++)
     {
@@ -832,10 +837,15 @@ fill_gstring_body (Lisp_Object gstring)
       LGLYPH_SET_FROM (g, i);
       LGLYPH_SET_TO (g, i);
       LGLYPH_SET_CHAR (g, c);
-      if (FONT_OBJECT_P (font_object))
-	{
-	  font_fill_lglyph_metrics (g, font_object);
-	}
+
+      if (font != NULL)
+        code = font->driver->encode_char (font, LGLYPH_CHAR (g));
+      else
+        code = FONT_INVALID_CODE;
+      if (code != FONT_INVALID_CODE)
+        {
+	  font_fill_lglyph_metrics (g, font, code);
+        }
       else
 	{
 	  int width = XFIXNAT (CHAR_TABLE_REF (Vchar_width_table, c));
@@ -1161,7 +1171,9 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos, 
    character to check, and CHARPOS and BYTEPOS are indices in the
    string.  In that case, FACE must not be NULL.  BIDI_LEVEL is the bidi
    embedding level of the current paragraph, and is used to calculate the
-   direction argument to pass to the font shaper.
+   direction argument to pass to the font shaper; value of -1 means the
+   caller doesn't know the embedding level (used by callers which didn't
+   invoke the display routines that perform bidi-display-reordering).
 
    If the character is composed, setup members of CMP_IT (id, nglyphs,
    from, to, reversed_p), and return true.  Otherwise, update
@@ -1207,7 +1219,9 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 	continue;
       if (charpos < endpos)
 	{
-	  if ((bidi_level & 1) == 0)
+	  if (bidi_level < 0)
+	    direction = Qnil;
+	  else if ((bidi_level & 1) == 0)
 	    direction = QL2R;
 	  else
 	    direction = QR2L;
@@ -1244,7 +1258,16 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 	      else
 		bpos = CHAR_TO_BYTE (cpos);
 	    }
-	  if ((bidi_level & 1) == 0)
+	  /* The bidi_level < 0 case below strictly speaking should
+	     never happen, since we get here when bidi scan direction
+	     is backward in the buffer, which can only happen if the
+	     display routines were called to perform the bidi
+	     reordering.  But it doesn't harm to test for that, and
+	     avoid someon raising their brows and thinking it's a
+	     subtle bug...  */
+	  if (bidi_level < 0)
+	    direction = Qnil;
+	  else if ((bidi_level & 1) == 0)
 	    direction = QL2R;
 	  else
 	    direction = QR2L;

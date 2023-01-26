@@ -1,6 +1,6 @@
 ;;; mml.el --- A package for parsing and validating MML documents
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is part of GNU Emacs.
@@ -281,7 +281,7 @@ part.  This is for the internal use, you should never modify the value.")
 	    (setq tag (mml-read-tag)
 		  no-markup-p nil
 		  warn nil)
-	  (setq tag (list 'part '(type . "text/plain"))
+	  (setq tag (list 'part (cons 'type "text/plain"))
 		no-markup-p t
 		warn t))
 	(setq raw (cdr (assq 'raw tag))

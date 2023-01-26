@@ -1,5 +1,5 @@
 /* Buffer insertion/deletion and gap motion for GNU Emacs. -*- coding: utf-8 -*-
-   Copyright (C) 1985-1986, 1993-1995, 1997-2019 Free Software
+   Copyright (C) 1985-1986, 1993-1995, 1997-2020 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -2397,7 +2397,13 @@ This affects `before-change-functions' and `after-change-functions',
 as well as hooks attached to text properties and overlays.
 Setting this variable non-nil also inhibits file locks and checks
 whether files are locked by another Emacs session, as well as
-handling of the active region per `select-active-regions'.  */);
+handling of the active region per `select-active-regions'.
+
+To delay change hooks during a series of changes, use
+`combine-change-calls' or `combine-after-change-calls' instead of
+binding this variable.
+
+See also the info node `(elisp) Change Hooks'.  */);
   inhibit_modification_hooks = 0;
   DEFSYM (Qinhibit_modification_hooks, "inhibit-modification-hooks");
 

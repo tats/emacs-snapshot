@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Buffers
@@ -12,6 +12,10 @@ the file's text.  Each time you invoke Dired, a buffer is used to hold
 the directory listing.  If you send a message with @kbd{C-x m}, a
 buffer is used to hold the text of the message.  When you ask for a
 command's documentation, that appears in a buffer named @file{*Help*}.
+
+  Buffers exist as long as they are in use, and are deleted
+(``killed'') when no longer needed, either by you (@pxref{Kill
+Buffer}) or by Emacs (e.g., when you exit Emacs, @pxref{Exiting}).
 
   Each buffer has a unique name, which can be of any length.  When a
 buffer is displayed in a window, its name is shown in the mode line
@@ -308,6 +312,8 @@ Offer to kill all buffers matching a regular expression.
 
 @findex kill-buffer
 @kindex C-x k
+@cindex killing unsaved buffers
+@cindex unsaved buffers, killing
   @kbd{C-x k} (@code{kill-buffer}) kills one buffer, whose name you
 specify in the minibuffer.  The default, used if you type just
 @key{RET} in the minibuffer, is to kill the current buffer.  If you
@@ -735,7 +741,14 @@ Ido'').  Among other things, in Fido mode, @kbd{C-s} and @kbd{C-r} are
 also used to rotate the completions list, @kbd{C-k} can be used to
 delete files and kill buffers in-list.  Another noteworthy aspect is
 that @code{flex} is used as the default completion style
-(@pxref{Completion Styles}).
+(@pxref{Completion Styles}).  To change this, add the following to
+your initialization file (@pxref{Init File}):
+
+@example
+(defun my-icomplete-styles ()
+  (setq-local completion-styles '(initials flex)))
+(add-hook 'icomplete-minibuffer-setup-hook 'my-icomplete-styles)
+@end example
 
   To enable Fido mode, type @kbd{M-x fido-mode}, or customize
 the variable @code{fido-mode} to @code{t} (@pxref{Easy

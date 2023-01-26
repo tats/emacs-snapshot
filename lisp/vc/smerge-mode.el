@@ -1,6 +1,6 @@
 ;;; smerge-mode.el --- Minor mode to resolve diff3 conflicts -*- lexical-binding: t -*-
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: vc, tools, revision control, merge, diff3, cvs, conflict
@@ -797,7 +797,10 @@ An error is raised if not inside a conflict."
 	       (filename (or (match-string 1) ""))
 
 	       (_ (re-search-forward smerge-end-re))
-	       (_ (cl-assert (< orig-point (match-end 0))))
+	       (_ (when (< (match-end 0) orig-point)
+	            ;; Point is not within the conflict we found,
+                    ;; so this conflict is not ours.
+	            (signal 'search-failed (list smerge-begin-re))))
 
 	       (lower-end (match-beginning 0))
 	       (end (match-end 0))

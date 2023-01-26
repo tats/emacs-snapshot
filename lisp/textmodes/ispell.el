@@ -1,6 +1,6 @@
 ;;; ispell.el --- interface to spell checkers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-1995, 1997-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1995, 1997-2020 Free Software Foundation, Inc.
 
 ;; Author: Ken Stevens <k.stevens@ieee.org>
 
@@ -800,8 +800,8 @@ Otherwise returns the library directory name, if that is defined."
 
 (defun ispell-create-debug-buffer (&optional append)
   "Create an ispell debug buffer for debugging output.
-If APPEND is non-nil, append the info to previous buffer if exists,
-otherwise is reset.  Returns name of ispell debug buffer.
+If APPEND is non-nil, add output to the old buffer if it exists,
+otherwise the buffer is erased first.  Returns the debug buffer.
 See `ispell-buffer-with-debug' for an example of use."
   (let ((ispell-debug-buffer (get-buffer-create "*ispell-debug*")))
     (with-current-buffer ispell-debug-buffer
@@ -812,7 +812,7 @@ See `ispell-buffer-with-debug' for an example of use."
     ispell-debug-buffer))
 
 (defsubst ispell-print-if-debug (format &rest args)
-  "Print message using FORMAT and ARGS to `ispell-debug-buffer' buffer if enabled."
+  "Print message using FORMAT and ARGS to `ispell-debug-buffer' if enabled."
   (if (boundp 'ispell-debug-buffer)
       (with-current-buffer ispell-debug-buffer
 	(goto-char (point-max))
@@ -1951,18 +1951,7 @@ quit          spell session exited."
       (or quietly
 	  (message "Checking spelling of %s..."
 		   (funcall ispell-format-word-function word)))
-      (ispell-send-string "%\n")	; put in verbose mode
-      (ispell-send-string (concat "^" word "\n"))
-      ;; wait until ispell has processed word
-      (while (progn
-	       (ispell-accept-output)
-	       (not (string= "" (car ispell-filter)))))
-      ;;(ispell-send-string "!\n") ;back to terse mode.
-      (setq ispell-filter (cdr ispell-filter)) ; remove extra \n
-      (if (and ispell-filter (listp ispell-filter))
-	  (if (> (length ispell-filter) 1)
-	      (error "Ispell and its process have different character maps")
-	    (setq poss (ispell-parse-output (car ispell-filter)))))
+      (setq poss (ispell--run-on-word word))
       (cond ((eq poss t)
 	     (or quietly
 		 (message "%s is correct"
@@ -2024,6 +2013,43 @@ quit          spell session exited."
       (goto-char cursor-location)	; return to original location
       replace))))
 
+(defun ispell--run-on-word (word)
+  "Run ispell on WORD."
+  (ispell-send-string "%\n")	; Put the speller in verbose mode.
+  (ispell-send-string (concat "^" word "\n"))
+  ;; wait until ispell has processed word
+  (while (progn
+           (ispell-accept-output)
+           (not (string= "" (car ispell-filter)))))
+  (setq ispell-filter (cdr ispell-filter))
+  (when (and ispell-filter (listp ispell-filter))
+    (if (> (length ispell-filter) 1)
+        (error "Ispell and its process have different character maps: %s" ispell-filter)
+      (ispell-parse-output (car ispell-filter)))))
+
+(defun ispell-error-checking-word (word)
+  "Return a string describing that checking for WORD failed."
+  (format "Error checking word %s using %s with %s dictionary"
+          (funcall ispell-format-word-function word)
+          (file-name-nondirectory ispell-program-name)
+          (or ispell-current-dictionary "default")))
+
+(defun ispell-correct-p (&optional following)
+  "Return t if the word at point is correct, nil otherwise.
+
+If optional argument FOLLOWING is non-nil then the following
+word (rather than preceding) is checked when the cursor is not
+over a word."
+  (save-excursion
+    ;; Reset ispell-filter so it only contains the result of
+    ;; spell-checking the current-word:
+    (setq ispell-filter nil)
+    (let* ((word-and-boundaries (ispell-get-word following))
+           (word (car word-and-boundaries))
+           (poss (ispell--run-on-word word)))
+      (unless poss (error (ispell-error-checking-word word)))
+      (or (eq poss t)
+          (stringp poss)))))
 
 (defun ispell-get-word (following &optional extra-otherchars)
   "Return the word for spell-checking according to ispell syntax.
@@ -3592,8 +3618,8 @@ Returns the sum SHIFT due to changes in word replacements."
 
 ;;;###autoload
 (defun ispell-buffer-with-debug (&optional append)
-  "`ispell-buffer' with some output sent to `ispell-debug-buffer' buffer.
-If APPEND is non-n il, append the info to previous buffer if exists."
+  "`ispell-buffer' with some output sent to `ispell-debug-buffer'.
+If APPEND is non-nil, don't erase previous debugging output."
   (interactive)
   (let ((ispell-debug-buffer (ispell-create-debug-buffer append)))
     (ispell-buffer)))

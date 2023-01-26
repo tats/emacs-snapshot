@@ -1,11 +1,11 @@
 ;;; erc-fill.el --- Filling IRC messages in various ways
 
-;; Copyright (C) 2001-2004, 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2004, 2006-2020 Free Software Foundation, Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
 ;;         Mario Lang <mlang@delysid.org>
-;; Maintainer: emacs-devel@gnu.org
-;; URL: http://www.emacswiki.org/cgi-bin/wiki.pl?ErcFilling
+;; Maintainer: Amin Bandali <bandali@gnu.org>
+;; URL: https://www.emacswiki.org/emacs/ErcFilling
 
 ;; This file is part of GNU Emacs.
 

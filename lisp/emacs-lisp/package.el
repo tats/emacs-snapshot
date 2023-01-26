@@ -1,6 +1,6 @@
 ;;; package.el --- Simple package system for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2020 Free Software Foundation, Inc.
 
 ;; Author: Tom Tromey <tromey@redhat.com>
 ;;         Daniel Hackney <dan@haxney.org>
@@ -606,8 +606,10 @@ EXP should be a form read from a foo-pkg.el file.
 Convert EXP into a `package-desc' object using the
 `package-desc-from-define' constructor before pushing it to
 `package-alist'.
-If there already exists a package by that name in
-`package-alist', replace that definition with the new one."
+
+If there already exists a package by the same name in
+`package-alist', insert this object there such that the packages
+are sorted with the highest version first."
   (when (eq (car-safe exp) 'define-package)
     (let* ((new-pkg-desc (apply #'package-desc-from-define (cdr exp)))
            (name (package-desc-name new-pkg-desc))
@@ -953,7 +955,7 @@ untar into a directory named DIR; otherwise, signal an error."
     pkg-dir))
 
 (defun package-generate-description-file (pkg-desc pkg-file)
-  "Create the foo-pkg.el file for single-file packages."
+  "Create the foo-pkg.el file PKG-FILE for single-file package PKG-DESC."
   (let* ((name (package-desc-name pkg-desc)))
     (let ((print-level nil)
           (print-quoted t)
@@ -997,6 +999,7 @@ untar into a directory named DIR; otherwise, signal an error."
 (defvar version-control)
 
 (defun package-generate-autoloads (name pkg-dir)
+  "Generate autoloads in PKG-DIR for package named NAME."
   (let* ((auto-name (format "%s-autoloads.el" name))
          ;;(ignore-name (concat name "-pkg.el"))
          (generated-autoload-file (expand-file-name auto-name pkg-dir))
@@ -1177,12 +1180,14 @@ The return result is a `package-desc'."
 ;; signature checking.
 
 (defun package--write-file-no-coding (file-name)
+  "Write file FILE-NAME without encoding using coding system."
   (let ((buffer-file-coding-system 'no-conversion))
     (write-region (point-min) (point-max) file-name nil 'silent)))
 
 (declare-function url-http-file-exists-p "url-http" (url))
 
 (defun package--archive-file-exists-p (location file)
+  "Return t if FILE exists in remote LOCATION."
   (let ((http (string-match "\\`https?:" location)))
     (if http
         (progn
@@ -2041,7 +2046,7 @@ Mark the installed package as selected by adding it to
 
 When called from Lisp and optional argument DONT-SELECT is
 non-nil, install the package but do not add it to
-`package-select-packages'.
+`package-selected-packages'.
 
 If PKG is a `package-desc' and it is already installed, don't try
 to install it but still mark it as selected."
@@ -2709,9 +2714,8 @@ either a full name or nil, and EMAIL is a valid email address."
     ["Help" package-menu-quick-help :help "Show short key binding help for package-menu-mode"]
     "--"
     ["Refresh Package List" revert-buffer
-     :help "Redownload the ELPA archive"
+     :help "Redownload the package archive(s)"
      :active (not package--downloads-in-progress)]
-    ["Redisplay buffer" revert-buffer :help "Update the buffer with current list of packages"]
     ["Execute Marked Actions" package-menu-execute :help "Perform all the marked actions"]
 
     "--"
@@ -2729,7 +2733,7 @@ either a full name or nil, and EMAIL is a valid email address."
      ["Filter by Name" package-menu-filter-by-name :help "Filter packages by name"]
      ["Clear Filter" package-menu-clear-filter :help "Clear package list filter"])
 
-    ["Hide by Regexp" package-menu-hide-package :help "Permanently hide all packages matching a regexp"]
+    ["Hide by Regexp" package-menu-hide-package :help "Hide all packages matching a regexp"]
     ["Display Older Versions" package-menu-toggle-hiding
      :style toggle :selected (not package-menu--hide-packages)
      :help "Display package even if a newer version is already installed"]
@@ -2820,6 +2824,7 @@ of these dependencies, similar to the list returned by
                     (push dep out)))))))))))
 
 (defun package-desc-status (pkg-desc)
+  "Return the status of `package-desc' object PKG-DESC."
   (let* ((name (package-desc-name pkg-desc))
          (dir (package-desc-dir pkg-desc))
          (lle (assq name package-load-list))
@@ -2865,7 +2870,11 @@ Can be toggled with \\<package-menu-mode-map> \\[package-menu-toggle-hiding].
 Installed obsolete packages are always displayed.")
 
 (defun package-menu-toggle-hiding ()
-  "In Package Menu, toggle visibility of obsolete available packages."
+  "In Package Menu, toggle visibility of obsolete available packages.
+
+Also hide packages whose name matches a regexp in user option
+`package-hidden-regexps' (a list).  To add regexps to this list,
+use `package-menu-hide-package'."
   (interactive)
   (package--ensure-package-menu-mode)
   (setq package-menu--hide-packages
@@ -3169,29 +3178,36 @@ Return (PKG-DESC [NAME VERSION STATUS DOC])."
 (defun package-menu--refresh-contents (&optional _arg _noconfirm)
   "In Package Menu, download the Emacs Lisp package archive.
 Fetch the contents of each archive specified in
-`package-archives', and then refresh the package menu.  Signal a
-user-error if there is already a refresh running asynchronously.
+`package-archives', and then refresh the package menu.
 
 `package-menu-mode' sets `revert-buffer-function' to this
 function.  The args ARG and NOCONFIRM, passed from
 `revert-buffer', are ignored."
   (package--ensure-package-menu-mode)
-  (when (and package-menu-async package--downloads-in-progress)
-    (user-error "Package refresh is already in progress, please wait..."))
   (setq package-menu--old-archive-contents package-archive-contents)
   (setq package-menu--new-package-list nil)
   (package-refresh-contents package-menu-async))
 (define-obsolete-function-alias 'package-menu-refresh 'revert-buffer "27.1")
 
 (defun package-menu-hide-package ()
-  "Hide a package under point in Package Menu.
-If optional arg BUTTON is non-nil, describe its associated package."
+  "Hide in Package Menu packages that match a regexp.
+Prompt for the regexp to match against package names.
+The default regexp will hide only the package whose name is at point.
+
+The regexp is added to the list in the user option
+`package-hidden-regexps' and saved for future sessions.
+
+To unhide a package, type
+`\\[customize-variable] RET package-hidden-regexps'.
+
+Type \\[package-menu-toggle-hiding] to toggle package hiding."
   (interactive)
   (package--ensure-package-menu-mode)
   (declare (interactive-only "change `package-hidden-regexps' instead."))
   (let* ((name (when (derived-mode-p 'package-menu-mode)
                  (concat "\\`" (regexp-quote (symbol-name (package-desc-name
-                                                           (tabulated-list-get-id)))))))
+                                                           (tabulated-list-get-id))))
+                         "\\'")))
          (re (read-string "Hide packages matching regexp: " name)))
     ;; Test if it is valid.
     (string-match re "")
@@ -3203,7 +3219,7 @@ If optional arg BUTTON is non-nil, describe its associated package."
                              package-archive-contents)))
       (message "Packages to hide: %d.  Type `%s' to toggle or `%s' to customize"
                (length hidden)
-               (substitute-command-keys "\\[package-menu-toggle-hidding]")
+               (substitute-command-keys "\\[package-menu-toggle-hiding]")
                (substitute-command-keys "\\[customize-variable] RET package-hidden-regexps")))))
 
 
@@ -3263,7 +3279,7 @@ If optional arg BUTTON is non-nil, describe its associated package."
   '(("install," "delete," "unmark," ("execute" . 1))
     ("next," "previous")
     ("Hide-package," "(-toggle-hidden")
-    ("refresh-contents," "g-redisplay," "filter," "help")))
+    ("g-refresh-contents," "/-filter," "help")))
 
 (defun package--prettify-quick-help-key (desc)
   "Prettify DESC to be displayed as a help menu."
@@ -3271,7 +3287,7 @@ If optional arg BUTTON is non-nil, describe its associated package."
       (if (listp (cdr desc))
           (mapconcat #'package--prettify-quick-help-key desc "   ")
         (let ((place (cdr desc))
-              (out (car desc)))
+              (out (copy-sequence (car desc))))
           (add-text-properties place (1+ place)
                                '(face (bold font-lock-warning-face))
                                out)
@@ -3702,6 +3718,9 @@ Statuses available include \"incompat\", \"available\",
   (package-show-package-list t (if (stringp keyword)
                                    (list keyword)
                                  keyword)))
+
+(define-obsolete-function-alias
+  'package-menu-filter #'package-menu-filter-by-keyword "27.1")
 
 (defun package-menu-filter-by-name (name)
   "Filter the \"*Packages*\" buffer by NAME.

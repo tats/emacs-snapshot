@@ -1,5 +1,5 @@
 /* Thread definitions
-Copyright (C) 2012-2019 Free Software Foundation, Inc.
+Copyright (C) 2012-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -169,8 +169,7 @@ struct thread_state
      interrupter should broadcast to this condition.  */
   sys_cond_t *wait_condvar;
 
-  /* Thread's name in the locale encoding.  Actually used only on
-     WINDOWSNT.  */
+  /* Thread's name in the locale encoding.  */
   char *thread_name;
 
   /* This thread might have released the global lock.  If so, this is

@@ -1,6 +1,6 @@
 ;;; gnus.el --- a newsreader for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1987-1990, 1993-1998, 2000-2019 Free Software
+;; Copyright (C) 1987-1990, 1993-1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -2818,7 +2818,11 @@ See Info node `(gnus)Formatting Variables'."
 ;; Info access macros.
 
 (cl-defstruct (gnus-info
+               (:constructor gnus-info-make
+                (group rank read &optional marks method params))
                (:constructor nil)
+	       ;; FIXME: gnus-newsrc-alist contains a list of those,
+               ;; so changing them to a real struct will take more work!
                (:type list))
   group rank read marks method params)
 

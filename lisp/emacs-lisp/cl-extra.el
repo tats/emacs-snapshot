@@ -1,6 +1,6 @@
 ;;; cl-extra.el --- Common Lisp features, part 2  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 ;; Keywords: extensions
@@ -469,7 +469,7 @@ Optional second arg STATE is a random-state object."
 	  (while (< (setq i (1+ i)) 200) (cl-random 2 state))))
     (let* ((i (cl-callf (lambda (x) (% (1+ x) 55)) (cl--random-state-i state)))
 	   (j (cl-callf (lambda (x) (% (1+ x) 55)) (cl--random-state-j state)))
-	   (n (logand 8388607 (aset vec i (- (aref vec i) (aref vec j))))))
+	   (n (aset vec i (logand 8388607 (- (aref vec i) (aref vec j))))))
       (if (integerp lim)
 	  (if (<= lim 512) (% n lim)
 	    (if (> lim 8388607) (setq n (+ (ash n 9) (cl-random 512 state))))
@@ -556,11 +556,7 @@ too large if positive or too small if negative)."
 (defun cl-concatenate (type &rest sequences)
   "Concatenate, into a sequence of type TYPE, the argument SEQUENCEs.
 \n(fn TYPE SEQUENCE...)"
-  (pcase type
-    ('vector (apply #'vconcat sequences))
-    ('string (apply #'concat sequences))
-    ('list (apply #'append (append sequences '(nil))))
-    (_ (error "Not a sequence type name: %S" type))))
+  (apply #'seq-concatenate type sequences))
 
 ;;; List functions.
 

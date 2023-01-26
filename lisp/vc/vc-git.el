@@ -1,6 +1,6 @@
 ;;; vc-git.el --- VC backend for the git version control system -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2020 Free Software Foundation, Inc.
 
 ;; Author: Alexandre Julliard <julliard@winehq.org>
 ;; Keywords: vc tools
@@ -1785,13 +1785,12 @@ The difference to vc-do-command is that this function always invokes
 	(process-environment
 	 (append
 	  `("GIT_DIR"
-	    "PAGER="
 	    ;; Avoid repository locking during background operations
 	    ;; (bug#21559).
 	    ,@(when revert-buffer-in-progress-p
 		'("GIT_OPTIONAL_LOCKS=0")))
 	  process-environment)))
-    (apply 'process-file vc-git-program nil buffer nil command args)))
+    (apply 'process-file vc-git-program nil buffer nil "--no-pager" command args)))
 
 (defun vc-git--out-ok (command &rest args)
   (zerop (apply 'vc-git--call '(t nil) command args)))

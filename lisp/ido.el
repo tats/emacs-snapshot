@@ -1,6 +1,6 @@
 ;;; ido.el --- interactively do things with buffers and files -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Based on: iswitchb by Stephen Eglen <stephen@cns.ed.ac.uk>
@@ -4726,7 +4726,13 @@ For details of keybindings, see `ido-find-file'."
 	(let ((inf (ido-completions contents)))
 	  (setq ido-show-confirm-message nil)
 	  (ido-trace "inf" inf)
-	  (insert inf))
+          (let ((pos (point)))
+            (insert inf)
+            (if (< pos (point-max))
+                ;; Tell set-minibuffer-message where to display the
+                ;; overlay with temporary messages.
+                (put-text-property pos (1+ pos) 'minibuffer-message t)))
+          )
 	))))
 
 (defun ido-completions (name)

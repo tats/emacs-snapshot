@@ -1,6 +1,6 @@
 ;;; mm-util.el --- Utility functions for Mule and low level things  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	MORIOKA Tomohiko <morioka@jaist.ac.jp>
@@ -53,7 +53,7 @@
     ;; positions!
     ,@(unless (mm-coding-system-p 'iso-8859-15)
 	'((iso-8859-15 . iso-8859-1)))
-    ;; BIG-5HKSCS is similar to, but different than, BIG-5.
+    ;; BIG-5HKSCS is similar to, but different from, BIG-5.
     ,@(unless (mm-coding-system-p 'big5-hkscs)
 	'((big5-hkscs . big5)))
     ;; A Microsoft misunderstanding.

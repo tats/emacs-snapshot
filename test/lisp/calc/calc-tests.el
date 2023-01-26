@@ -1,6 +1,6 @@
 ;;; calc-tests.el --- tests for calc                 -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Keywords: maint
@@ -29,6 +29,7 @@
 (require 'calc)
 (require 'calc-ext)
 (require 'calc-units)
+(require 'calc-forms)
 
 ;; XXX The order in which calc libraries (in particular calc-units)
 ;; are loaded influences whether a calc integer in an expression
@@ -317,6 +318,32 @@ An existing calc stack is reused, otherwise a new one is created."
             '(vec (var x var-x) (var y var-y)))
            '(vec (calcFunc-eq (var x var-x) 3)
                  (calcFunc-eq (var y var-y) 0)))))
+
+(ert-deftest calc-poly-div ()
+  "Test polynomial division, and that the remainder is recorded in the trail."
+  (with-current-buffer (calc-trail-buffer)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+
+      (calc-eval "2x**3+1" 'push)
+      (calc-eval "x**2+2x" 'push)
+      (calc-poly-div nil)
+      (let ((tos (calc-top-n 1))
+            (trail (buffer-string)))
+        (calc-pop 0)
+        (should (equal tos '(- (* 2 (var x var-x)) 4)))
+        (should (equal trail "pdiv 2 * x - 4\nprem 8 * x + 1\n"))))))
+
+(ert-deftest calc-Math-integerp ()
+  (should (Math-integerp -7))
+  (should (Math-integerp (ash 1 65)))
+  (should-not (Math-integerp '(float 1 0)))
+  (should-not (Math-integerp nil))
+
+  (should (Math-num-integerp -7))
+  (should (Math-num-integerp (ash 1 65)))
+  (should (Math-num-integerp '(float 1 0)))
+  (should-not (Math-num-integerp nil)))
 
 (provide 'calc-tests)
 ;;; calc-tests.el ends here

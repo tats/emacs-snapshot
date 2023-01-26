@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 
@@ -727,6 +727,8 @@ them.  Rectangle commands are useful with text in multicolumn formats,
 and for changing text into or out of such formats.
 
 @cindex mark rectangle
+@cindex region-rectangle
+@cindex rectangular region
   To specify a rectangle for a command to work on, set the mark at one
 corner and point at the opposite corner.  The rectangle thus specified
 is called the @dfn{region-rectangle}.  If point and the mark are in

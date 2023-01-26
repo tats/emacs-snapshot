@@ -1,14 +1,15 @@
 ;;; tramp.el --- Transparent Remote Access, Multiple Protocol  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
 
 ;; Author: Kai Großjohann <kai.grossjohann@gmx.net>
 ;;         Michael Albinus <michael.albinus@gmx.de>
 ;; Maintainer: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
 ;; Package: tramp
-;; Version: 2.4.3-pre
+;; Version: 2.4.3
 ;; Package-Requires: ((emacs "24.4"))
+;; Package-Type: multi
 ;; URL: https://savannah.gnu.org/projects/tramp
 
 ;; This file is part of GNU Emacs.
@@ -1032,7 +1033,7 @@ initial value is overwritten by the car of `tramp-file-name-structure'.")
 
 ;;;###autoload
 (defcustom tramp-ignored-file-name-regexp nil
-  "Regular expression matching file names that are not under Tramp’s control."
+  "Regular expression matching file names that are not under Tramp's control."
   :version "27.1"
   :type '(choice (const nil) regexp))
 
@@ -1327,6 +1328,24 @@ entry does not exist, return nil."
 	   (not (string-match-p tramp-ignored-file-name-regexp name)))
        (string-match-p tramp-file-name-regexp name)
        t))
+
+;; This function bypasses the file name handler approach.  It is NOT
+;; recommended to use it in any package if not absolutely necessary.
+;; However, it is more performant than `file-local-name', and might be
+;; useful where performance matters, like in operations over a bulk
+;; list of file names.
+(defun tramp-file-local-name (name)
+  "Return the local name component of NAME.
+This function removes from NAME the specification of the remote
+host and the method of accessing the host, leaving only the part
+that identifies NAME locally on the remote system.  If NAME does
+not match `tramp-file-name-regexp', just `file-local-name' is
+called.  The returned file name can be used directly as argument
+of `process-file', `start-file-process', or `shell-command'."
+  (or (and (tramp-tramp-file-p name)
+           (string-match (nth 0 tramp-file-name-structure) name)
+           (match-string (nth 4 tramp-file-name-structure) name))
+      (tramp-compat-file-local-name name)))
 
 (defun tramp-find-method (method user host)
   "Return the right method string to use depending on USER and HOST.
@@ -2439,7 +2458,7 @@ remote file names."
 	   (regexp-opt
 	    (mapcar
 	     #'file-name-sans-extension
-	     (directory-files dir nil "^tramp.+\\.elc?$"))
+	     (directory-files dir nil "\\`tramp.+\\.elc?\\'"))
 	    'paren))))
     (mapatoms
      (lambda (atom)
@@ -3681,7 +3700,9 @@ support symbolic links."
 
     (setq buffer (if (and (not asynchronous) error-buffer)
 		     (with-parsed-tramp-file-name default-directory nil
-		       (list output-buffer (tramp-make-tramp-temp-file v)))
+		       (list output-buffer
+			     (tramp-make-tramp-file-name
+			      v (tramp-make-tramp-temp-file v))))
 		   output-buffer))
 
     (if current-buffer-p
@@ -3735,7 +3756,7 @@ support symbolic links."
 
 (defun tramp-handle-start-file-process (name buffer program &rest args)
   "Like `start-file-process' for Tramp files."
-  ;; `make-process' knows the `:file-error' argument since Emacs 27.1.
+  ;; `make-process' knows the `:file-handler' argument since Emacs 27.1 only.
   (tramp-file-name-handler
    'make-process
    :name name
@@ -3777,10 +3798,10 @@ support symbolic links."
 	filename))))
 
 (defconst tramp-time-dont-know '(0 0 0 1000)
-  "An invalid time value, used as \"Don’t know\" value.")
+  "An invalid time value, used as \"Don't know\" value.")
 
 (defconst tramp-time-doesnt-exist '(-1 65535)
-  "An invalid time value, used as \"Doesn’t exist\" value.")
+  "An invalid time value, used as \"Doesn't exist\" value.")
 
 (defun tramp-handle-set-visited-file-modtime (&optional time-list)
   "Like `set-visited-file-modtime' for Tramp files."

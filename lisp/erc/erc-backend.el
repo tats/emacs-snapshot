@@ -1,10 +1,10 @@
 ;;; erc-backend.el --- Backend network communication for ERC  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
 
 ;; Filename: erc-backend.el
 ;; Author: Lawrence Mitchell <wence@gmx.li>
-;; Maintainer: emacs-devel@gnu.org
+;; Maintainer: Amin Bandali <bandali@gnu.org>
 ;; Created: 2004-05-7
 ;; Keywords: IRC chat client internet
 
@@ -466,7 +466,8 @@ If this is set to nil, never try to reconnect."
 The length is specified in `erc-split-line-length'.
 
 Currently this is called by `erc-send-input'."
-  (let ((charset (car (erc-coding-system-for-target nil))))
+  (let* ((coding (erc-coding-system-for-target nil))
+         (charset (if (consp coding) (car coding) coding)))
     (with-temp-buffer
       (insert longline)
       ;; The line lengths are in octets, not characters (because these

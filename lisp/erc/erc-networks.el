@@ -1,9 +1,9 @@
 ;;; erc-networks.el --- IRC networks
 
-;; Copyright (C) 2002, 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002, 2004-2020 Free Software Foundation, Inc.
 
 ;; Author: Mario Lang <mlang@lexx.delysid.org>
-;; Maintainer: emacs-devel@gnu.org
+;; Maintainer: Amin Bandali <bandali@gnu.org>
 ;; Keywords: comm
 
 ;; This file is part of GNU Emacs.

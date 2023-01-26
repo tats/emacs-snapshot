@@ -1,6 +1,6 @@
 ;;; isearch.el --- incremental search minor mode -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992-1997, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1997, 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: Daniel LaLiberte <liberte@cs.uiuc.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -319,7 +319,7 @@ this variable is set to the symbol `all-windows'."
   "Show match numbers in the search prompt.
 When both this option and `isearch-lazy-highlight' are non-nil,
 show the current match number and the total number of matches
-in the buffer (or its restriction)."
+in the buffer (or its restriction), including all hidden matches."
   :type 'boolean
   :group 'lazy-count
   :group 'isearch
@@ -1224,6 +1224,9 @@ used to set the value of `isearch-regexp-function'."
 
 	isearch-pre-scroll-point nil
 	isearch-pre-move-point nil
+
+	isearch-lazy-count-current nil
+	isearch-lazy-count-total nil
 
 	;; Save the original value of `minibuffer-message-timeout', and
 	;; set it to nil so that isearch's messages don't get timed out.
@@ -3776,7 +3779,7 @@ by other Emacs features."
 			         isearch-lazy-highlight-window-end))))))
     ;; something important did indeed change
     (lazy-highlight-cleanup t (not (equal isearch-string ""))) ;stop old timer
-    (when isearch-lazy-count
+    (when (and isearch-lazy-count isearch-mode (null isearch-message-function))
       (when (or (equal isearch-string "")
                 ;; Check if this place was reached by a condition above
                 ;; other than changed window boundaries (that shouldn't
@@ -3794,7 +3797,7 @@ by other Emacs features."
         (clrhash isearch-lazy-count-hash)
         (setq isearch-lazy-count-current nil
               isearch-lazy-count-total nil)
-        (funcall (or isearch-message-function #'isearch-message))))
+        (isearch-message)))
     (setq isearch-lazy-highlight-window-start-changed nil)
     (setq isearch-lazy-highlight-window-end-changed nil)
     (setq isearch-lazy-highlight-error isearch-error)
@@ -3863,7 +3866,9 @@ Attempt to do the search exactly the way the pending Isearch would."
 	    (isearch-regexp-lax-whitespace
 	     isearch-lazy-highlight-regexp-lax-whitespace)
 	    (isearch-forward isearch-lazy-highlight-forward)
-	    (search-invisible nil)	; don't match invisible text
+	    ;; Match invisible text only when counting matches
+	    ;; and user can visit invisible matches
+	    (search-invisible (and isearch-lazy-count search-invisible t))
 	    (retry t)
 	    (success nil))
 	;; Use a loop like in `isearch-search'.

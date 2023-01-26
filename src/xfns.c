@@ -1,6 +1,6 @@
 /* Functions for the X Window System.
 
-Copyright (C) 1989, 1992-2019 Free Software Foundation, Inc.
+Copyright (C) 1989, 1992-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -861,6 +861,12 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
 	(FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 	 p ? FRAME_X_WINDOW (p) : DefaultRootWindow (FRAME_X_DISPLAY (f)),
 	 f->left_pos, f->top_pos);
+#ifdef USE_GTK
+      if (EQ (x_gtk_resize_child_frames, Qresize_mode))
+	gtk_container_set_resize_mode
+	  (GTK_CONTAINER (FRAME_GTK_OUTER_WIDGET (f)),
+	   p ? GTK_RESIZE_IMMEDIATE : GTK_RESIZE_QUEUE);
+#endif
       unblock_input ();
 
       fset_parent_frame (f, new_value);
@@ -2652,7 +2658,7 @@ create_frame_xic (struct frame *f)
     goto out;
 
   xim = FRAME_X_XIM (f);
-  if (!xim)
+  if (!xim || ! FRAME_X_XIM_STYLES(f))
     goto out;
 
   /* Determine XIC style.  */
@@ -3555,7 +3561,7 @@ do_unwind_create_frame (Lisp_Object frame)
   unwind_create_frame (frame);
 }
 
-static void
+void
 x_default_font_parameter (struct frame *f, Lisp_Object parms)
 {
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
@@ -4084,6 +4090,11 @@ This function is an internal primitive--use `make-frame' instead.  */)
       block_input ();
       XReparentWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
 		       FRAME_X_WINDOW (p), f->left_pos, f->top_pos);
+#ifdef USE_GTK
+      if (EQ (x_gtk_resize_child_frames, Qresize_mode))
+	gtk_container_set_resize_mode
+	  (GTK_CONTAINER (FRAME_GTK_OUTER_WIDGET (f)), GTK_RESIZE_IMMEDIATE);
+#endif
       unblock_input ();
     }
 
@@ -4572,11 +4583,12 @@ On MS Windows, this just returns nil.  */)
     return Qnil;
 }
 
+#if !defined USE_GTK || !defined HAVE_GTK3
+
 /* Store the geometry of the workarea on display DPYINFO into *RECT.
    Return false if and only if the workarea information cannot be
    obtained via the _NET_WORKAREA root window property.  */
 
-#ifndef HAVE_GTK3
 static bool
 x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
 {
@@ -4634,9 +4646,6 @@ x_get_net_workarea (struct x_display_info *dpyinfo, XRectangle *rect)
 
   return result;
 }
-#endif
-
-#ifndef USE_GTK
 
 /* Return monitor number where F is "most" or closest to.  */
 static int
@@ -5091,6 +5100,8 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
 #elif defined HAVE_GTK3
       scale = gdk_screen_get_monitor_scale_factor (gscreen, i);
 #endif
+      rec.x *= scale;
+      rec.y *= scale;
       rec.width *= scale;
       rec.height *= scale;
       work.x *= scale;
@@ -6735,9 +6746,11 @@ x_hide_tip (bool delete)
 	    }
 	}
 
-      /* Reset tip_last_frame, it will be reassigned when showing the
-	 next GTK+ system tooltip.  */
-      tip_last_frame = Qnil;
+      /* When using GTK+ system tooltips (compare Bug#41200) reset
+	 tip_last_frame.  It will be reassigned when showing the next
+	 GTK+ system tooltip.  */
+      if (x_gtk_use_system_tooltips)
+	tip_last_frame = Qnil;
 
       /* Now look whether there's an Emacs tip around.  */
       if (FRAMEP (tip_frame))
@@ -7742,6 +7755,24 @@ Note: Text drawn with the `x' font backend is shown with hollow boxes.  */)
 #endif	/* USE_GTK */
 #endif	/* USE_CAIRO */
 
+#ifdef USE_GTK
+#ifdef HAVE_GTK3
+#if GTK_CHECK_VERSION (3, 14, 0)
+DEFUN ("x-gtk-debug", Fx_gtk_debug, Sx_gtk_debug, 1, 1, 0,
+       doc: /* Toggle interactive GTK debugging.   */)
+  (Lisp_Object enable)
+{
+  gboolean enable_debug = !NILP (enable);
+
+  block_input ();
+  gtk_window_set_interactive_debugging (enable_debug);
+  unblock_input ();
+
+  return NILP (enable) ? Qnil : Qt;
+}
+#endif /* GTK_CHECK_VERSION (3, 14, 0) */
+#endif /* HAVE_GTK3 */
+#endif	/* USE_GTK */
 
 /***********************************************************************
 			    Initialization
@@ -7810,6 +7841,8 @@ syms_of_xfns (void)
   DEFSYM (Qfont_parameter, "font-parameter");
   DEFSYM (Qmono, "mono");
   DEFSYM (Qassq_delete_all, "assq-delete-all");
+  DEFSYM (Qhide, "hide");
+  DEFSYM (Qresize_mode, "resize-mode");
 
 #ifdef USE_CAIRO
   DEFSYM (Qpdf, "pdf");
@@ -7986,6 +8019,28 @@ Otherwise use Emacs own tooltip implementation.
 When using Gtk+ tooltips, the tooltip face is not used.  */);
   x_gtk_use_system_tooltips = true;
 
+  DEFVAR_LISP ("x-gtk-resize-child-frames", x_gtk_resize_child_frames,
+    doc: /* If non-nil, resize child frames specially with GTK builds.
+If this is nil, resize child frames like any other frames.  This is the
+default and usually works with most desktops.  Some desktop environments
+(GNOME shell in particular when using the mutter window manager),
+however, may refuse to resize a child frame when Emacs is built with
+GTK3.  For those environments, the two settings below are provided.
+
+If this equals the symbol 'hide', Emacs temporarily hides the child
+frame during resizing.  This approach seems to work reliably, may
+however induce some flicker when the frame is made visible again.
+
+If this equals the symbol 'resize-mode', Emacs uses GTK's resize mode to
+always trigger an immediate resize of the child frame.  This method is
+deprecated by GTK and may not work in future versions of that toolkit.
+It also may freeze Emacs when used with other desktop environments.  It
+avoids, however, the unpleasent flicker induced by the hiding approach.
+
+This variable is considered a temporary workaround and will be hopefully
+eliminated in future versions of Emacs.  */);
+  x_gtk_resize_child_frames = Qnil;
+
   /* Tell Emacs about this window system.  */
   Fprovide (Qx, Qnil);
 
@@ -8099,6 +8154,13 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
   defsubr (&Sx_page_setup_dialog);
   defsubr (&Sx_get_page_setup);
   defsubr (&Sx_print_frames_dialog);
+#endif
+#endif
+#ifdef USE_GTK
+#ifdef HAVE_GTK3
+#if GTK_CHECK_VERSION (3, 14, 0)
+  defsubr (&Sx_gtk_debug);
+#endif
 #endif
 #endif
 }

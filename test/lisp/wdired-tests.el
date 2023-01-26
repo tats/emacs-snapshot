@@ -1,6 +1,6 @@
 ;;; wdired-tests.el --- tests for wdired.el          -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -129,6 +129,8 @@ wdired-mode."
 	(delete-directory test-dir t)))))
 
 (defvar server-socket-dir)
+(declare-function dired-smart-shell-command "dired-x"
+                  (command &optional output-buffer error-buffer))
 
 (ert-deftest wdired-test-bug34915 ()
   "Test editing when dired-listing-switches includes -F.

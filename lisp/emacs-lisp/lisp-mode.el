@@ -1,6 +1,6 @@
 ;;; lisp-mode.el --- Lisp mode, and its idiosyncratic commands  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1999-2020 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: lisp, languages
@@ -535,7 +535,7 @@ This will generate compile-time constants from BINDINGS."
 
 ;; Support backtrace mode.
 (defconst lisp-el-font-lock-keywords-for-backtraces lisp-el-font-lock-keywords
-  "Default highlighting from Emacs Lisp mod used in Backtrace mode.")
+  "Default highlighting from Emacs Lisp mode used in Backtrace mode.")
 (defconst lisp-el-font-lock-keywords-for-backtraces-1 lisp-el-font-lock-keywords-1
   "Subdued highlighting from Emacs Lisp mode used in Backtrace mode.")
 (defconst lisp-el-font-lock-keywords-for-backtraces-2

@@ -1,4 +1,4 @@
-# Copyright (C) 1992-1998, 2000-2019 Free Software Foundation, Inc.
+# Copyright (C) 1992-1998, 2000-2020 Free Software Foundation, Inc.
 #
 # This file is part of GNU Emacs.
 #
@@ -72,7 +72,7 @@ end
 
 define xgetsym
   xgetptr $arg0
-  set $ptr = ((struct Lisp_Symbol *) ((char *)lispsym + $ptr))
+  set $ptr = ((struct Lisp_Symbol *) ((char *) &lispsym + $ptr))
 end
 
 # Access the name of a symbol

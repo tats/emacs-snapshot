@@ -1,6 +1,6 @@
 ;;; gnus-uu.el --- extract (uu)encoded files in Gnus
 
-;; Copyright (C) 1985-1987, 1993-1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1987, 1993-1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
@@ -1674,7 +1674,7 @@ Gnus might fail to display all of it.")
     did-unpack))
 
 (defun gnus-uu-dir-files (dir)
-  (let ((dirs (directory-files dir t "[^/][^\\.][^\\.]?$"))
+  (let ((dirs (directory-files dir t (rx (or (not ".") "..."))))
 	files file)
     (while dirs
       (if (file-directory-p (setq file (car dirs)))

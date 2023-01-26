@@ -1,6 +1,6 @@
 ;;; nnspool.el --- spool access for GNU Emacs
 
-;; Copyright (C) 1988-1990, 1993-1998, 2000-2019 Free Software
+;; Copyright (C) 1988-1990, 1993-1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -260,7 +260,7 @@ there.")
 	    t)
 	;; Yes, completely empty spool directories *are* possible.
 	;; Fix by Sudish Joseph <joseph@cis.ohio-state.edu>
-	(when (setq dir (directory-files pathname nil "^[0-9]+$" t))
+	(when (setq dir (directory-files pathname nil "\\`[0-9]+\\'" t))
 	  (setq dir (sort (mapcar 'string-to-number dir) '<)))
 	(if dir
 	    (nnheader-insert

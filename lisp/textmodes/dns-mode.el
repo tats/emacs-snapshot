@@ -1,6 +1,6 @@
 ;;; dns-mode.el --- a mode for viewing/editing Domain Name System master files
 
-;; Copyright (C) 2000-2001, 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2001, 2004-2020 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <simon@josefsson.org>
 ;; Keywords: DNS master zone file SOA comm
@@ -134,6 +134,7 @@ manually with \\[dns-mode-soa-increment-serial]."
   :type '(choice (const :tag "Always" t)
 		 (const :tag "Ask" ask)
 		 (const :tag "Never" nil))
+  :safe 'symbolp
   :group 'dns-mode)
 
 ;; Syntax table.

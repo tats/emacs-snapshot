@@ -1,6 +1,6 @@
 ;;; loadhist.el --- lisp functions for working with feature groups
 
-;; Copyright (C) 1995, 1998, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 1998, 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Maintainer: emacs-devel@gnu.org
@@ -173,7 +173,7 @@ documentation of `unload-feature' for details.")
 ;; we undefine it.
 ;; So we use this auxiliary variable to keep track of the last (t . SYMBOL)
 ;; that occurred.
-(defvar loadhist--restore-autoload
+(defvar loadhist--restore-autoload nil
   "If non-nil, this is a symbol for which we should
 restore a previous autoload if possible.")
 

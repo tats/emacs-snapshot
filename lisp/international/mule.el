@@ -1,6 +1,6 @@
 ;;; mule.el --- basic commands for multilingual environment
 
-;; Copyright (C) 1997-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2020 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -2601,7 +2601,7 @@ This function is intended to be added to `auto-coding-functions'."
                     (detect-coding-region (point-min) size t)))))
             ;; Pure ASCII always comes back as undecided.
             (if (memq detected
-                      '(utf-8 'utf-8-with-signature 'utf-8-hfs undecided))
+                      '(utf-8 utf-8-with-signature utf-8-hfs undecided))
                 'utf-8
               (warn "File contents detected as %s.
   Consider adding an encoding attribute to the xml declaration,

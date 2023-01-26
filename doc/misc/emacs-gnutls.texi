@@ -9,7 +9,7 @@
 @copying
 This file describes the Emacs GnuTLS integration.
 
-Copyright @copyright{} 2012--2019 Free Software Foundation, Inc.
+Copyright @copyright{} 2012--2020 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -134,7 +134,7 @@ order: @file{/etc/ssl/certs/ca-certificates.crt} for Debian, Ubuntu,
 Gentoo and Arch Linux; @file{/etc/pki/tls/certs/ca-bundle.crt} for
 Fedora and RHEL; @file{/etc/ssl/ca-bundle.pem} for Suse;
 @file{/usr/ssl/certs/ca-bundle.crt} for Cygwin;
-@file{/usr/local/share/certs/ca-root-nss.crt} for FreeBSD.  You can
+@file{/usr/local/share/certs/ca-root-nss.crt} for FreeBSD@.  You can
 easily customize @code{gnutls-trustfiles} to be something else, but
 let us know if you do, so we can make the change to benefit the other
 users of that platform.

@@ -1,5 +1,5 @@
 /* font.h -- Interface definition for font handling.
-   Copyright (C) 2006-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -886,7 +886,7 @@ extern Lisp_Object font_update_drivers (struct frame *f, Lisp_Object list);
 extern Lisp_Object font_range (ptrdiff_t, ptrdiff_t, ptrdiff_t *,
 			       struct window *, struct face *,
 			       Lisp_Object);
-extern void font_fill_lglyph_metrics (Lisp_Object, Lisp_Object);
+extern void font_fill_lglyph_metrics (Lisp_Object, struct font *, unsigned int);
 
 extern Lisp_Object font_put_extra (Lisp_Object font, Lisp_Object prop,
                                    Lisp_Object val);

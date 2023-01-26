@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with X protocol.
-   Copyright (C) 1989, 1993-1994, 1998-2019 Free Software Foundation,
+   Copyright (C) 1989, 1993-1994, 1998-2020 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -1056,6 +1056,7 @@ extern void x_real_pos_and_offsets (struct frame *f,
                                     int *xptr,
                                     int *yptr,
                                     int *outer_border);
+extern void x_default_font_parameter (struct frame* f, Lisp_Object parms);
 
 /* From xrdb.c.  */
 

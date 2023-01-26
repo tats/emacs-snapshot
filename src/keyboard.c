@@ -1,6 +1,6 @@
 /* Keyboard and mouse input; editor command loop.
 
-Copyright (C) 1985-1989, 1993-1997, 1999-2019 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1997, 1999-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -1317,6 +1317,11 @@ command_loop_1 (void)
 	  /* Clear the echo area.  */
 	  message1 (0);
 	  safe_run_hooks (Qecho_area_clear_hook);
+
+	  /* We cleared the echo area, and the minibuffer will now
+	     show, so resize the mini-window in case the minibuffer
+	     needs more or less space than the echo area.  */
+	  resize_mini_window (XWINDOW (minibuf_window), false);
 
 	  unbind_to (count, Qnil);
 
@@ -2989,7 +2994,19 @@ read_char (int commandflag, Lisp_Object map,
 	{
 	  safe_run_hooks (Qecho_area_clear_hook);
 	  clear_message (1, 0);
+	  /* If we were showing the echo-area message on top of an
+	     active minibuffer, resize the mini-window, since the
+	     minibuffer may need more or less space than the echo area
+	     we've just wiped.  */
+	  if (minibuf_level
+	      && EQ (minibuf_window, echo_area_window)
+	      /* The case where minibuffer-message-timeout is a number
+		 was already handled near the beginning of command_loop_1.  */
+	      && !NUMBERP (Vminibuffer_message_timeout))
+	    resize_mini_window (XWINDOW (minibuf_window), false);
 	}
+      else if (FUNCTIONP (Vclear_message_function))
+        clear_message (1, 0);
     }
 
  reread_for_input_method:
@@ -10522,7 +10539,7 @@ The value is always a vector.  */)
 DEFUN ("clear-this-command-keys", Fclear_this_command_keys,
        Sclear_this_command_keys, 0, 1, 0,
        doc: /* Clear out the vector that `this-command-keys' returns.
-Also clear the record of the last 100 events, unless optional arg
+Also clear the record of the last 300 input events, unless optional arg
 KEEP-RECORD is non-nil.  */)
   (Lisp_Object keep_record)
 {

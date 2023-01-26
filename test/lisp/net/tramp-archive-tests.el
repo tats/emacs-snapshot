@@ -1,6 +1,6 @@
 ;;; tramp-archive-tests.el --- Tests of file archive access  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2017-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2020 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
@@ -669,7 +669,7 @@ This tests also `access-file', `file-readable-p' and `file-regular-p'."
 	  (setq attr (directory-files-and-attributes tmp-name 'full))
 	  (dolist (elt attr)
 	    (should (equal (file-attributes (car elt)) (cdr elt))))
-	  (setq attr (directory-files-and-attributes tmp-name nil "^b"))
+	  (setq attr (directory-files-and-attributes tmp-name nil "\\`b"))
 	  (should (equal (mapcar #'car attr) '("bar"))))
 
       ;; Cleanup.

@@ -1,5 +1,5 @@
 /* Define frame-object for GNU Emacs.
-   Copyright (C) 1993-1994, 1999-2019 Free Software Foundation, Inc.
+   Copyright (C) 1993-1994, 1999-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -107,7 +107,7 @@ struct frame
      to redirect keystrokes to a surrogate minibuffer frame when
      needed.
 
-     Note that a value of nil is different than having the field point
+     Note that a value of nil is different from having the field point
      to the frame itself.  Whenever the Fselect_frame function is used
      to shift from one frame to the other, any redirections to the
      original frame are shifted to the newly selected frame; if

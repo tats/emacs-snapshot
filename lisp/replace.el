@@ -1,6 +1,6 @@
 ;;; replace.el --- replace commands for Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1992, 1994, 1996-1997, 2000-2019 Free
+;; Copyright (C) 1985-1987, 1992, 1994, 1996-1997, 2000-2020 Free
 ;; Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -340,13 +340,17 @@ that reads FROM-STRING, or invoke replacements from
 incremental search with a key sequence like `C-s C-s M-%'
 to use its current search string as the string to replace.
 
-Matching is independent of case if `case-fold-search' is non-nil and
-FROM-STRING has no uppercase letters.  Replacement transfers the case
-pattern of the old text to the new text, if `case-replace' and
-`case-fold-search' are non-nil and FROM-STRING has no uppercase
-letters.  (Transferring the case pattern means that if the old text
-matched is all caps, or capitalized, then its replacement is upcased
-or capitalized.)
+Matching is independent of case if both `case-fold-search'
+and `search-upper-case' are non-nil and FROM-STRING has no
+uppercase letters; if `search-upper-case' is nil, then
+whether matching ignores case depends on `case-fold-search'
+regardless of whether there are uppercase letters in FROM-STRING.
+Replacement transfers the case pattern of the old text to the
+new text, if both `case-fold-search' and `case-replace' are
+non-nil and FROM-STRING has no uppercase letters.
+\(Transferring the case pattern means that if the old text
+matched is all caps, or capitalized, then its replacement is
+respectively upcased or capitalized.)
 
 Ignore read-only matches if `query-replace-skip-read-only' is non-nil,
 ignore hidden matches if `search-invisible' is nil, and ignore more
@@ -402,13 +406,16 @@ that reads REGEXP, or invoke replacements from
 incremental search with a key sequence like `C-M-s C-M-s C-M-%'
 to use its current search regexp as the regexp to replace.
 
-Matching is independent of case if `case-fold-search' is non-nil and
-REGEXP has no uppercase letters.  Replacement transfers the case
-pattern of the old text to the new text, if `case-replace' and
-`case-fold-search' are non-nil and REGEXP has no uppercase letters.
-\(Transferring the case pattern means that if the old text matched is
-all caps, or capitalized, then its replacement is upcased or
-capitalized.)
+Matching is independent of case if both `case-fold-search'
+and `search-upper-case' are non-nil and REGEXP has no uppercase
+letters; if `search-upper-case' is nil, then whether matching
+ignores case depends on `case-fold-search' regardless of whether
+there are uppercase letters in REGEXP.
+Replacement transfers the case pattern of the old text to the new
+text, if both `case-fold-search' and `case-replace' are non-nil
+and REGEXP has no uppercase letters.  (Transferring the case pattern
+means that if the old text matched is all caps, or capitalized,
+then its replacement is respectively upcased or capitalized.)
 
 Ignore read-only matches if `query-replace-skip-read-only' is non-nil,
 ignore hidden matches if `search-invisible' is nil, and ignore more
@@ -1937,8 +1944,10 @@ See also `multi-occur'."
       global-matches)))
 
 (defun occur-engine-line (beg end &optional keep-props)
-  (if (and keep-props font-lock-mode)
-      (font-lock-ensure beg end))
+  (if (and keep-props (if (boundp 'jit-lock-mode) jit-lock-mode)
+	   (text-property-not-all beg end 'fontified t))
+      (if (fboundp 'jit-lock-fontify-now)
+	  (jit-lock-fontify-now beg end)))
   (if (and keep-props (not (eq occur-excluded-properties t)))
       (let ((str (buffer-substring beg end)))
 	(remove-list-of-text-properties

@@ -1,6 +1,6 @@
 ;;; elisp-mode.el --- Emacs Lisp mode  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1999-2020 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: lisp, languages
@@ -264,9 +264,9 @@ Blank lines separate paragraphs.  Semicolons start comments.
   (unless
       (let* ((bfname (buffer-file-name))
              (fname (and (stringp bfname) (file-name-nondirectory bfname))))
-        (or (not (stringp fname))
-            (string-match "\\`\\.#" fname)
-            (string-equal dir-locals-file fname)))
+        (and (stringp fname)
+             (or (string-match "\\`\\.#" fname)
+                 (string-equal dir-locals-file fname))))
     (add-hook 'flymake-diagnostic-functions #'elisp-flymake-checkdoc nil t)
     (add-hook 'flymake-diagnostic-functions
               #'elisp-flymake-byte-compile nil t)))
@@ -630,9 +630,7 @@ functions are annotated with \"<f>\" via the
 
 ;;; Xref backend
 
-(declare-function xref-make-bogus-location "xref" (message))
 (declare-function xref-make "xref" (summary location))
-(declare-function xref-collect-references "xref" (symbol dir))
 
 (defun elisp--xref-backend () 'elisp)
 
@@ -935,7 +933,8 @@ Paragraphs are separated only by blank lines.
 Semicolons start comments.
 
 \\{lisp-interaction-mode-map}"
-  :abbrev-table nil)
+  :abbrev-table nil
+  (setq-local lexical-binding t))
 
 ;;; Emacs Lisp Byte-Code mode
 

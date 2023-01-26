@@ -1,6 +1,6 @@
 /* Evaluator for GNU Emacs Lisp interpreter.
 
-Copyright (C) 1985-1987, 1993-1995, 1999-2019 Free Software Foundation,
+Copyright (C) 1985-1987, 1993-1995, 1999-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -831,6 +831,7 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
   Lisp_Object sym, tem;
 
   sym = XCAR (args);
+  CHECK_SYMBOL (sym);
   Lisp_Object docstring = Qnil;
   if (!NILP (XCDR (XCDR (args))))
     {
@@ -1229,7 +1230,7 @@ The car of a handler may be a list of condition names instead of a
 single condition name; then it handles all of them.  If the special
 condition name `debug' is present in this list, it allows another
 condition in the list to run the debugger if `debug-on-error' and the
-other usual mechanisms says it should (otherwise, `condition-case'
+other usual mechanisms say it should (otherwise, `condition-case'
 suppresses the debugger).
 
 When a handler handles an error, control returns to the `condition-case'
@@ -3816,7 +3817,7 @@ backtrace_eval_unrewind (int distance)
 	  {
 	    Lisp_Object sym = specpdl_symbol (tmp);
 	    Lisp_Object old_value = specpdl_old_value (tmp);
-	    set_specpdl_old_value (tmp, Fdefault_value (sym));
+	    set_specpdl_old_value (tmp, default_value (sym));
 	    Fset_default (sym, old_value);
 	  }
 	  break;
@@ -3832,7 +3833,7 @@ backtrace_eval_unrewind (int distance)
 	    if (!NILP (Flocal_variable_p (symbol, where)))
 	      {
 		set_specpdl_old_value
-		  (tmp, Fbuffer_local_value (symbol, where));
+		  (tmp, buffer_local_value (symbol, where));
                 set_internal (symbol, old_value, where, SET_INTERNAL_UNBIND);
 	      }
 	  }

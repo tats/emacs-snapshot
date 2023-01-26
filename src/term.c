@@ -1,5 +1,5 @@
 /* Terminal control module for terminals described by TERMCAP
-   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2019 Free Software
+   Copyright (C) 1985-1987, 1993-1995, 1998, 2000-2020 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -563,8 +563,8 @@ encode_terminal_code (struct glyph *src, int src_len,
 	    {
 	      cmp = composition_table[src->u.cmp.id];
 	      required = cmp->glyph_len;
-	      required *= MAX_MULTIBYTE_LENGTH;
 	    }
+	  required *= MAX_MULTIBYTE_LENGTH;
 
 	  if (encode_terminal_src_size - nbytes < required)
 	    {
@@ -2568,6 +2568,14 @@ handle_one_term_event (struct tty_display_info *tty, Gpm_Event *event,
   else {
     f->mouse_moved = 0;
     term_mouse_click (&ie, event, f);
+    if (tty_handle_tab_bar_click (f, event->x, event->y,
+                                 (ie.modifiers & down_modifier) != 0, &ie))
+      {
+       /* tty_handle_tab_bar_click stores 2 events in the event
+          queue, so we are done here.  */
+       count += 2;
+       return count;
+      }
   }
 
  done:

@@ -1,6 +1,6 @@
 ;;; project.el --- Operations on the current project  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -175,7 +175,6 @@ subset of the project roots and external roots.
 
 The default implementation uses `find-program'.  PROJECT is used
 to find the list of ignores for each directory."
-  (require 'xref)
   (cl-mapcan
    (lambda (dir)
      (project--files-in-directory dir
@@ -184,24 +183,27 @@ to find the list of ignores for each directory."
 
 (defun project--files-in-directory (dir ignores &optional files)
   (require 'find-dired)
+  (require 'xref)
   (defvar find-name-arg)
-  (let ((default-directory dir)
-        (command (format "%s %s %s -type f %s -print0"
-                         find-program
-                         (file-local-name dir)
-                         (xref--find-ignores-arguments
-                          ignores
-                          (expand-file-name dir))
-                         (if files
-                             (concat (shell-quote-argument "(")
-                                     " " find-name-arg " "
-                                     (mapconcat
-                                      #'shell-quote-argument
-                                      (split-string files)
-                                      (concat " -o " find-name-arg " "))
-                                     " "
-                                     (shell-quote-argument ")"))"")
-                         )))
+  (let* ((default-directory dir)
+         ;; Make sure ~/ etc. in local directory name is
+         ;; expanded and not left for the shell command
+         ;; to interpret.
+         (localdir (file-local-name (expand-file-name dir)))
+         (command (format "%s %s %s -type f %s -print0"
+                          find-program
+                          localdir
+                          (xref--find-ignores-arguments ignores localdir)
+                          (if files
+                              (concat (shell-quote-argument "(")
+                                      " " find-name-arg " "
+                                      (mapconcat
+                                       #'shell-quote-argument
+                                       (split-string files)
+                                       (concat " -o " find-name-arg " "))
+                                      " "
+                                      (shell-quote-argument ")"))"")
+                          )))
     (project--remote-file-names
      (sort (split-string (shell-command-to-string command) "\0" t)
            #'string<))))
@@ -262,8 +264,15 @@ backend implementation of `project-external-roots'.")
 
 (defun project-try-vc (dir)
   (let* ((backend (ignore-errors (vc-responsible-backend dir)))
-         (root (and backend (ignore-errors
-                              (vc-call-backend backend 'root dir)))))
+         (root
+          (pcase backend
+            ('Git
+             ;; Don't stop at submodule boundary.
+             (or (vc-file-getprop dir 'project-git-root)
+                 (vc-file-setprop dir 'project-git-root
+                                  (vc-find-root dir ".git/"))))
+            ('nil nil)
+            (_ (ignore-errors (vc-call-backend backend 'root dir))))))
     (and root (cons 'vc root))))
 
 (cl-defmethod project-roots ((project (head vc)))
@@ -303,7 +312,8 @@ backend implementation of `project-external-roots'.")
   (pcase backend
     (`Git
      (let ((default-directory (expand-file-name (file-name-as-directory dir)))
-           (args '("-z")))
+           (args '("-z"))
+           files)
        ;; Include unregistered.
        (setq args (append args '("-c" "-o" "--exclude-standard")))
        (when extra-ignores
@@ -315,11 +325,26 @@ backend implementation of `project-external-roots'.")
                                          (format ":!/:%s" (substring i 2))
                                        (format ":!:%s" i)))
                                    extra-ignores)))))
-       (mapcar
-        (lambda (file) (concat default-directory file))
-        (split-string
-         (apply #'vc-git--run-command-string nil "ls-files" args)
-         "\0" t))))
+       (setq files
+             (mapcar
+              (lambda (file) (concat default-directory file))
+              (split-string
+               (apply #'vc-git--run-command-string nil "ls-files" args)
+               "\0" t)))
+       ;; Unfortunately, 'ls-files --recurse-submodules' conflicts with '-o'.
+       (let* ((submodules (project--git-submodules))
+              (sub-files
+               (mapcar
+                (lambda (module)
+                  (when (file-directory-p module)
+                    (project--vc-list-files
+                     (concat default-directory module)
+                     backend
+                     extra-ignores)))
+                submodules)))
+         (setq files
+               (apply #'nconc files sub-files)))
+       files))
     (`Hg
      (let ((default-directory (expand-file-name (file-name-as-directory dir)))
            args)
@@ -336,6 +361,18 @@ backend implementation of `project-external-roots'.")
          (mapcar
           (lambda (s) (concat default-directory s))
           (split-string (buffer-string) "\0" t)))))))
+
+(defun project--git-submodules ()
+  ;; 'git submodule foreach' is much slower.
+  (condition-case nil
+      (with-temp-buffer
+        (insert-file-contents ".gitmodules")
+        (let (res)
+          (goto-char (point-min))
+          (while (re-search-forward "path *= *\\(.+\\)" nil t)
+            (push (match-string 1) res))
+          (nreverse res)))
+    (file-missing nil)))
 
 (cl-defmethod project-ignores ((project (head vc)) dir)
   (let* ((root (cdr project))
@@ -390,8 +427,6 @@ DIRS must contain directory names."
 (declare-function grep-read-files "grep")
 (declare-function xref--show-xrefs "xref")
 (declare-function xref--find-ignores-arguments "xref")
-(declare-function xref--regexp-to-extended "xref")
-(declare-function xref--convert-hits "xref")
 
 ;;;###autoload
 (defun project-find-regexp (regexp)
@@ -403,6 +438,8 @@ e.g. entering `ch' is equivalent to `*.[ch]'.  As whitespace
 triggers completion when entering a pattern, including it
 requires quoting, e.g. `\\[quoted-insert]<space>'."
   (interactive (list (project--read-regexp)))
+  (require 'xref)
+  (require 'grep)
   (let* ((pr (project-current t))
          (files
           (if (not current-prefix-arg)
@@ -434,6 +471,7 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
 With \\[universal-argument] prefix, you can specify the file name
 pattern to search for."
   (interactive (list (project--read-regexp)))
+  (require 'xref)
   (let* ((pr (project-current t))
          (files
           (project-files pr (append
@@ -444,44 +482,9 @@ pattern to search for."
      nil)))
 
 (defun project--find-regexp-in-files (regexp files)
-  (pcase-let*
-      ((output (get-buffer-create " *project grep output*"))
-       (`(,grep-re ,file-group ,line-group . ,_) (car grep-regexp-alist))
-       (status nil)
-       (hits nil)
-       (xrefs nil)
-       ;; 'git ls-files' can output broken symlinks.
-       (command (format "xargs -0 grep %s -snHE -e %s"
-                        (if (and case-fold-search
-                                 (isearch-no-upper-case-p regexp t))
-                            "-i"
-                          "")
-                        (shell-quote-argument (xref--regexp-to-extended regexp)))))
-    (with-current-buffer output
-      (erase-buffer)
-      (with-temp-buffer
-        (insert (mapconcat #'identity files "\0"))
-        (setq status
-              (project--process-file-region (point-min)
-                                            (point-max)
-                                            shell-file-name
-                                            output
-                                            nil
-                                            shell-command-switch
-                                            command)))
-      (goto-char (point-min))
-      (when (and (/= (point-min) (point-max))
-                 (not (looking-at grep-re))
-                 ;; TODO: Show these matches as well somehow?
-                 (not (looking-at "Binary file .* matches")))
-        (user-error "Search failed with status %d: %s" status
-                    (buffer-substring (point-min) (line-end-position))))
-      (while (re-search-forward grep-re nil t)
-        (push (list (string-to-number (match-string line-group))
-                    (match-string file-group)
-                    (buffer-substring-no-properties (point) (line-end-position)))
-              hits)))
-    (setq xrefs (xref--convert-hits (nreverse hits) regexp))
+  (unless files
+    (user-error "Empty file list"))
+  (let ((xrefs (xref-matches-in-files regexp files)))
     (unless xrefs
       (user-error "No matches for: %s" regexp))
     xrefs))
@@ -608,7 +611,8 @@ PREDICATE, HIST, and DEFAULT have the same meaning as in
 (defun project-search (regexp)
   "Search for REGEXP in all the files of the project.
 Stops when a match is found.
-To continue searching for next match, use command \\[fileloop-continue]."
+To continue searching for the next match, use the
+command \\[fileloop-continue]."
   (interactive "sSearch (regexp): ")
   (fileloop-initialize-search
    regexp (project-files (project-current t)) 'default)
@@ -616,9 +620,10 @@ To continue searching for next match, use command \\[fileloop-continue]."
 
 ;;;###autoload
 (defun project-query-replace-regexp (from to)
-  "Search for REGEXP in all the files of the project.
-Stops when a match is found.
-To continue searching for next match, use command \\[fileloop-continue]."
+  "Query-replace REGEXP in all the files of the project.
+Stops when a match is found and prompts for whether to replace it.
+If you exit the query-replace, you can later continue the query-replace
+loop using the command \\[fileloop-continue]."
   (interactive
    (pcase-let ((`(,from ,to)
                 (query-replace-read-args "Query replace (regexp)" t t)))

@@ -1,6 +1,6 @@
 /* Functions for image support on window system.
 
-Copyright (C) 1989, 1992-2019 Free Software Foundation, Inc.
+Copyright (C) 1989, 1992-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1242,6 +1242,10 @@ prepare_image_for_display (struct frame *f, struct image *img)
       if (img->cr_data == NULL || (cairo_pattern_get_type (img->cr_data)
 				   != CAIRO_PATTERN_TYPE_SURFACE))
 	{
+	  /* Fill in the background/background_transparent field while
+	     we have img->pixmap->data/img->mask->data.  */
+	  IMAGE_BACKGROUND (img, f, img->pixmap);
+	  IMAGE_BACKGROUND_TRANSPARENT (img, f, img->mask);
 	  cr_put_image_to_cr_data (img);
 	  if (img->cr_data == NULL)
 	    {
@@ -6231,7 +6235,7 @@ pbm_load (struct frame *f, struct image *img)
 				 PNG
  ***********************************************************************/
 
-#if defined (HAVE_PNG) || defined (HAVE_NS) || defined (USE_CAIRO)
+#if defined (HAVE_PNG) || defined (HAVE_NS)
 
 /* Indices of image specification fields in png_format, below.  */
 
@@ -6282,10 +6286,10 @@ png_image_p (Lisp_Object object)
   return fmt[PNG_FILE].count + fmt[PNG_DATA].count == 1;
 }
 
-#endif /* HAVE_PNG || HAVE_NS || USE_CAIRO */
+#endif /* HAVE_PNG || HAVE_NS */
 
 
-#if (defined HAVE_PNG && !defined HAVE_NS) || defined USE_CAIRO
+#if defined HAVE_PNG && !defined HAVE_NS
 
 # ifdef WINDOWSNT
 /* PNG library details.  */
@@ -8603,6 +8607,17 @@ extern WandExport void PixelGetMagickColor (const PixelWand *,
 					    MagickPixelPacket *);
 #endif
 
+static void
+imagemagick_initialize (void)
+{
+  static bool imagemagick_initialized;
+  if (!imagemagick_initialized)
+    {
+      imagemagick_initialized = true;
+      MagickWandGenesis ();
+    }
+}
+
 /* Log ImageMagick error message.
    Useful when an ImageMagick function returns the status `MagickFalse'.  */
 
@@ -8874,14 +8889,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
   double rotation;
   char hint_buffer[MaxTextExtent];
   char *filename_hint = NULL;
-
-  /* Initialize the ImageMagick environment.  */
-  static bool imagemagick_initialized;
-  if (!imagemagick_initialized)
-    {
-      imagemagick_initialized = true;
-      MagickWandGenesis ();
-    }
+  imagemagick_initialize ();
 
   /* Handle image index for image types who can contain more than one image.
      Interface :index is same as for GIF.  First we "ping" the image to see how
@@ -9290,6 +9298,7 @@ and `imagemagick-types-inhibit'.  */)
   char **imtypes;
   size_t i;
 
+  imagemagick_initialize ();
   ex = AcquireExceptionInfo ();
   imtypes = GetMagickList ("*", &numf, ex);
   DestroyExceptionInfo (ex);
@@ -10155,7 +10164,7 @@ static struct image_type const image_types[] =
  { SYMBOL_INDEX (Qsvg), svg_image_p, svg_load, image_clear_image,
    IMAGE_TYPE_INIT (init_svg_functions) },
 #endif
-#if defined HAVE_PNG || defined HAVE_NS || defined USE_CAIRO
+#if defined HAVE_PNG || defined HAVE_NS
  { SYMBOL_INDEX (Qpng), png_image_p, png_load, image_clear_image,
    IMAGE_TYPE_INIT (init_png_functions) },
 #endif

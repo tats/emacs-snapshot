@@ -1,6 +1,6 @@
 ;;; shadow.el --- locate Emacs Lisp file shadowings
 
-;; Copyright (C) 1995, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: Terry Jones <terry@santafe.edu>
 ;; Keywords: lisp
@@ -99,7 +99,8 @@ See the documentation for `list-load-path-shadows' for further information."
 	(setq true-names (append true-names (list dir)))
 	(setq dir (directory-file-name (or pp ".")))
 	(setq curr-files (if (file-accessible-directory-p dir)
-			     (directory-files dir nil ".\\.elc?\\(\\.gz\\)?$" t)))
+			     (directory-files dir nil
+                                              "\\.elc?\\(?:\\.gz\\)?\\'" t)))
 	(and curr-files
 	     (not noninteractive)
 	     (message "Checking %d files in %s..." (length curr-files) dir))

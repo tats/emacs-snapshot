@@ -1,5 +1,5 @@
 /* GNU Emacs routines to deal with syntax tables; also word and list parsing.
-   Copyright (C) 1985, 1987, 1993-1995, 1997-1999, 2001-2019 Free
+   Copyright (C) 1985, 1987, 1993-1995, 1997-1999, 2001-2020 Free
    Software Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -480,10 +480,10 @@ parse_sexp_propertize (ptrdiff_t charpos)
       safe_call1 (Qinternal__syntax_propertize,
 		  make_fixnum (min (zv, 1 + charpos)));
       if (modiffs != CHARS_MODIFF)
-	error ("parse-sexp-propertize-function modified the buffer!");
+	error ("internal--syntax-propertize modified the buffer!");
       if (syntax_propertize__done <= charpos
 	  && syntax_propertize__done < zv)
-	error ("parse-sexp-propertize-function did not move"
+	error ("internal--syntax-propertize did not move"
 	       " syntax-propertize--done");
       SETUP_SYNTAX_TABLE (charpos, 1);
     }
@@ -2280,7 +2280,7 @@ in_classes (int c, Lisp_Object iso_classes)
      for nested comments and should be zero or negative else.
      ST_COMMENT_STYLE cannot be nested.
    PREV_SYNTAX is the SYNTAX_WITH_FLAGS of the previous character
-     (or 0 If the search cannot start in the middle of a two-character).
+     (or 0 if the search cannot start in the middle of a two-character).
 
    If successful, return true and store the charpos of the comment's
    end into *CHARPOS_PTR and the corresponding bytepos into

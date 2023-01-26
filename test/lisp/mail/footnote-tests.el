@@ -1,6 +1,6 @@
 ;;; footnote-tests.el --- Tests for footnote-mode    -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019  Free Software Foundation, Inc.
+;; Copyright (C) 2019-2020 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords:
@@ -18,11 +18,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-;;; Commentary:
-
-;;
-
 ;;; Code:
+
+(require 'footnote)
 
 (ert-deftest footnote-tests-same-place ()
   (with-temp-buffer

@@ -1,6 +1,6 @@
 ;;; auth-source-pass.el --- Integrate auth-source with password-store -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015, 2017-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015, 2017-2020 Free Software Foundation, Inc.
 
 ;; Author: Damien Cassou <damien@cassou.me>,
 ;;         Nicolas Petton <nicolas@petton.fr>
@@ -190,7 +190,7 @@ CONTENTS is the contents of a password-store formatted file."
   (let ((store-dir (expand-file-name auth-source-pass-filename)))
     (mapcar
      (lambda (file) (file-name-sans-extension (file-relative-name file store-dir)))
-     (directory-files-recursively store-dir "\\.gpg$"))))
+     (directory-files-recursively store-dir "\\.gpg\\'"))))
 
 (defun auth-source-pass--find-match (host user port)
   "Return password-store entry data matching HOST, USER and PORT.

@@ -1,4 +1,4 @@
-/* Copyright (C) 1992-2019 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -67,7 +67,7 @@ union ieee754_float
 #endif				/* Little endian.  */
       } ieee;
 
-    /* This format makes it easier to see if a NaN is a signalling NaN.  */
+    /* This format makes it easier to see if a NaN is a signaling NaN.  */
     struct
       {
 #if	__BYTE_ORDER == __BIG_ENDIAN
@@ -118,7 +118,7 @@ union ieee754_double
 #endif				/* Little endian.  */
       } ieee;
 
-    /* This format makes it easier to see if a NaN is a signalling NaN.  */
+    /* This format makes it easier to see if a NaN is a signaling NaN.  */
     struct
       {
 #if	__BYTE_ORDER == __BIG_ENDIAN

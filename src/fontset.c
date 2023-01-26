@@ -1,6 +1,6 @@
 /* Fontset handler.
 
-Copyright (C) 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 2001-2020 Free Software Foundation, Inc.
 Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
   2005, 2006, 2007, 2008, 2009, 2010, 2011
   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -353,7 +353,7 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 			      (NILP (args[idx]) ? args[1 - idx]
 			       : CALLMANY (Fvconcat, args)));
 	from = to1 + 1;
-      } while (from < to);
+      } while (from <= to);
     }
   else
     {
@@ -367,8 +367,14 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 static int
 fontset_compare_rfontdef (const void *val1, const void *val2)
 {
-  return (RFONT_DEF_SCORE (*(Lisp_Object *) val1)
-	  - RFONT_DEF_SCORE (*(Lisp_Object *) val2));
+  Lisp_Object v1 = *(Lisp_Object *) val1, v2 = *(Lisp_Object *) val2;
+  if (NILP (v1) && NILP (v2))
+    return 0;
+  else if (NILP (v1))
+    return INT_MIN;
+  else if (NILP (v2))
+    return INT_MAX;
+  return (RFONT_DEF_SCORE (v1) - RFONT_DEF_SCORE (v2));
 }
 
 /* Update a cons cell which has this form:
@@ -400,6 +406,8 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
   for (i = 0; i < size; i++)
     {
       Lisp_Object rfont_def = AREF (vec, i);
+      if (NILP (rfont_def))
+	continue;
       Lisp_Object font_def = RFONT_DEF_FONT_DEF (rfont_def);
       Lisp_Object font_spec = FONT_DEF_SPEC (font_def);
       int score = RFONT_DEF_SCORE (rfont_def) & 0xFF;

@@ -1,10 +1,11 @@
 ;; erc-replace.el -- wash and massage messages inserted into the buffer
 
-;; Copyright (C) 2001-2002, 2004, 2006-2019 Free Software Foundation,
+;; Copyright (C) 2001-2002, 2004, 2006-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
-;; Maintainer: emacs-devel@gnu.org
+;; Maintainer: Amin Bandali <bandali@gnu.org>
+;; URL: https://www.emacswiki.org/emacs/ErcReplace
 ;; Keywords: IRC, client, Internet
 
 ;; This file is part of GNU Emacs.

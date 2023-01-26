@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 
 @c See file emacs.texi for copying conditions.
@@ -140,6 +140,15 @@ any unfontified text they scroll over, instead to assume it has the
 default face.  This can cause Emacs to scroll to somewhat wrong buffer
 positions when the faces in use are not all the same size, even with
 single (i.e., without auto-repeat) scrolling operations.
+
+@vindex jit-lock-defer-time
+As an alternative to setting @code{fast-but-imprecise-scrolling} you
+might prefer to enable jit-lock deferred fontification (@pxref{Font
+Lock}).  To do this, customize @code{jit-lock-defer-time} to a small
+positive number such as 0.25, or even 0.1 if you type quickly.  This
+gives you less jerky scrolling when you hold down @kbd{C-v}, but the
+window contents after any action which scrolls into a fresh portion of
+the buffer will be momentarily unfontified.
 
 @vindex scroll-up
 @vindex scroll-down
@@ -726,6 +735,7 @@ in a way that does not interact well with @code{highlight}.
 @cindex @code{tab-line} face
 Similar to @code{mode-line} for a window's tab line, which appears
 at the top of a window with tabs representing window buffers.
+@xref{Tab Line}.
 @item vertical-border
 @cindex @code{vertical-border} face
 This face is used for the vertical divider between windows on text
@@ -797,12 +807,19 @@ would be selected if you click a mouse or press @key{RET}.
 @kindex C-x C--
 @kindex C-x C-=
 @kindex C-x C-0
+@kindex C-wheel-down
+@kindex C-wheel-up
   To increase the height of the default face in the current buffer,
 type @kbd{C-x C-+} or @kbd{C-x C-=}.  To decrease it, type @kbd{C-x
 C--}.  To restore the default (global) face height, type @kbd{C-x
 C-0}.  These keys are all bound to the same command,
 @code{text-scale-adjust}, which looks at the last key typed to
 determine which action to take.
+
+  Similarly, scrolling the mouse wheel with the @kbd{Ctrl} modifier
+pressed, when the mouse pointer is above buffer text, will increase or
+decrease the height of the default face, depending on the direction of
+the scrolling.
 
   The final key of these commands may be repeated without the leading
 @kbd{C-x}.  For instance, @kbd{C-x C-= C-= C-=} increases the face
@@ -1157,19 +1174,20 @@ right-to-left paragraphs.
 @findex display-fill-column-indicator-mode
 @findex global-display-fill-column-indicator-mode
   Emacs can add an indicator to display a fill column position.  The
-fill column indicator is a useful functionality specially in
-prog-mode to indicate the position of an specific column.
+fill column indicator is a useful functionality especially in
+@code{prog-mode} to indicate the position of a specific column.
 
-  You can set the buffer-local variables @code{display-fill-column-indicator}
-and @code{display-fill-column-indicator-character} to activate the
-indicator and controls how the indicator looks.
+  You can set the buffer-local variables
+@code{display-fill-column-indicator} and
+@code{display-fill-column-indicator-character} to activate the
+indicator and control how it looks, respectively.
 
 Alternatively you can type @w{@kbd{M-x display-fill-column-indicator-mode}}
-or @w{@kbd{M-x global-display-fill-column-indicator-mode}} which enables the
-indicator locally and globally respectively and also chooses the
-character to use if none is set already.  It is possible to use the
-first one to activate the indicator in a hook or the second one to
-enable it globally.
+or @w{@kbd{M-x global-display-fill-column-indicator-mode}} which
+enables the indicator locally or globally, respectively, and also
+chooses the character to use if none is already set.  It is possible
+to use the first one to activate the indicator in a hook and the
+second one to enable it globally.
 
 There are 2 buffer local variables and 1 face to customize this mode:
 
@@ -1186,20 +1204,20 @@ Any other value disables the indicator.  The default value is @code{t}.
 @item display-fill-column-indicator-character
 @vindex display-fill-column-indicator-character
 Specifies the character used for the indicator.  This character can be
-any valid char including unicode ones if the actual font supports
-them.
+any valid character including Unicode ones if the font supports them.
 
 When the mode is enabled through the functions
 @code{display-fill-column-indicator-mode} or
 @code{global-display-fill-column-indicator-mode}, the initialization
-functions check if this variable is @code{non-nil}, otherwise the
-initialization tries to set it to U+2502 or @samp{|}.
+functions check if this variable is non-@code{nil}, otherwise the
+initialization tries to set it to @code{U+2502} or @samp{|}.
 
 @item fill-column-indicator
 @vindex fill-column-indicator
 Specifies the face used to display the indicator.  It inherits its
-default values from shadow but without background color.  To change
-the indicator color you need to set only the foreground color of this face.
+default values from the face @code{shadow} but without background
+color.  To change the indicator color you need only set the foreground
+color of this face.
 @end table
 
 @vindex indicate-buffer-boundaries
@@ -1566,7 +1584,9 @@ sequences}, with the @code{escape-glyph} face.  For instance,
 character code @code{U+0098} (octal 230) is displayed as @samp{\230}.
 If you change the buffer-local variable @code{ctl-arrow} to
 @code{nil}, the @acronym{ASCII} control characters are also displayed
-as octal escape sequences instead of caret escape sequences.
+as octal escape sequences instead of caret escape sequences.  (You can
+also request that raw bytes be shown in hex, @pxref{Display Custom,
+display-raw-bytes-as-hex}.)
 
 @vindex nobreak-char-display
 @cindex non-breaking space

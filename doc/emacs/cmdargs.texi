@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2001-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Emacs Invocation
@@ -340,7 +340,7 @@ initialization file (@pxref{Resources}).
 @opindex --quick
 Start Emacs with minimum customizations.  This is similar to using
 @samp{-q}, @samp{--no-site-file}, @samp{--no-site-lisp},
-@samp{--no-x-resources}, and @samp{--no-splash} together..
+@samp{--no-x-resources}, and @samp{--no-splash} together.
 
 @item -daemon
 @opindex -daemon

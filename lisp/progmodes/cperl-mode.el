@@ -1,6 +1,6 @@
 ;;; cperl-mode.el --- Perl code editing commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1991-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1991-2020 Free Software Foundation, Inc.
 
 ;; Author: Ilya Zakharevich
 ;;	Bob Olson
@@ -446,7 +446,7 @@ May require patched `imenu' and `imenu-go'.  Obsolete."
   :group 'cperl-help-system)
 
 (defcustom cperl-info-page "perl"
-  "Name of the info page containing perl docs.
+  "Name of the Info manual containing perl docs.
 Older version of this page was called `perl5', newer `perl'."
   :type 'string
   :group 'cperl-help-system)

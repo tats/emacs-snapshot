@@ -4,7 +4,7 @@ dnl	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2019 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2020 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -23,7 +23,7 @@ dnl  along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.65)
 dnl Note this is parsed by (at least) make-dist and lisp/cedet/ede/emacs.el.
-AC_INIT(GNU Emacs, 27.0.50, bug-gnu-emacs@gnu.org, , https://www.gnu.org/software/emacs/)
+AC_INIT(GNU Emacs, 27.1, bug-gnu-emacs@gnu.org, , https://www.gnu.org/software/emacs/)
 
 dnl Set emacs_config_options to the options of 'configure', quoted for the shell,
 dnl and then quoted again for a C string.  Separate options with spaces.
@@ -461,7 +461,7 @@ OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
 OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
-OPTION_DEFAULT_ON([modules],[compile with dynamic modules support])
+OPTION_DEFAULT_ON([modules],[don't compile with dynamic modules support])
 OPTION_DEFAULT_ON([threads],[don't compile with elisp threading support])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
@@ -1767,7 +1767,7 @@ AC_CHECK_HEADERS_ONCE(
   sys/sysinfo.h
   coff.h pty.h
   sys/resource.h
-  sys/utsname.h pwd.h utmp.h util.h sys/prctl.h)
+  sys/utsname.h pwd.h utmp.h util.h)
 
 AC_CACHE_CHECK([for ADDR_NO_RANDOMIZE],
   [emacs_cv_personality_addr_no_randomize],
@@ -4180,8 +4180,40 @@ pthread_sigmask strsignal setitimer timer_getoverrun \
 sendto recvfrom getsockname getifaddrs freeifaddrs \
 gai_strerror sync \
 getpwent endpwent getgrent endgrent \
-cfmakeraw cfsetspeed __executable_start log2 prctl)
+cfmakeraw cfsetspeed __executable_start log2 pthread_setname_np)
 LIBS=$OLD_LIBS
+
+if test "$ac_cv_func_pthread_setname_np" = "yes"; then
+  AC_CACHE_CHECK(
+   [whether pthread_setname_np takes a single argument],
+   [emacs_cv_pthread_setname_np_1arg],
+   [AC_COMPILE_IFELSE(
+     [AC_LANG_PROGRAM(
+       [[#include <pthread.h>]],
+       [[pthread_setname_np ("a");]])],
+     [emacs_cv_pthread_setname_np_1arg=yes],
+     [emacs_cv_pthread_setname_np_1arg=no])])
+  if test "$emacs_cv_pthread_setname_np_1arg" = "yes"; then
+    AC_DEFINE(
+      HAVE_PTHREAD_SETNAME_NP_1ARG, 1,
+      [Define to 1 if pthread_setname_np takes a single argument.])
+  else
+    AC_CACHE_CHECK(
+     [whether pthread_setname_np takes three arguments],
+     [emacs_cv_pthread_setname_np_3arg],
+     [AC_COMPILE_IFELSE(
+       [AC_LANG_PROGRAM(
+         [[#include <pthread.h>]],
+         [[pthread_setname_np (0, "%s", "a");]])],
+       [emacs_cv_pthread_setname_np_3arg=yes],
+       [emacs_cv_pthread_setname_np_3arg=no])])
+     if test "$emacs_cv_pthread_setname_np_3arg" = "yes"; then
+       AC_DEFINE(
+         HAVE_PTHREAD_SETNAME_NP_3ARG, 1,
+         [Define to 1 if pthread_setname_np takes three arguments.])
+     fi
+  fi
+fi
 
 dnl No need to check for posix_memalign if aligned_alloc works.
 AC_CHECK_FUNCS([aligned_alloc posix_memalign], [break])
@@ -5185,7 +5217,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2019 Free Software Foundation, Inc."
+copyright="Copyright (C) 2020 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)
@@ -5559,7 +5591,7 @@ AC_SUBST(WINDOW_SYSTEM_OBJ)
 
 AH_TOP([/* GNU Emacs site configuration template file.
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2019
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2020
   Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -5734,9 +5766,9 @@ case $opsys,$emacs_uname_r in
     AC_MSG_WARN([[building Emacs on Cygwin 1.5 is not supported.]])
            echo
 	   ;;
-  cygwin,3.0.[[0-7]]'('*)
+  cygwin,3.0.[[0-7]]'('* | cygwin,3.1.[[0-2]]'('*)
     AC_DEFINE([HAVE_CYGWIN_O_PATH_BUG], 1,
-      [Define to 1 if opening a FIFO with O_PATH causes a hang.]);;
+      [Define to 1 if opening a FIFO, socket, or symlink with O_PATH is buggy.]);;
 esac
 
 # Remove any trailing slashes in these variables.

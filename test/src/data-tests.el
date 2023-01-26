@@ -1,6 +1,6 @@
 ;;; data-tests.el --- tests for src/data.c  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -174,7 +174,7 @@ most-positive-fixnum, which is just less than a power of 2.")
            sum 1))
 
 (defun test-bool-vector-bv-from-hex-string (desc)
-  (let (bv nchars nibbles)
+  (let (bv nibbles)
     (dolist (c (string-to-list desc))
       (push (string-to-number
              (char-to-string c)
@@ -244,9 +244,9 @@ comparing the subr with a much slower lisp implementation."
 
 (defun test-bool-vector-apply-mock-op (mock a b c)
   "Compute (slowly) the correct result of a bool-vector set operation."
-  (let (changed nv)
+  (let (changed)
     (cl-assert (eql (length b) (length c)))
-    (if a (setf nv a)
+    (unless a
       (setf a (make-bool-vector (length b) nil))
       (setf changed t))
 

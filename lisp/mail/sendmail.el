@@ -1,6 +1,6 @@
 ;;; sendmail.el --- mail sending commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992-1996, 1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1986, 1992-1996, 1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -73,7 +73,7 @@ Otherwise, most addresses look like `angles', but they look like
   :version "27.1")
 (make-obsolete-variable
  'mail-from-style
- "only the `angles' value is valid according to RFC2822." "27.1" 'set)
+ "only the `angles' value is valid according to RFC5322." "27.1" 'set)
 
 ;;;###autoload
 (defcustom mail-specify-envelope-from nil
@@ -1222,7 +1222,7 @@ external program defined by `sendmail-program'."
 		  (delete-region (line-beginning-position)
 				 (line-beginning-position 2))))
             ;; Apparently this causes a duplicate Sender.
-	    ;; ;; If the From is different than current user, insert Sender.
+	    ;; ;; If the From is different from current user, insert Sender.
 	    ;; (goto-char (point-min))
 	    ;; (and (re-search-forward "^From:"  delimline t)
 	    ;;      (progn

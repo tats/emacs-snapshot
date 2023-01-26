@@ -1,6 +1,6 @@
 ;;; vc-dir.el --- Directory status display under VC  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2020 Free Software Foundation, Inc.
 
 ;; Author: Dan Nicolaescu <dann@ics.uci.edu>
 ;; Keywords: vc tools
@@ -649,7 +649,7 @@ line."
 
 (defun vc-dir-mark-all-files (arg)
   "Mark all files with the same state as the current one.
-With a prefix argument mark all files.
+With a prefix argument mark all files (not directories).
 If the current entry is a directory, mark all child files.
 
 The commands operate on files that are on the same state.
@@ -670,7 +670,8 @@ share the same state."
 	 vc-ewoc)
 	(ewoc-map
 	 (lambda (filearg)
-	   (unless (vc-dir-fileinfo->marked filearg)
+	   (unless (or (vc-dir-fileinfo->directory filearg)
+                       (vc-dir-fileinfo->marked filearg))
 	     (setf (vc-dir-fileinfo->marked filearg) t)
 	     t))
 	 vc-ewoc))
@@ -878,7 +879,10 @@ If a prefix argument is given, ignore all marked files."
 	   (vc-ignore (vc-dir-fileinfo->name filearg))
 	   t))
        vc-ewoc)
-    (vc-ignore (vc-dir-current-file))))
+    (let ((rel-dir (vc--ignore-base-dir)))
+      (vc-ignore
+       (file-relative-name (vc-dir-current-file) rel-dir)
+       rel-dir))))
 
 (defun vc-dir-current-file ()
   (let ((node (ewoc-locate vc-ewoc)))

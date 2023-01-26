@@ -1,6 +1,6 @@
 ;;; cl-macs-tests.el --- tests for emacs-lisp/cl-macs.el  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2017-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -498,6 +498,7 @@ collection clause."
 
 (ert-deftest cl-macs-loop-for-as-equals-and ()
   "Test for https://debbugs.gnu.org/29799 ."
+  :expected-result :failed
   (let ((arr (make-vector 3 0)))
     (should (equal '((0 0) (1 1) (2 2))
                    (cl-loop for k below 3 for x = k and z = (elt arr k)
@@ -531,6 +532,7 @@ collection clause."
 
 (ert-deftest cl-macs-loop-conditional-step-clauses ()
   "These tests failed under the initial fixes in #bug#29799."
+  :expected-result :failed
   (should (cl-loop for i from 1 upto 100 and j = 1 then (1+ j)
                    if (not (= i j))
                    return nil

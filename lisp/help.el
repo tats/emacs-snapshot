@@ -1,6 +1,6 @@
 ;;; help.el --- help commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1993-1994, 1998-2019 Free Software
+;; Copyright (C) 1985-1986, 1993-1994, 1998-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -361,7 +361,7 @@ With argument, display info only for the selected version."
 		     (setq res (cons (match-string-no-properties 1) res)))))
 	       (cons "NEWS"
 		     (directory-files data-directory nil
-				      "^NEWS\\.[0-9][-0-9]*$" nil)))
+				      "\\`NEWS\\.[0-9][-0-9]*\\'" nil)))
 	      (sort (delete-dups res) #'string>)))
 	   (current (car all-versions)))
       (setq version (completing-read

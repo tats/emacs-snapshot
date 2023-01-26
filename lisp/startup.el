@@ -1,6 +1,6 @@
 ;;; startup.el --- process Emacs shell arguments  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-2019 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1992, 1994-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -352,11 +352,11 @@ Setting `init-file-user' does not prevent Emacs from loading
 
 (defcustom site-run-file (purecopy "site-start")
   "File containing site-wide run-time initializations.
-This file is loaded at run-time before `~/.emacs'.  It contains inits
-that need to be in place for the entire site, but which, due to their
-higher incidence of change, don't make sense to put into Emacs's
+This file is loaded at run-time before `user-init-file'.  It contains
+inits that need to be in place for the entire site, but which, due to
+their higher incidence of change, don't make sense to put into Emacs's
 dump file.  Thus, the run-time load order is: 1. file described in
-this variable, if non-nil; 2. `~/.emacs'; 3. `default.el'.
+this variable, if non-nil; 2. `user-init-file'; 3. `default.el'.
 
 Don't use the `site-start.el' file for things some users may not like.
 Put them in `default.el' instead, so that users can more easily
@@ -497,28 +497,28 @@ DIRS are relative."
 (defvar startup--xdg-config-home-emacs)
 
 ;; Return the name of the init file directory for Emacs, assuming
-;; XDG-DIR is the XDG location and USER-NAME is the user name.
-;; If USER-NAME is nil or "", use the current user.
-;; Prefer the XDG location unless it does does not exist and the
-;; .emacs.d location does exist.
+;; XDG-DIR is the XDG location and USER-NAME is the user name.  If
+;; USER-NAME is nil or "", use the current user.  Prefer the XDG
+;; location only if the .emacs.d location does not exist.
 (defun startup--xdg-or-homedot (xdg-dir user-name)
-  (if (file-exists-p xdg-dir)
-      xdg-dir
-    (let ((emacs-d-dir (concat "~" user-name
-			       (if (eq system-type 'ms-dos)
-				   "/_emacs.d/"
-				 "/.emacs.d/"))))
-      (if (or (file-exists-p emacs-d-dir)
-	      (if (eq system-type 'windows-nt)
-                  (if (file-directory-p (concat "~" user-name))
-                      (directory-files (concat "~" user-name) nil
-                                       "\\`[._]emacs\\(\\.elc?\\)?\\'"))
-		(file-exists-p (concat "~" init-file-user
-				       (if (eq system-type 'ms-dos)
-					   "/_emacs"
-					 "/.emacs")))))
-	  emacs-d-dir
-	xdg-dir))))
+  (let ((emacs-d-dir (concat "~" user-name
+                             (if (eq system-type 'ms-dos)
+                                 "/_emacs.d/"
+                               "/.emacs.d/"))))
+    (cond
+     ((or (file-exists-p emacs-d-dir)
+          (if (eq system-type 'windows-nt)
+              (if (file-directory-p (concat "~" user-name))
+                  (directory-files (concat "~" user-name) nil
+                                   "\\`[._]emacs\\(\\.elc?\\)?\\'"))
+            (file-exists-p (concat "~" init-file-user
+                                   (if (eq system-type 'ms-dos)
+                                       "/_emacs"
+                                     "/.emacs")))))
+      emacs-d-dir)
+     ((file-exists-p xdg-dir)
+      xdg-dir)
+     (t emacs-d-dir))))
 
 (defun normal-top-level ()
   "Emacs calls this function when it first starts up.
@@ -1373,10 +1373,10 @@ please check its value")
         ((not (eq system-type 'windows-nt))
          (concat "~" init-file-user "/.emacs"))
         ;; Else deal with the Windows situation.
-        ((directory-files "~" nil "^\\.emacs\\(\\.elc?\\)?$")
+        ((directory-files "~" nil "\\`\\.emacs\\(\\.elc?\\)?\\'")
          ;; Prefer .emacs on Windows.
          "~/.emacs")
-        ((directory-files "~" nil "^_emacs\\(\\.elc?\\)?$")
+        ((directory-files "~" nil "\\`_emacs\\(\\.elc?\\)?\\'")
          ;; Also support _emacs for compatibility, but warn about it.
          (push `(initialization
                  ,(format-message
@@ -1435,8 +1435,7 @@ please check its value")
   (if (get-buffer "*scratch*")
       (with-current-buffer "*scratch*"
 	(if (eq major-mode 'fundamental-mode)
-	    (funcall initial-major-mode))
-        (setq-local lexical-binding t)))
+	    (funcall initial-major-mode))))
 
   ;; Load library for our terminal type.
   ;; User init file can set term-file-prefix to nil to prevent this.
@@ -2317,7 +2316,6 @@ A fancy display is used on graphic displays, normal otherwise."
   (or (get-buffer "*scratch*")
       (with-current-buffer (get-buffer-create "*scratch*")
         (set-buffer-major-mode (current-buffer))
-        (setq-local lexical-binding t)
         (current-buffer))))
 
 (defun command-line-1 (args-left)

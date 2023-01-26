@@ -1,5 +1,5 @@
 ;;; epa-mail.el --- the EasyPG Assistant, minor-mode for mail composer -*- lexical-binding: t -*-
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2020 Free Software Foundation, Inc.
 
 ;; Author: Daiki Ueno <ueno@unixuser.org>
 ;; Keywords: PGP, GnuPG, mail, message
@@ -85,7 +85,10 @@ The buffer is expected to contain a mail message."
 ;;;###autoload
 (defun epa-mail-sign (start end signers mode)
   "Sign the current buffer.
-The buffer is expected to contain a mail message."
+The buffer is expected to contain a mail message, and signing is
+performed with your default key.
+With prefix argument, asks you to select interactively the key to
+use from your key ring."
   (declare (interactive-only t))
   (interactive
    (save-excursion

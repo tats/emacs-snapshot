@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Building
@@ -214,6 +214,7 @@ Select a buffer to be used by next invocation of @code{next-error} and
 @kindex C-x `
 @findex next-error
 @vindex next-error-highlight
+@vindex next-error-highlight-no-select
   To visit errors sequentially, type @w{@kbd{C-x `}}
 (@code{next-error}), or equivalently @kbd{M-g M-n} or @kbd{M-g n}.
 This command can be invoked from any buffer, not just a Compilation
@@ -258,7 +259,9 @@ to skip any messages.
 
   When Emacs visits the locus of an error message, it momentarily
 highlights the relevant source line.  The duration of this highlight
-is determined by the variable @code{next-error-highlight}.
+is determined by the variable @code{next-error-highlight} for the locus
+in the selected buffer, and @code{next-error-highlight-no-select} for
+the locus in non-selected buffers.
 
 @vindex compilation-context-lines
   If the @file{*compilation*} buffer is shown in a window with a left
@@ -1506,6 +1509,11 @@ putting a line like this in your init file (@pxref{Init File}):
 (add-to-list 'load-path "/path/to/my/lisp/library")
 @end example
 
+It is customary to put locally installed libraries in the
+@file{site-lisp} directory that is already in the default value of
+@code{load-path}, or in some subdirectory of @file{site-lisp}.  This
+way, you don't need to modify the default value of @code{load-path}.
+
 @cindex autoload
   Some commands are @dfn{autoloaded}; when you run them, Emacs
 automatically loads the associated library first.  For instance, the
@@ -1534,6 +1542,33 @@ prefix being completed.  To disable this feature, change the variable
 compiled with XEmacs, a modified version of Emacs---they can cause
 Emacs to crash.  Set the variable @code{load-dangerous-libraries} to
 @code{t} if you want to try loading them.
+
+  Once you put your library in a directory where Emacs can find and
+load it, you may wish to make it available at startup.  This is useful
+when the library defines features that should be available
+automatically on demand, and manually loading the library is thus
+inconvenient.  In these cases, make sure the library will be loaded by
+adding suitable forms to your init file: either @code{load} or
+@code{require} (if you always need to load the library at startup), or
+@code{autoload} if you need Emacs to load the library when some
+command or function is invoked.  For example:
+
+@smalllisp
+@group
+ ;; Loads @file{my-shining-package.elc} unconditionally.
+ (require 'my-shining-package)
+@end group
+@group
+ ;; Will load @file{my-shining-package.elc} when @code{my-func} is invoked.
+ (autoload 'my-func "my-shining-package")
+@end group
+@end smalllisp
+
+  Note that installing a package using @code{package-install}
+(@pxref{Package Installation}) takes care of placing the package's
+Lisp files in a directory where Emacs will find it, and also writes
+the necessary initialization code into your init files, making the
+above manual customizations unnecessary.
 
 @node Lisp Eval
 @section Evaluating Emacs Lisp Expressions

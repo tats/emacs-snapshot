@@ -1,6 +1,6 @@
 /* Window creation, deletion and examination for GNU Emacs.
    Does not include redisplay.
-   Copyright (C) 1985-1987, 1993-1998, 2000-2019 Free Software
+   Copyright (C) 1985-1987, 1993-1998, 2000-2020 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -5229,10 +5229,15 @@ grow_mini_window (struct window *w, int delta)
 {
   struct frame *f = XFRAME (w->frame);
   int old_height = window_body_height (w, true);
+  int min_height = FRAME_LINE_HEIGHT (f);
 
   eassert (MINI_WINDOW_P (w));
 
-  if ((delta != 0) && (old_height + delta >= FRAME_LINE_HEIGHT (f)))
+  /* Never shrink mini-window to less than its minimum height.  */
+  if (old_height + delta < min_height)
+    delta = old_height > min_height ? min_height - old_height : 0;
+
+  if (delta != 0)
     {
       Lisp_Object root = FRAME_ROOT_WINDOW (f);
       struct window *r = XWINDOW (root);

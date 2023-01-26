@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.  -*- coding: utf-8 -*-
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Calendar/Diary
@@ -532,8 +532,8 @@ holidays centered around a different month, use @kbd{C-u M-x
 holidays}, which prompts for the month and year.
 
   The holidays known to Emacs include United States holidays and the
-major Bahá'í, Chinese, Christian, Islamic, and Jewish holidays; also the
-solstices and equinoxes.
+major Bahá'í, Chinese, Christian, Islamic, and Jewish
+holidays; also the solstices and equinoxes.
 
 @findex list-holidays
    The command @kbd{M-x holiday-list} displays the list of holidays for

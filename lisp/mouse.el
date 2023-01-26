@@ -1,6 +1,6 @@
 ;;; mouse.el --- window system-independent mouse support  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1995, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1995, 1999-2020 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: hardware, mouse
@@ -1964,6 +1964,9 @@ When there is no region, this function does nothing."
     (move-overlay mouse-secondary-overlay (region-beginning) (region-end))))
 
 
+(declare-function rectangle--col-pos "rect" (col kind))
+(declare-function rectangle--reset-point-crutches "rect" ())
+
 (defconst mouse--rectangle-track-cursor t
   "Whether the mouse tracks the cursor when selecting a rectangle.
 If nil, the mouse tracks the rectangle corner instead.")

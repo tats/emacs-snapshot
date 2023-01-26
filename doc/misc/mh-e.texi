@@ -25,7 +25,7 @@
 This is version @value{VERSION}@value{EDITION} of @cite{The MH-E
 Manual}, last updated @value{UPDATED}.
 
-Copyright @copyright{} 1995, 2001--2003, 2005--2019 Free Software
+Copyright @copyright{} 1995, 2001--2003, 2005--2020 Free Software
 Foundation, Inc.
 
 @c This dual license has been agreed upon by the FSF.
@@ -2256,10 +2256,10 @@ signature block is more to your liking.
 Two hooks can be used to control how messages are displayed. The first
 hook, @code{mh-show-mode-hook}, is called early on in the process of
 the message display. It is usually used to perform some action on the
-message's content. The second hook, @code{mh-show-hook}, is the last
+message's buffer. The second hook, @code{mh-show-hook}, is the last
 thing called after messages are displayed. It's used to affect the
-behavior of MH-E in general or when @code{mh-show-mode-hook} is too
-early.
+message's content, the behavior of MH-E in general, or when
+@code{mh-show-mode-hook} is too early.
 
 @cindex MH-Show mode
 @cindex modes, MH-Show

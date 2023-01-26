@@ -1,6 +1,6 @@
 ;;; seq.el --- Sequence manipulation functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Petton <nicolas@petton.fr>
 ;; Keywords: sequences
@@ -57,6 +57,10 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-generic))
+
+;; We used to use some sequence functions from cl-lib, but this
+;; dependency was swapped around so that it will be easier to make
+;; seq.el preloaded in the future.  See also Bug#39761#26.
 
 (defmacro seq-doseq (spec &rest body)
   "Loop over a sequence.
@@ -285,7 +289,11 @@ sorted.  FUNCTION must be a function of one argument."
 TYPE must be one of following symbols: vector, string or list.
 
 \n(fn TYPE SEQUENCE...)"
-  (apply #'cl-concatenate type (seq-map #'seq-into-sequence sequences)))
+  (pcase type
+    ('vector (apply #'vconcat sequences))
+    ('string (apply #'concat sequences))
+    ('list (apply #'append (append sequences '(nil))))
+    (_ (error "Not a sequence type name: %S" type))))
 
 (cl-defgeneric seq-into-sequence (sequence)
   "Convert SEQUENCE into a sequence.

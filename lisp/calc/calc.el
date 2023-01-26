@@ -1,6 +1,6 @@
 ;;; calc.el --- the GNU Emacs calculator  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1993, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
 ;; Keywords: convenience, extensions
@@ -2288,7 +2288,7 @@ the United States."
        (calc-alg-digit-entry)
      (setq calc-aborted-prefix nil)
      (let* ((calc-digit-value nil)
-	    (calc-prev-char nil)
+	    (calc-prev-char last-command-event)
 	    (calc-prev-prev-char nil)
 	    (calc-buffer (current-buffer))
 	    (buf
@@ -2925,6 +2925,7 @@ the United States."
 
 
 
+(defvar math-comp-selected)
 (defvar calc-selection-cache-entry)
 ;;; Format the number A as a string.  [X N; X Z] [Public]
 (defun math-format-stack-value (entry)

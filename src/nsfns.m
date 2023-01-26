@@ -1,6 +1,6 @@
 /* Functions for the NeXT/Open/GNUstep and macOS window system.
 
-Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2019 Free Software
+Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2020 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -489,6 +489,17 @@ ns_set_represented_filename (struct frame *f)
     }
   else
     fstr = @"";
+
+#if defined (NS_IMPL_COCOA) && defined (MAC_OS_X_VERSION_10_7)
+  /* Work around for Mach port leaks on macOS 10.15 (bug#38618).  */
+  NSURL *fileURL = [NSURL fileURLWithPath:fstr isDirectory:NO];
+  NSNumber *isUbiquitousItem = @YES;
+  [fileURL getResourceValue:(id *)&isUbiquitousItem
+                     forKey:NSURLIsUbiquitousItemKey
+                      error:nil];
+  if ([isUbiquitousItem boolValue])
+    fstr = @"";
+#endif
 
 #ifdef NS_IMPL_COCOA
   /* Work around a bug observed on 10.3 and later where
@@ -1611,7 +1622,7 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
     dirS = [dirS stringByExpandingTildeInPath];
 
   panel = isSave ?
-    (id)[EmacsSavePanel savePanel] : (id)[EmacsOpenPanel openPanel];
+    (id)[NSSavePanel savePanel] : (id)[NSOpenPanel openPanel];
 
   [panel setTitle: promptS];
 
@@ -3065,29 +3076,6 @@ handlePanelKeys (NSSavePanel *panel, NSEvent *theEvent)
 
   return ret;
 }
-
-@implementation EmacsSavePanel
-- (BOOL)performKeyEquivalent:(NSEvent *)theEvent
-{
-  BOOL ret = handlePanelKeys (self, theEvent);
-  if (! ret)
-    ret = [super performKeyEquivalent:theEvent];
-  return ret;
-}
-@end
-
-
-@implementation EmacsOpenPanel
-- (BOOL)performKeyEquivalent:(NSEvent *)theEvent
-{
-  // NSOpenPanel inherits NSSavePanel, so passing self is OK.
-  BOOL ret = handlePanelKeys (self, theEvent);
-  if (! ret)
-    ret = [super performKeyEquivalent:theEvent];
-  return ret;
-}
-@end
-
 
 @implementation EmacsFileDelegate
 /* --------------------------------------------------------------------------

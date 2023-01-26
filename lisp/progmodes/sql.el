@@ -1,6 +1,6 @@
 ;;; sql.el --- specialized comint.el for SQL interpreters  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
 
 ;; Author: Alex Schroeder <alex@gnu.org>
 ;; Maintainer: Michael Mauger <michael@mauger.com>
@@ -860,7 +860,7 @@ The specified function will be called as:
   (wallet-func WALLET PRODUCT USER SERVER DATABASE PORT)
 
 It is expected to return either a string containing the password,
-a function returning the password, or nil, If you want to support
+a function returning the password, or nil.  If you want to support
 another format of password file, then implement a different
 search wallet function and identify the location of the password
 store with `sql-password-wallet'.")

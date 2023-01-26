@@ -1,6 +1,6 @@
 ;;; jsonrpc-tests.el --- tests for jsonrpc.el        -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2020 Free Software Foundation, Inc.
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: tests
@@ -114,7 +114,7 @@
     (condition-case err
         (progn
           (jsonrpc-request conn 'delete-directory "~/tmp")
-          (ert-fail "A `jsonrpc-error' should have been signalled!"))
+          (ert-fail "A `jsonrpc-error' should have been signaled!"))
       (jsonrpc-error
        (should (= -32601 (cdr (assoc 'jsonrpc-error-code (cdr err)))))))))
 
@@ -124,7 +124,7 @@
     (condition-case err
         (progn
           (jsonrpc-request conn '+ ["a" 2])
-          (ert-fail "A `jsonrpc-error' should have been signalled!"))
+          (ert-fail "A `jsonrpc-error' should have been signaled!"))
       (jsonrpc-error
        (should (= -32603 (cdr (assoc 'jsonrpc-error-code (cdr err)))))))))
 

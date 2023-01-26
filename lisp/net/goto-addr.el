@@ -1,11 +1,11 @@
 ;;; goto-addr.el --- click to browse URL or to send to e-mail address
 
-;; Copyright (C) 1995, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: Eric Ding <ericding@alum.mit.edu>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Created: 15 Aug 1995
-;; Keywords: mh-e, www, mouse, mail
+;; Keywords: www, mouse, mail
 
 ;; This file is part of GNU Emacs.
 
@@ -32,10 +32,10 @@
 
 ;; INSTALLATION
 ;;
-;; To use goto-address in a particular mode (for example, while
-;; reading mail in mh-e), add this to your init file:
+;; To use goto-address in a particular mode (this example uses
+;; the fictional rich-text-mode), add this to your init file:
 ;;
-;; (add-hook 'mh-show-mode-hook 'goto-address)
+;; (add-hook 'rich-text-mode-hook 'goto-address)
 ;;
 ;; The mouse click method is bound to [mouse-2] on highlighted URLs or
 ;; e-mail addresses only; it functions normally everywhere else.  To bind

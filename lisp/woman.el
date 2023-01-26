@@ -1,6 +1,6 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -138,7 +138,7 @@
 ;; Customization, Hooks and Imenu
 ;; ==============================
 
-;; WoMan supports the GNU Emacs 20+ customization facility, and puts
+;; WoMan supports the GNU Emacs customization facility, and puts
 ;; a customization group called `WoMan' in the `Help' group under the
 ;; top-level `Emacs' group.  In order to be able to customize WoMan
 ;; without first loading it, add the following sexp to your .emacs:

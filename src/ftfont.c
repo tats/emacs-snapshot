@@ -1,5 +1,5 @@
 /* ftfont.c -- FreeType font driver.
-   Copyright (C) 2006-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006-2020 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -102,7 +102,7 @@ static struct
     { "iso8859-15", { 0x00A0, 0x00A1, 0x00D0, 0x0152 }},
     { "iso8859-16", { 0x00A0, 0x0218}},
     { "gb2312.1980-0", { 0x4E13 }, "zh-cn"},
-    { "big5-0", { 0xF6B1 }, "zh-tw" },
+    { "big5-0", { 0x9C21 }, "zh-tw" },
     { "jisx0208.1983-0", { 0x4E55 }, "ja"},
     { "ksc5601.1985-0", { 0xAC00 }, "ko"},
     { "cns11643.1992-1", { 0xFE32 }, "zh-tw"},
@@ -119,7 +119,7 @@ static struct
     { "jisx0213.2004-1", { 0x20B9F }},
     { "viscii1.1-1", { 0x1EA0, 0x1EAE, 0x1ED2 }, "vi"},
     { "tis620.2529-1", { 0x0E01 }, "th"},
-    { "windows-1251", { 0x0401, 0x0490 }, "ru"},
+    { "microsoft-cp1251", { 0x0401, 0x0490 }, "ru"},
     { "koi8-r", { 0x0401, 0x2219 }, "ru"},
     { "mulelao-1", { 0x0E81 }, "lo"},
     { "unicode-sip", { 0x20000 }},
@@ -865,6 +865,9 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 #ifdef FC_FONTFORMAT
 			     FC_FONTFORMAT,
 #endif
+#if defined HAVE_XFT && defined FC_COLOR
+                             FC_COLOR,
+#endif
 			     NULL);
   if (! objset)
     goto err;
@@ -904,7 +907,19 @@ ftfont_list (struct frame *f, Lisp_Object spec)
   for (i = 0; i < fontset->nfont; i++)
     {
       Lisp_Object entity;
-
+#if defined HAVE_XFT && defined FC_COLOR
+      {
+        /* Some fonts, notably NotoColorEmoji, have an FC_COLOR value
+           that's neither FcTrue nor FcFalse, which means FcFontList
+           returns them even when it shouldn't really do so, so we
+           need to manually skip them here (Bug#37786).  */
+        FcBool b;
+        if (Vxft_ignore_color_fonts
+            && FcPatternGetBool (fontset->fonts[i], FC_COLOR, 0, &b)
+            == FcResultMatch && b != FcFalse)
+            continue;
+      }
+#endif
       if (spacing >= 0)
 	{
 	  int this;

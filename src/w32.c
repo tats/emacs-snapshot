@@ -1,6 +1,6 @@
 /* Utility and Unix shadow routines for GNU Emacs on the Microsoft Windows API.
 
-Copyright (C) 1994-1995, 2000-2019 Free Software Foundation, Inc.
+Copyright (C) 1994-1995, 2000-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -6398,7 +6398,15 @@ acl_get_file (const char *fname, acl_type_t type)
 	      if (!get_file_security (fname, si, psd, sd_len, &sd_len))
 		{
 		  xfree (psd);
-		  errno = EIO;
+		  err = GetLastError ();
+		  if (err == ERROR_NOT_SUPPORTED)
+		    errno = ENOTSUP;
+		  else if (err == ERROR_FILE_NOT_FOUND
+			   || err == ERROR_PATH_NOT_FOUND
+			   || err == ERROR_INVALID_NAME)
+		    errno = ENOENT;
+		  else
+		    errno = EIO;
 		  psd = NULL;
 		}
 	    }
@@ -6409,6 +6417,8 @@ acl_get_file (const char *fname, acl_type_t type)
 		      be encoded in the current ANSI codepage. */
 		   || err == ERROR_INVALID_NAME)
 	    errno = ENOENT;
+	  else if (err == ERROR_NOT_SUPPORTED)
+	    errno = ENOTSUP;
 	  else
 	    errno = EIO;
 	}

@@ -1,6 +1,6 @@
 ;;; man.el --- browse UNIX manual pages -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2001-2019 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2001-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Barry A. Warsaw <bwarsaw@cen.com>
@@ -996,7 +996,11 @@ An \"apropos\" query with -k gives a buffer of matching page
 names or descriptions.  The pattern argument is usually an
 \"grep -E\" style regexp.
 
-    -k pattern"
+    -k pattern
+
+Note that in some cases you will need to use \\[quoted-insert] to quote the
+SPC character in the above examples, because this command attempts
+to auto-complete your input based on the installed manual pages."
 
   (interactive
    (list (let* ((default-entry (Man-default-man-entry))

@@ -1,6 +1,6 @@
 ;;; buffer-tests.el --- tests for buffer.c functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -20,6 +20,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'seq)
 (eval-when-compile (require 'cl-lib))
 
 (ert-deftest overlay-modification-hooks-message-other-buf ()

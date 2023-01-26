@@ -1,6 +1,6 @@
 ;;; autoinsert.el --- automatic mode-dependent insertion of text into new files  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1994-1995, 1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1987, 1994-1995, 1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Charlie Martin <crm@cs.duke.edu>
@@ -171,7 +171,7 @@ If this contains a %s, that will be replaced by the matching rule."
                  (mapatoms (lambda (mode)
                              (let ((name (symbol-name mode)))
                                (when (string-match "-mode$" name)
-                                 (add-to-list 'modes name)))))
+                                 (push name modes)))))
                  (sort modes 'string<)))
      (completing-read "Local variables for mode: " v1 nil t)
      " . (("

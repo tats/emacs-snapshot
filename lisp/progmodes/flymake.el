@@ -1,6 +1,6 @@
 ;;; flymake.el --- A universal on-the-fly syntax checker  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2003-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2020 Free Software Foundation, Inc.
 
 ;; Author: Pavel Kobyakov <pk_at_work@yahoo.com>
 ;; Maintainer: João Távora <joaotavora@gmail.com>
@@ -313,9 +313,10 @@ generated it."
                                 &optional data
                                 overlay-properties)
   "Make a Flymake diagnostic for BUFFER's region from BEG to END.
-TYPE is a key to symbol and TEXT is a description of the problem
-detected in this region.  DATA is any object that the caller
-wishes to attach to the created diagnostic for later retrieval.
+TYPE is a diagnostic symbol and TEXT is string describing the
+problem detected in this region.  DATA is any object that the
+caller wishes to attach to the created diagnostic for later
+retrieval.
 
 OVERLAY-PROPERTIES is an alist of properties attached to the
 created diagnostic, overriding the default properties and any
@@ -1321,35 +1322,42 @@ POS can be a buffer position or a button"
    (flymake-show-diagnostic (if (button-type pos) (button-start pos) pos))))
 
 (defun flymake--diagnostics-buffer-entries ()
-  (with-current-buffer flymake--diagnostics-buffer-source
-    (cl-loop for diag in
-             (cl-sort (flymake-diagnostics) #'< :key #'flymake-diagnostic-beg)
-             for (line . col) =
-             (save-excursion
-               (goto-char (flymake--diag-beg diag))
-               (cons (line-number-at-pos)
-                     (- (point)
-                        (line-beginning-position))))
-             for type = (flymake--diag-type diag)
-             collect
-             (list (list :diagnostic diag
-                         :line line
-                         :severity (flymake--lookup-type-property
-                                    type
-                                    'severity (warning-numeric-level :error)))
-                   `[,(format "%s" line)
-                     ,(format "%s" col)
-                     ,(propertize (format "%s"
-                                          (flymake--lookup-type-property
-                                           type 'flymake-type-name type))
-                                  'face (flymake--lookup-type-property
-                                         type 'mode-line-face 'flymake-error))
-                     (,(format "%s" (flymake--diag-text diag))
-                      mouse-face highlight
-                      help-echo "mouse-2: visit this diagnostic"
-                      face nil
-                      action flymake-goto-diagnostic
-                      mouse-action flymake-goto-diagnostic)]))))
+  ;; Do nothing if 'flymake--diagnostics-buffer-source' has not yet
+  ;; been set to a valid buffer.  This could happen when this function
+  ;; is called too early.  For example 'global-display-line-numbers-mode'
+  ;; calls us from its mode hook, when the diagnostic buffer has just
+  ;; been created by 'flymake-show-diagnostics-buffer', but is not yet
+  ;; set up properly.
+  (when (bufferp flymake--diagnostics-buffer-source)
+    (with-current-buffer flymake--diagnostics-buffer-source
+      (cl-loop for diag in
+               (cl-sort (flymake-diagnostics) #'< :key #'flymake-diagnostic-beg)
+               for (line . col) =
+               (save-excursion
+                 (goto-char (flymake--diag-beg diag))
+                 (cons (line-number-at-pos)
+                       (- (point)
+                          (line-beginning-position))))
+               for type = (flymake--diag-type diag)
+               collect
+               (list (list :diagnostic diag
+                           :line line
+                           :severity (flymake--lookup-type-property
+                                      type
+                                      'severity (warning-numeric-level :error)))
+                     `[,(format "%s" line)
+                       ,(format "%s" col)
+                       ,(propertize (format "%s"
+                                            (flymake--lookup-type-property
+                                             type 'flymake-type-name type))
+                                    'face (flymake--lookup-type-property
+                                           type 'mode-line-face 'flymake-error))
+                       (,(format "%s" (flymake--diag-text diag))
+                        mouse-face highlight
+                        help-echo "mouse-2: visit this diagnostic"
+                        face nil
+                        action flymake-goto-diagnostic
+                        mouse-action flymake-goto-diagnostic)])))))
 
 (define-derived-mode flymake-diagnostics-buffer-mode tabulated-list-mode
   "Flymake diagnostics"

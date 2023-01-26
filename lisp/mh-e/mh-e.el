@@ -1,6 +1,6 @@
 ;;; mh-e.el --- GNU Emacs interface to the MH mail system
 
-;; Copyright (C) 1985-1988, 1990, 1992-1995, 1997, 1999-2019 Free
+;; Copyright (C) 1985-1988, 1990, 1992-1995, 1997, 1999-2020 Free
 ;; Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
@@ -3380,13 +3380,14 @@ used to affect the behavior of MH-E in general or when
 (defcustom-mh mh-show-mode-hook nil
   "Hook run upon entry to `mh-show-mode'.
 
-This hook is called early on in the process of the message
-display. It is usually used to perform some action on the
-message's content. See `mh-show-hook'."
+This hook is called early on in the process of the message display,
+before the message contents have been inserted into the buffer.
+It is usually used to perform some action on the
+buffer itself. See also `mh-show-hook'."
   :type 'hook
   :group 'mh-hooks
   :group 'mh-show
-  :package-version '(MH-E . "6.0"))
+  :package-version '(MH-E . "8.7"))
 
 (defcustom-mh mh-unseen-updated-hook nil
   "Hook run after the unseen sequence has been updated.

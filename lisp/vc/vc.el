@@ -1,6 +1,6 @@
 ;;; vc.el --- drive a version-control system from within Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1998, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1998, 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: FSF (see below for full credits)
 ;; Maintainer: emacs-devel@gnu.org
@@ -480,8 +480,8 @@
 ;;
 ;; - ignore (file &optional directory)
 ;;
-;;   Ignore FILE under the VCS of DIRECTORY (default is `default-directory').
-;;   FILE is a file wildcard.
+;;   Ignore FILE under DIRECTORY (default is 'default-directory').
+;;   FILE is a file wildcard relative to DIRECTORY.
 ;;   When called interactively and with a prefix argument, remove FILE
 ;;   from ignored files.
 ;;   When called from Lisp code, if DIRECTORY is non-nil, the
@@ -1406,40 +1406,45 @@ When called interactively, prompt for a FILE to ignore, unless a
 prefix argument is given, in which case prompt for a file FILE to
 remove from the list of ignored files."
   (interactive
-   (list
-    (if (not current-prefix-arg)
-        (read-file-name "File to ignore: ")
-      (completing-read
-       "File to remove: "
-       (vc-call-backend
-        (or (vc-responsible-backend default-directory)
-            (error "Unknown backend"))
-        'ignore-completion-table default-directory)))
-    nil current-prefix-arg))
+   (let* ((rel-dir (vc--ignore-base-dir))
+          (file (read-file-name "File to ignore: ")))
+     (when (and (file-name-absolute-p file)
+                (file-in-directory-p file rel-dir))
+       (setq file (file-relative-name file rel-dir)))
+     (list file
+           rel-dir
+           current-prefix-arg)))
   (let* ((directory (or directory default-directory))
 	 (backend (or (vc-responsible-backend default-directory)
                       (error "Unknown backend"))))
     (vc-call-backend backend 'ignore file directory remove)))
 
+(defun vc--ignore-base-dir ()
+  (let ((backend (vc-responsible-backend default-directory)))
+    (condition-case nil
+        (file-name-directory
+         (vc-call-backend backend 'find-ignore-file
+                          default-directory))
+      (vc-not-supported
+       default-directory))))
+
 (defun vc-default-ignore (backend file &optional directory remove)
-  "Ignore FILE under the VCS of DIRECTORY (default is `default-directory').
-FILE is a wildcard specification, either relative to
-DIRECTORY or absolute.
+  "Ignore FILE under DIRECTORY (default is `default-directory').
+FILE is a wildcard specification relative to DIRECTORY.
+
 When called from Lisp code, if DIRECTORY is non-nil, the
-repository to use will be deduced by DIRECTORY; if REMOVE is
-non-nil, remove FILE from ignored files.
-Argument BACKEND is the backend you are using."
+repository to use will be deduced by DIRECTORY.
+
+If REMOVE is non-nil, remove FILE from ignored files instead.
+
+Argument BACKEND is the backend to use."
   (let ((ignore
-	 (vc-call-backend backend 'find-ignore-file (or directory default-directory)))
-	file-path root-dir pattern)
-    (setq file-path (expand-file-name file directory))
-    (setq root-dir (file-name-directory ignore))
-    (when (not (string= (substring file-path 0 (length root-dir)) root-dir))
-      (error "Ignore spec %s is not below project root %s" file-path root-dir))
-    (setq pattern (substring file-path (length root-dir)))
+         (vc-call-backend backend
+                          'find-ignore-file
+                          (or directory default-directory))))
     (if remove
-	(vc--remove-regexp (concat "^" (regexp-quote pattern ) "\\(\n\\|$\\)") ignore)
-      (vc--add-line pattern ignore))))
+        (vc--remove-regexp (concat "^" (regexp-quote file) "\\(\n\\|$\\)") ignore)
+      (vc--add-line file ignore))))
 
 (defun vc-default-ignore-completion-table (backend file)
   "Return the list of ignored files under BACKEND."
@@ -1460,20 +1465,22 @@ Argument BACKEND is the backend you are using."
 ;; Subroutine for `vc-git-ignore' and `vc-hg-ignore'.
 (defun vc--add-line (string file)
   "Add STRING as a line to FILE."
-  (with-temp-buffer
-    (insert-file-contents file)
+  (with-current-buffer (find-file-noselect file)
+    (goto-char (point-min))
     (unless (re-search-forward (concat "^" (regexp-quote string) "$") nil t)
       (goto-char (point-max))
-      (insert (concat "\n" string))
-      (write-region (point-min) (point-max) file))))
+      (unless (bolp) (insert "\n"))
+      (insert string "\n")
+      (save-buffer))))
 
 (defun vc--remove-regexp (regexp file)
   "Remove all matching for REGEXP in FILE."
-  (with-temp-buffer
-    (insert-file-contents file)
-    (while (re-search-forward regexp nil t)
-      (replace-match ""))
-    (write-region (point-min) (point-max) file)))
+  (if (file-exists-p file)
+      (with-current-buffer (find-file-noselect file)
+        (goto-char (point-min))
+        (while (re-search-forward regexp nil t)
+          (replace-match ""))
+        (save-buffer))))
 
 (defun vc-checkout (file &optional rev)
   "Retrieve a copy of the revision REV of FILE.
@@ -2096,7 +2103,9 @@ Unlike `vc-find-revision-save', doesn't save the buffer to the file."
                     ;; For non-interactive, skip any questions
                     (let ((enable-local-variables :safe) ;; to find `mode:'
                           (buffer-file-name file))
-                      (ignore-errors (set-auto-mode)))
+                      ;; Don't run hooks that might assume buffer-file-name
+                      ;; really associates buffer with a file (bug#39190).
+                      (ignore-errors (delay-mode-hooks (set-auto-mode))))
                   (normal-mode))
 	        (set-buffer-modified-p nil)
                 (setq buffer-read-only t))

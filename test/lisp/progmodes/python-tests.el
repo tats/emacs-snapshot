@@ -1,6 +1,6 @@
 ;;; python-tests.el --- Test suite for python.el
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -3554,7 +3554,7 @@ def foo():
 ;;; Code check
 
 
-;;; Eldoc
+;;; ElDoc
 
 (ert-deftest python-eldoc--get-symbol-at-point-1 ()
   "Test paren handling."

@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Minibuffers
@@ -572,6 +572,7 @@ and returns the updated history list.  It limits the list length to
 the value of @var{maxelt} (if non-@code{nil}) or @code{history-length}
 (described below).  The possible values of @var{maxelt} have the same
 meaning as the values of @code{history-length}.
+@var{history-var} cannot refer to a lexical variable.
 
 Normally, @code{add-to-history} removes duplicate members from the
 history list if @code{history-delete-duplicates} is non-@code{nil}.
@@ -2226,16 +2227,16 @@ the end of @var{question}.  The possible responses are provided in
 @noindent
 where @var{long-answer} is the complete text of the user response, a
 string; @var{short-answer} is a short form of the same response, a
-single character; and @var{help-message} is the text that describes
-the meaning of the answer.  If the variable @code{read-answer-short}
-is non-@code{nil}, the prompt will show the short variants of the
-possible answers and the user is expected to type the single
-characters shown in the prompt; otherwise the prompt will show the
-long variants of the answers, and the user is expected to type the
-full text of one of the answers and end by pressing @key{RET}.  If
-@code{use-dialog-box} is non-@code{nil}, and this function was invoked
-by mouse events, the question and the answers will be displayed in a
-GUI dialog box.
+single character or a function key; and @var{help-message} is the text
+that describes the meaning of the answer.  If the variable
+@code{read-answer-short} is non-@code{nil}, the prompt will show the
+short variants of the possible answers and the user is expected to
+type the single characters/keys shown in the prompt; otherwise the
+prompt will show the long variants of the answers, and the user is
+expected to type the full text of one of the answers and end by
+pressing @key{RET}.  If @code{use-dialog-box} is non-@code{nil}, and
+this function was invoked by mouse events, the question and the
+answers will be displayed in a GUI dialog box.
 
 The function returns the text of the @var{long-answer} selected by the
 user, regardless of whether long or short answers were shown in the

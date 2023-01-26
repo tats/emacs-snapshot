@@ -1,6 +1,6 @@
 ;;; bookmark.el --- set bookmarks, maybe annotate them, jump to them later -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1997, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1997, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: Karl Fogel <kfogel@red-bean.com>
 ;; Created: July, 1993
@@ -1772,7 +1772,8 @@ Bookmark names preceded by a \"*\" have annotations.
 \\[bookmark-bmenu-show-annotation] -- show the annotation, if it exists, for the current bookmark
   in another buffer.
 \\[bookmark-bmenu-show-all-annotations] -- show the annotations of all bookmarks in another buffer.
-\\[bookmark-bmenu-edit-annotation] -- edit the annotation for the current bookmark."
+\\[bookmark-bmenu-edit-annotation] -- edit the annotation for the current bookmark.
+\\[bookmark-bmenu-search] -- incrementally search for bookmarks."
   (setq truncate-lines t)
   (setq buffer-read-only t))
 

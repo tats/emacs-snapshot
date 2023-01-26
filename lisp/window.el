@@ -1,6 +1,6 @@
 ;;; window.el --- GNU Emacs window commands aside from those written in C  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985, 1989, 1992-1994, 2000-2019 Free Software
+;; Copyright (C) 1985, 1989, 1992-1994, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -4970,9 +4970,11 @@ WINDOW must be a live window and defaults to the selected one.
 
 According to information stored in WINDOW's `quit-restore' window
 parameter either (1) delete WINDOW and its frame, (2) delete
-WINDOW, (3) restore the buffer previously displayed in WINDOW,
-or (4) make WINDOW display some other buffer than the present
-one.  If non-nil, reset `quit-restore' parameter to nil.
+WINDOW but leave its frame alone, (3) restore the buffer
+previously shown in WINDOW, or (4) make WINDOW display some other
+buffer.  If WINDOW is not deleted, reset its `quit-restore'
+parameter to nil.  See Info node `(elisp) Quitting Windows' for
+more details.
 
 Optional second argument BURY-OR-KILL tells how to proceed with
 the buffer of WINDOW.  The following values are handled:
@@ -5083,11 +5085,9 @@ WINDOW must be a live window and defaults to the selected one.
 With prefix argument KILL non-nil, kill the buffer instead of
 burying it.
 
-According to information stored in WINDOW's `quit-restore' window
-parameter either (1) delete WINDOW and its frame, (2) delete
-WINDOW, (3) restore the buffer previously displayed in WINDOW,
-or (4) make WINDOW display some other buffer than the present
-one.  If non-nil, reset `quit-restore' parameter to nil.
+This calls the function `quit-restore-window' to delete WINDOW or
+show some other buffer in it.  See Info node `(elisp) Quitting
+Windows' for more details.
 
 The functions in `quit-window-hook' will be run before doing
 anything else."
@@ -8794,8 +8794,7 @@ parameters of FRAME."
            (parent (frame-parent frame))
            (monitor-attributes
             (unless parent
-              (car (display-monitor-attributes-list
-                    (frame-parameter frame 'display)))))
+              (frame-monitor-attributes frame)))
            ;; FRAME'S parent or display sizes.  Used in connection
            ;; with margins.
            (geometry
@@ -8804,11 +8803,11 @@ parameters of FRAME."
            (parent-or-display-width
             (if parent
                 (frame-native-width parent)
-              (- (nth 2 geometry) (nth 0 geometry))))
+              (nth 2 geometry)))
            (parent-or-display-height
             (if parent
                 (frame-native-height parent)
-              (- (nth 3 geometry) (nth 1 geometry))))
+              (nth 3 geometry)))
            ;; FRAME's parent or workarea sizes.  Used when no margins
            ;; are specified.
            (parent-or-workarea
@@ -8870,13 +8869,15 @@ parameters of FRAME."
                                 (window--sanitize-margin
                                  (nth 2 margins) left-margin
                                  parent-or-display-width))
-                           (nth 2 parent-or-workarea)))
+                           (+ (nth 0 parent-or-workarea)
+                              (nth 2 parent-or-workarea))))
            (bottom-margin (if (nth 3 margins)
                               (- parent-or-display-height
                                  (window--sanitize-margin
                                   (nth 3 margins) top-margin
                                   parent-or-display-height))
-                            (nth 3 parent-or-workarea)))
+                            (+ (nth 1 parent-or-workarea)
+                               (nth 3 parent-or-workarea))))
            ;; Minimum and maximum sizes specified for FRAME.
            (sizes (or (frame-parameter frame 'fit-frame-to-buffer-sizes)
                       fit-frame-to-buffer-sizes))
@@ -9112,8 +9113,8 @@ accessible position."
 	       ;; wider than its frame's pixel width, its height
 	       ;; remains unaltered.
 	       (width (+ (car (window-text-pixel-size
-			       window (window-start) (point-max)
-			       (frame-pixel-width)
+			       window (window-start window) nil
+			       (frame-pixel-width (window-frame window))
 			       ;; Add one line-height to assure that
 			       ;; we're on the safe side.  This
 			       ;; overshoots when the first line below

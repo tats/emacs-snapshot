@@ -1,6 +1,6 @@
 ;;; shell-tests.el  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -37,5 +37,12 @@
     (forward-char -1)
     (should (equal (shell--parse-pcomplete-arguments)
                    '(("cd" "ba") 1 4)))))
+
+(ert-deftest shell-tests-completion-after-semi ()
+  (with-temp-buffer
+    (shell-mode)
+    (insert "cd ba;")
+    (should (equal (shell--parse-pcomplete-arguments)
+                   '(("cd" "ba" "") 1 4 7)))))
 
 ;;; shell-tests.el ends here

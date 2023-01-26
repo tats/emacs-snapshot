@@ -1,6 +1,6 @@
 ;;; prolog.el --- major mode for Prolog (and Mercury) -*- lexical-binding:t -*-
 
-;; Copyright (C) 1986-1987, 1997-1999, 2002-2003, 2011-2019 Free
+;; Copyright (C) 1986-1987, 1997-1999, 2002-2003, 2011-2020 Free
 ;; Software Foundation, Inc.
 
 ;; Authors: Emil Åström <emil_astrom(at)hotmail(dot)com>
@@ -381,7 +381,7 @@ terms (if this variable is nil, default)."
 
 (defcustom prolog-paren-indent 4
   "The indentation increase for parenthesis expressions.
-Only used in ( If -> Then ; Else) and ( Disj1 ; Disj2 ) style expressions."
+Only used in ( If -> Then ; Else ) and ( Disj1 ; Disj2 ) style expressions."
   :version "24.1"
   :group 'prolog-indentation
   :type 'integer

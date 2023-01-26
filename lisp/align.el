@@ -1,6 +1,6 @@
 ;;; align.el --- align text to a specific column, by regexp -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -259,7 +259,7 @@ The possible settings for `align-region-separate' are:
  `group'   Each contiguous set of lines where a specific alignment
 	   occurs is considered a section for that alignment rule.
 	   Note that each rule may have any entirely different set
-           of section divisions than another.
+           of section divisions from another.
 
 	     int    alpha = 1; /* one */
 	     double beta  = 2.0;

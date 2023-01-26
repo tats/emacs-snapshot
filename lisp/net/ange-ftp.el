@@ -1,6 +1,6 @@
 ;;; ange-ftp.el --- transparent FTP support for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-1996, 1998, 2000-2019 Free Software Foundation,
+;; Copyright (C) 1989-1996, 1998, 2000-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Andy Norman (ange@hplb.hpl.hp.com)
@@ -4170,8 +4170,7 @@ directory, so that Emacs will know its current contents."
 		   (ange-ftp-delete-directory file recursive trash)
 		 (delete-file file trash)))
 	     ;; We do not want to delete "." and "..".
-	     (directory-files
-	      dir 'full "^\\([^.]\\|\\.\\([^.]\\|\\..\\)\\).*")))
+	     (directory-files dir 'full (rx (or (not ".") "...")))))
 	(if parsed
 	    (let* ((host (nth 0 parsed))
 		   (user (nth 1 parsed))

@@ -1,6 +1,6 @@
 ;;; dired-aux.el --- less commonly used parts of dired -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
@@ -992,7 +992,14 @@ command with a prefix argument (the value does not matter)."
 	  (ignore-errors (dired-remove-entry new-file))
 	  (goto-char start)
 	  ;; Now replace the current line with an entry for NEW-FILE.
-	  (dired-update-file-line new-file) nil)
+	  ;; But don't remove the current line if either FROM-FILE or
+	  ;; NEW-FILE is a directory, because compressing/uncompressing
+          ;; directories doesn't remove the original.
+          (if (or (file-directory-p from-file)
+                  (file-directory-p new-file))
+              (dired-add-entry new-file nil t)
+            (dired-update-file-line new-file))
+          nil)
       (dired-log (concat "Failed to (un)compress " from-file))
       from-file)))
 
@@ -1020,8 +1027,9 @@ command with a prefix argument (the value does not matter)."
     ("\\.7z\\'" "" "7z x -aoa -o%o %i")
     ;; This item controls naming for compression.
     ("\\.tar\\'" ".tgz" nil)
-    ;; This item controls the compression of directories
-    (":" ".tar.gz" "tar -cf - %i | gzip -c9 > %o"))
+    ;; This item controls the compression of directories.  Its REGEXP
+    ;; element should never match any valid file name.
+    ("\000" ".tar.gz" "tar -cf - %i | gzip -c9 > %o"))
   "Control changes in file name suffixes for compression and uncompression.
 Each element specifies one transformation rule, and has the form:
   (REGEXP NEW-SUFFIX PROGRAM)
@@ -1145,7 +1153,7 @@ Return nil if no change in files."
            (condition-case nil
                (if (file-directory-p file)
                    (progn
-                     (setq suffix (cdr (assoc ":" dired-compress-file-suffixes)))
+                     (setq suffix (cdr (assoc "\000" dired-compress-file-suffixes)))
                      (when suffix
                        (let ((out-name (concat file (car suffix)))
                              (default-directory (file-name-directory file)))
@@ -1994,10 +2002,9 @@ Optional arg HOW-TO determines how to treat the target.
    (format prompt (dired-mark-prompt arg files)) dir default))
 
 (defun dired-dwim-target-directories ()
-  (cond ((functionp dired-dwim-target)
-         (funcall dired-dwim-target))
-        (dired-dwim-target
-         (dired-dwim-target-next))))
+  (if (functionp dired-dwim-target)
+      (funcall dired-dwim-target)
+    (dired-dwim-target-next)))
 
 (defun dired-dwim-target-next (&optional all-frames)
   ;; Return directories from all next windows with dired-mode buffers.
@@ -2957,6 +2964,7 @@ with the command \\[tags-loop-continue]."
 
 (declare-function xref--show-xrefs "xref")
 (declare-function xref-query-replace-in-results "xref")
+(declare-function project--files-in-directory "project")
 
 ;;;###autoload
 (defun dired-do-find-regexp (regexp)
@@ -2975,19 +2983,24 @@ REGEXP should use constructs supported by your local `grep' command."
   (require 'xref)
   (defvar grep-find-ignored-files)
   (declare-function rgrep-find-ignored-directories "grep" (dir))
-  (let* ((files (dired-get-marked-files nil nil nil nil t))
+  (let* ((marks (dired-get-marked-files nil nil nil nil t))
          (ignores (nconc (mapcar
                           #'file-name-as-directory
                           (rgrep-find-ignored-directories default-directory))
                          grep-find-ignored-files))
          (fetcher
           (lambda ()
-            (let ((xrefs (mapcan
-                          (lambda (file)
-                            (xref-collect-matches regexp "*" file
-                                                  (and (file-directory-p file)
-                                                       ignores)))
-                          files)))
+            (let (files xrefs)
+              (mapc
+               (lambda (mark)
+                 (if (file-directory-p mark)
+                     (setq files (nconc
+                                  (project--files-in-directory mark ignores "*")
+                                  files))
+                   (push mark files)))
+               (nreverse marks))
+              (setq xrefs
+                    (xref-matches-in-files regexp files))
               (unless xrefs
                 (user-error "No matches for: %s" regexp))
               xrefs))))

@@ -1,6 +1,6 @@
 ;;; gnus-sum.el --- summary mode commands for Gnus  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -3124,7 +3124,7 @@ follow up an article, type `\\[gnus-summary-followup]'.  To mail a reply to the 
 of an article, type `\\[gnus-summary-reply]'.
 
 There are approx. one gazillion commands you can execute in this
-buffer; read the info pages for more information (`\\[gnus-info-find-node]').
+buffer; read the Info manual for more information (`\\[gnus-info-find-node]').
 
 The following commands are available:
 
@@ -9493,16 +9493,26 @@ The 1st element is the button named by `gnus-collect-urls-primary-text'."
       (push primary urls))
     (delete-dups urls)))
 
+;; cf. `ediff-truncate-string-left', to become `string-truncate-left'
+;; in Emacs 28
+(defun gnus--string-truncate-left (string length)
+  "Truncate STRING to LENGTH, replacing initial surplus with \"...\"."
+  (let ((strlen (length string)))
+    (if (<= strlen length)
+	string
+      (setq length (max 0 (- length 3)))
+      (concat "..." (substring string (max 0 (- strlen 1 length)))))))
+
 (defun gnus-shorten-url (url max)
-  "Return an excerpt from URL."
+  "Return an excerpt from URL not exceeding MAX characters."
   (if (<= (length url) max)
       url
-    (let ((parsed (url-generic-parse-url url)))
-      (concat (url-host parsed)
-	      "..."
-	      (substring (url-filename parsed)
-			 (- (length (url-filename parsed))
-			    (max (- max (length (url-host parsed))) 0)))))))
+    (let* ((parsed (url-generic-parse-url url))
+           (host (url-host parsed))
+           (rest (concat (url-filename parsed)
+                         (when-let ((target (url-target parsed)))
+                           (concat "#" target)))))
+      (concat host (gnus--string-truncate-left rest (- max (length host)))))))
 
 (defun gnus-summary-browse-url (&optional external)
   "Scan the current article body for links, and offer to browse them.

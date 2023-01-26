@@ -1,6 +1,6 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2019 Free Software
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -3171,7 +3171,7 @@ Any other value means to ask for each directory."
   :group 'dired)
 
 ;; Match anything but `.' and `..'.
-(defvar dired-re-no-dot "^\\([^.]\\|\\.\\([^.]\\|\\..\\)\\).*")
+(defvar dired-re-no-dot (rx (or (not ".") "...")))
 
 ;; Delete file, possibly delete a directory and all its files.
 ;; This function is useful outside of dired.  One could change its name
@@ -3641,8 +3641,8 @@ in the active region."
 
 (defun dired-toggle-marks ()
   "Toggle marks: marked files become unmarked, and vice versa.
-Files marked with other flags (such as `D') are not affected.
-`.' and `..' are never toggled.
+Flagged files (indicated with flags such as `C' and `D', not
+with `*') are not affected, and `.' and `..' are never toggled.
 As always, hidden subdirs are not affected."
   (interactive)
   (save-excursion

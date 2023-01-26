@@ -1,6 +1,6 @@
 ;;; files.el --- file input and output commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1992-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1992-2020 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -134,10 +134,11 @@ This variable is relevant only if `backup-by-copying' is nil."
 (defcustom backup-by-copying-when-privileged-mismatch 200
   "Non-nil means create backups by copying to preserve a privileged owner.
 Renaming may still be used (subject to control of other variables)
-when it would not result in changing the owner of the file or if the owner
-has a user id greater than the value of this variable.  This is useful
-when low-numbered uid's are used for special system users (such as root)
-that must maintain ownership of certain files.
+when it would not result in changing the owner of the file or if the
+user id and group id of the file are both greater than the value of
+this variable.  This is useful when low-numbered uid's and gid's are
+used for special system users (such as root) that must maintain
+ownership of certain files.
 This variable is relevant only if `backup-by-copying' and
 `backup-by-copying-when-mismatch' are nil."
   :type '(choice (const nil) integer)
@@ -818,23 +819,25 @@ The path separator is colon in GNU and GNU-like systems."
 (defun directory-files-recursively (dir regexp
                                         &optional include-directories predicate
                                         follow-symlinks)
-  "Return list of all files under DIR that have file names matching REGEXP.
+  "Return list of all files under directory DIR whose names match REGEXP.
 This function works recursively.  Files are returned in \"depth
 first\" order, and files from each directory are sorted in
 alphabetical order.  Each file name appears in the returned list
 in its absolute form.
 
-Optional argument INCLUDE-DIRECTORIES non-nil means also include
-in the output directories whose names match REGEXP.
+By default, the returned list excludes directories, but if
+optional argument INCLUDE-DIRECTORIES is non-nil, they are
+included.
 
 PREDICATE can be either nil (which means that all subdirectories
-are descended into), t (which means that subdirectories that
+of DIR are descended into), t (which means that subdirectories that
 can't be read are ignored), or a function (which is called with
-the name of the subdirectory and should return non-nil if the
+the name of each subdirectory, and should return non-nil if the
 subdirectory is to be descended into).
 
-If FOLLOW-SYMLINKS, symbolic links that point to directories are
-followed.  Note that this can lead to infinite recursion."
+If FOLLOW-SYMLINKS is non-nil, symbolic links that point to
+directories are followed.  Note that this can lead to infinite
+recursion."
   (let* ((result nil)
 	 (files nil)
          (dir (directory-file-name dir))
@@ -2165,9 +2168,9 @@ If that fails, try to open it with `find-file-literally'
                       (* total-free-memory 1024)))))))))
 
 (defun files--message (format &rest args)
-  "Like `message', except sometimes don't print to minibuffer.
-If the variable `save-silently' is non-nil, the message is not
-displayed on the minibuffer."
+  "Like `message', except sometimes don't show the message text.
+If the variable `save-silently' is non-nil, the message will not
+be visible in the echo area."
   (apply #'message format args)
   (when save-silently (message nil)))
 
@@ -2668,7 +2671,7 @@ since only a single case-insensitive search through the alist is made."
      ("\\.pas\\'" . pascal-mode)
      ("\\.\\(dpr\\|DPR\\)\\'" . delphi-mode)
      ("\\.ad[abs]\\'" . ada-mode)
-     ("\\.ad[bs].dg\\'" . ada-mode)
+     ("\\.ad[bs]\\.dg\\'" . ada-mode)
      ("\\.\\([pP]\\([Llm]\\|erl\\|od\\)\\|al\\)\\'" . perl-mode)
      ("Imakefile\\'" . makefile-imake-mode)
      ("Makeppfile\\(?:\\.mk\\)?\\'" . makefile-makepp-mode) ; Put this before .mk
@@ -2819,7 +2822,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.properties\\(?:\\.[a-zA-Z0-9._-]+\\)?\\'" . conf-javaprop-mode)
      ("\\.toml\\'" . conf-toml-mode)
      ("\\.desktop\\'" . conf-desktop-mode)
-     ("/\\.redshift.conf\\'" . conf-windows-mode)
+     ("/\\.redshift\\.conf\\'" . conf-windows-mode)
      ("\\`/etc/\\(?:DIR_COLORS\\|ethers\\|.?fstab\\|.*hosts\\|lesskey\\|login\\.?de\\(?:fs\\|vperm\\)\\|magic\\|mtab\\|pam\\.d/.*\\|permissions\\(?:\\.d/.+\\)?\\|protocols\\|rpc\\|services\\)\\'" . conf-space-mode)
      ("\\`/etc/\\(?:acpid?/.+\\|aliases\\(?:\\.d/.+\\)?\\|default/.+\\|group-?\\|hosts\\..+\\|inittab\\|ksysguarddrc\\|opera6rc\\|passwd-?\\|shadow-?\\|sysconfig/.+\\)\\'" . conf-mode)
      ;; ChangeLog.old etc.  Other change-log-mode entries are above;
@@ -4634,8 +4637,10 @@ BACKUPNAME is the backup file name, which is the old file renamed."
 				      (let ((attr (file-attributes
 						   real-file-name
 						   'integer)))
-					(<= (file-attribute-user-id attr)
-					    copy-when-priv-mismatch))))
+                                        (or (<= (file-attribute-user-id attr)
+                                                copy-when-priv-mismatch)
+                                            (<= (file-attribute-group-id attr)
+                                                copy-when-priv-mismatch)))))
 			     (not (file-ownership-preserved-p real-file-name
 							      t)))))
 		   setmodes)
@@ -5749,7 +5754,7 @@ If called interactively, then PARENTS is non-nil."
   (write-region "" nil filename nil 0))
 
 (defconst directory-files-no-dot-files-regexp
-  "^\\([^.]\\|\\.\\([^.]\\|\\..\\)\\).*"
+  "[^.]\\|\\.\\.\\."
   "Regexp matching any file name except \".\" and \"..\".")
 
 (defun files--force (no-such fn &rest args)
@@ -7247,7 +7252,8 @@ if any returns nil.  If `confirm-kill-emacs' is non-nil, calls it."
            (or (not active)
                (with-displayed-buffer-window
                 (get-buffer-create "*Process List*")
-                '(display-buffer--maybe-at-bottom)
+                '(display-buffer--maybe-at-bottom
+                  (dedicated . t))
                 #'(lambda (window _value)
                     (with-selected-window window
                       (unwind-protect

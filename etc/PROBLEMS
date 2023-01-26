@@ -1,6 +1,6 @@
 Known Problems with GNU Emacs
 
-Copyright (C) 1987-1989, 1993-1999, 2001-2019 Free Software Foundation,
+Copyright (C) 1987-1989, 1993-1999, 2001-2020 Free Software Foundation,
 Inc.
 See the end of the file for license conditions.
 
@@ -727,6 +727,18 @@ and ps-mule to print Unicode characters.
 ** Under X, some characters appear improperly aligned in their lines.
 
 You may have bad fonts.
+
+** Under X, some characters are unexpectedly wide.
+
+e.g. recent versions of Inconsolata show this issue for almost all of
+its characters.  Due to what is probably an Xft bug, the determination
+of the width of some characters is incorrect.  One workaround is to
+build emacs with Cairo enabled ("configure --with-cairo" and have the
+appropriate Cairo development packages installed) as this
+configuration does not suffer from this problem.  See
+<https://github.com/googlefonts/Inconsolata/issues/42> and
+<https://lists.gnu.org/archive/html/bug-gnu-emacs/2020-01/msg00456.html>
+for more discussion.
 
 ** Under X, an unexpected monospace font is used as the default font.
 
@@ -2634,6 +2646,15 @@ If you do, please send it to bug-gnu-emacs@gnu.org so we can list it here.
 ** macOS doesn't come with libxpm, so only XPM3 is supported.
 
 Libxpm is available for macOS as part of the XQuartz project.
+
+** The color list can become corrupt.
+
+This can be seen when Emacs is run from the command line and produces
+output containing the text:
+
+    non-keyed archive cannot be decoded by NSKeyedUnarchiver
+
+The solution is to delete '$HOME/Library/Colors/Emacs.clr'.
 
 
 * Build-time problems

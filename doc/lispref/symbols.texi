@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Symbols
@@ -132,7 +132,7 @@ variables.  To define a customizable variable, use the
 (@pxref{Customization}).
 
   In principle, you can assign a variable value to any symbol with
-@code{setq}, whether not it has first been defined as a variable.
+@code{setq}, whether or not it has first been defined as a variable.
 However, you ought to write a variable definition for each global
 variable that you want to use; otherwise, your Lisp program may not
 act correctly if it is evaluated with lexical scoping enabled

@@ -1,6 +1,6 @@
 /* Minibuffer input and completion.
 
-Copyright (C) 1985-1986, 1993-2019 Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1993-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -696,10 +696,6 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   else
     histstring = Qnil;
 
-  /* If Lisp form desired instead of string, parse it.  */
-  if (expflag)
-    val = string_to_object (val, defalt);
-
   /* The appropriate frame will get selected
      in set-window-configuration.  */
   unbind_to (count, Qnil);
@@ -709,6 +705,10 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
      case the history variable is buffer-local.  */
   if (! (NILP (Vhistory_add_new_input) || NILP (histstring)))
     call2 (intern ("add-to-history"), histvar, histstring);
+
+  /* If Lisp form desired instead of string, parse it.  */
+  if (expflag)
+    val = string_to_object (val, defalt);
 
   return val;
 }

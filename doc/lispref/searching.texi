@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Searching and Matching
@@ -582,8 +582,13 @@ an unquoted @samp{[} is special again and a @samp{]} not.
 @cindex alpha character class, regexp
 @cindex xdigit character class, regexp
 
-  Here is a table of the classes you can use in a character alternative,
-and what they mean:
+  Below is a table of the classes you can use in a character
+alternative, and what they mean.  Note that the @samp{[} and @samp{]}
+characters that enclose the class name are part of the name, so a
+regular expression using these classes needs one more pair of
+brackets.  For example, a regular expression matching a sequence of
+one or more letters and digits would be @samp{[[:alnum:]]+}, not
+@samp{[:alnum:]+}.
 
 @table @samp
 @item [:ascii:]
@@ -1016,8 +1021,8 @@ or, using shorter synonyms and written more compactly,
 @example
 @group
 (rx "/*"
-    (* (| (not (any "*"))
-          (: "*" (not (any "/")))))
+    (* (| (not "*")
+          (: "*" (not "/"))))
     (+ "*") "/")
 @end group
 @end example
@@ -1080,7 +1085,11 @@ Corresponding string regexp: @samp{@var{A}@var{B}@dots{}}
 @cindex @code{or} in rx
 @itemx @code{(| @var{rx}@dots{})}
 @cindex @code{|} in rx
-Match exactly one of the @var{rx}s, trying from left to right.
+Match exactly one of the @var{rx}s.
+If all arguments are strings, characters, or @code{or} forms
+so constrained, the longest possible match will always be used.
+Otherwise, either the longest match or the
+first (in left-to-right order) will be used.
 Without arguments, the expression will not match anything at all.@*
 Corresponding string regexp: @samp{@var{A}\|@var{B}\|@dots{}}.
 
@@ -1742,7 +1751,7 @@ any special characters.
 @end defun
 
 @cindex optimize regexp
-@defun regexp-opt strings &optional paren keep-order
+@defun regexp-opt strings &optional paren
 This function returns an efficient regular expression that will match
 any of the strings in the list @var{strings}.  This is useful when you
 need to make matching or searching as fast as possible---for example,
@@ -1780,11 +1789,8 @@ if it is necessary to ensure that a postfix operator appended to
 it will apply to the whole expression.
 @end table
 
-The optional argument @var{keep-order}, if non-@code{nil}, forces the
-match to be performed in the order given, as if the strings were made
-into a regexp by joining them with the @samp{\|} operator.  If nil or
-omitted, the returned regexp will always match the longest string
-possible.
+The returned regexp is ordered in such a way that it will always match
+the longest string possible.
 
 Up to reordering, the resulting regexp of @code{regexp-opt} is
 equivalent to but usually more efficient than that of a simplified

@@ -1,6 +1,6 @@
 /* Lisp functions pertaining to editing.                 -*- coding: utf-8 -*-
 
-Copyright (C) 1985-1987, 1989, 1993-2019 Free Software Foundation, Inc.
+Copyright (C) 1985-1987, 1989, 1993-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -717,7 +717,7 @@ position of the first character in logical order, i.e. the smallest
 character position on the line.
 
 This function constrains the returned position to the current field
-unless that position would be on a different line than the original,
+unless that position would be on a different line from the original,
 unconstrained result.  If N is nil or 1, and a front-sticky field
 starts at point, the scan stops as soon as it starts.  To ignore field
 boundaries, bind `inhibit-field-text-motion' to t.
@@ -750,7 +750,7 @@ position of the last character in logical order, i.e. the largest
 character position on the line.
 
 This function constrains the returned position to the current field
-unless that would be on a different line than the original,
+unless that would be on a different line from the original,
 unconstrained result.  If N is nil or 1, and a rear-sticky field ends
 at point, the scan stops as soon as it starts.  To ignore field
 boundaries bind `inhibit-field-text-motion' to t.
@@ -863,7 +863,7 @@ instead.
 This does not take narrowing into account; to count the number of
 characters in the accessible portion of the current buffer, use
 `(- (point-max) (point-min))', and to count the number of characters
-in some other BUFFER, use
+in the accessible portion of some other BUFFER, use
 `(with-current-buffer BUFFER (- (point-max) (point-min)))'.  */)
   (Lisp_Object buffer)
 {
@@ -3031,7 +3031,7 @@ width, and precision specifiers, as follows:
   %<field><flags><width><precision>character
 
 where field is [0-9]+ followed by a literal dollar "$", flags is
-[+ #-0]+, width is [0-9]+, and precision is a literal period "."
+[+ #0-]+, width is [0-9]+, and precision is a literal period "."
 followed by [0-9]+.
 
 If a %-sequence is numbered with a field with positive value N, the
@@ -3057,7 +3057,7 @@ printed representation.  The padding, if any, normally goes on the
 left, but it goes on the right if the - flag is present.  The padding
 character is normally a space, but it is 0 if the 0 flag is present.
 The 0 flag is ignored if the - flag is present, or the format sequence
-is something other than %d, %e, %f, and %g.
+is something other than %d, %o, %x, %e, %f, and %g.
 
 For %e and %f sequences, the number after the "." in the precision
 specifier says how many decimal places to show; if zero, the decimal

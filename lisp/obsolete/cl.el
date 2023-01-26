@@ -1,6 +1,6 @@
 ;;; cl.el --- Compatibility aliases for the old CL library.  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2020 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Deprecated-since: 27.1
@@ -509,7 +509,7 @@ This method shows how to handle `setf's to places of the form
 ARGLIST, as if NAME were going to be expanded as a macro, then
 the BODY forms are executed and must return a list of five elements:
 a temporary-variables list, a value-forms list, a store-variables list
-\(of length one), a store-form, and an access- form.
+\(of length one), a store-form, and an access-form.
 
 See `gv-define-expander', and `gv-define-setter' for better and
 simpler ways to define setf-methods."

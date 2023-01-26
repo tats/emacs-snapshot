@@ -1,6 +1,6 @@
 ;;; ezimage --- Generalized Image management
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: file, tags, tools
@@ -270,4 +270,4 @@ See `ezimage-expand-image-button-alist' for details."
 
 (provide 'ezimage)
 
-;;; sb-image.el ends here
+;;; ezimage.el ends here

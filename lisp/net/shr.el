@@ -1,6 +1,6 @@
 ;;; shr.el --- Simple HTML Renderer -*- lexical-binding: t -*-
 
-;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: html
@@ -1197,7 +1197,8 @@ Return a string with image data."
 	     (libxml-parse-xml-region (point) (point-max)) 'utf-8)))
     ;; SVG images often do not have a specified foreground/background
     ;; color, so wrap them in styles.
-    (when (eq content-type 'image/svg+xml)
+    (when (and (display-images-p)
+               (eq content-type 'image/svg+xml))
       (setq data (svg--wrap-svg data)))
     (list data content-type)))
 

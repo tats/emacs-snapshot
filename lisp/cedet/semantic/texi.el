@@ -1,6 +1,6 @@
 ;;; semantic/texi.el --- Semantic details for Texinfo files
 
-;; Copyright (C) 2001-2005, 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2005, 2007-2020 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -495,7 +495,7 @@ that start with that symbol."
 	       (setq tabs (cdr tabs)))
 	     r))
 	  (t
-	   (directory-files default-directory nil "\\.texi$"))
+	   (directory-files default-directory nil "\\.texi\\'"))
 	  )))
 
 ;; Turns out this might not be useful.

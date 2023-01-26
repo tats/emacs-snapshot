@@ -1,6 +1,6 @@
 /* Simple built-in editing commands.
 
-Copyright (C) 1985, 1993-1998, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1998, 2001-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -159,7 +159,7 @@ With argument N not nil or 1, move forward N - 1 lines first.
 If point reaches the beginning or end of buffer, it stops there.
 
 This function constrains point to the current field unless this moves
-point to a different line than the original, unconstrained result.
+point to a different line from the original, unconstrained result.
 If N is nil or 1, and a front-sticky field starts at point, the point
 does not move.  To ignore field boundaries bind
 `inhibit-field-text-motion' to t, or use the `forward-line' function
@@ -184,7 +184,7 @@ If point reaches the beginning or end of buffer, it stops there.
 To ignore intangibility, bind `inhibit-point-motion-hooks' to t.
 
 This function constrains point to the current field unless this moves
-point to a different line than the original, unconstrained result.  If
+point to a different line from the original, unconstrained result.  If
 N is nil or 1, and a rear-sticky field ends at point, the point does
 not move.  To ignore field boundaries bind `inhibit-field-text-motion'
 to t.  */)
@@ -203,7 +203,7 @@ to t.  */)
       SET_PT (newpos);
 
       if (PT > newpos
-	  && FETCH_CHAR (PT - 1) == '\n')
+	  && FETCH_BYTE (PT_BYTE - 1) == '\n')
 	{
 	  /* If we skipped over a newline that follows
 	     an invisible intangible run,
@@ -214,7 +214,7 @@ to t.  */)
 	  break;
 	}
       else if (PT > newpos && PT < ZV
-	       && FETCH_CHAR (PT) != '\n')
+	       && FETCH_BYTE (PT_BYTE) != '\n')
 	/* If we skipped something intangible
 	   and now we're not really at eol,
 	   keep going.  */

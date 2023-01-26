@@ -1,6 +1,6 @@
 ;;; calc-macs.el --- important macros for Calc  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1993, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
 
@@ -161,8 +161,9 @@
 		      hms date mod var))))
 
 (defsubst Math-num-integerp (a)
-  (or (not (consp a))
-      (and (eq (car a) 'float)
+  (or (integerp a)
+      (and (consp a)
+           (eq (car a) 'float)
 	   (>= (nth 2 a) 0))))
 
 (defsubst Math-equal-int (a b)

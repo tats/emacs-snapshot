@@ -1,6 +1,6 @@
 ;;; cus-start.el --- define customization properties of builtins  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999-2020 Free Software Foundation, Inc.
 
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Keywords: internal
@@ -324,7 +324,7 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 			    ;; FIXME?
                             ;; :initialize custom-initialize-default
 			    :set custom-set-minor-mode)
-	     (tab-bar-mode (frames mouse) boolean nil
+	     (tab-bar-mode tab-bar boolean nil
                            ;; :initialize custom-initialize-default
 			   :set custom-set-minor-mode)
 	     (tool-bar-mode (frames mouse) boolean nil
@@ -771,9 +771,16 @@ since it could result in memory overflow and make Emacs crash."
               :safe (lambda (value) (or (booleanp value) (integerp value))))
              (display-fill-column-indicator-character
               display-fill-column-indicator
-              character
+              (choice
+               (character :tag "Use U+2502 to indicate fill column"
+                      :value ?│)
+               (character :tag "Use | to indicate fill column"
+                      :value ?|)
+               (const :tag "If possible, use U+2502 to indicate fill column, otherwise use |"
+                      :value nil)
+               character)
               "27.1"
-              :safe characterp)
+              :safe (lambda (value) (or (characterp value) (null value))))
 	     ;; xfaces.c
 	     (scalable-fonts-allowed display boolean "22.1")
 	     ;; xfns.c

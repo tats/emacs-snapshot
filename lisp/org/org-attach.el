@@ -1,6 +1,6 @@
 ;;; org-attach.el --- Manage file attachments to Org outlines -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@newartisans.com>
 ;; Keywords: org data attachment
@@ -429,7 +429,7 @@ attachment-folder.
 
 Change of attachment-folder due to unset might be if an ID
 property is set on the node, or if a separate inherited
-DIR-property exists (that is different than the unset one)."
+DIR-property exists (that is different from the unset one)."
   (interactive)
   (let ((old (org-attach-dir))
 	(new

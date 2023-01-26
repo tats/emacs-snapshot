@@ -1,6 +1,6 @@
 /* Random utility Lisp functions.
 
-Copyright (C) 1985-1987, 1993-1995, 1997-2019 Free Software Foundation,
+Copyright (C) 1985-1987, 1993-1995, 1997-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -1604,16 +1604,16 @@ The value is actually the tail of LIST whose car is ELT.  */)
 }
 
 DEFUN ("assq", Fassq, Sassq, 2, 2, 0,
-       doc: /* Return non-nil if KEY is `eq' to the car of an element of LIST.
-The value is actually the first element of LIST whose car is KEY.
-Elements of LIST that are not conses are ignored.  */)
-  (Lisp_Object key, Lisp_Object list)
+       doc: /* Return non-nil if KEY is `eq' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored.  */)
+  (Lisp_Object key, Lisp_Object alist)
 {
-  Lisp_Object tail = list;
+  Lisp_Object tail = alist;
   FOR_EACH_TAIL (tail)
     if (CONSP (XCAR (tail)) && EQ (XCAR (XCAR (tail)), key))
       return XCAR (tail);
-  CHECK_LIST_END (tail, list);
+  CHECK_LIST_END (tail, alist);
   return Qnil;
 }
 
@@ -1621,22 +1621,22 @@ Elements of LIST that are not conses are ignored.  */)
    Use only on objects known to be non-circular lists.  */
 
 Lisp_Object
-assq_no_quit (Lisp_Object key, Lisp_Object list)
+assq_no_quit (Lisp_Object key, Lisp_Object alist)
 {
-  for (; ! NILP (list); list = XCDR (list))
-    if (CONSP (XCAR (list)) && EQ (XCAR (XCAR (list)), key))
-      return XCAR (list);
+  for (; ! NILP (alist); alist = XCDR (alist))
+    if (CONSP (XCAR (alist)) && EQ (XCAR (XCAR (alist)), key))
+      return XCAR (alist);
   return Qnil;
 }
 
 DEFUN ("assoc", Fassoc, Sassoc, 2, 3, 0,
-       doc: /* Return non-nil if KEY is equal to the car of an element of LIST.
-The value is actually the first element of LIST whose car equals KEY.
+       doc: /* Return non-nil if KEY is equal to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car equals KEY.
 
 Equality is defined by TESTFN if non-nil or by `equal' if nil.  */)
-     (Lisp_Object key, Lisp_Object list, Lisp_Object testfn)
+     (Lisp_Object key, Lisp_Object alist, Lisp_Object testfn)
 {
-  Lisp_Object tail = list;
+  Lisp_Object tail = alist;
   FOR_EACH_TAIL (tail)
     {
       Lisp_Object car = XCAR (tail);
@@ -1647,7 +1647,7 @@ Equality is defined by TESTFN if non-nil or by `equal' if nil.  */)
 	      : !NILP (call2 (testfn, XCAR (car), key))))
 	return car;
     }
-  CHECK_LIST_END (tail, list);
+  CHECK_LIST_END (tail, alist);
   return Qnil;
 }
 
@@ -1656,11 +1656,11 @@ Equality is defined by TESTFN if non-nil or by `equal' if nil.  */)
    that are not too deep and are not window configurations.  */
 
 Lisp_Object
-assoc_no_quit (Lisp_Object key, Lisp_Object list)
+assoc_no_quit (Lisp_Object key, Lisp_Object alist)
 {
-  for (; ! NILP (list); list = XCDR (list))
+  for (; ! NILP (alist); alist = XCDR (alist))
     {
-      Lisp_Object car = XCAR (list);
+      Lisp_Object car = XCAR (alist);
       if (CONSP (car)
 	  && (EQ (XCAR (car), key) || equal_no_quit (XCAR (car), key)))
 	return car;
@@ -1669,24 +1669,24 @@ assoc_no_quit (Lisp_Object key, Lisp_Object list)
 }
 
 DEFUN ("rassq", Frassq, Srassq, 2, 2, 0,
-       doc: /* Return non-nil if KEY is `eq' to the cdr of an element of LIST.
-The value is actually the first element of LIST whose cdr is KEY.  */)
-  (Lisp_Object key, Lisp_Object list)
+       doc: /* Return non-nil if KEY is `eq' to the cdr of an element of ALIST.
+The value is actually the first element of ALIST whose cdr is KEY.  */)
+  (Lisp_Object key, Lisp_Object alist)
 {
-  Lisp_Object tail = list;
+  Lisp_Object tail = alist;
   FOR_EACH_TAIL (tail)
     if (CONSP (XCAR (tail)) && EQ (XCDR (XCAR (tail)), key))
       return XCAR (tail);
-  CHECK_LIST_END (tail, list);
+  CHECK_LIST_END (tail, alist);
   return Qnil;
 }
 
 DEFUN ("rassoc", Frassoc, Srassoc, 2, 2, 0,
-       doc: /* Return non-nil if KEY is `equal' to the cdr of an element of LIST.
-The value is actually the first element of LIST whose cdr equals KEY.  */)
-  (Lisp_Object key, Lisp_Object list)
+       doc: /* Return non-nil if KEY is `equal' to the cdr of an element of ALIST.
+The value is actually the first element of ALIST whose cdr equals KEY.  */)
+  (Lisp_Object key, Lisp_Object alist)
 {
-  Lisp_Object tail = list;
+  Lisp_Object tail = alist;
   FOR_EACH_TAIL (tail)
     {
       Lisp_Object car = XCAR (tail);
@@ -1694,7 +1694,7 @@ The value is actually the first element of LIST whose cdr equals KEY.  */)
 	  && (EQ (XCDR (car), key) || !NILP (Fequal (XCDR (car), key))))
 	return car;
     }
-  CHECK_LIST_END (tail, list);
+  CHECK_LIST_END (tail, alist);
   return Qnil;
 }
 
@@ -3297,7 +3297,13 @@ static Lisp_Object base64_encode_string_1 (Lisp_Object, bool,
 DEFUN ("base64-encode-region", Fbase64_encode_region, Sbase64_encode_region,
        2, 3, "r",
        doc: /* Base64-encode the region between BEG and END.
-Return the length of the encoded text.
+The data in the region is assumed to represent bytes, not text.  If
+you want to base64-encode text, the text has to be converted into data
+first by using `encode-coding-region' with the appropriate coding
+system first.
+
+Return the length of the encoded data.
+
 Optional third argument NO-LINE-BREAK means do not break long lines
 into shorter lines.  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object no_line_break)
@@ -3544,7 +3550,13 @@ base64_encode_1 (const char *from, char *to, ptrdiff_t length,
 DEFUN ("base64-decode-region", Fbase64_decode_region, Sbase64_decode_region,
        2, 3, "r",
        doc: /* Base64-decode the region between BEG and END.
-Return the length of the decoded text.
+Return the length of the decoded data.
+
+Note that after calling this function, the data in the region will
+represent bytes, not text.  If you want to end up with text, you have
+to call `decode-coding-region' afterwards with an appropriate coding
+system.
+
 If the region can't be decoded, signal an error and don't modify the buffer.
 Optional third argument BASE64URL determines whether to use the URL variant
 of the base 64 encoding, as defined in RFC 4648.  */)

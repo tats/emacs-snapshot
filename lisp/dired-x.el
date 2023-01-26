@@ -1,6 +1,6 @@
 ;;; dired-x.el --- extra Dired functionality  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 1997, 2001-2019 Free Software Foundation,
+;; Copyright (C) 1993-1994, 1997, 2001-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -27,7 +27,7 @@
 ;;; Commentary:
 
 ;; This is based on Sebastian Kremer's excellent dired-x.el (Dired Extra),
-;; version 1.191, adapted for GNU Emacs.  See the `dired-x' info pages.
+;; version 1.191, adapted for GNU Emacs.  See the `dired-x' Info manual.
 
 ;; At load time dired-x.el will install itself and bind some dired keys.
 ;; Some dired.el and dired-aux.el functions have extra features if
@@ -35,7 +35,7 @@
 
 ;; User customization: M-x customize-group RET dired-x RET.
 
-;; *Please* see the `dired-x' info pages for more details.
+;; *Please* see the `dired-x' Info manual for more details.
 
 
 ;;; Code:

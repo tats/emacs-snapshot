@@ -1,6 +1,6 @@
 ;;; svg.el --- SVG image creation functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;         Felix E. Klee <felix.klee@inka.de>
@@ -70,7 +70,9 @@ any further elements added."
 	      (height . ,height)
 	      (version . "1.1")
 	      (xmlns . "http://www.w3.org/2000/svg")
-	      ,@(svg--arguments nil args))))
+              ,@(unless (plist-get args :xmlns:xlink)
+                  '((xmlns:xlink . "http://www.w3.org/1999/xlink")))
+              ,@(svg--arguments nil args))))
 
 (defun svg-gradient (svg id type stops)
   "Add a gradient with ID to SVG.

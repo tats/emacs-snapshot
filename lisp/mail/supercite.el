@@ -1,6 +1,6 @@
 ;;; supercite.el --- minor mode for citing mail and news replies
 
-;; Copyright (C) 1993, 1997, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1997, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: 1993 Barry A. Warsaw <bwarsaw@python.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -1311,7 +1311,7 @@ use it instead of `sc-citation-root-regexp'."
 ;; filling
 (defun sc-fill-if-different (&optional prefix)
   "Fill the region bounded by `sc-fill-begin' and point.
-Only fill if optional PREFIX is different than `sc-fill-line-prefix'.
+Only fill if optional PREFIX is different from `sc-fill-line-prefix'.
 If `sc-auto-fill-region-p' is nil, do not fill region.  If PREFIX is
 not supplied, initialize fill variables.  This is useful for a regi
 `begin' frame-entry."

@@ -1,6 +1,6 @@
 ;;; wdired.el --- Rename files editing their names in dired buffers -*- coding: utf-8; -*-
 
-;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
 
 ;; Filename: wdired.el
 ;; Author: Juan León Lahoz García <juanleon1@gmail.com>
@@ -357,6 +357,8 @@ non-nil means return old filename."
     (remove-text-properties
      (point-min) (point-max)
      '(front-sticky nil rear-nonsticky nil read-only nil keymap nil)))
+  (remove-function (local 'isearch-filter-predicate)
+                   #'wdired-isearch-filter-read-only)
   (use-local-map dired-mode-map)
   (force-mode-line-update)
   (setq buffer-read-only t)

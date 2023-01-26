@@ -1,6 +1,6 @@
 /* Updating of data structures for redisplay.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2019 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2020 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -534,6 +534,14 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
       eassert (left >= 0 && right >= 0);
       matrix->left_margin_glyphs = left;
       matrix->right_margin_glyphs = right;
+
+      /* If we are resizing a window, make sure the previous mode-line
+	 row of the window's current matrix is no longer marked as such.  */
+      if (w && matrix == w->current_matrix
+	  && matrix->nrows > 0
+	  && dim.height != matrix->nrows
+	  && matrix->nrows <= matrix->rows_allocated)
+	MATRIX_MODE_LINE_ROW (matrix)->mode_line_p = false;
     }
 
   /* Number of rows to be used by MATRIX.  */
@@ -3675,6 +3683,10 @@ update_window (struct window *w, bool force_p)
          W->output_cursor doesn't contain the cursor location.  */
       gui_update_window_end (w, !paused_p, mouse_face_overwritten_p);
 #endif
+      /* If the update wasn't interrupted, this window has been
+	 completely updated.  */
+      if (!paused_p)
+	w->must_be_updated_p = false;
     }
   else
     paused_p = 1;
@@ -3735,11 +3747,10 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 
-  block_input ();
-
   /* Pseudo windows don't have cursors, so don't display them here.  */
   if (!w->pseudo_window_p)
     {
+      block_input ();
 
       if (cursor_on_p)
 	display_and_set_cursor (w, true,
@@ -3753,6 +3764,7 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
 	  else
 	    gui_draw_vertical_border (w);
 	}
+      unblock_input ();
     }
 
   /* If a row with mouse-face was overwritten, arrange for
@@ -3770,7 +3782,6 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
     FRAME_RIF (f)->update_window_end_hook (w,
                                            cursor_on_p,
                                            mouse_face_overwritten_p);
-  unblock_input ();
 }
 
 #endif /* HAVE_WINDOW_SYSTEM  */
@@ -4349,6 +4360,14 @@ scrolling_window (struct window *w, int tab_line_p)
      bytes in 64-bit builds, and thus the comparison of u.val values
      done by GLYPH_EQUAL_P doesn't work reliably, since it assumes the
      size of the union is 4 bytes.  FIXME.  */
+    return 0;
+#endif
+
+  /* Can't scroll the display of w32 GUI frames when position of point
+     is indicated by the system caret, because scrolling the display
+     will then "copy" the pixels used by the caret.  */
+#ifdef HAVE_NTGUI
+  if (w32_use_visible_system_caret)
     return 0;
 #endif
 

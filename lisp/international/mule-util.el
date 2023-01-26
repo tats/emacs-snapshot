@@ -1,6 +1,6 @@
 ;;; mule-util.el --- utility functions for multilingual environment (mule)  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-1998, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2000-2020 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -75,7 +75,7 @@ unless the display width of STR is equal to or less than the display
 width of ELLIPSIS.  If it is non-nil and not a string, then ELLIPSIS
 defaults to `truncate-string-ellipsis'.
 
-If ELLIPSIS-TEXT-PROPERTY in non-nil, a too-long string will not
+If ELLIPSIS-TEXT-PROPERTY is non-nil, a too-long string will not
 be truncated, but instead the elided parts will be covered by a
 `display' text property showing the ellipsis."
   (or start-column

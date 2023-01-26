@@ -1,5 +1,5 @@
 /* Definitions and headers for communication with NeXT/Open/GNUstep API.
-   Copyright (C) 1989, 1993, 2005, 2008-2019 Free Software Foundation,
+   Copyright (C) 1989, 1993, 2005, 2008-2020 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -594,22 +594,6 @@ typedef id instancetype;
 - (NSRect) frame;
 @end
 
-
-/* ==========================================================================
-
-   File open/save panels
-   This and next override methods to handle keyboard input in panels.
-
-   ========================================================================== */
-
-@interface EmacsSavePanel : NSSavePanel
-{
-}
-@end
-@interface EmacsOpenPanel : NSOpenPanel
-{
-}
-@end
 
 @interface EmacsFileDelegate : NSObject
 {

@@ -1,6 +1,6 @@
 ;;; autorevert.el --- revert buffers when files on disk change  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-1999, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1999, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: Anders Lindgren
 ;; Keywords: convenience
@@ -543,7 +543,7 @@ specifies in the mode line."
                       ;; we wouldn't know when to revert it otherwise.
                       (not (eq buffer-stale-function
                                #'buffer-stale--default-function))))
-             (not (memq 'major-mode global-auto-revert-ignore-modes))
+             (not (memq major-mode global-auto-revert-ignore-modes))
              (or (null global-auto-revert-ignore-buffer)
                  (if (functionp global-auto-revert-ignore-buffer)
                      (not (funcall global-auto-revert-ignore-buffer
@@ -733,8 +733,8 @@ system.")
                      (null buffer-file-name))
                 (auto-revert-notify-rm-watch)
                 ;; Restart the timer if it wasn't running.
-                (unless auto-revert-timer)
-                  (auto-revert-set-timer))))
+                (unless auto-revert-timer
+                  (auto-revert-set-timer)))))
 
         ;; Loop over all buffers, in order to find the intended one.
         (cl-dolist (buffer buffers)

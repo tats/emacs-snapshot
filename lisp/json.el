@@ -1,6 +1,6 @@
 ;;; json.el --- JavaScript Object Notation parser / generator -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2020 Free Software Foundation, Inc.
 
 ;; Author: Theresa O'Connor <ted@oconnor.cx>
 ;; Version: 1.4
@@ -735,7 +735,7 @@ you will get the following structure returned:
 
 OBJECT should have a structure like one returned by `json-read'.
 If an error is detected during encoding, an error based on
-`json-error' is signalled."
+`json-error' is signaled."
   (cond ((memq object (list t json-null json-false))
          (json-encode-keyword object))
         ((stringp object)      (json-encode-string object))
