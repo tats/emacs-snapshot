@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2021 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2022 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Customization
@@ -1084,8 +1084,9 @@ first line:
 @noindent
 You can specify any number of variable/value pairs in this way, each
 pair with a colon and semicolon.  The special variable/value pair
-@code{mode: @var{modename};}, if present, specifies a major mode.  The
-@var{value}s are used literally, and not evaluated.
+@code{mode: @var{modename};}, if present, specifies a major mode
+(without the ``-mode'' suffix).  The @var{value}s are used literally,
+and not evaluated.
 
 @findex add-file-local-variable-prop-line
 @findex delete-file-local-variable-prop-line
@@ -1506,7 +1507,7 @@ criteria, identifying a remote machine:
   This code declares two different profiles, @code{remote-ksh} and
 @code{remote-bash}. The profile @code{remote-ksh} is applied to all
 buffers which have a remote default directory matching the regexp
-@code{"remotemachine} as host name.  Such a criteria can also
+@code{"remotemachine"} as host name.  Such a criteria can also
 discriminate for the properties @code{:protocol} (this is the Tramp
 method) or @code{:user} (a remote user name).  The @code{nil} criteria
 matches all buffers with a remote default directory.
@@ -1699,7 +1700,6 @@ circumstances.
 @vindex minibuffer-local-completion-map
 @vindex minibuffer-local-must-match-map
 @vindex minibuffer-local-filename-completion-map
-@vindex minibuffer-local-filename-must-match-map
   The minibuffer has its own set of local keymaps; they contain various
 completion and exit commands.
 
@@ -1715,10 +1715,9 @@ just like @key{RET}.
 @code{minibuffer-local-must-match-map} is for strict completion and
 for cautious completion.
 @item
-@code{minibuffer-local-filename-completion-map} and
-@code{minibuffer-local-filename-must-match-map} are like the two
-previous ones, but they are specifically for file name completion.
-They do not bind @key{SPC}.
+@code{minibuffer-local-filename-completion-map} is like the two
+previous ones, but specifically for file name completion.
+It does not bind @key{SPC}.
 @end itemize
 
 By default, @key{TAB}, @key{SPC} and @key{?} do completion in

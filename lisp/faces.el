@@ -1,6 +1,6 @@
 ;;; faces.el --- Lisp faces -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992-1996, 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1996, 1998-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -663,7 +663,12 @@ face spec.  It is mostly intended for internal use only.
 
 If FRAME is nil, set the attributes for all existing frames, as
 well as the default for new frames.  If FRAME is t, change the
-default for new frames only.
+default for new frames only.  As an exception, to reset the value
+of some attribute to `unspecified' in a way that overrides the
+non-`unspecified' value defined by the face's spec in `defface',
+for new frames, you must explicitly call this function with FRAME
+set to t and the attribute's value set to `unspecified'; just
+using FRAME of nil will not affect new frames in this case.
 
 ARGS must come in pairs ATTRIBUTE VALUE.  ATTRIBUTE must be a
 valid face attribute name.  All attributes can be set to
@@ -1796,8 +1801,8 @@ If FRAME is nil, that stands for the selected frame."
 (defalias 'x-defined-colors 'defined-colors)
 
 (defun defined-colors-with-face-attributes (&optional frame foreground)
-  "Return a list of colors supported for a particular frame.
-See `defined-colors' for arguments and return value. In contrast
+  "Return a list of colors supported for a particular FRAME.
+See `defined-colors' for arguments and return value.  In contrast
 to `defined-colors' the elements of the returned list are color
 strings with text properties, that make the color names render
 with the color they represent as background color (if FOREGROUND
@@ -2289,7 +2294,9 @@ If you set `term-file-prefix' to nil, this function does nothing."
 			   (let ((file (locate-library (concat term-file-prefix type))))
 			     (and file
 				  (or (assoc file load-history)
-				      (load (file-name-sans-extension file)
+				      (load (replace-regexp-in-string
+                                             "\\.el\\(\\.gz\\)?\\'" ""
+                                             file)
                                             t t)))))
 		       type)
 	;; Next, try to find a matching initialization function, and call it.

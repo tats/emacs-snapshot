@@ -1,6 +1,6 @@
 ;;; viper-cmd.el --- Vi command support for Viper  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: viper
@@ -3546,10 +3546,11 @@ If MODE is set, set the macros only in that major mode."
 
 
 (defun viper-set-parsing-style-toggling-macro (unset)
-  "Set `%%%' to be a macro that toggles whether comment fields should be parsed for matching parentheses.
+  "Set or unset `%%%' as a macro that toggles comment parsing for parentheses.
 This is used in conjunction with the `%' command.
-
-With a prefix argument, unsets the macro."
+By default, sets the macro which will toggle whether comment fields should
+be parsed for matching parentheses.  With a prefix argument, unsets the
+macro instead."
   (interactive "P")
   (or noninteractive
       (if (not unset)
@@ -3766,7 +3767,7 @@ Null string will repeat previous search."
   (define-key viper-vi-basic-map
     (cond ((characterp viper-buffer-search-char)
 	   (char-to-string viper-buffer-search-char))
-	  (t (error "viper-buffer-search-char: wrong value type, %S"
+          (t (error "viper-buffer-search-char: Wrong value type, %S"
 		    viper-buffer-search-char)))
     #'viper-command-argument)
   (aset viper-exec-array viper-buffer-search-char #'viper-exec-buffer-search)

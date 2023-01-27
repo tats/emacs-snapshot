@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2021 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2022 Free Software
 @c Foundation, Inc.
 
 @c See file emacs.texi for copying conditions.
@@ -149,6 +149,14 @@ positive number such as 0.25, or even 0.1 if you type quickly.  This
 gives you less jerky scrolling when you hold down @kbd{C-v}, but the
 window contents after any action which scrolls into a fresh portion of
 the buffer will be momentarily unfontified.
+
+@vindex redisplay-skip-fontification-on-input
+Finally, a third alternative to these variables is
+@code{redisplay-skip-fontification-on-input}.  If this variable is
+non-@code{nil}, skip some fontifications is there's input pending.
+This usually does not affect the display because redisplay is
+completely skipped anyway if input was pending, but it can make
+scrolling smoother by avoiding unnecessary fontification.
 
 @vindex scroll-up
 @vindex scroll-down

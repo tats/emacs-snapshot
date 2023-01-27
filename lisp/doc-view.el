@@ -1,6 +1,6 @@
 ;;; doc-view.el --- Document viewer for Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 2007-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Tassilo Horn <tsdh@gnu.org>
 ;; Keywords: files, pdf, ps, dvi
@@ -727,7 +727,7 @@ It's a subdirectory of `doc-view-cache-directory'."
 	  (file-name-as-directory
 	   (expand-file-name
 	    (concat (thread-last
-                        (file-name-nondirectory doc-view--buffer-file-name)
+                      (file-name-nondirectory doc-view--buffer-file-name)
                       ;; bug#13679
                       (subst-char-in-string ?% ?_)
                       ;; arc-mode concatenates archive name and file name

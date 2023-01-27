@@ -1,6 +1,6 @@
 ;;; window.el --- GNU Emacs window commands aside from those written in C  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985, 1989, 1992-1994, 2000-2021 Free Software
+;; Copyright (C) 1985, 1989, 1992-1994, 2000-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -1212,7 +1212,8 @@ it is found."
      ((setq state (frame-parameter frame 'window-state))
       ;; A window state was saved for FRAME.  Restore it and put the
       ;; current root window into its main window.
-      (let ((main-state (window-state-get (frame-root-window frame))))
+      (let ((window-combination-resize t)
+            (main-state (window-state-get (frame-root-window frame))))
         (window-state-put state (frame-root-window frame) t)
         (window-state-put main-state (window-main-window frame)))
       (window--sides-reverse-frame frame))
@@ -1406,9 +1407,12 @@ before writing to it."
 		 (cadr fringes)
 		 (window-scroll-bar-width window)
 		 (window-right-divider-width window))
-	 (format "height header-line: %s  mode-line: %s  divider: %s\n"
+	 (format "height tab-line: %s header-line: %s  mode-line: %s\n"
+		 (window-tab-line-height window)
 		 (window-header-line-height window)
-		 (window-mode-line-height window)
+		 (window-mode-line-height window))
+	 (format "height scroll-bar: %s divider: %s"
+		 (window-scroll-bar-height window)
 		 (window-bottom-divider-width window)))))
     (insert "\n")))
 
@@ -1690,6 +1694,7 @@ return the minimum pixel-size of WINDOW."
 	 ((let ((char-size (frame-char-size window))
 		(pixel-height
 		 (+ (window-safe-min-size window nil t)
+		    (window-tab-line-height window)
 		    (window-header-line-height window)
 		    (window-scroll-bar-height window)
 		    (window-mode-line-height window)
@@ -5162,7 +5167,10 @@ nil means to not handle the buffer in a particular way.  This
     (cond
      ;; First try to delete dedicated windows that are not side windows.
      ((and dedicated (not (eq dedicated 'side))
-           (window--delete window 'dedicated (eq bury-or-kill 'kill))))
+           (window--delete window 'dedicated (eq bury-or-kill 'kill)))
+      ;; If the previously selected window is still alive, select it.
+      (when (window-live-p (nth 2 quit-restore))
+        (select-window (nth 2 quit-restore))))
      ((and (not prev-buffer)
 	   (eq (nth 1 quit-restore) 'tab)
 	   (eq (nth 3 quit-restore) buffer))
@@ -6402,7 +6410,11 @@ windows can get as small as `window-safe-min-height' and
 	(window--state-put-2 ignore pixelwise))
       (while window-state-put-stale-windows
 	(let ((window (pop window-state-put-stale-windows)))
-	  (when (eq (window-deletable-p window) t)
+          ;; Avoid that 'window-deletable-p' throws an error if window
+          ;; was already deleted when exiting 'with-temp-buffer' above
+          ;; (Bug#54028).
+	  (when (and (window-valid-p window)
+                     (eq (window-deletable-p window) t))
 	    (delete-window window))))
       (window--check frame))))
 

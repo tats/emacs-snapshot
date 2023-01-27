@@ -1,6 +1,6 @@
 ;;; erc-tests.el --- Tests for erc.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2020-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2020-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Ingebrigtsen <larsi@gnus.org>
 
@@ -227,3 +227,5 @@
   (when noninteractive
     (kill-buffer "*erc-protocol*")
     (should-not erc-debug-irc-protocol)))
+
+;;; erc-tests.el ends here

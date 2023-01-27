@@ -1,6 +1,6 @@
 ;;; face-remap.el --- Functions for managing `face-remapping-alist'  -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Miles Bader <miles@gnu.org>
 ;; Keywords: faces, face remapping, display, user commands
@@ -397,7 +397,7 @@ a top-level keymap, `text-scale-increase' or
 (defcustom buffer-face-mode-face 'variable-pitch
   "The face specification used by `buffer-face-mode'.
 It may contain any value suitable for a `face' text property,
-including a face name, a list of face names, a face-attribute
+including a face name, a list of face names, a face attribute
 plist, etc."
   :type '(choice (face)
 		 (repeat :tag "List of faces" face)

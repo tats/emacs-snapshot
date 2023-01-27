@@ -1,6 +1,6 @@
 /* Implementation of GUI terminal on the Microsoft Windows API.
 
-Copyright (C) 1989, 1993-2021 Free Software Foundation, Inc.
+Copyright (C) 1989, 1993-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -777,11 +777,24 @@ w32_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
     w32_fill_area (f, hdc, face->background,
 		   p->bx, p->by, p->nx, p->ny);
 
-  if (p->which && p->which < max_fringe_bmp)
+  if (p->which
+      && p->which < max_fringe_bmp
+      && p->which < max_used_fringe_bitmap)
     {
       HBITMAP pixmap = fringe_bmp[p->which];
       HDC compat_hdc;
       HANDLE horig_obj;
+
+      if (!fringe_bmp[p->which])
+	{
+	  /* This fringe bitmap is known to fringe.c, but lacks the
+	     HBITMAP data which shadows that bitmap.  This is typical
+	     to define-fringe-bitmap being called when the selected
+	     frame was not a GUI frame, for example, when packages
+	     that define fringe bitmaps are loaded by a daemon Emacs.
+	     Create the missing HBITMAP now.  */
+	  gui_define_fringe_bitmap (f, p->which);
+	}
 
       compat_hdc = CreateCompatibleDC (hdc);
 

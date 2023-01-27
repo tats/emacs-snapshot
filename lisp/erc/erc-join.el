@@ -1,6 +1,6 @@
 ;;; erc-join.el --- autojoin channels on connect and reconnects  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2002-2004, 2006-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2004, 2006-2022 Free Software Foundation, Inc.
 
 ;; Author: Alex Schroeder <alex@gnu.org>
 ;; Maintainer: Amin Bandali <bandali@gnu.org>
@@ -123,7 +123,7 @@ This is called from a timer set up by `erc-autojoin-channels'."
       (erc-autojoin-channels server nick))))
 
 (defun erc-autojoin-server-match (candidate)
-  "Match the current network or server against CANDIDATE
+  "Match the current network or server against CANDIDATE.
 This should be a key from `erc-autojoin-channels-alist'."
   (or (eq candidate (erc-network))
       (and (stringp candidate)

@@ -1,6 +1,6 @@
 ;;; frame.el --- multi-frame management independent of window systems  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2000-2021 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2000-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -701,9 +701,8 @@ Return nil if we don't know how to interpret DISPLAY."
   "Make a frame on display DISPLAY.
 The optional argument PARAMETERS specifies additional frame parameters."
   (interactive (if (fboundp 'x-display-list)
-                   (list (completing-read
-                          (format "Make frame on display: ")
-                          (x-display-list)))
+                   (list (completing-read "Make frame on display: "
+                                          (x-display-list)))
                  (user-error "This Emacs build does not support X displays")))
   (make-frame (cons (cons 'display display) parameters)))
 
@@ -787,25 +786,27 @@ When called from Lisp, returns the new frame."
       (make-frame)
     (select-frame (make-frame))))
 
-(defun clone-frame (&optional frame use-default-parameters)
-  "Make a new frame with the same parameters as FRAME.
-With a prefix arg (USE-DEFAULT-PARAMETERS), use
-`default-frame-alist' instead.
+(defun clone-frame (&optional frame no-windows)
+  "Make a new frame with the same parameters and windows as FRAME.
+With a prefix arg NO-WINDOWS, don't clone the window configuration.
 
 FRAME defaults to the selected frame.  The frame is created on the
 same terminal as FRAME.  If the terminal is a text-only terminal then
 also select the new frame."
-  (interactive "i\nP")
-  (if use-default-parameters
-      (make-frame-command)
-    (let* ((default-frame-alist (seq-filter
-                                 (lambda (elem)
-                                   (not (eq (car elem) 'name)))
-                                 (frame-parameters frame)))
-           (new-frame (make-frame)))
-      (unless (display-graphic-p)
-        (select-frame new-frame))
-      new-frame)))
+  (interactive (list (selected-frame) current-prefix-arg))
+  (let* ((frame (or frame (selected-frame)))
+         (windows (unless no-windows
+                    (window-state-get (frame-root-window frame))))
+         (default-frame-alist
+          (seq-remove (lambda (elem)
+                        (memq (car elem) '(name parent-id)))
+                      (frame-parameters frame)))
+         (new-frame (make-frame)))
+    (when windows
+      (window-state-put windows (frame-root-window new-frame) 'safe))
+    (unless (display-graphic-p)
+      (select-frame new-frame))
+    new-frame))
 
 (defvar before-make-frame-hook nil
   "Functions to run before `make-frame' creates a new frame.")

@@ -1,6 +1,6 @@
 ;;; ps-print.el --- print text from the buffer as PostScript -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1993-2022 Free Software Foundation, Inc.
 
 ;; Author: Jim Thompson (was <thompson@wg2.waii.com>)
 ;;	Jacques Duthen (was <duthen@cegelec-red.fr>)
@@ -2788,7 +2788,7 @@ Each element comprises: font family (the key), name, bold, italic, bold-italic,
 reference size, line height, space width, average character width.
 To get the info for another specific font (say Helvetica), do the following:
 - create a new buffer
-- generate the PostScript image to a file (C-u M-x ps-print-buffer)
+- generate the PostScript image to a file (\\[universal-argument] \\[ps-print-buffer])
 - open this file and delete the leading `%' (which is the PostScript comment
   character) from the line
 	   `% 3 cm 20 cm moveto  10/Courier ReportFontInfo  showpage'
@@ -3878,7 +3878,7 @@ Note: No major/minor-mode is activated and no local variables are evaluated for
 	(with-temp-buffer
 	  (insert-file-contents filename)
 	  (buffer-string))
-      (error "ps-print PostScript prologue `%s' file was not found"
+      (error "ps-print: PostScript prologue `%s' file was not found"
 	     filename))))
 
 

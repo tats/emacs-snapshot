@@ -1,6 +1,6 @@
 ;;; loadup.el --- load up standardly loaded Lisp files for Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 2001-2021 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 2001-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -275,7 +275,6 @@
 (load "textmodes/paragraphs")
 (load "progmodes/prog-mode")
 (load "emacs-lisp/lisp-mode")
-(load "progmodes/elisp-mode")
 (load "textmodes/text-mode")
 (load "textmodes/fill")
 (load "newcomment")
@@ -339,6 +338,13 @@
     ;; Do it after loading term/foo-win.el since the value of the
     ;; mouse-wheel-*-event vars depends on those files being loaded or not.
     (load "mwheel"))
+
+;; progmodes/elisp-mode.el must be after w32-fns.el, to avoid this:
+;;"Eager macro-expansion failure: (void-function w32-convert-standard-filename)"
+;; which happens while processing 'elisp-flymake-byte-compile', when
+;; elisp-mode.elc is outdated.
+(load "progmodes/elisp-mode")
+
 ;; Preload some constants and floating point functions.
 (load "emacs-lisp/float-sup")
 
@@ -346,6 +352,10 @@
 (load "vc/ediff-hook")
 (load "uniquify")
 (load "electric")
+(load "paren")
+
+(load "emacs-lisp/shorthands")
+
 (load "emacs-lisp/eldoc")
 (load "cus-start") ;Late to reduce customize-rogue (needs loaddefs.el anyway)
 (if (not (eq system-type 'ms-dos))
@@ -535,10 +545,13 @@ lost after dumping")))
       (let (success)
         (unwind-protect
              (let ((tmp-dump-mode dump-mode)
-                   (dump-mode nil))
+                   (dump-mode nil)
+                   (lexical-binding nil))
                (if (member tmp-dump-mode '("pdump" "pbootstrap"))
                    (dump-emacs-portable (expand-file-name output invocation-directory))
-                 (dump-emacs output "temacs")
+                 (dump-emacs output (if (eq system-type 'ms-dos)
+                                        "temacs.exe"
+                                      "temacs"))
                  (message "%d pure bytes used" pure-bytes-used))
                (setq success t))
           (unless success

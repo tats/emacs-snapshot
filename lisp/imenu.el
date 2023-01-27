@@ -1,6 +1,6 @@
 ;;; imenu.el --- framework for mode-specific buffer indexes  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1994-1998, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1998, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Ake Stenhoff <etxaksf@aom.ericsson.se>
 ;;         Lars Lindberg <lli@sypro.cap.se>
@@ -829,8 +829,7 @@ A trivial interface to `imenu-add-to-menubar' suitable for use in a hook."
 (defvar imenu-buffer-menubar nil)
 
 (defvar-local imenu-menubar-modified-tick 0
-  "The value of (buffer-chars-modified-tick) as of the last call
-to `imenu-update-menubar'.")
+  "Value of (buffer-chars-modified-tick) when `imenu-update-menubar' was called.")
 
 (defun imenu-update-menubar ()
   (when (and (current-local-map)

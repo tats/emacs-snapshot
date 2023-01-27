@@ -1,6 +1,6 @@
 /* Buffer manipulation primitives for GNU Emacs.
 
-Copyright (C) 1985-1989, 1993-1995, 1997-2021 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1995, 1997-2022 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -1434,7 +1434,7 @@ and `buffer-file-truename' are non-nil.  */)
 DEFUN ("restore-buffer-modified-p", Frestore_buffer_modified_p,
        Srestore_buffer_modified_p, 1, 1, 0,
        doc: /* Like `set-buffer-modified-p', but doesn't redisplay buffer's mode line.
-This function also locks and unlocks the file visited by the buffer,
+This function also locks or unlocks the file visited by the buffer,
 if both `buffer-file-truename' and `buffer-file-name' are non-nil.
 
 It is not ensured that mode lines will be updated to show the modified
@@ -3843,7 +3843,9 @@ fix_overlays_before (struct buffer *bp, ptrdiff_t prev, ptrdiff_t pos)
      or the found one ends before PREV,
      or the found one is the last one in the list,
      we don't have to fix anything.  */
-  if (!tail || end < prev || !tail->next)
+  if (!tail)
+    return;
+  if (end < prev || !tail->next)
     return;
 
   right_pair = parent;
@@ -6016,15 +6018,16 @@ specifies.  */);
 
   DEFVAR_PER_BUFFER ("indicate-empty-lines",
 		     &BVAR (current_buffer, indicate_empty_lines), Qnil,
-		     doc: /* Visually indicate empty lines after the buffer end.
-If non-nil, a bitmap is displayed in the left fringe of a window on
-window-systems.  */);
+		     doc: /* Visually indicate unused ("empty") screen lines after the buffer end.
+If non-nil, a bitmap is displayed in the left fringe of a window
+on graphical displays for each screen line that doesn't correspond
+to any buffer text.  */);
 
   DEFVAR_PER_BUFFER ("indicate-buffer-boundaries",
 		     &BVAR (current_buffer, indicate_buffer_boundaries), Qnil,
 		     doc: /* Visually indicate buffer boundaries and scrolling.
 If non-nil, the first and last line of the buffer are marked in the fringe
-of a window on window-systems with angle bitmaps, or if the window can be
+of a window on graphical displays with angle bitmaps, or if the window can be
 scrolled, the top and bottom line of the window are marked with up and down
 arrow bitmaps.
 

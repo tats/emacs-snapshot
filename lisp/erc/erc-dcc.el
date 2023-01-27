@@ -1,6 +1,6 @@
 ;;; erc-dcc.el --- CTCP DCC module for ERC  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1993-1995, 1998, 2002-2004, 2006-2021 Free Software
+;; Copyright (C) 1993-1995, 1998, 2002-2004, 2006-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Ben A. Mesander <ben@gnu.ai.mit.edu>
@@ -81,7 +81,8 @@ IRC users."
 All values of the list must be uppercase strings.")
 
 (defvar erc-dcc-list nil
-  "List of DCC connections. Looks like:
+  "List of DCC connections.
+Looks like:
   ((:nick \"nick!user@host\" :type GET :peer proc
     :parent proc :size size :file file)
    (:nick \"nick!user@host\" :type CHAT :peer proc :parent proc)
@@ -163,8 +164,8 @@ All values of the list must be uppercase strings.")
 ;;; Misc macros and utility functions
 
 (defun erc-dcc-member (&rest args)
-  "Return the first matching entry in `erc-dcc-list' which satisfies the
-constraints given as a plist in ARGS.  Returns nil on no match.
+  "Return first matching entry in `erc-dcc-list' satisfying constraints in ARGS.
+ARGS is a plist.  Return nil on no match.
 
 The property :nick is treated specially, if it contains a `!' character,
 it is treated as a nick!user@host string, and compared with the :nick property
@@ -205,8 +206,7 @@ compared with `erc-nick-equal-p' which is IRC case-insensitive."
     result))
 
 (defun erc-pack-int (value)
-  "Convert an integer into a packed string in network byte order,
-which is big-endian."
+  "Convert integer into a packed string in network byte order, which is big-endian."
   ;; make sure value is not negative
   (when (< value 0)
     (error "ERC-DCC (erc-pack-int): packet size is negative"))
@@ -760,8 +760,7 @@ the matching regexp, or nil if none found."
   :type 'integer)
 
 (defcustom erc-dcc-pump-bytes nil
-  "If set to an integer, keep sending until that number of bytes are
-unconfirmed."
+  "If an integer, keep sending until that number of bytes are unconfirmed."
   :type '(choice (const nil) integer))
 
 (define-inline erc-dcc-get-parent (proc)
@@ -833,8 +832,7 @@ bytes sent."
 
 (defcustom erc-dcc-send-connect-hook
   '(erc-dcc-display-send erc-dcc-send-block)
-  "Hook run whenever the remote end of a DCC SEND offer connected to your
-listening port."
+  "Hook run when remote end of a DCC SEND offer connected to your listening port."
   :type 'hook)
 
 (defun erc-dcc-nick (plist)
@@ -865,7 +863,7 @@ listening port."
     (buffer-string)))
 
 (defun erc-dcc-send-file (nick file &optional pproc)
-  "Open a socket for incoming connections, and send a CTCP send request to the
+  "Open socket for incoming connections and send a CTCP send request to the
 other client."
   (interactive "sNick: \nfFile: ")
   (when (null pproc) (if (processp erc-server-process)
@@ -1028,11 +1026,11 @@ transfer is complete."
   :type 'hook)
 
 (defcustom erc-dcc-chat-connect-hook nil
-  ""
+  "" ; FIXME
   :type 'hook)
 
 (defcustom erc-dcc-chat-exit-hook nil
-  ""
+  "" ; FIXME
   :type 'hook)
 
 (defun erc-cmd-CREQ (line &optional _force)

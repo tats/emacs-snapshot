@@ -1,6 +1,6 @@
 ;;; ls-lisp.el --- emulate insert-directory completely in Emacs Lisp  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992, 1994, 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992, 1994, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
 ;; Modified by: Francis J. Wright <F.J.Wright@maths.qmw.ac.uk>
@@ -283,6 +283,7 @@ are also supported; unsupported long options are silently ignored."
       (funcall orig-fun
 	       file switches wildcard full-directory-p)
     ;; We need the directory in order to find the right handler.
+    (setq switches (or switches ""))
     (let ((handler (find-file-name-handler (expand-file-name file)
 					   'insert-directory))
 	  (orig-file file)

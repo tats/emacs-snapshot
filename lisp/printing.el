@@ -1,6 +1,6 @@
 ;;; printing.el --- printing utilities  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2000-2001, 2003-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2001, 2003-2022 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, print, PostScript
@@ -1672,7 +1672,7 @@ DEFAULT		It's a way to set default values when this entry is selected.
 
 		   (set VARIABLE (eval VALUE))
 
-		Note that VALUE can be any valid lisp expression.  So, don't
+                Note that VALUE can be any valid Lisp expression.  So, don't
 		forget to quote symbols and constant lists.
 		If VARIABLE is the special keyword `inherits-from:', VALUE must
 		be a symbol name setting defined in `pr-setting-database' from
@@ -1772,8 +1772,7 @@ Useful links:
   `https://linux.die.net/man/1/lp'
 
 * GNU utilities for w32 (cp.exe)
-  `http://unxutils.sourceforge.net/'
-"
+  `http://unxutils.sourceforge.net/'"
   :type '(repeat
 	  (list
 	   :tag "PostScript Printer"
@@ -2181,7 +2180,7 @@ DEFAULT		It's a way to set default values when this entry is selected.
 
 		   (set (make-local-variable VARIABLE-SYM) (eval VALUE))
 
-		Note that VALUE can be any valid lisp expression.  So, don't
+                Note that VALUE can be any valid Lisp expression.  So, don't
 		forget to quote symbols and constant lists.
 		If VARIABLE is the special keyword `inherits-from:', VALUE must
 		be a symbol name setting defined in `pr-setting-database' from
@@ -2413,8 +2412,7 @@ Useful links:
 
 * GNU Enscript documentation (Windows, GNU or Unix)
   `https://people.ssh.com/mtr/genscript/enscript.man.html'
-  (on GNU or Unix, type `man enscript')
-"
+  (on GNU or Unix, type `man enscript')"
   :type '(repeat
 	  (list :tag "PS File Utility"
 		(symbol :tag "Utility Symbol")
@@ -4276,7 +4274,7 @@ printed using `pr-ps-mode-ps-print'.
 
 Interactively, you have the following situations:
 
-   M-x pr-ps-fast-fire RET
+   \\[pr-ps-fast-fire]
       The command prompts the user for a N-UP value and printing will
       immediately be done using the current active printer.
 
@@ -5135,7 +5133,7 @@ If menu binding was not done, calls `pr-menu-bind'."
   (and (eq (symbol-value infile-sym) t)
        (set infile-sym (pr-ps-infile-preprint prompt)))
   (or (symbol-value infile-sym)
-      (error "%s: input PostScript file name is missing" prompt))
+      (error "%s: Input PostScript file name is missing" prompt))
   ;; output file
   (and (eq (symbol-value outfile-sym) t)
        (set outfile-sym (and current-prefix-arg

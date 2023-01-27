@@ -1,6 +1,6 @@
 ;;; rng-valid.el --- real-time validation of XML using RELAX NG  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2003, 2007-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2003, 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: James Clark
 ;; Keywords: wp, hypermedia, languages, XML, RelaxNG
@@ -962,9 +962,8 @@ Return nil at end of buffer, t otherwise."
     (and type t)))
 
 (defun rng-process-start-tag (tag-type)
-  "TAG-TYPE is `start-tag' for a start-tag, `empty-element' for
-an empty element.  `partial-empty-element' should be passed
-as empty-element."
+  "TAG-TYPE is `start-tag' for a start-tag, `empty-element' for an empty element.
+`partial-empty-element' should be passed as empty-element."
   (and rng-collecting-text (rng-flush-text))
   (setq rng-collecting-text nil)
   (setq rng-pending-contents nil)

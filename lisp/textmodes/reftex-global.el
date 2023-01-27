@@ -1,6 +1,6 @@
 ;;; reftex-global.el --- operations on entire documents with RefTeX  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2022 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <dominik@science.uva.nl>
 ;; Maintainer: auctex-devel@gnu.org
@@ -338,17 +338,17 @@ Also checks if buffers visiting the files are in read-only mode."
     (while (setq file (pop files))
       (unless (file-exists-p file)
         (ding)
-        (or (y-or-n-p (format "No such file %s. Continue? " file))
+        (or (y-or-n-p (format "No such file %s. Continue?" file))
             (error "Abort")))
       (unless (file-writable-p file)
         (ding)
-        (or (y-or-n-p (format "No write access to %s. Continue? " file))
+        (or (y-or-n-p (format "No write access to %s. Continue?" file))
             (error "Abort")))
       (when (and (setq buf (find-buffer-visiting file))
                  (with-current-buffer buf
                    buffer-read-only))
         (ding)
-        (or (y-or-n-p (format "Buffer %s is read-only. Continue? "
+        (or (y-or-n-p (format "Buffer %s is read-only.  Continue?"
                               (buffer-name buf)))
             (error "Abort"))))))
 

@@ -1,6 +1,6 @@
 ;;; gnus-art.el --- article mode commands for Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1996-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -4279,7 +4279,7 @@ If variable `gnus-use-long-file-name' is non-nil, it is
 	    (insert "Version: " (car items) "\n\n")
 	    (insert (mapconcat #'identity (cddr items) "\n"))
 	    (insert "\n-----END PGP SIGNATURE-----\n")
-	    (let ((mm-security-handle (list (format "multipart/signed"))))
+	    (let ((mm-security-handle (list (substring "multipart/signed"))))
 	      (mml2015-clean-buffer)
 	      (let ((coding-system-for-write (or gnus-newsgroup-charset
 						 'iso-8859-1)))
@@ -4507,6 +4507,9 @@ commands:
   (gnus-set-default-directory)
   (buffer-disable-undo)
   (setq show-trailing-whitespace nil)
+  ;; Arrange a callback from `mm-inline-message' if we're
+  ;; displaying a message/rfc822 part.
+  (setq-local mm-inline-message-prepare-function #'gnus-mime--inline-message)
   (mm-enable-multibyte))
 
 (defun gnus-article-setup-buffer ()
@@ -6042,31 +6045,29 @@ If nil, don't show those extra buttons."
 (defun gnus-mime-display-mixed (handles)
   (mapcar #'gnus-mime-display-part handles))
 
+(defun gnus-mime--inline-message (handle charset)
+  (let ((handles
+         (let (gnus-article-mime-handles
+	       ;; disable prepare hook
+	       gnus-article-prepare-hook
+	       (gnus-newsgroup-charset
+                ;; mm-uu might set it.
+	        (unless (eq charset 'gnus-decoded)
+		  (or charset gnus-newsgroup-charset))))
+	   (let ((gnus-original-article-buffer
+                  (mm-handle-buffer handle)))
+	     (run-hooks 'gnus-article-decode-hook))
+	   (gnus-article-prepare-display)
+           gnus-article-mime-handles)))
+    (when handles
+      (setq gnus-article-mime-handles
+	    (mm-merge-handles gnus-article-mime-handles handles)))))
+
 (defun gnus-mime-display-single (handle)
   (let ((type (mm-handle-media-type handle))
 	(ignored gnus-ignored-mime-types)
 	(mm-inline-font-lock (gnus-visual-p 'article-highlight 'highlight))
 	(not-attachment t)
-        ;; Arrange a callback from `mm-inline-message' if we're
-        ;; displaying a message/rfc822 part.
-        (mm-inline-message-prepare-function
-         (lambda (charset)
-           (let ((handles
-                  (let (gnus-article-mime-handles
-	                ;; disable prepare hook
-	                gnus-article-prepare-hook
-	                (gnus-newsgroup-charset
-                         ;; mm-uu might set it.
-	                 (unless (eq charset 'gnus-decoded)
-		           (or charset gnus-newsgroup-charset))))
-	            (let ((gnus-original-article-buffer
-                           (mm-handle-buffer handle)))
-	              (run-hooks 'gnus-article-decode-hook))
-	            (gnus-article-prepare-display)
-                    gnus-article-mime-handles)))
-	     (when handles
-	       (setq gnus-article-mime-handles
-		     (mm-merge-handles gnus-article-mime-handles handles))))))
 	display text
         gnus-displaying-mime)
     (catch 'ignored
@@ -6866,7 +6867,9 @@ KEY is a string or a vector."
 	       unread-command-events))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
-	  (describe-key (read-key-sequence nil t))))
+	  (describe-key (list (cons (read-key-sequence nil t)
+			            (this-single-command-raw-keys)))
+			(current-buffer))))
     (describe-key key)))
 
 (defun gnus-article-describe-key-briefly (key &optional insert)
@@ -6889,7 +6892,9 @@ KEY is a string or a vector."
 	       unread-command-events))
 	(let ((cursor-in-echo-area t)
 	      gnus-pick-mode)
-	  (describe-key-briefly (read-key-sequence nil t) insert)))
+	  (describe-key-briefly (list (cons (read-key-sequence nil t)
+				            (this-single-command-raw-keys)))
+				insert (current-buffer))))
     (describe-key-briefly key insert)))
 
 ;;`gnus-agent-mode' in gnus-agent.el will define it.

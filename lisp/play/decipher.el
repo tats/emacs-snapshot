@@ -1,6 +1,6 @@
 ;;; decipher.el --- cryptanalyze monoalphabetic substitution ciphers  -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 1995-1996, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1995-1996, 2001-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Christopher J. Madsen <chris_madsen@geocities.com>
 ;; Keywords: games
@@ -983,13 +983,14 @@ if it can't, it signals an error."
     decipher-stats-buffer)
    ;; Create a new buffer if requested:
    (create
-    (let ((stats-name (concat "*" (buffer-name) "*")))
+    (let* ((stats-name (concat "*" (buffer-name) "*"))
+           (buf (get-buffer stats-name)))
       (setq decipher-stats-buffer
-            (if (eq 'decipher-stats-mode
-                    (buffer-local-value 'major-mode
-                                        (get-buffer stats-name)))
-                ;; We just lost track of the statistics buffer:
-                (get-buffer stats-name)
+            (if (and (bufferp buf)
+                     (eq 'decipher-stats-mode
+                         (buffer-local-value 'major-mode buf)))
+                buf
+              ;; We just lost track of the statistics buffer:
               (generate-new-buffer stats-name))))
     (with-current-buffer decipher-stats-buffer
       (decipher-stats-mode))

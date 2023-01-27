@@ -1,6 +1,6 @@
 ;;; package.el --- Simple package system for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: Tom Tromey <tromey@redhat.com>
 ;;         Daniel Hackney <dan@haxney.org>
@@ -397,7 +397,13 @@ a sane initial value."
   :type '(repeat symbol))
 
 (defcustom package-native-compile nil
-  "Non-nil means to native compile packages on installation."
+  "Non-nil means to natively compile packages as part of their installation.
+This controls ahead-of-time compilation of packages when they are
+installed.  If this option is nil, packages will be natively
+compiled when they are loaded for the first time.
+
+This option does not have any effect if Emacs was not built with
+native compilation support."
   :type '(boolean)
   :risky t
   :version "28.1")
@@ -426,7 +432,7 @@ synchronously."
   :version "28.1")
 
 (defcustom package-archive-column-width 8
-  "Column width for the Package status in the package menu."
+  "Column width for the Package archive in the package menu."
   :type 'number
   :version "28.1")
 
@@ -1081,8 +1087,7 @@ This assumes that `pkg-desc' has already been activated with
   "Native compile installed package PKG-DESC asynchronously.
 This assumes that `pkg-desc' has already been activated with
 `package-activate-1'."
-  (when (and (featurep 'native-compile)
-             (native-comp-available-p))
+  (when (native-comp-available-p)
     (let ((warning-minimum-level :error))
       (native-compile-async (package-desc-dir pkg-desc) t))))
 
@@ -1118,7 +1123,7 @@ is wrapped around any parts requiring it."
 
 (declare-function lm-header "lisp-mnt" (header))
 (declare-function lm-header-multiline "lisp-mnt" (header))
-(declare-function lm-homepage "lisp-mnt" (&optional file))
+(declare-function lm-website "lisp-mnt" (&optional file))
 (declare-function lm-keywords-list "lisp-mnt" (&optional file))
 (declare-function lm-maintainers "lisp-mnt" (&optional file))
 (declare-function lm-authors "lisp-mnt" (&optional file))
@@ -1153,7 +1158,7 @@ boundaries."
             (or (lm-header "package-version") (lm-header "version")))
            (pkg-version (package-strip-rcs-id version-info))
            (keywords (lm-keywords-list))
-           (homepage (lm-homepage)))
+           (website (lm-website)))
       (unless pkg-version
          (if version-info
              (error "Unrecognized package version: %s" version-info)
@@ -1164,7 +1169,7 @@ boundaries."
          (package--prepare-dependencies
           (package-read-from-string (mapconcat #'identity require-lines " "))))
        :kind 'single
-       :url homepage
+       :url website
        :keywords keywords
        :maintainer
        ;; For backward compatibility, use a single string if there's only
@@ -1586,7 +1591,7 @@ If the archive version is too new, signal an error."
         (if package
             (package--add-to-archive-contents package archive)
           (lwarn '(package refresh) :warning
-                 "Ignoring `nil' package on `%s' package archive" archive))))))
+                 "Ignoring nil package on `%s' package archive" archive))))))
 
 (defvar package--old-archive-priorities nil
   "Store currently used `package-archive-priorities'.
@@ -2170,7 +2175,7 @@ Otherwise return nil."
       ;; to make sure we use a "canonical name"!
       (if l (package-version-join l)))))
 
-(declare-function lm-homepage "lisp-mnt" (&optional file))
+(declare-function lm-website "lisp-mnt" (&optional file))
 
 ;;;###autoload
 (defun package-install-from-buffer ()
@@ -2240,6 +2245,7 @@ directory."
           (dired-mode))
       (insert-file-contents-literally file)
       (set-visited-file-name file)
+      (set-buffer-modified-p nil)
       (when (string-match "\\.tar\\'" file) (tar-mode)))
     (package-install-from-buffer)))
 
@@ -2268,7 +2274,9 @@ confirmation to install packages."
                            (mapconcat #'symbol-name available " "))))
           (mapc (lambda (p) (package-install p 'dont-select)) available)))
        ((> difference 0)
-        (message "Packages that are not available: %d (the rest is already installed), maybe you need to `M-x package-refresh-contents'"
+        (message (substitute-command-keys
+                  "Packages that are not available: %d (the rest is already \
+installed), maybe you need to \\[package-refresh-contents]")
                  difference))
        (t
         (message "All your packages are already installed"))))))
@@ -2504,7 +2512,7 @@ Helper function for `describe-package'."
          (version (if desc (package-desc-version desc)))
          (archive (if desc (package-desc-archive desc)))
          (extras (and desc (package-desc-extras desc)))
-         (homepage (cdr (assoc :url extras)))
+         (website (cdr (assoc :url extras)))
          (commit (cdr (assoc :commit extras)))
          (keywords (if desc (package-desc--keywords desc)))
          (built-in (eq pkg-dir 'builtin))
@@ -2617,15 +2625,20 @@ Helper function for `describe-package'."
             (help-insert-xref-button text 'help-package
                                      (package-desc-name pkg))))
         (insert "\n")))
-    (when homepage
-      ;; Prefer https for the homepage of packages on gnu.org.
-      (if (string-match-p "^http://\\(elpa\\|www\\)\\.gnu\\.org/" homepage)
-          (let ((gnu (cdr (assoc "gnu" package-archives))))
-            (and gnu (string-match-p "^https" gnu)
-                 (setq homepage
-                       (replace-regexp-in-string "^http" "https" homepage)))))
-      (package--print-help-section "Homepage")
-      (help-insert-xref-button homepage 'help-url homepage)
+    (when website
+      ;; Prefer https for the website of packages on common domains.
+      (when (string-match-p (rx bol "http://" (or "elpa." "www." "git." "")
+                                (or "nongnu.org" "gnu.org" "sr.ht"
+                                    "emacswiki.org" "gitlab.com" "github.com")
+                                "/")
+                            website)
+        ;; But only if the user has "https" in `package-archives'.
+        (let ((gnu (cdr (assoc "gnu" package-archives))))
+          (and gnu (string-match-p "^https" gnu)
+               (setq website
+                     (replace-regexp-in-string "^http" "https" website)))))
+      (package--print-help-section "Website")
+      (help-insert-xref-button website 'help-url website)
       (insert "\n"))
     (when keywords
       (package--print-help-section "Keywords")

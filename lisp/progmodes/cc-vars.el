@@ -1,6 +1,6 @@
 ;;; cc-vars.el --- user customization variables for CC Mode -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985, 1987, 1992-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2022 Free Software Foundation, Inc.
 
 ;; Authors:    2002- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -1227,7 +1227,7 @@ can always override the use of `c-default-style' by making calls to
        ;; Anchor pos: None.
        ))
 (defcustom c-offsets-alist nil
-  "Association list of syntactic element symbols and indentation offsets.
+  "Alist of syntactic element symbols and indentation offsets.
 As described below, each cons cell in this list has the form:
 
     (SYNTACTIC-SYMBOL . OFFSET)
@@ -1770,7 +1770,7 @@ variables.")
 		      ; all XEmacsen.
 	  ((null c-macro-names-with-semicolon)
 	   nil)
-	  (t (error "c-make-macro-with-semi-re: invalid \
+	  (t (error "c-make-macro-with-semi-re: Invalid \
 c-macro-names-with-semicolon: %s"
 		    c-macro-names-with-semicolon))))))
 

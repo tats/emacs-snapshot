@@ -1,6 +1,6 @@
 ;;; cal-tex.el --- calendar functions for printing calendars with LaTeX  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1995, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Steve Fisk <fisk@bowdoin.edu>
 ;;         Edward M. Reingold <reingold@cs.uiuc.edu>
@@ -1648,10 +1648,10 @@ informative header, and run HOOK."
   (goto-char (point-min))
   ;; FIXME auctex equivalents?
   (cal-tex-comment
-   (format "\tThis buffer was produced by cal-tex.el.
+   "\tThis buffer was produced by cal-tex.el.
 \tTo print a calendar, type
 \t\tM-x tex-buffer RET
-\t\tM-x tex-print  RET")))
+\t\tM-x tex-print  RET"))
 
 (defun cal-tex-insert-preamble (weeks &optional class-options append)
   "Initialize the output LaTeX calendar buffer, `cal-tex-buffer'.

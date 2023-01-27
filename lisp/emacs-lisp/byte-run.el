@@ -1,6 +1,6 @@
 ;;; byte-run.el --- byte-compiler support for inlining  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Jamie Zawinski <jwz@lucid.com>
 ;;	Hallvard Furuseth <hbf@ulrik.uio.no>
@@ -422,7 +422,8 @@ was first made obsolete, for example a date or a release number."
                                            &optional docstring)
   "Set OBSOLETE-NAME's function definition to CURRENT-NAME and mark it obsolete.
 
-\(define-obsolete-function-alias \\='old-fun \\='new-fun \"28.1\" \"old-fun's doc.\")
+\(define-obsolete-function-alias \\='old-fun \\='new-fun \"28.1\" \
+\"old-fun's doc.\")
 
 is equivalent to the following two lines of code:
 
@@ -529,11 +530,11 @@ is enabled."
   (list 'quote (eval (cons 'progn body) lexical-binding)))
 
 (defmacro eval-and-compile (&rest body)
-  "Like `progn', but evaluates the body at compile time and at
-load time.  In interpreted code, this is entirely equivalent to
-`progn', except that the value of the expression may be (but is
-not necessarily) computed at load time if eager macro expansion
-is enabled."
+  "Like `progn', but evaluates the body at compile time and at load time.
+In interpreted code, this is entirely equivalent to `progn',
+except that the value of the expression may be (but is not
+necessarily) computed at load time if eager macro expansion is
+enabled."
   (declare (debug (&rest def-form)) (indent 0))
   ;; When the byte-compiler expands code, this macro is not used, so we're
   ;; either about to run `body' (plain interpretation) or we're doing eager

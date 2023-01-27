@@ -1,5 +1,5 @@
 /* Compile Emacs Lisp into native code.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 Author: Andrea Corallo <akrl@sdf.org>
 
@@ -705,6 +705,12 @@ comp_hash_source_file (Lisp_Object filename)
   /* Can't use Finsert_file_contents + Fbuffer_hash as this is called
      by Fcomp_el_to_eln_filename too early during bootstrap.  */
   bool is_gz = suffix_p (filename, ".gz");
+#ifndef HAVE_ZLIB
+  if (is_gz)
+    xsignal2 (Qfile_notify_error,
+	      build_string ("Cannot natively compile compressed *.el files without zlib support"),
+	      filename);
+#endif
   Lisp_Object encoded_filename = ENCODE_FILE (filename);
   FILE *f = emacs_fopen (SSDATA (encoded_filename), is_gz ? "rb" : "r");
 
@@ -713,9 +719,13 @@ comp_hash_source_file (Lisp_Object filename)
 
   Lisp_Object digest = make_uninit_string (MD5_DIGEST_SIZE * 2);
 
+#ifdef HAVE_ZLIB
   int res = is_gz
     ? md5_gz_stream (f, SSDATA (digest))
     : md5_stream (f, SSDATA (digest));
+#else
+  int res = md5_stream (f, SSDATA (digest));
+#endif
   fclose (f);
 
   if (res)
@@ -4041,7 +4051,13 @@ make_directory_wrapper_1 (Lisp_Object ignore)
 
 DEFUN ("comp-el-to-eln-rel-filename", Fcomp_el_to_eln_rel_filename,
        Scomp_el_to_eln_rel_filename, 1, 1, 0,
-       doc: /* Return the corresponding .eln relative filename.  */)
+       doc: /* Return the relative name of the .eln file for FILENAME.
+FILENAME must exist, and if it's a symlink, the target must exist.
+If FILENAME is compressed, it must have the \".gz\" extension,
+and Emacs must have been compiled with zlib; the file will be
+uncompressed on the fly to hash its contents.
+Value includes the original base name, followed by 2 hash values,
+one for the file name and another for its contents, followed by .eln.  */)
   (Lisp_Object filename)
 {
   CHECK_STRING (filename);
@@ -4126,10 +4142,22 @@ DEFUN ("comp-el-to-eln-rel-filename", Fcomp_el_to_eln_rel_filename,
 
 DEFUN ("comp-el-to-eln-filename", Fcomp_el_to_eln_filename,
        Scomp_el_to_eln_filename, 1, 2, 0,
-       doc: /* Return the .eln filename for source FILENAME to used
-for new compilations.
-If BASE-DIR is non-nil use it as a base directory, look for a suitable
-directory in `comp-eln-load-path' otherwise.  */)
+       doc: /* Return the absolute .eln file name for source FILENAME.
+The resulting .eln file name is intended to be used for natively
+compiling FILENAME.  FILENAME must exist and be readable, but other
+than that, its leading directories are ignored when constructing
+the name of the .eln file.
+If BASE-DIR is non-nil, use it as the directory for the .eln file;
+non-absolute BASE-DIR is interpreted as relative to `invocation-directory'.
+If BASE-DIR is omitted or nil, look for the first writable directory
+in `native-comp-eln-load-path', and use as BASE-DIR its subdirectory
+whose name is given by `comp-native-version-dir'.
+If FILENAME specifies a preloaded file, the directory for the .eln
+file is the \"preloaded/\" subdirectory of the directory determined
+as described above.  FILENAME is considered to be a preloaded file if
+the value of `comp-file-preloaded-p' is non-nil, or if FILENAME
+appears in the value of the environment variable LISP_PRELOADED;
+the latter is supposed to be used by the Emacs build procedure.  */)
   (Lisp_Object filename, Lisp_Object base_dir)
 {
   Lisp_Object source_filename = filename;
@@ -4707,7 +4735,7 @@ helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 }
 
 
-/* `comp-eln-load-path' clean-up support code.  */
+/* `native-comp-eln-load-path' clean-up support code.  */
 
 static Lisp_Object all_loaded_comp_units_h;
 
@@ -4722,7 +4750,7 @@ return_nil (Lisp_Object arg)
 /* Windows does not let us delete a .eln file that is currently loaded
    by a process.  The strategy is to rename .eln files into .old.eln
    instead of removing them when this is not possible and clean-up
-   `comp-eln-load-path' when exiting.
+   `native-comp-eln-load-path' when exiting.
 
    Any error is ignored because it may be due to the file being loaded
    in another Emacs instance.  */
@@ -4850,7 +4878,7 @@ maybe_defer_native_compilation (Lisp_Object function_name,
 /**************************************/
 
 /* Fixup the system eln-cache directory, which is the last entry in
-   `comp-eln-load-path'.  Argument is a .eln file in that directory.  */
+   `native-comp-eln-load-path'.  Argument is a .eln file in that directory.  */
 void
 fixup_eln_load_path (Lisp_Object eln_filename)
 {
@@ -5126,21 +5154,29 @@ make_subr (Lisp_Object symbol_name, Lisp_Object minarg, Lisp_Object maxarg,
   if (CONSP (minarg))
     {
       /* Dynamic code.  */
-      x->s.lambda_list[0] = maxarg;
+#ifdef HAVE_NATIVE_COMP
+      x->s.lambda_list = maxarg;
+#endif
       maxarg = XCDR (minarg);
       minarg = XCAR (minarg);
     }
   else
-    x->s.lambda_list[0] = Qnil;
+    {
+#ifdef HAVE_NATIVE_COMP
+      x->s.lambda_list = Qnil;
+#endif
+    }
   x->s.function.a0 = func;
   x->s.min_args = XFIXNUM (minarg);
   x->s.max_args = FIXNUMP (maxarg) ? XFIXNUM (maxarg) : MANY;
   x->s.symbol_name = xstrdup (SSDATA (symbol_name));
   x->s.native_intspec = intspec;
   x->s.doc = XFIXNUM (doc_idx);
-  x->s.native_comp_u[0] = comp_u;
-  x->s.native_c_name[0] = xstrdup (SSDATA (c_name));
-  x->s.type[0] = type;
+#ifdef HAVE_NATIVE_COMP
+  x->s.native_comp_u = comp_u;
+  x->s.native_c_name = xstrdup (SSDATA (c_name));
+  x->s.type = type;
+#endif
   Lisp_Object tem;
   XSETSUBR (tem, &x->s);
 
@@ -5497,9 +5533,9 @@ protect the trampolines against GC.  */);
   Vcomp_installed_trampolines_h = CALLN (Fmake_hash_table);
 
   DEFVAR_LISP ("comp-no-native-file-h", V_comp_no_native_file_h,
-	       doc: /* Files for which no deferred compilation has to
-be performed because the bytecode version was explicitly requested by
-the user during load.
+	       doc: /* Files for which no deferred compilation has to be performed.
+These files' compilation should not be deferred because the bytecode
+version was explicitly requested by the user during load.
 For internal use.  */);
   V_comp_no_native_file_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 

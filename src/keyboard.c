@@ -1,6 +1,6 @@
 /* Keyboard and mouse input; editor command loop.
 
-Copyright (C) 1985-1989, 1993-1997, 1999-2021 Free Software Foundation,
+Copyright (C) 1985-1989, 1993-1997, 1999-2022 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -753,10 +753,21 @@ DEFUN ("recursive-edit", Frecursive_edit, Srecursive_edit, 0, 0, "",
        doc: /* Invoke the editor command loop recursively.
 To get out of the recursive edit, a command can throw to `exit' -- for
 instance (throw \\='exit nil).
-If you throw a value other than t, `recursive-edit' returns normally
-to the function that called it.  Throwing a t value causes
-`recursive-edit' to quit, so that control returns to the command loop
-one level up.
+
+The following values (last argument to `throw') can be used when
+throwing to \\='exit:
+
+- t causes `recursive-edit' to quit, so that control returns to the
+  command loop one level up.
+
+- A string causes `recursive-edit' to signal an error, printing that
+  string as the error message.
+
+- A function causes `recursive-edit' to call that function with no
+  arguments, and then return normally.
+
+- Any other value causes `recursive-edit' to return normally to the
+  function that called it.
 
 This function is called by the editor initialization to begin editing.  */)
   (void)
@@ -3451,6 +3462,8 @@ readable_events (int flags)
      READABLE_EVENTS_FILTER_EVENTS is set, report it as empty.  */
   if (kbd_fetch_ptr != kbd_store_ptr)
     {
+      /* See https://lists.gnu.org/r/emacs-devel/2005-05/msg00297.html
+	 for why we treat toolkit scroll-bar events specially here.  */
       if (flags & (READABLE_EVENTS_FILTER_EVENTS
 #ifdef USE_TOOLKIT_SCROLL_BARS
 		   | READABLE_EVENTS_IGNORE_SQUEEZABLES
@@ -5111,7 +5124,21 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 #endif
       )
     {
-      posn = EQ (window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
+      /* While 'track-mouse' is neither nil nor t, do not report this
+	 event as something that happened on the tool or tab bar since
+	 that would break mouse drag operations that originate from an
+	 ordinary window beneath that bar and expect the window to
+	 auto-scroll as soon as the mouse cursor appears above or
+	 beneath it (Bug#50993).  We do allow reports for t, because
+	 applications may have set 'track-mouse' to t and still expect a
+	 click on the tool or tab bar to get through (Bug#51794).
+
+	 FIXME: This is a preliminary fix for the bugs cited above and
+	 awaits a solution that includes a convention for all special
+	 values of 'track-mouse' and their documentation in the Elisp
+	 manual.  */
+      if (NILP (track_mouse) || EQ (track_mouse, Qt))
+	posn = EQ (window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
       /* Kludge alert: for mouse events on the tab bar and tool bar,
 	 keyboard.c wants the frame, not the special-purpose window
 	 we use to display those, and it wants frame-relative
@@ -5119,7 +5146,8 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       window_or_frame = Qnil;
     }
 #endif
-  if (!FRAME_WINDOW_P (f)
+  if (f
+      && !FRAME_WINDOW_P (f)
       && FRAME_TAB_BAR_LINES (f) > 0
       && my >= FRAME_MENU_BAR_LINES (f)
       && my < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
@@ -11321,6 +11349,8 @@ The elements of this list correspond to the arguments of
 DEFUN ("posn-at-x-y", Fposn_at_x_y, Sposn_at_x_y, 2, 4, 0,
        doc: /* Return position information for pixel coordinates X and Y.
 By default, X and Y are relative to text area of the selected window.
+Note that the text area includes the header-line and the tab-line of
+the window, if any of them are present.
 Optional third arg FRAME-OR-WINDOW non-nil specifies frame or window.
 If optional fourth arg WHOLE is non-nil, X is relative to the left
 edge of the window.

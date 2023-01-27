@@ -1,6 +1,6 @@
 ;;; eudc.el --- Emacs Unified Directory Client  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Oscar Figueiredo <oscar@cpe.fr>
 ;;         Pavel Janík <Pavel@Janik.cz>
@@ -798,8 +798,9 @@ see `eudc-inline-expansion-servers'."
   "Query the directory server, and return the matching responses.
 The variable `eudc-inline-query-format' controls how to associate the
 individual QUERY-WORDS with directory attribute names.
-After querying the server for the given string, the expansion specified by
-`eudc-inline-expansion-format' is applied to the matches before returning them.inserted in the buffer at point.
+After querying the server for the given string, the expansion
+specified by `eudc-inline-expansion-format' is applied to the
+matches before returning them.inserted in the buffer at point.
 Multiple servers can be tried with the same query until one finds a match,
 see `eudc-inline-expansion-servers'."
   (cond

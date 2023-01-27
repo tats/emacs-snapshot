@@ -1,6 +1,6 @@
 ;;; idlwave.el --- IDL editing mode for GNU Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
 
 ;; Authors: JD Smith <jd.smith@utoledo.edu>
 ;;          Carsten Dominik <dominik@science.uva.nl>
@@ -245,7 +245,7 @@ would yield:
   :type 'boolean)
 
 (defcustom idlwave-indent-parens-nested nil
-  "Non-nil means, indent continuation lines with parens by nesting
+  "Non-nil means indent continuation lines with parens by nesting
 lines at consecutively deeper levels."
  :group 'idlwave-code-formatting
   :type 'boolean)
@@ -1522,7 +1522,8 @@ No spaces before and 1 after a comma
 A minimum of 1 space before and after `=' (see `idlwave-expand-equal').
    (idlwave-action-and-binding \"=\"  (lambda (_) (idlwave-expand-equal -1 -1)))
 Capitalize system variables - action only
-   (idlwave-action-and-binding idlwave-sysvar (lambda (_) (capitalize-word 1) t))"
+   (idlwave-action-and-binding idlwave-sysvar
+                               (lambda (_) (capitalize-word 1) t))"
   (if (not (equal select 'noaction))
       ;; Add action
       (let* ((table (if select 'idlwave-indent-action-table
@@ -5316,7 +5317,7 @@ directories and save the routine info.
 
 (defun idlwave-delete-user-catalog-file (&rest _ignore)
   (if (yes-or-no-p
-       (format "Delete file %s " idlwave-user-catalog-file))
+       (format "Delete file %s?" idlwave-user-catalog-file))
       (progn
 	(delete-file idlwave-user-catalog-file)
 	(message "%s has been deleted" idlwave-user-catalog-file))))
@@ -7285,8 +7286,7 @@ The list is cached in `idlwave-class-info' for faster access."
 				   inherits))
 	    (if (> (cdr cl) 999)
 	      (error
-	       "Class scan: inheritance depth exceeded. Circular inheritance?")
-	      ))
+               "Class scan: inheritance depth exceeded.  Circular inheritance?")))
 	  (setq all-inherits (nreverse rtn))
 	  (nconc info (list (cons 'all-inherits all-inherits)))
 	  all-inherits))))))
@@ -7786,7 +7786,7 @@ force class query for object methods."
 		(if (or (not this-buffer)
 			(assoc default list))
 		    (format-prompt "Module" default)
-		  (format "Module in this file: "))
+		  "Module in this file: ")
 		list))
 	 type class)
     (if (string-match "\\`\\s-*\\'" name)

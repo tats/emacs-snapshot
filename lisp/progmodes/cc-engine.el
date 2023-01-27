@@ -1,6 +1,6 @@
 ;;; cc-engine.el --- core syntax guessing engine for CC mode -*- lexical-binding:t; coding: utf-8 -*-
 
-;; Copyright (C) 1985, 1987, 1992-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2022 Free Software Foundation, Inc.
 
 ;; Authors:    2001- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -1545,7 +1545,7 @@ comment at the start of cc-engine.el for more info."
 	    nil))))))
 
 (defun c-at-statement-start-p ()
-  "Return non-nil if the point is at the first token in a statement
+  "Return non-nil if point is at the first token in a statement
 or somewhere in the syntactic whitespace before it.
 
 A \"statement\" here is not restricted to those inside code blocks.
@@ -1574,7 +1574,7 @@ comment at the start of cc-engine.el for more info."
 	  (c-crosses-statement-barrier-p (point) end)))))
 
 (defun c-at-expression-start-p ()
-  "Return non-nil if the point is at the first token in an expression or
+  "Return non-nil if point is at the first token in an expression or
 statement, or somewhere in the syntactic whitespace before it.
 
 An \"expression\" here is a bit different from the normal language
@@ -4969,7 +4969,7 @@ out of an enclosing paren."
 	     nil))))
 
 (defun c-forward-over-token-and-ws (&optional balanced)
-  "Move forward over a token and any following whitespace
+  "Move forward over a token and any following whitespace.
 Return t if we moved, nil otherwise (i.e. we were at EOB, or a
 non-token or BALANCED is non-nil and we can't move).  If we
 are at syntactic whitespace, move over this in place of a token.
@@ -5384,8 +5384,8 @@ comment at the start of cc-engine.el for more info."
 (defvar safe-pos-list)		  ; bound in c-syntactic-skip-backward
 
 (defun c-syntactic-skip-backward (skip-chars &optional limit paren-level)
-  "Like `skip-chars-backward' but only look at syntactically relevant chars,
-i.e. don't stop at positions inside syntactic whitespace or string
+  "Like `skip-chars-backward' but only look at syntactically relevant chars.
+This means don't stop at positions inside syntactic whitespace or string
 literals.  Preprocessor directives are also ignored, with the exception
 of the one that the point starts within, if any.  If LIMIT is given,
 it's assumed to be at a syntactically relevant position.
@@ -6135,7 +6135,7 @@ comment at the start of cc-engine.el for more info."
 	  (setq s (cons -1 (cdr s))))
 	 ((and (equal match ",")
 	       (eq (car s) -1)))	; at "," in "class foo : bar, ..."
-	 ((member match '(";" "," ")"))
+	 ((member match '(";" "*" "," "("))
 	  (when (and s (cdr s) (<= (car s) 0))
 	    (setq s (cdr s))))
 	 ((c-keyword-member kwd-sym 'c-flat-decl-block-kwds)
@@ -9978,7 +9978,12 @@ This function might do hidden buffer changes."
 		(save-excursion
 		  (goto-char type-start)
 		  (let ((c-promote-possible-types t))
-		    (c-forward-type)))))
+		    (c-forward-type))))
+
+	      ;; Signal a type declaration for "struct foo {".
+	      (when (and backup-at-type-decl
+			 (eq (char-after) ?{))
+		(setq at-type-decl t)))
 
 	    (setq backup-at-type at-type
 		  backup-type-start type-start
@@ -10409,6 +10414,7 @@ This function might do hidden buffer changes."
 			      ;; are directly inside a class (etc.) called "bar".
 			      (save-excursion
 				(and
+				 type-start
 				 (progn
 				   (goto-char name-start)
 				   (not (memq (c-forward-type) '(nil maybe))))

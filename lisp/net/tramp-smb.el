@@ -1,6 +1,6 @@
 ;;; tramp-smb.el --- Tramp access functions for SMB servers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -1658,7 +1658,7 @@ errors for shares like \"C$/\", which are common in Microsoft Windows."
 
       ;; The end.
       (when (and (null noninteractive)
-		 (or (eq visit t) (null visit) (stringp visit)))
+		 (or (eq visit t) (string-or-null-p visit)))
 	(tramp-message v 0 "Wrote %s" filename))
       (run-hooks 'tramp-handle-write-region-hook))))
 
@@ -1962,7 +1962,7 @@ If ARGUMENT is non-nil, use it as argument for
     ;; Otherwise, we must delete the connection cache, because
     ;; capabilities might have changed.
     (unless (or argument (processp p))
-      (let ((default-directory (tramp-compat-temporary-file-directory))
+      (let ((default-directory tramp-compat-temporary-file-directory)
 	    (command (concat tramp-smb-program " -V")))
 
 	(unless tramp-smb-version
@@ -2049,7 +2049,7 @@ If ARGUMENT is non-nil, use it as argument for
 	    (let* ((coding-system-for-read nil)
 		   (process-connection-type tramp-process-connection-type)
 		   (p (let ((default-directory
-			      (tramp-compat-temporary-file-directory))
+			      tramp-compat-temporary-file-directory)
 			    (process-environment
 			     (cons (concat "TERM=" tramp-terminal-type)
 				   process-environment)))

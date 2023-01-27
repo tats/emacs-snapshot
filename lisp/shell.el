@@ -1,6 +1,6 @@
 ;;; shell.el --- specialized comint.el for running the shell -*- lexical-binding: t -*-
 
-;; Copyright (C) 1988, 1993-1997, 2000-2021 Free Software Foundation,
+;; Copyright (C) 1988, 1993-1997, 2000-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Olin Shivers <shivers@cs.cmu.edu>
@@ -517,7 +517,8 @@ Shell buffers.  It implements `shell-completion-execonly' for
 (put 'shell-mode 'mode-class 'special)
 
 (define-derived-mode shell-mode comint-mode "Shell"
-  "Major mode for interacting with an inferior shell.\\<shell-mode-map>
+  "Major mode for interacting with an inferior shell.
+\\<shell-mode-map>
 \\[comint-send-input] after the end of the process' output sends the text from
     the end of process to the end of the current line.
 \\[comint-send-input] before end of process output copies the current line minus the prompt to
@@ -765,12 +766,16 @@ Make the shell buffer the current buffer, and return it.
               (called-interactively-p 'any)
               (null explicit-shell-file-name)
               (null (getenv "ESHELL")))
+     ;; `expand-file-name' shall not add the MS Windows volume letter
+     ;; (Bug#49229).
      (setq-local explicit-shell-file-name
-                 (file-local-name
-                  (expand-file-name
-                   (read-file-name "Remote shell path: " default-directory
-                                   shell-file-name t shell-file-name
-                                   #'file-remote-p)))))
+                 (replace-regexp-in-string
+                  "^[[:alpha:]]:" ""
+                  (file-local-name
+                   (expand-file-name
+                    (read-file-name "Remote shell path: " default-directory
+                                    shell-file-name t shell-file-name
+                                    #'file-remote-p))))))
 
    ;; Rain or shine, BUFFER must be current by now.
    (unless (comint-check-proc buffer)
@@ -936,7 +941,7 @@ Environment variables are expanded, see function `substitute-in-file-name'."
       dir
     (if (file-name-absolute-p dir)
 	;; The name is absolute, so prepend the prefix.
-	(concat comint-file-name-prefix dir)
+	(concat comint-file-name-prefix (file-local-name dir))
       ;; For relative name we assume default-directory already has the prefix.
       (expand-file-name dir))))
 

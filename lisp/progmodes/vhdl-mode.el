@@ -1,6 +1,6 @@
 ;;; vhdl-mode.el --- major mode for editing VHDL code  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1992-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2022 Free Software Foundation, Inc.
 
 ;; Authors:     Reto Zimmermann <reto@gnu.org>
 ;;              Rodney J. Whitby <software.vhdl-mode@rwhitby.net>
@@ -2197,8 +2197,8 @@ is pair matching KEY."
 	(setq alist alist-cdr)))))
 
 (defun vhdl-aget (alist key)
-  "Return the value in ALIST that is associated with KEY.  If KEY is
-not found, then nil is returned."
+  "Return the value in ALIST that is associated with KEY.
+If KEY is not found, then nil is returned."
   (cdr (assoc key alist)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4275,8 +4275,7 @@ STRING are replaced by `-' and substrings are converted to lower case."
 (defvar vhdl-sources-menu nil)
 
 (defun vhdl-directory-files (directory &optional full match)
-  "Call `directory-files' if DIRECTORY exists, otherwise generate error
-message."
+  "Call `directory-files' if DIRECTORY exists, otherwise generate error message."
   (if (not (file-directory-p directory))
       (vhdl-warning-when-idle "No such directory: \"%s\"" directory)
     (let ((dir (directory-files directory full match)))
@@ -5734,8 +5733,8 @@ the offset is simply returned."
 	 (save-excursion (re-search-forward "\\\\" (vhdl-point 'eol) t)))))
 
 (defun vhdl-forward-comment (&optional direction)
-  "Skip all comments (including whitespace).  Skip backwards if DIRECTION is
-negative, skip forward otherwise."
+  "Skip all comments (including whitespace).
+Skip backwards if DIRECTION is negative, skip forward otherwise."
   (interactive "p")
   (if (and direction (< direction 0))
       ;; skip backwards
@@ -5918,16 +5917,16 @@ negative, skip forward otherwise."
 ;; Functions to help finding the correct indentation column:
 
 (defun vhdl-first-word (point)
-  "If the keyword at POINT is at boi, then return (current-column) at
-that point, else nil."
+  "If the keyword at POINT is at boi, return (current-column) at that point.
+Otherwise return nil."
   (save-excursion
     (and (goto-char point)
 	 (eq (point) (vhdl-point 'boi))
 	 (current-column))))
 
 (defun vhdl-last-word (point)
-  "If the keyword at POINT is at eoi, then return (current-column) at
-that point, else nil."
+  "If keyword at POINT is at eoi, then return (current-column) at that point.
+Otherwise, return nil."
   (save-excursion
     (and (goto-char point)
 	 (save-excursion (or (eq (progn (forward-sexp) (point))
@@ -6267,13 +6266,11 @@ of an identifier that just happens to contain an \"end\" keyword."
 
 (defconst vhdl-statement-fwd-re
   "\\b\\(if\\|for\\|while\\|loop\\)\\b\\([^_]\\|\\'\\)"
-  "A regular expression for searching forward that matches all known
-\"statement\" keywords.")
+  "Regexp for searching forward that matches all known \"statement\" keywords.")
 
 (defconst vhdl-statement-bwd-re
   "\\b\\(if\\|for\\|while\\|loop\\)\\b[^_]"
-  "A regular expression for searching backward that matches all known
-\"statement\" keywords.")
+  "Regexp for searching backward that matches all known \"statement\" keywords.")
 
 (defun vhdl-statement-p (&optional _lim)
   "Return t if we are looking at a real \"statement\" keyword.
@@ -6724,8 +6721,9 @@ search, and an argument indicating an interactive call."
 	  vhdl-begin-bwd-re "\\|" vhdl-statement-bwd-re))
 
 (defun vhdl-beginning-of-statement-1 (&optional lim)
-  "Move to the start of the current statement, or the previous
-statement if already at the beginning of one."
+  "Move to the start of the current statement.
+If already at the beginning of a statement, move to the start of
+the previous statement instead."
   (let ((lim (or lim (point-min)))
 	(here (point))
 	(pos (point))
@@ -6912,9 +6910,9 @@ previous libunit keyword)."
   (concat vhdl-case-alternative-re "\\|" vhdl-case-header-key))
 
 (defun vhdl-skip-case-alternative (&optional lim)
-  "Skip forward over case/when bodies, with optional maximal
-limit.  If no next case alternative is found, nil is returned and
-point is not moved."
+  "Skip forward over case/when bodies, with optional maximal limit.
+If no next case alternative is found, nil is returned and point
+is not moved."
   (let ((lim (or lim (point-max)))
 	(here (point))
 	donep foundp)
@@ -6939,9 +6937,8 @@ point is not moved."
     foundp))
 
 (defun vhdl-backward-skip-label (&optional lim)
-  "Skip backward over a label, with optional maximal
-limit.  If label is not found, nil is returned and point
-is not moved."
+  "Skip backward over a label, with optional maximal limit.
+If label is not found, nil is returned and point is not moved."
   (let ((lim (or lim (point-min)))
 	placeholder)
     (if (save-excursion
@@ -6955,9 +6952,8 @@ is not moved."
     ))
 
 (defun vhdl-forward-skip-label (&optional lim)
-  "Skip forward over a label, with optional maximal
-limit.  If label is not found, nil is returned and point
-is not moved."
+  "Skip forward over a label, with optional maximal limit.
+If label is not found, nil is returned and point is not moved."
   (let ((lim (or lim (point-max))))
     (if (looking-at vhdl-label-key)
 	(progn
@@ -7327,9 +7323,9 @@ after the containing paren which starts the arglist."
       (- ce-curcol cs-curcol -1))))
 
 (defun vhdl-lineup-comment (_langelem)
-  "Support old behavior for comment indentation.  We look at
-vhdl-comment-only-line-offset to decide how to indent comment
-only-lines."
+  "Support old behavior for comment indentation.
+We look at `vhdl-comment-only-line-offset' to decide how to
+indent comment only-lines."
   (save-excursion
     (back-to-indentation)
     ;; at or to the right of comment-column
@@ -7445,7 +7441,7 @@ else indent `correctly'."
    (setq this-command 'vhdl-electric-tab)))
 
 (defun vhdl-electric-return ()
-  "newline-and-indent or indent-new-comment-line if in comment and preceding
+  "`newline-and-indent' or `indent-new-comment-line' if in comment and preceding
 character is a space."
   (interactive)
   (if (and (= (preceding-char) ? ) (vhdl-in-comment-p))
@@ -7456,8 +7452,8 @@ character is a space."
     (newline-and-indent)))
 
 (defun vhdl-indent-line ()
-  "Indent the current line as VHDL code.  Returns the amount of
-indentation change."
+  "Indent the current line as VHDL code.
+Return the amount of indentation change."
   (interactive)
   (let* ((syntax (and vhdl-indent-syntax-based (vhdl-get-syntactic-context)))
 	 (pos (- (point-max) (point)))
@@ -7617,8 +7613,8 @@ ALIGN-PATTERN matches the white space to be expanded/contracted.")
 ;; Align code
 
 (defvar vhdl-align-try-all-clauses t
-  "If REGEXP is not found on the first line of the region that clause
-is ignored.  If this variable is non-nil, then the clause is tried anyway.")
+  "If REGEXP is not found on the first line of the region that clause is ignored.
+If this variable is non-nil, then the clause is tried anyway.")
 
 (defun vhdl-do-group (function &optional spacing)
   "Apply FUNCTION on group of lines between empty lines."
@@ -7637,8 +7633,7 @@ is ignored.  If this variable is non-nil, then the clause is tried anyway.")
     (funcall function beg end spacing)))
 
 (defun vhdl-do-list (function &optional spacing)
-  "Apply FUNCTION to the lines of a list surrounded by a balanced group of
-parentheses."
+  "Apply FUNCTION to lines of a list surrounded by a balanced group of parentheses."
   (let (beg end)
     (save-excursion
       ;; search for beginning of balanced group of parentheses
@@ -7683,11 +7678,11 @@ parentheses."
     (funcall function beg end spacing)))
 
 (defun vhdl-align-region-1 (begin end &optional spacing alignment-list _indent)
-  "Attempt to align a range of lines based on the content of the
-lines.  The definition of `alignment-list' determines the matching
-order and the manner in which the lines are aligned.  If ALIGNMENT-LIST
-is not specified `vhdl-align-alist' is used.  If INDENT is non-nil,
-indentation is done before aligning."
+  "Attempt to align a range of lines based on the content of the lines.
+The definition of `alignment-list' determines the matching order
+and the manner in which the lines are aligned.  If ALIGNMENT-LIST
+is not specified `vhdl-align-alist' is used.  If INDENT is
+non-nil, indentation is done before aligning."
   (interactive "r\np")
   (setq alignment-list (or alignment-list vhdl-align-alist))
   (setq spacing (or spacing 1))
@@ -11070,7 +11065,7 @@ Point is left between them."
 ;; Help functions
 
 (defun vhdl-electric-space (count)
-  "Expand abbreviations and self-insert space(s), do indent-new-comment-line
+  "Expand abbreviations and self-insert space(s), do `indent-new-comment-line'
 if in comment and past end-comment-column."
   (interactive "p")
   (cond ((vhdl-in-comment-p)
@@ -11619,8 +11614,7 @@ but not if inside a comment or quote."
       string)))
 
 (defun vhdl-paste-group-comment (string indent)
-  "Paste comment and empty lines from STRING between groups of lines
-with INDENT."
+  "Paste comment and empty lines from STRING between groups of lines with INDENT."
   (let ((pos (point-marker)))
     (when (> indent 0)
       (while (string-match "^\\(--\\)" string)
@@ -14919,7 +14913,8 @@ if required."
       (setq project-alist (cdr project-alist)))))
 
 (defun vhdl-speedbar-insert-project-hierarchy (project indent &optional rescan)
-  "Insert hierarchy of PROJECT.  Rescan directories if RESCAN is non-nil,
+  "Insert hierarchy of PROJECT.
+Rescan directories if optional argument RESCAN is non-nil,
 otherwise use cached data."
   (when (or rescan (and (not (assoc project vhdl-file-alist))
 			(not (vhdl-load-cache project))))
@@ -14937,7 +14932,8 @@ otherwise use cached data."
   (vhdl-speedbar-expand-units project))
 
 (defun vhdl-speedbar-insert-dir-hierarchy (directory depth &optional rescan)
-  "Insert hierarchy of DIRECTORY.  Rescan directory if RESCAN is non-nil,
+  "Insert hierarchy of DIRECTORY.
+Rescan directory if optional argument RESCAN is non-nil,
 otherwise use cached data."
   (when (or rescan (and (not (assoc directory vhdl-file-alist))
 			(not (vhdl-load-cache directory))))

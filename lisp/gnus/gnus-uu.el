@@ -1,6 +1,6 @@
 ;;; gnus-uu.el --- extract (uu)encoded files in Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1985-1987, 1993-1998, 2000-2021 Free Software
+;; Copyright (C) 1985-1987, 1993-1998, 2000-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
@@ -579,7 +579,7 @@ didn't work, and overwrite existing files.  Otherwise, ask each time."
 (defun gnus-new-processable (unmarkp articles)
   (if unmarkp
       (nreverse (seq-intersection gnus-newsgroup-processable articles #'eq))
-    (seq-difference articles gnus-newsgroup-processable #'eq)))
+    (gnus-set-difference articles gnus-newsgroup-processable)))
 
 (defun gnus-uu-mark-by-regexp (regexp &optional unmark)
   "Set the process mark on articles whose subjects match REGEXP.

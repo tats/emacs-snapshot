@@ -1,6 +1,6 @@
 ;;; vc.el --- drive a version-control system from within Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1998, 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1998, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: FSF (see below for full credits)
 ;; Maintainer: emacs-devel@gnu.org
@@ -1216,7 +1216,11 @@ For old-style locking-based version control systems, like RCS:
      ((eq state 'ignored)
       (error "Fileset files are ignored by the version-control system"))
      ((or (null state) (eq state 'unregistered))
-      (vc-register vc-fileset))
+      (cond (verbose
+             (let ((backend (vc-read-backend "Backend to register to: ")))
+               (vc-register (cons backend (cdr vc-fileset)))))
+            (t
+             (vc-register vc-fileset))))
      ;; Files are up-to-date, or need a merge and user specified a revision
      ((or (eq state 'up-to-date) (and verbose (eq state 'needs-update)))
       (cond
@@ -2620,7 +2624,7 @@ with its diffs (if the underlying VCS supports that)."
 
 ;;;###autoload
 (defun vc-log-incoming (&optional remote-location)
-  "Show a log of changes that will be received with a pull operation from REMOTE-LOCATION.
+  "Show log of changes that will be received with pull from REMOTE-LOCATION.
 When called interactively with a prefix argument, prompt for REMOTE-LOCATION."
   (interactive
    (when current-prefix-arg
@@ -2633,7 +2637,7 @@ When called interactively with a prefix argument, prompt for REMOTE-LOCATION."
 
 ;;;###autoload
 (defun vc-log-outgoing (&optional remote-location)
-  "Show a log of changes that will be sent with a push operation to REMOTE-LOCATION.
+  "Show log of changes that will be sent with a push operation to REMOTE-LOCATION.
 When called interactively with a prefix argument, prompt for REMOTE-LOCATION."
   (interactive
    (when current-prefix-arg
@@ -2860,6 +2864,7 @@ permanent, only for the current session.  This function only changes
 VC's perspective on FILE, it does not register or unregister it.
 By default, this command cycles through the registered backends.
 To get a prompt, use a prefix argument."
+  (declare (obsolete nil "28.1"))
   (interactive
    (list
     (or buffer-file-name
@@ -2914,7 +2919,8 @@ backend to NEW-BACKEND, and unregister FILE from the current backend.
     (if registered
 	(set-file-modes file (logior (file-modes file) 128))
       ;; `registered' might have switched under us.
-      (vc-switch-backend file old-backend)
+      (with-suppressed-warnings ((obsolete vc-switch-backend))
+        (vc-switch-backend file old-backend))
       (let* ((rev (vc-working-revision file))
 	     (modified-file (and edited (make-temp-file file)))
 	     (unmodified-file (and modified-file (vc-version-backup-file file))))
@@ -2933,16 +2939,19 @@ backend to NEW-BACKEND, and unregister FILE from the current backend.
 		    (vc-revert-file file))))
 	      (vc-call-backend new-backend 'receive-file file rev))
 	  (when modified-file
-	    (vc-switch-backend file new-backend)
+            (with-suppressed-warnings ((obsolete vc-switch-backend))
+              (vc-switch-backend file new-backend))
 	    (unless (eq (vc-checkout-model new-backend (list file)) 'implicit)
 	      (vc-checkout file))
 	    (rename-file modified-file file 'ok-if-already-exists)
 	    (vc-file-setprop file 'vc-checkout-time nil)))))
     (when move
-      (vc-switch-backend file old-backend)
+      (with-suppressed-warnings ((obsolete vc-switch-backend))
+        (vc-switch-backend file old-backend))
       (setq comment (vc-call-backend old-backend 'comment-history file))
       (vc-call-backend old-backend 'unregister file))
-    (vc-switch-backend file new-backend)
+    (with-suppressed-warnings ((obsolete vc-switch-backend))
+      (vc-switch-backend file new-backend))
     (when (or move edited)
       (vc-file-setprop file 'vc-state 'edited)
       (vc-mode-line file new-backend)

@@ -1,6 +1,6 @@
 ;;; compile.el --- run compiler as inferior of Emacs, parse error messages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1993-1999, 2001-2021 Free Software
+;; Copyright (C) 1985-1987, 1993-1999, 2001-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Authors: Roland McGrath <roland@gnu.org>,
@@ -662,7 +662,8 @@ has just been matched, and should correspondingly preserve this match data.
 TYPE is 2 or nil for a real error or 1 for warning or 0 for info.
 TYPE can also be of the form (WARNING . INFO).  In that case this
 will be equivalent to 1 if the WARNING'th subexpression matched
-or else equivalent to 0 if the INFO'th subexpression matched.
+or else equivalent to 0 if the INFO'th subexpression matched,
+or else equivalent to 2 if neither of them matched.
 See `compilation-error-face', `compilation-warning-face',
 `compilation-info-face' and `compilation-skip-threshold'.
 
@@ -687,10 +688,12 @@ matched file names, and weeding out false positives."
 		    ,(expand-file-name "compilation.txt" data-directory)))
 
 (defvar compilation-error-case-fold-search nil
-  "If non-nil, use case-insensitive matching of compilation errors
-by the regexps of `compilation-error-regexp-alist' and
-`compilation-error-regexp-alist-alist'.
+  "If non-nil, use case-insensitive matching of compilation errors.
 If nil, matching is case-sensitive.
+
+Compilation errors are given by the regexps in
+`compilation-error-regexp-alist' and
+`compilation-error-regexp-alist-alist'.
 
 This variable should only be set for backward compatibility as a temporary
 measure.  The proper solution is to use a regexp that matches the
@@ -2260,7 +2263,7 @@ by replacing the first word, e.g., `compilation-scroll-output' from
   (if buffer-file-name
       (let (revert-buffer-function)
 	(revert-buffer ignore-auto noconfirm))
-    (if (or noconfirm (yes-or-no-p (format "Restart compilation? ")))
+    (if (or noconfirm (yes-or-no-p "Restart compilation? "))
 	(apply #'compilation-start compilation-arguments))))
 
 (defvar compilation-current-error nil

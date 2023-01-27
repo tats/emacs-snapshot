@@ -1,6 +1,6 @@
 ;;; compare-w.el --- compare text between windows for Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1986, 1989, 1993, 1997, 2001-2021 Free Software
+;; Copyright (C) 1986, 1989, 1993, 1997, 2001-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -188,7 +188,7 @@ If both windows display the same buffer,
 the mark is pushed twice in that buffer:
 first in the other window, then in the selected window.
 
-A prefix arg means reverse the value of variable
+A prefix arg IGNORE-WHITESPACE, means reverse the value of variable
 `compare-ignore-whitespace'.  If `compare-ignore-whitespace' is
 nil, then a prefix arg means ignore changes in whitespace.  If
 `compare-ignore-whitespace' is non-nil, then a prefix arg means

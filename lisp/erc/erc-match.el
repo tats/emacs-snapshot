@@ -1,6 +1,6 @@
 ;;; erc-match.el --- Highlight messages matching certain regexps  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2022 Free Software Foundation, Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
 ;; Maintainer: Amin Bandali <bandali@gnu.org>
@@ -79,7 +79,7 @@ Useful to mark nicks from dangerous hosts."
   :type '(repeat regexp))
 
 (defcustom erc-current-nick-highlight-type 'keyword
-  "Determines how to highlight text in which your current nickname appears
+  "Determine how to highlight text in which your current nickname appears
 \(does not apply to text sent by you).
 
 The following values are allowed:
@@ -234,9 +234,9 @@ current-nick, keyword, pal, dangerous-host, fool."
   :type 'hook)
 
 (defcustom erc-match-exclude-server-buffer nil
-  "If true, don't perform match on the server buffer; this is
-useful for excluding all the things like MOTDs from the server
-and other miscellaneous functions."
+  "If true, don't perform match on the server buffer.
+This is useful for excluding all the things like MOTDs from the
+server and other miscellaneous functions."
   :version "24.3"
   :type 'boolean)
 

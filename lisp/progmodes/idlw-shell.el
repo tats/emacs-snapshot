@@ -1,6 +1,6 @@
 ;;; idlw-shell.el --- run IDL as an inferior process of Emacs.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
 
 ;; Authors: JD Smith <jd.smith@utoledo.edu>
 ;;          Carsten Dominik <dominik@astro.uva.nl>
@@ -105,8 +105,9 @@ process buffer."
   :type 'regexp)
 
 (defcustom idlwave-shell-process-name "idl"
-  "Name to be associated with the IDL process.  The buffer for the
-process output is made by surrounding this name with `*'s."
+  "Name to be associated with the IDL process.
+The buffer for the process output is made by surrounding this
+name with `*'s."
   :group 'idlwave-shell-general-setup
   :type 'string)
 

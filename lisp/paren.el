@@ -1,6 +1,6 @@
 ;;; paren.el --- highlight matching paren  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993, 1996, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1996, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: rms@gnu.org
 ;; Maintainer: emacs-devel@gnu.org
@@ -107,6 +107,8 @@ after `show-paren-delay' seconds of Emacs idle time.
 This is a global minor mode.  To toggle the mode in a single buffer,
 use `show-paren-local-mode'."
   :global t :group 'paren-showing
+  :initialize 'custom-initialize-delay
+  :init-value t
   ;; Enable or disable the mechanism.
   ;; First get rid of the old idle timer.
   (when show-paren--idle-timer

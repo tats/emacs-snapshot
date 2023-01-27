@@ -1,6 +1,6 @@
 ;;; frameset.el --- save and restore frame and window setup -*- lexical-binding: t -*-
 
-;; Copyright (C) 2013-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; Author: Juanma Barranquero <lekktu@gmail.com>
 ;; Keywords: convenience
@@ -1178,7 +1178,8 @@ FORCE-ONSCREEN can be:
 	   - a list (LEFT TOP WIDTH HEIGHT), describing the workarea.
 	   It must return non-nil to force the frame onscreen, nil otherwise.
 
-CLEANUP-FRAMES allows \"cleaning up\" the frame list after restoring a frameset:
+CLEANUP-FRAMES allows \"cleaning up\" the frame list after
+restoring a frameset:
   t        Delete all frames that were not created or restored upon.
   nil      Keep all frames.
   FUNC     A function called with two arguments:

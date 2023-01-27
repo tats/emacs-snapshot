@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual., Abbrevs, This is part of the Emacs manual., Top
-@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2021 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2022 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Maintaining
@@ -493,7 +493,7 @@ action on the current VC fileset: either registering it with a version
 control system, or committing it, or unlocking it, or merging changes
 into it.  The precise actions are described in detail in the following
 subsections.  You can use @kbd{C-x v v} either in a file-visiting
-buffer or in a VC Directory buffer.
+buffer, in a Dired buffer, or in a VC Directory buffer.
 
   Note that VC filesets are distinct from the named filesets used
 for viewing and visiting files in functional groups
@@ -945,7 +945,7 @@ the author's description of the changes in the revision on the current
 line.
 
 @item w
-Annotate the working revision--the one you are editing.  If you used
+Annotate the working revision---the one you are editing.  If you used
 @kbd{p} and @kbd{n} to browse to other revisions, use this key to
 return to your working revision.
 
@@ -1769,8 +1769,13 @@ Replace}), and continues to the next match after you respond.  If your
 response causes Emacs to exit the query-replace loop, you can later
 continue with @w{@kbd{M-x fileloop-continue @key{RET}}}.
 
+@findex project-find-dir
+  The command @kbd{C-x p d} (@code{project-find-dir}) prompts you to
+choose a directory inside the current project, with completion.
+And opens a Dired buffer (@pxref{Dired}) listing the files in it.
+
 @findex project-dired
-  The command @kbd{C-x p d} (@code{project-dired}) opens a Dired
+  The command @kbd{C-x p D} (@code{project-dired}) opens a Dired
 buffer (@pxref{Dired}) listing the files in the current project's root
 directory.
 
@@ -1861,14 +1866,14 @@ records the list of known projects.  It defaults to the file
 @subsection Managing the Project List File
 
 @table @kbd
-@item M-x project-remove-known-project
+@item M-x project-forget-project
 Remove a known project from the @code{project-list-file}.
 @end table
 
-@findex project-remove-known-project
+@findex project-forget-project
   Normally Emacs automatically adds and removes projects to and from the
 @code{project-list-file}, but sometimes you may want to manually edit
-the available projects.  @kbd{M-x project-remove-known-project}
+the available projects.  @kbd{M-x project-forget-project}
 prompts you to choose one of the available projects, and then removes
 it from the file.
 
@@ -2278,7 +2283,12 @@ the match with @var{replacement}.  @xref{Identifier Search}.
 @item g
 @findex xref-revert-buffer
 Refresh the contents of the @file{*xref*} buffer
-(@code{xref-revert-buffer}.
+(@code{xref-revert-buffer}).
+
+@item M-,
+@findex xref-quit-and-pop-marker-stack
+Quit the window showing the @file{*xref*} buffer, and then jump to the
+previous Xref stack location (@code{xref-quit-and-pop-marker-stack}).
 
 @item q
 @findex xref-quit
@@ -2964,11 +2974,12 @@ etags --language=none \
 
 @findex visit-tags-table
   Emacs has at any time at most one @dfn{selected} tags table.  All
-the commands for working with tags tables use the selected one.  To
-select a tags table, type @kbd{M-x visit-tags-table}, which reads the
-tags table file name as an argument, with @file{TAGS} defaulting to
-the first directory that contains a file named @file{TAGS} encountered
-when recursively searching upward from the default directory.
+the commands for working with tags tables use the selected one first.
+To select a tags table, type @kbd{M-x visit-tags-table}, which reads
+the tags table file name as an argument, with @file{TAGS} defaulting
+to the first directory that contains a file named @file{TAGS}
+encountered when recursively searching upward from the default
+directory.
 
 @vindex tags-file-name
   Emacs does not actually read in the tags table contents until you
@@ -2978,16 +2989,25 @@ variable's initial value is @code{nil}; that value tells all the
 commands for working with tags tables that they must ask for a tags
 table file name to use.
 
-  Using @code{visit-tags-table} when a tags table is already loaded
-gives you a choice: you can add the new tags table to the current list
-of tags tables, or start a new list.  The tags commands use all the tags
-tables in the current list.  If you start a new list, the new tags table
-is used @emph{instead} of others.  If you add the new table to the
-current list, it is used @emph{as well as} the others.
+  In addition to the selected tags table, Emacs maintains the list of
+several tags tables that you use together.  For example, if you are
+working on a program that uses a library, you may wish to have the
+tags tables of both the program and the library available, so that
+Emacs could easily find identifiers from both.  If the selected tags
+table doesn't have the identifier or doesn't mention the source file a
+tags command needs, the command will try using all the other tags
+tables in the current list of tags tables.
+
+  Using @code{visit-tags-table} to load a new tags table when another
+tags table is already loaded gives you a choice: you can add the new
+tags table to the current list of tags tables, or discard the current
+list and start a new list.  If you start a new list, the new tags
+table is used @emph{instead} of others.  If you add the new table to
+the current list, it is used @emph{as well as} the others.
 
 @vindex tags-table-list
   You can specify a precise list of tags tables by setting the variable
-@code{tags-table-list} to a list of strings, like this:
+@code{tags-table-list} to a list of directory names, like this:
 
 @c keep this on two lines for formatting in smallbook
 @example

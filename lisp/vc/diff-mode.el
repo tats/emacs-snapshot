@@ -1,6 +1,6 @@
 ;;; diff-mode.el --- a mode for viewing/editing context diffs -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: convenience patch diff vc
@@ -1355,7 +1355,11 @@ else cover the whole buffer."
 	      (pcase (char-after)
 		(?\s (cl-incf space))
 		(?+ (cl-incf plus))
-		(?- (cl-incf minus))
+		(?- (unless ;; In git format-patch "^-- $" signifies
+                            ;; the end of the patch.
+			(and (eq diff-buffer-type 'git)
+			     (looking-at "^-- $"))
+		      (cl-incf minus)))
 		(?! (cl-incf bang))
 		((or ?\\ ?#) nil)
 		(?\n (if diff-valid-unified-empty-line

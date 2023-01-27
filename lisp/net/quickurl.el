@@ -1,6 +1,6 @@
 ;;; quickurl.el --- insert a URL based on text at point in buffer  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
 
 ;; Author: Dave Pearson <davep@davep.org>
 ;; Created: 1999-05-28
@@ -55,7 +55,7 @@
 ;;
 ;; (("GNU"    . "https://www.gnu.org/")
 ;;  ("FSF"      "https://www.fsf.org/" "The Free Software Foundation")
-;;  ("emacs"  . "http://www.emacs.org/")
+;;  ("emacs"  . "https://www.emacs.org/")
 ;;  ("davep"    "http://www.davep.org/" "Dave's homepage"))
 ;;
 ;; In case you're wondering about the mixture of cons cells and lists,
@@ -284,7 +284,7 @@ It also restores point after the `read'."
   "Return URL associated with key LOOKUP.
 
 The lookup is done by looking in the alist `quickurl-urls' and the `cons'
-for the URL is returned. The actual method used to look into the alist
+for the URL is returned.  The actual method used to look into the alist
 depends on the setting of the variable `quickurl-assoc-function'."
   (funcall quickurl-assoc-function lookup quickurl-urls))
 

@@ -1,6 +1,6 @@
 ;;; ewoc.el --- utility to maintain a view of a list of objects in a buffer  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1991-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1991-2022 Free Software Foundation, Inc.
 
 ;; Author: Per Cederqvist <ceder@lysator.liu.se>
 ;;	Inge Wallin <inge@lysator.liu.se>
@@ -49,7 +49,7 @@
 ;;
 ;; Ewoc is a package that implements a connection between an
 ;; dll (a doubly linked list) and the contents of a buffer.
-;; Possible uses are dired (have all files in a list, and show them),
+;; Possible uses are Dired (have all files in a list, and show them),
 ;; buffer-list, kom-prioritize (in the LysKOM elisp client) and
 ;; others.  pcl-cvs.el and vc.el use ewoc.el.
 ;;
@@ -147,7 +147,7 @@ and (ewoc--node-nth dll -1) returns the last node."
   buffer pretty-printer header footer dll last-node hf-pp)
 
 (defmacro ewoc--set-buffer-bind-dll-let* (ewoc varlist &rest forms)
-  "Execute FORMS with ewoc--buffer selected as current buffer,
+  "Execute FORMS with `ewoc--buffer' selected as current buffer,
 `dll' bound to the dll, and VARLIST bound as in a let*.
 `dll' will be bound when VARLIST is initialized, but
 the current buffer will *not* have been changed.
@@ -381,7 +381,7 @@ arguments will be passed to MAP-FUNCTION."
 
 (defun ewoc-filter (ewoc predicate &rest args)
   "Remove all elements in EWOC for which PREDICATE returns nil.
-Note that the buffer for EWOC will be current-buffer when PREDICATE
+Note that the buffer for EWOC will be the current buffer when PREDICATE
 is called.  PREDICATE must restore the current buffer before it returns
 if it changes it.
 The PREDICATE is called with the element as its first argument.  If any

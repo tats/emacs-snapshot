@@ -1,6 +1,6 @@
 ;;; ebnf-dtd.el --- parser for DTD (Data Type Description for XML)  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, ebnf, PostScript
@@ -62,7 +62,7 @@
 ;;
 ;;    Document authors are encouraged to avoid "compatibility characters", as
 ;;    defined in section 6.8 of [Unicode] (see also D21 in section 3.6 of
-;;    [Unicode3]). The characters defined in the following ranges are also
+;;    [Unicode3]).  The characters defined in the following ranges are also
 ;;    discouraged.  They are either control characters or permanently undefined
 ;;    Unicode characters:
 ;;

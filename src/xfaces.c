@@ -1,6 +1,6 @@
 /* xfaces.c -- "Face" primitives.
 
-Copyright (C) 1993-1994, 1998-2021 Free Software Foundation, Inc.
+Copyright (C) 1993-1994, 1998-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -2420,11 +2420,11 @@ evaluate_face_filter (Lisp_Object filter, struct window *w,
 /* Determine whether FACE_REF is a "filter" face specification (case
    #4 in merge_face_ref).  If it is, evaluate the filter, and if the
    filter matches, return the filtered face spec.  If the filter does
-   not match, return `nil'.  If FACE_REF is not a filtered face
+   not match, return nil.  If FACE_REF is not a filtered face
    specification, return FACE_REF.
 
    On error, set *OK to false, having logged an error message if
-   ERR_MSGS is true, and return `nil'.  Otherwise, *OK is not touched.
+   ERR_MSGS is true, and return nil.  Otherwise, *OK is not touched.
 
    W is either NULL or a window used to evaluate filters.  If W is
    NULL, no window-based face specification filter matches.
@@ -2709,7 +2709,7 @@ merge_face_ref (struct window *w,
 		{
 		  if (EQ (value, Qt))
 		    value = make_fixnum (1);
-		  if (FIXNUMP (value)
+		  if ((FIXNUMP (value) && XFIXNUM (value) != 0)
 		      || STRINGP (value)
 		      || CONSP (value)
 		      || NILP (value))
@@ -4168,9 +4168,9 @@ If the optional argument FRAME is given, report on face FACE in that frame.
 If FRAME is t, report on the defaults for face FACE (for new frames).
   The font default for a face is either nil, or a list
   of the form (bold), (italic) or (bold italic).
-If FRAME is omitted or nil, use the selected frame.  And, in this case,
-if the optional third argument CHARACTER is given,
-return the font name used for CHARACTER.  */)
+If FRAME is omitted or nil, use the selected frame.
+If FRAME is anything but t, and the optional third argument CHARACTER
+is given, return the font name used by FACE for CHARACTER on FRAME.  */)
   (Lisp_Object face, Lisp_Object frame, Lisp_Object character)
 {
   if (EQ (frame, Qt))
@@ -4824,7 +4824,7 @@ face_for_font (struct frame *f, Lisp_Object font_object,
                struct face *base_face)
 {
   struct face_cache *cache = FRAME_FACE_CACHE (f);
-  unsigned hash;
+  uintptr_t hash;
   int i;
   struct face *face;
 
@@ -6423,7 +6423,14 @@ face_at_buffer_position (struct window *w, ptrdiff_t pos,
     else
       face_id = lookup_basic_face (w, f, DEFAULT_FACE_ID);
 
-    default_face = FACE_FROM_ID (f, face_id);
+    default_face = FACE_FROM_ID_OR_NULL (f, face_id);
+    if (!default_face)
+      {
+	if (FRAME_FACE_CACHE (f)->used == 0)
+	  recompute_basic_faces (f);
+	default_face = FACE_FROM_ID (f,
+				     lookup_basic_face (w, f, DEFAULT_FACE_ID));
+      }
   }
 
   /* Optimize common cases where we can use the default face.  */

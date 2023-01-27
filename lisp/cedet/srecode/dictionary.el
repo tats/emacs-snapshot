@@ -1,6 +1,6 @@
 ;;; srecode/dictionary.el --- Dictionary code for the semantic recoder.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2007-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -364,7 +364,7 @@ values but STATE is nil."
        ;; Value is some other object; create a compound value.
        (t
 	(unless state
-	  (error "Cannot insert compound values without state."))
+          (error "Cannot insert compound values without state"))
 
 	(srecode-dictionary-set-value
 	 dict name

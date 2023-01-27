@@ -1,6 +1,6 @@
 ;;; tramp-sshfs.el --- Tramp access functions via sshfs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2021 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -110,7 +110,7 @@
     (file-notify-rm-watch . ignore)
     (file-notify-valid-p . ignore)
     (file-ownership-preserved-p . ignore)
-    (file-readable-p . tramp-fuse-handle-file-readable-p)
+    (file-readable-p . tramp-handle-file-readable-p)
     (file-regular-p . tramp-handle-file-regular-p)
     (file-remote-p . tramp-handle-file-remote-p)
     (file-selinux-context . tramp-handle-file-selinux-context)
@@ -222,11 +222,14 @@ arguments to pass to the OPERATION."
 (defun tramp-sshfs-handle-insert-file-contents
   (filename &optional visit beg end replace)
   "Like `insert-file-contents' for Tramp files."
-  (let ((result
-	 (insert-file-contents
-	  (tramp-fuse-local-file-name filename) visit beg end replace)))
-    (when visit (setq buffer-file-name filename))
-    (cons (expand-file-name filename) (cdr result))))
+  (setq filename (expand-file-name filename))
+  (let (signal-hook-function result)
+    (unwind-protect
+        (setq result
+	      (insert-file-contents
+	       (tramp-fuse-local-file-name filename) visit beg end replace))
+      (when visit (setq buffer-file-name filename))
+      (cons filename (cdr result)))))
 
 (defun tramp-sshfs-handle-process-file
   (program &optional infile destination display &rest args)
@@ -317,7 +320,7 @@ arguments to pass to the OPERATION."
 
       ;; The end.
       (when (and (null noninteractive)
-		 (or (eq visit t) (null visit) (stringp visit)))
+		 (or (eq visit t) (string-or-null-p visit)))
 	(tramp-message v 0 "Wrote %s" filename))
       (run-hooks 'tramp-handle-write-region-hook))))
 
@@ -346,30 +349,31 @@ connection if a previous connection has died for some reason."
       (tramp-set-connection-property p "lock-pid" (truncate (time-to-seconds)))
 
       ;; Set connection-local variables.
-      (tramp-set-connection-local-variables vec)
+      (tramp-set-connection-local-variables vec)))
 
-      ;; Create directory.
-      (unless (file-directory-p (tramp-fuse-mount-point vec))
-	(make-directory (tramp-fuse-mount-point vec) 'parents))
+  ;; Create directory.
+  (unless (file-directory-p (tramp-fuse-mount-point vec))
+    (make-directory (tramp-fuse-mount-point vec) 'parents))
 
-      (unless
-	  (or (tramp-fuse-mounted-p vec)
-	      (with-temp-buffer
-		(zerop
-		 (apply
-		  #'tramp-call-process
-		  vec tramp-sshfs-program nil t nil
-		  (tramp-fuse-mount-spec vec)
-		  (tramp-fuse-mount-point vec)
-		  (tramp-expand-args
-		   vec 'tramp-mount-args
-		   ?p (or (tramp-file-name-port vec) "")))))
-	  (tramp-error
-	   vec 'file-error "Error mounting %s" (tramp-fuse-mount-spec vec))))
+  (unless
+      (or (tramp-fuse-mounted-p vec)
+	  (with-temp-buffer
+	    (zerop
+	     (apply
+	      #'tramp-call-process
+	      vec tramp-sshfs-program nil t nil
+	      (tramp-fuse-mount-spec vec)
+	      (tramp-fuse-mount-point vec)
+	      (tramp-expand-args
+	       vec 'tramp-mount-args
+	       ?p (or (tramp-file-name-port vec) ""))))))
+    (tramp-error
+     vec 'file-error "Error mounting %s" (tramp-fuse-mount-spec vec)))
 
-      ;; Mark it as connected.
-      (tramp-set-connection-property
-       (tramp-get-connection-process vec) "connected" t)))
+  ;; Mark it as connected.
+  (add-to-list 'tramp-fuse-mount-points (tramp-file-name-unify vec))
+  (tramp-set-connection-property
+   (tramp-get-connection-process vec) "connected" t)
 
   ;; In `tramp-check-cached-permissions', the connection properties
   ;; "{uid,gid}-{integer,string}" are used.  We set them to proper values.

@@ -1,6 +1,6 @@
 ;;; bug-reference.el --- buttonize bug references  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: Tom Tromey <tromey@redhat.com>
 ;; Created: 21 Mar 2007
@@ -72,7 +72,7 @@ so that it is considered safe, see `enable-local-variables'.")
                 (get s 'bug-reference-url-format)))))
 
 (defcustom bug-reference-bug-regexp
-  "\\(\\(?:[Bb]ug ?#?\\|[Pp]atch ?#\\|RFE ?#\\|PR [a-z+-]+/\\)\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
+  "\\(\\b\\(?:[Bb]ug ?#?\\|[Pp]atch ?#\\|RFE ?#\\|PR [a-z+-]+/\\)\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
   "Regular expression matching bug references.
 The first subexpression defines the region of the bug-reference
 overlay, i.e., the region being fontified and made clickable in
@@ -270,7 +270,8 @@ via the internet it might also be http.")
 ;; possibly different projects are also supported.
 (cl-defmethod bug-reference--build-forge-setup-entry
   (host-domain (_forge-type (eql github)) protocol)
-  `(,(concat "[/@]" host-domain "[/:]\\([.A-Za-z0-9_/-]+\\)\\.git")
+  `(,(concat "[/@]" (regexp-quote host-domain)
+             "[/:]\\([.A-Za-z0-9_/-]+\\)\\.git")
     "\\(\\([.A-Za-z0-9_/-]+\\)?\\(?:#\\)\\([0-9]+\\)\\)\\>"
     ,(lambda (groups)
        (let ((ns-project (nth 1 groups)))
@@ -350,7 +351,7 @@ generated from `bug-reference-forge-alist'."
             ;; `bug-reference-url-format' and
             ;; `bug-reference-bug-regexp' aren't set already.
             ("git\\.\\(?:sv\\|savannah\\)\\.gnu\\.org:"
-             "\\<\\(\\(?:[Bb]ug ?#?\\)\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)\\>"
+             "\\(\\b\\(?:[Bb]ug ?#?\\)\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)\\>"
              ,(lambda (_) "https://debbugs.gnu.org/%s"))
 
             ;; Entries for the software forges of
@@ -376,31 +377,26 @@ URL-REGEXP against the VCS URL and returns the value to be set as
 Test each configuration in `bug-reference-setup-from-vc-alist'
 and `bug-reference--setup-from-vc-alist' and apply it if
 applicable."
-  (let ((file-or-dir (or buffer-file-name
-                         ;; Catches modes such as vc-dir and Magit.
-                         default-directory)))
-    (when file-or-dir
-      (let* ((backend (vc-responsible-backend file-or-dir t))
-             (url
-              (or (ignore-errors
-                    (vc-call-backend backend 'repository-url "upstream"))
-                  (ignore-errors
-                    (vc-call-backend backend 'repository-url)))))
-        (when url
-          (catch 'found
-            (dolist (config (append
-                             bug-reference-setup-from-vc-alist
-                             (bug-reference--setup-from-vc-alist)))
-              (when (apply #'bug-reference-maybe-setup-from-vc
-                           url config)
-                (throw 'found t)))))))))
+  (when-let ((file-or-dir (or buffer-file-name
+                              ;; Catches modes such as vc-dir and Magit.
+                              default-directory))
+             (backend (vc-responsible-backend file-or-dir t))
+             (url (seq-some (lambda (remote)
+                              (ignore-errors
+                                (vc-call-backend backend 'repository-url
+                                                 file-or-dir remote)))
+                            '("upstream" nil))))
+    (seq-some (lambda (config)
+                (apply #'bug-reference-maybe-setup-from-vc url config))
+              (append bug-reference-setup-from-vc-alist
+                      (bug-reference--setup-from-vc-alist)))))
 
 (defvar bug-reference-setup-from-mail-alist
   `((,(regexp-opt '("emacs" "auctex" "gnus" "tramp" "orgmode") 'words)
      ,(regexp-opt '("@debbugs.gnu.org" "-devel@gnu.org"
                     ;; List-Id of Gnus devel mailing list.
                     "ding.gnus.org"))
-     "\\([Bb]ug ?#?\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
+     "\\(\\b[Bb]ug ?#?\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
      "https://debbugs.gnu.org/%s"))
   "An alist for setting up `bug-reference-mode' in mail modes.
 
@@ -531,7 +527,7 @@ From, and Cc against HEADER-REGEXP in
   `((,(concat "#" (regexp-opt '("emacs" "gnus" "org-mode" "rcirc"
                                 "erc") 'words))
      "Libera.Chat"
-     "\\([Bb]ug ?#?\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
+     "\\(\\b[Bb]ug ?#?\\([0-9]+\\(?:#[0-9]+\\)?\\)\\)"
      "https://debbugs.gnu.org/%s"))
   "An alist for setting up `bug-reference-mode' in IRC modes.
 

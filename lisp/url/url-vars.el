@@ -1,6 +1,6 @@
 ;;; url-vars.el --- Variables for Uniform Resource Locator tool  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2021 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
@@ -19,6 +19,8 @@
 
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
 
 ;;; Code:
 

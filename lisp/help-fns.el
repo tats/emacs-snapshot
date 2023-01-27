@@ -1,6 +1,6 @@
 ;;; help-fns.el --- Complex help functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1993-1994, 1998-2021 Free Software
+;; Copyright (C) 1985-1986, 1993-1994, 1998-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -132,6 +132,12 @@ with the current prefix.  The files are chosen according to
   :group 'help
   :version "26.3")
 
+(defcustom help-enable-symbol-autoload nil
+  "Perform autoload if docs are missing from autoload objects."
+  :type 'boolean
+  :group 'help
+  :version "28.1")
+
 (defun help--symbol-class (s)
   "Return symbol class characters for symbol S."
   (when (stringp s)
@@ -170,8 +176,11 @@ with the current prefix.  The files are chosen according to
           completions))
 
 (defun help--symbol-completion-table (string pred action)
-  (if (and completions-detailed (eq action 'metadata))
-      '(metadata (affixation-function . help--symbol-completion-table-affixation))
+  (if (eq action 'metadata)
+      `(metadata
+        ,@(when completions-detailed
+            '((affixation-function . help--symbol-completion-table-affixation)))
+        (category . symbol-help))
     (when help-enable-completion-autoload
       (let ((prefixes (radix-tree-prefixes (help-definition-prefixes) string)))
         (help--load-prefixes prefixes)))
@@ -227,7 +236,10 @@ interactive command."
 ;;;###autoload
 (defun describe-function (function)
   "Display the full documentation of FUNCTION (a symbol).
-When called from Lisp, FUNCTION may also be a function object."
+When called from Lisp, FUNCTION may also be a function object.
+
+See the `help-enable-symbol-autoload' variable for special
+handling of autoloaded functions."
   (interactive (help-fns--describe-function-or-command-prompt))
 
   ;; We save describe-function-orig-buffer on the help xref stack, so
@@ -811,7 +823,7 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
                            ;; Advised & aliased function.
                            (and advised (symbolp real-function)
                                 (not (eq 'autoload (car-safe def))))
-                           (and (subrp def)
+                           (and (subrp def) (symbolp function)
                                 (not (string= (subr-name def)
                                               (symbol-name function)))))))
 	 (real-def (cond
@@ -823,6 +835,16 @@ Returns a list of the form (REAL-FUNCTION DEF ALIASED REAL-DEF)."
                        f))
 		    ((subrp def) (intern (subr-name def)))
                     (t def))))
+
+    ;; If we don't have a doc string, then try to load the file.
+    (when (and help-enable-symbol-autoload
+               (autoloadp real-def)
+               ;; Empty documentation slot.
+               (not (nth 2 real-def)))
+      (condition-case err
+          (autoload-do-load real-def)
+        (error (message "Error while autoloading: %S" err))))
+
     (list real-function def aliased real-def)))
 
 (defun help-fns-function-description-header (function)
@@ -1162,7 +1184,7 @@ it is displayed along with the global value."
                 (princ (format "Local in buffer %s; "
                                (buffer-name buffer))))
                ((terminal-live-p locus)
-                (princ (format "It is a terminal-local variable; ")))
+                (princ "It is a terminal-local variable; "))
                (t
                 (princ (format "It is local to %S" locus))))
 	      (if (not (default-boundp variable))

@@ -1,6 +1,6 @@
 ;;; diary-lib.el --- diary functions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-1990, 1992-1995, 2001-2021 Free Software
+;; Copyright (C) 1989-1990, 1992-1995, 2001-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Edward M. Reingold <reingold@cs.uiuc.edu>
@@ -1223,8 +1223,7 @@ ensure that all relevant variables are set.
 
 \(diary-mail-entries)
 
-# diary-rem.el ends here
-"
+# diary-rem.el ends here"
   (interactive "P")
   (if (string-equal diary-mail-addr "")
       (user-error "You must set `diary-mail-addr' to use this command")
@@ -1254,10 +1253,10 @@ the regexp with parentheses."
               paren))
 
 (defvar diary-marking-entries-flag nil
-  "True during the marking of diary entries, nil otherwise.")
+  "Non-nil during the marking of diary entries, nil otherwise.")
 
 (defvar diary-marking-entry-flag nil
-  "True during the marking of diary entries, if current entry is marking.")
+  "Non-nil during the marking of diary entries, if current entry is marking.")
 
 ;; file-glob-attrs bound in diary-mark-entries.
 (defun diary-mark-entries-1 (markfunc &optional months symbol absfunc)

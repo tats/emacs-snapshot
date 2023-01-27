@@ -1,6 +1,6 @@
 ;;; texnfo-upd.el --- utilities for updating nodes and menus in Texinfo files  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1989-1992, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1989-1992, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Robert J. Chassell
 ;; Maintainer: emacs-devel@gnu.org
@@ -1508,7 +1508,7 @@ will be at some level higher in the Texinfo file.  The fourth argument
 	       'normal
 	     'no-pointer))
 	  (t
-	   (error "texinfo-find-pointer: lack proper arguments")))))
+           (error "texinfo-find-pointer: Lack proper arguments")))))
 
 (defun texinfo-pointer-name (kind)
   "Return the node name preceding the section command.
@@ -1676,7 +1676,7 @@ or `Up' pointer."
 	       'normal
 	     'no-pointer))
 	  (t
-	   (error "texinfo-sequential-find-pointer: lack proper arguments")))))
+           (error "texinfo-sequential-find-pointer: Lack proper arguments")))))
 
 
 ;;; Inserting `@node' lines

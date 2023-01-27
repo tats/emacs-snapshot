@@ -1,6 +1,6 @@
 ;;; characters.el --- set syntax and category for multibyte characters  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997, 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2000-2022 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -116,11 +116,11 @@ Base characters (Unicode General Category L,N,P,S,Zs)")
 Combining diacritic or mark (Unicode General Category M)")
 
 ;; bidi types
-(define-category ?R "Right-to-left (strong)
+(define-category ?R "Strong R2L
 Characters with \"strong\" right-to-left directionality, i.e.
 with R, AL, RLE, or RLO Unicode bidi character type.")
 
-(define-category ?L "Left-to-right (strong)
+(define-category ?L "Strong L2R
 Characters with \"strong\" left-to-right directionality, i.e.
 with L, LRE, or LRO Unicode bidi character type.")
 
@@ -1428,8 +1428,12 @@ Setup `char-width-table' appropriate for non-CJK language environment."
 (if dump-mode
     ;; While dumping, we can't use require, and international is not
     ;; in load-path.
-    (load "international/charscript")
-  (require 'charscript))
+    (progn
+      (load "international/charscript")
+      (load "international/emoji-zwj"))
+  (progn
+    (require 'charscript)
+    (require 'emoji-zwj)))
 
 (map-charset-chars
  (lambda (range _ignore)
@@ -1536,6 +1540,9 @@ option `glyphless-char-display'."
 	    ((eq target 'c1-control)
 	     (glyphless-set-char-table-range glyphless-char-display
 					     #x80 #x9F method))
+	    ((eq target 'variation-selectors)
+	     (glyphless-set-char-table-range glyphless-char-display
+					     #xFE00 #xFE0F method))
 	    ((eq target 'format-control)
 	     (when unicode-category-table
 	       (map-char-table
@@ -1571,6 +1578,7 @@ option `glyphless-char-display'."
 ;;; Control of displaying glyphless characters.
 (defcustom glyphless-char-display-control
   '((format-control . thin-space)
+    (variation-selectors . thin-space)
     (no-font . hex-code))
   "List of directives to control display of glyphless characters.
 
@@ -1586,6 +1594,9 @@ GROUP must be one of these symbols:
                     such as U+200C (ZWNJ), U+200E (LRM), but
                     excluding characters that have graphic images,
                     such as U+00AD (SHY).
+  `variation-selectors': U+FE00..U+FE0F, used for choosing between
+                         glyph variations (e.g. Emoji vs Text
+                         presentation).
   `no-font':        characters for which no suitable font is found.
                     For character terminals, characters that cannot
                     be encoded by `terminal-coding-system'.
@@ -1603,7 +1614,7 @@ Do not set its value directly from Lisp; the value takes effect
 only via a custom `:set'
 function (`update-glyphless-char-display'), which updates
 `glyphless-char-display'."
-  :version "24.1"
+  :version "28.1"
   :type '(alist :key-type (symbol :tag "Character Group")
 		:value-type (symbol :tag "Display Method"))
   :options '((c0-control
@@ -1619,6 +1630,12 @@ function (`update-glyphless-char-display'), which updates
 		      (const :tag "Display acronym" acronym)
 		      (const :tag "Display hex code in a box" hex-code)))
 	     (format-control
+	      (choice (const :tag "Don't display" zero-width)
+		      (const :tag "Display as thin space" thin-space)
+		      (const :tag "Display as empty box" empty-box)
+		      (const :tag "Display acronym" acronym)
+		      (const :tag "Display hex code in a box" hex-code)))
+	     (variation-selectors
 	      (choice (const :tag "Don't display" zero-width)
 		      (const :tag "Display as thin space" thin-space)
 		      (const :tag "Display as empty box" empty-box)

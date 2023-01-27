@@ -1,6 +1,6 @@
 ;;; auth-source-pass-tests.el --- Tests for auth-source-pass.el  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013, 2017-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2013, 2017-2022 Free Software Foundation, Inc.
 
 ;; Author: Damien Cassou <damien.cassou@gmail.com>
 
@@ -97,7 +97,8 @@ This function is intended to be set to `auth-source-debug'."
 (defun auth-source-pass--explain-match-entry-p (entry hostname &optional user port)
   "Explainer function for `auth-source-pass-match-entry-p'.
 
-ENTRY, HOSTNAME, USER and PORT are the same as in `auth-source-pass-match-entry-p'."
+ENTRY, HOSTNAME, USER and PORT are the same as in
+`auth-source-pass-match-entry-p'."
   `(entry
     ,entry
     store
@@ -122,7 +123,8 @@ HOSTNAME, USER and PORT are passed unchanged to
 (defun auth-source-pass--explain-includes-sorted-entries (entries hostname &optional user port)
   "Explainer function for `auth-source-pass--includes-sorted-entries'.
 
-ENTRIES, HOSTNAME, USER and PORT are the same as in `auth-source-pass--includes-sorted-entries'."
+ENTRIES, HOSTNAME, USER and PORT are the same as in
+`auth-source-pass--includes-sorted-entries'."
   `(store
     ,(auth-source-pass-entries)
     matching-entries

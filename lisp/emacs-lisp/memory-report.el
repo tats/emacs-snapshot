@@ -1,6 +1,6 @@
 ;;; memory-report.el --- Short function summaries  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2020-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2020-2022 Free Software Foundation, Inc.
 
 ;; Keywords: lisp, help
 
@@ -75,7 +75,7 @@ by counted more than once."
 
 (defun memory-report-object-size (object)
   "Return the size of OBJECT in bytes."
-  (unless memory-report--type-size
+  (when (zerop (hash-table-count memory-report--type-size))
     (memory-report--garbage-collect))
   (memory-report--object-size (make-hash-table :test #'eq) object))
 

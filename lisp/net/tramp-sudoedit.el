@@ -1,6 +1,6 @@
 ;;; tramp-sudoedit.el --- Functions for accessing under root permissions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2018-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -464,8 +464,9 @@ the result will be a local, non-Tramp, file name."
   "Like `file-readable-p' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (with-tramp-file-property v localname "file-readable-p"
-      (tramp-sudoedit-send-command
-       v "test" "-r" (tramp-compat-file-name-unquote localname)))))
+      (or (tramp-handle-file-readable-p filename)
+	  (tramp-sudoedit-send-command
+	   v "test" "-r" (tramp-compat-file-name-unquote localname))))))
 
 (defun tramp-sudoedit-handle-set-file-modes (filename mode &optional flag)
   "Like `set-file-modes' for Tramp files."

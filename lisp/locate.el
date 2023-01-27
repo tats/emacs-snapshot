@@ -1,6 +1,6 @@
 ;;; locate.el --- interface to the locate command  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996, 1998, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1996, 1998, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Peter Breton <pbreton@cs.umb.edu>
 ;; Keywords: unix files
@@ -50,7 +50,7 @@
 ;; from a shell prompt.  GNU locate and BSD find expect the file databases
 ;; to either be in standard places or located via environment variables.
 ;; If the latter, make sure these environment variables are set in
-;; your emacs process.
+;; your Emacs process.
 ;;
 ;; Locate-mode assumes that each line output from the locate-command
 ;; consists exactly of a file name, possibly preceded or trailed by

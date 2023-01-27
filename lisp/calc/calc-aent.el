@@ -1,6 +1,6 @@
 ;;; calc-aent.el --- algebraic entry functions for Calc  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1993, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 
@@ -537,8 +537,7 @@ The value t means abort and give an error message.")
     ("₋"  "-")  ; -
     ("₍"  "(")  ; (
     ("₎"  ")"))  ; )
-  "A list whose elements (old new) indicate replacements to make
-in Calc algebraic input.")
+  "A list indicating replacements to make in Calc algebraic input.")
 
 (defvar math-read-superscripts
   "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾ⁿⁱ" ; 0123456789+-()ni

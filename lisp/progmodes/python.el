@@ -1,10 +1,10 @@
 ;;; python.el --- Python's flying circus support for Emacs -*- lexical-binding: t -*-
 
-;; Copyright (C) 2003-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2022 Free Software Foundation, Inc.
 
 ;; Author: Fabián E. Gallina <fgallina@gnu.org>
 ;; URL: https://github.com/fgallina/python.el
-;; Version: 0.27.1
+;; Version: 0.28
 ;; Package-Requires: ((emacs "24.2") (cl-lib "1.0"))
 ;; Maintainer: emacs-devel@gnu.org
 ;; Created: Jul 2010
@@ -555,9 +555,6 @@ class declarations.")
           "assert" "else" "if" "pass" "yield" "break" "except" "import" "class"
           "in" "raise" "continue" "finally" "is" "return" "def" "for" "lambda"
           "try"
-          ;; Python 2:
-          "print" "exec"
-          ;; Python 3:
           ;; False, None, and True are listed as keywords on the Python 3
           ;; documentation, but since they also qualify as constants they are
           ;; fontified like that in order to keep font-lock consistent between
@@ -775,12 +772,21 @@ is used to limit the scan."
            ;; The first quote is escaped, so it's not part of a triple quote!
            (goto-char (1+ quote-starting-pos)))
           ((null string-start)
-           ;; This set of quotes delimit the start of a string.
-           (put-text-property quote-starting-pos (1+ quote-starting-pos)
+           ;; This set of quotes delimit the start of a string.  Put
+           ;; string fence syntax on last quote. (bug#49518)
+           ;; FIXME: This makes sexp-movement a bit suboptimal since """a"""
+           ;; is now treated as 3 strings.
+           ;; We could probably have our cake and eat it too by
+           ;; putting the string fence on the first quote and then
+           ;; convincing `syntax-ppss-flush-cache' to flush to before
+           ;; that fence when any char of the 3-char delimiter
+           ;; is modified.
+           (put-text-property (1- quote-ending-pos) quote-ending-pos
                               'syntax-table (string-to-syntax "|")))
           (t
-           ;; This set of quotes delimit the end of a string.
-           (put-text-property (1- quote-ending-pos) quote-ending-pos
+           ;; This set of quotes delimit the end of a string.  Put
+           ;; string fence syntax on first quote. (bug#49518)
+           (put-text-property quote-starting-pos (1+ quote-starting-pos)
                               'syntax-table (string-to-syntax "|"))))))
 
 (defvar python-mode-syntax-table
@@ -2988,8 +2994,9 @@ killed."
                   (mapconcat #'identity args " ")))
             (with-current-buffer buffer
               (inferior-python-mode))
-            (when show (display-buffer buffer))
             (and internal (set-process-query-on-exit-flag process nil))))
+        (when show
+          (pop-to-buffer proc-buffer-name))
         proc-buffer-name))))
 
 ;;;###autoload
@@ -3021,7 +3028,6 @@ process buffer for a list of commands.)"
          (python-shell-make-comint
           (or cmd (python-shell-calculate-command))
           (python-shell-get-process-name dedicated) show)))
-    (set-buffer buffer)
     (get-buffer-process buffer)))
 
 (defun run-python-internal ()
@@ -3705,6 +3711,8 @@ def __PYTHON_EL_native_completion_setup():
             readline.parse_and_bind('tab: complete')
             # Require just one tab to send output.
             readline.parse_and_bind('set show-all-if-ambiguous on')
+            # Avoid replacing common prefix with ellipsis.
+            readline.parse_and_bind('set completion-prefix-display-length 0')
 
         print ('python.el: native completion setup loaded')
     except:
@@ -4308,6 +4316,7 @@ JUSTIFY should be used (if applicable) as in `fill-paragraph'."
                (and (equal (string-to-syntax "|")
                            (syntax-after (point)))
                     (point)))))
+         ;; JT@2021-09-21: Since bug#49518's fix this will always be 1
          (num-quotes (python-syntax-count-quotes
                       (char-after str-start-pos) str-start-pos))
          (str-line-start-pos

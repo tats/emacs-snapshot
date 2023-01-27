@@ -1,6 +1,6 @@
 ;;; japan-util.el --- utilities for Japanese  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2022 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -108,7 +108,7 @@ HANKAKU-KATAKANA belongs to `japanese-jisx0201-kana'.")
     ;; cp932-2-byte
     (#x2015 ?-) (#xFF5E ?~) (#xFF0D ?-))
   "Japanese JISX0208 and CP932 symbol character table.
-  Each element is of the form (SYMBOL ASCII HANKAKU), where SYMBOL
+Each element is of the form (SYMBOL ASCII HANKAKU), where SYMBOL
 belongs to `japanese-jisx0208' or `cp932', ASCII belongs to `ascii',
 and HANKAKU belongs to `japanese-jisx0201-kana'.")
 

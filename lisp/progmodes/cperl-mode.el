@@ -1,6 +1,6 @@
 ;;; cperl-mode.el --- Perl code editing commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1991-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1991-2022 Free Software Foundation, Inc.
 
 ;; Author: Ilya Zakharevich
 ;;	Bob Olson
@@ -361,14 +361,14 @@ Affects: `cperl-font-lock', `cperl-electric-lbrace-space',
 ;;   :group 'cperl)
 
 (defcustom cperl-info-on-command-no-prompt nil
-  "Not-nil (and non-null) means not to prompt on C-h f.
+  "Not-nil (and non-null) means not to prompt on \\[cperl-info-on-command].
 The opposite behavior is always available if prefixed with C-c.
 Can be overwritten by `cperl-hairy' if nil."
   :type '(choice (const null) boolean)
   :group 'cperl-affected-by-hairy)
 
 (defcustom cperl-clobber-lisp-bindings nil
-  "Not-nil (and non-null) means not overwrite C-h f.
+  "Not-nil (and non-null) means not overwrite \\[describe-function].
 The function is available on \\[cperl-info-on-command], \\[cperl-get-help].
 Can be overwritten by `cperl-hairy' if nil."
   :type '(choice (const null) boolean)
@@ -507,9 +507,9 @@ Currently used with `cperl-check-syntax' only."
   :group 'cperl-help-system)
 
 (defcustom cperl-indent-region-fix-constructs 1
-  "Amount of space to insert between `}' and `else' or `elsif'
-in `cperl-indent-region'.  Set to nil to leave as is.  Values other
-than 1 and nil will probably not work."
+  "Amount of space to insert between `}' and `else' or `elsif'.
+Used by `cperl-indent-region'.  Set to nil to leave as is.
+Values other than 1 and nil will probably not work."
   :type '(choice (const nil) (const 1))
   :group 'cperl-indentation-details)
 

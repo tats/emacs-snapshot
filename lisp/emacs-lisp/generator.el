@@ -1,6 +1,6 @@
 ;;; generator.el --- generators  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015-2021  Free Software Foundation, Inc.
+;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
 
 ;; Author: Daniel Colascione <dancol@dancol.org>
 ;; Keywords: extensions, elisp
@@ -668,7 +668,7 @@ sub-iterator function returns via `iter-end-of-sequence'."
          (iter-close ,valsym)))))
 
 (defmacro iter-defun (name arglist &rest body)
-  "Creates a generator NAME.
+  "Create a generator NAME that accepts ARGLIST as its arguments.
 When called as a function, NAME returns an iterator value that
 encapsulates the state of a computation that produces a sequence
 of values.  Callers can retrieve each value using `iter-next'."

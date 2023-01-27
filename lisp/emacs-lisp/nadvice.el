@@ -1,6 +1,6 @@
 ;;; nadvice.el --- Light-weight advice primitives for Elisp functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2022 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: extensions, lisp, tools
@@ -160,7 +160,7 @@ Each element has the form (WHERE BYTECODE STACK) where:
    (t (eval spec))))
 
 (defun advice--interactive-form (function)
-  ;; Like `interactive-form' but tries to avoid autoloading functions.
+  "Like `interactive-form' but tries to avoid autoloading functions."
   (when (commandp function)
     (if (not (and (symbolp function) (autoloadp (indirect-function function))))
         (interactive-form function)

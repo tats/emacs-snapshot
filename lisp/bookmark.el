@@ -1,6 +1,6 @@
 ;;; bookmark.el --- set bookmarks, maybe annotate them, jump to them later -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1997, 2001-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1997, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Karl Fogel <kfogel@red-bean.com>
 ;; Created: July, 1993
@@ -249,11 +249,13 @@ functions have a binding in this keymap.")
 Bookmark functions update the value automatically.
 You probably do NOT want to change the value yourself.
 
-The value is an alist with bookmarks of the form
+The value is an alist whose elements are of the form
 
  (BOOKMARK-NAME . PARAM-ALIST)
 
-or the deprecated form (BOOKMARK-NAME PARAM-ALIST).
+or the deprecated form (BOOKMARK-NAME PARAM-ALIST).  The alist is
+ordered from most recently created bookmark at the front to least
+recently created bookmark at the end.
 
 BOOKMARK-NAME is the name you gave to the bookmark when creating it.
 
@@ -479,7 +481,10 @@ See user option `bookmark-set-fringe'."
       (dolist (buf (buffer-list))
         (with-current-buffer buf
           (when (equal filename buffer-file-name)
-            (setq overlays (overlays-in pos pos))
+            (setq overlays
+                  (save-excursion
+                    (goto-char pos)
+                    (overlays-in (point-at-bol) (1+ (point-at-bol)))))
             (while (and (not found) (setq temp (pop overlays)))
               (when (eq 'bookmark (overlay-get temp 'category))
                 (delete-overlay (setq found temp))))))))))
@@ -574,10 +579,10 @@ old one."
           ;; Modify using the new (NAME . ALIST) format.
           (setcdr bm alist))
 
-      ;; otherwise just cons it onto the front (either the bookmark
-      ;; doesn't exist already, or there is no prefix arg.  In either
-      ;; case, we want the new bookmark consed onto the alist...)
-
+      ;; Otherwise just put it onto the front of the list.  Either the
+      ;; bookmark doesn't exist already, or there is no prefix arg.
+      ;; In either case, we want the new bookmark on the front of the
+      ;; list, since the list is kept in reverse order of creation.
       (push (cons stripped-name alist) bookmark-alist))
 
     ;; Added by db
@@ -905,7 +910,9 @@ others are still there, should the user decide to delete the most
 recent one.
 
 To yank words from the text of the buffer and use them as part of the
-bookmark name, type C-w while setting a bookmark.  Successive C-w's
+bookmark name, type \\<bookmark-minibuffer-read-name-map>\
+\\[bookmark-yank-word] while setting a bookmark.  Successive \
+\\[bookmark-yank-word]'s
 yank successive words.
 
 Typing \\[universal-argument] inserts (at the bookmark name prompt) the name of the last
@@ -938,7 +945,9 @@ Otherwise, if a bookmark named NAME already exists but PUSH-BOOKMARK
 is nil, raise an error.
 
 To yank words from the text of the buffer and use them as part of the
-bookmark name, type C-w while setting a bookmark.  Successive C-w's
+bookmark name, type \\<bookmark-minibuffer-read-name-map>\
+\\[bookmark-yank-word] while setting a bookmark.  Successive \
+\\[bookmark-yank-word]'s
 yank successive words.
 
 Typing \\[universal-argument] inserts (at the bookmark name prompt) the name of the last
@@ -1131,7 +1140,9 @@ it to the name of the bookmark currently being set, advancing
 
 (defun bookmark-maybe-sort-alist ()
   "Return `bookmark-alist' for display.
-If `bookmark-sort-flag' is non-nil, then return a sorted copy of the alist."
+If `bookmark-sort-flag' is non-nil, then return a sorted copy of the alist.
+Otherwise, just return `bookmark-alist', which by default is ordered
+from most recently created to least recently created bookmark."
   (if bookmark-sort-flag
       (sort (copy-alist bookmark-alist)
             (lambda (x y) (string-lessp (car x) (car y))))
@@ -1157,7 +1168,7 @@ and then show any annotations for this bookmark."
   ;; FIXME: we used to only run bookmark-after-jump-hook in
   ;; `bookmark-jump' itself, but in none of the other commands.
   (when bookmark-set-fringe-mark
-    (let ((overlays (overlays-in (point) (point)))
+    (let ((overlays (overlays-in (point-at-bol) (1+ (point-at-bol))))
           temp found)
       (while (and (not found) (setq temp (pop overlays)))
         (when (eq 'bookmark (overlay-get temp 'category))
@@ -1361,7 +1372,8 @@ If called from Lisp, prompt for NEW-NAME if only OLD-NAME was passed
 as an argument.  If called with two strings, then no prompting is done.
 You must pass at least OLD-NAME when calling from Lisp.
 
-While you are entering the new name, consecutive C-w's insert
+While you are entering the new name, consecutive \
+\\<bookmark-minibuffer-read-name-map>\\[bookmark-yank-word]'s insert
 consecutive words from the text of the buffer into the new bookmark
 name."
   (interactive (list (bookmark-completing-read "Old bookmark name")))
@@ -1734,8 +1746,8 @@ unique numeric suffixes \"<2>\", \"<3>\", etc."
     (define-key map [mouse-2] 'bookmark-bmenu-other-window-with-mouse)
     map))
 
-(easy-menu-define
-  bookmark-menu bookmark-bmenu-mode-map "Bookmark Menu"
+(easy-menu-define bookmark-menu bookmark-bmenu-mode-map
+  "Menu for `bookmark-bmenu'."
   '("Bookmark"
     ["Select Bookmark in This Window" bookmark-bmenu-this-window  t]
     ["Select Bookmark in Full-Frame Window" bookmark-bmenu-1-window  t]
@@ -2062,7 +2074,7 @@ You can mark bookmarks with the \\<bookmark-bmenu-mode-map>\\[bookmark-bmenu-mar
 
 (defun bookmark-bmenu-save ()
   "Save the current list into a bookmark file.
-With a prefix arg, prompts for a file to save them in.
+With a prefix arg, prompt for a file to save them in.
 
 See also the related behaviors of `bookmark-load' and
 `bookmark-bmenu-load'."

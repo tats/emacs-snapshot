@@ -1,6 +1,6 @@
 ;;; flyspell.el --- On-the-fly spell checker  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998, 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1998, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Manuel Serrano <Manuel.Serrano@sophia.inria.fr>
 ;; Maintainer: emacs-devel@gnu.org
@@ -488,6 +488,9 @@ See also `flyspell-duplicate-distance'."
 Flyspell mode is a buffer-local minor mode.  When enabled, it
 spawns a single Ispell process and checks each word.  The default
 flyspell behavior is to highlight incorrect words.
+
+This mode is geared toward text modes.  In buffers that contain
+code, `flyspell-prog-mode' is usually a better choice.
 
 Bindings:
 \\[ispell-word]: correct words (using Ispell).
@@ -1861,7 +1864,7 @@ is itself incorrect, but suspiciously repeated."
 ;;*    flyspell-highlight-duplicate-region ...                          */
 ;;*---------------------------------------------------------------------*/
 (defun flyspell-highlight-duplicate-region (beg end poss)
-  "Set up an overlay on a duplicate misspelled word, in the buffer from BEG to END.
+  "Set up overlay on duplicate misspelled word, in the buffer from BEG to END.
 POSS is a list of possible spelling/correction lists,
 as returned by `ispell-parse-output'."
   (let ((inhibit-read-only t))
@@ -2160,7 +2163,7 @@ The word checked is the word at the mouse position."
   (interactive "e")
   (let ((save (point)))
     (mouse-set-point event)
-    (flyspell-correct-word-before-point event save)))
+    (flyspell-correct-word-before-point (and (consp event) event) save)))
 
 (defun flyspell-correct-word-before-point (&optional event opoint)
   "Pop up a menu of possible corrections for misspelled word before point.

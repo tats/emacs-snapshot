@@ -1,6 +1,6 @@
 ;;; lisp-mode.el --- Lisp mode, and its idiosyncratic commands  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1999-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1999-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: lisp, languages
@@ -556,7 +556,7 @@ This will generate compile-time constants from BINDINGS."
   "Gaudy highlighting from Emacs Lisp mode used in Backtrace mode.")
 
 (defun lisp-string-in-doc-position-p (listbeg startpos)
-   "Return true if a doc string may occur at STARTPOS inside a list.
+   "Return non-nil if a doc string may occur at STARTPOS inside a list.
 LISTBEG is the position of the start of the innermost list
 containing STARTPOS."
   (let* ((firstsym (and listbeg
@@ -589,7 +589,7 @@ containing STARTPOS."
                 (= (point) startpos))))))
 
 (defun lisp-string-after-doc-keyword-p (listbeg startpos)
-  "Return true if `:documentation' symbol ends at STARTPOS inside a list.
+  "Return non-nil if `:documentation' symbol ends at STARTPOS inside a list.
 LISTBEG is the position of the start of the innermost list
 containing STARTPOS."
   (and listbeg                          ; We are inside a Lisp form.
@@ -627,7 +627,7 @@ Value for `adaptive-fill-function'."
 ;; encouraged to use 'lisp-data-mode' instead.
 (defun lisp-mode-variables (&optional lisp-syntax keywords-case-insensitive
                                       elisp)
-  "Common initialization routine for lisp modes.
+  "Common initialization routine for Lisp modes.
 The LISP-SYNTAX argument is used by code in inf-lisp.el and is
 \(uselessly) passed from pp.el, chistory.el, gnus-kill.el and
 score-mode.el.  KEYWORDS-CASE-INSENSITIVE non-nil means that for
@@ -1075,10 +1075,11 @@ is the buffer position of the start of the containing expression."
 		       ;; Handle prefix characters and whitespace
 		       ;; following an open paren.  (Bug#1012)
                        (backward-prefix-chars)
-                       (while (not (or (looking-back "^[ \t]*\\|([ \t]+"
-                                                      (line-beginning-position))
-                                       (and containing-sexp
-                                            (>= (1+ containing-sexp) (point)))))
+                       (while (not (save-excursion
+                                     (skip-chars-backward " \t")
+                                     (or (= (point) (line-beginning-position))
+                                         (and containing-sexp
+                                              (= (point) (1+ containing-sexp))))))
                          (forward-sexp -1)
                          (backward-prefix-chars))
                        (setq calculate-lisp-indent-last-sexp (point)))

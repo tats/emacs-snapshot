@@ -1,8 +1,8 @@
 ;;; org-timer.el --- Timer code for Org mode         -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
-;; Author: Carsten Dominik <carsten at orgmode dot org>
+;; Author: Carsten Dominik <carsten.dominik@gmail.com>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: https://orgmode.org
 ;;

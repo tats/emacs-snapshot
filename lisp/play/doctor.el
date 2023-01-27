@@ -1,6 +1,6 @@
 ;;; doctor.el --- psychological help for frustrated users  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985, 1987, 1994, 1996, 2000-2021 Free Software
+;; Copyright (C) 1985, 1987, 1994, 1996, 2000-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -115,7 +115,7 @@
 (defun doc// (x) x)
 
 (defmacro doc$ (what)
-  "Quoted arg form of doctor-$."
+  "Quoted arg form of `doctor-$'."
   `(doctor-$ ',what))
 
 (defun doctor-$ (what)
@@ -1011,8 +1011,8 @@ Put dialogue in buffer."
 
 (defun doctor-subjsearch (sent key type)
   "Search for the subject of a sentence SENT, looking for the noun closest
-to and preceding KEY by at least TYPE words.  Set global variable doctor-subj to
-the subject noun, and return the portion of the sentence following it."
+to and preceding KEY by at least TYPE words.  Set global variable `doctor-subj'
+to the subject noun, and return the portion of the sentence following it."
   (let ((i (- (length sent) (length (memq key sent)) type)))
     (while (and (> i -1) (not (doctor-nounp (nth i sent))))
       (setq i (1- i)))

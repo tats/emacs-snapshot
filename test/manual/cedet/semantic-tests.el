@@ -1,6 +1,6 @@
 ;;; semantic-tests.el --- Miscellaneous Semantic tests.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2003-2021  Free Software Foundation, Inc.
+;; Copyright (C) 2003-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -271,3 +271,5 @@ tag that contains point, and return that."
 		 Lcount (semantic-tag-name target)
 		 (semantic-elapsed-time start nil)))
       Lcount)))
+
+;;; semantic-tests.el ends here

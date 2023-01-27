@@ -1,6 +1,6 @@
 ;;; cua-base.el --- emulate CUA key bindings  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2022 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Keywords: keyboard emulations convenience cua
@@ -330,9 +330,9 @@ See `cua-set-mark' for details."
   "If non-nil, registers are supported via numeric prefix arg.
 If the value is t, any numeric prefix arg in the range 0 to 9 will be
 interpreted as a register number.
-If the value is `not-ctrl-u', using C-u to enter a numeric prefix is not
+If the value is `not-ctrl-u', using \\[universal-argument] to enter a numeric prefix is not
 interpreted as a register number.
-If the value is `ctrl-u-only', only numeric prefix entered with C-u is
+If the value is `ctrl-u-only', only numeric prefix entered with \\[universal-argument] is
 interpreted as a register number."
   :type '(choice (const :tag "Disabled" nil)
 		 (const :tag "Enabled, but C-u arg is not a register" not-ctrl-u)

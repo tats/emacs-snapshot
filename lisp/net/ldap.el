@@ -1,6 +1,6 @@
 ;;; ldap.el --- client interface to LDAP for Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Oscar Figueiredo <oscar@cpe.fr>
 ;; Maintainer: emacs-devel@gnu.org
@@ -154,8 +154,7 @@ Valid properties include:
 		 (string :tag "Argument")))
 
 (defcustom ldap-ldapsearch-password-prompt-regexp "Enter LDAP Password: "
-  "A regular expression used to recognize the `ldapsearch'
-program's password prompt."
+  "Regexp used to recognize the `ldapsearch' program's password prompt."
   :type 'regexp
   :version "25.1")
 

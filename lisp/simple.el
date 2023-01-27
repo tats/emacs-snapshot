@@ -1,6 +1,6 @@
 ;;; simple.el --- basic editing commands for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1993-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1993-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -241,7 +241,7 @@ all other buffers."
 (defun next-error-buffer-on-selected-frame (&optional _avoid-current
                                                       extra-test-inclusive
                                                       extra-test-exclusive)
-  "Return a single visible next-error buffer on the selected frame."
+  "Return a single visible `next-error' buffer on the selected frame."
   (let ((window-buffers
          (delete-dups
           (delq nil (mapcar (lambda (w)
@@ -589,6 +589,9 @@ text-property `hard'.
 A non-nil INTERACTIVE argument means to run the `post-self-insert-hook'."
   (interactive "*P\np")
   (barf-if-buffer-read-only)
+  (when (and arg
+             (< (prefix-numeric-value arg) 0))
+    (error "Repetition argument has to be non-negative"))
   ;; Call self-insert so that auto-fill, abbrev expansion etc. happen.
   ;; Set last-command-event to tell self-insert what to insert.
   (let* ((was-page-start (and (bolp) (looking-at page-delimiter)))
@@ -2133,21 +2136,23 @@ or (if one of MODES is a minor mode), if it is switched on in BUFFER."
      command-names)))
 
 (defcustom suggest-key-bindings t
-  "Non-nil means show the equivalent key-binding when M-x command has one.
+  "Non-nil means show the equivalent keybinding when \
+\\[execute-extended-command] has one.
 The value can be a length of time to show the message for.
 If the value is non-nil and not a number, we wait 2 seconds.
 
 Also see `extended-command-suggest-shorter'.
 
 Equivalent key-bindings are also shown in the completion list of
-M-x for all commands that have them."
+\\[execute-extended-command] for all commands that have them."
   :group 'keyboard
   :type '(choice (const :tag "off" nil)
-                 (integer :tag "time" 2)
+                 (natnum :tag "time" 2)
                  (other :tag "on")))
 
 (defcustom extended-command-suggest-shorter t
-  "If non-nil, show a shorter M-x invocation when there is one.
+  "If non-nil, show a shorter \\[execute-extended-command] invocation \
+when there is one.
 
 Also see `suggest-key-bindings'."
   :group 'keyboard
@@ -2291,8 +2296,8 @@ maps."
    (let* ((execute-extended-command--last-typed nil)
           (keymaps
            ;; The major mode's keymap and any active minor modes.
-           (cons
-            (current-local-map)
+           (nconc
+            (and (current-local-map) (list (current-local-map)))
             (mapcar
              #'cdr
              (seq-filter
@@ -2940,8 +2945,10 @@ undo record: if we undo from 4, `pending-undo-list' will be at 3,
 (defvar undo-in-region nil
   "Non-nil if `pending-undo-list' is not just a tail of `buffer-undo-list'.")
 
-(defvar undo-no-redo nil
-  "If t, `undo' doesn't go through redo entries.")
+(defcustom undo-no-redo nil
+  "If t, `undo' doesn't go through redo entries."
+  :type 'boolean
+  :group 'undo)
 
 (defvar pending-undo-list nil
   "Within a run of consecutive undo commands, list remaining to be undone.
@@ -3522,7 +3529,7 @@ with < or <= based on USE-<."
 ;; called or in some cases on a timer called after a change is made in
 ;; any buffer.
 (defvar-local undo-auto--last-boundary-cause nil
-  "Describe the cause of the last undo-boundary.
+  "Describe the cause of the last `undo-boundary'.
 
 If `explicit', the last boundary was caused by an explicit call to
 `undo-boundary', that is one not called by the code in this
@@ -5279,12 +5286,16 @@ Lisp programs should use this function for killing text.
 Supply two arguments, character positions BEG and END indicating the
  stretch of text to be killed.  If the optional argument REGION is
  non-nil, the function ignores BEG and END, and kills the current
- region instead."
+ region instead.  Interactively, REGION is always non-nil, and so
+ this command always kills the current region."
   ;; Pass mark first, then point, because the order matters when
   ;; calling `kill-append'.
-  (interactive (list (mark) (point) 'region))
-  (unless (and beg end)
-    (user-error "The mark is not set now, so there is no region"))
+  (interactive (progn
+                 (let ((beg (mark))
+                       (end (point)))
+                   (unless (and beg end)
+                     (user-error "The mark is not set now, so there is no region"))
+                   (list beg end 'region))))
   (condition-case nil
       (let ((string (if region
                         (funcall region-extract-function 'delete)
@@ -6641,11 +6652,10 @@ mode temporarily."
         (user-error "No mark set in this buffer"))
     (set-mark (point))
     (goto-char omark)
-    (cond (temp-highlight
-	   (setq-local transient-mark-mode (cons 'only transient-mark-mode)))
-	  ((xor arg (not (region-active-p)))
-	   (deactivate-mark))
-	  (t (activate-mark)))
+    (or temp-highlight
+        (cond ((xor arg (not (region-active-p)))
+	       (deactivate-mark))
+	      (t (activate-mark))))
     nil))
 
 (defcustom shift-select-mode t
@@ -8413,16 +8423,29 @@ presented."
 
 (defcustom blink-matching-paren t
   "Non-nil means show matching open-paren when close-paren is inserted.
-If t, highlight the paren.  If `jump', briefly move cursor to its
-position.  If `jump-offscreen', move cursor there even if the
-position is off screen.  With any other non-nil value, the
-off-screen position of the opening paren will be shown in the
-echo area."
+If this is non-nil, then when you type a closing delimiter, such as a
+closing parenthesis or brace, Emacs briefly indicates the location
+of the matching opening delimiter.
+
+The valid values are:
+
+  t                 Highlight the matching open-paren if it is visible
+                    in the window, otherwise show the text with matching
+                    open-paren in the echo area.  This is the default.
+  `jump'            If the matching open-paren is visible in the window,
+                    briefly move cursor to its position; otherwise show
+                    the text with matching open-paren in the echo area.
+  `jump-offscreen'  Briefly move cursor to the matching open-paren
+                    even if it is not visible in the window.
+  nil               Don't show the matching open-paren.
+
+Any other non-nil value is handled the same as t."
+
   :type '(choice
           (const :tag "Disable" nil)
-          (const :tag "Highlight" t)
-          (const :tag "Move cursor" jump)
-          (const :tag "Move cursor, even if off screen" jump-offscreen))
+          (const :tag "Highlight open-paren if visible" t)
+          (const :tag "Move cursor to open-paren if visible" jump)
+          (const :tag "Move cursor even if it's off screen" jump-offscreen))
   :group 'paren-blinking)
 
 (defcustom blink-matching-paren-on-screen t
@@ -9817,11 +9840,13 @@ warning using STRING as the message.")
 
 The argument `COMMAND' should be a symbol.
 
-Running `M-x COMMAND RET' for the first time prompts for which
+Running `\\[execute-extended-command] COMMAND RET' for \
+the first time prompts for which
 alternative to use and records the selected command as a custom
 variable.
 
-Running `C-u M-x COMMAND RET' prompts again for an alternative
+Running `\\[universal-argument] \\[execute-extended-command] COMMAND RET' \
+prompts again for an alternative
 and overwrites the previous choice.
 
 The variable `COMMAND-alternatives' contains an alist with

@@ -1,6 +1,6 @@
 ;;; erc-networks.el --- IRC networks  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2002, 2004-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2002, 2004-2022 Free Software Foundation, Inc.
 
 ;; Author: Mario Lang <mlang@lexx.delysid.org>
 ;; Maintainer: Amin Bandali <bandali@gnu.org>
@@ -824,7 +824,7 @@ As an example:
 	 (ports (if (listp (nth 3 srv))
 		    (erc-ports-list (nth 3 srv))
 		  (list (nth 3 srv))))
-	 (port (nth (random (length ports)) ports)))
+         (port (and ports (seq-random-elt ports))))
     (erc :server host :port port)))
 
 ;;; The following experimental

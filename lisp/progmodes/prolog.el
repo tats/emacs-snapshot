@@ -1,6 +1,6 @@
 ;;; prolog.el --- major mode for Prolog (and Mercury) -*- lexical-binding:t -*-
 
-;; Copyright (C) 1986-1987, 1997-1999, 2002-2003, 2011-2021 Free
+;; Copyright (C) 1986-1987, 1997-1999, 2002-2003, 2011-2022 Free
 ;; Software Foundation, Inc.
 
 ;; Authors: Emil Åström <emil_astrom(at)hotmail(dot)com>
@@ -512,7 +512,7 @@ to automatically indent if-then-else constructs."
   :type 'boolean)
 
 (defcustom prolog-electric-colon-flag nil
-  "Makes `:' electric (inserts `:-' on a new line).
+  "Non-nil means make `:' electric (inserts `:-' on a new line).
 If non-nil, pressing `:' at the end of a line that starts in
 the first column (i.e., clause heads) inserts ` :-' and newline."
   :version "24.1"
@@ -520,7 +520,7 @@ the first column (i.e., clause heads) inserts ` :-' and newline."
   :type 'boolean)
 
 (defcustom prolog-electric-dash-flag nil
-  "Makes `-' electric (inserts a `-->' on a new line).
+  "Non-nil means make `-' electric (inserts a `-->' on a new line).
 If non-nil, pressing `-' at the end of a line that starts in
 the first column (i.e., DCG heads) inserts ` -->' and newline."
   :version "24.1"
@@ -2136,7 +2136,8 @@ A return value of N means N more left parentheses than right ones."
                              (line-end-position)))))
 
 (defun prolog-electric--if-then-else ()
-  "Insert spaces after the opening parenthesis, \"then\" (->) and \"else\" (;) branches.
+  "Insert spaces after the opening parenthesis.
+\"then\" (->) and \"else\" (;) branches.
 Spaces are inserted if all preceding objects on the line are
 whitespace characters, parentheses, or then/else branches."
   (when prolog-electric-if-then-else-flag

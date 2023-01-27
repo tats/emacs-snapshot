@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2021 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 1999--2022 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Programs
@@ -470,6 +470,23 @@ functions, according to the @code{lisp-indent-function} property of
 the function name.  This is normally done for macro definitions, using
 the @code{declare} construct.  @xref{Defining Macros,,, elisp, The
 Emacs Lisp Reference Manual}.
+
+  In Emacs Lisp, lists are usually indented as if they are
+function-like forms:
+
+@lisp
+(setq foo '(bar zot
+                gazonk))
+@end lisp
+
+  However, if you add a space after the opening parenthesis, this tells
+Emacs that it's a data list instead of a piece of code, and Emacs will
+then indent it like this:
+
+@lisp
+(setq foo '( bar zot
+             gazonk))
+@end lisp
 
 @node C Indent
 @subsection Commands for C Indentation

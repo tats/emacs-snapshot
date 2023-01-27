@@ -1,6 +1,6 @@
 ;;; hexl.el --- edit a file in a hex dump format using the hexl filter -*- lexical-binding: t -*-
 
-;; Copyright (C) 1989, 1994, 1998, 2001-2021 Free Software Foundation,
+;; Copyright (C) 1989, 1994, 1998, 2001-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Keith Gabryelski <ag@wheaties.ai.mit.edu>
@@ -1165,7 +1165,7 @@ This function is assumed to be used as callback function for `hl-line-mode'."
 
 ;; startup stuff.
 
-(easy-menu-define hexl-menu hexl-mode-map "Hexl Mode menu"
+(easy-menu-define hexl-menu hexl-mode-map "Hexl Mode menu."
   '("Hexl"
     :help "Hexl-specific Features"
 

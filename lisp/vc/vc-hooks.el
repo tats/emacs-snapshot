@@ -1,6 +1,6 @@
 ;;; vc-hooks.el --- resident support for version-control  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1996, 1998-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1996, 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: FSF (see vc.el for full credits)
 ;; Maintainer: emacs-devel@gnu.org
@@ -256,9 +256,9 @@ It is usually called via the `vc-call' macro."
 (defmacro vc-call (fun file &rest args)
   "A convenience macro for calling VC backend functions.
 Functions called by this macro must accept FILE as the first argument.
-ARGS specifies any additional arguments.  FUN should be unquoted.
-BEWARE!! FILE is evaluated twice!!"
-  `(vc-call-backend (vc-backend ,file) ',fun ,file ,@args))
+ARGS specifies any additional arguments.  FUN should be unquoted."
+  (macroexp-let2 nil file file
+    `(vc-call-backend (vc-backend ,file) ',fun ,file ,@args)))
 
 (defsubst vc-parse-buffer (pattern i)
   "Find PATTERN in the current buffer and return its Ith submatch."

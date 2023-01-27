@@ -1,6 +1,6 @@
 ;;; hi-lock.el --- minor mode for interactive automatic highlighting  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: David M. Koppelman <koppel@ece.lsu.edu>
 ;; Keywords: faces, minor-mode, matching, display
@@ -244,7 +244,7 @@ by cycling through the faces in `hi-lock-face-defaults'."
   "String used to identify hi-lock patterns at the start of files.")
 
 (defvar hi-lock-archaic-interface-message-used nil
-  "True if user alerted that `global-hi-lock-mode' is now the global switch.
+  "Non-nil if user alerted that `global-hi-lock-mode' is now the global switch.
 Earlier versions of hi-lock used `hi-lock-mode' as the global switch;
 the message is issued if it appears that `hi-lock-mode' is used assuming
 that older functionality.  This variable avoids multiple reminders.")

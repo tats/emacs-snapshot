@@ -1,6 +1,6 @@
 ;;; cconv.el --- Closure conversion for statically scoped Emacs Lisp. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2011-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2022 Free Software Foundation, Inc.
 
 ;; Author: Igor Kuzmin <kzuminig@iro.umontreal.ca>
 ;; Maintainer: emacs-devel@gnu.org
@@ -794,6 +794,8 @@ This function does not return anything but instead fills the
     ;; (`(declare . ,_) nil)               ;The args don't contain code.
 
     (`(,_ . ,body-forms)    ; First element is a function or whatever.
+     (unless (listp body-forms)
+       (signal 'wrong-type-argument (list 'proper-list-p form)))
      (dolist (form body-forms) (cconv-analyze-form form env)))
 
     ((pred symbolp)

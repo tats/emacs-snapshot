@@ -1,6 +1,6 @@
 ;;; cc-langs.el --- language specific settings for CC Mode -*- lexical-binding: t; coding: utf-8 -*-
 
-;; Copyright (C) 1985, 1987, 1992-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2022 Free Software Foundation, Inc.
 
 ;; Authors:    2002- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -680,7 +680,7 @@ A search for this regexp starting at the end of the corresponding
 opener must find the first closer as the first match.
 
 Such a closer must include a \" character.  (match-string 1)
-matches the actual delimiter and and (match-string 2) matches the
+matches the actual delimiter and (match-string 2) matches the
 actual \".  If a delimiter contains several \"s, it is
 recommended to regard the last of them as \"the\" \"."
   t nil
@@ -3180,8 +3180,8 @@ Note that Java specific rules are currently applied to tell this from
       (append
        (c-lang-const c-flat-decl-block-kwds)
        (if (c-lang-const c-recognize-<>-arglists)
-	   '("{" "}" ";" "," ")" ":" "<")
-	 '("{" "}" ";" "," ")" ":")))))
+	   '("{" "}" ";" "*" "," ")" ":" "<")
+	 '("{" "}" ";" "*" "," ")" ":")))))
 (c-lang-defvar c-brace-stack-thing-key (c-lang-const c-brace-stack-thing-key))
 
 (c-lang-defconst c-brace-stack-no-semi-key
@@ -4178,8 +4178,7 @@ aliases in Emacs are resolved."
 	       (cdr c-emacs-variable-inits))))
 
 (defun c-make-init-lang-vars-fun (mode)
-  "Create a function that initializes all the language dependent variables
-for the given mode.
+  "Create a function that initializes all language dependent variables for MODE.
 
 This function should be evaluated at compile time, so that the
 function it returns is byte compiled with all the evaluated results

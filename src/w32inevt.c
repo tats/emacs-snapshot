@@ -1,5 +1,5 @@
 /* Input event support for Emacs on the Microsoft Windows API.
-   Copyright (C) 1992-1993, 1995, 2001-2021 Free Software Foundation,
+   Copyright (C) 1992-1993, 1995, 2001-2022 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -469,6 +469,9 @@ do_mouse_event (MOUSE_EVENT_RECORD *event,
   static Lisp_Object last_mouse_window;
   DWORD but_change, mask, flags = event->dwEventFlags;
   int i;
+
+  /* Mouse didn't move unless MOUSE_MOVED says it did.  */
+  SELECTED_FRAME ()->mouse_moved = 0;
 
   switch (flags)
     {

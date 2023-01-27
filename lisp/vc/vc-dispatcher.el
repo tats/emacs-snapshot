@@ -1,6 +1,6 @@
 ;;; vc-dispatcher.el --- generic command-dispatcher facility.  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: FSF (see below for full credits)
 ;; Keywords: vc tools
@@ -404,7 +404,7 @@ Display the buffer in some window, but don't select it."
 (defvar compilation-error-regexp-alist)
 
 (defun vc-compilation-mode (backend)
-  "Setup `compilation-mode' after with the appropriate `compilation-error-regexp-alist'."
+  "Setup `compilation-mode' with the appropriate `compilation-error-regexp-alist'."
   (require 'compile)
   (let* ((error-regexp-alist
           (vc-make-backend-sym backend 'error-regexp-alist))

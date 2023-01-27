@@ -1,6 +1,6 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2021 Free Software
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -247,7 +247,7 @@ This is similar to the \"-L\" option for the \"cp\" shell command."
   :type 'boolean
   :group 'dired)
 
-;; These variables were deleted and the replacements are on files.el.
+;; These variables were deleted and the replacements are in files.el.
 ;; We leave aliases behind for back-compatibility.
 (define-obsolete-variable-alias 'dired-free-space-program
   'directory-free-space-program "27.1")
@@ -2219,8 +2219,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
 ;; Autoload cookie needed by desktop.el
 ;;;###autoload
 (defun dired-mode (&optional dirname switches)
-  "\
-Mode for \"editing\" directory listings.
+  "Mode for \"editing\" directory listings.
 In Dired, you are \"editing\" a list of the files in a directory and
   (optionally) its subdirectories, in the format of `ls -lR'.
   Each directory is a page: use \\[backward-page] and \\[forward-page] to move pagewise.
@@ -2871,12 +2870,10 @@ You can then feed the file name(s) to other commands with \\[yank]."
 
 ;;; Keeping Dired buffers in sync with the filesystem and with each other
 
-(defun dired-buffers-for-dir (dir &optional file subdirs)
+(defun dired-buffers-for-dir (dir &optional file)
   "Return a list of buffers for DIR (top level or in-situ subdir).
 If FILE is non-nil, include only those whose wildcard pattern (if any)
 matches FILE.
-If SUBDIRS is non-nil, also include the dired buffers of
-directories below DIR.
 The list is in reverse order of buffer creation, most recent last.
 As a side effect, killed dired buffers for DIR are removed from
 `dired-buffers'."
@@ -2888,20 +2885,35 @@ As a side effect, killed dired buffers for DIR are removed from
        ((null (buffer-name buf))
 	;; Buffer is killed - clean up:
 	(setq dired-buffers (delq elt dired-buffers)))
-       ((dired-in-this-tree-p (car elt) dir)
+       ((dired-in-this-tree-p dir (car elt))
 	(with-current-buffer buf
-          (when (and (or subdirs
-                         (assoc dir dired-subdir-alist))
-	             (or (null file)
-		         (if (stringp dired-directory)
-		             (let ((wildcards (file-name-nondirectory
-					       dired-directory)))
-			       (or (zerop (length wildcards))
-			           (string-match-p (dired-glob-regexp wildcards)
-                                                   file)))
-		           (member (expand-file-name file dir)
-			           (cdr dired-directory)))))
-            (setq result (cons buf result)))))))
+          (and (assoc dir dired-subdir-alist)
+	       (or (null file)
+		   (if (stringp dired-directory)
+		       (let ((wildcards (file-name-nondirectory
+					 dired-directory)))
+			 (or (zerop (length wildcards))
+			     (string-match-p (dired-glob-regexp wildcards)
+                                             file)))
+		     (member (expand-file-name file dir)
+			     (cdr dired-directory))))
+               (setq result (cons buf result)))))))
+    result))
+
+(defun dired-buffers-for-dir-or-subdir (dir)
+  "Return a list of buffers for DIR or a subdirectory thereof.
+As a side effect, killed dired buffers for DIR are removed from
+`dired-buffers'."
+  (setq dir (file-name-as-directory dir))
+  (let (result buf)
+    (dolist (elt dired-buffers)
+      (setq buf (cdr elt))
+      (cond
+       ((null (buffer-name buf))
+	;; Buffer is killed - clean up:
+	(setq dired-buffers (delq elt dired-buffers)))
+       ((dired-in-this-tree-p (car elt) dir)
+        (setq result (cons buf result)))))
     result))
 
 (defun dired-glob-regexp (pattern)
@@ -3480,15 +3492,16 @@ confirmation.  To disable the confirmation, see
                                      (file-name-nondirectory fn))))
                (not dired-clean-confirm-killing-deleted-buffers))
            (kill-buffer buf)))
-    (let ((buf-list (dired-buffers-for-dir (expand-file-name fn)
-                                           nil 'subdirs)))
+    (let ((buf-list (dired-buffers-for-dir-or-subdir
+                     (expand-file-name fn))))
       (and buf-list
            (or (and dired-clean-confirm-killing-deleted-buffers
                     (y-or-n-p
                      (format
-                      (ngettext "Kill Dired buffer of %s, too? "
-                                "Kill Dired buffers of %s, too? "
-                                (length buf-list))
+                      (ngettext
+                       "Kill Dired buffer of %s, too? "
+                       "Kill Dired buffers of %s and its sub-directories, too? "
+                       (length buf-list))
                       (file-name-nondirectory
                        ;; FN may end in a / if `dired-listing-switches'
                        ;; contains -p, so we need to strip that
@@ -3697,7 +3710,7 @@ no ARGth marked file is found before this line."
 (defun dired-mark-files-in-region (start end)
   (let ((inhibit-read-only t))
     (if (> start end)
-	(error "start > end"))
+        (error "Start > End"))
     (goto-char start)			; assumed at beginning of line
     (while (< (point) end)
       ;; Skip subdir line and following garbage like the `total' line:
@@ -4491,6 +4504,7 @@ Ask means pop up a menu for the user to select one of copy, move or link."
 
 (defvar archive-superior-buffer)
 (defvar tar-superior-buffer)
+(declare-function dired-omit-mode "dired-x" (&optional arg))
 
 ;;;###autoload
 (defun dired-jump (&optional other-window file-name)

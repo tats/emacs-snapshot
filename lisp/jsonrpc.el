@@ -1,6 +1,6 @@
 ;;; jsonrpc.el --- JSON-RPC library                  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2022 Free Software Foundation, Inc.
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: processes, languages, extensions
@@ -219,7 +219,7 @@ object, using the keywords `:code', `:message' and `:data'."
                   (jsonrpc-error-message . ,msg))))
     (cl-destructuring-bind (&key code message data) args
       (signal 'jsonrpc-error
-              `(,(format "[jsonrpc] error ")
+              `("[jsonrpc] error "
                 (jsonrpc-error-code . ,code)
                 (jsonrpc-error-message . ,message)
                 (jsonrpc-error-data . ,data))))))

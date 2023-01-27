@@ -1,6 +1,6 @@
 /* Interface definitions for display code.
 
-Copyright (C) 1985, 1993-1994, 1997-2021 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1994, 1997-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1326,7 +1326,9 @@ struct glyph_string
   /* The area within row.  */
   enum glyph_row_area area;
 
-  /* Characters to be drawn, and number of characters.  */
+  /* Characters to be drawn, and number of characters.  Note that
+     NCHARS can be zero if this is a composition glyph string, as
+     evidenced by FIRST_GLYPH->type.  */
   unsigned *char2b;
   int nchars;
 
@@ -3446,6 +3448,9 @@ bool draw_window_fringes (struct window *, bool);
 bool update_window_fringes (struct window *, bool);
 
 void gui_init_fringe (struct redisplay_interface *);
+
+extern int max_used_fringe_bitmap;
+void gui_define_fringe_bitmap (struct frame *, int);
 
 #ifdef HAVE_NTGUI
 void w32_reset_fringes (void);

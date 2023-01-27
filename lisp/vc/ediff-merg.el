@@ -1,6 +1,6 @@
 ;;; ediff-merg.el --- merging utilities  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-2021 Free Software Foundation, Inc.
+;; Copyright (C) 1994-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: ediff
@@ -257,7 +257,8 @@ Buffer B."
 
 
 (defun ediff-re-merge ()
-  "Remerge unmodified diff regions using a new default.  Start with the current region."
+  "Remerge unmodified diff regions using a new default.
+Start with the current region."
   (interactive)
   (let* ((default-variant-alist
 	   (list '("default-A") '("default-B") '("combined")))
