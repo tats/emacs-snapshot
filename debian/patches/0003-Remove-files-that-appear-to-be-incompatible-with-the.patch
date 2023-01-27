@@ -24,15 +24,15 @@ Status: new
  Makefile.in          | 44 +++++++++++++++++---------------------------
  admin/update_autogen |  3 +--
  configure.ac         | 11 +----------
- doc/misc/Makefile.in | 12 ++++--------
+ doc/misc/Makefile.in |  6 ++++++
  lisp/help.el         |  8 ++++++++
- 5 files changed, 31 insertions(+), 47 deletions(-)
+ 5 files changed, 33 insertions(+), 39 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 235b707..f787577 100644
+index c902b46..fadcf10 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -161,7 +161,9 @@ man1dir=
+@@ -161,7 +161,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -43,7 +43,7 @@ index 235b707..f787577 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -879,8 +881,7 @@ $(1)_$(2):
+@@ -885,8 +887,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -53,7 +53,7 @@ index 235b707..f787577 100644
  
  $(foreach dir,$(mostlyclean_dirs),$(eval $(call submake_template,$(dir),mostlyclean)))
  
-@@ -994,11 +995,11 @@ test/%:
+@@ -1000,11 +1001,11 @@ test/%:
  dist:
  	cd ${srcdir}; ./make-dist
  
@@ -70,7 +70,7 @@ index 235b707..f787577 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1029,9 +1030,6 @@ info-dir:
+@@ -1035,9 +1036,6 @@ info-dir: ${srcdir}/info/dir
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -80,7 +80,7 @@ index 235b707..f787577 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1053,14 +1051,10 @@ ${srcdir}/info/dir:
+@@ -1059,14 +1057,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -99,7 +99,7 @@ index 235b707..f787577 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1078,14 +1072,10 @@ install-pdf:
+@@ -1084,14 +1078,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -119,7 +119,7 @@ index 235b707..f787577 100644
  
  $(UNINSTALL_DOC):
 diff --git a/admin/update_autogen b/admin/update_autogen
-index 11c4313..b6dfadd 100755
+index 5923bee..44e6817 100755
 --- a/admin/update_autogen
 +++ b/admin/update_autogen
 @@ -260,8 +260,7 @@ info_dir ()
@@ -133,10 +133,10 @@ index 11c4313..b6dfadd 100755
              ## FIXME do not ignore w32 if OS is w32.
              case $file in
 diff --git a/configure.ac b/configure.ac
-index 1146b58..786c596 100644
+index 6607843..40b3057 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6016,7 +6016,7 @@ AC_DEFUN
+@@ -6049,7 +6049,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -145,7 +145,7 @@ index 1146b58..786c596 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6071,15 +6071,6 @@ m4_define
+@@ -6104,15 +6104,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -162,7 +162,7 @@ index 1146b58..786c596 100644
  dnl then a directory etc/refcards is created in the build directory,
  dnl which is probably harmless, but confusing (in out-of-tree builds).
 diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
-index 7982c0d..a9b1395 100644
+index 1e33987..7180ff4 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
 @@ -84,6 +84,12 @@ INFO_INSTALL = $(INFO_COMMON) $(DOCMISC_W32)
@@ -179,10 +179,10 @@ index 7982c0d..a9b1395 100644
  ## This is discouraged because the .texi files it generates
  ## are not as well formatted as handwritten ones.
 diff --git a/lisp/help.el b/lisp/help.el
-index 29ae340..82970ef 100644
+index fd331ac..cfe6dd9 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -357,6 +357,14 @@ view-help-file
+@@ -357,6 +357,14 @@ If that doesn't give a function, return nil."
    (goto-address-mode 1)
    (goto-char (point-min)))
  
