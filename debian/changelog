@@ -1,9 +1,31 @@
-emacs28 (3:28.1+0.20220403-0.0) UNRELEASED; urgency=medium
+emacs28 (3:28.1+0.20220403-0.1) UNRELEASED; urgency=medium
 
+  [ Dima Kogan ]
+  * default debian/control matches the template in debian/control.in
+  * control.in matches control
+  * asking for latest libgcc jit
+
+  [ Ian Eure ]
+  * Depend on libgcjit10 or libgcjit11.
+
+  [ Tatsuya Kinoshita ]
   * New upstream version 28.1+0.20220403
     - emacs-28 branch, emacs-28.1 on 2022-04-03
+  * Switch to libgccjit-11-dev
+  * Don't install desktop files in -common to avoid conflicts
+  * Prefer libgccjit-11-dev over libgccjit-10-dev
+  * Update debian/changelog to emacs28
+  * Rename emacs-snapshot to emacs28 for flavor_other_native_comp
+  * Mention the Savannah site instead of the FTP sites in debian/copyright
+  * Generate debian/control and debian/copyright with debian-sync
+  * Rename emacs-snapshot to emacs28 for debian-emacs-flavor
+  * Remove unneeded patches
+  * Avoid patch rejection when INFO_COMMON is modified
+  * Adjust patches
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Downgrade bin_priority to 26, less than emacs and emacs-snapshot
 
- -- Tatsuya Kinoshita <tats@debian.org>  Fri, 27 Jan 2023 23:06:25 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Sat, 28 Jan 2023 00:43:48 +0900
 
 emacs-snapshot (2:20210917+emacs-27.1-9587-g0ac58e89d71-1) unstable; urgency=medium
 
