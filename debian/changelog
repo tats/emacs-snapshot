@@ -1,3 +1,10 @@
+emacs27 (3:27.1+0.20200804-0.0) UNRELEASED; urgency=medium
+
+  * New upstream version 27.1+0.20200804
+    - emacs-27 branch, emacs-27.1 on 2020-08-04
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Fri, 27 Jan 2023 20:29:41 +0900
+
 emacs-snapshot (2:20191221+emacs-26.1-8645-g9b7f3b0f577-1) unstable; urgency=medium
 
   * New snapshot
