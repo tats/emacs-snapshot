@@ -1,9 +1,31 @@
-emacs27 (3:27.1+0.20200804-0.0) UNRELEASED; urgency=medium
+emacs27 (3:27.1+0.20200804-0.1) UNRELEASED; urgency=medium
 
+  [ Alberto Donato ]
+  * Build-depend on libjansson-dev to get faster json
+
+  [ Dima Kogan ]
+  * I build with systemd
+  * shipping the systemd service again
+
+  [ Paul Eggert ]
+  * Port alternate signal stack to upcoming glibc 2.34
+
+  [ Tatsuya Kinoshita ]
   * New upstream version 27.1+0.20200804
     - emacs-27 branch, emacs-27.1 on 2020-08-04
+  * Use ${flavor} for emacs.ico
+  * Use flavor for emacs.service
+  * Install emacs-module.h as $(flavor)-module.h
+  * Update debian/changelog to emacs27
+  * Mention the Savannah site instead of the FTP sites in debian/copyright
+  * Generate debian/control and debian/copyright with debian-sync
+  * Rename emacs-snapshot to emacs27 for debian-emacs-flavor
+  * Remove unneeded patches
+  * Adjust patches
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Downgrade bin_priority to 26, less than emacs and emacs-snapshot
 
- -- Tatsuya Kinoshita <tats@debian.org>  Fri, 27 Jan 2023 20:29:41 +0900
+ -- Tatsuya Kinoshita <tats@debian.org>  Fri, 27 Jan 2023 20:55:48 +0900
 
 emacs-snapshot (2:20191221+emacs-26.1-8645-g9b7f3b0f577-1) unstable; urgency=medium
 
