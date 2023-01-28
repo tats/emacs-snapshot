@@ -2330,7 +2330,7 @@ pixel_to_glyph_coords (struct frame *f, int pix_x, int pix_y, int *x, int *y,
    text, or we can't tell because W's current matrix is not up to
    date.  */
 
-static struct glyph *
+struct glyph *
 x_y_to_hpos_vpos (struct window *w, int x, int y, int *hpos, int *vpos,
 		  int *dx, int *dy, int *area)
 {
@@ -3342,7 +3342,8 @@ init_iterator (struct it *it, struct window *w,
     {
       /* Mode lines, menu bar in terminal frames.  */
       it->first_visible_x = 0;
-      it->last_visible_x = body_width = WINDOW_PIXEL_WIDTH (w);
+      it->last_visible_x =
+	WINDOW_PIXEL_WIDTH (w) - WINDOW_RIGHT_DIVIDER_WIDTH (w);
     }
   else
     {
@@ -3410,8 +3411,13 @@ init_iterator (struct it *it, struct window *w,
       face = FACE_FROM_ID_OR_NULL (it->f, remapped_base_face_id);
       if (face && face->box != FACE_NO_BOX)
 	{
+	  int box_thickness = face->box_vertical_line_width;
 	  it->face_box_p = true;
 	  it->start_of_box_run_p = true;
+	  /* Make sure we will have enough horizontal space to add the
+	     right box line at the end.  */
+	  if (box_thickness > 0)
+	    it->last_visible_x -= box_thickness;
 	}
     }
 
@@ -3525,6 +3531,33 @@ get_closer_narrowed_begv (struct window *w, ptrdiff_t pos)
 {
   int len = get_narrowed_width (w);
   return max ((pos / len - 1) * len, BEGV);
+}
+
+ptrdiff_t
+get_locked_narrowing_begv (ptrdiff_t pos)
+{
+  if (long_line_locked_narrowing_region_size <= 0)
+    return BEGV;
+  int len = long_line_locked_narrowing_region_size / 2;
+  int begv = max (pos - len, BEGV);
+  int limit = long_line_locked_narrowing_bol_search_limit;
+  while (limit > 0)
+    {
+      if (begv == BEGV || FETCH_BYTE (CHAR_TO_BYTE (begv) - 1) == '\n')
+	return begv;
+      begv--;
+      limit--;
+    }
+  return begv;
+}
+
+ptrdiff_t
+get_locked_narrowing_zv (ptrdiff_t pos)
+{
+  if (long_line_locked_narrowing_region_size <= 0)
+    return ZV;
+  int len = long_line_locked_narrowing_region_size / 2;
+  return min (pos + len, ZV);
 }
 
 static void
@@ -4360,18 +4393,20 @@ handle_fontified_prop (struct it *it)
 
       eassert (it->end_charpos == ZV);
 
-      if (current_buffer->long_line_optimizations_p)
+      if (current_buffer->long_line_optimizations_p
+	  && long_line_locked_narrowing_region_size > 0)
 	{
-	  ptrdiff_t begv = it->narrowed_begv;
-	  ptrdiff_t zv = it->narrowed_zv;
+	  ptrdiff_t begv = it->locked_narrowing_begv;
+	  ptrdiff_t zv = it->locked_narrowing_zv;
 	  ptrdiff_t charpos = IT_CHARPOS (*it);
 	  if (charpos < begv || charpos > zv)
 	    {
-	      begv = get_narrowed_begv (it->w, charpos);
-	      zv = get_narrowed_zv (it->w, charpos);
+	      begv = get_locked_narrowing_begv (charpos);
+	      zv = get_locked_narrowing_zv (charpos);
 	    }
-	  narrow_to_region_internal (make_fixnum (begv), make_fixnum (zv), true);
-	  specbind (Qrestrictions_locked, Qt);
+	  if (begv != BEG || zv != Z)
+	    narrow_to_region_locked (make_fixnum (begv), make_fixnum (zv),
+				     Qfontification_functions);
 	}
 
       /* Don't allow Lisp that runs from 'fontification-functions'
@@ -5324,6 +5359,8 @@ display_min_width (struct it *it, ptrdiff_t bufpos,
 	  /* Insert the stretch glyph.  */
 	  it->object = list3 (Qspace, QCwidth, w);
 	  produce_stretch_glyph (it);
+	  if (it->area == TEXT_AREA)
+	    it->current_x += it->pixel_width;
 	  it->min_width_property = Qnil;
 	}
     }
@@ -7036,17 +7073,11 @@ strings_with_newlines (ptrdiff_t startpos, ptrdiff_t endpos, struct window *w)
       str = Foverlay_get (overlay, Qbefore_string);
       if (STRINGP (str) && SCHARS (str)
 	  && memchr (SDATA (str), '\n', SBYTES (str)))
-	{
-	  ITREE_FOREACH_ABORT ();
-	  return true;
-	}
+	return true;
       str = Foverlay_get (overlay, Qafter_string);
       if (STRINGP (str) && SCHARS (str)
 	  && memchr (SDATA (str), '\n', SBYTES (str)))
-	{
-	  ITREE_FOREACH_ABORT ();
-	  return true;
-	}
+	return true;
     }
 
   /* Check for 'display' properties whose values include strings.  */
@@ -7433,12 +7464,20 @@ reseat (struct it *it, struct text_pos pos, bool force_p)
 	{
 	  it->narrowed_begv = get_narrowed_begv (it->w, window_point (it->w));
 	  it->narrowed_zv = get_narrowed_zv (it->w, window_point (it->w));
+	  it->locked_narrowing_begv
+	    = get_locked_narrowing_begv (window_point (it->w));
+	  it->locked_narrowing_zv
+	    = get_locked_narrowing_zv (window_point (it->w));
 	}
       else if ((pos.charpos < it->narrowed_begv || pos.charpos > it->narrowed_zv)
 		&& (!redisplaying_p || it->line_wrap == TRUNCATE))
 	{
 	  it->narrowed_begv = get_narrowed_begv (it->w, pos.charpos);
 	  it->narrowed_zv = get_narrowed_zv (it->w, pos.charpos);
+	  it->locked_narrowing_begv
+	    = get_locked_narrowing_begv (window_point (it->w));
+	  it->locked_narrowing_zv
+	    = get_locked_narrowing_zv (window_point (it->w));
 	}
     }
 
@@ -16264,7 +16303,6 @@ do { if (! polling_stopped_here) stop_polling ();	\
 do { if (polling_stopped_here) start_polling ();	\
        polling_stopped_here = false; } while (false)
 
-
 /* Perhaps in the future avoid recentering windows if it
    is not necessary; currently that causes some problems.  */
 
@@ -16349,6 +16387,8 @@ redisplay_internal (void)
 
   FOR_EACH_FRAME (tail, frame)
     XFRAME (frame)->already_hscrolled_p = false;
+
+  reset_outermost_narrowings ();
 
  retry:
   /* Remember the currently selected window.  */
@@ -26718,7 +26758,17 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
     {
       struct glyph *last = (it.glyph_row->glyphs[TEXT_AREA]
 			    + it.glyph_row->used[TEXT_AREA] - 1);
+      int box_thickness = face->box_vertical_line_width;
       last->right_box_line_p = true;
+      /* Add back the space for the right box line we subtracted in
+	 init_iterator, since the right_box_line_p flag will make the
+	 glyph wider.  We actually add only as much space as is
+	 available for the last glyph of the modeline and whatever
+	 space is left beyond it, since that glyph could be only
+	 partially visible */
+      if (box_thickness > 0)
+	last->pixel_width += max (0, (box_thickness
+				      - (it.current_x - it.last_visible_x)));
     }
 
   return it.glyph_row->height;
@@ -34564,8 +34614,11 @@ note_mode_line_or_margin_highlight (Lisp_Object window, int x, int y,
     }
 #endif	/* HAVE_WINDOW_SYSTEM */
 
+  /* CHARPOS can be beyond the last position of STRING due, e.g., to
+     min-width 'display' property.  Fix that, to let all the calls to
+     get-text-property below do their thing.  */
   if (STRINGP (string))
-    pos = make_fixnum (charpos);
+    pos = make_fixnum (min (charpos, SCHARS (string) - 1));
 
   /* Set the help text and mouse pointer.  If the mouse is on a part
      of the mode line without any text (e.g. past the right edge of
@@ -36696,10 +36749,11 @@ fontify a region starting at POS in the current buffer, and give
 fontified regions the property `fontified' with a non-nil value.
 
 Note that, when the buffer contains one or more lines whose length is
-above `long-line-threshold', these functions are called with the buffer
-narrowed to a small portion around POS, and the narrowing is locked (see
-`narrow-to-region'), so that these functions cannot use `widen' to gain
-access to other portions of buffer text.  */);
+above `long-line-threshold', these functions are called with the
+buffer narrowed to a small portion around POS (whose size is specified
+by `long-line-locked-narrowing-region-size'), and the narrowing is
+locked (see `narrowing-lock'), so that these functions cannot use
+`widen' to gain access to other portions of buffer text.  */);
   Vfontification_functions = Qnil;
   Fmake_variable_buffer_local (Qfontification_functions);
 

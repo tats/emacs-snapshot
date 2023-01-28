@@ -9,7 +9,7 @@
 ;; Keywords: convenience, languages
 ;; Package-Requires: ((emacs "26.3") (jsonrpc "1.0.14") (flymake "1.2.1") (project "0.3.0") (xref "1.0.1") (eldoc "1.11.0") (seq "2.23"))
 
-;; This is is a GNU ELPA :core package.  Avoid adding functionality
+;; This is a GNU ELPA :core package.  Avoid adding functionality
 ;; that is not available in the version of Emacs recorded above or any
 ;; of the package dependencies.
 
@@ -166,7 +166,7 @@ chosen (interactively or automatically)."
                (cond ((cdr available)
                       (cdr (assoc
                             (completing-read
-                             "[eglot] More than one server executable available:"
+                             "[eglot] More than one server executable available: "
                              (mapcar #'car available)
                              nil t nil nil (car (car available)))
                             available #'equal)))
@@ -184,18 +184,22 @@ chosen (interactively or automatically)."
 (defvar eglot-server-programs `((rust-mode . ,(eglot-alternatives '("rust-analyzer" "rls")))
                                 (cmake-mode . ("cmake-language-server"))
                                 (vimrc-mode . ("vim-language-server" "--stdio"))
-                                (python-mode
+                                ((python-mode python-ts-mode)
                                  . ,(eglot-alternatives
                                      '("pylsp" "pyls" ("pyright-langserver" "--stdio") "jedi-language-server")))
-                                ((js-json-mode json-mode) . ,(eglot-alternatives '(("vscode-json-language-server" "--stdio") ("json-languageserver" "--stdio"))))
-                                ((js-mode ts-mode typescript-mode)
+                                ((js-json-mode json-mode json-ts-mode)
+                                 . ,(eglot-alternatives '(("vscode-json-language-server" "--stdio")
+                                                          ("json-languageserver" "--stdio"))))
+                                ((js-mode js-ts-mode typescript-ts-mode typescript-mode)
                                  . ("typescript-language-server" "--stdio"))
-                                (sh-mode . ("bash-language-server" "start"))
+                                ((bash-ts-mode sh-mode) . ("bash-language-server" "start"))
                                 ((php-mode phps-mode)
-                                 . ("php" "vendor/felixfbecker/\
-language-server/bin/php-language-server.php"))
-                                ((c++-mode c-mode) . ,(eglot-alternatives
-                                                       '("clangd" "ccls")))
+                                 . ,(eglot-alternatives
+                                     '(("phpactor" "language-server")
+                                       ("php" "vendor/felixfbecker/language-server/bin/php-language-server.php"))))
+                                ((c-mode c-ts-mode c++-mode c++-ts-mode)
+                                 . ,(eglot-alternatives
+                                     '("clangd" "ccls")))
                                 (((caml-mode :language-id "ocaml")
                                   (tuareg-mode :language-id "ocaml") reason-mode)
                                  . ("ocamllsp"))
@@ -209,7 +213,7 @@ language-server/bin/php-language-server.php"))
                                 ((go-mode go-dot-mod-mode go-dot-work-mode) . ("gopls"))
                                 ((R-mode ess-r-mode) . ("R" "--slave" "-e"
                                                         "languageserver::run()"))
-                                (java-mode . ("jdtls"))
+                                ((java-mode java-ts-mode) . ("jdtls"))
                                 (dart-mode . ("dart" "language-server"
                                               "--client-id" "emacs.eglot-dart"))
                                 (elixir-mode . ("language_server.sh"))
@@ -227,12 +231,15 @@ language-server/bin/php-language-server.php"))
                                 (lua-mode . ,(eglot-alternatives
                                               '("lua-language-server" "lua-lsp")))
                                 (zig-mode . ("zls"))
-                                (css-mode . ,(eglot-alternatives '(("vscode-css-language-server" "--stdio") ("css-languageserver" "--stdio"))))
+                                ((css-mode css-ts-mode)
+                                 . ,(eglot-alternatives '(("vscode-css-language-server" "--stdio")
+                                                          ("css-languageserver" "--stdio"))))
                                 (html-mode . ,(eglot-alternatives '(("vscode-html-language-server" "--stdio") ("html-languageserver" "--stdio"))))
                                 (dockerfile-mode . ("docker-langserver" "--stdio"))
                                 ((clojure-mode clojurescript-mode clojurec-mode)
                                  . ("clojure-lsp"))
-                                (csharp-mode . ("omnisharp" "-lsp"))
+                                ((csharp-mode csharp-ts-mode)
+                                 . ("omnisharp" "-lsp"))
                                 (purescript-mode . ("purescript-language-server" "--stdio"))
                                 ((perl-mode cperl-mode) . ("perl" "-MPerl::LanguageServer" "-e" "Perl::LanguageServer::run"))
                                 (markdown-mode . ("marksman" "server")))
@@ -736,6 +743,10 @@ treated as in `eglot--dbind'."
                                            t
                                          :json-false)
                                       :deprecatedSupport t
+                                      :resolveSupport (:properties
+                                                       ["documentation"
+                                                        "details"
+                                                        "additionalTextEdits"])
                                       :tagSupport (:valueSet [1]))
                                     :contextSupport t)
              :hover              (list :dynamicRegistration :json-false
@@ -820,9 +831,6 @@ treated as in `eglot--dbind'."
    (project
     :documentation "Project associated with server."
     :accessor eglot--project)
-   (spinner
-    :documentation "List (ID DOING-WHAT DONE-P) representing server progress."
-    :initform `(nil nil t) :accessor eglot--spinner)
    (inhibit-autoreconnect
     :initform t
     :documentation "Generalized boolean inhibiting auto-reconnection if true."
@@ -1183,7 +1191,7 @@ Each function is passed the server as an argument")
   "Connect to MANAGED-MODES, LANGUAGE-ID, PROJECT, CLASS and CONTACT.
 This docstring appeases checkdoc, that's all."
   (let* ((default-directory (project-root project))
-         (nickname (file-name-base (directory-file-name default-directory)))
+         (nickname (project-name project))
          (readable-name (format "EGLOT (%s/%s)" nickname managed-modes))
          autostart-inferior-process
          server-info
@@ -1237,7 +1245,7 @@ This docstring appeases checkdoc, that's all."
            :request-dispatcher (funcall spread #'eglot-handle-request)
            :on-shutdown #'eglot--on-shutdown
            initargs))
-         (cancelled nil)
+         (canceled nil)
          (tag (make-symbol "connected-catch-tag")))
     (when server-info
       (jsonrpc--debug server "Running language server: %s"
@@ -1276,7 +1284,7 @@ This docstring appeases checkdoc, that's all."
                             :workspaceFolders (eglot-workspace-folders server))
                       :success-fn
                       (eglot--lambda ((InitializeResult) capabilities serverInfo)
-                        (unless cancelled
+                        (unless canceled
                           (push server
                                 (gethash project eglot--servers-by-project))
                           (setf (eglot--capabilities server) capabilities)
@@ -1314,13 +1322,13 @@ in project `%s'."
                           (when tag (throw tag t))))
                       :timeout eglot-connect-timeout
                       :error-fn (eglot--lambda ((ResponseError) code message)
-                                  (unless cancelled
+                                  (unless canceled
                                     (jsonrpc-shutdown server)
                                     (let ((msg (format "%s: %s" code message)))
                                       (if tag (throw tag `(error . ,msg))
                                         (eglot--error msg)))))
                       :timeout-fn (lambda ()
-                                    (unless cancelled
+                                    (unless canceled
                                       (jsonrpc-shutdown server)
                                       (let ((msg (format "Timed out after %s seconds"
                                                          eglot-connect-timeout)))
@@ -1337,7 +1345,7 @@ in project `%s'."
                                       (jsonrpc-name server))
                       nil)
                 (_ server)))
-          (quit (jsonrpc-shutdown server) (setq cancelled 'quit)))
+          (quit (jsonrpc-shutdown server) (setq canceled 'quit)))
       (setq tag nil))))
 
 (defun eglot--inferior-bootstrap (name contact &optional connect-args)
@@ -1501,11 +1509,15 @@ If optional MARKER, return a marker instead"
 (defun eglot--path-to-uri (path)
   "URIfy PATH."
   (let ((truepath (file-truename path)))
-    (if (url-type (url-generic-parse-url truepath))
+    (if (and (url-type (url-generic-parse-url path))
+             ;; It might be MS Windows path which includes a drive
+             ;; letter that looks like a URL scheme (bug#59338)
+             (not (and (eq system-type 'windows-nt)
+                       (file-name-absolute-p truepath))))
         ;; Path is already a URI, so forward it to the LSP server
         ;; untouched.  The server should be able to handle it, since
         ;; it provided this URI to clients in the first place.
-        truepath
+        path
       (concat "file://"
               ;; Add a leading "/" for local MS Windows-style paths.
               (if (and (eq system-type 'windows-nt)
@@ -1688,7 +1700,7 @@ For example, to keep your Company customization, add the symbol
 `company' to this variable.")
 
 (defun eglot--stay-out-of-p (symbol)
-  "Tell if Eglot should stay of of SYMBOL."
+  "Tell if Eglot should stay out of SYMBOL."
   (cl-find (symbol-name symbol) eglot-stay-out-of
            :test (lambda (s thing)
                    (let ((re (if (symbolp thing) (symbol-name thing) thing)))
@@ -1923,12 +1935,11 @@ Uses THING, FACE, DEFS and PREPEND."
 
 (defun eglot--mode-line-format ()
   "Compose the Eglot's mode-line."
-  (pcase-let* ((server (eglot-current-server))
-               (nick (and server (eglot-project-nickname server)))
-               (pending (and server (hash-table-count
-                                     (jsonrpc--request-continuations server))))
-               (`(,_id ,doing ,done-p ,_detail) (and server (eglot--spinner server)))
-               (last-error (and server (jsonrpc-last-error server))))
+  (let* ((server (eglot-current-server))
+         (nick (and server (eglot-project-nickname server)))
+         (pending (and server (hash-table-count
+                               (jsonrpc--request-continuations server))))
+         (last-error (and server (jsonrpc-last-error server))))
     (append
      `(,(propertize
          eglot-menu-string
@@ -1954,14 +1965,11 @@ Uses THING, FACE, DEFS and PREPEND."
                      '((mouse-3 eglot-clear-status  "Clear this status"))
                      (format "An error occurred: %s\n" (plist-get last-error
                                                                  :message)))))
-         ,@(when (and doing (not done-p))
-             `("/" ,(eglot--mode-line-props doing
-                                            'compilation-mode-line-run '())))
-         ,@(when (cl-plusp pending)
-             `("/" ,(eglot--mode-line-props
-                     (format "%d" pending) 'warning
-                     '((mouse-3 eglot-forget-pending-continuations
-                                "Forget pending continuations"))
+       ,@(when (cl-plusp pending)
+           `("/" ,(eglot--mode-line-props
+                   (format "%d" pending) 'warning
+                   '((mouse-3 eglot-forget-pending-continuations
+                              "Forget pending continuations"))
                      "Number of outgoing, \
 still unanswered LSP requests to the server\n"))))))))
 
@@ -2298,8 +2306,7 @@ Instead of a plist, an alist ((SECTION . VALUE) ...) can be used
 instead, but this variant is less reliable and not recommended.
 
 This variable should be set as a directory-local variable.  See
-See info node `(emacs)Directory Variables' for various ways to to
-that.
+info node `(emacs)Directory Variables' for various ways to do that.
 
 Here's an example value that establishes two sections relevant to
 the Pylsp and Gopls LSP servers:
@@ -2414,7 +2421,6 @@ When called interactively, use the currently active server"
                    vconcat `[,(list :range `(:start ,beg :end ,end)
                                     :rangeLength len :text text)]))))
       (setq eglot--recent-changes nil)
-      (setf (eglot--spinner server) (list nil :textDocument/didChange t))
       (jsonrpc--call-deferred server))))
 
 (defun eglot--signal-textDocument/didOpen ()
@@ -2460,7 +2466,7 @@ When called interactively, use the currently active server"
 Calls REPORT-FN (or arranges for it to be called) when the server
 publishes diagnostics.  Between calls to this function, REPORT-FN
 may be called multiple times (respecting the protocol of
-`flymake-backend-functions')."
+`flymake-diagnostic-functions')."
   (cond (eglot--managed-mode
          (setq eglot--current-flymake-report-fn report-fn)
          (eglot--report-to-flymake eglot--diagnostics))
@@ -3213,7 +3219,7 @@ at point.  With prefix argument, prompt for ACTION-KIND."
       actions)))
 
 (defun eglot--read-execute-code-action (actions server &optional action-kind)
-  "Helper for interactive calls to `eglot-code-actions'"
+  "Helper for interactive calls to `eglot-code-actions'."
   (let* ((menu-items
           (or (cl-loop for a in actions
                        collect (cons (plist-get a :title) a))

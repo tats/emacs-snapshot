@@ -580,7 +580,9 @@ struct x_display_info
   Time last_user_time;
 
   /* Position where the mouse was last time we reported a motion.
-     This is a position on last_mouse_motion_frame.  */
+     This is a position on last_mouse_motion_frame.  It is used in
+     some situations to report the mouse position as well: see
+     XTmouse_position.  */
   int last_mouse_motion_x;
   int last_mouse_motion_y;
 
@@ -1177,6 +1179,10 @@ struct x_output
      frame.  */
   bool_bf waiting_for_frame_p : 1;
 
+  /* Whether or not Emacs just skipped waiting for a frame due to a
+     timeout.  */
+  bool_bf draw_just_hung_p : 1;
+
 #if !defined USE_GTK && defined HAVE_CLOCK_GETTIME
   /* Whether or not Emacs should wait for the compositing manager to
      draw frames before starting a new frame.  */
@@ -1390,6 +1396,8 @@ extern void x_mark_frame_dirty (struct frame *f);
   FRAME_X_OUTPUT (f)->extended_frame_counter
 #define FRAME_X_WAITING_FOR_DRAW(f)		\
   FRAME_X_OUTPUT (f)->waiting_for_frame_p
+#define FRAME_X_DRAW_JUST_HUNG(f)		\
+  FRAME_X_OUTPUT (f)->draw_just_hung_p
 #define FRAME_X_COUNTER_VALUE(f)		\
   FRAME_X_OUTPUT (f)->current_extended_counter_value
 #endif
@@ -1605,22 +1613,15 @@ SELECTION_EVENT_DISPLAY (struct selection_input_event *ev)
 
 extern void x_free_gcs (struct frame *);
 extern void x_relative_mouse_position (struct frame *, int *, int *);
-extern void x_real_pos_and_offsets (struct frame *f,
-                                    int *left_offset_x,
-                                    int *right_offset_x,
-                                    int *top_offset_y,
-                                    int *bottom_offset_y,
-                                    int *x_pixels_diff,
-                                    int *y_pixels_diff,
-                                    int *xptr,
-                                    int *yptr,
-                                    int *outer_border);
-extern void x_default_font_parameter (struct frame* f, Lisp_Object parms);
+extern void x_real_pos_and_offsets (struct frame *, int *, int *, int *,
+                                    int *, int *, int *, int *, int *,
+				    int *);
+extern void x_default_font_parameter (struct frame *, Lisp_Object);
 
 /* From xrdb.c.  */
 
-XrmDatabase x_load_resources (Display *, const char *, const char *,
-			      const char *);
+extern XrmDatabase x_load_resources (Display *, const char *, const char *,
+				     const char *);
 extern const char *x_get_string_resource (void *, const char *, const char *);
 
 /* Defined in xterm.c */

@@ -219,6 +219,7 @@ If NAME doesn't belong to an encrypted remote directory, return nil."
     (make-nearby-temp-file . tramp-handle-make-nearby-temp-file)
     (make-process . ignore)
     (make-symbolic-link . tramp-handle-make-symbolic-link)
+    (memory-info . ignore)
     (process-attributes . ignore)
     (process-file . ignore)
     (rename-file . tramp-crypt-handle-rename-file)
@@ -455,7 +456,7 @@ Otherwise, return NAME."
 (defun tramp-crypt-do-encrypt-or-decrypt-file (op root infile outfile)
   "Encrypt / decrypt file INFILE to OUTFILE according to encrypted directory ROOT.
 Both files must be local files.  OP must be `encrypt' or `decrypt'.
-If OP ist `decrypt', the basename of INFILE must be an encrypted file name.
+If OP is `decrypt', the basename of INFILE must be an encrypted file name.
 Raise an error if this fails."
   (when-let ((tramp-crypt-enabled t)
 	     (dir (tramp-crypt-file-name-p root))

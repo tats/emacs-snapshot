@@ -4017,7 +4017,7 @@ initializing CC Mode.  Currently (2020-06) these are `js-mode' and
 	 (t from))))))
 
 (defun c-remove-stale-state-cache (start-point here pps-point)
-  ;; Remove stale entries from the `c-cache-state', i.e. those which will
+  ;; Remove stale entries from the `c-state-cache', i.e. those which will
   ;; not be in it when it is amended for position HERE.  This may involve
   ;; replacing a CONS element for a brace pair containing HERE with its car.
   ;; Additionally, the "outermost" open-brace entry before HERE will be
@@ -4951,30 +4951,31 @@ comment at the start of cc-engine.el for more info."
       "\\w\\|\\s_\\|\\s\"\\|\\s|"
     "\\w\\|\\s_\\|\\s\""))
 
-(defun c-forward-over-token (&optional balanced)
+(defun c-forward-over-token (&optional balanced limit)
   "Move forward over a token.
 Return t if we moved, nil otherwise (i.e. we were at EOB, or a
 non-token or BALANCED is non-nil and we can't move).  If we
 are at syntactic whitespace, move over this in place of a token.
 
 If BALANCED is non-nil move over any balanced parens we are at, and never move
-out of an enclosing paren."
+out of an enclosing paren.  LIMIT is the limit to where we might move to."
   (let ((jump-syntax (if balanced
 			 c-jump-syntax-balanced
 		       c-jump-syntax-unbalanced))
-	(here (point)))
+	(here (point))
+	(limit (or limit (point-max))))
     (condition-case nil
 	(cond
 	 ((/= (point)
-	      (progn (c-forward-syntactic-ws) (point)))
+	      (progn (c-forward-syntactic-ws limit) (point)))
 	  ;; If we're at whitespace, count this as the token.
 	  t)
 	 ((eobp) nil)
 	 ((looking-at jump-syntax)
-	  (goto-char (scan-sexps (point) 1))
+	  (goto-char (min limit (scan-sexps (point) 1)))
 	  t)
 	 ((looking-at c-nonsymbol-token-regexp)
-	  (goto-char (match-end 0))
+	  (goto-char (min (match-end 0) limit))
 	  t)
 	 ((save-restriction
 	    (widen)
@@ -6963,7 +6964,7 @@ comment at the start of cc-engine.el for more info."
 ;; At each buffer change, the syntax-table properties are removed in a
 ;; before-change function and reapplied, when needed, in an
 ;; after-change function.  It is far more important that the
-;; properties get removed when they they are spurious than that they
+;; properties get removed when they are spurious than that they
 ;; be present when wanted.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun c-clear-<-pair-props (&optional pos)
@@ -9036,7 +9037,8 @@ multi-line strings (but not C++, for example)."
   ;;   o - 'found if it's a type that matches one in `c-found-types';
   ;;   o - 'maybe if it's an identifier that might be a type;
   ;;   o - 'decltype if it's a decltype(variable) declaration; - or
-  ;;   o - 'no-id if "auto" precluded parsing a type identifier.
+  ;;   o - 'no-id if "auto" precluded parsing a type identifier (C++)
+  ;;      or the type int was implicit (C).
   ;;   o -  nil if it can't be a type (the point isn't moved then).
   ;;
   ;; The point is assumed to be at the beginning of a token.
@@ -9060,10 +9062,11 @@ multi-line strings (but not C++, for example)."
 
     ;; Skip leading type modifiers.  If any are found we know it's a
     ;; prefix of a type.
-    (when c-opt-type-modifier-prefix-key ; e.g. "const" "volatile", but NOT "typedef"
-      (while (looking-at c-opt-type-modifier-prefix-key)
-	(when (looking-at c-no-type-key)
-	  (setq res 'no-id))
+    (when c-maybe-typeless-specifier-re
+      (while (looking-at c-maybe-typeless-specifier-re)
+	(save-match-data
+	  (when (looking-at c-no-type-key)
+	    (setq res 'no-id)))
 	(goto-char (match-end 1))
 	(c-forward-syntactic-ws)
 	(or (eq res 'no-id)
@@ -9128,6 +9131,9 @@ multi-line strings (but not C++, for example)."
        (not (eq res 'no-id))
        (progn
 	 (setq pos nil)
+	 (while (and c-opt-cpp-prefix
+		     (looking-at c-noise-macro-with-parens-name-re))
+	   (c-forward-noise-clause))
 	 (if (looking-at c-identifier-start)
 	     (save-excursion
 	       (setq id-start (point)
@@ -9187,6 +9193,18 @@ multi-line strings (but not C++, for example)."
 	    (goto-char (match-end 1))
 	    (c-forward-syntactic-ws)))))
 
+     ((and (eq name-res t)
+	   (eq res 'prefix)
+	   (c-major-mode-is 'c-mode)
+	   (save-excursion
+	     (goto-char id-end)
+	     (and (not (looking-at c-symbol-start))
+		  (not (looking-at c-type-decl-prefix-key)))))
+      ;; A C specifier followed by an implicit int, e.g.
+      ;; "register count;"
+      (goto-char id-start)
+      (setq res 'no-id))
+
      (name-res
       (cond ((eq name-res t)
 	     ;; A normal identifier.
@@ -9224,7 +9242,11 @@ multi-line strings (but not C++, for example)."
 	    (t
 	     ;; Otherwise it's an operator identifier, which is not a type.
 	     (goto-char start)
-	     (setq res nil)))))
+	     (setq res nil))))
+
+     ((eq res 'prefix)
+      ;; Deal with "extern "C" foo_t my_foo;"
+      (setq res nil)))
 
     (when (not (memq res '(nil no-id)))
       ;; Skip trailing type modifiers.  If any are found we know it's
@@ -10012,9 +10034,11 @@ This function might do hidden buffer changes."
 	       got-suffix-after-parens id-start
 	       paren-depth 0))
 
-     (if (setq at-type (if (eq backup-at-type 'prefix)
-			   t
-			 backup-at-type))
+     (if (not (memq
+	       (setq at-type (if (eq backup-at-type 'prefix)
+				 t
+			       backup-at-type))
+	       '(nil no-id)))
 	 (setq type-start backup-type-start
 	       id-start backup-id-start)
        (setq type-start start-pos
@@ -10080,7 +10104,7 @@ This function might do hidden buffer changes."
   ;;   Specifically it is nil, or a three element list (A B C) where C is t
   ;;   when context is '<> and the "identifier" is a found type, B is t when a
   ;;   `c-typedef-kwds' ("typedef") is present, and A is t when some other
-  ;;   `c-typedef-declkwds' (e.g. class, struct, enum) specifier is present.
+  ;;   `c-typedef-decl-kwds' (e.g. class, struct, enum) specifier is present.
   ;;   I.e., (some of) the declared identifier(s) are types.
   ;;
   ;;   The third element of the return value is non-nil when the declaration
@@ -11053,8 +11077,9 @@ This function might do hidden buffer changes."
 			      at-decl-start))
 		 (let ((space-before-id
 			(save-excursion
-			  (goto-char name-start)
-			  (or (bolp) (memq (char-before) '(?\  ?\t)))))
+			  (goto-char id-start) ; Position of "*".
+			  (and (> (skip-chars-forward "* \t\n\r") 0)
+			       (memq (char-before) '(?\  ?\t ?\n ?\r)))))
 		       (space-after-type
 			(save-excursion
 			  (goto-char type-start)
@@ -11064,6 +11089,8 @@ This function might do hidden buffer changes."
 				   (memq (char-after) '(?\  ?\t)))))))
 		   (when (not (eq (not space-before-id)
 				  (not space-after-type)))
+		     (when (eq at-type 'maybe)
+		       (setq unsafe-maybe t))
 		     (setq maybe-expression t)
 		     (throw 'at-decl-or-cast t)))))
 
@@ -11219,7 +11246,8 @@ This function might do hidden buffer changes."
 
       ;; Record the type's coordinates in `c-record-type-identifiers' for
       ;; later fontification.
-      (when (and c-record-type-identifiers at-type ;; (not (eq at-type t))
+      (when (and c-record-type-identifiers
+		 (not (memq at-type '(nil no-id)))
 		 ;; There seems no reason to exclude a token from
 		 ;; fontification just because it's "a known type that can't
 		 ;; be a name or other expression".  2013-09-18.
@@ -12602,7 +12630,7 @@ comment at the start of cc-engine.el for more info."
 
 (defun c-laomib-fix-elt (lwm elt paren-state)
   ;; Correct a c-laomib-cache entry ELT with respect to buffer changes, either
-  ;; doing nothing, signalling it is to be deleted, or replacing its start
+  ;; doing nothing, signaling it is to be deleted, or replacing its start
   ;; point with one lower in the buffer than LWM.  PAREN-STATE is the paren
   ;; state at LWM.  Return the corrected entry, or nil (if it needs deleting).
   ;; Note that corrections are made by `setcar'ing the original structure,
@@ -15494,7 +15522,7 @@ Cannot combine absolute offsets %S and %S in `add' method"
 
 (defun c-get-syntactic-indentation (langelems)
   ;; Calculate the syntactic indentation from a syntactic description
-  ;; as returned by `c-guess-syntax'.
+  ;; as returned by `c-guess-basic-syntax'.
   ;;
   ;; Note that topmost-intro always has an anchor position at bol, for
   ;; historical reasons.  It's often used together with other symbols

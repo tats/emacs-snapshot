@@ -2342,6 +2342,14 @@ struct it
      optimize display.  */
   ptrdiff_t narrowed_zv;
 
+  /* Begin position of the buffer for the locked narrowing around
+     low-level hooks.  */
+  ptrdiff_t locked_narrowing_begv;
+
+  /* End position of the buffer for the locked narrowing around
+     low-level hooks.  */
+  ptrdiff_t locked_narrowing_zv;
+
   /* C string to iterate over.  Non-null means get characters from
      this string, otherwise characters are read from current_buffer
      or it->string.  */
@@ -3405,6 +3413,8 @@ void init_iterator (struct it *, struct window *, ptrdiff_t,
 ptrdiff_t get_narrowed_begv (struct window *, ptrdiff_t);
 ptrdiff_t get_narrowed_zv (struct window *, ptrdiff_t);
 ptrdiff_t get_closer_narrowed_begv (struct window *, ptrdiff_t);
+ptrdiff_t get_locked_narrowing_begv (ptrdiff_t);
+ptrdiff_t get_locked_narrowing_zv (ptrdiff_t);
 void init_iterator_to_row_start (struct it *, struct window *,
                                  struct glyph_row *);
 void start_display (struct it *, struct window *, struct text_pos);
@@ -3495,7 +3505,8 @@ extern bool cursor_in_mouse_face_p (struct window *w);
 extern void tty_draw_row_with_mouse_face (struct window *, struct glyph_row *,
 					  int, int, enum draw_glyphs_face);
 extern void display_tty_menu_item (const char *, int, int, int, int, bool);
-
+extern struct glyph *x_y_to_hpos_vpos (struct window *, int, int, int *, int *,
+				       int *, int *, int *);
 /* Flags passed to try_window.  */
 #define TRY_WINDOW_CHECK_MARGINS	(1 << 0)
 #define TRY_WINDOW_IGNORE_FONTS_CHANGE	(1 << 1)

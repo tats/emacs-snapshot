@@ -568,6 +568,7 @@ decode_options (int argc, char **argv)
         case 't':
 	  tty = true;
 	  create_frame = true;
+	  reuse_frame = false;
           break;
 
         case 'c':
@@ -576,7 +577,8 @@ decode_options (int argc, char **argv)
 
 	case 'r':
 	  create_frame = true;
-	  reuse_frame = true;
+	  if (!tty)
+	    reuse_frame = true;
 	  break;
 
 	case 'p':
@@ -689,7 +691,7 @@ The following OPTIONS are accepted:\n\
 			Set the parameters of a new frame\n\
 -e, --eval    		Evaluate the FILE arguments as ELisp expressions\n\
 -n, --no-wait		Don't wait for the server to return\n\
--w, --timeout		Seconds to wait before timing out\n\
+-w, --timeout=SECONDS	Seconds to wait before timing out\n\
 -q, --quiet		Don't display messages on success\n\
 -u, --suppress-output   Don't display return values from the server\n\
 -d DISPLAY, --display=DISPLAY\n\
@@ -2240,7 +2242,7 @@ main (int argc, char **argv)
               char *str = unquote_argument (p + strlen ("-error "));
               if (!skiplf)
                 printf ("\n");
-              fprintf (stderr, "*ERROR*: %s", str);
+	      message (true, "*ERROR*: %s", str);
               if (str[0])
 	        skiplf = str[strlen (str) - 1] == '\n';
               exit_status = EXIT_FAILURE;
