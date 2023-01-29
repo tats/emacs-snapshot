@@ -367,7 +367,7 @@ usage: (char-bytes CHAR)  */)
 static int
 char_width (int c, struct Lisp_Char_Table *dp)
 {
-  int width = CHAR_WIDTH (c);
+  int width = CHARACTER_WIDTH (c);
 
   if (dp)
     {
@@ -379,7 +379,7 @@ char_width (int c, struct Lisp_Char_Table *dp)
 	  {
 	    ch = AREF (disp, i);
 	    if (CHARACTERP (ch))
-	      width += CHAR_WIDTH (XFASTINT (ch));
+	      width += CHARACTER_WIDTH (XFASTINT (ch));
 	  }
     }
   return width;

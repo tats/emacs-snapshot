@@ -303,7 +303,7 @@ skip_invisible (pos, next_boundary_p, to, window)
 	if (dp != 0 && VECTORP (DISP_CHAR_VECTOR (dp, c)))		\
 	  width = XVECTOR_SIZE (DISP_CHAR_VECTOR (dp, c));		\
 	else								\
-	  width = CHAR_WIDTH (c);					\
+	  width = CHARACTER_WIDTH (c);					\
 	if (width > 1)							\
 	  wide_column = width;						\
       }									\

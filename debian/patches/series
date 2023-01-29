@@ -23,3 +23,5 @@
 0023-Fix-compilation-with-glibc-2.28.patch
 0024-Declare-__dso_handle-variable.patch
 0025-Avoid-loading-.elc-under-usr-share-emacs-site-lisp.patch
+0026-Accept-GNU-texinfo.patch
+0027-Rename-CHAR_WIDTH-to-CHARACTER_WIDTH.patch

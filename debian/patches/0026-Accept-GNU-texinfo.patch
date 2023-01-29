@@ -1,0 +1,31 @@
+From fdeb69556375b697a6a64993579ff4e3ef525ffd Mon Sep 17 00:00:00 2001
+From: Tatsuya Kinoshita <tats@debian.org>
+Date: Sun, 29 Jan 2023 19:52:50 +0900
+Subject: Accept GNU texinfo
+
+---
+ configure.in | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/configure.in b/configure.in
+index 23be17d0e04..73fa0a753c9 100644
+--- a/configure.in
++++ b/configure.in
+@@ -800,9 +800,16 @@ AC_PATH_PROG(GZIP_PROG, gzip)
+ AC_PATH_PROG(MAKEINFO, makeinfo, no)
+ dnl By this stage, configure has already checked for egrep and set EGREP,
+ dnl or exited with an error if no egrep was found.
+-if test "$MAKEINFO" != "no" && \
++if test "$MAKEINFO" != "no"; then
++  case `($MAKEINFO --version) 2>/dev/null` in
++    *' (GNU texinfo) '*);;
++    *)
++    if
+   test x"`$MAKEINFO --version 2> /dev/null | $EGREP 'texinfo[[^0-9]]*([[1-4]][[0-9]]+|[[5-9]]|4\.[[6-9]]|4\.[[1-5]][[0-9]]+)'`" = x; then
+    MAKEINFO=no
++    fi
++    ;;
++  esac
+ fi
+ 
+ ## Makeinfo is unusual.  For a released Emacs, the manuals are

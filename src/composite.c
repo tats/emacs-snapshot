@@ -347,7 +347,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
 	{
 	  int this_width;
 	  ch = XINT (key_contents[i]);
-	  this_width = (ch == '\t' ? 1 : CHAR_WIDTH (ch));
+	  this_width = (ch == '\t' ? 1 : CHARACTER_WIDTH (ch));
 	  if (cmp->width < this_width)
 	    cmp->width = this_width;
 	}
@@ -358,7 +358,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
       float leftmost = 0.0, rightmost;
 
       ch = XINT (key_contents[0]);
-      rightmost = ch != '\t' ? CHAR_WIDTH (ch) : 1;
+      rightmost = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
 
       for (i = 1; i < glyph_len; i += 2)
 	{
@@ -368,7 +368,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
 
 	  rule = XINT (key_contents[i]);
 	  ch = XINT (key_contents[i + 1]);
-	  this_width = ch != '\t' ? CHAR_WIDTH (ch) : 1;
+	  this_width = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
 
 	  /* A composition rule is specified by an integer value
 	     that encodes global and new reference points (GREF and
@@ -1224,7 +1224,7 @@ composition_update_it (cmp_it, charpos, bytepos, string)
 	  c = XINT (LGSTRING_CHAR (gstring, from));
 	  cmp_it->nchars = LGLYPH_TO (glyph) - from + 1;
 	  cmp_it->width = (LGLYPH_WIDTH (glyph) > 0
-			   ? CHAR_WIDTH (LGLYPH_CHAR (glyph)) : 0);
+			   ? CHARACTER_WIDTH (LGLYPH_CHAR (glyph)) : 0);
 	  for (cmp_it->to = cmp_it->from + 1; cmp_it->to < cmp_it->nglyphs;
 	       cmp_it->to++)
 	    {
@@ -1232,7 +1232,7 @@ composition_update_it (cmp_it, charpos, bytepos, string)
 	      if (LGLYPH_FROM (glyph) != from)
 		break;
 	      if (LGLYPH_WIDTH (glyph) > 0)
-		cmp_it->width += CHAR_WIDTH (LGLYPH_CHAR (glyph));
+		cmp_it->width += CHARACTER_WIDTH (LGLYPH_CHAR (glyph));
 	    }
 	}
     }

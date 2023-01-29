@@ -1,0 +1,132 @@
+From 3b055ef7444777d9b8ef1ca369aa4db7f7ecab6d Mon Sep 17 00:00:00 2001
+From: Tatsuya Kinoshita <tats@debian.org>
+Date: Sun, 22 Jan 2023 23:36:13 +0900
+Subject: Rename CHAR_WIDTH to CHARACTER_WIDTH
+
+---
+ src/character.c |  4 ++--
+ src/character.h |  2 +-
+ src/composite.c | 10 +++++-----
+ src/indent.c    |  2 +-
+ src/term.c      |  4 ++--
+ 5 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/character.c b/src/character.c
+index 0409f30dc0e..263e48cb486 100644
+--- a/src/character.c
++++ b/src/character.c
+@@ -367,7 +367,7 @@ usage: (char-bytes CHAR)  */)
+ static int
+ char_width (int c, struct Lisp_Char_Table *dp)
+ {
+-  int width = CHAR_WIDTH (c);
++  int width = CHARACTER_WIDTH (c);
+ 
+   if (dp)
+     {
+@@ -379,7 +379,7 @@ char_width (int c, struct Lisp_Char_Table *dp)
+ 	  {
+ 	    ch = AREF (disp, i);
+ 	    if (CHARACTERP (ch))
+-	      width += CHAR_WIDTH (XFASTINT (ch));
++	      width += CHARACTER_WIDTH (XFASTINT (ch));
+ 	  }
+     }
+   return width;
+diff --git a/src/character.h b/src/character.h
+index d454add19ee..c3ea65f6f9f 100644
+--- a/src/character.h
++++ b/src/character.h
+@@ -592,7 +592,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+    columns C will occupy on the screen when displayed in the current
+    buffer.  */
+ 
+-#define CHAR_WIDTH(c)		\
++#define CHARACTER_WIDTH(c)		\
+   (ASCII_CHAR_P (c)		\
+    ? ASCII_CHAR_WIDTH (c)	\
+    : XINT (CHAR_TABLE_REF (Vchar_width_table, c)))
+diff --git a/src/composite.c b/src/composite.c
+index c6f461e71da..3c378efda89 100644
+--- a/src/composite.c
++++ b/src/composite.c
+@@ -347,7 +347,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+ 	{
+ 	  int this_width;
+ 	  ch = XINT (key_contents[i]);
+-	  this_width = (ch == '\t' ? 1 : CHAR_WIDTH (ch));
++	  this_width = (ch == '\t' ? 1 : CHARACTER_WIDTH (ch));
+ 	  if (cmp->width < this_width)
+ 	    cmp->width = this_width;
+ 	}
+@@ -358,7 +358,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+       float leftmost = 0.0, rightmost;
+ 
+       ch = XINT (key_contents[0]);
+-      rightmost = ch != '\t' ? CHAR_WIDTH (ch) : 1;
++      rightmost = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
+ 
+       for (i = 1; i < glyph_len; i += 2)
+ 	{
+@@ -368,7 +368,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+ 
+ 	  rule = XINT (key_contents[i]);
+ 	  ch = XINT (key_contents[i + 1]);
+-	  this_width = ch != '\t' ? CHAR_WIDTH (ch) : 1;
++	  this_width = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
+ 
+ 	  /* A composition rule is specified by an integer value
+ 	     that encodes global and new reference points (GREF and
+@@ -1224,7 +1224,7 @@ composition_update_it (cmp_it, charpos, bytepos, string)
+ 	  c = XINT (LGSTRING_CHAR (gstring, from));
+ 	  cmp_it->nchars = LGLYPH_TO (glyph) - from + 1;
+ 	  cmp_it->width = (LGLYPH_WIDTH (glyph) > 0
+-			   ? CHAR_WIDTH (LGLYPH_CHAR (glyph)) : 0);
++			   ? CHARACTER_WIDTH (LGLYPH_CHAR (glyph)) : 0);
+ 	  for (cmp_it->to = cmp_it->from + 1; cmp_it->to < cmp_it->nglyphs;
+ 	       cmp_it->to++)
+ 	    {
+@@ -1232,7 +1232,7 @@ composition_update_it (cmp_it, charpos, bytepos, string)
+ 	      if (LGLYPH_FROM (glyph) != from)
+ 		break;
+ 	      if (LGLYPH_WIDTH (glyph) > 0)
+-		cmp_it->width += CHAR_WIDTH (LGLYPH_CHAR (glyph));
++		cmp_it->width += CHARACTER_WIDTH (LGLYPH_CHAR (glyph));
+ 	    }
+ 	}
+     }
+diff --git a/src/indent.c b/src/indent.c
+index a57094c9902..59e9a20eaa1 100644
+--- a/src/indent.c
++++ b/src/indent.c
+@@ -303,7 +303,7 @@ skip_invisible (pos, next_boundary_p, to, window)
+ 	if (dp != 0 && VECTORP (DISP_CHAR_VECTOR (dp, c)))		\
+ 	  width = XVECTOR_SIZE (DISP_CHAR_VECTOR (dp, c));		\
+ 	else								\
+-	  width = CHAR_WIDTH (c);					\
++	  width = CHARACTER_WIDTH (c);					\
+ 	if (width > 1)							\
+ 	  wide_column = width;						\
+       }									\
+diff --git a/src/term.c b/src/term.c
+index 3aef9cf8354..95cccbd1f94 100644
+--- a/src/term.c
++++ b/src/term.c
+@@ -640,7 +640,7 @@ encode_terminal_code (src, src_len, coding)
+ 		  continue;
+ 		if (char_charset (c, charset_list, NULL))
+ 		  {
+-		    if (CHAR_WIDTH (c) == 0
++		    if (CHARACTER_WIDTH (c) == 0
+ 			&& i > 0 && COMPOSITION_GLYPH (cmp, i - 1) == '\t')
+ 		      /* Should be left-padded */
+ 		      {
+@@ -1656,7 +1656,7 @@ produce_glyphs (it)
+     }
+   else
+     {
+-      it->pixel_width = CHAR_WIDTH (it->char_to_display);
++      it->pixel_width = CHARACTER_WIDTH (it->char_to_display);
+       it->nglyphs = it->pixel_width;
+ 
+       if (it->glyph_row)
