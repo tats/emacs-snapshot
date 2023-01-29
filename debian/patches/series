@@ -17,3 +17,8 @@
 0017-Initialize-xgselect-in-function-xg_select-when-gfds_.patch
 0018-Don-t-eval-code-when-enable-local-variables-is-safe.patch
 0019-A-remote-execution-exploit-via-enriched-text-has-bee.patch
+0020-Fix-jpeg-version-check-to-work-with-gcc-5.patch
+0021-Fix-compilation-with-giflib-5.patch
+0022-Fix-segmentation-fault-in-emacs-during-compile-phase.patch
+0023-Fix-compilation-with-glibc-2.28.patch
+0024-Declare-__dso_handle-variable.patch

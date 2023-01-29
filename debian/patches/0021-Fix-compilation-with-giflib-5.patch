@@ -1,0 +1,164 @@
+From 3fb38e9213523ee44216f183ce5e7f78f0b01261 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ulrich=20M=C3=BCller?= <ulm@gentoo.org>
+Date: Sun, 17 Jan 2016 03:14:11 +0100
+Subject: Fix compilation with giflib-5
+
+Backported from Emacs 24, comprises parts of the following commits:
+
+commit be316ede5fffb724852ee225489e70778d240bb0
+Author: Paul Eggert <eggert@cs.ucla.edu>
+Date:   Tue Jan 7 13:14:32 2014 -0800
+
+    Fix misdisplay of interlaced GIFs with libgif5.
+
+commit f3606ef766bcec86789316a05949f1e67a51e7c1
+Author: Barry Fishman <barry_fishman@acm.org>
+Date:   Wed Oct 9 20:37:44 2013 -0400
+
+    Handle giflib 5 changes (tiny change)
+
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=866dfcae6b4f3ae8d4af7ac5f687e24ee10589d1
+---
+ configure.in |  5 +++--
+ src/image.c  | 41 ++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 43 insertions(+), 3 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index 84fc0dc0445..bf14147adf4 100644
+--- a/configure.in
++++ b/configure.in
+@@ -2190,8 +2190,9 @@ HAVE_GIF=no
+ if test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no"; then
+   AC_CHECK_HEADER(gif_lib.h,
+ # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
+-# Earlier versions can crash Emacs.
+-    [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, try_libungif=yes)])
++# Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.
++    [AC_CHECK_LIB(gif, GifMakeMapObject, HAVE_GIF=yes,
++        [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, try_libungif=yes)])])
+ 
+   if test "$HAVE_GIF" = yes; then
+       ac_gif_lib_name="-lgif"
+diff --git a/src/image.c b/src/image.c
+index 947428cff6e..46af94215be 100644
+--- a/src/image.c
++++ b/src/image.c
+@@ -7244,6 +7244,13 @@ gif_image_p (object)
+ 
+ #endif /* HAVE_NTGUI */
+ 
++/* Giflib before 5.0 didn't define these macros.  */
++#ifndef GIFLIB_MAJOR
++#define GIFLIB_MAJOR 0
++#endif
++#ifndef GIFLIB_MINOR
++#define GIFLIB_MINOR 0
++#endif
+ 
+ #ifdef HAVE_NTGUI
+ 
+@@ -7350,7 +7357,11 @@ gif_load (f, img)
+ 	}
+ 
+       /* Open the GIF file.  */
++#if GIFLIB_MAJOR < 5
+       gif = fn_DGifOpenFileName (SDATA (file));
++#else
++      gif = fn_DGifOpenFileName (SDATA (file), NULL);
++#endif
+       if (gif == NULL)
+ 	{
+ 	  image_error ("Cannot open `%s'", file, Qnil);
+@@ -7366,7 +7377,11 @@ gif_load (f, img)
+       memsrc.len = SBYTES (specified_data);
+       memsrc.index = 0;
+ 
++#if GIFLIB_MAJOR < 5
+       gif = fn_DGifOpen (&memsrc, gif_read_from_memory);
++#else
++      gif = fn_DGifOpen (&memsrc, gif_read_from_memory, NULL);
++#endif
+       if (!gif)
+ 	{
+ 	  image_error ("Cannot open memory source `%s'", img->spec, Qnil);
+@@ -7379,7 +7394,11 @@ gif_load (f, img)
+   if (!check_image_size (f, gif->SWidth, gif->SHeight))
+     {
+       image_error ("Invalid image size (see `max-image-size')", Qnil, Qnil);
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+       fn_DGifCloseFile (gif);
++#else
++      fn_DGifCloseFile (gif, NULL);
++#endif
+       UNGCPRO;
+       return 0;
+     }
+@@ -7389,7 +7408,11 @@ gif_load (f, img)
+   if (rc == GIF_ERROR)
+     {
+       image_error ("Error reading `%s'", img->spec, Qnil);
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+       fn_DGifCloseFile (gif);
++#else
++      fn_DGifCloseFile (gif, NULL);
++#endif
+       UNGCPRO;
+       return 0;
+     }
+@@ -7400,7 +7423,11 @@ gif_load (f, img)
+     {
+       image_error ("Invalid image number `%s' in image `%s'",
+ 		   image, img->spec);
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+       fn_DGifCloseFile (gif);
++#else
++      fn_DGifCloseFile (gif, NULL);
++#endif
+       UNGCPRO;
+       return 0;
+     }
+@@ -7422,7 +7449,11 @@ gif_load (f, img)
+   if (!check_image_size (f, width, height))
+     {
+       image_error ("Invalid image size (see `max-image-size')", Qnil, Qnil);
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+       fn_DGifCloseFile (gif);
++#else
++      fn_DGifCloseFile (gif, NULL);
++#endif
+       UNGCPRO;
+       return 0;
+     }
+@@ -7430,7 +7461,11 @@ gif_load (f, img)
+   /* Create the X image and pixmap.  */
+   if (!x_create_x_image_and_pixmap (f, width, height, 0, &ximg, &img->pixmap))
+     {
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+       fn_DGifCloseFile (gif);
++#else
++      fn_DGifCloseFile (gif, NULL);
++#endif
+       UNGCPRO;
+       return 0;
+     }
+@@ -7482,7 +7517,7 @@ gif_load (f, img)
+      problems with bytes >= 0x80.  */
+   raster = (unsigned char *) gif->SavedImages[ino].RasterBits;
+ 
+-  if (gif->SavedImages[ino].ImageDesc.Interlace)
++  if (GIFLIB_MAJOR < 5 && gif->SavedImages[ino].ImageDesc.Interlace)
+     {
+       int pass;
+       int row = interlace_start[0];
+@@ -7537,7 +7572,11 @@ gif_load (f, img)
+ 				Fcons (make_number (gif->ImageCount),
+ 				       img->data.lisp_val));
+ 
++#if GIFLIB_MAJOR < 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0)
+   fn_DGifCloseFile (gif);
++#else
++  fn_DGifCloseFile (gif, NULL);
++#endif
+ 
+   /* Maybe fill in the background field while we have ximg handy. */
+   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))

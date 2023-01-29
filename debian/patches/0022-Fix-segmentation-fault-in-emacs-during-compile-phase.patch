@@ -1,0 +1,56 @@
+From 359c6d931ac0508764899226640c2f63feb74b9e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ulrich=20M=C3=BCller?= <ulm@gentoo.org>
+Date: Sun, 19 Feb 2017 15:36:54 +0100
+Subject: Fix segmentation fault in emacs during compile phase
+
+Backported from Emacs 24:
+
+commit 4b5b5289577b4cc89ee45595832f943ef9a43de6
+Author: Paul Eggert <eggert@cs.ucla.edu>
+Date:   Sat Apr 21 23:56:42 2012 -0700
+
+    * configure.in (doug_lea_malloc): Check for __malloc_initialize_hook.
+
+Bug-Gentoo: https://bugs.gentoo.org/602992
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=1af0cd151374d5dfafab3a89d0c79f17f69dcdde
+---
+ configure.in | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index bf14147adf4..23be17d0e04 100644
+--- a/configure.in
++++ b/configure.in
+@@ -1469,17 +1469,21 @@ esac
+ # Do the opsystem or machine files prohibit the use of the GNU malloc?
+ # Assume not, until told otherwise.
+ GNU_MALLOC=yes
+-doug_lea_malloc=yes
+-AC_CHECK_FUNC(malloc_get_state, ,doug_lea_malloc=no)
+-AC_CHECK_FUNC(malloc_set_state, ,doug_lea_malloc=no)
+-AC_CACHE_CHECK(whether __after_morecore_hook exists,
+-	       emacs_cv_var___after_morecore_hook,
+-[AC_TRY_LINK([extern void (* __after_morecore_hook)();],[__after_morecore_hook = 0],
+-  emacs_cv_var___after_morecore_hook=yes,
+-  emacs_cv_var___after_morecore_hook=no)])
+-if test $emacs_cv_var___after_morecore_hook = no; then
+-  doug_lea_malloc=no
+-fi
++
++AC_CACHE_CHECK(
++  [whether malloc is Doug Lea style],
++  [emacs_cv_var_doug_lea_malloc],
++  [AC_LINK_IFELSE(
++     [AC_LANG_PROGRAM(
++	[[#include <malloc.h>
++	  static void hook (void) {}]],
++	[[malloc_set_state (malloc_get_state ());
++	  __after_morecore_hook = hook;
++	  __malloc_initialize_hook = hook;]])],
++     [emacs_cv_var_doug_lea_malloc=yes],
++     [emacs_cv_var_doug_lea_malloc=no])])
++doug_lea_malloc=$emacs_cv_var_doug_lea_malloc
++
+ if test "${system_malloc}" = "yes"; then
+   GNU_MALLOC=no
+   GNU_MALLOC_reason="

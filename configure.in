@@ -1469,17 +1469,21 @@ esac
 # Do the opsystem or machine files prohibit the use of the GNU malloc?
 # Assume not, until told otherwise.
 GNU_MALLOC=yes
-doug_lea_malloc=yes
-AC_CHECK_FUNC(malloc_get_state, ,doug_lea_malloc=no)
-AC_CHECK_FUNC(malloc_set_state, ,doug_lea_malloc=no)
-AC_CACHE_CHECK(whether __after_morecore_hook exists,
-	       emacs_cv_var___after_morecore_hook,
-[AC_TRY_LINK([extern void (* __after_morecore_hook)();],[__after_morecore_hook = 0],
-  emacs_cv_var___after_morecore_hook=yes,
-  emacs_cv_var___after_morecore_hook=no)])
-if test $emacs_cv_var___after_morecore_hook = no; then
-  doug_lea_malloc=no
-fi
+
+AC_CACHE_CHECK(
+  [whether malloc is Doug Lea style],
+  [emacs_cv_var_doug_lea_malloc],
+  [AC_LINK_IFELSE(
+     [AC_LANG_PROGRAM(
+	[[#include <malloc.h>
+	  static void hook (void) {}]],
+	[[malloc_set_state (malloc_get_state ());
+	  __after_morecore_hook = hook;
+	  __malloc_initialize_hook = hook;]])],
+     [emacs_cv_var_doug_lea_malloc=yes],
+     [emacs_cv_var_doug_lea_malloc=no])])
+doug_lea_malloc=$emacs_cv_var_doug_lea_malloc
+
 if test "${system_malloc}" = "yes"; then
   GNU_MALLOC=no
   GNU_MALLOC_reason="
@@ -2140,9 +2144,11 @@ if test "${HAVE_X11}" = "yes"; then
   AH_TEMPLATE(HAVE_JPEG, [Define to 1 if you have the jpeg library (-ljpeg).])dnl
   if test "${HAVE_JPEG}" = "yes"; then
     AC_DEFINE(HAVE_JPEG)
-    AC_EGREP_CPP([version= *(6[2-9]|[7-9][0-9])],
+    AC_EGREP_CPP([version 6b or later],
         [#include <jpeglib.h>
-	 version=JPEG_LIB_VERSION
+	 #if JPEG_LIB_VERSION >= 62
+	 version 6b or later
+	 #endif
 ],
         [AC_DEFINE(HAVE_JPEG)],
         [AC_MSG_WARN([libjpeg found, but not version 6b or later])
@@ -2188,8 +2194,9 @@ HAVE_GIF=no
 if test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no"; then
   AC_CHECK_HEADER(gif_lib.h,
 # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
-# Earlier versions can crash Emacs.
-    [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, try_libungif=yes)])
+# Earlier versions can crash Emacs, but version 5.0 removes EGifPutExtensionLast.
+    [AC_CHECK_LIB(gif, GifMakeMapObject, HAVE_GIF=yes,
+        [AC_CHECK_LIB(gif, EGifPutExtensionLast, HAVE_GIF=yes, try_libungif=yes)])])
 
   if test "$HAVE_GIF" = yes; then
       ac_gif_lib_name="-lgif"
