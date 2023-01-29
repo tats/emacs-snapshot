@@ -163,7 +163,7 @@ endif
 
 deb_host_multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-LDFLAGS   := -g
+LDFLAGS   := -g -no-pie
 CFLAGS    := -DDEBIAN -g
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
