@@ -173,7 +173,7 @@ CFLAGS += -Wall
 LDFLAGS = `dpkg-buildflags --get LDFLAGS`
 CPPFLAGS = `dpkg-buildflags --get CPPFLAGS`
 
-LDFLAGS   += -g
+LDFLAGS   += -g -no-pie
 CFLAGS    += -DDEBIAN
 
 ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
