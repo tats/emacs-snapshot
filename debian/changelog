@@ -1,3 +1,26 @@
+emacs23 (23.4+1-4+deb7u1+0.1) UNRELEASED; urgency=medium
+
+  [ Rob Browning ]
+  * Explicitly create $(pkgdir_el) in debian/rules
+  * debian/control: make Source-Version source:Version
+
+  [ Ulrich Müller ]
+  * Fix jpeg version check to work with gcc >= 5
+  * Fix compilation with giflib-5
+  * Fix segmentation fault in emacs during compile phase
+  * Fix compilation with glibc-2.28
+  * Declare __dso_handle variable
+
+  [ Tatsuya Kinoshita ]
+  * Do not provide flavor name to avoid conflicts
+  * Rename package names to avoid conflicts
+  * Avoid loading *.elc under /usr/share/emacs/site-lisp
+  * Accept GNU texinfo
+  * Rename CHAR_WIDTH to CHARACTER_WIDTH
+  * Add -no-pie to LDFLAGS
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Mon, 30 Jan 2023 00:08:08 +0900
+
 emacs23 (23.4+1-4+deb7u1) wheezy-security; urgency=high
 
   * Block remote code execution via enriched text.  Add
