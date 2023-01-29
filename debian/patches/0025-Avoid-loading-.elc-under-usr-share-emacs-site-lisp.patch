@@ -1,0 +1,31 @@
+From ccb966aa98322b037ac02d21b6b77eaf34066f8c Mon Sep 17 00:00:00 2001
+From: Tatsuya Kinoshita <tats@debian.org>
+Date: Sat, 21 Jan 2023 22:42:49 +0900
+Subject: Avoid loading *.elc under /usr/share/emacs/site-lisp
+
+---
+ lisp/startup.el | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/startup.el b/lisp/startup.el
+index b3e56ade8d9..e0dfb8440b1 100644
+--- a/lisp/startup.el
++++ b/lisp/startup.el
+@@ -966,11 +966,15 @@ opening the first frame (e.g. open a connection to an X server).")
+     ;;
+ 
+     ;; Debian startup
+-     (if site-run-file
++    (dolist (dir load-path)
++      (if (string-match "^/usr/share/emacs/site-lisp/" dir)
++          (setq load-path (delete dir load-path))))
++    (if site-run-file
+         (progn
+           ;; Load all the debian package snippets.
+           ;; It's in here because we want -q to kill it too.
+-          (if (load "debian-startup" t t nil)
++          (if (or (load "/usr/share/emacsen-common/debian-startup.el" t t t)
++                  (load "debian-startup" t t nil))
+               (debian-startup debian-emacs-flavor))
+           ;; Now the normal site file...
+           (load site-run-file t t nil)))
