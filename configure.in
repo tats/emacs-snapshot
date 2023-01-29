@@ -800,9 +800,16 @@ AC_PATH_PROG(GZIP_PROG, gzip)
 AC_PATH_PROG(MAKEINFO, makeinfo, no)
 dnl By this stage, configure has already checked for egrep and set EGREP,
 dnl or exited with an error if no egrep was found.
-if test "$MAKEINFO" != "no" && \
+if test "$MAKEINFO" != "no"; then
+  case `($MAKEINFO --version) 2>/dev/null` in
+    *' (GNU texinfo) '*);;
+    *)
+    if
   test x"`$MAKEINFO --version 2> /dev/null | $EGREP 'texinfo[[^0-9]]*([[1-4]][[0-9]]+|[[5-9]]|4\.[[6-9]]|4\.[[1-5]][[0-9]]+)'`" = x; then
    MAKEINFO=no
+    fi
+    ;;
+  esac
 fi
 
 ## Makeinfo is unusual.  For a released Emacs, the manuals are
