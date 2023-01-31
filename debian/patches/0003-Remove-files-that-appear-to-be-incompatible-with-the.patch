@@ -31,7 +31,7 @@ diff --git a/Makefile.in b/Makefile.in
 index 2fb7754..98b0346 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -174,7 +174,9 @@ man1dir=
+@@ -174,7 +174,9 @@ man1dir=$(mandir)/man1
  # Where to install and expect the info files describing Emacs.
  infodir=@infodir@
  # Info files not in the doc/misc directory (we get those via make echo-info).
@@ -42,7 +42,7 @@ index 2fb7754..98b0346 100644
  
  # Directory for local state files for all programs.
  localstatedir=@localstatedir@
-@@ -984,8 +986,7 @@ $(1)_$(2):
+@@ -984,8 +986,7 @@ endef
  ###      normally don't want to recompile.  For example, the 'mostlyclean'
  ###      target for GCC does not delete 'libgcc.a', because recompiling it
  ###      is rarely necessary and takes a lot of time.
@@ -69,7 +69,7 @@ index 2fb7754..98b0346 100644
  
  DOCS = $(DVIS) $(HTMLS) $(INFOS) $(PDFS) $(PSS)
  $(DOCS):
-@@ -1138,9 +1139,6 @@ info-dir:
+@@ -1138,9 +1139,6 @@ info-dir: ${srcdir}/info/dir
  texi_misc = $(shell MAKEFLAGS= ${MAKE} --no-print-directory -s -C doc/misc echo-sources)
  
  srcdir_doc_info_dir_inputs = \
@@ -79,7 +79,7 @@ index 2fb7754..98b0346 100644
    $(addprefix ${srcdir}/doc/misc/,${texi_misc})
  info_dir_inputs = \
    ../build-aux/dir_top \
-@@ -1162,14 +1160,10 @@ ${srcdir}/info/dir:
+@@ -1162,14 +1160,10 @@ ${srcdir}/info/dir: ${info_dir_deps}
  	 AWK='${AWK}' ../build-aux/make-info-dir ${info_dir_inputs} \
  	) >$@.tmp && mv $@.tmp $@
  
@@ -98,7 +98,7 @@ index 2fb7754..98b0346 100644
  INSTALL_DOC = $(INSTALL_DVI) $(INSTALL_HTML) $(INSTALL_PDF) $(INSTALL_PS)
  
  ## Install non .info forms of the documentation.
-@@ -1187,14 +1181,10 @@ install-pdf:
+@@ -1187,14 +1181,10 @@ install-pdf: $(INSTALL_PDF)
  install-ps: $(INSTALL_PS)
  
  
@@ -121,7 +121,7 @@ diff --git a/configure.ac b/configure.ac
 index fc17dbd..104b3c4 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6733,7 +6733,7 @@ AC_DEFUN
+@@ -6733,7 +6733,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index fc17dbd..104b3c4 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6799,15 +6799,6 @@ m4_define
+@@ -6799,15 +6799,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
@@ -150,7 +150,7 @@ diff --git a/doc/misc/Makefile.in b/doc/misc/Makefile.in
 index 1831bbb..c7a6da5 100644
 --- a/doc/misc/Makefile.in
 +++ b/doc/misc/Makefile.in
-@@ -63,18 +63,14 @@ INSTALL_DATA =
+@@ -63,18 +63,14 @@ INSTALL_DATA = @INSTALL_DATA@
  MAKEINFO = @MAKEINFO@
  MAKEINFO_OPTS = --force -I$(emacsdir)
  
@@ -177,7 +177,7 @@ diff --git a/lisp/help.el b/lisp/help.el
 index 83be85b..a847e35 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
-@@ -496,6 +496,14 @@ view-help-file
+@@ -496,6 +496,14 @@ If that doesn't give a function, return nil."
    (goto-address-mode 1)
    (goto-char (point-min)))
  
