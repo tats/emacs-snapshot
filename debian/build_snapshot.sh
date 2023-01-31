@@ -7,15 +7,13 @@ git show-ref | grep refs/heads
 
 cd `dirname $0`/..
 
+# Assumed:
+#   git remote add upstream git://git.savannah.gnu.org/emacs.git
 git fetch upstream
 git reset --hard
 git clean -ffdx
 
-git checkout upstream
-git merge -m 'Merged upstream' upstream/master
-
-git checkout master
-git merge -m 'Merging new upstream' upstream
+git merge -m 'Merging new upstream' upstream/master
 
 gbp pq rebase
 gbp pq export
