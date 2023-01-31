@@ -3805,22 +3805,22 @@ Return the trampoline if found or nil otherwise."
      form nil
      ;; If we've disabled nativecomp, don't write the trampolines to
      ;; the eln cache (but create them).
-     (and (not inhibit-automatic-native-compilation)
-          (cl-loop
-           for dir in (if native-compile-target-directory
-                          (list (expand-file-name comp-native-version-dir
-                                                  native-compile-target-directory))
-                        (comp-eln-load-path-eff))
-           for f = (expand-file-name
-                    (comp-trampoline-filename subr-name)
-                    dir)
-           unless (file-exists-p dir)
-           do (ignore-errors
-                (make-directory dir t)
-                (cl-return f))
-           when (file-writable-p f)
-           do (cl-return f)
-           finally (error "Cannot find suitable directory for output in \
+     (unless inhibit-automatic-native-compilation
+       (cl-loop
+        for dir in (if native-compile-target-directory
+                       (list (expand-file-name comp-native-version-dir
+                                               native-compile-target-directory))
+                     (comp-eln-load-path-eff))
+        for f = (expand-file-name
+                 (comp-trampoline-filename subr-name)
+                 dir)
+        unless (file-exists-p dir)
+          do (ignore-errors
+               (make-directory dir t)
+               (cl-return f))
+        when (file-writable-p f)
+          do (cl-return f)
+        finally (error "Cannot find suitable directory for output in \
 `native-comp-eln-load-path'"))))))
 
 
@@ -4112,13 +4112,16 @@ the deferred compilation mechanism."
                 (native-elisp-load data)))
           ;; We may have created a temporary file when we're being
           ;; called with something other than a file as the argument.
-          ;; Delete it.
+          ;; Delete it if we can.
           (when (and (not (stringp function-or-file))
                      (not output)
                      comp-ctxt
                      (comp-ctxt-output comp-ctxt)
                      (file-exists-p (comp-ctxt-output comp-ctxt)))
-            (delete-file (comp-ctxt-output comp-ctxt))))))))
+            (cond ((eq 'windows-nt system-type)
+                   ;; We may still be using the temporary .eln file.
+                   (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
+                  (t (delete-file (comp-ctxt-output comp-ctxt))))))))))
 
 (defun native-compile-async-skip-p (file load selector)
   "Return non-nil if FILE's compilation should be skipped.
