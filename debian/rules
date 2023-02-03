@@ -172,9 +172,11 @@ else # not noopt
   ifeq (m68k,$(DEB_HOST_ARCH))
     # fix problem with newer versions of gcc on m68k
     # -O2 causes a build failure (broken byte compiler)
-    CFLAGS += -O1
+    #CFLAGS += -O1
+    CFLAGS += -O0
   else # neq (m68k,$(DEB_HOST_ARCH))
-    CFLAGS += -O2
+    #CFLAGS += -O2 # causes a build failure
+    CFLAGS += -O0
   endif # neq (m68k,$(DEB_HOST_ARCH))
 endif # not noopt
 
