@@ -1,3 +1,27 @@
+emacs22 (22.3+1-1+0.0) UNRELEASED; urgency=medium
+
+  [ Rob Browning ]
+  * Remove explicit install-info calls. Rely on triggers now
+  * Don't fail to build if info dir or dir.old doesn't exist (use rm -f)
+  * Support DEB_BUILD_OPTIONS parallel=N
+  * Always regenerate autofiles (drop autofiles-sync); set debian/compat to 7
+  * Switch to "3.0 (quilt)" source format and drop protected_files handling
+  * Don't define unix when building Emacs (add-unix-to-cpp-undefs.diff)
+  * Add automake to Build-Depends
+  * Disable parallel builds until an upstream race is fixed
+  * Pass the correct crt-dir to ./configure for multiarch
+  * Build-depend on libjpeg-dev rather than libjpeg62-dev
+  * Depend on libpng-dev rather than libpng12-dev
+  * Stop producing the emacs binary metapackage
+  * Explicitly create $(pkgdir_el) in debian/rules (fix FTBS)
+  * debian/control: make Source-Version source:Version
+
+  [ Tatsuya Kinoshita ]
+  * Add -no-pie to LDFLAGS
+  * Set CFLAGS to -O0
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Sun, 05 Feb 2023 07:02:20 +0900
+
 emacs22 (22.3+1-1) unstable; urgency=low
 
   * New upstream release. (closes: #512134)
