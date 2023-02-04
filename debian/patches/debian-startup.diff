@@ -1,3 +1,7 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:14 +0900
+Subject: debian-startup
+
 * Emacs runs debian-startup and sets debian-emacs-flavor.
   Patch: debian-startup.diff
 
@@ -6,12 +10,15 @@
     
   * The global variable debian-emacs-flavor is bound to 'emacs22.
     Author: Rob Browning <rlb@defaultvalue.org>
-    
-Index: sid/lisp/startup.el
-===================================================================
---- sid.orig/lisp/startup.el
-+++ sid/lisp/startup.el
-@@ -302,6 +302,10 @@
+---
+ lisp/startup.el | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/lisp/startup.el b/lisp/startup.el
+index 55f5e98..21c6190 100644
+--- a/lisp/startup.el
++++ b/lisp/startup.el
+@@ -302,6 +302,10 @@ from being initialized."
  Warning Warning!!!  Pure space overflow    !!!Warning Warning
  \(See the node Pure Storage in the Lisp manual for details.)\n")
  
@@ -22,7 +29,7 @@ Index: sid/lisp/startup.el
  (defun normal-top-level-add-subdirs-to-load-path ()
    "Add all subdirectories of current directory to `load-path'.
  More precisely, this uses only the subdirectories whose names
-@@ -826,8 +830,21 @@
+@@ -826,8 +830,21 @@ or `CVS', and any subdirectory that contains a file named `.nosearch'."
      ;; be loaded from site-run-file and wants to test if -q was given
      ;; should check init-file-user instead, since that is already set.
      ;; See cus-edit.el for an example.

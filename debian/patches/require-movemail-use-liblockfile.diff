@@ -1,3 +1,7 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:14 +0900
+Subject: require-movemail-use-liblockfile
+
 * The build will fail if liblockfile isn't selected for movemail.
   Patch: require-movemail-use-liblockfile.diff
   Author: Rob Browning <rlb@defaultvalue.org>
@@ -6,12 +10,16 @@
   This makes sure the Debian Emacs won't accidentally be built with
   the wrong locking strategy.  To disable this check, comment out
   require-movemail-use-liblockfile.diff in debian/patches/series.
+---
+ lib-src/movemail.c | 4 ++++
+ src/s/bsd4-3.h     | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-Index: sid/lib-src/movemail.c
-===================================================================
---- sid.orig/lib-src/movemail.c
-+++ sid/lib-src/movemail.c
-@@ -167,6 +167,10 @@
+diff --git a/lib-src/movemail.c b/lib-src/movemail.c
+index 8ccf6ce..7ea7a88 100644
+--- a/lib-src/movemail.c
++++ b/lib-src/movemail.c
+@@ -167,6 +167,10 @@ int mbx_delimit_end ();
  /* Nonzero means this is name of a lock file to delete on fatal error.  */
  char *delete_lockname;
  
@@ -22,11 +30,11 @@ Index: sid/lib-src/movemail.c
  int
  main (argc, argv)
       int argc;
-Index: sid/src/s/bsd4-3.h
-===================================================================
---- sid.orig/src/s/bsd4-3.h
-+++ sid/src/s/bsd4-3.h
-@@ -98,7 +98,11 @@
+diff --git a/src/s/bsd4-3.h b/src/s/bsd4-3.h
+index 595bb0c..66f17e1 100644
+--- a/src/s/bsd4-3.h
++++ b/src/s/bsd4-3.h
+@@ -98,7 +98,11 @@ Boston, MA 02110-1301, USA.  */
     The alternative is that a lock file named
     /usr/spool/mail/$USER.lock.  */
  

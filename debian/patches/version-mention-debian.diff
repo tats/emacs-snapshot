@@ -1,13 +1,20 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:14 +0900
+Subject: version-mention-debian
+
 * The output of (version) has been modified to indicate Debian modifications.
   Patch: version-mention-debian.diff
   Author: Rob Browning <rlb@defaultvalue.org>
   Added-by: Rob Browning <rlb@defaultvalue.org>
+---
+ lisp/version.el | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Index: sid/lisp/version.el
-===================================================================
---- sid.orig/lisp/version.el
-+++ sid/lisp/version.el
-@@ -58,8 +58,8 @@
+diff --git a/lisp/version.el b/lisp/version.el
+index 2c15217..dce8db9 100644
+--- a/lisp/version.el
++++ b/lisp/version.el
+@@ -58,8 +58,8 @@ to the system configuration; look at `system-configuration' instead."
    (interactive "P")
    (let ((version-string
           (format (if (not (interactive-p))

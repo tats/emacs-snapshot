@@ -1,12 +1,19 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:14 +0900
+Subject: fix-vc-path
+
 * The default vc-path variable value has been adjusted for Debian.
   Patch: fix-vc-path.diff
   Bug: 120079
+---
+ lisp/vc-hooks.el | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Index: sid/lisp/vc-hooks.el
-===================================================================
---- sid.orig/lisp/vc-hooks.el
-+++ sid/lisp/vc-hooks.el
-@@ -77,8 +77,8 @@
+diff --git a/lisp/vc-hooks.el b/lisp/vc-hooks.el
+index 0bf03b2..c9447a7 100644
+--- a/lisp/vc-hooks.el
++++ b/lisp/vc-hooks.el
+@@ -77,8 +77,8 @@ An empty list disables VC altogether."
    :group 'vc)
  
  (defcustom vc-path

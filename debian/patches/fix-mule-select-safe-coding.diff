@@ -1,3 +1,7 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:15 +0900
+Subject: fix-mule-select-safe-coding
+
 * A problem with saving non-ASCII buffers has been fixed.
   Patch: fix-mule-select-safe-coding.diff
   Provided-by: Jun Inoue <jun.lambda@gmail.com>
@@ -9,12 +13,15 @@
   rejected when trying to save a buffer containing non-ASCII text when
   select-safe-coding-system-accept-default-p was set to a function.
   Now Emacs should continue.
+---
+ lisp/international/mule-cmds.el | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: sid/lisp/international/mule-cmds.el
-===================================================================
---- sid.orig/lisp/international/mule-cmds.el
-+++ sid/lisp/international/mule-cmds.el
-@@ -733,7 +733,7 @@
+diff --git a/lisp/international/mule-cmds.el b/lisp/international/mule-cmds.el
+index ad9f73b..4ad8ba2 100644
+--- a/lisp/international/mule-cmds.el
++++ b/lisp/international/mule-cmds.el
+@@ -733,7 +733,7 @@ DEFAULT is the coding system to use by default in the query."
  	    (let ((pos (point))
  		  (fill-prefix "  "))
  	      (dolist (x (append rejected unsafe))

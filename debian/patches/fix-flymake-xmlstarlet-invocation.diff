@@ -1,3 +1,7 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:15 +0900
+Subject: fix-flymake-xmlstarlet-invocation
+
 * Emacs now invokes the correct xmlstarlet executable on Debian systems.
   Patch: fix-flymake-xmlstarlet-invocation.diff
   Provided-by: Jussi Judin <jjudin+debian@iki.fi>
@@ -8,12 +12,15 @@
 
   Emacs invokes xmlstarlet rather than xml, which is the correct
   executable name on Debian systems.
+---
+ lisp/progmodes/flymake.el | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: sid/lisp/progmodes/flymake.el
-===================================================================
---- sid.orig/lisp/progmodes/flymake.el
-+++ sid/lisp/progmodes/flymake.el
-@@ -1756,7 +1756,7 @@
+diff --git a/lisp/progmodes/flymake.el b/lisp/progmodes/flymake.el
+index 395aa3e..622b768 100644
+--- a/lisp/progmodes/flymake.el
++++ b/lisp/progmodes/flymake.el
+@@ -1756,7 +1756,7 @@ Use CREATE-TEMP-F for creating temp copy."
  
  ;;;; xml-specific init-cleanup routines
  (defun flymake-xml-init ()

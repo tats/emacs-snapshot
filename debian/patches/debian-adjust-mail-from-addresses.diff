@@ -1,3 +1,7 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Sun, 5 Feb 2023 07:04:14 +0900
+Subject: debian-adjust-mail-from-addresses
+
 * The default handling of mail from addresses has been changed.
   Patch: debian-adjust-mail-from-addresses.diff
   Bug: 7051 35128
@@ -8,12 +12,16 @@
     trusted.
     
   * The default mail-from-style is 'system-default rather than 'angles.
-    
-Index: sid/lisp/gnus/message.el
-===================================================================
---- sid.orig/lisp/gnus/message.el
-+++ sid/lisp/gnus/message.el
-@@ -738,9 +738,14 @@
+---
+ lisp/gnus/message.el  | 11 ++++++++---
+ lisp/mail/sendmail.el |  2 +-
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/lisp/gnus/message.el b/lisp/gnus/message.el
+index 214d971..a07bd2a 100644
+--- a/lisp/gnus/message.el
++++ b/lisp/gnus/message.el
+@@ -745,9 +745,14 @@ symbol `never', the posting is not allowed.  If it is the symbol
  		 (const never)
  		 (const ask)))
  
@@ -31,10 +39,10 @@ Index: sid/lisp/gnus/message.el
    :group 'message-sending
    :link '(custom-manual "(message)Mail Variables")
    :type 'boolean)
-Index: sid/lisp/mail/sendmail.el
-===================================================================
---- sid.orig/lisp/mail/sendmail.el
-+++ sid/lisp/mail/sendmail.el
+diff --git a/lisp/mail/sendmail.el b/lisp/mail/sendmail.el
+index 20d881c..c737fda 100644
+--- a/lisp/mail/sendmail.el
++++ b/lisp/mail/sendmail.el
 @@ -59,7 +59,7 @@
    :type 'file)
  
