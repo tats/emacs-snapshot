@@ -1,0 +1,23 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Tue, 2 Apr 2019 10:09:04 +0200
+Subject: Declare __dso_handle variable
+
+Bug-Gentoo: https://bugs.gentoo.org/682282
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=835f61910c26fb178282dc48d194c35b65c2f7fa
+---
+ src/emacs.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/emacs.c b/src/emacs.c
+index 2fbc992..c046c14 100644
+--- a/src/emacs.c
++++ b/src/emacs.c
+@@ -213,6 +213,8 @@ static unsigned long heap_bss_diff;
+    work around it, and if that fails, output a warning in dump-emacs.  */
+ #define MAX_HEAP_BSS_DIFF (1024*1024)
+ 
++void *__dso_handle = NULL;
++
+ 
+ #ifdef HAVE_WINDOW_SYSTEM
+ extern Lisp_Object Vwindow_system;

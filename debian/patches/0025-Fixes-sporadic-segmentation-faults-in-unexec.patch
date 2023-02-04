@@ -1,0 +1,24 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Fri, 29 May 2009 15:28:40 +0000
+Subject: Fixes sporadic segmentation faults in unexec
+
+Bug: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=900
+Bug-Gentoo: https://bugs.gentoo.org/236579
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=0a36193036cf7de3e2d447474302e83b531e8486
+---
+ src/emacs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/emacs.c b/src/emacs.c
+index 7cb53a4..2fbc992 100644
+--- a/src/emacs.c
++++ b/src/emacs.c
+@@ -883,7 +883,7 @@ main (argc, argv
+   if (!initialized
+       && (strcmp (argv[argc-1], "dump") == 0
+           || strcmp (argv[argc-1], "bootstrap") == 0)
+-      && heap_bss_diff > MAX_HEAP_BSS_DIFF)
++      /*&& heap_bss_diff > MAX_HEAP_BSS_DIFF*/)
+     {
+       if (! getenv ("EMACS_HEAP_EXEC"))
+         {

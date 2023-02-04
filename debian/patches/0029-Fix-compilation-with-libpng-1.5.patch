@@ -1,0 +1,32 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Tue, 27 Sep 2011 16:00:24 +0000
+Subject: Fix compilation with libpng-1.5
+
+Bug-Gentoo: https://bugs.gentoo.org/384553
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=db9f6d8b3c0845e018a71d5589a140ebe35021b8
+---
+ src/image.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/image.c b/src/image.c
+index ed04212..b648c62 100644
+--- a/src/image.c
++++ b/src/image.c
+@@ -6427,7 +6427,7 @@ my_png_error (png_ptr, msg)
+ {
+   xassert (png_ptr != NULL);
+   image_error ("PNG error: %s", build_string (msg), Qnil);
+-  longjmp (png_ptr->jmpbuf, 1);
++  longjmp (png_jmpbuf (png_ptr), 1);
+ }
+ 
+ 
+@@ -6603,7 +6603,7 @@ png_load (f, img)
+ 
+   /* Set error jump-back.  We come back here when the PNG library
+      detects an error.  */
+-  if (setjmp (png_ptr->jmpbuf))
++  if (setjmp (png_jmpbuf (png_ptr)))
+     {
+     error:
+       if (png_ptr)

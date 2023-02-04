@@ -1,0 +1,24 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Mon, 10 Nov 2014 21:39:11 +0100
+Subject: Remove redundant _BSD_SOURCE macro causing warnings with glibc 2.20
+
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=07847684e6889d85675130b393047e48de0b9301
+---
+ src/s/gnu-linux.h | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/src/s/gnu-linux.h b/src/s/gnu-linux.h
+index 4a1bb70..eb6ee9c 100644
+--- a/src/s/gnu-linux.h
++++ b/src/s/gnu-linux.h
+@@ -270,10 +270,6 @@ Boston, MA 02110-1301, USA.  */
+ /* alane@wozzle.linet.org says that -lipc is not a separate library,
+    since libc-4.4.1.  So -lipc was deleted.  */
+ #define LIBS_SYSTEM
+-/* _BSD_SOURCE is redundant, at least in glibc2, since we define
+-   _GNU_SOURCE.  Left in in case it's relevant to libc5 systems and
+-   anyone's still using Emacs on those.  --fx 2002-12-14  */
+-#define C_SWITCH_SYSTEM -D_BSD_SOURCE
+ #endif
+ 
+ /* Paul Abrahams <abrahams@equinox.shaysnet.com> says this is needed.  */

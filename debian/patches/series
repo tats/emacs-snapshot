@@ -21,3 +21,15 @@ add-unix-to-cpp-undefs.diff
 0021-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch
 0022-Look-for-crt1.o-in-the-correct-multiarch-location.patch
 0023-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch
+0024-Include-Xaw3d-headers.patch
+0025-Fixes-sporadic-segmentation-faults-in-unexec.patch
+0026-Fix-building-with-libpng-1.4.patch
+0027-Fix-building-with-GNU-CPP-4.5-patch-from-upstream-CV.patch
+0028-Fix-an-issue-with-duplicate-items-in-GNU-Info-direct.patch
+0029-Fix-compilation-with-libpng-1.5.patch
+0030-Remove-redundant-_BSD_SOURCE-macro-causing-warnings-.patch
+0031-Fix-jpeg-version-check-to-work-with-gcc-5.patch
+0032-Fix-compilation-with-giflib-5.patch
+0033-Fix-segmentation-fault-in-emacs-during-compile-phase.patch
+0034-Fix-compilation-with-glibc-2.28.patch
+0035-Declare-__dso_handle-variable.patch

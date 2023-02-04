@@ -1,0 +1,33 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Thu, 11 Mar 2010 08:10:43 +0000
+Subject: Fix building with GNU CPP 4.5, patch from upstream CVS
+
+Bug: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=5047
+Bug-Gentoo: https://bugs.gentoo.org/308653
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=dcc3edea059df99741a00adc4d5234dc9d8167ef
+---
+ configure.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index 823eee7..2eb7ec3 100644
+--- a/configure.in
++++ b/configure.in
+@@ -3420,7 +3420,7 @@ echo creating lib-src/Makefile
+   sed -e '1,/start of cpp stuff/d'\
+       -e 's,/\*\*/#\(.*\)$,/* \1 */,' \
+       < Makefile.c > junk.c
+-  $CPP $cpp_undefs -I. -I$srcdir/src $CPPFLAGS junk.c | \
++  $CPP -P $cpp_undefs -I. -I$srcdir/src $CPPFLAGS junk.c | \
+       sed -e 's/^ /	/' -e '/^#/d' -e '/^[ 	]*$/d' > junk2.c
+   cat junk1.c junk2.c > Makefile.new
+   rm -f junk.c junk1.c junk2.c
+@@ -3436,7 +3436,7 @@ echo creating src/Makefile
+   sed -e '1,/start of cpp stuff/d'\
+       -e 's,/\*\*/#\(.*\)$,/* \1 */,' \
+       < Makefile.c > junk.c
+-  $CPP $cpp_undefs -I. -I$srcdir/src $CPPFLAGS junk.c | \
++  $CPP -P $cpp_undefs -I. -I$srcdir/src $CPPFLAGS junk.c | \
+       sed -e 's/^ /	/' -e '/^#/d' -e '/^[ 	]*$/d' > junk2.c
+   cat junk1.c junk2.c > Makefile.new
+   rm -f junk.c junk1.c junk2.c

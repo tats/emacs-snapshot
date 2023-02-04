@@ -1,0 +1,173 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Fri, 29 May 2009 15:28:40 +0000
+Subject: Include Xaw3d headers
+
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=0a36193036cf7de3e2d447474302e83b531e8486
+---
+ configure.in      | 55 ++++++++++++++++++++++++++++---------------------------
+ lwlib/lwlib-Xaw.c |  9 +++++++++
+ lwlib/lwlib.c     |  4 ++++
+ src/xfns.c        |  5 +++++
+ src/xmenu.c       |  4 ++++
+ 5 files changed, 50 insertions(+), 27 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index 0eddee3..823eee7 100644
+--- a/configure.in
++++ b/configure.in
+@@ -2265,29 +2265,45 @@ fi
+ 
+ dnl Do not put whitespace before the #include statements below.
+ dnl Older compilers (eg sunos4 cc) choke on it.
++HAVE_XAW3D=no
+ if test x"${USE_X_TOOLKIT}" = xmaybe || test x"${USE_X_TOOLKIT}" = xLUCID; then
+-  if test x"${HAVE_X11R5}" = xyes; then
+-    AC_MSG_CHECKING(X11 version 5 with Xaw)
+-    AC_CACHE_VAL(emacs_cv_x11_version_5_with_xaw,
++  if test x"${HAVE_X11R5}" != xyes; then
++    USE_X_TOOLKIT=none
++  else
++    AC_MSG_CHECKING(for xaw3d)
++    AC_CACHE_VAL(emacs_cv_xaw3d,
+     [AC_TRY_LINK([
+ #include <X11/Intrinsic.h>
+-#include <X11/Xaw/Simple.h>],
++#include <X11/Xaw3d/Simple.h>],
+       [],
+-      emacs_cv_x11_version_5_with_xaw=yes,
+-      emacs_cv_x11_version_5_with_xaw=no)])
+-    if test $emacs_cv_x11_version_5_with_xaw = yes; then
+-      AC_MSG_RESULT([5 or newer, with Xaw; use toolkit by default])
++      emacs_cv_xaw3d=yes,
++      emacs_cv_xaw3d=no)])
++    if test $emacs_cv_xaw3d = yes; then
++      AC_MSG_RESULT([yes; using Lucid toolkit])
+       USE_X_TOOLKIT=LUCID
++      HAVE_XAW3D=yes
++      AC_DEFINE(HAVE_XAW3D, 1,
++                [Define to 1 if you have the Xaw3d library (-lXaw3d).])
+     else
+-      if test x"${USE_X_TOOLKIT}" = xLUCID; then
++      AC_MSG_RESULT(no)
++      AC_MSG_CHECKING(for libXaw)
++      AC_CACHE_VAL(emacs_cv_xaw,
++      [AC_TRY_LINK([
++#include <X11/Intrinsic.h>
++#include <X11/Xaw/Simple.h>],
++        [],
++        emacs_cv_xaw=yes,
++        emacs_cv_xaw=no)])
++      if test $emacs_cv_xaw = yes; then
++        AC_MSG_RESULT([yes; using Lucid toolkit])
++        USE_X_TOOLKIT=LUCID
++      elif test x"${USE_X_TOOLKIT}" = xLUCID; then
+         AC_MSG_ERROR([Lucid toolkit requires X11/Xaw include files])
+       else
+-        AC_MSG_RESULT(before 5 or no Xaw; do not use toolkit by default)
++        AC_MSG_RESULT([no; do not use toolkit by default])
+         USE_X_TOOLKIT=none
+       fi
+     fi
+-  else
+-    USE_X_TOOLKIT=none
+   fi
+ fi
+ 
+@@ -2375,21 +2391,6 @@ Motif version prior to 2.1.
+   fi
+ fi
+ 
+-### Is -lXaw3d available?
+-HAVE_XAW3D=no
+-if test "${HAVE_X11}" = "yes"; then
+-  if test "${USE_X_TOOLKIT}" != "none" && test "${with_toolkit_scroll_bars}" != "no"; then
+-    dnl Fixme: determine what Scrollbar.h needs to avoid compilation
+-    dnl errors from the test without the `-'.
+-    AC_CHECK_HEADER(X11/Xaw3d/Scrollbar.h,
+-	[AC_CHECK_LIB(Xaw3d, XawScrollbarSetThumb, HAVE_XAW3D=yes)], , -)
+-    if test "${HAVE_XAW3D}" = "yes"; then
+-	AC_DEFINE(HAVE_XAW3D, 1,
+-		  [Define to 1 if you have the Xaw3d library (-lXaw3d).])
+-    fi
+-  fi
+-fi
+-
+ dnl Use toolkit scroll bars if configured for GTK or X toolkit and either
+ dnl using Motif or Xaw3d is available, and unless
+ dnl --with-toolkit-scroll-bars=no was specified.
+diff --git a/lwlib/lwlib-Xaw.c b/lwlib/lwlib-Xaw.c
+index 815a227..5a2acf2 100644
+--- a/lwlib/lwlib-Xaw.c
++++ b/lwlib/lwlib-Xaw.c
+@@ -35,12 +35,21 @@ Boston, MA 02110-1301, USA.  */
+ #include <X11/CoreP.h>
+ #include <X11/Shell.h>
+ 
++#ifdef HAVE_XAW3D
++#include <X11/Xaw3d/Scrollbar.h>
++#include <X11/Xaw3d/Paned.h>
++#include <X11/Xaw3d/Dialog.h>
++#include <X11/Xaw3d/Form.h>
++#include <X11/Xaw3d/Command.h>
++#include <X11/Xaw3d/Label.h>
++#else /* !HAVE_XAW3D */
+ #include <X11/Xaw/Scrollbar.h>
+ #include <X11/Xaw/Paned.h>
+ #include <X11/Xaw/Dialog.h>
+ #include <X11/Xaw/Form.h>
+ #include <X11/Xaw/Command.h>
+ #include <X11/Xaw/Label.h>
++#endif /* HAVE_XAW3D */
+ 
+ #include <X11/Xatom.h>
+ 
+diff --git a/lwlib/lwlib.c b/lwlib/lwlib.c
+index 42b2f1f..d99112b 100644
+--- a/lwlib/lwlib.c
++++ b/lwlib/lwlib.c
+@@ -48,7 +48,11 @@ Boston, MA 02110-1301, USA.  */
+ #endif /* not USE_MOTIF && USE_LUCID */
+ #endif
+ #if defined (USE_XAW)
++#ifdef HAVE_XAW3D
++#include <X11/Xaw3d/Paned.h>
++#else  /* !HAVE_XAW3D */
+ #include <X11/Xaw/Paned.h>
++#endif /* HAVE_XAW3D */
+ #include "lwlib-Xaw.h"
+ #endif
+ 
+diff --git a/src/xfns.c b/src/xfns.c
+index f576b7f..cd4e925 100644
+--- a/src/xfns.c
++++ b/src/xfns.c
+@@ -73,8 +73,13 @@ Boston, MA 02110-1301, USA.  */
+ #include <X11/Shell.h>
+ 
+ #ifndef USE_MOTIF
++#ifdef HAVE_XAW3D
++#include <X11/Xaw3d/Paned.h>
++#include <X11/Xaw3d/Label.h>
++#else  /* !HAVE_XAW3D */
+ #include <X11/Xaw/Paned.h>
+ #include <X11/Xaw/Label.h>
++#endif /* HAVE_XAW3D */
+ #endif /* USE_MOTIF */
+ 
+ #ifdef USG
+diff --git a/src/xmenu.c b/src/xmenu.c
+index 6902f1e..c381bdb 100644
+--- a/src/xmenu.c
++++ b/src/xmenu.c
+@@ -82,7 +82,11 @@ Boston, MA 02110-1301, USA.  */
+ #include <X11/StringDefs.h>
+ #include <X11/Shell.h>
+ #ifdef USE_LUCID
++#ifdef HAVE_XAW3D
++#include <X11/Xaw3d/Paned.h>
++#else  /* !HAVE_XAW3D */
+ #include <X11/Xaw/Paned.h>
++#endif /* HAVE_XAW3D */
+ #endif /* USE_LUCID */
+ #include "../lwlib/lwlib.h"
+ #else /* not USE_X_TOOLKIT */

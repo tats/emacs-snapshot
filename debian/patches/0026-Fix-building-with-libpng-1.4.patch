@@ -1,0 +1,58 @@
+From: =?utf-8?q?Ulrich_M=C3=BCller?= <ulm@gentoo.org>
+Date: Mon, 8 Mar 2010 18:48:30 +0000
+Subject: Fix building with libpng-1.4
+
+Origin: https://gitweb.gentoo.org/proj/emacs-patches.git/commit/?id=4616e0b296cb45759e958067ce72f22102dcd910
+---
+ src/image.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/image.c b/src/image.c
+index 0045770..ed04212 100644
+--- a/src/image.c
++++ b/src/image.c
+@@ -6338,7 +6338,7 @@ png_image_p (object)
+ /* PNG library details.  */
+ 
+ DEF_IMGLIB_FN (png_get_io_ptr);
+-DEF_IMGLIB_FN (png_check_sig);
++DEF_IMGLIB_FN (png_sig_cmp);
+ DEF_IMGLIB_FN (png_create_read_struct);
+ DEF_IMGLIB_FN (png_create_info_struct);
+ DEF_IMGLIB_FN (png_destroy_read_struct);
+@@ -6369,7 +6369,7 @@ init_png_functions (Lisp_Object libraries)
+     return 0;
+ 
+   LOAD_IMGLIB_FN (library, png_get_io_ptr);
+-  LOAD_IMGLIB_FN (library, png_check_sig);
++  LOAD_IMGLIB_FN (library, png_sig_cmp);
+   LOAD_IMGLIB_FN (library, png_create_read_struct);
+   LOAD_IMGLIB_FN (library, png_create_info_struct);
+   LOAD_IMGLIB_FN (library, png_destroy_read_struct);
+@@ -6394,7 +6394,7 @@ init_png_functions (Lisp_Object libraries)
+ #else
+ 
+ #define fn_png_get_io_ptr		png_get_io_ptr
+-#define fn_png_check_sig		png_check_sig
++#define fn_png_sig_cmp			png_sig_cmp
+ #define fn_png_create_read_struct	png_create_read_struct
+ #define fn_png_create_info_struct	png_create_info_struct
+ #define fn_png_destroy_read_struct	png_destroy_read_struct
+@@ -6541,7 +6541,7 @@ png_load (f, img)
+ 
+       /* Check PNG signature.  */
+       if (fread (sig, 1, sizeof sig, fp) != sizeof sig
+-	  || !fn_png_check_sig (sig, sizeof sig))
++	  || fn_png_sig_cmp (sig, 0, sizeof sig))
+ 	{
+ 	  image_error ("Not a PNG file: `%s'", file, Qnil);
+ 	  UNGCPRO;
+@@ -6558,7 +6558,7 @@ png_load (f, img)
+ 
+       /* Check PNG signature.  */
+       if (tbr.len < sizeof sig
+-	  || !fn_png_check_sig (tbr.bytes, sizeof sig))
++	  || fn_png_sig_cmp (tbr.bytes, 0, sizeof sig))
+ 	{
+ 	  image_error ("Not a PNG image: `%s'", img->spec, Qnil);
+ 	  UNGCPRO;
