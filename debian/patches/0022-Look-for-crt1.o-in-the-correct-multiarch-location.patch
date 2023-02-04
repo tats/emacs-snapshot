@@ -1,0 +1,38 @@
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Mon, 24 Oct 2011 22:29:59 -0500
+Subject: Look for crt1.o in the correct multiarch location.
+
+The Emacs build should now be able to handle the fact that crt1.o is
+no longer in /usr/lib.  It was moved to support multarch.
+
+Provided-by: Sven Joachim <svenjoac@gmx.de>
+Date: Sat, 25 Jun 2011 08:25:48 +0200
+Applied-by: Rob Browning <rlb@defaultvalue.org>
+Bug-Debian: http://bugs.debian.org/629567
+Applied-Upstream: http://lists.gnu.org/archive/html/emacs-diffs/2010-04/msg00325.html
+---
+ src/s/gnu-linux.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/s/gnu-linux.h b/src/s/gnu-linux.h
+index cedd75d..4a1bb70 100644
+--- a/src/s/gnu-linux.h
++++ b/src/s/gnu-linux.h
+@@ -192,7 +192,7 @@ Boston, MA 02110-1301, USA.  */
+ /* GNU/Linux usually has crt0.o in a non-standard place */
+ #define START_FILES pre-crt0.o /usr/lib/crt0.o
+ #else
+-#define START_FILES pre-crt0.o /usr/lib/crt1.o /usr/lib/crti.o
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
+ #endif
+ 
+ #ifdef __ELF__
+@@ -244,7 +244,7 @@ Boston, MA 02110-1301, USA.  */
+ #else
+ #undef LIB_GCC
+ #define LIB_GCC
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtn.o
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
+ #endif
+ 
+ /* Don't use -g in test compiles in configure.

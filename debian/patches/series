@@ -18,3 +18,6 @@ add-unix-to-cpp-undefs.diff
 0018-Prefer-libgif-over-libungif.patch
 0019-LIBGIF-Default-to-lgif.patch
 0020-Use-CRT_DIR-rather-than-HAVE_X86_64_LIB64_DIR.patch
+0021-Add-i386-to-cpp_undefs-in-configure.in-to-fix-i386-m.patch
+0022-Look-for-crt1.o-in-the-correct-multiarch-location.patch
+0023-Add-a-printf-attribute-to-movemail.c-to-allow-harden.patch
