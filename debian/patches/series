@@ -11,3 +11,10 @@ fix-mule-select-safe-coding.diff
 look-for-news-to-find-etc.diff
 fix-flymake-xmlstarlet-invocation.diff
 add-unix-to-cpp-undefs.diff
+0014-miscdic-convert-Force-writing-the-file-by-iso-2022-7.patch
+0015-Prefer-build_alias-over-host-when-host_alias-is-not-.patch
+0016-HAVE_GIF-If-lungif-fails-try-lgif.patch
+0017-HAVE_GIF-Doc-fix.patch
+0018-Prefer-libgif-over-libungif.patch
+0019-LIBGIF-Default-to-lgif.patch
+0020-Use-CRT_DIR-rather-than-HAVE_X86_64_LIB64_DIR.patch

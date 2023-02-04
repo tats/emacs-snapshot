@@ -1,0 +1,21 @@
+From: Glenn Morris <rgm@gnu.org>
+Date: Wed, 20 Jun 2007 07:51:59 +0000
+Subject: (LIBGIF): Default to -lgif.
+
+---
+ src/Makefile.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Makefile.in b/src/Makefile.in
+index edbcb44..470bd71 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -441,7 +441,7 @@ XFT_LIBS=@XFT_LIBS@
+ 
+ #if HAVE_GIF
+ #ifndef LIBGIF
+-#define LIBGIF -lungif
++#define LIBGIF -lgif
+ #endif /* not defined LIBGIF */
+ #else /* not HAVE_GIF */
+ #define LIBGIF

@@ -1,0 +1,21 @@
+From: Andreas Schwab <schwab@suse.de>
+Date: Tue, 22 May 2007 15:54:32 +0000
+Subject: Prefer build_alias over host when host_alias is not set.
+
+---
+ configure.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.in b/configure.in
+index aef0767..6c710a4 100644
+--- a/configure.in
++++ b/configure.in
+@@ -198,7 +198,7 @@ fi
+ 
+ AC_CANONICAL_HOST
+ canonical=$host
+-configuration=${host_alias-$host}
++configuration=${host_alias-${build_alias-$host}}
+ 
+ dnl This used to use changequote, but, apart from `changequote is evil'
+ dnl per the autoconf manual, we can speed up autoconf somewhat by quoting

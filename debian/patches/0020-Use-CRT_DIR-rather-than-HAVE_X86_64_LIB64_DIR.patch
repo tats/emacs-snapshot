@@ -1,0 +1,161 @@
+From: Glenn Morris <rgm@gnu.org>
+Date: Wed, 3 Nov 2010 14:55:19 -0400
+Subject: Use $CRT_DIR rather than HAVE_X86_64_LIB64_DIR
+
+Fix for Bug#5655, backported from trunk.
+
+* configure.in (CRT_DIR): New output variable.
+(--with-crt-dir): New option.  (Bug#5655)
+(HAVE_LIB64_DIR): Remove.
+
+* src/Makefile.in (CRT_DIR): New variable, set by configure.
+* src/m/amdx86-64.h, m/ibms390x.h (START_FILES, LIB_STANDARD):
+Use $CRT_DIR rather than HAVE_LIB64_DIR.  (Bug#5655)
+---
+ configure.in      | 31 +++++++++++++++++++++++++------
+ src/Makefile.in   |  3 +++
+ src/m/amdx86-64.h | 20 ++++++--------------
+ src/m/ibms390x.h  | 12 ++----------
+ 4 files changed, 36 insertions(+), 30 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index 54f3ab7..b333e8b 100644
+--- a/configure.in
++++ b/configure.in
+@@ -1554,15 +1554,34 @@ dnl Do this early because it can frob feature test macros for Unix-98 &c.
+ AC_SYS_LARGEFILE
+ 
+ 
+-### The standard library on x86-64 GNU/Linux distributions can 
+-### be located in either /usr/lib64 or /usr/lib.
++CRT_DIR=
++AC_ARG_WITH([crt-dir],dnl
++[AS_HELP_STRING([--with-crt-dir=DIR],[directory containing crtn.o etc.
++This option is only used on x86-64 and s390x GNU/Linux architectures.])])
++CRT_DIR="${with_crt_dir}"
++
++## Note: at present CRT_DIR is only used for amdx86-64 and ibms390x.
++## Other machine types hard-code the location in src/[ms]/*.h.
+ case "${canonical}" in
+   x86_64-*-linux-gnu* | s390x-*-linux-gnu* )
+-    if test -d /usr/lib64; then
+-      AC_DEFINE(HAVE_X86_64_LIB64_DIR, 1,
+-        [Define to 1 if the file /usr/lib64 exists.])
+-fi
++   ## On x86-64 and s390x GNU/Linux distributions, the standard library
++   ## can be in a variety of places.  We only try /usr/lib64 and /usr/lib.
++   ## For anything else (eg /usr/lib32), it is up the user to specify
++   ## the location (bug#5655).
++   ## Test for crtn.o, not just the directory, because sometimes the
++   ## directory exists but does not have the relevant files (bug#1287).
++   ## If user specified a crt-dir, use that unconditionally.
++   if test "X$CRT_DIR" = "X"; then
++     CRT_DIR=/usr/lib
++     test -e /usr/lib64/crtn.o && CRT_DIR=/usr/lib64
++   fi
++
++   test -e $CRT_DIR/crtn.o || test -e $CRT_DIR/crt0.o || \
++     AC_MSG_ERROR([crt*.o not found.  Use --with-crt-dir to specify the location.])
++   ;;
+ esac
++test "X$CRT_DIR" = "X" && CRT_DIR=/usr/lib
++AC_SUBST(CRT_DIR)
+ 
+ dnl This function defintion taken from Gnome 2.0
+ dnl PKG_CHECK_MODULES(GSTUFF, gtk+-2.0 >= 1.3 glib = 1.3.4, action-if, action-not)
+diff --git a/src/Makefile.in b/src/Makefile.in
+index 470bd71..bfce7e8 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -63,6 +63,9 @@ M_FILE = ${srcdir}/@machfile@
+ S_FILE = ${srcdir}/@opsysfile@
+ config_h = config.h $(M_FILE) $(S_FILE)
+ 
++## Only used by amdx86-64 and ibms390x GNU/Linux.
++CRT_DIR=@CRT_DIR@
++
+ # ========================== start of cpp stuff =======================
+ /* From here on, comments must be done in C syntax.  */
+ 
+diff --git a/src/m/amdx86-64.h b/src/m/amdx86-64.h
+index 22e2595..02ef05e 100644
+--- a/src/m/amdx86-64.h
++++ b/src/m/amdx86-64.h
+@@ -109,7 +109,7 @@ Boston, MA 02110-1301, USA.  */
+    a native binary of Emacs on FreeBSD/amd64 we can just point to /usr/lib.  */
+ 
+ #undef START_FILES
+-#define START_FILES pre-crt0.o /usr/lib/crt1.o /usr/lib/crti.o
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
+ 
+ /* The duplicate -lgcc is intentional in the definition of LIB_STANDARD.
+    The reason is that some functions in libgcc.a call functions from libc.a,
+@@ -117,14 +117,14 @@ Boston, MA 02110-1301, USA.  */
+    versions of ld are one-pass linkers, we need to mention -lgcc twice,
+    or else we risk getting unresolved externals.  */
+ #undef LIB_STANDARD
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtn.o
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
+ 
+ #elif defined(__OpenBSD__)
+ 
+ #undef START_FILES
+-#define START_FILES pre-crt0.o /usr/lib/crt0.o /usr/lib/crtbegin.o
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt0.o $(CRT_DIR)/crtbegin.o
+ #undef LIB_STANDARD
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtend.o
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtend.o
+ 
+ #elif defined(__NetBSD__)
+ 
+@@ -138,11 +138,7 @@ Boston, MA 02110-1301, USA.  */
+ #else /* !__OpenBSD__ && !__FreeBSD__ && !__NetBSD__ && !sun */
+ 
+ #undef START_FILES
+-#ifdef HAVE_X86_64_LIB64_DIR
+-#define START_FILES pre-crt0.o /usr/lib64/crt1.o /usr/lib64/crti.o
+-#else
+-#define START_FILES pre-crt0.o /usr/lib/crt1.o /usr/lib/crti.o
+-#endif
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
+ 
+ /* The duplicate -lgcc is intentional in the definition of LIB_STANDARD.
+    The reason is that some functions in libgcc.a call functions from libc.a,
+@@ -150,11 +146,7 @@ Boston, MA 02110-1301, USA.  */
+    versions of ld are one-pass linkers, we need to mention -lgcc twice,
+    or else we risk getting unresolved externals.  */
+ #undef LIB_STANDARD
+-#ifdef HAVE_X86_64_LIB64_DIR
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib64/crtn.o
+-#else
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtn.o
+-#endif
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
+ 
+ #endif /* __FreeBSD__ */
+ 
+diff --git a/src/m/ibms390x.h b/src/m/ibms390x.h
+index 290b17a..ca2fc3e 100644
+--- a/src/m/ibms390x.h
++++ b/src/m/ibms390x.h
+@@ -161,18 +161,10 @@ NOTE-END */
+ #define XPNTR(a) XUINT (a)
+ 
+ #undef START_FILES
+-#ifdef HAVE_X86_64_LIB64_DIR
+-#define START_FILES pre-crt0.o /usr/lib64/crt1.o /usr/lib64/crti.o
+-#else
+-#define START_FILES pre-crt0.o /usr/lib/crt1.o /usr/lib/crti.o
+-#endif
++#define START_FILES pre-crt0.o $(CRT_DIR)/crt1.o $(CRT_DIR)/crti.o
+ 
+ #undef LIB_STANDARD
+-#ifdef HAVE_X86_64_LIB64_DIR
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib64/crtn.o
+-#else
+-#define LIB_STANDARD -lgcc -lc -lgcc /usr/lib/crtn.o
+-#endif
++#define LIB_STANDARD -lgcc -lc -lgcc $(CRT_DIR)/crtn.o
+ 
+ /* arch-tag: 4b87653c-6add-4663-8691-7d9dc17b5519
+    (do not change this comment) */
