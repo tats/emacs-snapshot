@@ -33,3 +33,4 @@ add-unix-to-cpp-undefs.diff
 0033-Fix-segmentation-fault-in-emacs-during-compile-phase.patch
 0034-Fix-compilation-with-glibc-2.28.patch
 0035-Declare-__dso_handle-variable.patch
+0036-Rename-CHAR_WIDTH-to-CHARACTER_WIDTH.patch

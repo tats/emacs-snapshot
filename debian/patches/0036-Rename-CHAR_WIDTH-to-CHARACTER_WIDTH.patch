@@ -1,0 +1,48 @@
+From: Tatsuya Kinoshita <tats@debian.org>
+Date: Sun, 22 Jan 2023 23:36:13 +0900
+Subject: Rename CHAR_WIDTH to CHARACTER_WIDTH
+
+---
+ src/composite.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/composite.c b/src/composite.c
+index 12830b4..bfeba4d 100644
+--- a/src/composite.c
++++ b/src/composite.c
+@@ -157,7 +157,7 @@ Lisp_Object composition_temp;
+ /* Return how many columns C will occupy on the screen.  It always
+    returns 1 for control characters and 8-bit characters because those
+    are just ignored in a composition.  */
+-#define CHAR_WIDTH(c) \
++#define CHARACTER_WIDTH(c) \
+   (SINGLE_BYTE_CHAR_P (c) ? 1 : CHARSET_WIDTH (CHAR_CHARSET (c)))
+ 
+ /* Return COMPOSITION-ID of a composition at buffer position
+@@ -324,7 +324,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+ 	{
+ 	  int this_width;
+ 	  ch = XINT (key_contents[i]);
+-	  this_width = CHAR_WIDTH (ch);
++	  this_width = CHARACTER_WIDTH (ch);
+ 	  if (cmp->width < this_width)
+ 	    cmp->width = this_width;
+ 	}
+@@ -335,7 +335,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+       float leftmost = 0.0, rightmost;
+ 
+       ch = XINT (key_contents[0]);
+-      rightmost = CHAR_WIDTH (ch);
++      rightmost = CHARACTER_WIDTH (ch);
+ 
+       for (i = 1; i < glyph_len; i += 2)
+ 	{
+@@ -345,7 +345,7 @@ get_composition_id (charpos, bytepos, nchars, prop, string)
+ 
+ 	  rule = XINT (key_contents[i]);
+ 	  ch = XINT (key_contents[i + 1]);
+-	  this_width = CHAR_WIDTH (ch);
++	  this_width = CHARACTER_WIDTH (ch);
+ 
+ 	  /* A composition rule is specified by an integer value
+ 	     that encodes global and new reference points (GREF and
