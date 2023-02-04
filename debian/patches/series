@@ -34,3 +34,4 @@ add-unix-to-cpp-undefs.diff
 0034-Fix-compilation-with-glibc-2.28.patch
 0035-Declare-__dso_handle-variable.patch
 0036-Rename-CHAR_WIDTH-to-CHARACTER_WIDTH.patch
+0037-Avoid-loading-.elc-under-usr-share-emacs-site-lisp.patch
