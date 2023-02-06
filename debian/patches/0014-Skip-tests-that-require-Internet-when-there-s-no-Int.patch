@@ -60,7 +60,7 @@ index a0df0a26672..699c2da97cf 100644
  (ert-deftest make-local-unix-server ()
    (skip-unless (featurep 'make-network-process '(:family local)))
    (let* ((file (make-temp-name "/tmp/server-test"))
-@@ -280,6 +295,7 @@ make-tls-server
+@@ -280,6 +295,7 @@ connect-to-tls-ipv4-wait
  (ert-deftest connect-to-tls-ipv4-nowait ()
    (skip-unless (executable-find "gnutls-serv"))
    (skip-unless (gnutls-available-p))
@@ -68,7 +68,7 @@ index a0df0a26672..699c2da97cf 100644
    (let ((server (make-tls-server 44331))
          (times 0)
          (network-security-level 'low)
-@@ -322,6 +338,7 @@ make-tls-server
+@@ -322,6 +338,7 @@ connect-to-tls-ipv4-nowait
  (ert-deftest connect-to-tls-ipv6-nowait ()
    (skip-unless (executable-find "gnutls-serv"))
    (skip-unless (gnutls-available-p))
@@ -76,7 +76,7 @@ index a0df0a26672..699c2da97cf 100644
    (skip-unless (not (eq system-type 'windows-nt)))
    (skip-unless (featurep 'make-network-process '(:family ipv6)))
    (let ((server (make-tls-server 44333))
-@@ -406,6 +423,7 @@ make-tls-server
+@@ -406,6 +423,7 @@ open-network-stream-tls-wait
  (ert-deftest open-network-stream-tls-nowait ()
    (skip-unless (executable-find "gnutls-serv"))
    (skip-unless (gnutls-available-p))
@@ -84,7 +84,7 @@ index a0df0a26672..699c2da97cf 100644
    (let ((server (make-tls-server 44335))
          (times 0)
          (network-security-level 'low)
-@@ -634,6 +652,7 @@ make-tls-server
+@@ -634,6 +652,7 @@ open-gnutls-stream-old-api-wait
  (ert-deftest open-gnutls-stream-new-api-nowait ()
    (skip-unless (executable-find "gnutls-serv"))
    (skip-unless (gnutls-available-p))
@@ -92,7 +92,7 @@ index a0df0a26672..699c2da97cf 100644
    (let ((server (make-tls-server 44668))
          (times 0)
          (network-security-level 'low)
-@@ -672,6 +691,7 @@ make-tls-server
+@@ -672,6 +691,7 @@ open-gnutls-stream-new-api-nowait
  (ert-deftest open-gnutls-stream-old-api-nowait ()
    (skip-unless (executable-find "gnutls-serv"))
    (skip-unless (gnutls-available-p))
@@ -104,7 +104,7 @@ diff --git a/test/src/process-tests.el b/test/src/process-tests.el
 index 66a76fd33b8..f54bcf05047 100644
 --- a/test/src/process-tests.el
 +++ b/test/src/process-tests.el
-@@ -329,12 +329,24 @@ process-tests--file-handler
+@@ -329,12 +329,24 @@ make-process/stop
                                                    invocation-directory))
                   :stop t)))
  
@@ -132,7 +132,7 @@ index 66a76fd33b8..f54bcf05047 100644
    (should-error (network-lookup-address-info "google.com" 'both))
    (should (network-lookup-address-info "google.com" 'ipv4))
    (when (featurep 'make-network-process '(:family ipv6))
-@@ -342,18 +354,18 @@ process-tests--file-handler
+@@ -342,18 +354,18 @@ lookup-family-specification
  
  (ert-deftest lookup-unicode-domains ()
    "Unicode domains should fail"
@@ -154,7 +154,7 @@ index 66a76fd33b8..f54bcf05047 100644
    (let ((addresses-both (network-lookup-address-info "google.com"))
          (addresses-v4 (network-lookup-address-info "google.com" 'ipv4)))
      (should addresses-both)
-@@ -362,7 +374,7 @@ process-tests--file-handler
+@@ -362,7 +374,7 @@ lookup-google
      (should (network-lookup-address-info "google.com" 'ipv6))))
  
  (ert-deftest non-existent-lookup-failure ()

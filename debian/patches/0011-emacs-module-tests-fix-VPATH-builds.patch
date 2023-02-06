@@ -18,7 +18,7 @@ diff --git a/test/Makefile.in b/test/Makefile.in
 index f03c194a7cb..6c433f1d682 100644
 --- a/test/Makefile.in
 +++ b/test/Makefile.in
-@@ -260,7 +260,7 @@ GMP_OBJ = $(if @GMP_OBJ@, ../src/@GMP_OBJ@)
+@@ -260,7 +260,7 @@ GMP_OBJ =
  
  # Note: emacs-module.h is generated from emacs-module.h.in, hence we
  # look in ../src, not $(srcdir)/../src.
@@ -31,7 +31,7 @@ diff --git a/test/src/emacs-module-tests.el b/test/src/emacs-module-tests.el
 index 91206156f85..1b512aff566 100644
 --- a/test/src/emacs-module-tests.el
 +++ b/test/src/emacs-module-tests.el
-@@ -318,14 +318,15 @@ module--test-assertion
+@@ -318,14 +318,15 @@ module/describe-function-1
    (with-temp-buffer
      (let ((standard-output (current-buffer)))
        (describe-function-1 #'mod-test-sum)

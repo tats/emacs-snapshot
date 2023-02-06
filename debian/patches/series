@@ -12,3 +12,4 @@
 0012-Strip-parent-path-from-package-descriptions-for-repr.patch
 0013-Recover-the-contents-of-the-schemas.xml-file.patch
 0014-Skip-tests-that-require-Internet-when-there-s-no-Int.patch
+0015-Fixed-ctags-local-command-execute-vulnerability.patch
