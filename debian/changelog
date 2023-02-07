@@ -1,3 +1,10 @@
+emacs-snapshot (2:20230207+emacs-28.2-163940-ga98d0daac47-1) unstable; urgency=medium
+
+  * New snapshot
+  * building with tree-sitter support
+
+ -- Dima Kogan <dima@secretsauce.net>  Tue, 07 Feb 2023 11:17:38 -0800
+
 emacs-snapshot (2:20230131+emacs-28.2-163888-ga73b046c7d5-1) unstable; urgency=medium
 
   * New snapshot
