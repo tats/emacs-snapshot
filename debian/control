@@ -25,8 +25,8 @@ Depends: emacs29-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Dep
 Provides: emacs29, emacsen, editor, info-browser, mail-reader, news-reader
 Suggests: emacs29-common-non-dfsg
 Conflicts: emacs29-no-native-comp-lucid,
-  emacs29, emacs29-nox, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
-Replaces: emacs29, emacs29-nox
+  emacs29, emacs29-pgtk, emacs29-nox, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Replaces: emacs29, emacs29-pgtk, emacs29-nox
 Description: GNU Emacs editor (with Lucid GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs with support for a graphical user
@@ -38,14 +38,29 @@ Description: GNU Emacs editor (with Lucid GUI support)
  https://bugzilla.gnome.org/show_bug.cgi?id=85715 for more
  information.
 
+Package: emacs29-pgtk
+Architecture: any
+Depends: emacs29-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Provides: emacs29, emacsen, editor, info-browser, mail-reader, news-reader
+Suggests: emacs29-common-non-dfsg
+Conflicts: emacs29-no-native-comp-pgtk,
+  emacs29, emacs29-lucid, emacs29-nox, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Replaces: emacs29, emacs29-lucid, emacs29-nox
+Description: GNU Emacs editor (with pure GTK GUI support)
+ GNU Emacs is the extensible self-documenting text editor.  This
+ package contains a version of Emacs with support for a graphical user
+ interface based on pure GTK.  We recommend that you use this only if
+ you are running a window system other than X that's supported by GDK,
+ such as Wayland and Broadway.
+
 Package: emacs29-nox
 Architecture: any
 Depends: emacs29-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: emacs29, editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs29-common-non-dfsg
 Conflicts: emacs29-no-native-comp-nox,
-  emacs29, emacs29-lucid, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
-Replaces: emacs29, emacs29-lucid
+  emacs29, emacs29-lucid, emacs29-pgtk, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Replaces: emacs29, emacs29-lucid, emacs29-pgtk
 Description: GNU Emacs editor (without GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs compiled without support for X,
@@ -57,8 +72,8 @@ Depends: emacs29-bin-common (= ${binary:Version}), ${shlibs:Depends}, ${misc:Dep
 Provides: editor, emacsen, info-browser, mail-reader, news-reader
 Suggests: emacs29-common-non-dfsg
 Conflicts: emacs29-no-native-comp,
-  emacs29-lucid, emacs29-nox, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
-Replaces: emacs29-lucid, emacs29-nox
+  emacs29-lucid, emacs29-pgtk, emacs29-nox, emacs29-common (<< 2:20150222+emacs-pretest-24.0.05-15849-g3f006e1-1)
+Replaces: emacs29-lucid, emacs29-pgtk, emacs29-nox
 Description: GNU Emacs editor (with GTK+ GUI support)
  GNU Emacs is the extensible self-documenting text editor.  This
  package contains a version of Emacs with a graphical user interface
@@ -72,7 +87,7 @@ Depends: emacs29-common (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends
 Description: GNU Emacs editor's shared, architecture dependent files
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture dependent infrastructure
- that's shared by emacs29, emacs29-lucid, and emacs29-nox.
+ that's shared by emacs29, emacs29-lucid, emacs29-pgtk, and emacs29-nox.
 
 # This depends on the emacs-el package. It is needed only for the native-comp
 # packages so tha they have something to compile. I leave the Depends even for
@@ -87,7 +102,7 @@ Conflicts: emacs29-no-native-comp-common,
 Description: GNU Emacs editor's shared, architecture independent infrastructure
  GNU Emacs is the extensible self-documenting text editor.
  This package contains the architecture independent infrastructure
- that's shared by emacs29, emacs29-lucid, and emacs29-nox.
+ that's shared by emacs29, emacs29-lucid, emacs29-pgtk, and emacs29-nox.
 
 Package: emacs29-el
 Conflicts: emacs29-no-native-comp-el
