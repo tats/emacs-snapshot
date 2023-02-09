@@ -1,3 +1,13 @@
+emacs29 (3:29.0.60+0.20221128-0.2) UNRELEASED; urgency=medium
+
+  [ Matan Peled ]
+  * Build with tree-sitter
+
+  [ Tatsuya Kinoshita ]
+  * Add -pgtk package
+
+ -- Tatsuya Kinoshita <tats@debian.org>  Thu, 09 Feb 2023 22:14:13 +0900
+
 emacs29 (3:29.0.60+0.20221128-0.1) UNRELEASED; urgency=medium
 
   * New upstream version 29.0.60+0.20221128
