@@ -641,10 +641,11 @@ This regexp must match both `tramp-initial-end-of-output' and
   :type 'regexp)
 
 (defcustom tramp-password-prompt-regexp
-  (rx
-   bol (* nonl)
-   (group (regexp (regexp-opt password-word-equivalents)))
-   (* nonl) (any ":：៖") (? "\^@") (* blank))
+  (rx-to-string
+   `(: bol (* nonl)
+       (group (| . ,password-word-equivalents))
+       (* nonl) (any . ,tramp-compat-password-colon-equivalents)
+       (? "\^@") (* blank)))
   "Regexp matching password-like prompts.
 The regexp should match at end of buffer.
 
@@ -1211,9 +1212,12 @@ The `ftp' syntax does not support methods.")
      (? (regexp tramp-completion-method-regexp)
 	;; Method separator, user name and host name.
 	(? (regexp tramp-postfix-method-regexp)
-	   ;; This is a little bit lax, but it serves.
-	   (? (regexp tramp-host-regexp))))
-
+	   (? (regexp tramp-user-regexp)
+	      (regexp tramp-postfix-user-regexp))
+	   (? (| (regexp tramp-host-regexp) ;; This includes a user.
+                 (: (regexp tramp-prefix-ipv6-regexp)
+		    (? (regexp tramp-ipv6-regexp)
+		       (? (regexp tramp-postfix-ipv6-regexp))))))))
      eos)))
 
 (defvar tramp-completion-file-name-regexp
@@ -2948,9 +2952,24 @@ not in completion mode."
 
 (defun tramp-completion-handle-expand-file-name (filename &optional directory)
   "Like `expand-file-name' for partial Tramp files."
-  (if (file-name-absolute-p filename)
-      filename
-    (concat (or directory default-directory "/") filename)))
+  ;; We need special handling only when a method is needed.  Then we
+  ;; check, whether DIRECTORY is "/method:" or "/[method/".
+  (let ((dir (or directory default-directory "/")))
+    (cond
+     ((file-name-absolute-p filename) filename)
+     ((and (eq tramp-syntax 'simplified)
+           (string-match-p (rx (regexp tramp-postfix-host-regexp) eos) dir))
+      (concat dir filename))
+     ((string-match-p
+       (rx bos (regexp tramp-prefix-regexp)
+	   (* (regexp tramp-remote-file-name-spec-regexp)
+	      (regexp tramp-postfix-hop-regexp))
+	   (? (regexp tramp-method-regexp) (regexp tramp-postfix-method-regexp)
+	      (? (regexp tramp-user-regexp) (regexp tramp-postfix-user-regexp)))
+	   eos)
+       dir)
+      (concat dir filename))
+     (t (tramp-run-real-handler #'expand-file-name (list filename directory))))))
 
 (defun tramp-completion-handle-file-exists-p (filename)
   "Like `file-exists-p' for partial Tramp files."
@@ -2968,6 +2987,8 @@ not in completion mode."
                   (string-match
 	           (rx
 	            (regexp tramp-prefix-regexp)
+		    (* (regexp tramp-remote-file-name-spec-regexp)
+		       (regexp tramp-postfix-hop-regexp))
 	            (group (regexp tramp-method-regexp))
 	            (? (regexp tramp-postfix-method-regexp))
                     eos)
@@ -2977,6 +2998,8 @@ not in completion mode."
             ((string-match
 	      (rx
                (regexp tramp-prefix-regexp)
+	       (* (regexp tramp-remote-file-name-spec-regexp)
+		  (regexp tramp-postfix-hop-regexp))
                (group (regexp tramp-remote-file-name-spec-regexp))
                eos)
               filename)
@@ -3233,20 +3256,31 @@ PARTIAL-USER must match USER, PARTIAL-HOST must match HOST."
   ;; method.  In the `separate' file name syntax, we return "/[" when
   ;; `filename' is "/[string" w/o a trailing method separator "/".
   (cond
-   ((and (not (string-empty-p tramp-method-regexp))
-         (string-match
+   ((string-match
+     (rx (group (regexp tramp-prefix-regexp)
+		(* (regexp tramp-remote-file-name-spec-regexp)
+		   (regexp tramp-postfix-hop-regexp)))
+         (? (regexp tramp-completion-method-regexp)) eos)
+     filename)
+    (match-string 1 filename))
+   ((and (string-match
           (rx (group
 	       (regexp tramp-prefix-regexp)
+	       (* (regexp tramp-remote-file-name-spec-regexp)
+		  (regexp tramp-postfix-hop-regexp))
                (group (regexp tramp-method-regexp))
-	       (regexp tramp-postfix-method-regexp)))
+	       (regexp tramp-postfix-method-regexp)
+	       (? (regexp tramp-user-regexp)
+	          (regexp tramp-postfix-user-regexp)))
+	      (? (| (regexp tramp-host-regexp)
+                    (: (regexp tramp-prefix-ipv6-regexp)
+		       (? (regexp tramp-ipv6-regexp)
+			  (? (regexp tramp-postfix-ipv6-regexp))))))
+	      eos)
           filename)
          ;; Is it a valid method?
-         (assoc (match-string 2 filename) tramp-methods))
-    (match-string 1 filename))
-   ((string-match
-     (rx (group (regexp tramp-prefix-regexp))
-         (regexp tramp-completion-method-regexp) eos)
-     filename)
+	 (or (tramp-string-empty-or-nil-p (match-string 2 filename))
+             (assoc (match-string 2 filename) tramp-methods)))
     (match-string 1 filename))
    (t (tramp-run-real-handler #'file-name-directory (list filename)))))
 
@@ -4493,8 +4527,7 @@ Return it as number of seconds.  Used in `tramp-process-attributes-ps-format'."
 (defconst tramp-process-attributes-ps-args
   `("-eww"
     "-o"
-    ,(mapconcat
-     #'identity
+    ,(string-join
      '("pid"
        "euid"
        "euser"
@@ -4968,7 +5001,7 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 		(if (consp (tramp-get-method-parameter v 'tramp-direct-async))
 		    (append
 		     (tramp-get-method-parameter v 'tramp-direct-async)
-                     `(,(mapconcat #'identity command " ")))
+                     `(,(string-join command " ")))
 		  command)))
 
 	  ;; Check for `tramp-sh-file-name-handler', because something
@@ -5864,8 +5897,7 @@ the remote host use line-endings as defined in the variable
       (let ((inhibit-read-only t)) (delete-region (point-min) (point-max)))
       ;; Replace "\n" by `tramp-rsh-end-of-line'.
       (setq string
-	    (mapconcat
-	     #'identity (split-string string "\n") tramp-rsh-end-of-line))
+	    (string-join (split-string string "\n") tramp-rsh-end-of-line))
       (unless (or (string-empty-p string)
 		  (string-equal (substring string -1) tramp-rsh-end-of-line))
 	(setq string (concat string tramp-rsh-end-of-line)))
@@ -6563,7 +6595,7 @@ verbosity of 6."
 	      (apply #'process-lines program args)
 	    (error
 	     (tramp-error vec (car err) (cdr err)))))
-    (tramp-message vec 6 "\n%s" (mapconcat #'identity result "\n"))
+    (tramp-message vec 6 "\n%s" (string-join result "\n"))
     result))
 
 (defun tramp-process-running-p (process-name)

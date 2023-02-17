@@ -221,7 +221,8 @@ chosen (interactively or automatically)."
                                               "--client-id" "emacs.eglot-dart"))
                                 (elixir-mode . ("language_server.sh"))
                                 (ada-mode . ("ada_language_server"))
-                                (scala-mode . ("metals-emacs"))
+                                (scala-mode . ,(eglot-alternatives
+                                                '("metals" "metals-emacs")))
                                 (racket-mode . ("racket" "-l" "racket-langserver"))
                                 ((tex-mode context-mode texinfo-mode bibtex-mode)
                                  . ,(eglot-alternatives '("digestif" "texlab")))
@@ -2495,13 +2496,14 @@ When called interactively, use the currently active server"
 (defun eglot--signal-textDocument/didSave ()
   "Send textDocument/didSave to server."
   (eglot--signal-textDocument/didChange)
-  (jsonrpc-notify
-   (eglot--current-server-or-lose)
-   :textDocument/didSave
-   (list
-    ;; TODO: Handle TextDocumentSaveRegistrationOptions to control this.
-    :text (buffer-substring-no-properties (point-min) (point-max))
-    :textDocument (eglot--TextDocumentIdentifier))))
+  (when (eglot--server-capable :textDocumentSync :save)
+    (jsonrpc-notify
+     (eglot--current-server-or-lose)
+     :textDocument/didSave
+     (list
+      ;; TODO: Handle TextDocumentSaveRegistrationOptions to control this.
+      :text (buffer-substring-no-properties (point-min) (point-max))
+      :textDocument (eglot--TextDocumentIdentifier)))))
 
 (defun eglot-flymake-backend (report-fn &rest _more)
   "A Flymake backend for Eglot.
@@ -2873,7 +2875,10 @@ for which LSP on-type-formatting should be requested."
          (when-let* ((lsp-item (get-text-property 0 'eglot--lsp-item proxy))
                      (kind (alist-get (plist-get lsp-item :kind)
                                       eglot--kind-names)))
-           (intern (downcase kind))))
+           (pcase kind
+             ("EnumMember" 'enum-member)
+             ("TypeParameter" 'type-parameter)
+             (_ (intern (downcase kind))))))
        :company-deprecated
        (lambda (proxy)
          (when-let ((lsp-item (get-text-property 0 'eglot--lsp-item proxy)))

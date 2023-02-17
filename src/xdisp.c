@@ -3536,11 +3536,11 @@ get_closer_narrowed_begv (struct window *w, ptrdiff_t pos)
 ptrdiff_t
 get_locked_narrowing_begv (ptrdiff_t pos)
 {
-  if (long_line_locked_narrowing_region_size <= 0)
+  if (long_line_optimizations_region_size <= 0)
     return BEGV;
-  int len = long_line_locked_narrowing_region_size / 2;
+  int len = long_line_optimizations_region_size / 2;
   int begv = max (pos - len, BEGV);
-  int limit = long_line_locked_narrowing_bol_search_limit;
+  int limit = long_line_optimizations_bol_search_limit;
   while (limit > 0)
     {
       if (begv == BEGV || FETCH_BYTE (CHAR_TO_BYTE (begv) - 1) == '\n')
@@ -3554,9 +3554,9 @@ get_locked_narrowing_begv (ptrdiff_t pos)
 ptrdiff_t
 get_locked_narrowing_zv (ptrdiff_t pos)
 {
-  if (long_line_locked_narrowing_region_size <= 0)
+  if (long_line_optimizations_region_size <= 0)
     return ZV;
-  int len = long_line_locked_narrowing_region_size / 2;
+  int len = long_line_optimizations_region_size / 2;
   return min (pos + len, ZV);
 }
 
@@ -4394,7 +4394,7 @@ handle_fontified_prop (struct it *it)
       eassert (it->end_charpos == ZV);
 
       if (current_buffer->long_line_optimizations_p
-	  && long_line_locked_narrowing_region_size > 0)
+	  && long_line_optimizations_region_size > 0)
 	{
 	  ptrdiff_t begv = it->locked_narrowing_begv;
 	  ptrdiff_t zv = it->locked_narrowing_zv;
@@ -4406,7 +4406,7 @@ handle_fontified_prop (struct it *it)
 	    }
 	  if (begv != BEG || zv != Z)
 	    narrow_to_region_locked (make_fixnum (begv), make_fixnum (zv),
-				     Qfontification_functions);
+				     Qlong_line_optimizations_in_fontification_functions);
 	}
 
       /* Don't allow Lisp that runs from 'fontification-functions'
@@ -29364,6 +29364,7 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
 			   int start, int end, int overlaps)
 {
   struct glyph *glyph, *last;
+  int voffset;
   Lisp_Object lgstring;
   int i;
   bool glyph_not_available_p;
@@ -29371,6 +29372,7 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
   s->for_overlaps = overlaps;
   glyph = s->row->glyphs[s->area] + start;
   last = s->row->glyphs[s->area] + end;
+  voffset = glyph->voffset;
   glyph_not_available_p = glyph->glyph_not_available_p;
   s->cmp_id = glyph->u.cmp.id;
   s->cmp_from = glyph->slice.cmp.from;
@@ -29420,6 +29422,9 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
      characters of the glyph string.  */
   if (glyph_not_available_p)
     s->font_not_found_p = true;
+
+  /* Adjust base line for subscript/superscript text.  */
+  s->ybase += voffset;
 
   return glyph - s->row->glyphs[s->area];
 }
@@ -36308,6 +36313,8 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+  DEFSYM (Qlong_line_optimizations_in_fontification_functions,
+	  "long-line-optimizations-in-fontification-functions");
 
   /* Name of the symbol which disables Lisp evaluation in 'display'
      properties.  This is used by enriched.el.  */
@@ -36817,12 +36824,11 @@ Each function is called with one argument POS.  Functions must
 fontify a region starting at POS in the current buffer, and give
 fontified regions the property `fontified' with a non-nil value.
 
-Note that, when the buffer contains one or more lines whose length is
-above `long-line-threshold', these functions are called with the
-buffer narrowed to a small portion around POS (whose size is specified
-by `long-line-locked-narrowing-region-size'), and the narrowing is
-locked (see `narrowing-lock'), so that these functions cannot use
-`widen' to gain access to other portions of buffer text.  */);
+Note that, when `long-line-optimizations-p' is non-nil in the buffer,
+these functions are called as if they were in a `with-restriction' form,
+with a `long-line-optimizations-in-fontification-functions' label and
+with the buffer narrowed to a portion around POS whose size is
+specified by `long-line-optimizations-region-size'.  */);
   Vfontification_functions = Qnil;
   Fmake_variable_buffer_local (Qfontification_functions);
 
