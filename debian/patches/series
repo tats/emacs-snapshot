@@ -17,3 +17,6 @@
 0017-Add-inhibit-native-compilation.patch
 0018-Rename-to-inhibit-automatic-native-compilation.patch
 0019-Fix-copyright-tests-for-2023-onwards.patch
+0020-Fix-htmlfontify.el-command-injection-vulnerability-C.patch
+0021-Fix-ruby-mode.el-command-injection-vulnerability-CVE.patch
+0022-Fix-etags-local-command-injection-vulnerability-CVE-.patch
