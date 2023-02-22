@@ -1,3 +1,11 @@
+emacs (1:28.2+1-11~1.gbpdf510d) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @df510da80649e797176e722a2bbb94cacbdf511e **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Wed, 22 Feb 2023 10:44:02 -0700
+
 emacs (1:28.2+1-10) unstable; urgency=medium
 
   * Fix copyright tests for 2023 onwards.  Thanks to Mattias Engdegård for
