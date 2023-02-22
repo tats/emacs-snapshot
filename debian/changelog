@@ -1,10 +1,9 @@
-emacs (1:28.2+1-11~1.gbpdf510d) UNRELEASED; urgency=medium
+emacs (1:28.2+1-11) unstable; urgency=high
 
-  ** SNAPSHOT build @df510da80649e797176e722a2bbb94cacbdf511e **
+  * Cherry-pick upstream fixes for command injection vulnerabilities
+    (CVE-2022-48337, CVE-2022-48338, CVE-2022-48339) (Closes: #1031730).
 
-  * UNRELEASED
-
- -- Sean Whitton <spwhitton@spwhitton.name>  Wed, 22 Feb 2023 10:44:02 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Wed, 22 Feb 2023 11:01:50 -0700
 
 emacs (1:28.2+1-10) unstable; urgency=medium
 
