@@ -720,6 +720,7 @@ Return nil if a grammar library for LANGUAGE is not available.  */)
     }
 }
 
+
 /*** Parsing functions */
 
 static void
@@ -770,7 +771,8 @@ treesit_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
       treesit_check_parser (lisp_parser);
       TSTree *tree = XTS_PARSER (lisp_parser)->tree;
       /* See comment (ref:visible-beg-null) if you wonder why we don't
-      update visible_beg/end when tree is NULL.  */
+	 update visible_beg/end when tree is NULL.  */
+
       if (tree != NULL)
 	{
 	  eassert (start_byte <= old_end_byte);
@@ -794,8 +796,12 @@ treesit_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 	  ptrdiff_t old_end_offset = (min (visible_end,
 					   max (visible_beg, old_end_byte))
 				      - visible_beg);
-	  ptrdiff_t new_end_offset = (min (visible_end,
-					   max (visible_beg, new_end_byte))
+	  /* We don't clip new_end_offset under visible_end, because
+	     otherwise we would miss updating the clipped part.  Plus,
+	     when inserting in narrowed region, the narrowed region
+	     will grow to accommodate the new text, so this is the
+	     correct behavior.  (Bug#61369).  */
+	  ptrdiff_t new_end_offset = (max (visible_beg, new_end_byte)
 				      - visible_beg);
 	  eassert (start_offset <= old_end_offset);
 	  eassert (start_offset <= new_end_offset);
@@ -817,11 +823,13 @@ treesit_record_change (ptrdiff_t start_byte, ptrdiff_t old_end_byte,
 	    /* Move forward.  */
 	    visi_beg_delta = (old_end_byte < visible_beg
 			      ? new_end_byte - old_end_byte : 0);
+
 	  XTS_PARSER (lisp_parser)->visible_beg = visible_beg + visi_beg_delta;
 	  XTS_PARSER (lisp_parser)->visible_end = (visible_end
 						   + visi_beg_delta
 						   + (new_end_offset
 						      - old_end_offset));
+
 	  eassert (XTS_PARSER (lisp_parser)->visible_beg >= 0);
 	  eassert (XTS_PARSER (lisp_parser)->visible_beg
 		   <= XTS_PARSER (lisp_parser)->visible_end);
@@ -1104,6 +1112,7 @@ treesit_read_buffer (void *parser, uint32_t byte_index,
   return beg;
 }
 
+
 /*** Functions for parser and node object */
 
 /* Wrap the parser in a Lisp_Object to be used in the Lisp
@@ -1265,6 +1274,9 @@ treesit_ensure_query_compiled (Lisp_Object query, Lisp_Object *signal_symbol,
   XTS_COMPILED_QUERY (query)->query = treesit_query;
   return treesit_query;
 }
+
+
+/* Lisp definitions.  */
 
 DEFUN ("treesit-parser-p",
        Ftreesit_parser_p, Streesit_parser_p, 1, 1, 0,
@@ -1484,6 +1496,7 @@ treesit_parser_live_p (Lisp_Object parser)
 	  (!NILP (Fbuffer_live_p (XTS_PARSER (parser)->buffer))));
 }
 
+
 /*** Parser API */
 
 DEFUN ("treesit-parser-root-node",
@@ -1730,6 +1743,7 @@ positions.  PARSER is the parser issuing the notification.   */)
   return Qnil;
 }
 
+
 /*** Node API  */
 
 /* Check that OBJ is a positive integer and signal an error if
@@ -2252,6 +2266,7 @@ produced by tree-sitter.  */)
   return same_node ? Qt : Qnil;
 }
 
+
 /*** Query functions */
 
 DEFUN ("treesit-pattern-expand",
@@ -2469,7 +2484,7 @@ treesit_predicate_match (Lisp_Object args, struct capture_range captures)
 {
   if (XFIXNUM (Flength (args)) != 2)
     xsignal2 (Qtreesit_query_error,
-	      build_string ("Predicate `equal' requires two "
+	      build_string ("Predicate `match' requires two "
 		            "arguments but only given"),
 	      Flength (args));
 
@@ -2826,6 +2841,7 @@ the query.  */)
   return Fnreverse (result);
 }
 
+
 /*** Navigation */
 
 static inline void
@@ -3446,7 +3462,7 @@ DEFUN ("treesit-available-p", Ftreesit_available_p,
 #endif
 }
 
-
+
 /*** Initialization */
 
 /* Initialize the tree-sitter routines.  */

@@ -77,6 +77,7 @@
 (declare-function treesit-node-child "treesit.c")
 (declare-function treesit-node-child-by-field-name "treesit.c")
 (declare-function treesit-node-type "treesit.c")
+(declare-function treesit-node-prev-sibling "treesit.c")
 
 ;;; Custom variables
 
@@ -86,6 +87,25 @@
   :type 'integer
   :safe 'integerp
   :group 'c)
+
+(defun c-ts-mode-toggle-comment-style ()
+  "Toggle the comment style between block and line comments.
+Optional numeric ARG, if supplied, switches to block comment
+style when positive, to line comment style when negative, and
+just toggles it when zero or left out."
+  (interactive)
+  (pcase-let ((`(,starter . ,ender)
+               (if (string= comment-start "// ")
+                   (cons "/* " " */")
+                 (cons "// " ""))))
+    (setq-local comment-start starter
+                comment-end ender))
+  (c-ts-mode-set-modeline))
+
+(defun c-ts-mode-set-modeline ()
+  (setq mode-name
+        (concat (if (eq major-mode 'c-ts-mode) "C" "C++") comment-start))
+  (force-mode-line-update))
 
 (defun c-ts-mode--indent-style-setter (sym val)
   "Custom setter for `c-ts-mode-set-style'.
@@ -214,11 +234,64 @@ delimiters < and >'s."
 
 ;;; Indent
 
+(defun c-ts-mode--preproc-offset (_n _p &rest _)
+  "This anchor is used for preprocessor directives.
+
+Because node is nil at the moment of indentation, we use
+`treesit-node-on' to capture the anonymous node covering the
+newline.  If the grand-parent of that node is the
+translation_unit itself, we don't indent.  Otherwise, just indent
+one step according to the great-grand-parent indent level.  The
+reason there is a difference between grand-parent and
+great-grand-parent here is that the node containing the newline
+is actually the parent of point at the moment of indentation."
+  (when-let ((node (treesit-node-on (point) (point))))
+    (if (string-equal "translation_unit"
+                      (treesit-node-type
+                       (treesit-node-parent
+                        (treesit-node-parent node))))
+        0
+      c-ts-mode-indent-offset)))
+
+(defun c-ts-mode--anchor-prev-sibling (node &rest _)
+  "Return the start of the previous named sibling of NODE.
+
+This anchor handles the special case where the previous sibling
+is a labeled_statement, in that case, return the child of the
+labeled statement instead.  (Actually, recursively go down until
+the node isn't a labeled_statement.)  Eg,
+
+label:
+  int x = 1;
+  int y = 2;
+
+The anchor of \"int y = 2;\" should be \"int x = 1;\" rather than
+the labeled_statement.
+
+Return nil if a) there is no prev-sibling, or 2) prev-sibling
+doesn't have a child."
+  (when-let ((prev-sibling (treesit-node-prev-sibling node t)))
+    (while (and prev-sibling
+                (equal "labeled_statement"
+                       (treesit-node-type prev-sibling)))
+      ;; The 0th child is the label, the 1th the colon.
+      (setq prev-sibling (treesit-node-child prev-sibling 2)))
+    ;; This could be nil if a) there is no prev-sibling or b)
+    ;; prev-sibling doesn't have a child.
+    (treesit-node-start prev-sibling)))
+
+(defun c-ts-mode--standalone-grandparent (_node parent bol &rest args)
+  "Like the standalone-parent anchor but pass it the grandparent.
+PARENT, BOL, ARGS are the same as other anchor functions."
+  (apply (alist-get 'standalone-parent treesit-simple-indent-presets)
+         parent (treesit-node-parent parent) bol args))
+
 (defun c-ts-mode--indent-styles (mode)
   "Indent rules supported by `c-ts-mode'.
 MODE is either `c' or `cpp'."
   (let ((common
          `(((parent-is "translation_unit") point-min 0)
+           ((query "(ERROR (ERROR)) @indent") point-min 0)
            ((node-is ")") parent 1)
            ((node-is "]") parent-bol 0)
            ((node-is "else") parent-bol 0)
@@ -234,23 +307,17 @@ MODE is either `c' or `cpp'."
            ((parent-is "comment") prev-adaptive-prefix 0)
 
            ;; Labels.
-           ((node-is "labeled_statement") parent-bol 0)
+           ((node-is "labeled_statement") standalone-parent 0)
            ((parent-is "labeled_statement")
-            point-min c-ts-common-statement-offset)
+            c-ts-mode--standalone-grandparent c-ts-mode-indent-offset)
 
-           ;; Bracketless statement matchers.
-           ((match nil "while_statement" "condition") parent-bol c-ts-mode-indent-offset)
-           ((match nil "if_statement" "consequence") parent-bol c-ts-mode-indent-offset)
-           ((match nil "if_statement" "alternative") parent-bol c-ts-mode-indent-offset)
-           ((match nil "do_statement" "body") parent-bol c-ts-mode-indent-offset)
-           ((match nil "for_statement" "body") parent-bol c-ts-mode-indent-offset)
-
-           ((match "preproc_ifdef" "compound_statement") point-min 0)
-           ((match "#endif" "preproc_ifdef") point-min 0)
-           ((match "preproc_if" "compound_statement") point-min 0)
-           ((match "#endif" "preproc_if") point-min 0)
-           ((match "preproc_function_def" "compound_statement") point-min 0)
+           ((node-is "preproc") point-min 0)
+           ((node-is "#endif") point-min 0)
            ((match "preproc_call" "compound_statement") point-min 0)
+
+           ((n-p-gp nil "preproc" "translation_unit") point-min 0)
+           ((n-p-gp nil "\n" "preproc") great-grand-parent c-ts-mode--preproc-offset)
+           ((parent-is "preproc") grand-parent c-ts-mode-indent-offset)
 
            ((parent-is "function_definition") parent-bol 0)
            ((parent-is "conditional_expression") first-sibling 0)
@@ -270,7 +337,7 @@ MODE is either `c' or `cpp'."
            ;; Closing bracket.  This should be before initializer_list
            ;; (and probably others) rule because that rule (and other
            ;; similar rules) will match the closing bracket.  (Bug#61398)
-           ((node-is "}") point-min c-ts-common-statement-offset)
+           ((node-is "}") standalone-parent 0)
            ,@(when (eq mode 'cpp)
                '(((node-is "access_specifier") parent-bol 0)
                  ;; Indent the body of namespace definitions.
@@ -278,24 +345,28 @@ MODE is either `c' or `cpp'."
 
 
            ;; int[5] a = { 0, 0, 0, 0 };
-           ((parent-is "initializer_list") parent-bol c-ts-mode-indent-offset)
+           ((match nil "initializer_list" nil 1 1) parent-bol c-ts-mode-indent-offset)
+           ((match nil "initializer_list" nil 2) c-ts-mode--anchor-prev-sibling 0)
            ;; Statement in enum.
-           ((parent-is "enumerator_list") point-min c-ts-common-statement-offset)
+           ((match nil "enumerator_list" nil 1 1) standalone-parent c-ts-mode-indent-offset)
+           ((match nil "enumerator_list" nil 2) c-ts-mode--anchor-prev-sibling 0)
            ;; Statement in struct and union.
-           ((parent-is "field_declaration_list") point-min c-ts-common-statement-offset)
+           ((match nil "field_declaration_list" nil 1 1) standalone-parent c-ts-mode-indent-offset)
+           ((match nil "field_declaration_list" nil 2) c-ts-mode--anchor-prev-sibling 0)
 
            ;; Statement in {} blocks.
-           ((parent-is "compound_statement") point-min c-ts-common-statement-offset)
+           ((match nil "compound_statement" nil 1 1) standalone-parent c-ts-mode-indent-offset)
+           ((match nil "compound_statement" nil 2) c-ts-mode--anchor-prev-sibling 0)
            ;; Opening bracket.
-           ((node-is "compound_statement") point-min c-ts-common-statement-offset)
+           ((node-is "compound_statement") standalone-parent c-ts-mode-indent-offset)
            ;; Bug#61291.
-           ((match "expression_statement" nil "body") point-min c-ts-common-statement-offset)
+           ((match "expression_statement" nil "body") standalone-parent c-ts-mode-indent-offset)
            ;; These rules are for cases where the body is bracketless.
            ;; Tested by the "Bracketless Simple Statement" test.
-           ((parent-is "if_statement") point-min c-ts-common-statement-offset)
-           ((parent-is "for_statement") point-min c-ts-common-statement-offset)
-           ((parent-is "while_statement") point-min c-ts-common-statement-offset)
-           ((parent-is "do_statement") point-min c-ts-common-statement-offset)
+           ((parent-is "if_statement") standalone-parent c-ts-mode-indent-offset)
+           ((parent-is "for_statement") standalone-parent c-ts-mode-indent-offset)
+           ((parent-is "while_statement") standalone-parent c-ts-mode-indent-offset)
+           ((parent-is "do_statement") standalone-parent c-ts-mode-indent-offset)
 
            ,@(when (eq mode 'cpp)
                `(((node-is "field_initializer_list") parent-bol ,(* c-ts-mode-indent-offset 2)))))))
@@ -324,16 +395,13 @@ MODE is either `c' or `cpp'."
        ((parent-is "do_statement") parent-bol 0)
        ,@common))))
 
-(defun c-ts-mode--top-level-label-matcher (node &rest _)
+(defun c-ts-mode--top-level-label-matcher (node parent &rest _)
   "A matcher that matches a top-level label.
-NODE should be a labeled_statement."
-  (let ((func (treesit-parent-until
-               node (lambda (n)
-                      (equal (treesit-node-type n)
-                             "compound_statement")))))
-    (and (equal (treesit-node-type node)
-                "labeled_statement")
-         (not (treesit-node-top-level func "compound_statement")))))
+NODE should be a labeled_statement.  PARENT is its parent."
+  (and (equal (treesit-node-type node)
+              "labeled_statement")
+       (equal "function_definition"
+              (treesit-node-type (treesit-node-parent parent)))))
 
 ;;; Font-lock
 
@@ -466,7 +534,10 @@ MODE is either `c' or `cpp'."
       declarator: (_) @c-ts-mode--fontify-declarator)
 
      (parameter_declaration
-      declarator: (_) @c-ts-mode--fontify-declarator))
+      declarator: (_) @c-ts-mode--fontify-declarator)
+
+     (enumerator
+      name: (identifier) @font-lock-property-name-face))
 
    :language mode
    :feature 'assignment
@@ -476,7 +547,7 @@ MODE is either `c' or `cpp'."
    '((assignment_expression
       left: (identifier) @font-lock-variable-name-face)
      (assignment_expression
-      left: (field_expression field: (_) @font-lock-property-face))
+      left: (field_expression field: (_) @font-lock-property-use-face))
      (assignment_expression
       left: (pointer_expression
              (identifier) @font-lock-variable-name-face))
@@ -489,8 +560,8 @@ MODE is either `c' or `cpp'."
    :feature 'function
    '((call_expression
       function:
-      [(identifier) @font-lock-function-name-face
-       (field_expression field: (field_identifier) @font-lock-function-name-face)]))
+      [(identifier) @font-lock-function-call-face
+       (field_expression field: (field_identifier) @font-lock-function-call-face)]))
 
    :language mode
    :feature 'variable
@@ -512,9 +583,7 @@ MODE is either `c' or `cpp'."
 
    :language mode
    :feature 'property
-   '((field_identifier) @font-lock-property-face
-     (enumerator
-      name: (identifier) @font-lock-property-face))
+   '((field_identifier) @font-lock-property-use-face)
 
    :language mode
    :feature 'bracket
@@ -574,6 +643,7 @@ For NODE, OVERRIDE, START, END, and ARGS, see
          (face (pcase (treesit-node-type (treesit-node-parent
                                           (or qualified-root
                                               identifier)))
+                 ("field_declaration" 'font-lock-property-name-face)
                  ("function_declarator" 'font-lock-function-name-face)
                  (_ 'font-lock-variable-name-face))))
     (when identifier
@@ -590,7 +660,7 @@ OVERRIDE, START, END, and ARGS, see `treesit-font-lock-rules'."
                     "call_expression"))
     (treesit-fontify-with-override
      (treesit-node-start node) (treesit-node-end node)
-     'font-lock-variable-name-face override start end)))
+     'font-lock-variable-use-face override start end)))
 
 (defun c-ts-mode--fontify-defun (node override start end &rest _)
   "Correctly fontify the DEFUN macro.
@@ -739,7 +809,8 @@ the semicolon.  This function skips the semicolon."
   :parent prog-mode-map
   "C-c C-q" #'c-ts-mode-indent-defun
   "C-c ." #'c-ts-mode-set-style
-  "C-c C-c" #'comment-region)
+  "C-c C-c" #'comment-region
+  "C-c C-k" #'c-ts-mode-toggle-comment-style)
 
 ;;;###autoload
 (define-derived-mode c-ts-base-mode prog-mode "C"
@@ -800,11 +871,14 @@ the semicolon.  This function skips the semicolon."
   (when (eq c-ts-mode-indent-style 'linux)
     (setq-local indent-tabs-mode t))
   (setq-local c-ts-common-indent-offset 'c-ts-mode-indent-offset)
+  ;; This setup is not needed anymore, but we might find uses for it
+  ;; later, so I'm keeping it.
   (setq-local c-ts-common-indent-type-regexp-alist
               `((block . ,(rx (or "compound_statement"
                                   "field_declaration_list"
                                   "enumerator_list"
-                                  "initializer_list")))
+                                  "initializer_list"
+                                  "declaration_list")))
                 (if . "if_statement")
                 (else . ("if_statement" . "alternative"))
                 (do . "do_statement")
@@ -816,7 +890,7 @@ the semicolon.  This function skips the semicolon."
 
   ;; Electric
   (setq-local electric-indent-chars
-              (append "{}():;," electric-indent-chars))
+              (append "{}():;,#" electric-indent-chars))
 
   ;; Imenu.
   (setq-local treesit-simple-imenu-settings
@@ -854,6 +928,7 @@ To use tree-sitter C/C++ modes by default, evaluate
 
 in your configuration."
   :group 'c
+  :after-hook (c-ts-mode-set-modeline)
 
   (when (treesit-ready-p 'c)
     (treesit-parser-create 'c)
@@ -886,6 +961,7 @@ To use tree-sitter C/C++ modes by default, evaluate
 
 in your configuration."
   :group 'c++
+  :after-hook (c-ts-mode-set-modeline)
 
   (when (treesit-ready-p 'cpp)
     (setq-local treesit-text-type-regexp

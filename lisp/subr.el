@@ -422,7 +422,9 @@ PREFIX is a string, and defaults to \"g\"."
   "Do nothing and return nil.
 This function accepts any number of ARGUMENTS, but ignores them.
 Also see `always'."
-  (declare (completion ignore))
+  ;; Not declared `side-effect-free' because we don't want calls to it
+  ;; elided; see `byte-compile-ignore'.
+  (declare (pure t) (completion ignore))
   (interactive)
   nil)
 
@@ -430,6 +432,7 @@ Also see `always'."
   "Do nothing and return t.
 This function accepts any number of ARGUMENTS, but ignores them.
 Also see `ignore'."
+  (declare (pure t) (side-effect-free error-free))
   t)
 
 ;; Signal a compile-error if the first arg is missing.
@@ -509,16 +512,19 @@ was called."
   "Return t if NUMBER is zero."
   ;; Used to be in C, but it's pointless since (= 0 n) is faster anyway because
   ;; = has a byte-code.
-  (declare (compiler-macro (lambda (_) `(= 0 ,number))))
+  (declare (pure t) (side-effect-free t)
+           (compiler-macro (lambda (_) `(= 0 ,number))))
   (= 0 number))
 
 (defun fixnump (object)
   "Return t if OBJECT is a fixnum."
+  (declare (side-effect-free error-free))
   (and (integerp object)
        (<= most-negative-fixnum object most-positive-fixnum)))
 
 (defun bignump (object)
   "Return t if OBJECT is a bignum."
+  (declare (side-effect-free error-free))
   (and (integerp object) (not (fixnump object))))
 
 (defun lsh (value count)
@@ -533,7 +539,8 @@ instead."
             (lambda (form)
               (macroexp-warn-and-return
                (format-message "avoid `lsh'; use `ash' instead")
-               form '(suspicious lsh) t form))))
+               form '(suspicious lsh) t form)))
+           (side-effect-free t))
   (when (and (< value 0) (< count 0))
     (when (< value most-negative-fixnum)
       (signal 'args-out-of-range (list value count)))
@@ -706,7 +713,7 @@ instead."
 If LIST is nil, return nil.
 If N is non-nil, return the Nth-to-last link of LIST.
 If N is bigger than the length of LIST, return LIST."
-  (declare (side-effect-free t))
+  (declare (pure t) (side-effect-free t))    ; pure up to mutation
   (if n
       (and (>= n 0)
            (let ((m (safe-length list)))
@@ -761,7 +768,9 @@ one is kept.  See `seq-uniq' for non-destructive operation."
 (defun delete-consecutive-dups (list &optional circular)
   "Destructively remove `equal' consecutive duplicates from LIST.
 First and last elements are considered consecutive if CIRCULAR is
-non-nil."
+non-nil.
+Of several consecutive `equal' occurrences, the one earliest in
+the list is kept."
   (let ((tail list) last)
     (while (cdr tail)
       (if (equal (car tail) (cadr tail))
@@ -797,6 +806,7 @@ TO as (+ FROM (* N INC)) or use a variable whose value was
 computed with this exact expression.  Alternatively, you can,
 of course, also replace TO with a slightly larger value
 \(or a slightly more negative value if INC is negative)."
+  (declare (side-effect-free t))
   (if (or (not to) (= from to))
       (list from)
     (or inc (setq inc 1))
@@ -818,6 +828,7 @@ of course, also replace TO with a slightly larger value
 If TREE is a cons cell, this recursively copies both its car and its cdr.
 Contrast to `copy-sequence', which copies only along the cdrs.  With second
 argument VECP, this copies vectors as well as conses."
+  (declare (side-effect-free t))
   (if (consp tree)
       (let (result)
 	(while (consp tree)
@@ -1525,6 +1536,7 @@ See also `current-global-map'.")
 
 (defun eventp (object)
   "Return non-nil if OBJECT is an input event or event object."
+  (declare (pure t) (side-effect-free error-free))
   (or (integerp object)
       (and (if (consp object)
                (setq object (car object))
@@ -1587,6 +1599,7 @@ in the current Emacs session, then this function may return nil."
 
 (defsubst mouse-movement-p (object)
   "Return non-nil if OBJECT is a mouse movement event."
+  (declare (side-effect-free error-free))
   (eq (car-safe object) 'mouse-movement))
 
 (defun mouse-event-p (object)
@@ -1859,7 +1872,7 @@ be a list of the form returned by `event-start' and `event-end'."
 
 (defun log10 (x)
   "Return (log X 10), the log base 10 of X."
-  (declare (obsolete log "24.4"))
+  (declare (side-effect-free t) (obsolete log "24.4"))
   (log x 10))
 
 (set-advertised-calling-convention
@@ -1916,8 +1929,13 @@ activations.  To prevent runaway recursion, use `max-lisp-eval-depth'
 instead; it will indirectly limit the specpdl stack size as well.")
 (make-obsolete-variable 'max-specpdl-size nil "29.1")
 
+(make-obsolete-variable 'comp-enable-subr-trampolines
+                        'native-comp-enable-subr-trampolines
+                        "29.1")
+
 (make-obsolete-variable 'native-comp-deferred-compilation
-                        'inhibit-automatic-native-compilation "29.1")
+                        'native-comp-jit-compilation
+                        "29.1")
 
 
 ;;;; Alternate names for functions - these are not being phased out.
@@ -2983,6 +3001,7 @@ It can be retrieved with `(process-get PROCESS PROPNAME)'."
 
 (defun memory-limit ()
   "Return an estimate of Emacs virtual memory usage, divided by 1024."
+  (declare (side-effect-free error-free))
   (let ((default-directory temporary-file-directory))
     (or (cdr (assq 'vsize (process-attributes (emacs-pid)))) 0)))
 
@@ -5224,11 +5243,13 @@ wherever possible, since it is slow."
 (defsubst looking-at-p (regexp)
   "\
 Same as `looking-at' except this function does not change the match data."
+  (declare (side-effect-free t))
   (looking-at regexp t))
 
 (defsubst string-match-p (regexp string &optional start)
   "\
 Same as `string-match' except this function does not change the match data."
+  (declare (side-effect-free t))
   (string-match regexp string start t))
 
 (defun subregexp-context-p (regexp pos &optional start)
@@ -5499,7 +5520,7 @@ Upper-case and lower-case letters are treated as equal.
 Unibyte strings are converted to multibyte for comparison.
 
 See also `string-equal'."
-  (declare (pure t) (side-effect-free t))
+  (declare (side-effect-free t))
   (eq t (compare-strings string1 0 nil string2 0 nil t)))
 
 (defun string-prefix-p (prefix string &optional ignore-case)
@@ -5544,6 +5565,7 @@ consisting of STR followed by an invisible left-to-right mark
   "Return non-nil if STRING1 is greater than STRING2 in lexicographic order.
 Case is significant.
 Symbols are also allowed; their print names are used instead."
+  (declare (pure t) (side-effect-free t))
   (string-lessp string2 string1))
 
 
@@ -5825,6 +5847,7 @@ integer that encodes the corresponding syntax class.  See Info
 node `(elisp)Syntax Table Internals' for a list of codes.
 
 If SYNTAX is nil, return nil."
+  (declare (pure t) (side-effect-free t))
   (and syntax (logand (car syntax) 65535)))
 
 ;; Utility motion commands
@@ -6187,7 +6210,8 @@ To test whether a function can be called interactively, use
 `commandp'."
   ;; Kept around for now.  See discussion at:
   ;; https://lists.gnu.org/r/emacs-devel/2020-08/msg00564.html
-  (declare (obsolete called-interactively-p "23.2"))
+  (declare (obsolete called-interactively-p "23.2")
+           (side-effect-free error-free))
   (called-interactively-p 'interactive))
 
 (defun internal-push-keymap (keymap symbol)
@@ -6674,6 +6698,7 @@ Note that a version specified by the list (1) is equal to (1 0),
 \(1 0 0), (1 0 0 0), etc.  That is, the trailing zeros are insignificant.
 Also, a version given by the list (1) is higher than (1 -1), which in
 turn is higher than (1 -2), which is higher than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6695,6 +6720,7 @@ Note that a version specified by the list (1) is equal to (1 0),
 \(1 0 0), (1 0 0 0), etc.  That is, the trailing zeros are insignificant.
 Also, a version given by the list (1) is higher than (1 -1), which in
 turn is higher than (1 -2), which is higher than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6716,6 +6742,7 @@ Note that integer list (1) is equal to (1 0), (1 0 0), (1 0 0 0),
 etc.  That is, the trailing zeroes are insignificant.  Also, integer
 list (1) is greater than (1 -1) which is greater than (1 -2)
 which is greater than (1 -3)."
+  (declare (pure t) (side-effect-free t))
   (while (and l1 l2 (= (car l1) (car l2)))
     (setq l1 (cdr l1)
 	  l2 (cdr l2)))
@@ -6733,6 +6760,7 @@ which is greater than (1 -3)."
   "Return the first non-zero element of LST, which is a list of integers.
 
 If all LST elements are zeros or LST is nil, return zero."
+  (declare (pure t) (side-effect-free t))
   (while (and lst (zerop (car lst)))
     (setq lst (cdr lst)))
   (if lst
@@ -6899,6 +6927,7 @@ REGEXP defaults to \"[ \\t\\n\\r]+\"."
   "Trim STRING of trailing string matching REGEXP.
 
 REGEXP defaults to  \"[ \\t\\n\\r]+\"."
+  (declare (side-effect-free t))
   (let ((i (string-match-p (concat "\\(?:" (or regexp "[ \t\n\r]+") "\\)\\'")
                            string)))
     (if i (substring string 0 i) string)))
@@ -6970,6 +6999,7 @@ sentence (see Info node `(elisp) Documentation Tips')."
   "Return OBJECT as a list.
 If OBJECT is already a list, return OBJECT itself.  If it's
 not a list, return a one-element list containing OBJECT."
+  (declare (side-effect-free error-free))
   (if (listp object)
       object
     (list object)))
@@ -6985,27 +7015,17 @@ string will be displayed only if BODY takes longer than TIMEOUT seconds.
                                  (lambda ()
                                    ,@body)))
 
-(defun function-alias-p (func &optional noerror)
+(defun function-alias-p (func &optional _noerror)
   "Return nil if FUNC is not a function alias.
-If FUNC is a function alias, return the function alias chain.
-
-If the function alias chain contains loops, an error will be
-signaled.  If NOERROR, the non-loop parts of the chain is returned."
-  (declare (side-effect-free t))
-  (let ((chain nil)
-        (orig-func func))
-    (nreverse
-     (catch 'loop
-       (while (and (symbolp func)
-                   (setq func (symbol-function func))
-                   (symbolp func))
-         (when (or (memq func chain)
-                   (eq func orig-func))
-           (if noerror
-               (throw 'loop chain)
-             (signal 'cyclic-function-indirection (list orig-func))))
-         (push func chain))
-       chain))))
+If FUNC is a function alias, return the function alias chain."
+  (declare (advertised-calling-convention (func) "30.1")
+           (side-effect-free error-free))
+  (let ((chain nil))
+    (while (and (symbolp func)
+                (setq func (symbol-function func))
+                (symbolp func))
+      (push func chain))
+    (nreverse chain)))
 
 (defun readablep (object)
   "Say whether OBJECT has a readable syntax.
@@ -7055,6 +7075,7 @@ is inserted before adjusting the number of empty lines."
 If OMIT-NULLS, empty lines will be removed from the results.
 If KEEP-NEWLINES, don't strip trailing newlines from the result
 lines."
+  (declare (side-effect-free t))
   (if (equal string "")
       (if omit-nulls
           nil

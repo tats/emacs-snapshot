@@ -272,6 +272,14 @@ for speeding up processing.")
                     . ,(cdr case)))
                 cases)))
 
+(defsubst byte-opt--fget (f prop)
+  "Simpler and faster version of `function-get'."
+  (let ((val nil))
+    (while (and (symbolp f) f
+                (null (setq val (get f prop))))
+      (setq f (symbol-function f)))
+    val))
+
 (defun byte-optimize-form-code-walker (form for-effect)
   ;;
   ;; For normal function calls, We can just mapcar the optimizer the cdr.  But
@@ -497,7 +505,7 @@ for speeding up processing.")
        form)
 
       ((guard (when for-effect
-		(if-let ((tmp (get fn 'side-effect-free)))
+		(if-let ((tmp (byte-opt--fget fn 'side-effect-free)))
 		    (or byte-compile-delete-errors
 		        (eq tmp 'error-free)
 		        (progn
@@ -516,7 +524,7 @@ for speeding up processing.")
        ;; even if the called function is for-effect, because we
        ;; don't know anything about that function.
        (let ((form (cons fn (mapcar #'byte-optimize-form (cdr form)))))
-	 (if (get fn 'pure)
+	 (if (byte-opt--fget fn 'pure)
 	     (byte-optimize-constant-args form)
 	   form))))))
 
@@ -538,7 +546,7 @@ for speeding up processing.")
         ;; until a fixpoint has been reached.
         (and (consp form)
              (symbolp (car form))
-             (let ((opt (function-get (car form) 'byte-optimizer)))
+             (let ((opt (byte-opt--fget (car form) 'byte-optimizer)))
                (and opt
                     (let ((old form)
                           (new (funcall opt form)))
@@ -1647,7 +1655,7 @@ See Info node `(elisp) Integer Basics'."
 	 capitalize car-less-than-car car cdr ceiling char-after char-before
 	 char-equal char-to-string char-width compare-strings
 	 window-configuration-equal-p concat coordinates-in-window-p
-	 copy-alist copy-sequence copy-marker copysign cos count-lines
+	 copy-alist copy-sequence copy-marker copysign cos
 	 current-time-string current-time-zone
 	 decode-char
 	 decode-time default-boundp default-value documentation downcase
@@ -1656,76 +1664,68 @@ See Info node `(elisp) Integer Basics'."
 	 file-directory-p file-exists-p file-locked-p file-name-absolute-p
          file-name-concat
 	 file-newer-than-file-p file-readable-p file-symlink-p file-writable-p
-	 float float-time floor format format-time-string frame-first-window
-	 frame-root-window frame-selected-window
+	 float float-time floor format format-message format-time-string
+         frame-first-window frame-root-window frame-selected-window
 	 frame-visible-p fround ftruncate
-	 get gethash get-buffer get-buffer-window getenv get-file-buffer
+	 get gethash get-buffer get-buffer-window get-file-buffer
 	 hash-table-count
-	 int-to-string intern-soft isnan
+	 intern-soft isnan
 	 keymap-parent
-         lax-plist-get ldexp
+         ldexp
          length length< length> length=
          line-beginning-position line-end-position pos-bol pos-eol
 	 local-variable-if-set-p local-variable-p locale-info
-	 log log10 logand logb logcount logior lognot logxor lsh
-	 make-byte-code make-list make-string make-symbol mark marker-buffer max
+	 log logand logb logcount logior lognot logxor
+	 make-byte-code make-list make-string make-symbol marker-buffer max
          match-beginning match-end
 	 member memq memql min minibuffer-selected-window minibuffer-window
 	 mod multibyte-char-to-unibyte next-window nth nthcdr number-to-string
-	 parse-colon-path
 	 prefix-numeric-value previous-window prin1-to-string propertize
-	 degrees-to-radians
-	 radians-to-degrees rassq rassoc read-from-string regexp-opt
+	 rassq rassoc read-from-string
          regexp-quote region-beginning region-end reverse round
-	 sin sqrt string string< string= string-equal string-lessp
-         string> string-greaterp string-empty-p string-blank-p
+	 sin sqrt string string-equal string-lessp
          string-search string-to-char
-	 string-to-number string-to-syntax substring
-	 sxhash sxhash-equal sxhash-eq sxhash-eql
-	 symbol-function symbol-name symbol-plist symbol-value string-make-unibyte
+	 string-to-number string-to-syntax substring substring-no-properties
+	 sxhash-equal sxhash-eq sxhash-eql
+	 symbol-function symbol-name symbol-plist symbol-value
+         string-make-unibyte
 	 string-make-multibyte string-as-multibyte string-as-unibyte
 	 string-to-multibyte
 	 take tan time-convert truncate
 	 unibyte-char-to-multibyte upcase user-full-name
-	 user-login-name user-original-login-name custom-variable-p
+	 user-login-name
 	 vconcat
-	 window-absolute-pixel-edges window-at window-body-height
+	 window-at window-body-height
 	 window-body-width window-buffer window-dedicated-p window-display-table
-	 window-combination-limit window-edges window-frame window-fringes
-	 window-height window-hscroll window-inside-edges
-	 window-inside-absolute-pixel-edges window-inside-pixel-edges
+	 window-combination-limit window-frame window-fringes
+	 window-hscroll
 	 window-left-child window-left-column window-margins window-minibuffer-p
 	 window-next-buffers window-next-sibling window-new-normal
 	 window-new-total window-normal-size window-parameter window-parameters
-	 window-parent window-pixel-edges window-point window-prev-buffers
+	 window-parent window-point window-prev-buffers
          window-prev-sibling window-scroll-bars
 	 window-start window-text-height window-top-child window-top-line
 	 window-total-height window-total-width window-use-time window-vscroll
-	 window-width zerop))
+	 ))
       (side-effect-and-error-free-fns
-       '(always arrayp atom
-	 bignump bobp bolp bool-vector-p
-	 buffer-end buffer-list buffer-size buffer-string bufferp
+       '(arrayp atom
+	 bobp bolp bool-vector-p
+	 buffer-list buffer-size buffer-string bufferp
 	 car-safe case-table-p cdr-safe char-or-string-p characterp
 	 charsetp commandp cons consp
 	 current-buffer current-global-map current-indentation
 	 current-local-map current-minor-mode-maps current-time
-	 eobp eolp eq equal eventp
-	 fixnump floatp following-char framep
-	 get-largest-window get-lru-window
+	 eobp eolp eq equal
+	 floatp following-char framep
 	 hash-table-p
-         ;; `ignore' isn't here because we don't want calls to it elided;
-         ;; see `byte-compile-ignore'.
-	 identity integerp integer-or-marker-p interactive-p
+	 identity indirect-function integerp integer-or-marker-p
 	 invocation-directory invocation-name
 	 keymapp keywordp
 	 list listp
 	 make-marker mark-marker markerp max-char
-	 memory-limit
-	 mouse-movement-p
-	 natnump nlistp not null number-or-marker-p numberp
-	 one-window-p overlayp
-	 point point-marker point-min point-max preceding-char primary-charset
+	 natnump nlistp null number-or-marker-p numberp
+	 overlayp
+	 point point-marker point-min point-max preceding-char
 	 processp proper-list-p
 	 recent-keys recursion-depth
 	 safe-length selected-frame selected-window sequencep
@@ -1761,7 +1761,7 @@ See Info node `(elisp) Integer Basics'."
 ;; values if a marker is moved.
 
 (let ((pure-fns
-       '(concat regexp-opt regexp-quote
+       '(concat regexp-quote
 	 string-to-char string-to-syntax symbol-name
          eq eql
          = /= < <= >= > min max
@@ -1770,30 +1770,28 @@ See Info node `(elisp) Integer Basics'."
          copysign isnan ldexp float logb
          floor ceiling round truncate
          ffloor fceiling fround ftruncate
-         string= string-equal string< string-lessp string> string-greaterp
-         string-empty-p string-blank-p
+         string-equal string-lessp
          string-search
          consp atom listp nlistp proper-list-p
          sequencep arrayp vectorp stringp bool-vector-p hash-table-p
-         null not
+         null
          numberp integerp floatp natnump characterp
          integer-or-marker-p number-or-marker-p char-or-string-p
          symbolp keywordp
          type-of
-         identity ignore
+         identity
 
          ;; The following functions are pure up to mutation of their
          ;; arguments.  This is pure enough for the purposes of
          ;; constant folding, but not necessarily for all kinds of
          ;; code motion.
-         car cdr car-safe cdr-safe nth nthcdr last take
+         car cdr car-safe cdr-safe nth nthcdr take
          equal
          length safe-length
          memq memql member
          ;; `assoc' and `assoc-default' are excluded since they are
          ;; impure if the test function is (consider `string-match').
          assq rassq rassoc
-         lax-plist-get
          aref elt
          base64-decode-string base64-encode-string base64url-encode-string
          bool-vector-subsetp

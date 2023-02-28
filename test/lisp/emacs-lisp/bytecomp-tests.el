@@ -886,19 +886,28 @@ byte-compiled.  Run with dynamic binding."
     ;; Should not warn that mt--test2 is not known to be defined.
     (should-not (re-search-forward "my--test2" nil t))))
 
-(defmacro bytecomp--with-warning-test (re-warning form)
+(defun bytecomp--with-warning-test (re-warning form)
   (declare (indent 1))
-  `(with-current-buffer (get-buffer-create "*Compile-Log*")
+  (with-current-buffer (get-buffer-create "*Compile-Log*")
      (let ((inhibit-read-only t)) (erase-buffer))
      (let ((text-quoting-style 'grave)
-           (macroexp--warned
-            (make-hash-table :test #'equal :weakness 'key))   ; oh dear
-           (form ,form))
+           (macroexp--warned            ; oh dear
+            (make-hash-table :test #'equal :weakness 'key)))
        (ert-info ((prin1-to-string form) :prefix "form: ")
          (byte-compile form)
          (ert-info ((prin1-to-string (buffer-string)) :prefix "buffer: ")
            (should (re-search-forward
-                    (string-replace " " "[ \n]+" ,re-warning))))))))
+                    (string-replace " " "[ \n]+" re-warning))))))))
+
+(ert-deftest bytecomp-warn--ignore ()
+  (bytecomp--with-warning-test "unused"
+    '(lambda (y) 6))
+  (bytecomp--with-warning-test "\\`\\'" ;No warning!
+    '(lambda (y) (ignore y) 6))
+  (bytecomp--with-warning-test "assq"
+    '(lambda (x y) (progn (assq x y) 5)))
+  (bytecomp--with-warning-test "\\`\\'" ;No warning!
+    '(lambda (x y) (progn (ignore (assq x y)) 5))))
 
 (ert-deftest bytecomp-warn-wrong-args ()
   (bytecomp--with-warning-test "remq.*3.*2"
@@ -1436,6 +1445,12 @@ literals (Bug#20852)."
         nil))
    '((suspicious set-buffer))
    "Warning: Use .with-current-buffer. rather than")
+
+  (test-suppression
+   '(defun zot (x)
+      (condition-case nil (list x)))
+   '((suspicious condition-case))
+   "Warning: `condition-case' without handlers")
 
   (test-suppression
    '(defun zot ()

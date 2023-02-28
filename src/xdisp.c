@@ -3498,18 +3498,18 @@ init_iterator (struct it *it, struct window *w,
 static int
 get_narrowed_width (struct window *w)
 {
-  int fact;
   /* In a character-only terminal, only one font size is used, so we
      can use a smaller factor.  */
-  fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
-  return fact * window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  int fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
+  int width = window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  return fact * max (1, width);
 }
 
 static int
 get_narrowed_len (struct window *w)
 {
-  return get_narrowed_width (w) *
-    window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  int height = window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  return get_narrowed_width (w) * max (1, height);
 }
 
 ptrdiff_t
@@ -9609,8 +9609,8 @@ move_it_in_display_line_to (struct it *it,
 	  else
 	    line_number_pending = true;
 	}
-      /* If there's a line-/wrap-prefix, handle it.  */
-      if (it->method == GET_FROM_BUFFER)
+      /* If there's a line-/wrap-prefix, handle it, if we didn't already.  */
+      if (it->area == TEXT_AREA && !it->string_from_prefix_prop_p)
 	handle_line_prefix (it);
     }
 
@@ -13424,7 +13424,8 @@ gui_consider_frame_title (Lisp_Object frame)
 
       Fselect_window (f->selected_window, Qt);
       set_buffer_internal_1 (XBUFFER (XWINDOW (f->selected_window)->contents));
-      fmt = FRAME_ICONIFIED_P (f) ? Vicon_title_format : Vframe_title_format;
+      fmt = (FRAME_ICONIFIED_P (f) && !EQ (Vicon_title_format, Qt)
+	     ? Vicon_title_format : Vframe_title_format);
 
       mode_line_target = MODE_LINE_TITLE;
       title_start = MODE_LINE_NOPROP_LEN (0);
@@ -36655,9 +36656,11 @@ which no explicit name has been set (see `modify-frame-parameters').  */);
   DEFVAR_LISP ("icon-title-format", Vicon_title_format,
     doc: /* Template for displaying the title bar of an iconified frame.
 \(Assuming the window manager supports this feature.)
-This variable has the same structure as `mode-line-format' (which see),
-and is used only on frames for which no explicit name has been set
-\(see `modify-frame-parameters').  */);
+If the value is a string, it should have the same structure
+as `mode-line-format' (which see), and is used only on frames
+for which no explicit name has been set \(see `modify-frame-parameters').
+If the value is t, that means use `frame-title-format' for
+iconified frames.  */);
   /* Do not nest calls to pure_list.  This works around a bug in
      Oracle Developer Studio 12.6.  */
   Lisp_Object icon_title_name_format

@@ -113,10 +113,6 @@ is less than this number.")
 (defvar cconv--dynbound-variables nil
   "List of variables known to be dynamically bound.")
 
-(defvar cconv-dont-trim-unused-variables nil
-  "When bound to non-nil, don't remove unused variables from the environment.
-This is intended for use by edebug and similar.")
-
 ;;;###autoload
 (defun cconv-closure-convert (form &optional dynbound-vars)
   "Main entry point for closure conversion.
@@ -467,7 +463,7 @@ places where they originally did not directly appear."
                                   ; first element is lambda expression
     (`(,(and `(lambda . ,_) fun) . ,args)
      ;; FIXME: it's silly to create a closure just to call it.
-     ;; Running byte-optimize-form earlier will resolve this.
+     ;; Running byte-optimize-form earlier would resolve this.
      `(funcall
        ,(cconv-convert `(function ,fun) env extend)
        ,@(mapcar (lambda (form)
@@ -883,14 +879,21 @@ lexically and dynamically bound symbols actually used by FORM."
 
 (defun cconv-make-interpreted-closure (fun env)
   "Make a closure for the interpreter.
-This function is evaluated both at compile time and run time.
-FUN, the closure's function, must be a lambda form.
-ENV, the closure's environment, is a mixture of lexical bindings of the form
-(SYMBOL . VALUE) and symbols which indicate dynamic bindings of those
-symbols."
+This is intended to be called at runtime by the ELisp interpreter (when
+the code has not been compiled).
+FUN is the closure's source code, must be a lambda form.
+ENV is the runtime representation of the lexical environment,
+i.e. a list whose elements can be either plain symbols (which indicate
+that this symbol should use dynamic scoping) or pairs (SYMBOL . VALUE)
+for the lexical bindings."
   (cl-assert (eq (car-safe fun) 'lambda))
   (let ((lexvars (delq nil (mapcar #'car-safe env))))
-    (if (or cconv-dont-trim-unused-variables (null lexvars))
+    (if (or (null lexvars)
+            ;; Functions with a `:closure-dont-trim-context' marker
+            ;; should keep their whole context untrimmed (bug#59213).
+            (and (eq :closure-dont-trim-context (nth 2 fun))
+                 ;; Check the function doesn't just return the magic keyword.
+                 (nthcdr 3 fun)))
         ;; The lexical environment is empty, or needs to be preserved,
         ;; so there's no need to look for free variables.
         ;; Attempting to replace ,(cdr fun) by a macroexpanded version

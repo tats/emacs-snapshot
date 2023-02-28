@@ -6360,7 +6360,18 @@ If FILE1 or FILE2 does not exist, the return value is unspecified."
       (let (f1-attr f2-attr)
         (and (setq f1-attr (file-attributes (file-truename file1)))
 	     (setq f2-attr (file-attributes (file-truename file2)))
-	     (equal f1-attr f2-attr))))))
+             (progn
+               ;; Haiku systems change the file's last access timestamp
+               ;; every time `stat' is called.  Make sure to not compare
+               ;; the timestamps in that case.
+               (or (equal f1-attr f2-attr)
+                   (when (and (eq system-type 'haiku)
+                              (consp (nthcdr 4 f1-attr))
+                              (consp (nthcdr 4 f2-attr)))
+                     (ignore-errors
+                       (setcar (nthcdr 4 f1-attr) nil)
+                       (setcar (nthcdr 4 f2-attr) nil))
+	             (equal f1-attr f2-attr)))))))))
 
 (defun file-in-directory-p (file dir)
   "Return non-nil if DIR is a parent directory of FILE.
@@ -8395,11 +8406,14 @@ as in \"og+rX-w\"."
     num-rights))
 
 (defun file-modes-number-to-symbolic (mode &optional filetype)
-  "Return a string describing a file's MODE.
+  "Return a description of a file's MODE as a string of 10 letters and dashes.
+The returned string is like the mode description produced by \"ls -l\".
 For instance, if MODE is #o700, then it produces `-rwx------'.
-FILETYPE if provided should be a character denoting the type of file,
-such as `?d' for a directory, or `?l' for a symbolic link and will override
-the leading `-' char."
+Note that this is NOT the same as the \"chmod\" style symbolic description
+accepted by `file-modes-symbolic-to-number'.
+FILETYPE, if provided, should be a character denoting the type of file,
+such as `?d' for a directory, or `?l' for a symbolic link, and will override
+the leading `-' character."
   (string
    (or filetype
        (pcase (ash mode -12)
