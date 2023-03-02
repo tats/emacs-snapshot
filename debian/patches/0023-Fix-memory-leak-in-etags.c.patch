@@ -1,0 +1,30 @@
+From 3f6e215ea8d05e2760981c8ab5bce41879e54703 Mon Sep 17 00:00:00 2001
+From: Eli Zaretskii <eliz@gnu.org>
+Date: Sun, 26 Feb 2023 20:03:20 +0200
+Subject: Fix memory leak in etags.c
+
+This upstream patch has been incorporated to fix the problem:
+
+  * lib-src/etags.c (process_file_name): Free malloc'ed vars (bug#61819).
+
+Origin: upstream, commit 0fde314f6f6e6664cddab1b2f0fe20629cd39d14
+Bug: https://debbugs.gnu.org/61819
+Bug-Debian: https://bugs.debian.org/1031888
+Forwarded: not-needed
+---
+ lib-src/etags.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib-src/etags.c b/lib-src/etags.c
+index a6bd7f66e29..ea80ba6e49a 100644
+--- a/lib-src/etags.c
++++ b/lib-src/etags.c
+@@ -1714,6 +1714,8 @@ process_file_name (char *file, language *lang)
+           int buf_len = strlen (compr->command) + strlen ("  > ") + strlen (new_real_name) + strlen (new_tmp_name) + 1;
+           char *cmd = xmalloc (buf_len);
+           snprintf (cmd, buf_len, "%s %s > %s", compr->command, new_real_name, new_tmp_name);
++	  free (new_real_name);
++	  free (new_tmp_name);
+ #endif
+ 	  inf = (system (cmd) == -1
+ 		 ? NULL
