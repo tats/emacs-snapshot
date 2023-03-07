@@ -1237,16 +1237,27 @@ See `treesit-simple-indent-presets'.")
                                           (line-beginning-position))
                         (throw 'term (point)))
                       (setq parent (treesit-node-parent parent)))))))
-        (cons 'prev-sibling (lambda (node &rest _)
+        (cons 'prev-sibling (lambda (node parent bol &rest _)
                               (treesit-node-start
-                               (treesit-node-prev-sibling node))))
+                               (or (treesit-node-prev-sibling node t)
+                                   ;; If node is nil (indenting empty
+                                   ;; line), we still try to guess the
+                                   ;; previous sibling.
+                                   (treesit-node-prev-sibling
+                                    (treesit-node-first-child-for-pos
+                                     parent bol)
+                                    t)
+                                   (treesit-node-child parent -1 t)))))
         (cons 'no-indent (lambda (_n _p bol &rest _) bol))
         (cons 'prev-line (lambda (_n _p bol &rest _)
                            (save-excursion
                              (goto-char bol)
                              (forward-line -1)
                              (skip-chars-forward " \t"))))
-        (cons 'point-min (lambda (&rest _) (point-min)))
+        (cons 'column-0 (lambda (_n _p bol &rest _)
+                          (save-excursion
+                            (goto-char bol)
+                            (line-beginning-position))))
         ;; TODO: Document.
         (cons 'and (lambda (&rest fns)
                      (lambda (node parent bol &rest _)
@@ -1350,9 +1361,9 @@ prev-line
 
     Returns the first non-whitespace character on the previous line.
 
-point-min
+column-0
 
-    Returns the beginning of buffer, which is always at column 0.
+    Returns the beginning of the current line, which is at column 0.
 
 comment-start
 
@@ -1532,14 +1543,24 @@ Similar to `treesit-indent', but indent a region instead."
                     (aref meta-vec (+ 1 (* idx meta-len))) nil)
             (pcase-let* ((`(,anchor . ,offset) (treesit--indent-1))
                          (marker (aref meta-vec (* idx meta-len))))
-              ;; Set ANCHOR.
-              (when anchor
+              (if (not (and anchor offset))
+                  ;; No indent for this line, either...
+                  (if (markerp marker)
+                      (progn
+                        ;; ... Set marker and offset to do a dummy
+                        ;; indent, or...
+                        (back-to-indentation)
+                        (move-marker marker (point))
+                        (setf (aref meta-vec (+ 1 (* idx meta-len))) 0))
+                    ;; ...Set anchor to nil so no indent is performed.
+                    (setf (aref meta-vec (* idx meta-len)) nil))
+                ;; Set ANCHOR.
                 (if (markerp marker)
                     (move-marker marker anchor)
                   (setf (aref meta-vec (* idx meta-len))
-                        (copy-marker anchor t))))
-              ;; SET OFFSET.
-              (setf (aref meta-vec (+ 1 (* idx meta-len))) offset)))
+                        (copy-marker anchor t)))
+                ;; SET OFFSET.
+                (setf (aref meta-vec (+ 1 (* idx meta-len))) offset))))
           (cl-incf idx)
           (setq lines-left-to-move (forward-line 1)))
         ;; Now IDX = last valid IDX + 1.

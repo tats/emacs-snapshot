@@ -533,7 +533,9 @@ Return the compile-time value of FORM."
                                       (macroexpand--all-toplevel
                                        form
                                        macroexpand-all-environment)))
-                                (eval expanded lexical-binding)
+                                (eval (byte-run-strip-symbol-positions
+                                       (safe-copy-tree expanded))
+                                      lexical-binding)
                                 expanded)))))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
@@ -4590,6 +4592,7 @@ Return (TAIL VAR TEST CASES), where:
         (if switch-prefix
             (progn
               (byte-compile-cond-jump-table (cdr switch-prefix) donetag)
+              (setq clause nil)
               (setq clauses (car switch-prefix)))
           (setq clause (car clauses))
           (cond ((or (eq (car clause) t)

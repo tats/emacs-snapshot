@@ -1370,7 +1370,9 @@ special value `tramp-default-remote-path'.
 
 `Private Directories' are the settings of the $PATH environment,
 as given in your `~/.profile'.  This entry is represented in
-the list by the special value `tramp-own-remote-path'."
+the list by the special value `tramp-own-remote-path'.
+
+For a full discussion, see Info node `(tramp) Remote programs'."
   :group 'tramp
   :type '(repeat (choice
 		  (const :tag "Default Directories" tramp-default-remote-path)
@@ -2947,7 +2949,7 @@ not in completion mode."
     (or ;; We check this for the process related to
 	;; `tramp-buffer-name'; otherwise `start-file-process'
 	;; wouldn't run ever when `non-essential' is non-nil.
-        (and vec (process-live-p (get-process (tramp-buffer-name vec))))
+        (process-live-p (tramp-get-process vec))
 	(not non-essential))))
 
 (defun tramp-completion-handle-expand-file-name (filename &optional directory)
@@ -4778,17 +4780,20 @@ Do not set it manually, it is used buffer-local in `tramp-get-lock-pid'.")
 
 (defun tramp-handle-unlock-file (file)
   "Like `unlock-file' for Tramp files."
-  ;; When there is no connection, we don't do it.  Otherwise,
-  ;; functions like `kill-buffer' would try to reestablish the
-  ;; connection.  See Bug#61663.
-  (when-let ((v (tramp-dissect-file-name file))
-	     (p (tramp-get-process v))
-	     ((process-live-p p))
-	     (lockname (tramp-compat-make-lock-file-name file)))
-    (condition-case err
-        (delete-file lockname)
-      ;; `userlock--handle-unlock-error' exists since Emacs 28.1.
-      (error (tramp-compat-funcall 'userlock--handle-unlock-error err)))))
+  (condition-case err
+      ;; When there is no connection, we don't do it.  Otherwise,
+      ;; functions like `kill-buffer' would try to reestablish the
+      ;; connection.  See Bug#61663.
+      (if-let ((v (tramp-dissect-file-name file))
+	       ((process-live-p (tramp-get-process v)))
+	       (lockname (tramp-compat-make-lock-file-name file)))
+          (delete-file lockname)
+	;; Trigger the unlock error.
+	(signal 'file-error `("Cannot remove lock file for" ,file)))
+    ;; `userlock--handle-unlock-error' exists since Emacs 28.1.
+    (error
+     (when create-lockfiles
+       (tramp-compat-funcall 'userlock--handle-unlock-error err)))))
 
 (defun tramp-handle-load (file &optional noerror nomessage nosuffix must-suffix)
   "Like `load' for Tramp files."

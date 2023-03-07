@@ -845,6 +845,62 @@ argument VECP, this copies vectors as well as conses."
 	    (aset tree i (copy-tree (aref tree i) vecp)))
 	  tree)
       tree)))
+
+(defvar safe-copy-tree--seen nil
+  "A hash table for conses/vectors/records already seen by safe-copy-tree-1.
+Its key is a cons or vector/record seen by the algorithm, and its
+value is the corresponding cons/vector/record in the copy.")
+
+(defun safe-copy-tree--1 (tree &optional vecp)
+  "Make a copy of TREE, taking circular structure into account.
+If TREE is a cons cell, this recursively copies both its car and its cdr.
+Contrast to `copy-sequence', which copies only along the cdrs.  With second
+argument VECP, this copies vectors and records as well as conses."
+  (cond
+   ((gethash tree safe-copy-tree--seen))
+   ((consp tree)
+    (let* ((result (cons (car tree) (cdr tree)))
+	   (newcons result)
+	   hash)
+      (while (and (not hash) (consp tree))
+	(if (setq hash (gethash tree safe-copy-tree--seen))
+            (setq newcons hash)
+	  (puthash tree newcons safe-copy-tree--seen))
+        (setq tree newcons)
+        (unless hash
+	  (if (or (consp (car tree))
+                  (and vecp (or (vectorp (car tree)) (recordp (car tree)))))
+	      (let ((newcar (safe-copy-tree--1 (car tree) vecp)))
+	        (setcar tree newcar)))
+          (setq newcons (if (consp (cdr tree))
+                            (cons (cadr tree) (cddr tree))
+                          (cdr tree)))
+          (setcdr tree newcons)
+          (setq tree (cdr tree))))
+      (nconc result
+             (if (and vecp (or (vectorp tree) (recordp tree)))
+		 (safe-copy-tree--1 tree vecp) tree))))
+   ((and vecp (or (vectorp tree) (recordp tree)))
+    (let* ((newvec (copy-sequence tree))
+           (i (length newvec)))
+      (puthash tree newvec safe-copy-tree--seen)
+      (setq tree newvec)
+      (while (>= (setq i (1- i)) 0)
+	(aset tree i (safe-copy-tree--1 (aref tree i) vecp)))
+      tree))
+   (t tree)))
+
+(defun safe-copy-tree (tree &optional vecp)
+  "Make a copy of TREE, taking circular structure into account.
+If TREE is a cons cell, this recursively copies both its car and its cdr.
+Contrast to `copy-sequence', which copies only along the cdrs.  With second
+argument VECP, this copies vectors and records as well as conses."
+  (setq safe-copy-tree--seen (make-hash-table :test #'eq))
+  (unwind-protect
+      (safe-copy-tree--1 tree vecp)
+    (clrhash safe-copy-tree--seen)
+    (setq safe-copy-tree--seen nil)))
+
 
 ;;;; Various list-search functions.
 
@@ -2441,8 +2497,9 @@ If the variable `delay-mode-hooks' is non-nil, does not do anything,
 just adds the HOOKS to the list `delayed-mode-hooks'.
 Otherwise, runs hooks in the sequence: `change-major-mode-after-body-hook',
 `delayed-mode-hooks' (in reverse order), HOOKS, then runs
-`hack-local-variables', runs the hook `after-change-major-mode-hook', and
-finally evaluates the functions in `delayed-after-hook-functions' (see
+`hack-local-variables' (if the buffer is visiting a file),
+runs the hook `after-change-major-mode-hook', and finally
+evaluates the functions in `delayed-after-hook-functions' (see
 `define-derived-mode').
 
 Major mode functions should use this instead of `run-hooks' when
