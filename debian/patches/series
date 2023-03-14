@@ -21,3 +21,5 @@
 0021-Fix-ruby-mode.el-command-injection-vulnerability-CVE.patch
 0022-Fix-etags-local-command-injection-vulnerability-CVE-.patch
 0023-Fix-memory-leak-in-etags.c.patch
+0024-Fix-quoted-argument-in-emacsclient-mail.desktop-CVE-.patch
+0025-Fix-code-injection-vulnerability-CVE-2023-27986.patch
