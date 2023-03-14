@@ -1,3 +1,11 @@
+emacs (1:28.2+1-13~1.gbpe491c4) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @e491c46f7c698c40df1f5643451f219c43a11b3f **
+
+  * UNRELEASED
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 14 Mar 2023 13:20:05 -0700
+
 emacs (1:28.2+1-12) unstable; urgency=medium
 
   * Fix memory leak in etags.c introduced by recent security fix.
