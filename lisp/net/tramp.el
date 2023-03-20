@@ -685,7 +685,7 @@ See also `tramp-yn-prompt-regexp'."
   :type 'regexp)
 
 (defcustom tramp-yn-prompt-regexp
-  (rx (| "Store key in cache? (y/n)"
+  (rx (| (: "Store key in cache? (y/n" (* nonl) ")")
 	 "Update cached key? (y/n, Return cancels connection)")
       (* blank))
   "Regular expression matching all y/n queries which need to be confirmed.
@@ -725,7 +725,8 @@ The regexp should match at end of buffer."
 
 ;; A security key requires the user physically to touch the device
 ;; with their finger.  We must tell it to the user.
-;; Added in OpenSSH 8.2.  I've tested it with yubikey.
+;; Added in OpenSSH 8.2.  I've tested it with yubikey.  Nitrokey,
+;; which has also passed the tests, does not show such a message.
 (defcustom tramp-security-key-confirm-regexp
   (rx bol (* "\r") "Confirm user presence for key " (* nonl) (* (any "\r\n")))
   "Regular expression matching security key confirmation message.
@@ -1909,7 +1910,7 @@ Return `tramp-cache-undefined' in case it doesn't exist."
   (or (and (tramp-file-name-p vec-or-proc)
 	   (get-buffer-process (tramp-buffer-name vec-or-proc)))
       (and (processp vec-or-proc)
-	   (tramp-get-process (process-get vec-or-proc 'vector)))
+	   (tramp-get-process (process-get vec-or-proc 'tramp-vector)))
       tramp-cache-undefined))
 
 (defun tramp-get-connection-process (vec)
@@ -2189,7 +2190,7 @@ applicable)."
 			    vec-or-proc 'dont-create))))))))
 	  ;; Translate proc to vec.
 	  (when (processp vec-or-proc)
-	    (setq vec-or-proc (process-get vec-or-proc 'vector))))
+	    (setq vec-or-proc (process-get vec-or-proc 'tramp-vector))))
 	;; Do it.
 	(when (tramp-file-name-p vec-or-proc)
 	  (apply #'tramp-debug-message
@@ -5087,6 +5088,11 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 	    ;; t.  See Bug#51177.
 	    (when filter
 	      (set-process-filter p filter))
+	    (process-put p 'tramp-vector v)
+	    ;; This is neded for ssh or PuTTY based processes, and
+	    ;; only if the respective options are set.  Perhaps, the
+	    ;; setting could be more fine-grained.
+	    ;; (process-put p 'tramp-shared-socket t)
 	    (process-put p 'remote-command orig-command)
 	    (tramp-set-connection-property p "remote-command" orig-command)
 
@@ -5489,7 +5495,7 @@ of."
   ;; There might be pending output.  Avoid problems with reentrant
   ;; call of Tramp.
   (ignore-errors
-    (while (tramp-accept-process-output proc 0)))
+    (while (tramp-accept-process-output proc)))
   (tramp-message proc 6 "Kill %S" proc)
   (delete-process proc))
 
@@ -5501,7 +5507,7 @@ of."
        (with-current-buffer (process-buffer proc)
 	 (file-exists-p
 	  (concat (file-remote-p default-directory)
-		  (process-get proc 'watch-name))))))
+		  (process-get proc 'tramp-watch-name))))))
 
 (defun tramp-file-notify-process-sentinel (proc event)
   "Call `file-notify-rm-watch'."
@@ -5641,13 +5647,13 @@ Wait, until the connection buffer changes."
   "Check, whether a process has finished."
   (unless (process-live-p proc)
     ;; There might be pending output.
-    (while (tramp-accept-process-output proc 0))
+    (while (tramp-accept-process-output proc))
     (throw 'tramp-action 'process-died)))
 
 (defun tramp-action-out-of-band (proc vec)
   "Check, whether an out-of-band copy has finished."
   ;; There might be pending output for the exit status.
-  (while (tramp-accept-process-output proc 0))
+  (while (tramp-accept-process-output proc))
   (cond ((and (not (process-live-p proc))
 	      (zerop (process-exit-status proc)))
 	 (tramp-message	vec 3 "Process has finished.")
@@ -5678,7 +5684,7 @@ See `tramp-process-actions' for the format of ACTIONS."
     (while (not found)
       ;; Reread output once all actions have been performed.
       ;; Obviously, the output was not complete.
-      (while (tramp-accept-process-output proc 0))
+      (while (tramp-accept-process-output proc))
       (setq todo actions)
       (while todo
 	(setq item (pop todo)
@@ -5721,7 +5727,7 @@ performed successfully.  Any other value means an error."
   ;; use the "password-vector" property in case we have several hops.
   (tramp-set-connection-property
    (tramp-get-connection-property
-    proc "password-vector" (process-get proc 'vector))
+    proc "password-vector" (process-get proc 'tramp-vector))
    "first-password-request" tramp-cache-read-persistent-data)
   (save-restriction
     (with-tramp-progress-reporter
@@ -5795,11 +5801,22 @@ Mostly useful to protect BODY from being interrupted by timers."
 	   ,@body)
        (tramp-flush-connection-property ,proc "locked"))))
 
-(defun tramp-accept-process-output (proc &optional timeout)
+(defun tramp-accept-process-output (proc &optional _timeout)
   "Like `accept-process-output' for Tramp processes.
 This is needed in order to hide `last-coding-system-used', which is set
 for process communication also.
 If the user quits via `C-g', it is propagated up to `tramp-file-name-handler'."
+  (declare (advertised-calling-convention (proc) "29.2"))
+  ;; There could be other processes which use the same socket for
+  ;; communication.  This could block the output for the current
+  ;; process.  Read such output first.  (Bug#61350)
+  ;; The process property isn't set anymore due to Bug#62194.
+  (when-let (((process-get proc 'tramp-shared-socket))
+	     (v (process-get proc 'tramp-vector)))
+    (dolist (p (delq proc (process-list)))
+      (when (tramp-file-name-equal-p v (process-get p 'tramp-vector))
+	(accept-process-output p 0 nil t))))
+
   (with-current-buffer (process-buffer proc)
     (let ((inhibit-read-only t)
 	  last-coding-system-used
@@ -5809,10 +5826,10 @@ If the user quits via `C-g', it is propagated up to `tramp-file-name-handler'."
 	;; JUST-THIS-ONE is set due to Bug#12145.  `with-local-quit'
 	;; returns t in order to report success.
 	(if (with-local-quit
-	      (setq result (accept-process-output proc timeout nil t)) t)
+	      (setq result (accept-process-output proc 0 nil t)) t)
 	    (tramp-message
-	     proc 10 "%s %s %s %s\n%s"
-	     proc timeout (process-status proc) result (buffer-string))
+	     proc 10 "%s %s %s\n%s"
+	     proc (process-status proc) result (buffer-string))
 	  ;; Propagate quit.
 	  (keyboard-quit)))
       result)))
@@ -5949,7 +5966,7 @@ the remote host use line-endings as defined in the variable
 (defun tramp-process-sentinel (proc event)
   "Flush file caches and remove shell prompt."
   (unless (process-live-p proc)
-    (let ((vec (process-get proc 'vector))
+    (let ((vec (process-get proc 'tramp-vector))
 	  (buf (process-buffer proc))
 	  (prompt (tramp-get-connection-property proc "prompt")))
       (when vec
@@ -6656,7 +6673,7 @@ Consults the auth-source package."
 	 ;; In tramp-sh.el, we must use "password-vector" due to
 	 ;; multi-hop.
 	 (vec (tramp-get-connection-property
-	       proc "password-vector" (process-get proc 'vector)))
+	       proc "password-vector" (process-get proc 'tramp-vector)))
 	 (key (tramp-make-tramp-file-name vec 'noloc))
 	 (method (tramp-file-name-method vec))
 	 (user (or (tramp-file-name-user-domain vec)
@@ -6819,13 +6836,14 @@ name of a process or buffer, or nil to default to the current buffer."
 	;; negative pid, so we try both variants.
 	(tramp-compat-funcall
 	 'tramp-send-command
-	 (process-get proc 'vector)
+	 (process-get proc 'tramp-vector)
 	 (format "(\\kill -2 -%d || \\kill -2 %d) 2>%s"
                  pid pid
-                 (tramp-get-remote-null-device (process-get proc 'vector))))
+                 (tramp-get-remote-null-device
+		  (process-get proc 'tramp-vector))))
 	;; Wait, until the process has disappeared.  If it doesn't,
 	;; fall back to the default implementation.
-        (while (tramp-accept-process-output proc 0))
+        (while (tramp-accept-process-output proc))
 	(not (process-live-p proc))))))
 
 (add-hook 'interrupt-process-functions #'tramp-interrupt-process)
@@ -6848,7 +6866,7 @@ SIGCODE may be an integer, or a symbol whose name is a signal name."
     (cond
      ((processp process)
       (setq pid (process-get process 'remote-pid)
-            vec (process-get process 'vector)))
+            vec (process-get process 'tramp-vector)))
      ((numberp process)
       (setq pid process
             vec (and (stringp remote) (tramp-dissect-file-name remote))))

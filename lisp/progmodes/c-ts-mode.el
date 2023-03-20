@@ -419,7 +419,9 @@ MODE is either `c' or `cpp'."
            ((parent-is "field_declaration_list") c-ts-mode--anchor-prev-sibling 0)
 
            ;; Statement in {} blocks.
-           ((match nil "compound_statement" nil 1 1) standalone-parent c-ts-mode-indent-offset)
+           ((or (match nil "compound_statement" nil 1 1)
+                (match null "compound_statement"))
+            standalone-parent c-ts-mode-indent-offset)
            ((parent-is "compound_statement") c-ts-mode--anchor-prev-sibling 0)
            ;; Opening bracket.
            ((node-is "compound_statement") standalone-parent c-ts-mode-indent-offset)
@@ -959,9 +961,9 @@ the semicolon.  This function skips the semicolon."
   ;; Imenu.
   (setq-local treesit-simple-imenu-settings
               (let ((pred #'c-ts-mode--defun-valid-p))
-                `(("Struct" ,(rx bos (or "struct" "enum" "union")
-                                 "_specifier" eos)
-                   ,pred nil)
+                `(("Enum" "\\`enum_specifier\\'" ,pred nil)
+                  ("Struct" "\\`struct_specifier\\'" ,pred nil)
+                  ("Union" "\\`union_specifier\\'" ,pred nil)
                   ("Variable" ,(rx bos "declaration" eos) ,pred nil)
                   ("Function" "\\`function_definition\\'" ,pred nil)
                   ("Class" ,(rx bos (or "class_specifier"
@@ -1098,10 +1100,15 @@ the code is C or C++ and based on that chooses whether to enable
                  '("\\(\\.ii\\|\\.\\(CC?\\|HH?\\)\\|\\.[ch]\\(pp\\|xx\\|\\+\\+\\)\\|\\.\\(cc\\|hh\\)\\)\\'"
                    . c++-ts-mode)))
 
-(if (treesit-ready-p 'c)
-    (add-to-list 'auto-mode-alist
-                 '("\\(\\.[chi]\\|\\.lex\\|\\.y\\(acc\\)?\\|\\.x[bp]m\\)\\'"
-                   . c-ts-mode)))
+(when (treesit-ready-p 'c)
+  (add-to-list 'auto-mode-alist
+               '("\\(\\.[chi]\\|\\.lex\\|\\.y\\(acc\\)?\\)\\'" . c-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.x[pb]m\\'" . c-ts-mode))
+  ;; image-mode's association must be before the C mode, otherwise XPM
+  ;; images will be initially visited as C files.  Also note that the
+  ;; regexp must be different from what files.el does, or else
+  ;; add-to-list will not add the association where we want it.
+  (add-to-list 'auto-mode-alist '("\\.x[pb]m\\'" . image-mode)))
 
 (if (and (treesit-ready-p 'cpp)
          (treesit-ready-p 'c))

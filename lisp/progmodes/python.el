@@ -426,7 +426,7 @@ This variant of `rx' supports common Python named REGEXPS."
                                              (or "def" "for" "with")))
                                     symbol-end))
             (dedenter          (seq symbol-start
-                                    (or "elif" "else" "except" "finally")
+                                    (or "elif" "else" "except" "finally" "case")
                                     symbol-end))
             (block-ender       (seq symbol-start
                                     (or
@@ -511,19 +511,28 @@ This variant of `rx' supports common Python named REGEXPS."
       (''string
        `(let ((ppss (or ,syntax-ppss (syntax-ppss))))
           (and (nth 3 ppss) (nth 8 ppss))))
+      (''single-quoted-string
+       `(let ((ppss (or ,syntax-ppss (syntax-ppss))))
+          (and (characterp (nth 3 ppss)) (nth 8 ppss))))
+      (''triple-quoted-string
+       `(let ((ppss (or ,syntax-ppss (syntax-ppss))))
+          (and (eq t (nth 3 ppss)) (nth 8 ppss))))
       (''paren
        `(nth 1 (or ,syntax-ppss (syntax-ppss))))
       (_ form))))
 
 (defun python-syntax-context (type &optional syntax-ppss)
   "Return non-nil if point is on TYPE using SYNTAX-PPSS.
-TYPE can be `comment', `string' or `paren'.  It returns the start
+TYPE can be `comment', `string', `single-quoted-string',
+`triple-quoted-string' or `paren'.  It returns the start
 character address of the specified TYPE."
   (declare (compiler-macro python-syntax--context-compiler-macro))
   (let ((ppss (or syntax-ppss (syntax-ppss))))
     (pcase type
       ('comment (and (nth 4 ppss) (nth 8 ppss)))
       ('string (and (nth 3 ppss) (nth 8 ppss)))
+      ('single-quoted-string (and (characterp (nth 3 ppss)) (nth 8 ppss)))
+      ('triple-quoted-string (and (eq t (nth 3 ppss)) (nth 8 ppss)))
       ('paren (nth 1 ppss))
       (_ nil))))
 
@@ -2062,10 +2071,6 @@ of the statement."
                        ;; are somehow out of whack.  This has been
                        ;; observed when using `syntax-ppss' during
                        ;; narrowing.
-                       ;; It can also fail in cases where the buffer is in
-                       ;; the process of being modified, e.g. when creating
-                       ;; a string with `electric-pair-mode' disabled such
-                       ;; that there can be an unmatched single quote
                        (when (>= string-start last-string-end)
                          (goto-char string-start)
                          (if (python-syntax-context 'paren)
@@ -2076,10 +2081,16 @@ of the statement."
                            (goto-char (+ (point)
                                          (python-syntax-count-quotes
                                           (char-after (point)) (point))))
-                           (setq last-string-end
-                                 (or (re-search-forward
-                                      (rx (syntax string-delimiter)) nil t)
-                                     (goto-char (point-max)))))))
+                           (setq
+                            last-string-end
+                            (or (if (eq t (nth 3 (syntax-ppss)))
+                                    (re-search-forward
+                                     (rx (syntax string-delimiter)) nil t)
+                                  (ignore-error scan-error
+                                    (goto-char string-start)
+                                    (python-nav--lisp-forward-sexp)
+                                    (point)))
+                                (goto-char (point-max)))))))
                       ((python-syntax-context 'paren)
                        ;; The statement won't end before we've escaped
                        ;; at least one level of parenthesis.
@@ -2148,10 +2159,7 @@ backward to previous statement."
       (while (and (forward-line 1)
                   (not (eobp))
                   (or (and (> (current-indentation) block-indentation)
-                           (let ((start (point)))
-                             (python-nav-end-of-statement)
-                             ;; must move forward otherwise infinite loop
-                             (> (point) start)))
+                           (or (python-nav-end-of-statement) t))
                       (python-info-current-line-comment-p)
                       (python-info-current-line-empty-p))))
       (python-util-forward-comment -1)
@@ -4806,9 +4814,7 @@ Optional argument JUSTIFY defines if the paragraph should be justified."
      ((python-syntax-context 'comment)
       (funcall python-fill-comment-function justify))
      ;; Strings/Docstrings
-     ((save-excursion (or (python-syntax-context 'string)
-                          (equal (string-to-syntax "|")
-                                 (syntax-after (point)))))
+     ((python-info-triple-quoted-string-p)
       (funcall python-fill-string-function justify))
      ;; Decorators
      ((equal (char-after (save-excursion
@@ -4834,10 +4840,7 @@ JUSTIFY should be used (if applicable) as in `fill-paragraph'."
   (let* ((str-start-pos
           (set-marker
            (make-marker)
-           (or (python-syntax-context 'string)
-               (and (equal (string-to-syntax "|")
-                           (syntax-after (point)))
-                    (point)))))
+           (python-info-triple-quoted-string-p)))
          ;; JT@2021-09-21: Since bug#49518's fix this will always be 1
          (num-quotes (python-syntax-count-quotes
                       (char-after str-start-pos) str-start-pos))
@@ -5784,7 +5787,8 @@ likely an invalid python file."
                (pairs '(("elif" "elif" "if")
                         ("else" "if" "elif" "except" "for" "while")
                         ("except" "except" "try")
-                        ("finally" "else" "except" "try")))
+                        ("finally" "else" "except" "try")
+                        ("case" "case")))
                (dedenter (match-string-no-properties 0))
                (possible-opening-blocks (cdr (assoc-string dedenter pairs)))
                (collected-indentations)
@@ -5792,7 +5796,11 @@ likely an invalid python file."
           (catch 'exit
             (while (python-nav--syntactically
                     (lambda ()
-                      (re-search-backward (python-rx block-start) nil t))
+                      (cl-loop while (re-search-backward (python-rx block-start) nil t)
+                               if (save-match-data
+                                    (looking-back (rx line-start (* whitespace))
+                                                  (line-beginning-position)))
+                               return t))
                     #'<)
               (let ((indentation (current-indentation)))
                 (when (and (not (memq indentation collected-indentations))
@@ -6038,6 +6046,21 @@ point's current `syntax-ppss'."
               ((python-info-assignment-statement-p) t)
               ((python-info-looking-at-beginning-of-defun))
               (t nil))))))
+
+(defun python-info-triple-quoted-string-p ()
+  "Check if point is in a triple quoted string including quotes.
+It returns the position of the third quote character of the start
+of the string."
+  (save-excursion
+    (let ((pos (point)))
+      (cl-loop
+       for offset in '(0 3 -2 2 -1 1)
+       if (let ((check-pos (+ pos offset)))
+            (and (>= check-pos (point-min))
+                 (<= check-pos (point-max))
+                 (python-syntax-context
+                  'triple-quoted-string (syntax-ppss check-pos))))
+       return it))))
 
 (defun python-info-encoding-from-cookie ()
   "Detect current buffer's encoding from its coding cookie.
