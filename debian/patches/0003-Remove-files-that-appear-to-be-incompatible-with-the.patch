@@ -28,7 +28,7 @@ Status: new
  4 files changed, 32 insertions(+), 37 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index 2fb7754..98b0346 100644
+index 4f2f2f1..17436eb 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -174,7 +174,9 @@ man1dir=$(mandir)/man1
@@ -118,10 +118,10 @@ index 2fb7754..98b0346 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index b484ebd..7a0239b 100644
+index c5300be..8dca2e7 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -6744,7 +6744,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
+@@ -6763,7 +6763,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
  AC_CONFIG_FILES([$srcdir/doc/man/emacs.1])
  
  m4_define([subdir_makefiles],
@@ -130,7 +130,7 @@ index b484ebd..7a0239b 100644
  SUBDIR_MAKEFILES="subdir_makefiles"
  AC_CONFIG_FILES(subdir_makefiles)
  
-@@ -6810,15 +6810,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
+@@ -6829,15 +6829,6 @@ if test ! -f src/.gdbinit && test -f "$srcdir/src/.gdbinit"; then
  fi
  ])
  
