@@ -322,7 +322,7 @@ PARENT is the same as other anchor functions."
       ;; nil.
       parent (lambda (node)
                (and node
-                    (not (string-match "preproc" (treesit-node-type node)))
+                    (not (string-search "preproc" (treesit-node-type node)))
                     (progn
                       (goto-char (treesit-node-start node))
                       (looking-back (rx bol (* whitespace))
@@ -386,7 +386,7 @@ MODE is either `c' or `cpp'."
            ((parent-is "function_definition") parent-bol 0)
            ((parent-is "conditional_expression") first-sibling 0)
            ((parent-is "assignment_expression") parent-bol c-ts-mode-indent-offset)
-           ((parent-is "concatenated_string") parent-bol c-ts-mode-indent-offset)
+           ((parent-is "concatenated_string") first-sibling 0)
            ((parent-is "comma_expression") first-sibling 0)
            ((parent-is "init_declarator") parent-bol c-ts-mode-indent-offset)
            ((parent-is "parenthesized_expression") first-sibling 1)
@@ -433,6 +433,8 @@ MODE is either `c' or `cpp'."
            ((parent-is "for_statement") standalone-parent c-ts-mode-indent-offset)
            ((parent-is "while_statement") standalone-parent c-ts-mode-indent-offset)
            ((parent-is "do_statement") standalone-parent c-ts-mode-indent-offset)
+
+           ((parent-is "case_statement") standalone-parent c-ts-mode-indent-offset)
 
            ,@(when (eq mode 'cpp)
                `(((node-is "field_initializer_list") parent-bol ,(* c-ts-mode-indent-offset 2)))))))

@@ -106,7 +106,7 @@ indent, imenu, etc."
     ;; 40MB for 64-bit systems, 15 for 32-bit.
     (if (or (< most-positive-fixnum (* 2.0 1024 mb))
             ;; 32-bit system with wide ints.
-            (string-match-p "--with-wide-int" system-configuration-options))
+            (string-search "--with-wide-int" system-configuration-options))
         (* 15 mb)
       (* 40 mb)))
   "Maximum buffer size (in bytes) for enabling tree-sitter parsing.
@@ -324,13 +324,13 @@ If INCLUDE-NODE is non-nil, return NODE if it satisfies PRED."
     node))
 
 (defun treesit-parent-while (node pred)
-  "Return the furthest parent of NODE that satisfies PRED.
+  "Return the furthest parent of NODE (including NODE) that satisfies PRED.
 
-This function successively examines the parent of NODE, then
-the parent of the parent, etc., until it finds an ancestor node
-which no longer satisfies the predicate PRED; it returns the last
-examined ancestor that satisfies PRED.  It returns nil if no
-ancestor node was found that satisfies PRED.
+This function successively examines NODE, the parent of NODE,
+then the parent of the parent, etc., until it finds a node which
+no longer satisfies the predicate PRED; it returns the last
+examined node that satisfies PRED.  If no node satisfies PRED, it
+returns nil.
 
 PRED should be a function that takes one argument, the node to
 examine, and returns a boolean value indicating whether that
@@ -1923,6 +1923,7 @@ this function depends on `treesit-defun-type-regexp' and
 `treesit-defun-skipper'."
   (interactive "^p\nd")
   (let ((orig-point (point)))
+    (if (or (null arg) (= arg 0)) (setq arg 1))
     (catch 'done
       (dotimes (_ 2) ; Not making progress is better than infloop.
 
@@ -3055,11 +3056,17 @@ function signals an error."
           (apply #'treesit--call-process-signal
                  (if (file-exists-p "scanner.cc") c++ cc)
                  nil t nil
-                 `("-fPIC" "-shared"
-                   ,@(directory-files
-                      default-directory nil
-                      (rx bos (+ anychar) ".o" eos))
-                   "-o" ,lib-name))
+                 (if (eq system-type 'cygwin)
+                     `("-shared" "-Wl,-dynamicbase"
+                       ,@(directory-files
+                          default-directory nil
+                          (rx bos (+ anychar) ".o" eos))
+                       "-o" ,lib-name)
+                   `("-fPIC" "-shared"
+                     ,@(directory-files
+                        default-directory nil
+                        (rx bos (+ anychar) ".o" eos))
+                     "-o" ,lib-name)))
           ;; Copy out.
           (unless (file-exists-p out-dir)
             (make-directory out-dir t))
@@ -3089,7 +3096,7 @@ function signals an error."
          (with-temp-buffer
            (insert-file-contents (find-library-name "treesit"))
            (cl-remove-if
-            (lambda (name) (string-match "treesit--" name))
+            (lambda (name) (string-search "treesit--" name))
             (cl-sort
              (save-excursion
                (goto-char (point-min))

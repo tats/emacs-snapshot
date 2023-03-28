@@ -106,6 +106,9 @@ detected as prompt when being sent on echoing hosts, therefore.")
 (defconst tramp-end-of-heredoc (md5 tramp-end-of-output)
   "String used to recognize end of heredoc strings.")
 
+(define-obsolete-variable-alias
+  'tramp-use-ssh-controlmaster-options 'tramp-use-connection-share "30.1")
+
 (defcustom tramp-use-connection-share (not (eq system-type 'windows-nt))
   "Whether to use connection share in ssh or PuTTY.
 Set it to t, if you want Tramp to apply respective options. These
@@ -121,11 +124,6 @@ Set it to `suppress' if you want to disable settings in your
                  (const :tag "Suppress ControlMaster" suppress))
   ;; Check with (safe-local-variable-p 'tramp-use-connection-share 'suppress)
   :safe (lambda (val) (and (memq val '(t nil suppress)) t)))
-
-(defvaralias 'tramp-use-connection-share 'tramp-use-ssh-controlmaster-options)
-(make-obsolete-variable
- 'tramp-use-ssh-controlmaster-options
- "Use `tramp-use-connection-share' instead" "30.1")
 
 (defvar tramp-ssh-controlmaster-options nil
   "Which ssh Control* arguments to use.
@@ -1149,8 +1147,8 @@ Operations not mentioned here will be handled by the normal Emacs functions.")
     (unless (tramp-get-remote-ln v)
       (tramp-error
        v 'file-error
-       (concat "Making a symbolic link. "
-	       "ln(1) does not exist on the remote host."))))
+       (concat "Making a symbolic link: "
+	       "ln(1) does not exist on the remote host"))))
 
   (tramp-skeleton-handle-make-symbolic-link target linkname ok-if-already-exists
     (and (tramp-send-command-and-check
@@ -2152,7 +2150,7 @@ the uid and gid from FILENAME."
 		 cmd-result)
 	      (tramp-error-with-buffer
 	       nil v 'file-error
-	       "Copying directly failed, see buffer `%s' for details."
+	       "Copying directly failed, see buffer `%s' for details"
 	       (buffer-name)))))
 
 	 ;; We are on the local host.
@@ -2207,7 +2205,7 @@ the uid and gid from FILENAME."
 			  "%s %s %s" cmd
 			  (tramp-shell-quote-argument localname1)
 			  (tramp-shell-quote-argument tmpfile))
-		       "Copying directly failed, see buffer `%s' for details."
+		       "Copying directly failed, see buffer `%s' for details"
 		       (tramp-get-buffer v))
 		      ;; We must change the ownership as remote user.
 		      ;; Since this does not work reliable, we also
@@ -2240,7 +2238,7 @@ the uid and gid from FILENAME."
 			  "cp -f -p %s %s"
 			  (tramp-shell-quote-argument tmpfile)
 			  (tramp-shell-quote-argument localname2))
-		       "Copying directly failed, see buffer `%s' for details."
+		       "Copying directly failed, see buffer `%s' for details"
 		       (tramp-get-buffer v)))
 		     (t1
 		      (tramp-run-real-handler

@@ -636,7 +636,7 @@ If SELECT is non-nil, select the target window."
 
 (defface xref-match '((t :inherit match))
   "Face used to highlight matches in the xref buffer."
-  :version "27.1")
+  :version "28.1")
 
 (defmacro xref--with-dedicated-window (&rest body)
   `(let* ((xref-w (get-buffer-window xref-buffer-name))
@@ -1525,7 +1525,7 @@ The meanings of both arguments are the same as documented in
                        prompt))
                    (xref-backend-identifier-completion-table backend)
                    nil nil nil
-                   'xref--read-identifier-history def)))
+                   'xref--read-identifier-history def t)))
              (if (equal id "")
                  (or def (user-error "There is no default identifier"))
                id)))

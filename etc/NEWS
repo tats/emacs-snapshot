@@ -50,6 +50,11 @@ as it has in batch mode since Emacs 24.
 When non-nil, this option suppresses moving remote files to the local
 trash when deleting.  Default is nil.
 
+---
+** New user option 'remote-file-name-inhibit-auto-save'.
+If this user option is non-nil, 'auto-save-mode' will not auto-save
+remote buffers.  The default is nil.
+
 +++
 ** New user option 'yes-or-no-prompt'.
 This allows the user to customize the prompt that is appended by
@@ -240,6 +245,14 @@ following to your init file:
     (add-hook 'help-fns-describe-function-functions
               #'shortdoc-help-fns-examples-function)
 
+** Package
+
+---
+*** New user option 'package-vc-register-as-project'.
+When non-nil, it will automatically register every package as a
+project, that you can quickly select using 'project-switch-project'
+('C-x p p').
+
 
 * New Modes and Packages in Emacs 30.1
 
@@ -273,6 +286,18 @@ their customization options.
 
 * Incompatible Lisp Changes in Emacs 30.1
 
+---
+** The escape sequence '\x' not followed by hex digits is now an error.
+Previously, '\x' without at least one hex digit denoted character code
+zero (NUL) but as this was neither intended nor documented or even
+known by anyone, it is now treated as an error by the Lisp reader.
+
+---
+** Connection-local variables are applied in buffers visiting a remote file.
+This overrides possible directory-local or file-local variables with
+the same name.
+
+---
 ** User option 'tramp-completion-reread-directory-timeout' has been removed.
 This user option has been obsoleted in Emacs 27, use
 'remote-file-name-inhibit-cache' instead.
