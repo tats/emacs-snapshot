@@ -118,7 +118,7 @@ index 4f2f2f1..17436eb 100644
  
  $(UNINSTALL_DOC):
 diff --git a/configure.ac b/configure.ac
-index c5300be..8dca2e7 100644
+index a9a8f10..682199c 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -6763,7 +6763,7 @@ dnl config.status treats $srcdir specially, so I think this is ok...
@@ -164,7 +164,7 @@ index 1831bbb..b4ffb77 100644
  ## This is discouraged because the .texi files it generates
  ## are not as well formatted as handwritten ones.
 diff --git a/lisp/help.el b/lisp/help.el
-index 83be85b..a847e35 100644
+index 3e94b50..af8ac52 100644
 --- a/lisp/help.el
 +++ b/lisp/help.el
 @@ -496,6 +496,14 @@ If that doesn't give a function, return nil."
