@@ -64,17 +64,13 @@ FROM emacs-base as emacs-eglot
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \
-      snapd wget lsb-release software-properties-common gpg \
+      wget lsb-release software-properties-common gpg \
     && rm -rf /var/lib/apt/lists/*
 
 # A recent clangd.  It must be at least clangd 14, which is in Debian
 # bookworm.
 RUN bash -c "$(wget --no-check-certificate -O - https://apt.llvm.org/llvm.sh)"
-
-# A recent pylsp.  Since Debian bookworm there is the package
-# python3-pylsp.
-# RUN snap install core
-# RUN snap install pylsp
+RUN ln -s /usr/bin/clangd-15 /usr/bin/clangd
 
 COPY . /checkout
 WORKDIR /checkout
@@ -93,7 +89,7 @@ COPY . /checkout
 WORKDIR /checkout
 RUN ./autogen.sh autoconf
 RUN ./configure --with-ns
-RUN make bootstrap
+RUN make V=1 bootstrap
 
 FROM emacs-base as emacs-native-comp
 
