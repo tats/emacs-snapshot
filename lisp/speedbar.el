@@ -1,6 +1,6 @@
 ;;; speedbar.el --- quick access to files and tags in a frame  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: file, tags, tools
@@ -349,7 +349,7 @@ determined automatically."
 
 (defcustom speedbar-sort-tags nil
   "If non-nil, sort tags in the speedbar display.  *Obsolete*.
-Use `semantic-tag-hierarchy-method' instead."
+Use `speedbar-tag-hierarchy-method' instead."
   :group 'speedbar
   :type 'boolean)
 

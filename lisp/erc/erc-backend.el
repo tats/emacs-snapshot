@@ -1,6 +1,6 @@
 ;;; erc-backend.el --- Backend network communication for ERC  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2004-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2023 Free Software Foundation, Inc.
 
 ;; Filename: erc-backend.el
 ;; Author: Lawrence Mitchell <wence@gmx.li>
@@ -320,6 +320,15 @@ session when reconnecting.  Once `erc-reuse-buffers' is retired
 and fully removed, modules can switch to leveraging the
 `permanent-local' property instead.")
 
+(defvar erc--server-post-connect-hook '(erc-networks--warn-on-connect)
+  "Functions to run when a network connection is successfully opened.
+Though internal, this complements `erc-connect-pre-hook' in that
+it bookends the process rather than the logical connection, which
+is the domain of `erc-before-connect' and `erc-after-connect'.
+Note that unlike `erc-connect-pre-hook', this only runs in server
+buffers, and it does so immediately before the first protocol
+exchange.")
+
 (defvar-local erc-server-timed-out nil
   "Non-nil if the IRC server failed to respond to a ping.")
 
@@ -416,7 +425,7 @@ Called with a server buffer as its only argument.  Potential uses
 include exponential backoff and probing for connectivity prior to
 dialing.  Use `erc-schedule-reconnect' to instead try again later
 and optionally alter the attempts tally."
-  :package-version '(ERC . "5.4.1") ; FIXME on next release
+  :package-version '(ERC . "5.5")
   :type '(choice (function-item erc-server-delayed-reconnect)
                  function))
 
@@ -646,6 +655,7 @@ The current buffer is given by BUFFER."
 
 (cl-defmethod erc--register-connection ()
   "Perform opening IRC protocol exchange with server."
+  (run-hooks 'erc--server-post-connect-hook)
   (erc-login))
 
 (defvar erc--server-connect-dumb-ipv6-regexp
@@ -873,24 +883,22 @@ Conditionally try to reconnect and take appropriate action."
     (erc--unhide-prompt)))
 
 (defun erc--hide-prompt (proc)
-  (erc-with-all-buffers-of-server
-      proc nil ; sorta wish this was indent 2
-      (when (and erc-hide-prompt
-                 (or (eq erc-hide-prompt t)
-                     ;; FIXME use `erc--target' after bug#48598
-                     (memq (if (erc-default-target)
-                               (if (erc-channel-p (car erc-default-recipients))
-                                   'channel
-                                 'query)
-                             'server)
-                           erc-hide-prompt))
-                 (marker-position erc-insert-marker)
-                 (marker-position erc-input-marker)
-                 (get-text-property erc-insert-marker 'erc-prompt))
-        (with-silent-modifications
-          (add-text-properties erc-insert-marker (1- erc-input-marker)
-                               `(display ,erc-prompt-hidden)))
-        (add-hook 'pre-command-hook #'erc--unhide-prompt-on-self-insert 0 t))))
+  (erc-with-all-buffers-of-server proc nil
+    (when (and erc-hide-prompt
+               (or (eq erc-hide-prompt t)
+                   (memq (if erc--target
+                             (if (erc--target-channel-p erc--target)
+                                 'channel
+                               'query)
+                           'server)
+                         erc-hide-prompt))
+               (marker-position erc-insert-marker)
+               (marker-position erc-input-marker)
+               (get-text-property erc-insert-marker 'erc-prompt))
+      (with-silent-modifications
+        (add-text-properties erc-insert-marker (1- erc-input-marker)
+                             `(display ,erc-prompt-hidden)))
+      (add-hook 'pre-command-hook #'erc--unhide-prompt-on-self-insert 91 t))))
 
 (defun erc-process-sentinel (cproc event)
   "Sentinel function for ERC process."
@@ -1157,7 +1165,7 @@ Note that future bundled modules providing IRCv3 functionality
 will not be compatible with the legacy format.  User code should
 eventually transition to expecting this \"5.5+ variant\" and set
 this option to nil."
-  :package-version '(ERC . "5.4.1") ; FIXME increment on next release
+  :package-version '(ERC . "5.5")
   :type '(choice (const nil)
                  (const legacy)
                  (const overridable)))
@@ -1191,7 +1199,7 @@ instead, leave them as a single string."
                 (get 'erc-parse-tags 'erc-v3-warned-p))
       (put 'erc-parse-tags 'erc-v3-warned-p t)
       (display-warning
-       'ERC
+       'erc
        (concat
         "Legacy ERC tags behavior is currently in effect, but other modules,"
         " including those bundled with ERC, may override this in future"

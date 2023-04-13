@@ -1,10 +1,10 @@
 ;;; jsonrpc.el --- JSON-RPC library                  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2023 Free Software Foundation, Inc.
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: processes, languages, extensions
-;; Version: 1.0.15
+;; Version: 1.0.16
 ;; Package-Requires: ((emacs "25.2"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -548,18 +548,32 @@ With optional CLEANUP, kill any associated buffers."
         (delete-process proc)
         (funcall (jsonrpc--on-shutdown connection) connection)))))
 
-(defun jsonrpc--process-filter (proc string)
+(defvar jsonrpc--in-process-filter nil
+  "Non-nil if inside `jsonrpc--process-filter'.")
+
+(cl-defun jsonrpc--process-filter (proc string)
   "Called when new data STRING has arrived for PROC."
+  (when jsonrpc--in-process-filter
+    ;; Problematic recursive process filters may happen if
+    ;; `jsonrpc--connection-receive', called by us, eventually calls
+    ;; client code which calls `process-send-string' (which see) to,
+    ;; say send a follow-up message.  If that happens to writes enough
+    ;; bytes for pending output to be received, we will lose JSONRPC
+    ;; messages.  In that case, remove recursiveness by re-scheduling
+    ;; ourselves to run from within a timer as soon as possible
+    ;; (bug#60088)
+    (run-at-time 0 nil #'jsonrpc--process-filter proc string)
+    (cl-return-from jsonrpc--process-filter))
   (when (buffer-live-p (process-buffer proc))
     (with-current-buffer (process-buffer proc)
-      (let* ((inhibit-read-only t)
+      (let* ((jsonrpc--in-process-filter t)
              (connection (process-get proc 'jsonrpc-connection))
              (expected-bytes (jsonrpc--expected-bytes connection)))
         ;; Insert the text, advancing the process marker.
         ;;
         (save-excursion
           (goto-char (process-mark proc))
-          (insert string)
+          (let ((inhibit-read-only t)) (insert string))
           (set-marker (process-mark proc) (point)))
         ;; Loop (more than one message might have arrived)
         ;;
@@ -608,7 +622,8 @@ With optional CLEANUP, kill any associated buffers."
                                     (jsonrpc-connection-receive connection
                                                                 json-message)))))
                           (goto-char message-end)
-                          (delete-region (point-min) (point))
+                          (let ((inhibit-read-only t))
+                            (delete-region (point-min) (point)))
                           (setq expected-bytes nil))))
                      (t
                       ;; Message is still incomplete

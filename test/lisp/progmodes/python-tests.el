@@ -1,6 +1,6 @@
 ;;; python-tests.el --- Test suite for python.el  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -189,6 +189,14 @@ default to `point-min' and `point-max' respectively."
                            (overlay-end overlay))))
       (buffer-substring-no-properties (point-min) (point-max)))))
 
+(defun python-tests-should-not-move (func &rest args)
+  "Assert that point does not move while calling FUNC with ARGS.
+Returns the value returned by FUNC."
+  (let ((pos (point))
+        (ret (apply func args)))
+    (should (= pos (point)))
+    ret))
+
 (defun python-virt-bin (&optional virt-root)
   "Return the virtualenv bin dir, starting from VIRT-ROOT.
 If nil, VIRT-ROOT defaults to `python-shell-virtualenv-root'.
@@ -247,6 +255,27 @@ aliqua."
 
 ;;; Font-lock and syntax
 
+(ert-deftest python-syntax-context-1 ()
+  (python-tests-with-temp-buffer
+   "
+# Comment
+s = 'Single Quoted String'
+t = '''Triple Quoted String'''
+p = (1 + 2)
+"
+   (python-tests-look-at "Comment")
+   (should (= (python-syntax-context 'comment) (pos-bol)))
+   (python-tests-look-at "Single")
+   (should (= (python-syntax-context 'string) (1- (point))))
+   (should (= (python-syntax-context 'single-quoted-string) (1- (point))))
+   (should-not (python-syntax-context 'triple-quoted-string))
+   (python-tests-look-at "Triple")
+   (should (= (python-syntax-context 'string) (1- (point))))
+   (should-not (python-syntax-context 'single-quoted-string))
+   (should (= (python-syntax-context 'triple-quoted-string) (1- (point))))
+   (python-tests-look-at "1 + 2")
+   (should (= (python-syntax-context 'paren) (1- (point))))))
+
 (ert-deftest python-syntax-after-python-backspace ()
   ;; `python-indent-dedent-line-backspace' garbles syntax
   (python-tests-with-temp-buffer
@@ -280,28 +309,33 @@ aliqua."
    "a, b, c = 1, 2, 3"
    '((1 . font-lock-variable-name-face) (2)
      (4 . font-lock-variable-name-face) (5)
-     (7 . font-lock-variable-name-face) (8))))
+     (7 . font-lock-variable-name-face) (8)
+     (9 . font-lock-operator-face) (10))))
 
 (ert-deftest python-font-lock-assignment-statement-2 ()
   (python-tests-assert-faces
    "a, *b, c = 1, 2, 3, 4, 5"
    '((1 . font-lock-variable-name-face) (2)
+     (4 . font-lock-operator-face)
      (5 . font-lock-variable-name-face) (6)
-     (8 . font-lock-variable-name-face) (9))))
+     (8 . font-lock-variable-name-face) (9)
+     (10 . font-lock-operator-face) (11))))
 
 (ert-deftest python-font-lock-assignment-statement-3 ()
   (python-tests-assert-faces
    "[a, b] = (1, 2)"
    '((1)
      (2 . font-lock-variable-name-face) (3)
-     (5 . font-lock-variable-name-face) (6))))
+     (5 . font-lock-variable-name-face) (6)
+     (8 . font-lock-operator-face) (9))))
 
 (ert-deftest python-font-lock-assignment-statement-4 ()
   (python-tests-assert-faces
    "(l[1], l[2]) = (10, 11)"
    '((1)
      (2 . font-lock-variable-name-face) (3)
-     (8 . font-lock-variable-name-face) (9))))
+     (8 . font-lock-variable-name-face) (9)
+     (14 . font-lock-operator-face) (15))))
 
 (ert-deftest python-font-lock-assignment-statement-5 ()
   (python-tests-assert-faces
@@ -310,22 +344,29 @@ aliqua."
      (2 . font-lock-variable-name-face) (3)
      (5 . font-lock-variable-name-face) (6)
      (8 . font-lock-variable-name-face) (9)
+     (11 . font-lock-operator-face)
      (12 . font-lock-variable-name-face) (13)
+     (15 . font-lock-operator-face) (16)
+     (17 . font-lock-operator-face)
      (18 . font-lock-variable-name-face) (19)
-     (21 . font-lock-variable-name-face) (22))))
+     (21 . font-lock-variable-name-face) (22)
+     (23 . font-lock-operator-face) (24))))
 
 (ert-deftest python-font-lock-assignment-statement-6 ()
   (python-tests-assert-faces
    "(a,) = 'foo',"
    '((1)
      (2 . font-lock-variable-name-face) (3)
+     (6 . font-lock-operator-face) (7)
      (8 . font-lock-string-face) (13))))
 
 (ert-deftest python-font-lock-assignment-statement-7 ()
   (python-tests-assert-faces
    "(*a,) = ['foo', 'bar', 'baz']"
    '((1)
+     (2 . font-lock-operator-face)
      (3 . font-lock-variable-name-face) (4)
+     (7 . font-lock-operator-face) (8)
      (10 . font-lock-string-face) (15)
      (17 . font-lock-string-face) (22)
      (24 . font-lock-string-face) (29))))
@@ -334,6 +375,7 @@ aliqua."
   (python-tests-assert-faces
    "d = D('a', ['b'], 'c')"
    '((1 . font-lock-variable-name-face) (2)
+     (3 . font-lock-operator-face) (4)
      (7 . font-lock-string-face) (10)
      (13 . font-lock-string-face) (16)
      (19 . font-lock-string-face) (22))))
@@ -344,7 +386,9 @@ aliqua."
    '((1)
      (3 . font-lock-variable-name-face) (4)
      (8 . font-lock-variable-name-face) (9)
+     (14 . font-lock-operator-face) (15)
      (17 . font-lock-variable-name-face) (18)
+     (19 . font-lock-operator-face) (20)
      (21 . font-lock-string-face) (24)
      (26 . font-lock-string-face) (29)
      (31 . font-lock-string-face) (34)
@@ -355,7 +399,8 @@ aliqua."
   (python-tests-assert-faces
    "a: int = 5"
    '((1 . font-lock-variable-name-face) (2)
-     (4 . font-lock-builtin-face) (7))))
+     (4 . font-lock-builtin-face) (7)
+     (8 . font-lock-operator-face) (9))))
 
 (ert-deftest python-font-lock-assignment-statement-11 ()
   (python-tests-assert-faces
@@ -364,13 +409,15 @@ aliqua."
      (19 . font-lock-builtin-face) (22)
      (40 . font-lock-builtin-face) (43)
      (46 . font-lock-builtin-face) (49)
+     (52 . font-lock-operator-face) (53)
      (55 . font-lock-constant-face) (59)
      (61 . font-lock-string-face) (66))))
 
 (ert-deftest python-font-lock-assignment-statement-12 ()
   (python-tests-assert-faces
    "c: Collection = {1, 2, 3}"
-   '((1 . font-lock-variable-name-face) (2))))
+   '((1 . font-lock-variable-name-face) (2)
+     (15 . font-lock-operator-face) (16))))
 
 (ert-deftest python-font-lock-assignment-statement-13 ()
   (python-tests-assert-faces
@@ -378,6 +425,7 @@ aliqua."
    '((1 . font-lock-variable-name-face) (2)
      (12 . font-lock-builtin-face) (15)
      (17 . font-lock-builtin-face) (20)
+     (22 . font-lock-operator-face) (23)
      (28 . font-lock-string-face) (33)
      (38 . font-lock-string-face) (43))))
 
@@ -386,28 +434,38 @@ aliqua."
    "(a) = 5; (b) = 6"
    '((1)
      (2 . font-lock-variable-name-face) (3)
-     (11 . font-lock-variable-name-face) (12))))
+     (5 . font-lock-operator-face) (6)
+     (11 . font-lock-variable-name-face) (12)
+     (14 . font-lock-operator-face) (15))))
 
 (ert-deftest python-font-lock-assignment-statement-15 ()
   (python-tests-assert-faces
    "[a] = 5,; [b] = 6,"
    '((1)
      (2 . font-lock-variable-name-face) (3)
-     (12 . font-lock-variable-name-face) (13))))
+     (5 . font-lock-operator-face) (6)
+     (12 . font-lock-variable-name-face) (13)
+     (15 . font-lock-operator-face) (16))))
 
 (ert-deftest python-font-lock-assignment-statement-16 ()
   (python-tests-assert-faces
    "[*a] = 5, 6; [*b] = 7, 8"
    '((1)
+     (2 . font-lock-operator-face)
      (3 . font-lock-variable-name-face) (4)
-     (16 . font-lock-variable-name-face) (17))))
+     (6 . font-lock-operator-face) (7)
+     (15 . font-lock-operator-face)
+     (16 . font-lock-variable-name-face) (17)
+     (19 . font-lock-operator-face) (20))))
 
 (ert-deftest python-font-lock-assignment-statement-17 ()
   (python-tests-assert-faces
    "(a) = (b) = 1"
-   `((1)
+   '((1)
      (2 . font-lock-variable-name-face) (3)
-     (8 . font-lock-variable-name-face) (9))))
+     (5 . font-lock-operator-face) (6)
+     (8 . font-lock-variable-name-face) (9)
+     (11 . font-lock-operator-face) (12))))
 
 (ert-deftest python-font-lock-assignment-statement-18 ()
   (python-tests-assert-faces
@@ -420,13 +478,21 @@ def f(x: CustomInt) -> CustomInt:
     return res
 "
    '((1 . font-lock-variable-name-face) (10)
+     (11 . font-lock-operator-face) (12)
      (13 . font-lock-builtin-face) (16)
      (18 . font-lock-keyword-face) (21)
      (22 . font-lock-function-name-face) (23)
+     (38 . font-lock-operator-face) (40)
      (56 . font-lock-variable-name-face) (57)
+     (58 . font-lock-operator-face) (59)
+     (62 . font-lock-operator-face) (63)
      (70 . font-lock-variable-name-face) (72)
+     (94 . font-lock-operator-face) (95)
+     (102 . font-lock-operator-face) (103)
      (111 . font-lock-variable-name-face) (114)
+     (126 . font-lock-operator-face) (127)
      (128 . font-lock-builtin-face) (131)
+     (136 . font-lock-operator-face) (137)
      (144 . font-lock-keyword-face) (150))))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-1 ()
@@ -442,7 +508,8 @@ def f(x: CustomInt) -> CustomInt:
 "
    '((1)
      (8 . font-lock-variable-name-face) (9)
-     (15 . font-lock-variable-name-face) (16))
+     (15 . font-lock-variable-name-face) (16)
+     (19 . font-lock-operator-face) (20))
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-2 ()
@@ -453,7 +520,9 @@ def f(x: CustomInt) -> CustomInt:
 ] # 5, 6
 "
    '((1)
-     (9 . font-lock-variable-name-face) (10))
+     (8 . font-lock-operator-face)
+     (9 . font-lock-variable-name-face) (10)
+     (13 . font-lock-operator-face) (14))
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-3 ()
@@ -471,7 +540,8 @@ def f(x: CustomInt) -> CustomInt:
     3"
    '((1 . font-lock-variable-name-face) (2)
      (15 . font-lock-variable-name-face) (16)
-     (29 . font-lock-variable-name-face) (30))
+     (29 . font-lock-variable-name-face) (30)
+     (36 . font-lock-operator-face) (37))
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-4 ()
@@ -482,7 +552,8 @@ def f(x: CustomInt) -> CustomInt:
     #\\
     5"
    '((1 . font-lock-variable-name-face) (2)
-     (15 . font-lock-builtin-face) (18))
+     (15 . font-lock-builtin-face) (18)
+     (24 . font-lock-operator-face) (25))
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-5 ()
@@ -500,7 +571,9 @@ def f(x: CustomInt) -> CustomInt:
     6"
    '((1)
      (8 . font-lock-variable-name-face) (9)
-     (46 . font-lock-variable-name-face) (47))
+     (18 . font-lock-operator-face) (19)
+     (46 . font-lock-variable-name-face) (47)
+     (60 . font-lock-operator-face) (61))
    "#" "="))
 
 (ert-deftest python-font-lock-assignment-statement-multiline-6 ()
@@ -518,8 +591,32 @@ def f(x: CustomInt) -> CustomInt:
     6"
    '((1)
      (7 . font-lock-variable-name-face) (8)
-     (43 . font-lock-variable-name-face) (44))
+     (16 . font-lock-operator-face) (17)
+     (43 . font-lock-variable-name-face) (44)
+     (56 . font-lock-operator-face) (57))
    "#" "="))
+
+(ert-deftest python-font-lock-operator-1 ()
+  (python-tests-assert-faces
+   "1 << 2 ** 3 == +4%-5|~6&7^8%9"
+   '((1)
+     (3 . font-lock-operator-face) (5)
+     (8 . font-lock-operator-face) (10)
+     (13 . font-lock-operator-face) (15)
+     (16 . font-lock-operator-face) (17)
+     (18 . font-lock-operator-face) (20)
+     (21 . font-lock-operator-face) (23)
+     (24 . font-lock-operator-face) (25)
+     (26 . font-lock-operator-face) (27)
+     (28 . font-lock-operator-face) (29))))
+
+(ert-deftest python-font-lock-operator-2 ()
+  "Keyword operators are font-locked as keywords."
+  (python-tests-assert-faces
+   "is_ is None"
+   '((1)
+     (5 . font-lock-keyword-face) (7)
+     (8 . font-lock-constant-face))))
 
 (ert-deftest python-font-lock-escape-sequence-string-newline ()
   (python-tests-assert-faces
@@ -603,12 +700,16 @@ u\"\\n\""
      (196 . font-lock-constant-face)
      (215 . font-lock-string-face) (218)
      (221 . font-lock-string-face) (254)
+     (259 . font-lock-operator-face) (260)
      (271 . font-lock-string-face) (274)
      (277 . font-lock-string-face) (310)
+     (315 . font-lock-operator-face) (316)
      (327 . font-lock-string-face) (330)
      (333 . font-lock-string-face) (366)
+     (371 . font-lock-operator-face) (372)
      (383 . font-lock-string-face) (386)
      (389 . font-lock-string-face) (422)
+     (427 . font-lock-operator-face) (428)
      (439 . font-lock-string-face) (442)
      (444 . font-lock-string-face) (497)
      (499 . font-lock-string-face) (552)
@@ -1578,6 +1679,21 @@ a == 4):
    (python-indent-line t)
    (should (= (python-indent-calculate-indentation t) 6))))
 
+(ert-deftest python-indent-dedenters-9 ()
+  "Test de-indentation for the case keyword."
+  (python-tests-with-temp-buffer
+   "
+match a:
+    case 1:
+        print(1)
+        case 2
+"
+   (python-tests-look-at "case 2")
+   (should (eq (car (python-indent-context)) :at-dedenter-block-start))
+   (should (= (python-indent-calculate-indentation) 4))
+   (python-indent-line t)
+   (should (= (python-indent-calculate-indentation t) 4))))
+
 (ert-deftest python-indent-inside-string-1 ()
   "Test indentation for strings."
   (python-tests-with-temp-buffer
@@ -1902,6 +2018,32 @@ match foo:
    (should (eq (car (python-indent-context)) :after-block-start))
    (should (= (python-indent-calculate-indentation) 8))))
 
+(ert-deftest python-indent-after-re-match ()
+  "Test BUG 62031 regression."
+  (python-tests-with-temp-buffer
+   "
+def test_re(string):
+    if re.match('^[a-c]+$', string):
+        print('yes')
+    else:
+    "
+   (python-tests-look-at "else:")
+   (should (= (python-indent-calculate-indentation) 4))))
+
+(ert-deftest python-indent-after-bare-match ()
+  "Test BUG 62031 regression."
+  (python-tests-with-temp-buffer
+   "
+from re import match
+
+def test_re(string):
+    if match('^[a-c]+$', string):
+        print('yes')
+    else:
+    "
+   (python-tests-look-at "else:")
+   (should (= (python-indent-calculate-indentation) 4))))
+
 
 ;;; Filling
 
@@ -1930,6 +2072,54 @@ this is a test this is a test this is a test this is a test this is a test this 
    (search-forward "test.")
    (fill-paragraph)
    (should (= (current-indentation) 0))))
+
+(ert-deftest python-fill-paragraph-single-quoted-string-1 ()
+  "Single quoted string should not be filled."
+  (let ((contents "
+s = 'abc def ghi jkl mno pqr stu vwx yz'
+")
+        (fill-column 20))
+    (python-tests-with-temp-buffer
+     contents
+     (python-tests-look-at "abc")
+     (fill-paragraph)
+     (should (string= (buffer-substring-no-properties (point-min) (point-max))
+                      contents)))))
+
+(ert-deftest python-fill-paragraph-single-quoted-string-2 ()
+  "Ensure no fill is performed after the end of the single quoted string."
+  (let ((contents "
+s1 = 'abc'
+s2 = 'def'
+"))
+    (python-tests-with-temp-buffer
+     contents
+     (python-tests-look-at "abc")
+     (fill-paragraph)
+     (should (string= (buffer-substring-no-properties (point-min) (point-max))
+                      contents)))))
+
+(ert-deftest python-fill-paragraph-triple-quoted-string-1 ()
+  "Triple quoted string should be filled."
+  (let ((contents "
+s = '''abc def ghi jkl mno pqr stu vwx yz'''
+")
+        (expected "
+s = '''abc def ghi
+jkl mno pqr stu vwx
+yz'''
+")
+        (fill-column 20))
+    (dolist (look-at '("'''abc" "z'''"))
+      (dolist (offset '(0 1 2 3))
+        (python-tests-with-temp-buffer
+         contents
+         (python-tests-look-at look-at)
+         (forward-char offset)
+         (fill-paragraph)
+         (should (string=
+                  (buffer-substring-no-properties (point-min) (point-max))
+                  expected)))))))
 
 
 ;;; Mark
@@ -2862,6 +3052,36 @@ string
   (python-tests-with-temp-buffer
    "'\n''\n"
    (python-nav-end-of-statement)))
+
+(ert-deftest python-nav-end-of-statement-3 ()
+  "Test unmatched quotes (Bug#58780)."
+  (python-tests-with-temp-buffer
+   "
+' \"\"\"
+v = 1
+"
+   (python-tests-look-at "v =")
+   (should (= (save-excursion
+                (python-nav-end-of-statement)
+                (point))
+              (save-excursion
+                (point-max))))))
+
+(ert-deftest python-nav-end-of-statement-4 ()
+  (python-tests-with-temp-buffer
+   "
+abc = 'a\\
+b\\
+c'
+d = '''d'''
+"
+   (python-tests-look-at "b\\")
+   (should (= (save-excursion
+                (python-nav-end-of-statement)
+                (point))
+              (save-excursion
+                (python-tests-look-at "c'")
+                (pos-eol))))))
 
 (ert-deftest python-nav-forward-statement-1 ()
   (python-tests-with-temp-buffer
@@ -4141,7 +4361,8 @@ class Bar(models.Model):
     pass
 "
    (should (string= (buffer-string)
-                    (python-shell-buffer-substring (point-min) (point-max))))))
+                    (python-tests-should-not-move
+                     #'python-shell-buffer-substring (point-min) (point-max))))))
 
 (ert-deftest python-shell-buffer-substring-2 ()
   "Main block should be removed if NOMAIN is non-nil."
@@ -4157,7 +4378,8 @@ if __name__ == \"__main__\":
     foo = Foo()
     print (foo)
 "
-   (should (string= (python-shell-buffer-substring (point-min) (point-max) t)
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring (point-min) (point-max) t)
                     "
 class Foo(models.Model):
     pass
@@ -4184,7 +4406,8 @@ if __name__ == \"__main__\":
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring (point-min) (point-max) t)
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring (point-min) (point-max) t)
                     "
 class Foo(models.Model):
     pass
@@ -4212,7 +4435,8 @@ if __name__ == \"__main__\":
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "class Foo(models.Model):")
                      (progn (python-nav-forward-sexp) (point)))
                     "# -*- coding: latin-1 -*-
@@ -4235,7 +4459,8 @@ if __name__ == \"__main__\":
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "class Bar(models.Model):")
                      (progn (python-nav-forward-sexp) (point)))
                     "# -*- coding: latin-1 -*-
@@ -4266,7 +4491,8 @@ if __name__ == \"__main__\":
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "# coding: latin-1")
                      (python-tests-look-at "if __name__ == \"__main__\":"))
                     "# -*- coding: latin-1 -*-
@@ -4293,7 +4519,8 @@ if __name__ == \"__main__\":
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "# coding: latin-1")
                      (python-tests-look-at "if __name__ == \"__main__\":"))
                     "# -*- coding: utf-8 -*-
@@ -4313,7 +4540,8 @@ class Foo(models.Model):
 class Foo(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring (point-min) (point-max))
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring (point-min) (point-max))
                     "# coding: utf-8
 
 
@@ -4332,7 +4560,8 @@ class Foo(models.Model):
 class Bar(models.Model):
     pass
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (point-min)
                      (python-tests-look-at "class Bar(models.Model):"))
                     "# coding: utf-8
@@ -4349,7 +4578,8 @@ class Foo(models.Model):
 def foo():
     print ('a')
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "print ('a')")
                      (point-max))
                     "# -*- coding: utf-8 -*-\nif True:\n    print ('a')\n\n"))))
@@ -4361,7 +4591,8 @@ def foo():
 def foo():
     print ('a')
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (progn
                        (python-tests-look-at "print ('a')")
                        (backward-char 1)
@@ -4379,10 +4610,91 @@ def foo():
 
     print ('a')
 "
-   (should (string= (python-shell-buffer-substring
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
                      (python-tests-look-at "# Whitespace")
                      (point-max))
                     "# -*- coding: utf-8 -*-\n\nif True:\n        # Whitespace\n\n    print ('a')\n\n"))))
+
+(ert-deftest python-shell-buffer-substring-13 ()
+  "Check substring from indented single statement."
+  (python-tests-with-temp-buffer
+   "
+def foo():
+    a = 1
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "a = 1")
+                     (pos-eol))
+                    "# -*- coding: utf-8 -*-\n\na = 1"))))
+
+(ert-deftest python-shell-buffer-substring-14 ()
+  "Check substring from indented single statement spanning multiple lines."
+  (python-tests-with-temp-buffer
+   "
+def foo():
+    a = \"\"\"Some
+    string\"\"\"
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "a = \"\"\"Some")
+                     (pos-eol 2))
+                    "# -*- coding: utf-8 -*-\n\na = \"\"\"Some\n    string\"\"\""))))
+
+(ert-deftest python-shell-buffer-substring-15 ()
+  "Check substring from partial statement."
+  (python-tests-with-temp-buffer
+   "
+def foo():
+    a = 1
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "    a = 1")
+                     (python-tests-look-at " = 1"))
+                    "# -*- coding: utf-8 -*-\n\na"))))
+
+(ert-deftest python-shell-buffer-substring-16 ()
+  "Check substring from partial statement."
+  (python-tests-with-temp-buffer
+   "
+def foo():
+    a = 1
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "1")
+                     (1+ (point)))
+                    "# -*- coding: utf-8 -*-\n\n1"))))
+
+(ert-deftest python-shell-buffer-substring-17 ()
+  "Check substring from multiline string."
+  (python-tests-with-temp-buffer
+   "
+def foo():
+    s = \"\"\"
+    a = 1
+    b = 2
+\"\"\"
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "a = 1")
+                     (python-tests-look-at "\"\"\""))
+                    "# -*- coding: utf-8 -*-\n\nif True:\n    a = 1\n    b = 2\n\n"))))
+
+(ert-deftest python-shell-buffer-substring-18 ()
+  "Check substring from the part of the first line."
+  (python-tests-with-temp-buffer
+   "s = 'test'
+"
+   (should (string= (python-tests-should-not-move
+                     #'python-shell-buffer-substring
+                     (python-tests-look-at "'test'")
+                     (pos-eol))
+                    "'test'"))))
 
 
 
@@ -4566,6 +4878,11 @@ import abc
 
 (ert-deftest python-ffap-module-path-1 ()
   (skip-unless (executable-find python-tests-shell-interpreter))
+  ;; Skip the test on macOS, since the standard Python installation uses
+  ;; libedit rather than readline which confuses the running of an inferior
+  ;; interpreter in this case (see bug#59477 and bug#25753).
+  (skip-unless (not (eq system-type 'darwin)))
+  (trace-function 'python-shell-output-filter)
   (python-tests-with-temp-buffer-with-shell
    "
 import abc
@@ -5031,6 +5348,20 @@ def decoratorFunctionWithArguments(arg1, arg2, arg3):
                     "decoratorFunctionWithArguments"))
    (should (string= (python-info-current-defun t)
                     "def decoratorFunctionWithArguments"))))
+
+(ert-deftest python-info-current-defun-4 ()
+  "Ensure unmatched quotes do not cause hang (Bug#58780)."
+  (python-tests-with-temp-buffer
+   "
+def func():
+    ' \"\"\"
+    v = 1
+"
+   (python-tests-look-at "v = 1")
+   (should (string= (python-info-current-defun)
+                    "func"))
+   (should (string= (python-info-current-defun t)
+                    "def func"))))
 
 (ert-deftest python-info-current-symbol-1 ()
   (python-tests-with-temp-buffer
@@ -5609,6 +5940,26 @@ def func():
      (equal (list (python-tests-look-at "if (" -1 t))
             (python-info-dedenter-opening-block-positions)))))
 
+(ert-deftest python-info-dedenter-opening-block-positions-7 ()
+  "Test case blocks."
+  (python-tests-with-temp-buffer
+   "
+match a:
+    case 1:
+        match b:
+            case 2:
+                something()
+            case 3:
+"
+   (python-tests-look-at "case 1:")
+   (should-not (python-info-dedenter-opening-block-positions))
+   (python-tests-look-at "case 2:")
+   (should-not (python-info-dedenter-opening-block-positions))
+   (python-tests-look-at "case 3:")
+   (equal (list (python-tests-look-at "case 2:" -1)
+                (python-tests-look-at "case 1:" -1 t))
+            (python-info-dedenter-opening-block-positions))))
+
 (ert-deftest python-info-dedenter-opening-block-message-1 ()
   "Test dedenters inside strings are ignored."
   (python-tests-with-temp-buffer
@@ -5793,6 +6144,24 @@ elif b:
                  (back-to-indentation)
                  (point))
                (python-info-dedenter-statement-p)))))
+
+(ert-deftest python-info-dedenter-statement-p-6 ()
+  "Test case keyword."
+  (python-tests-with-temp-buffer
+      "
+match a:  # Comment
+    case 1:
+        match b:
+            case 2:
+                something()
+            case 3:
+"
+    (python-tests-look-at "case 1:")
+    (should-not (python-info-dedenter-statement-p))
+    (python-tests-look-at "case 2:")
+    (should-not (python-info-dedenter-statement-p))
+    (python-tests-look-at "case 3:")
+    (should (= (point) (python-info-dedenter-statement-p)))))
 
 (ert-deftest python-info-line-ends-backslash-p-1 ()
   (python-tests-with-temp-buffer
@@ -6228,6 +6597,56 @@ class Class:
    (should (python-info-docstring-p))
    (python-tests-look-at "'''Not a method docstring.'''")
    (should (not (python-info-docstring-p)))))
+
+(ert-deftest python-info-triple-quoted-string-p-1 ()
+  "Test triple quoted string."
+  (python-tests-with-temp-buffer
+   "
+t = '''Triple'''
+"
+   (python-tests-look-at " '''Triple")
+   (should-not
+    (python-tests-should-not-move
+     #'python-info-triple-quoted-string-p))
+   (forward-char)
+   (let ((start-pos (+ (point) 2))
+         (eol (pos-eol)))
+     (while (< (point) eol)
+       (should (= (python-tests-should-not-move
+                   #'python-info-triple-quoted-string-p)
+                  start-pos))
+       (forward-char)))
+   (dolist (pos `(,(point) ,(point-min) ,(point-max)))
+     (goto-char pos)
+     (should-not
+      (python-tests-should-not-move
+       #'python-info-triple-quoted-string-p)))))
+
+(ert-deftest python-info-triple-quoted-string-p-2 ()
+  "Test empty triple quoted string."
+  (python-tests-with-temp-buffer
+   "
+e = ''''''
+"
+   (python-tests-look-at "''''''")
+   (let ((start-pos (+ (point) 2))
+         (eol (pos-eol)))
+     (while (< (point) eol)
+       (should (= (python-tests-should-not-move
+                   #'python-info-triple-quoted-string-p)
+                  start-pos))
+       (forward-char)))))
+
+(ert-deftest python-info-triple-quoted-string-p-3 ()
+  "Test single quoted string."
+  (python-tests-with-temp-buffer
+   "
+s = 'Single'
+"
+   (while (< (point) (point-max))
+     (should-not (python-tests-should-not-move
+                  #'python-info-triple-quoted-string-p))
+     (forward-char))))
 
 (ert-deftest python-info-encoding-from-cookie-1 ()
   "Should detect it on first line."

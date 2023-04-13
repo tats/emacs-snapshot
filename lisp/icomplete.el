@@ -1,6 +1,6 @@
 ;;; icomplete.el --- minibuffer completion incremental feedback -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2023 Free Software Foundation, Inc.
 
 ;; Author: Ken Manheimer <ken dot manheimer at gmail...>
 ;; Created: Mar 1993 Ken Manheimer, klm@nist.gov - first release to usenet
@@ -215,15 +215,29 @@ the default otherwise."
        ;; calculated, This causes the first cached completion to
        ;; be taken (i.e. the one that the user sees highlighted)
        completion-all-sorted-completions)
-      (minibuffer-force-complete-and-exit)
+      (if (window-minibuffer-p)
+          (minibuffer-force-complete-and-exit)
+        (minibuffer-force-complete (icomplete--field-beg)
+                                   (icomplete--field-end)
+                                   'dont-cycle)
+        (completion-in-region-mode -1))
     ;; Otherwise take the faster route...
-    (minibuffer-complete-and-exit)))
+    (if (window-minibuffer-p)
+        (minibuffer-complete-and-exit)
+      (completion-complete-and-exit
+       (icomplete--field-beg)
+       (icomplete--field-end)
+       (lambda () (completion-in-region-mode -1))))))
 
 (defun icomplete-force-complete ()
   "Complete the icomplete minibuffer."
   (interactive)
   ;; We're not at all interested in cycling here (bug#34077).
-  (minibuffer-force-complete nil nil 'dont-cycle))
+  (if (window-minibuffer-p)
+      (minibuffer-force-complete nil nil 'dont-cycle)
+    (minibuffer-force-complete (icomplete--field-beg)
+                               (icomplete--field-end)
+                               'dont-cycle)))
 
 ;; Apropos `icomplete-scroll', we implement "scrolling icomplete"
 ;; within classic icomplete, which is "rotating", by contrast.
@@ -252,7 +266,7 @@ the default otherwise."
   "Step forward completions by one entry.
 Second entry becomes the first and can be selected with
 `icomplete-force-complete-and-exit'.
-Return non-nil iff something was stepped."
+Return non-nil if something was stepped."
   (interactive)
   (let* ((beg (icomplete--field-beg))
          (end (icomplete--field-end))
@@ -270,7 +284,7 @@ Return non-nil iff something was stepped."
   "Step backward completions by one entry.
 Last entry becomes the first and can be selected with
 `icomplete-force-complete-and-exit'.
-Return non-nil iff something was stepped."
+Return non-nil if something was stepped."
   (interactive)
   (let* ((beg (icomplete--field-beg))
          (end (icomplete--field-end))
@@ -405,6 +419,16 @@ if that doesn't produce a completion match."
   "C-."     #'icomplete-forward-completions
   "C-,"     #'icomplete-backward-completions)
 
+(defun icomplete--fido-ccd ()
+  "Make value for `completion-category-defaults' prioritizing `flex'."
+  (cl-loop
+   for (cat . alist) in completion-category-defaults collect
+   `(,cat . ,(cl-loop
+              for entry in alist for (prop . val) = entry
+              if (eq prop 'styles)
+              collect `(,prop . (flex ,@(delq 'flex val)))
+              else collect entry))))
+
 (defun icomplete--fido-mode-setup ()
   "Setup `fido-mode''s minibuffer."
   (when (and icomplete-mode (icomplete-simple-completing-p))
@@ -416,7 +440,7 @@ if that doesn't produce a completion match."
                 icomplete-scroll (not (null icomplete-vertical-mode))
                 completion-styles '(flex)
                 completion-flex-nospace nil
-                completion-category-defaults nil
+                completion-category-defaults (icomplete--fido-ccd)
                 completion-ignore-case t
                 read-buffer-completion-ignore-case t
                 read-file-name-completion-ignore-case t)))
@@ -430,9 +454,12 @@ more like `ido-mode' than regular `icomplete-mode'."
   :global t
   (remove-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)
   (remove-hook 'minibuffer-setup-hook #'icomplete--fido-mode-setup)
+  (remove-hook 'completion-in-region-mode-hook #'icomplete--in-region-setup)
   (when fido-mode
     (icomplete-mode -1)
     (setq icomplete-mode t)
+    (when icomplete-in-buffer
+      (add-hook 'completion-in-region-mode-hook #'icomplete--in-region-setup))
     (add-hook 'minibuffer-setup-hook #'icomplete-minibuffer-setup)
     (add-hook 'minibuffer-setup-hook #'icomplete--fido-mode-setup)))
 

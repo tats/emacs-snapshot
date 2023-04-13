@@ -1,6 +1,6 @@
 ;;; semantic/symref.el --- Symbol Reference API  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -388,7 +388,8 @@ Each element is a cons cell of the form (LINE . FILENAME).")
 	     :type list
 	     :documentation
 	     "The list of tags with hits in them.
-Use the `semantic-symref-hit-tags' method to get this list.")
+Use the `semantic-symref-hit-to-tag-via-buffer' method to get
+this list.")
    )
   "The results from a symbol reference search.")
 

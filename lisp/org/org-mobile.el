@@ -1,9 +1,9 @@
 ;;; org-mobile.el --- Code for Asymmetric Sync With a Mobile Device -*- lexical-binding: t; -*-
-;; Copyright (C) 2009-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2023 Free Software Foundation, Inc.
 ;;
 ;; Author: Carsten Dominik <carsten.dominik@gmail.com>
 ;; Keywords: outlines, hypermedia, calendar, wp
-;; Homepage: https://orgmode.org
+;; URL: https://orgmode.org
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -30,6 +30,9 @@
 ;; Appendix B of the Org manual.  The code is not specific for the
 ;; iPhone and Android - any external viewer/flagging/editing
 ;; application that uses the same conventions could be used.
+
+(require 'org-macs)
+(org-assert-version)
 
 (require 'cl-lib)
 (require 'org)
@@ -1064,7 +1067,7 @@ be returned that indicates what went wrong."
 	  (progn
 	    ;; Workaround a `org-insert-heading-respect-content' bug
 	    ;; which prevents correct insertion when point is invisible
-	    (org-show-subtree)
+	    (org-fold-show-subtree)
 	    (end-of-line 1)
 	    (org-insert-heading-respect-content t)
 	    (org-demote))

@@ -1,6 +1,6 @@
 ### @configure_input@
 
-# Copyright (C) 1992-2022 Free Software Foundation, Inc.
+# Copyright (C) 1992-2023 Free Software Foundation, Inc.
 
 # This file is part of GNU Emacs.
 
@@ -841,7 +841,7 @@ install-etc:
 	rm -f $${tmp}
 	tmp=etc/emacsclient.tmpdesktop; rm -f $${tmp}; \
 	client_name=`echo emacsclient | sed '$(TRANSFORM)'`${EXEEXT}; \
-	sed -e "/^Exec=emacsclient/ s|emacsclient|${bindir}/$${client_name}|" \
+	sed -e "/^Exec=/ s|emacsclient|${bindir}/$${client_name}|" \
 	  -e "/^Icon=emacs/ s/emacs/${EMACS_NAME}/" \
 	  $(USE_STARTUP_NOTIFICATION_SED_CMD) \
 	  ${srcdir}/etc/emacsclient.desktop > $${tmp}; \
@@ -855,7 +855,7 @@ install-etc:
 	rm -f $${tmp}
 	tmp=etc/emacsclient-mail.tmpdesktop; rm -f $${tmp}; \
 	client_name=`echo emacsclient | sed '$(TRANSFORM)'`${EXEEXT}; \
-	sed -e "/^Exec=emacsclient/ s|emacsclient|${bindir}/$${client_name}|" \
+	sed -e "/^Exec=/ s|emacsclient|${bindir}/$${client_name}|" \
 	  -e "/^Icon=emacs/ s/emacs/${EMACS_NAME}/" \
 	  ${srcdir}/etc/emacsclient-mail.desktop > $${tmp}; \
 	${INSTALL_DATA} $${tmp} "$(DESTDIR)${desktopdir}/$${client_name}-mail.desktop"; \
@@ -1270,7 +1270,7 @@ emacslog = build-aux/gitlog-to-emacslog
 # The ChangeLog history files are called ChangeLog.1, ChangeLog.2, ...,
 # ChangeLog.$(CHANGELOG_HISTORY_INDEX_MAX).  $(CHANGELOG_N) stands for
 # the newest (highest-numbered) ChangeLog history file.
-CHANGELOG_HISTORY_INDEX_MAX = 3
+CHANGELOG_HISTORY_INDEX_MAX = 4
 CHANGELOG_N = ChangeLog.$(CHANGELOG_HISTORY_INDEX_MAX)
 
 # Convert git commit log to ChangeLog file.  make-dist uses this.
@@ -1280,7 +1280,7 @@ ChangeLog:
 	  ./$(emacslog) -o $(CHANGELOG) -n $(CHANGELOG_HISTORY_INDEX_MAX)
 
 # Check that we are in a good state for changing history.
-PREFERRED_BRANCH = emacs-28
+PREFERRED_BRANCH = emacs-29
 preferred-branch-is-current:
 	git branch | grep -q '^\* $(PREFERRED_BRANCH)$$'
 unchanged-history-files:

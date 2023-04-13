@@ -1,6 +1,6 @@
 ;;; easy-mmode.el --- easy definition for major and minor modes  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997, 2000-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2000-2023 Free Software Foundation, Inc.
 
 ;; Author: Georges Brun-Cottan <Georges.Brun-Cottan@inria.fr>
 ;; Maintainer: Stefan Monnier <monnier@gnu.org>
@@ -417,8 +417,6 @@ No problems result if this variable is not bound.
 	  `(defvar ,keymap-sym
 	     (let ((m ,keymap))
 	       (cond ((keymapp m) m)
-                     ;; FIXME: `easy-mmode-define-keymap' is obsolete,
-                     ;; so this form should also be obsolete somehow.
 		     ((listp m)
                       (with-suppressed-warnings ((obsolete
                                                   easy-mmode-define-keymap))
@@ -451,15 +449,23 @@ No problems result if this variable is not bound.
 TURN-ON is a function that will be called with no args in every buffer
 and that should try to turn MODE on if applicable for that buffer.
 
-Each of KEY VALUE is a pair of CL-style keyword arguments.  :predicate
-specifies which major modes the globalized minor mode should be switched on
-in.  As the minor mode defined by this function is always global, any
-:global keyword is ignored.  Other keywords have the same meaning as in
-`define-minor-mode', which see.  In particular, :group specifies the custom
-group.  The most useful keywords are those that are passed on to the
-`defcustom'.  It normally makes no sense to pass the :lighter or :keymap
-keywords to `define-globalized-minor-mode', since these are usually passed
-to the buffer-local version of the minor mode.
+Each of KEY VALUE is a pair of CL-style keyword arguments.
+The :predicate argument specifies in which major modes should the
+globalized minor mode be switched on.  The value should be t (meaning
+switch on the minor mode in all major modes), nil (meaning don't
+switch on in any major mode), a list of modes (meaning switch on only
+in those modes and their descendants), or a list (not MODES...),
+meaning switch on in any major mode except MODES.  The value can also
+mix all of these forms, see the info node `Defining Minor Modes' for
+details.
+As the minor mode defined by this function is always global, any
+:global keyword is ignored.
+Other keywords have the same meaning as in `define-minor-mode',
+which see.  In particular, :group specifies the custom group.
+The most useful keywords are those that are passed on to the `defcustom'.
+It normally makes no sense to pass the :lighter or :keymap keywords
+to `define-globalized-minor-mode', since these are usually passed to
+the buffer-local version of the minor mode.
 
 BODY contains code to execute each time the mode is enabled or disabled.
 It is executed after toggling the mode, and before running
@@ -511,7 +517,7 @@ on if the hook has explicitly disabled it.
          (setq turn-on-function
                `(lambda ()
                   (require 'easy-mmode)
-                  (when (easy-mmode--globalized-predicate-p ,(car predicate))
+                  (when (easy-mmode--globalized-predicate-p ,MODE-predicate)
                     (funcall ,turn-on-function)))))
         (_ (push keyw extra-keywords) (push (pop body) extra-keywords))))
 
@@ -684,7 +690,6 @@ Valid keywords and arguments are:
   :group     Ignored.
   :suppress  Non-nil to call `suppress-keymap' on keymap,
              `nodigits' to suppress digits as prefix arguments."
-  (declare (obsolete define-keymap "29.1"))
   (let (inherit dense suppress)
     (while args
       (let ((key (pop args))
@@ -725,7 +730,9 @@ The M, BS, and ARGS arguments are as per that function.  DOC is
 the constant's documentation.
 
 This macro is deprecated; use `defvar-keymap' instead."
-  (declare (doc-string 3) (indent 1) (obsolete defvar-keymap "29.1"))
+  ;; FIXME: Declare obsolete in favor of `defvar-keymap'.  It is still
+  ;; used for `gud-menu-map' and `gud-minor-mode-map', so fix that first.
+  (declare (doc-string 3) (indent 1))
   `(defconst ,m
      (easy-mmode-define-keymap ,bs nil (if (boundp ',m) ,m) ,(cons 'list args))
      ,doc))

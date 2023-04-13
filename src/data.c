@@ -1,5 +1,5 @@
 /* Primitive operations on Lisp data types for GNU Emacs Lisp interpreter.
-   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
+   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2023 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -773,7 +773,10 @@ DEFUN ("symbol-plist", Fsymbol_plist, Ssymbol_plist, 1, 1, 0,
 }
 
 DEFUN ("symbol-name", Fsymbol_name, Ssymbol_name, 1, 1, 0,
-       doc: /* Return SYMBOL's name, a string.  */)
+       doc: /* Return SYMBOL's name, a string.
+
+Warning: never alter the string returned by `symbol-name'.
+Doing that might make Emacs dysfunctional, and might even crash Emacs.  */)
   (register Lisp_Object symbol)
 {
   register Lisp_Object name;
@@ -855,7 +858,7 @@ DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
 #ifdef HAVE_NATIVE_COMP
   register Lisp_Object function = XSYMBOL (symbol)->u.s.function;
 
-  if (comp_enable_subr_trampolines
+  if (!NILP (Vnative_comp_enable_subr_trampolines)
       && SUBRP (function)
       && !SUBR_NATIVE_COMPILEDP (function))
     CALLN (Ffuncall, Qcomp_subr_trampoline_install, symbol);

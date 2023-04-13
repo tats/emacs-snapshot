@@ -1,6 +1,6 @@
 ;;; url-gw.el --- Gateway munging for URL loading  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997-1998, 2004-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2004-2023 Free Software Foundation, Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -208,7 +208,7 @@ linked Emacs under SunOS 4.x."
       proc)))
 
 (defvar url-gw-rlogin-obsolete-warned-once nil)
-(make-obsolete-variable url-gw-rlogin-obsolete-warned-once nil "29.1")
+(make-obsolete-variable 'url-gw-rlogin-obsolete-warned-once nil "29.1")
 
 ;;;###autoload
 (defun url-open-stream (name buffer host service &optional gateway-method)

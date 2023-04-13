@@ -4788,7 +4788,7 @@
 2003-03-10  Thien-Thi Nguyen  <ttn@gnu.org>
 
 	* progmodes/scheme.el (scheme-mode-syntax-table):
-	Construct w/o using `with-syntax-table'.
+	Construct without using `with-syntax-table'.
 
 2003-03-10  John Paul Wallington  <jpw@gnu.org>
 
@@ -23541,7 +23541,7 @@ See ChangeLog.9 for earlier changes.
 ;; coding: utf-8
 ;; End:
 
-    Copyright (C) 2001-2022 Free Software Foundation, Inc.
+    Copyright (C) 2001-2023 Free Software Foundation, Inc.
 
   This file is part of GNU Emacs.
 

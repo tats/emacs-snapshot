@@ -1,6 +1,6 @@
 ;;; tramp-tests.el --- Tests of remote file access  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
@@ -3495,6 +3495,9 @@ This tests also `access-file', `file-readable-p',
 	     (access-file tmp-name1 "error")
 	     :type 'file-missing)
 
+	    (should-not (file-exists-p tmp-name1))
+	    (should-not (file-readable-p tmp-name1))
+	    (should-not (file-regular-p tmp-name1))
 	    ;; `file-ownership-preserved-p' should return t for
 	    ;; non-existing files.
 	    (when test-file-ownership-preserved-p
@@ -3579,7 +3582,7 @@ This tests also `access-file', `file-readable-p',
 	    (should (file-exists-p tmp-name1))
 	    (should (file-readable-p tmp-name1))
 	    (should-not (file-regular-p tmp-name1))
-	    (should-not (access-file tmp-name1 ""))
+	    (should-not (access-file tmp-name1 "error"))
 	    (when test-file-ownership-preserved-p
 	      (should (file-ownership-preserved-p tmp-name1 'group)))
 	    (setq attr (file-attributes tmp-name1))
@@ -3927,7 +3930,10 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (tramp--test-ignore-make-symbolic-link-error
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
+	    (should (file-regular-p tmp-name1))
 	    (make-symbolic-link tmp-name1 tmp-name2)
+	    (should (file-exists-p tmp-name2))
+	    (should (file-regular-p tmp-name2))
 	    (should
 	     (string-equal
 	      (funcall
@@ -3978,6 +3984,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	       (string-equal tmp-name1 (file-symlink-p tmp-name3))))
 	    ;; Check directory as newname.
 	    (make-directory tmp-name4)
+	    (should (file-directory-p tmp-name4))
+	    (should-not (file-regular-p tmp-name4))
 	    (when (tramp--test-expensive-test-p)
 	      (should-error
 	       (make-symbolic-link tmp-name1 tmp-name4)
@@ -3991,6 +3999,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (file-symlink-p tmp-name5)))
 	    ;; Check, that files in symlinked directories still work.
 	    (make-symbolic-link tmp-name4 tmp-name6)
+	    (should (file-symlink-p tmp-name6))
+	    (should-not (file-regular-p tmp-name6))
 	    (write-region "foo" nil (expand-file-name "foo" tmp-name6))
 	    (delete-file (expand-file-name "foo" tmp-name6))
 	    (should-not (file-exists-p (expand-file-name "foo" tmp-name4)))
@@ -4052,9 +4062,11 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (tramp--test-ignore-make-symbolic-link-error
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
+	    (should (file-regular-p tmp-name1))
 	    (should (string-equal tmp-name1 (file-truename tmp-name1)))
 	    (make-symbolic-link tmp-name1 tmp-name2)
 	    (should (file-symlink-p tmp-name2))
+	    (should (file-regular-p tmp-name2))
 	    (should-not (string-equal tmp-name2 (file-truename tmp-name2)))
 	    (should
 	     (string-equal (file-truename tmp-name1) (file-truename tmp-name2)))
@@ -4064,6 +4076,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (let ((default-directory ert-remote-temporary-file-directory))
 	      (make-symbolic-link (file-name-nondirectory tmp-name1) tmp-name2))
 	    (should (file-symlink-p tmp-name2))
+	    (should (file-regular-p tmp-name2))
 	    (should-not (string-equal tmp-name2 (file-truename tmp-name2)))
 	    (should
 	     (string-equal (file-truename tmp-name1) (file-truename tmp-name2)))
@@ -4079,6 +4092,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		(if quoted #'tramp-compat-file-name-unquote #'identity) penguin)
 	       tmp-name2)
 	      (should (file-symlink-p tmp-name2))
+	      (should-not (file-regular-p tmp-name2))
 	      (should
 	       (string-equal
 		(file-truename tmp-name2)
@@ -4089,6 +4103,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (unless (tramp--test-windows-nt-p)
 	      (make-symbolic-link tmp-name1 tmp-name3)
 	      (should (file-symlink-p tmp-name3))
+	      (should-not (file-regular-p tmp-name3))
               (should-not (string-equal tmp-name3 (file-truename tmp-name3)))
 	      ;; `file-truename' returns a quoted file name for `tmp-name3'.
 	      ;; We must unquote it.
@@ -4117,6 +4132,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		(make-symbolic-link
 		 tmp-name3
 		 (setq tmp-name3 (tramp--test-make-temp-name nil quoted))))
+	      (should-not (file-regular-p tmp-name2))
+	      (should-not (file-regular-p tmp-name3))
 	      (should
 	       (string-equal
 		(file-truename tmp-name2)
@@ -4147,6 +4164,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (tramp--test-ignore-make-symbolic-link-error
 	     (make-symbolic-link tmp-name2 tmp-name1)
 	     (should (file-symlink-p tmp-name1))
+	     (should-not (file-regular-p tmp-name1))
+	     (should-not (file-regular-p tmp-name2))
 	     (if (tramp--test-smb-p)
 		 ;; The symlink command of "smbclient" detects the
 		 ;; cycle already.
@@ -4155,6 +4174,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		  :type 'file-error)
 	       (make-symbolic-link tmp-name1 tmp-name2)
 	       (should (file-symlink-p tmp-name2))
+	       (should-not (file-regular-p tmp-name2))
 	       (should-error
 		(file-truename tmp-name1)
 		:type 'file-error))))
@@ -5503,15 +5523,11 @@ INPUT, if non-nil, is a string sent to the process."
 	       ;; String to be sent.
 	       (format "%s\n" (file-name-nondirectory tmp-name)))
 	      (should
-	       (string-equal
-		;; tramp-adb.el echoes, so we must add the string.
-		(if (and (tramp--test-adb-p)
-			 (not (tramp-direct-async-process-p)))
-		    (format
-		     "%s\n%s\n"
-		     (file-name-nondirectory tmp-name)
-		     (file-name-nondirectory tmp-name))
-		  (format "%s\n" (file-name-nondirectory tmp-name)))
+	       (string-match-p
+		;; Some shells echo, for example the "adb" or container methods.
+		(tramp-compat-rx
+		 bos (** 1 2 (literal (file-name-nondirectory tmp-name)) "\n")
+		 eos)
 		(buffer-string))))
 
 	  ;; Cleanup.
@@ -5803,6 +5819,8 @@ INPUT, if non-nil, is a string sent to the process."
 	 (enable-remote-dir-locals t)
          (inhibit-message t)
 	 kill-buffer-query-functions
+	 (clpa connection-local-profile-alist)
+	 (clca connection-local-criteria-alist)
 	 connection-local-profile-alist connection-local-criteria-alist)
     (unwind-protect
 	(progn
@@ -5851,6 +5869,9 @@ INPUT, if non-nil, is a string sent to the process."
 	    (kill-buffer (current-buffer))))
 
       ;; Cleanup.
+      (custom-set-variables
+       `(connection-local-profile-alist ',clpa now)
+       `(connection-local-criteria-alist ',clca now))
       (ignore-errors (delete-directory tmp-name1 'recursive)))))
 
 (ert-deftest tramp-test34-explicit-shell-file-name ()
@@ -5865,6 +5886,8 @@ INPUT, if non-nil, is a string sent to the process."
 
   (let ((default-directory ert-remote-temporary-file-directory)
 	explicit-shell-file-name kill-buffer-query-functions
+	(clpa connection-local-profile-alist)
+	(clca connection-local-criteria-alist)
 	connection-local-profile-alist connection-local-criteria-alist)
     (unwind-protect
 	(progn
@@ -5899,6 +5922,9 @@ INPUT, if non-nil, is a string sent to the process."
 
       ;; Cleanup.
       (put 'explicit-shell-file-name 'permanent-local nil)
+      (custom-set-variables
+       `(connection-local-profile-alist ',clpa now)
+       `(connection-local-criteria-alist ',clca now))
       (kill-buffer "*shell*"))))
 
 ;; `exec-path' was introduced in Emacs 27.1.  `executable-find' has
@@ -6597,20 +6623,20 @@ INPUT, if non-nil, is a string sent to the process."
 
 (defun tramp--test-emacs27-p ()
   "Check for Emacs version >= 27.1.
-Some semantics has been changed for there, w/o new functions or
-variables, so we check the Emacs version directly."
+Some semantics has been changed for there, without new functions
+or variables, so we check the Emacs version directly."
   (>= emacs-major-version 27))
 
 (defun tramp--test-emacs28-p ()
   "Check for Emacs version >= 28.1.
-Some semantics has been changed for there, w/o new functions or
-variables, so we check the Emacs version directly."
+Some semantics has been changed for there, without new functions
+or variables, so we check the Emacs version directly."
   (>= emacs-major-version 28))
 
 (defun tramp--test-emacs29-p ()
   "Check for Emacs version >= 29.1.
-Some semantics has been changed for there, w/o new functions or
-variables, so we check the Emacs version directly."
+Some semantics has been changed for there, without new functions
+or variables, so we check the Emacs version directly."
   (>= emacs-major-version 29))
 
 (defun tramp--test-adb-p ()
@@ -6641,11 +6667,12 @@ This is used in tests which we don't want to tag
   "Check, whether the remote directory is encrypted."
   (tramp-crypt-file-name-p ert-remote-temporary-file-directory))
 
-(defun tramp--test-docker-p ()
-  "Check, whether the docker method is used.
+(defun tramp--test-container-p ()
+  "Check, whether a container method is used.
 This does not support some special file names."
-  (string-equal
-   "docker" (file-remote-p ert-remote-temporary-file-directory 'method)))
+  (string-match-p
+   (rx bol (| "docker" "podman") eol)
+   (file-remote-p ert-remote-temporary-file-directory 'method)))
 
 (defun tramp--test-expensive-test-p ()
   "Whether expensive tests are run.
@@ -7030,7 +7057,7 @@ This requires restrictions of file name syntax."
   (let ((files
 	 (list
 	  (cond ((or (tramp--test-ange-ftp-p)
-		     (tramp--test-docker-p)
+		     (tramp--test-container-p)
 		     (tramp--test-gvfs-p)
 		     (tramp--test-rclone-p)
 		     (tramp--test-sudoedit-p)
@@ -7088,7 +7115,7 @@ This requires restrictions of file name syntax."
   "Check UTF8 encoding in file names and file contents."
   (skip-unless (tramp--test-enabled))
   (skip-unless (not (getenv "EMACS_HYDRA_CI"))) ; SLOW ~ 620s
-  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-container-p)))
   (skip-unless (not (tramp--test-rsync-p)))
   (skip-unless (not (tramp--test-windows-nt-and-out-of-band-p)))
   (skip-unless (not (tramp--test-ksh-p)))
@@ -7217,7 +7244,7 @@ process sentinels.  They shall not disturb each other."
   ;; remote processes in Emacs.  That doesn't work for tramp-adb.el.
   (when (tramp--test-adb-p)
     (skip-unless (tramp--test-emacs27-p)))
-  (skip-unless (not (tramp--test-docker-p)))
+  (skip-unless (not (tramp--test-container-p)))
   (skip-unless (not (tramp--test-telnet-p)))
   (skip-unless (not (tramp--test-sshfs-p)))
   (skip-unless (not (tramp--test-windows-nt-p)))
@@ -7707,6 +7734,8 @@ If INTERACTIVE is non-nil, the tests are run interactively."
 ;; * file-equal-p (partly done in `tramp-test21-file-links')
 ;; * file-in-directory-p
 ;; * file-name-case-insensitive-p
+;; * memory-info
+;; * tramp-get-home-directory
 ;; * tramp-get-remote-gid
 ;; * tramp-get-remote-groups
 ;; * tramp-get-remote-uid

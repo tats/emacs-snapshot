@@ -1,6 +1,6 @@
 ;;; help-fns.el --- Complex help functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1993-1994, 1998-2022 Free Software
+;; Copyright (C) 1985-1986, 1993-1994, 1998-2023 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -437,7 +437,7 @@ the C sources, too."
       (setq file-name
 	    (locate-file file-name load-path '(".el" ".elc") 'readable)))
      ((and (stringp file-name)
-	   (string-match "[.]*loaddefs.el\\'" file-name))
+	   (string-match "[.]*loaddefs.elc?\\'" file-name))
       ;; An autoloaded variable or face.  Visit loaddefs.el in a buffer
       ;; and try to extract the defining file.  The following form is
       ;; from `describe-function-1' and `describe-variable'.

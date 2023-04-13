@@ -1,6 +1,6 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2022 Free Software
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2023 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -789,7 +789,7 @@ Subexpression 2 must end right before the \\n.")
                '(dired-move-to-filename)
                nil
                '(1 dired-symlink-face)
-               '(2 '(face dired-directory-face dired-symlink-filename t))))
+               '(2 `(face ,dired-directory-face dired-symlink-filename t))))
    ;;
    ;; Symbolic link to a non-directory.
    (list dired-re-sym
@@ -2728,7 +2728,8 @@ directory in another window."
 (defun dired--find-possibly-alternative-file (file)
   "Find FILE, but respect `dired-kill-when-opening-new-dired-buffer'."
   (if (and dired-kill-when-opening-new-dired-buffer
-           (file-directory-p file))
+           (file-directory-p file)
+           (< (length (get-buffer-window-list)) 2))
       (progn
         (set-buffer-modified-p nil)
         (dired--find-file #'find-alternate-file file))
@@ -4882,9 +4883,9 @@ Interactively with prefix argument, read FILE-NAME."
 
 (defvar-keymap dired-jump-map
   :doc "Keymap to repeat `dired-jump'.  Used in `repeat-mode'."
+  :repeat t
   "j"   #'dired-jump
   "C-j" #'dired-jump)
-(put 'dired-jump 'repeat-map 'dired-jump-map)
 
 
 ;;; Miscellaneous commands

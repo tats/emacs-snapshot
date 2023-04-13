@@ -1,6 +1,6 @@
 ;;; semantic/sort.el --- Utilities for sorting and re-arranging tag tables.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: syntax
@@ -474,7 +474,7 @@ The default behavior, if not overridden with
 the name of TAG.
 
 If this function is overridden, use
-`semantic-tag-external-member-children-p-default' to also
+`semantic-tag-external-member-children-default' to also
 include the default behavior, and merely extend your own."
   )
 

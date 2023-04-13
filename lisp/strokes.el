@@ -1,6 +1,6 @@
 ;;; strokes.el --- control Emacs through mouse strokes  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997, 2000-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2000-2023 Free Software Foundation, Inc.
 
 ;; Author: David Bakhash <cadet@alum.mit.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -1151,7 +1151,7 @@ the stroke as a character in some language."
 						     strokes-last-stroke)
 						 31))))
 	  (lift-flag t)
-	  (rainbow-chars (list ?R ?O ?Y ?G ?B ?P))) ; ROYGBIV w/o indigo
+	  (rainbow-chars (list ?R ?O ?Y ?G ?B ?P))) ; ROYGBIV without indigo
       (set-buffer buf)
       (erase-buffer)
       (insert strokes-xpm-header)

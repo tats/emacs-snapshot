@@ -1,6 +1,6 @@
 /* Fully extensible Emacs, running on Unix, intended for GNU.
 
-Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2022 Free Software
+Copyright (C) 1985-1987, 1993-1995, 1997-1999, 2001-2023 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -1924,6 +1924,12 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	 Vcoding_system_hash_table.  */
       syms_of_coding ();	/* This should be after syms_of_fileio.  */
       init_frame_once ();       /* Before init_window_once.  */
+      /* init_window_once calls make_initial_frame, which calls
+	 Fcurrent_time and bset_display_time, both of which allocate
+	 bignums.  Without the following call to init_bignums, crashes
+	 happen on Windows 9X after dumping when GC tries to free a
+	 pointer allocated on the system heap.  */
+      init_bignum ();
       init_window_once ();	/* Init the window system.  */
 #ifdef HAVE_WINDOW_SYSTEM
       init_fringe_once ();	/* Swap bitmaps if necessary.  */
@@ -1948,7 +1954,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   /* Do less garbage collection in batch mode (since these tend to be
      more short-lived, and the memory is returned to the OS on exit
      anyway).  */
-  Vgc_cons_percentage = make_float (noninteractive? 1.0: 0.1);
+  Vgc_cons_percentage = make_float (noninteractive && initialized ? 1.0 : 0.1);
 
   no_loadup
     = argmatch (argv, argc, "-nl", "--no-loadup", 6, NULL, &skip_args);
@@ -2904,6 +2910,7 @@ killed.  */
 
   if (!NILP (restart))
     {
+      turn_on_atimers (false);
 #ifdef WINDOWSNT
       if (w32_reexec_emacs (initial_cmdline, initial_wd) < 0)
 #else

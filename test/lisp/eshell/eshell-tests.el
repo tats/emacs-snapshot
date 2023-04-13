@@ -1,6 +1,6 @@
 ;;; eshell-tests.el --- Eshell test suite  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2023 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -105,36 +105,56 @@
      (format template "format \"%s\" eshell-in-pipeline-p")
      "nil")))
 
-(ert-deftest eshell-test/escape-nonspecial ()
-  "Test that \"\\c\" and \"c\" are equivalent when \"c\" is not a
-special character."
-  (with-temp-eshell
-   (eshell-match-command-output "echo he\\llo"
-                                "hello\n")))
+(ert-deftest eshell-test/eshell-command/simple ()
+  "Test that the `eshell-command' function writes to the current buffer."
+  (skip-unless (executable-find "echo"))
+  (ert-with-temp-directory eshell-directory-name
+    (let ((eshell-history-file-name nil))
+      (with-temp-buffer
+        (eshell-command "*echo hi" t)
+        (should (equal (buffer-string) "hi\n"))))))
 
-(ert-deftest eshell-test/escape-nonspecial-unicode ()
-  "Test that \"\\c\" and \"c\" are equivalent when \"c\" is a
-unicode character (unicode characters are nonspecial by
-definition)."
-  (with-temp-eshell
-   (eshell-match-command-output "echo Vid\\éos"
-                                "Vidéos\n")))
+(ert-deftest eshell-test/eshell-command/pipeline ()
+  "Test that the `eshell-command' function writes to the current buffer.
+This test uses a pipeline for the command."
+  (skip-unless (and (executable-find "echo")
+                    (executable-find "cat")))
+  (ert-with-temp-directory eshell-directory-name
+    (let ((eshell-history-file-name nil))
+      (with-temp-buffer
+        (eshell-command "*echo hi | *cat" t)
+        (should (equal (buffer-string) "hi\n"))))))
 
-(ert-deftest eshell-test/escape-nonspecial-quoted ()
-  "Test that the backslash is preserved for escaped nonspecial
-chars"
-  (with-temp-eshell
-   (eshell-match-command-output "echo \"h\\i\""
-                                ;; Backslashes are doubled for regexp.
-                                "h\\\\i\n")))
+(ert-deftest eshell-test/eshell-command/background ()
+  "Test that `eshell-command' works for background commands."
+  (skip-unless (executable-find "echo"))
+  (ert-with-temp-directory eshell-directory-name
+    (let ((eshell-history-file-name nil))
+      ;; XXX: We can't write to the current buffer here, since
+      ;; `eshell-command' will produce an invalid command in that
+      ;; case.  Just make sure the command runs and produces an output
+      ;; buffer.
+      (eshell-command "*echo hi &")
+      (with-current-buffer "*Eshell Async Command Output*"
+        (while (get-buffer-process (current-buffer))
+          (accept-process-output))
+        (goto-char (point-min))
+        (should (looking-at "\\[echo\\(\\.exe\\)?\\(<[0-9]+>\\)?\\]"))))))
 
-(ert-deftest eshell-test/escape-special-quoted ()
-  "Test that the backslash is not preserved for escaped special
-chars"
-  (with-temp-eshell
-   (eshell-match-command-output "echo \"\\\"hi\\\\\""
-                                ;; Backslashes are doubled for regexp.
-                                "\\\"hi\\\\\n")))
+(ert-deftest eshell-test/eshell-command/background-pipeline ()
+  "Test that `eshell-command' works for background commands.
+This test uses a pipeline for the command."
+  (skip-unless (and (executable-find "echo")
+                    (executable-find "cat")))
+  (ert-with-temp-directory eshell-directory-name
+    (let ((eshell-history-file-name nil))
+      ;; XXX: As above, we can't write to the current buffer here.
+      (eshell-command "*echo hi | *cat &")
+      (with-current-buffer "*Eshell Async Command Output*"
+        (while (get-buffer-process (current-buffer))
+          (accept-process-output))
+        (goto-char (point-min))
+        (should (looking-at "\\[cat\\(\\.exe\\)?\\(<[0-9]+>\\)?\\]"))))))
 
 (ert-deftest eshell-test/command-running-p ()
   "Modeline should show no command running"

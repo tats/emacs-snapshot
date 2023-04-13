@@ -1,6 +1,6 @@
 /* Storage allocation and gc for GNU Emacs Lisp interpreter.
 
-Copyright (C) 1985-2022  Free Software Foundation, Inc.
+Copyright (C) 1985-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -3542,7 +3542,8 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
 	 && FIXNATP (args[COMPILED_STACK_DEPTH])))
     error ("Invalid byte-code object");
 
-  pin_string (args[COMPILED_BYTECODE]);  // Bytecode must be immovable.
+  /* Bytecode must be immovable.  */
+  pin_string (args[COMPILED_BYTECODE]);
 
   /* We used to purecopy everything here, if purify-flag was set.  This worked
      OK for Emacs-23, but with Emacs-24's lexical binding code, it can be
@@ -5275,7 +5276,8 @@ valid_lisp_object_p (Lisp_Object obj)
       if (valid <= 0)
 	return valid;
 
-      if (SUBRP (obj))
+      /* Strings and conses produced by AUTO_STRING etc. all get here.  */
+      if (SUBRP (obj) || STRINGP (obj) || CONSP (obj))
 	return 1;
 
       return 0;
@@ -5686,7 +5688,7 @@ purecopy (Lisp_Object obj)
       memcpy (vec, objp, nbytes);
       for (i = 0; i < size; i++)
 	vec->contents[i] = purecopy (vec->contents[i]);
-      // Byte code strings must be pinned.
+      /* Byte code strings must be pinned.  */
       if (COMPILEDP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))
 	pin_string (vec->contents[1]);
@@ -7436,7 +7438,7 @@ DEFUN ("memory-info", Fmemory_info, Smemory_info, 0, 0, 0,
 All values are in Kbytes.  If there is no swap space,
 last two values are zero.  If the system is not supported
 or memory information can't be obtained, return nil.
-If `default-directory’ is remote, return memory information of the
+If `default-directory' is remote, return memory information of the
 respective remote host.  */)
   (void)
 {

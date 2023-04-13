@@ -1,6 +1,6 @@
 ;;; semantic/lex-spp.el --- Semantic Lexical Pre-processor  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -1256,7 +1256,7 @@ DOC is the documentation for the analyzer.
 REGEXP is a regular expression for the analyzer to match.
 See `define-lex-regex-analyzer' for more on regexp.
 TOKIDX is an index into REGEXP for which a new lexical token
-of type `spp-macro-include' is to be created.
+of type `spp-system-include' is to be created.
 VALFORM are forms that return the name of the thing being included, and the
 type of include.  The return value should be of the form:
   (NAME . TYPE)

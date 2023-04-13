@@ -1,6 +1,6 @@
 ;;; wid-edit.el --- Functions for creating and using widgets -*- lexical-binding:t -*-
 ;;
-;; Copyright (C) 1996-1997, 1999-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1997, 1999-2023 Free Software Foundation, Inc.
 ;;
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -2220,7 +2220,9 @@ But if NO-TRUNCATE is non-nil, include them."
             (if (widget-get current :inline)
                 (setq val value
                       fun :match-inline)
-              (setq val (car value)
+              (setq val (if (consp value)
+                            (car value)
+                          value)
                     fun :match))
           (setq val value
                 fun :match))

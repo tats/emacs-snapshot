@@ -1,6 +1,6 @@
 /* Display generation from window structure and buffer text.
 
-Copyright (C) 1985-2022  Free Software Foundation, Inc.
+Copyright (C) 1985-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -3498,18 +3498,18 @@ init_iterator (struct it *it, struct window *w,
 static int
 get_narrowed_width (struct window *w)
 {
-  int fact;
   /* In a character-only terminal, only one font size is used, so we
      can use a smaller factor.  */
-  fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
-  return fact * window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  int fact = EQ (Fterminal_live_p (Qnil), Qt) ? 2 : 3;
+  int width = window_body_width (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  return fact * max (1, width);
 }
 
 static int
 get_narrowed_len (struct window *w)
 {
-  return get_narrowed_width (w) *
-    window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  int height = window_body_height (w, WINDOW_BODY_IN_CANONICAL_CHARS);
+  return get_narrowed_width (w) * max (1, height);
 }
 
 ptrdiff_t
@@ -3536,11 +3536,11 @@ get_closer_narrowed_begv (struct window *w, ptrdiff_t pos)
 ptrdiff_t
 get_locked_narrowing_begv (ptrdiff_t pos)
 {
-  if (long_line_locked_narrowing_region_size <= 0)
+  if (long_line_optimizations_region_size <= 0)
     return BEGV;
-  int len = long_line_locked_narrowing_region_size / 2;
+  int len = long_line_optimizations_region_size / 2;
   int begv = max (pos - len, BEGV);
-  int limit = long_line_locked_narrowing_bol_search_limit;
+  int limit = long_line_optimizations_bol_search_limit;
   while (limit > 0)
     {
       if (begv == BEGV || FETCH_BYTE (CHAR_TO_BYTE (begv) - 1) == '\n')
@@ -3554,9 +3554,9 @@ get_locked_narrowing_begv (ptrdiff_t pos)
 ptrdiff_t
 get_locked_narrowing_zv (ptrdiff_t pos)
 {
-  if (long_line_locked_narrowing_region_size <= 0)
+  if (long_line_optimizations_region_size <= 0)
     return ZV;
-  int len = long_line_locked_narrowing_region_size / 2;
+  int len = long_line_optimizations_region_size / 2;
   return min (pos + len, ZV);
 }
 
@@ -4394,7 +4394,7 @@ handle_fontified_prop (struct it *it)
       eassert (it->end_charpos == ZV);
 
       if (current_buffer->long_line_optimizations_p
-	  && long_line_locked_narrowing_region_size > 0)
+	  && long_line_optimizations_region_size > 0)
 	{
 	  ptrdiff_t begv = it->locked_narrowing_begv;
 	  ptrdiff_t zv = it->locked_narrowing_zv;
@@ -4406,7 +4406,7 @@ handle_fontified_prop (struct it *it)
 	    }
 	  if (begv != BEG || zv != Z)
 	    narrow_to_region_locked (make_fixnum (begv), make_fixnum (zv),
-				     Qfontification_functions);
+				     Qlong_line_optimizations_in_fontification_functions);
 	}
 
       /* Don't allow Lisp that runs from 'fontification-functions'
@@ -4583,7 +4583,7 @@ face_at_pos (const struct it *it, enum lface_attribute_index attr_filter)
                                       &next_stop,
                                       base_face_id, false,
                                       attr_filter);
-    } // !STRINGP (it->string))
+    } /* !STRINGP (it->string) */
 }
 
 
@@ -6281,13 +6281,16 @@ static ptrdiff_t
 string_buffer_position (Lisp_Object string, ptrdiff_t around_charpos)
 {
   const int MAX_DISTANCE = 1000;
+  ptrdiff_t forward_limit = min (around_charpos + MAX_DISTANCE, ZV);
   ptrdiff_t found = string_buffer_position_lim (string, around_charpos,
-						around_charpos + MAX_DISTANCE,
-						false);
+						forward_limit, false);
 
   if (!found)
-    found = string_buffer_position_lim (string, around_charpos,
-					around_charpos - MAX_DISTANCE, true);
+    {
+      ptrdiff_t backward_limit = max (around_charpos - MAX_DISTANCE, BEGV);
+      found = string_buffer_position_lim (string, around_charpos,
+					  backward_limit, true);
+    }
   return found;
 }
 
@@ -9606,8 +9609,8 @@ move_it_in_display_line_to (struct it *it,
 	  else
 	    line_number_pending = true;
 	}
-      /* If there's a line-/wrap-prefix, handle it.  */
-      if (it->method == GET_FROM_BUFFER)
+      /* If there's a line-/wrap-prefix, handle it, if we didn't already.  */
+      if (it->area == TEXT_AREA && !it->string_from_prefix_prop_p)
 	handle_line_prefix (it);
     }
 
@@ -13421,7 +13424,8 @@ gui_consider_frame_title (Lisp_Object frame)
 
       Fselect_window (f->selected_window, Qt);
       set_buffer_internal_1 (XBUFFER (XWINDOW (f->selected_window)->contents));
-      fmt = FRAME_ICONIFIED_P (f) ? Vicon_title_format : Vframe_title_format;
+      fmt = (FRAME_ICONIFIED_P (f) && !EQ (Vicon_title_format, Qt)
+	     ? Vicon_title_format : Vframe_title_format);
 
       mode_line_target = MODE_LINE_TITLE;
       title_start = MODE_LINE_NOPROP_LEN (0);
@@ -14268,12 +14272,14 @@ redisplay_tab_bar (struct frame *f)
 	frame_default_tab_bar_height = new_height;
     }
 
-  /* If new_height or new_nrows indicate that we need to enlarge the
-     tab-bar window, we can return right away.  */
+  /* If new_height or new_nrows indicate that we need to enlarge or
+     shrink the tab-bar window, we can return right away.  */
   if (new_nrows > f->n_tab_bar_rows
       || (EQ (Vauto_resize_tab_bars, Qgrow_only)
 	  && !f->minimize_tab_bar_window_p
-	  && new_height > WINDOW_PIXEL_HEIGHT (w)))
+	  && new_height > WINDOW_PIXEL_HEIGHT (w))
+      || (! EQ (Vauto_resize_tab_bars, Qgrow_only)
+	  && new_height < WINDOW_PIXEL_HEIGHT (w)))
     {
       if (FRAME_TERMINAL (f)->change_tab_bar_height_hook)
 	FRAME_TERMINAL (f)->change_tab_bar_height_hook (f, new_height);
@@ -16835,6 +16841,13 @@ redisplay_internal (void)
 		/* Only GC scrollbars when we redisplay the whole frame.  */
 		= f->redisplay || !REDISPLAY_SOME_P ();
 	      bool f_redisplay_flag = f->redisplay;
+
+	      /* The X error handler may have deleted that frame
+		 before we went back to retry_frame.  This must come
+		 before any accesses to f->terminal.  */
+	      if (!FRAME_LIVE_P (f))
+		continue;
+
 	      /* Mark all the scroll bars to be removed; we'll redeem
 		 the ones we want when we redisplay their windows.  */
 	      if (gcscrollbars && FRAME_TERMINAL (f)->condemn_scroll_bars_hook)
@@ -16842,7 +16855,6 @@ redisplay_internal (void)
 
 	      if (FRAME_VISIBLE_P (f) && !FRAME_OBSCURED_P (f))
 		{
-
 		  /* Don't allow freeing images and faces for this
 		     frame as long as the frame's update wasn't
 		     completed.  This prevents crashes when some Lisp
@@ -17264,7 +17276,6 @@ mark_window_display_accurate_1 (struct window *w, bool accurate_p)
 
       BUF_UNCHANGED_MODIFIED (b) = BUF_MODIFF (b);
       BUF_OVERLAY_UNCHANGED_MODIFIED (b) = BUF_OVERLAY_MODIFF (b);
-      BUF_CHARS_UNCHANGED_MODIFIED (b) = BUF_CHARS_MODIFF (b);
       BUF_BEG_UNCHANGED (b) = BUF_GPT (b) - BUF_BEG (b);
       BUF_END_UNCHANGED (b) = BUF_Z (b) - BUF_GPT (b);
 
@@ -18535,8 +18546,9 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  start_display (&it, w, startp);
 
 	  if (arg_scroll_conservatively)
-	    amount_to_scroll = max (dy, frame_line_height
-				    * max (scroll_step, temp_scroll_step));
+	    amount_to_scroll
+	      = min (max (dy, frame_line_height),
+		     frame_line_height * arg_scroll_conservatively);
 	  else if (scroll_step || temp_scroll_step)
 	    amount_to_scroll = scroll_max;
 	  else
@@ -19430,6 +19442,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	    blank_row (w, row, y);
 	  goto finish_scroll_bars;
 	}
+      else if (minibuf_level >= 1)
+	{
+	  /* We could have a message produced by set-minibuffer-message
+	     displayed in the mini-window as an overlay, so resize the
+	     mini-window if needed.  */
+	  resize_mini_window (w, false);
+	}
 
       clear_glyph_matrix (w->desired_matrix);
     }
@@ -19535,7 +19554,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Check whether the buffer to be displayed contains long lines.  */
   if (!NILP (Vlong_line_threshold)
       && !current_buffer->long_line_optimizations_p
-      && CHARS_MODIFF - CHARS_UNCHANGED_MODIFIED > 8)
+      && (CHARS_MODIFF - UNCHANGED_MODIFIED > 8
+	  || current_buffer->clip_changed))
     {
       ptrdiff_t cur, next, found, max = 0, threshold;
       threshold = XFIXNUM (Vlong_line_threshold);
@@ -22616,7 +22636,8 @@ usage: (trace-to-stderr STRING &rest OBJECTS)  */)
  ***********************************************************************/
 
 /* Return a temporary glyph row holding the glyphs of an overlay arrow.
-   Used for non-window-redisplay windows, and for windows w/o left fringe.  */
+   Used for non-window-redisplay windows, and for windows without left
+   fringe.  */
 
 static struct glyph_row *
 get_overlay_arrow_glyph_row (struct window *w, Lisp_Object overlay_arrow_string)
@@ -23303,8 +23324,9 @@ extend_face_to_end_of_line (struct it *it)
 	  it->avoid_cursor_p = true;
 	  it->object = Qnil;
 
-	  const int stretch_ascent = (((it->ascent + it->descent)
-	                               * FONT_BASE (font)) / FONT_HEIGHT (font));
+	  const int stretch_height = it->ascent + it->descent;
+	  const int stretch_ascent =
+	    (stretch_height * FONT_BASE (font)) / FONT_HEIGHT (font);
 
 	  if (indicator_column >= 0
 	      && indicator_column > it->current_x
@@ -23324,8 +23346,7 @@ extend_face_to_end_of_line (struct it *it)
 	      if (stretch_width > 0)
 		{
 		  append_stretch_glyph (it, Qnil, stretch_width,
-		                        it->ascent + it->descent,
-		                        stretch_ascent);
+		                        stretch_height, stretch_ascent);
 		}
 
 	      /* Generate the glyph indicator only if
@@ -23333,6 +23354,8 @@ extend_face_to_end_of_line (struct it *it)
 	      if (it->current_x < indicator_column)
 		{
 		  const int save_face_id = it->face_id;
+		  const int save_ascent = it->ascent;
+		  const int save_descent = it->descent;
 		  it->char_to_display
 		    = XFIXNAT (Vdisplay_fill_column_indicator_character);
 		  it->face_id
@@ -23340,6 +23363,8 @@ extend_face_to_end_of_line (struct it *it)
 		                   0, extend_face_id);
 		  PRODUCE_GLYPHS (it);
 		  it->face_id = save_face_id;
+		  it->ascent = save_ascent;
+		  it->descent = save_descent;
 		}
 	    }
 
@@ -23353,8 +23378,7 @@ extend_face_to_end_of_line (struct it *it)
 		{
 		  clear_position (it);
 		  append_stretch_glyph (it, Qnil, stretch_width,
-					it->ascent + it->descent,
-					stretch_ascent);
+					stretch_height, stretch_ascent);
 		}
 	    }
 
@@ -29295,6 +29319,7 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
 			   int start, int end, int overlaps)
 {
   struct glyph *glyph, *last;
+  int voffset;
   Lisp_Object lgstring;
   int i;
   bool glyph_not_available_p;
@@ -29302,6 +29327,7 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
   s->for_overlaps = overlaps;
   glyph = s->row->glyphs[s->area] + start;
   last = s->row->glyphs[s->area] + end;
+  voffset = glyph->voffset;
   glyph_not_available_p = glyph->glyph_not_available_p;
   s->cmp_id = glyph->u.cmp.id;
   s->cmp_from = glyph->slice.cmp.from;
@@ -29351,6 +29377,9 @@ fill_gstring_glyph_string (struct glyph_string *s, int face_id,
      characters of the glyph string.  */
   if (glyph_not_available_p)
     s->font_not_found_p = true;
+
+  /* Adjust base line for subscript/superscript text.  */
+  s->ybase += voffset;
 
   return glyph - s->row->glyphs[s->area];
 }
@@ -36239,6 +36268,8 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+  DEFSYM (Qlong_line_optimizations_in_fontification_functions,
+	  "long-line-optimizations-in-fontification-functions");
 
   /* Name of the symbol which disables Lisp evaluation in 'display'
      properties.  This is used by enriched.el.  */
@@ -36440,7 +36471,7 @@ This is used for internal purposes.  */);
   Vinhibit_redisplay = Qnil;
 
   DEFVAR_LISP ("global-mode-string", Vglobal_mode_string,
-    doc: /* String (or mode line construct) included (normally) in `mode-line-format'.  */);
+    doc: /* String (or mode line construct) included (normally) in `mode-line-misc-info'.  */);
   Vglobal_mode_string = Qnil;
 
   DEFVAR_LISP ("overlay-arrow-position", Voverlay_arrow_position,
@@ -36579,9 +36610,11 @@ which no explicit name has been set (see `modify-frame-parameters').  */);
   DEFVAR_LISP ("icon-title-format", Vicon_title_format,
     doc: /* Template for displaying the title bar of an iconified frame.
 \(Assuming the window manager supports this feature.)
-This variable has the same structure as `mode-line-format' (which see),
-and is used only on frames for which no explicit name has been set
-\(see `modify-frame-parameters').  */);
+If the value is a string, it should have the same structure
+as `mode-line-format' (which see), and is used only on frames
+for which no explicit name has been set \(see `modify-frame-parameters').
+If the value is t, that means use `frame-title-format' for
+iconified frames.  */);
   /* Do not nest calls to pure_list.  This works around a bug in
      Oracle Developer Studio 12.6.  */
   Lisp_Object icon_title_name_format
@@ -36748,12 +36781,11 @@ Each function is called with one argument POS.  Functions must
 fontify a region starting at POS in the current buffer, and give
 fontified regions the property `fontified' with a non-nil value.
 
-Note that, when the buffer contains one or more lines whose length is
-above `long-line-threshold', these functions are called with the
-buffer narrowed to a small portion around POS (whose size is specified
-by `long-line-locked-narrowing-region-size'), and the narrowing is
-locked (see `narrowing-lock'), so that these functions cannot use
-`widen' to gain access to other portions of buffer text.  */);
+Note that, when `long-line-optimizations-p' is non-nil in the buffer,
+these functions are called as if they were in a `with-restriction' form,
+with a `long-line-optimizations-in-fontification-functions' label and
+with the buffer narrowed to a portion around POS whose size is
+specified by `long-line-optimizations-region-size'.  */);
   Vfontification_functions = Qnil;
   Fmake_variable_buffer_local (Qfontification_functions);
 

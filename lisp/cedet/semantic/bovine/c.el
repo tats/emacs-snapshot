@@ -1,6 +1,6 @@
 ;;; semantic/bovine/c.el --- Semantic details for C  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -1578,7 +1578,7 @@ Optional PARENT and COLOR as specified with
   c-mode (token &optional parent color)
   "Return an UML string describing TOKEN for C and C++.
 Optional PARENT and COLOR as specified with
-`semantic-abbreviate-tag-default'."
+`semantic-format-tag-abbreviate-default'."
   ;; If we have special template things, append.
   (concat  (semantic-format-tag-uml-prototype-default token parent color)
 	   (semantic-c-template-string token parent color)))

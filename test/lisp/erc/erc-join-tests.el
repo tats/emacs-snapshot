@@ -1,6 +1,6 @@
 ;;; erc-join-tests.el --- Tests for erc-join.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2020-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 ;;
@@ -335,7 +335,7 @@
               (start-process "true" (current-buffer) "true")
               erc-server-current-nick "tester"
               erc-server-announced-name "foo.gnu.chat"
-              ;; Assume special case w/o known network
+              ;; Assume special case without known network
               erc-networks--id (make-erc-networks--id))
         (set-process-query-on-exit-flag erc-server-process nil)
         (should-not calls)

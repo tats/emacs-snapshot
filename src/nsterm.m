@@ -1,6 +1,6 @@
 /* NeXT/Open/GNUstep / macOS communication module.      -*- coding: utf-8 -*-
 
-Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2022 Free Software
+Copyright (C) 1989, 1993-1994, 2005-2006, 2008-2023 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -3750,14 +3750,18 @@ ns_maybe_dumpglyphs_background (struct glyph_string *s, char force_p)
 	{
           struct face *face = s->face;
           if (!face->stipple)
-	    {
-	      if (s->hl != DRAW_CURSOR)
-		[(NS_FACE_BACKGROUND (face) != 0
-		  ? [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND (face)]
-		  : FRAME_BACKGROUND_COLOR (s->f)) set];
-	      else
-		[FRAME_CURSOR_COLOR (s->f) set];
-	    }
+            {
+              if (s->hl != DRAW_CURSOR)
+                [(NS_FACE_BACKGROUND (face) != 0
+                  ? [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND (face)]
+                  : FRAME_BACKGROUND_COLOR (s->f)) set];
+              else if (face && (NS_FACE_BACKGROUND (face)
+                                == [(NSColor *) FRAME_CURSOR_COLOR (s->f)
+                                                unsignedLong]))
+                [[NSColor colorWithUnsignedLong:NS_FACE_FOREGROUND (face)] set];
+              else
+                [FRAME_CURSOR_COLOR (s->f) set];
+            }
           else
             {
               struct ns_display_info *dpyinfo = FRAME_DISPLAY_INFO (s->f);
@@ -6703,8 +6707,16 @@ ns_create_font_panel_buttons (id target, SEL select, SEL cancel_action)
 
 - (void)resetCursorRects
 {
-  NSRect visible = [self visibleRect];
-  NSCursor *currentCursor = FRAME_POINTER_TYPE (emacsframe);
+  NSRect visible;
+  NSCursor *currentCursor;
+
+  /* On macOS 13, [resetCursorRects:] could be called even after the
+     window is closed. */
+  if (! emacsframe || ! FRAME_OUTPUT_DATA (emacsframe))
+    return;
+
+  visible = [self visibleRect];
+  currentCursor = FRAME_POINTER_TYPE (emacsframe);
   NSTRACE ("[EmacsView resetCursorRects]");
 
   if (currentCursor == nil)
@@ -8573,6 +8585,10 @@ ns_in_echo_area (void)
   return self;
 }
 
+- (BOOL) validateToolbarItem: (NSToolbarItem *) toolbarItem
+{
+  return [toolbarItem isEnabled];
+}
 
 - (instancetype)toggleToolbar: (id)sender
 {

@@ -1,6 +1,6 @@
 ;;; zone.el --- idle display hacks  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2000-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2023 Free Software Foundation, Inc.
 
 ;; Author: Victor Zandy <zandy@cs.wisc.edu>
 ;; Maintainer: Thien-Thi Nguyen <ttn@gnu.org>
@@ -320,7 +320,7 @@ run a specific program.  The program must be a member of
   (zone-pgm-jitter))
 
 
-;;;; putzing w/ case
+;;;; putzing with case
 
 ;; Faster than `zone-pgm-putz-with-case', but not as good: all
 ;; instances of the same letter have the same case, which produces a

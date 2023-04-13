@@ -1,6 +1,6 @@
 ;;; outline.el --- outline mode commands for Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1986-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1986-2023 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: outlines
@@ -209,8 +209,14 @@ This option is only in effect when `outline-minor-mode-cycle' is non-nil."
   :version "28.1")
 
 (defvar outline-minor-mode-cycle)
+(defvar outline-minor-mode-cycle-map)
 (defun outline-minor-mode-cycle--bind (map key binding &optional filter)
-  (define-key map key
+  "Define KEY as BINDING in MAP using FILTER.
+The key takes effect only on the following conditions:
+`outline-minor-mode-cycle' is non-nil, point is located on the heading line,
+FILTER or `outline-minor-mode-cycle-filter' is nil or returns non-nil.
+The argument MAP is optional and defaults to `outline-minor-mode-cycle-map'."
+  (define-key (or map outline-minor-mode-cycle-map) key
     `(menu-item
       "" ,binding
       ;; Filter out specific positions on the heading.
@@ -227,8 +233,16 @@ This option is only in effect when `outline-minor-mode-cycle' is non-nil."
   (let ((map (make-sparse-keymap)))
     (outline-minor-mode-cycle--bind map (kbd "TAB") #'outline-cycle)
     (outline-minor-mode-cycle--bind map (kbd "<backtab>") #'outline-cycle-buffer)
+    (keymap-set map "<left-margin> <mouse-1>" 'outline-cycle)
+    (keymap-set map "<right-margin> <mouse-1>" 'outline-cycle)
+    (keymap-set map "<left-margin> S-<mouse-1>" 'outline-cycle-buffer)
+    (keymap-set map "<right-margin> S-<mouse-1>" 'outline-cycle-buffer)
     map)
-  "Keymap used by `outline-minor-mode-cycle'.")
+  "Keymap used as a parent of the `outline-minor-mode' keymap.
+It contains key bindings that can be used to cycle visibility.
+The recommended way to bind keys is with `outline-minor-mode-cycle--bind'
+when the key should be enabled only when `outline-minor-mode-cycle' is
+non-nil and point is located on the heading line.")
 
 (defvar outline-mode-map
   (let ((map (make-sparse-keymap)))
@@ -318,6 +332,12 @@ don't modify the buffer."
 (defvar-local outline--use-rtl nil
   "Non-nil when direction of clickable buttons is right-to-left.")
 
+(defvar-local outline--margin-width nil
+  "Current margin width.")
+
+(defvar-local outline-margin-width nil
+  "Default margin width.")
+
 (define-icon outline-open nil
   '((image "outline-open.svg" "outline-open.pbm" :height (0.8 . em))
     (emoji "🔽")
@@ -344,24 +364,24 @@ don't modify the buffer."
   "Right-to-left icon used for buttons in closed outline sections."
   :version "29.1")
 
-(define-icon outline-open-in-margins outline-open
-  '((image "outline-open.svg" "outline-open.pbm" :height 10)
+(define-icon outline-open-in-margins nil
+  '((image "outline-open.svg" "outline-open.pbm" :width font)
     (emoji "🔽")
     (symbol "▼")
     (text "v"))
   "Icon used for buttons for opened sections in margins."
   :version "29.1")
 
-(define-icon outline-close-in-margins outline-close
-  '((image "outline-open.svg" "outline-open.pbm" :height 10 :rotation -90)
+(define-icon outline-close-in-margins nil
+  '((image "outline-open.svg" "outline-open.pbm" :width font :rotation -90)
     (emoji "▶️")
     (symbol "▶")
     (text ">"))
   "Icon used for buttons for closed sections in margins."
   :version "29.1")
 
-(define-icon outline-close-rtl-in-margins outline-close-rtl
-  '((image "outline-open.svg" "outline-open.pbm" :height 10 :rotation 90)
+(define-icon outline-close-rtl-in-margins nil
+  '((image "outline-open.svg" "outline-open.pbm" :width font :rotation 90)
     (emoji "◀️")
     (symbol "◀")
     (text "<"))
@@ -512,10 +532,6 @@ See the command `outline-mode' for more information on this mode."
   :keymap (define-keymap
             :parent outline-minor-mode-cycle-map
             "<menu-bar>" outline-minor-mode-menu-bar-map
-            "<left-margin> <mouse-1>" 'outline-cycle
-            "<right-margin> <mouse-1>" 'outline-cycle
-            "<left-margin> S-<mouse-1>" 'outline-cycle-buffer
-            "<right-margin> S-<mouse-1>" 'outline-cycle-buffer
             (key-description outline-minor-mode-prefix) outline-mode-prefix-map)
   (if outline-minor-mode
       (progn
@@ -528,9 +544,22 @@ See the command `outline-mode' for more information on this mode."
           (when (and (eq outline-minor-mode-use-buttons 'in-margins)
                      (> 1 (if outline--use-rtl right-margin-width
                             left-margin-width)))
+            (setq outline--margin-width
+                  (or outline-margin-width
+                      (ceiling
+                       (/ (seq-max
+                           (seq-map #'string-pixel-width
+                                    (seq-map #'icon-string
+                                             `(outline-open-in-margins
+                                               ,(if outline--use-rtl
+                                                    'outline-close-rtl-in-margins
+                                                  'outline-close-in-margins)))))
+                          (* (default-font-width) 1.0)))))
             (if outline--use-rtl
-                (setq-local right-margin-width (1+ right-margin-width))
-              (setq-local left-margin-width (1+ left-margin-width)))
+                (setq-local right-margin-width (+ right-margin-width
+                                                  outline--margin-width))
+              (setq-local left-margin-width (+ left-margin-width
+                                               outline--margin-width)))
             (setq-local fringes-outside-margins t)
             ;; Force display of margins
             (when (eq (current-buffer) (window-buffer))
@@ -566,8 +595,10 @@ See the command `outline-mode' for more information on this mode."
                  (< 0 (if outline--use-rtl right-margin-width
                         left-margin-width)))
         (if outline--use-rtl
-            (setq-local right-margin-width (1- right-margin-width))
-          (setq-local left-margin-width (1- left-margin-width)))
+            (setq-local right-margin-width (- right-margin-width
+                                              outline--margin-width))
+          (setq-local left-margin-width (- left-margin-width
+                                           outline--margin-width)))
         (setq-local fringes-outside-margins nil)
         ;; Force removal of margins
         (when (eq (current-buffer) (window-buffer))
@@ -1745,6 +1776,20 @@ With a prefix argument, show headings up to that LEVEL."
 
 ;;; Button/margin indicators
 
+(defvar-keymap outline-button-icon-map
+  "<mouse-2>" #'outline-cycle
+  ;; Need to override the global binding
+  ;; `mouse-appearance-menu' with <down->:
+  "S-<down-mouse-1>" #'ignore
+  "S-<mouse-1>" #'outline-cycle-buffer)
+
+(defvar-keymap outline-overlay-button-map
+  "RET" #'outline-cycle)
+
+(defvar-keymap outline-inserted-button-map
+  :parent (make-composed-keymap outline-button-icon-map
+                                outline-overlay-button-map))
+
 (defun outline--create-button-icons ()
   (pcase outline-minor-mode-use-buttons
     ('in-margins
@@ -1777,12 +1822,7 @@ With a prefix argument, show headings up to that LEVEL."
         (propertize (icon-string icon-name)
                     'mouse-face 'default
                     'follow-link 'mouse-face
-                    'keymap (define-keymap
-                              "<mouse-2>" #'outline-cycle
-                              ;; Need to override the global binding
-                              ;; `mouse-appearance-menu' with <down->:
-                              "S-<down-mouse-1>" #'ignore
-                              "S-<mouse-1>" #'outline-cycle-buffer)))
+                    'keymap outline-button-icon-map))
       (list 'outline-open
             (if outline--use-rtl 'outline-close-rtl 'outline-close))))))
 
@@ -1796,7 +1836,7 @@ With a prefix argument, show headings up to that LEVEL."
         (unless o
           (when (eq outline-minor-mode-use-buttons 'insert)
             (let ((inhibit-read-only t))
-              (insert "  ")
+              (insert (apply #'propertize "  " (text-properties-at (point))))
               (beginning-of-line)))
           (setq o (make-overlay (point) (1+ (point))))
           (overlay-put o 'outline-button t)
@@ -1808,19 +1848,13 @@ With a prefix argument, show headings up to that LEVEL."
            (overlay-put o 'face (plist-get icon 'face))
            (overlay-put o 'follow-link 'mouse-face)
            (overlay-put o 'mouse-face 'highlight)
-           (overlay-put o 'keymap (define-keymap
-                                    "RET" #'outline-cycle
-                                    "<mouse-2>" #'outline-cycle
-                                    ;; Need to override the global binding
-                                    ;; `mouse-appearance-menu' with <down->:
-                                    "S-<down-mouse-1>" #'ignore
-                                    "S-<mouse-1>" #'outline-cycle-buffer)))
+           (overlay-put o 'keymap outline-inserted-button-map))
           ('in-margins
            (overlay-put o 'before-string icon)
-           (overlay-put o 'keymap (define-keymap "RET" #'outline-cycle)))
+           (overlay-put o 'keymap outline-overlay-button-map))
           (_
            (overlay-put o 'before-string icon)
-           (overlay-put o 'keymap (define-keymap "RET" #'outline-cycle))))))))
+           (overlay-put o 'keymap outline-overlay-button-map)))))))
 
 (defun outline--fix-up-all-buttons (&optional from to)
   (when outline-minor-mode-use-buttons
@@ -1843,10 +1877,11 @@ With a prefix argument, show headings up to that LEVEL."
   (save-excursion (goto-char beg) (setq beg (pos-bol)))
   (save-excursion (goto-char end) (setq end (pos-eol)))
   (remove-overlays beg end 'outline-button t)
-  (outline--fix-up-all-buttons beg end))
+  (save-match-data (outline--fix-up-all-buttons beg end)))
 
 
 (defvar-keymap outline-navigation-repeat-map
+  :repeat t
   "C-b" #'outline-backward-same-level
   "b"   #'outline-backward-same-level
   "C-f" #'outline-forward-same-level
@@ -1858,14 +1893,8 @@ With a prefix argument, show headings up to that LEVEL."
   "C-u" #'outline-up-heading
   "u"   #'outline-up-heading)
 
-(dolist (command '(outline-backward-same-level
-                   outline-forward-same-level
-                   outline-next-visible-heading
-                   outline-previous-visible-heading
-                   outline-up-heading))
-  (put command 'repeat-map 'outline-navigation-repeat-map))
-
 (defvar-keymap outline-editing-repeat-map
+  :repeat t
   "C-v" #'outline-move-subtree-down
   "v"   #'outline-move-subtree-down
   "C-^" #'outline-move-subtree-up
@@ -1874,12 +1903,6 @@ With a prefix argument, show headings up to that LEVEL."
   ">"   #'outline-demote
   "C-<" #'outline-promote
   "<"   #'outline-promote)
-
-(dolist (command '(outline-move-subtree-down
-                   outline-move-subtree-up
-                   outline-demote
-                   outline-promote))
-  (put command 'repeat-map 'outline-editing-repeat-map))
 
 
 (provide 'outline)

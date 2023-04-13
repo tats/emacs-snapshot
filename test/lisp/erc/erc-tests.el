@@ -1,6 +1,6 @@
 ;;; erc-tests.el --- Tests for erc.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2020-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
 ;; Author: Lars Ingebrigtsen <larsi@gnus.org>
 
@@ -147,7 +147,7 @@
       (should (looking-at-p (regexp-quote erc-prompt)))
       (setq erc-server-process (buffer-local-value 'erc-server-process
                                                    (get-buffer "ServNet"))
-            erc-default-recipients '("#chan")))
+            erc--target (erc--target-from-string "#chan")))
 
     (with-current-buffer (get-buffer-create "bob")
       (erc-tests--send-prep)
@@ -155,7 +155,7 @@
       (should (looking-at-p (regexp-quote erc-prompt)))
       (setq erc-server-process (buffer-local-value 'erc-server-process
                                                    (get-buffer "ServNet"))
-            erc-default-recipients '("bob")))
+            erc--target (erc--target-from-string "bob")))
 
     (ert-info ("Value: t (default)")
       (should (eq erc-hide-prompt t))
@@ -428,18 +428,21 @@
 
     (ert-info ("ascii")
       (puthash 'CASEMAPPING  '("ascii") erc--isupport-params)
+      (should (equal (erc-downcase "ABC 123 ΔΞΩΣ") "abc 123 ΔΞΩΣ"))
       (should (equal (erc-downcase "Bob[m]`") "bob[m]`"))
       (should (equal (erc-downcase "Tilde~") "tilde~" ))
       (should (equal (erc-downcase "\\O/") "\\o/" )))
 
     (ert-info ("rfc1459")
       (puthash 'CASEMAPPING  '("rfc1459") erc--isupport-params)
+      (should (equal (erc-downcase "ABC 123 ΔΞΩΣ") "abc 123 ΔΞΩΣ"))
       (should (equal (erc-downcase "Bob[m]`") "bob{m}`" ))
       (should (equal (erc-downcase "Tilde~") "tilde^" ))
       (should (equal (erc-downcase "\\O/") "|o/" )))
 
     (ert-info ("rfc1459-strict")
       (puthash 'CASEMAPPING  '("rfc1459-strict") erc--isupport-params)
+      (should (equal (erc-downcase "ABC 123 ΔΞΩΣ") "abc 123 ΔΞΩΣ"))
       (should (equal (erc-downcase "Bob[m]`") "bob{m}`"))
       (should (equal (erc-downcase "Tilde~") "tilde~" ))
       (should (equal (erc-downcase "\\O/") "|o/" )))))
@@ -998,11 +1001,11 @@
 
 (ert-deftest erc-select-read-args ()
 
-  (ert-info ("Defaults to TLS")
+  (ert-info ("Does not default to TLS")
     (should (equal (ert-simulate-keys "\r\r\r\r"
                      (erc-select-read-args))
                    (list :server "irc.libera.chat"
-                         :port 6697
+                         :port 6667
                          :nick (user-login-name)
                          :password nil))))
 
@@ -1033,7 +1036,7 @@
                          :password nil))))
 
   (ert-info ("Address includes nick and password")
-    (should (equal (ert-simulate-keys "nick:sesame@localhost:6667\r"
+    (should (equal (ert-simulate-keys "nick:sesame@localhost:6667\r\r"
                      (erc-select-read-args))
                    (list :server "localhost"
                          :port 6667
@@ -1248,18 +1251,28 @@
         (setq calls nil)))))
 
 (ert-deftest erc--merge-local-modes ()
+  (cl-letf (((get 'erc-b-mode 'erc-module) 'b)
+            ((get 'erc-c-mode 'erc-module) 'c)
+            ((get 'erc-d-mode 'erc-module) 'd)
+            ((get 'erc-e-mode 'erc-module) 'e))
 
-  (ert-info ("No existing modes")
-    (let ((old '((a) (b . t)))
-          (new '(erc-c-mode erc-d-mode)))
-      (should (equal (erc--merge-local-modes new old)
-                     '((erc-c-mode erc-d-mode))))))
+    (ert-info ("No existing modes")
+      (let ((old '((a) (b . t)))
+            (new '(erc-c-mode erc-d-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-c-mode erc-d-mode))))))
 
-  (ert-info ("Active existing added, inactive existing removed, deduped")
-    (let ((old '((a) (erc-b-mode) (c . t) (erc-d-mode . t) (erc-e-mode . t)))
-          (new '(erc-b-mode erc-d-mode)))
-      (should (equal (erc--merge-local-modes new old)
-                     '((erc-d-mode erc-e-mode) . (erc-b-mode)))))))
+    (ert-info ("Active existing added, inactive existing removed, deduped")
+      (let ((old '((a) (erc-b-mode) (c . t) (erc-d-mode . t) (erc-e-mode . t)))
+            (new '(erc-b-mode erc-d-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-d-mode erc-e-mode) . (erc-b-mode))))))
+
+    (ert-info ("Non-module erc-prefixed mode ignored")
+      (let ((old '((erc-b-mode) (erc-f-mode . t) (erc-d-mode . t)))
+            (new '(erc-b-mode)))
+        (should (equal (erc--merge-local-modes new old)
+                       '((erc-d-mode) . (erc-b-mode))))))))
 
 (ert-deftest define-erc-module--global ()
   (let ((global-module '(define-erc-module mname malias
@@ -1297,13 +1310,15 @@ Some docstring"
                         (ignore c) (ignore d))
 
                       (defalias 'erc-malias-mode #'erc-mname-mode)
+                      (put 'erc-malias-mode 'erc-module 'mname)
 
+                      (put 'erc-mname-mode 'erc-module 'mname)
                       (put 'erc-mname-mode 'definition-name 'mname)
                       (put 'erc-mname-enable 'definition-name 'mname)
                       (put 'erc-mname-disable 'definition-name 'mname))))))
 
 (ert-deftest define-erc-module--local ()
-  (let* ((global-module '(define-erc-module mname malias
+  (let* ((global-module '(define-erc-module mname nil ; no alias
                            "Some docstring"
                            ((ignore a) (ignore b))
                            ((ignore c) (ignore d))
@@ -1328,7 +1343,7 @@ Some docstring"
 
                       (defun erc-mname-enable (&optional ,arg-en)
                         "Enable ERC mname mode.
-With ARG, do so in all buffers for the current connection."
+When called interactively, do so in all buffers for the current connection."
                         (interactive "p")
                         (when (derived-mode-p 'erc-mode)
                           (if ,arg-en
@@ -1340,7 +1355,7 @@ With ARG, do so in all buffers for the current connection."
 
                       (defun erc-mname-disable (&optional ,arg-dis)
                         "Disable ERC mname mode.
-With ARG, do so in all buffers for the current connection."
+When called interactively, do so in all buffers for the current connection."
                         (interactive "p")
                         (when (derived-mode-p 'erc-mode)
                           (if ,arg-dis
@@ -1350,8 +1365,7 @@ With ARG, do so in all buffers for the current connection."
                             (setq erc-mname-mode nil)
                             (ignore c) (ignore d))))
 
-                      (defalias 'erc-malias-mode #'erc-mname-mode)
-
+                      (put 'erc-mname-mode 'erc-module 'mname)
                       (put 'erc-mname-mode 'definition-name 'mname)
                       (put 'erc-mname-enable 'definition-name 'mname)
                       (put 'erc-mname-disable 'definition-name 'mname))))))

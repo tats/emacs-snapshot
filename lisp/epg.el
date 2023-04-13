@@ -1,6 +1,6 @@
 ;;; epg.el --- the EasyPG Library -*- lexical-binding: t -*-
 
-;; Copyright (C) 1999-2000, 2002-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2000, 2002-2023 Free Software Foundation, Inc.
 
 ;; Author: Daiki Ueno <ueno@unixuser.org>
 ;; Keywords: PGP, GnuPG
@@ -482,7 +482,7 @@ callback data (if any)."
 	      (format "      skipped new keys: %d\n"
 		      (epg-import-result-not-imported import-result)))
 	  (if (> (epg-import-result-no-user-id import-result) 0)
-	      (format "          w/o user IDs: %d\n"
+	      (format "          without user IDs: %d\n"
 		      (epg-import-result-no-user-id import-result)))
 	  (if (> (epg-import-result-imported import-result) 0)
 	      (concat (format "              imported: %d"

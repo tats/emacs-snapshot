@@ -1,6 +1,6 @@
 ;;; package.el --- Simple package system for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2023 Free Software Foundation, Inc.
 
 ;; Author: Tom Tromey <tromey@redhat.com>
 ;;         Daniel Hackney <dan@haxney.org>
@@ -1949,8 +1949,10 @@ SEEN is used internally to detect infinite recursion."
               (if (eq next-pkg 'emacs)
                   (error "This package requires Emacs version %s"
                          (package-version-join next-version))
-                (error "Package `%s-%s' is unavailable"
-                       next-pkg (package-version-join next-version))))))
+                (error (if (not next-version)
+                           (format "Package `%s' is unavailable" next-pkg)
+                         (format "Package `%s' (version %s) is unavailable"
+                                 next-pkg (package-version-join next-version))))))))
           (setq packages
                 (package-compute-transaction (cons found packages)
                                              (package-desc-reqs found)
@@ -2092,7 +2094,7 @@ if all the in-between dependencies are also in PACKAGE-LIST."
 (defun package-install-from-archive (pkg-desc)
   "Download and install a package defined by PKG-DESC."
   ;; This won't happen, unless the archive is doing something wrong.
-  (when (package-vc-p pkg-desc)
+  (when (eq (package-desc-kind pkg-desc) 'dir)
     (error "Can't install directory package from archive"))
   (let* ((location (package-archive-base pkg-desc))
          (file (concat (package-desc-full-name pkg-desc)
@@ -2696,7 +2698,10 @@ Helper function for `describe-package'."
          (signed (if desc (package-desc-signed desc)))
          (maintainer (cdr (assoc :maintainer extras)))
          (authors (cdr (assoc :authors extras)))
-         (news (and-let* ((file (expand-file-name "news" pkg-dir))
+         (news (and-let* (pkg-dir
+                          ((not built-in))
+                          (file (expand-file-name "news" pkg-dir))
+                          ((file-regular-p file))
                           ((file-readable-p file)))
                  file)))
     (when (string= status "avail-obso")
@@ -3107,7 +3112,7 @@ package PKG-DESC, add one.  The alist is keyed with PKG-DESC."
   "If non-nil, include packages that don't have a version in `list-packages'.")
 
 (defvar package-list-unsigned nil
-  "If non-nil, mention in the list which packages were installed w/o signature.")
+  "If non-nil, mention in the list which packages were installed without signature.")
 
 (defvar package--emacs-version-list (version-to-list emacs-version)
   "The value of variable `emacs-version' as a list.")
@@ -4549,7 +4554,7 @@ will be signaled in that case."
       (user-error "Package `%s' has no explicit maintainer" name))
      ((and (not (progn
                   (require 'ietf-drums)
-                  (ietf-drums-parse-address maint)))
+                  (ietf-drums-parse-address (cdr maint))))
            (null no-error))
       (user-error "Package `%s' has no maintainer address" name))
      ((not (null maint))

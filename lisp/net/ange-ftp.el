@@ -1,6 +1,6 @@
 ;;; ange-ftp.el --- transparent FTP support for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
 ;; Author: Andy Norman <ange@hplb.hpl.hp.com>
 ;; Maintainer: emacs-devel@gnu.org
@@ -218,7 +218,7 @@
 ;; ange-ftp-smart-gateway and ange-ftp-smart-gateway-port.
 ;;
 ;; Otherwise, if there is an alternate ftp program that implements proxy in
-;; a transparent way (i.e. w/o specifying the proxy host), that will
+;; a transparent way (i.e. without specifying the proxy host), that will
 ;; connect you directly to the desired destination host:
 ;; Set ange-ftp-gateway-ftp-program-name to that program's name.
 ;; Set ange-ftp-local-host-regexp to a value as stated earlier on.

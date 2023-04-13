@@ -1,6 +1,6 @@
 /* Buffer manipulation primitives for GNU Emacs.
 
-Copyright (C) 1985-2022  Free Software Foundation, Inc.
+Copyright (C) 1985-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -525,14 +525,14 @@ get_truename_buffer (register Lisp_Object filename)
   return Qnil;
 }
 
-/* Run buffer-list-update-hook if Vrun_hooks is non-nil, and BUF is NULL
-   or does not have buffer hooks inhibited.  BUF is NULL when called by
-   make-indirect-buffer, since it does not inhibit buffer hooks.  */
+/* Run buffer-list-update-hook if Vrun_hooks is non-nil and BUF does
+   not have buffer hooks inhibited.  */
 
 static void
 run_buffer_list_update_hook (struct buffer *buf)
 {
-  if (! (NILP (Vrun_hooks) || (buf && buf->inhibit_buffer_hooks)))
+  eassert (buf);
+  if (! (NILP (Vrun_hooks) || buf->inhibit_buffer_hooks))
     call1 (Vrun_hooks, Qbuffer_list_update_hook);
 }
 
@@ -604,7 +604,6 @@ even if it is dead.  The return value is never nil.  */)
   set_buffer_intervals (b, NULL);
   BUF_UNCHANGED_MODIFIED (b) = 1;
   BUF_OVERLAY_UNCHANGED_MODIFIED (b) = 1;
-  BUF_CHARS_UNCHANGED_MODIFIED (b) = 1;
   BUF_END_UNCHANGED (b) = 0;
   BUF_BEG_UNCHANGED (b) = 0;
   *(BUF_GPT_ADDR (b)) = *(BUF_Z_ADDR (b)) = 0; /* Put an anchor '\0'.  */
@@ -908,7 +907,7 @@ does not run the hooks `kill-buffer-hook',
       set_buffer_internal_1 (old_b);
     }
 
-  run_buffer_list_update_hook (NULL);
+  run_buffer_list_update_hook (b);
 
   return buf;
 }
@@ -1748,7 +1747,19 @@ other_buffer_safely (Lisp_Object buffer)
     if (candidate_buffer (buf, buffer))
       return buf;
 
-  return safe_call (1, Qget_scratch_buffer_create);
+  /* This function must return a valid buffer, since it is frequently
+     our last line of defense in the face of the expected buffers
+     becoming dead under our feet.  safe_call below could return nil
+     if recreating *scratch* in Lisp, which does some fancy stuff,
+     signals an error in some weird use case.  */
+  buf = safe_call (1, Qget_scratch_buffer_create);
+  if (NILP (buf))
+    {
+      AUTO_STRING (scratch, "*scratch*");
+      buf = Fget_buffer_create (scratch, Qnil);
+      Fset_buffer_major_mode (buf);
+    }
+  return buf;
 }
 
 DEFUN ("buffer-enable-undo", Fbuffer_enable_undo, Sbuffer_enable_undo,
@@ -3899,11 +3910,11 @@ the value is (point-min).  */)
 /* These functions are for debugging overlays.  */
 
 DEFUN ("overlay-lists", Foverlay_lists, Soverlay_lists, 0, 0, 0,
-       doc: /* Return a pair of lists giving all the overlays of the current buffer.
-The car has all the overlays before the overlay center;
-the cdr has all the overlays after the overlay center.
-Recentering overlays moves overlays between these lists.
-The lists you get are copies, so that changing them has no effect.
+       doc: /* Return a list giving all the overlays of the current buffer.
+
+For backward compatibility, the value is actually a list that
+holds another list; the overlays are in the inner list.
+The list you get is a copy, so that changing it has no effect.
 However, the overlays you get are the real objects that the buffer uses. */)
   (void)
 {
@@ -3919,7 +3930,12 @@ However, the overlays you get are the real objects that the buffer uses. */)
 DEFUN ("overlay-recenter", Foverlay_recenter, Soverlay_recenter, 1, 1, 0,
        doc: /* Recenter the overlays of the current buffer around position POS.
 That makes overlay lookup faster for positions near POS (but perhaps slower
-for positions far away from POS).  */)
+for positions far away from POS).
+
+Since Emacs 29.1, this function is a no-op, because the implementation
+of overlays changed and their lookup is now fast regardless of their
+position in the buffer.  In particular, this function no longer affects
+the value returned by `overlay-lists'.  */)
   (Lisp_Object pos)
 {
   CHECK_FIXNUM_COERCE_MARKER (pos);
@@ -5065,8 +5081,8 @@ the mode line appears at the bottom.  */);
 The header line appears, optionally, at the top of a window; the mode
 line appears at the bottom.
 
-Also see `header-line-indent-mode' if `display-line-number-mode' is
-used.  */);
+Also see `header-line-indent-mode' if `display-line-numbers-mode' is
+turned on and header-line text should be aligned with buffer text.  */);
 
   DEFVAR_PER_BUFFER ("mode-line-format", &BVAR (current_buffer, mode_line_format),
 		     Qnil,
@@ -5123,11 +5139,13 @@ A string is printed verbatim in the mode line except for %-constructs:
   %C -- Like %c, but the leftmost column is displayed as one.
   %i -- print the size of the buffer.
   %I -- like %i, but use k, M, G, etc., to abbreviate.
+  %o -- print percent of window travel through buffer, or Top, Bot or All.
   %p -- print percent of buffer above top of window, or Top, Bot or All.
   %P -- print percent of buffer above bottom of window, perhaps plus Top,
         or print Bottom or All.
+  %q -- print percent of buffer above both the top and the bottom of the
+        window, separated by ‘-’, or ‘All’.
   %n -- print Narrow if appropriate.
-  %t -- visited file is text or binary (if OS supports this distinction).
   %z -- print mnemonics of keyboard, terminal, and buffer coding systems.
   %Z -- like %z, but including the end-of-line format.
   %e -- print error message about full memory.
@@ -5900,40 +5918,41 @@ If nil, these display shortcuts will always remain disabled.
 There is no reason to change that value except for debugging purposes.  */);
   XSETFASTINT (Vlong_line_threshold, 50000);
 
-  DEFVAR_INT ("long-line-locked-narrowing-region-size",
-	      long_line_locked_narrowing_region_size,
-	      doc: /* Region size for locked narrowing in buffers with long lines.
+  DEFVAR_INT ("long-line-optimizations-region-size",
+	      long_line_optimizations_region_size,
+	      doc: /* Region size for narrowing in buffers with long lines.
 
-This variable has effect only in buffers which contain one or more
-lines whose length is above `long-line-threshold', which see.  For
-performance reasons, in such buffers, low-level hooks such as
-`fontification-functions' or `post-command-hook' are executed on a
-narrowed buffer, with a narrowing locked with `narrowing-lock'.  This
-variable specifies the size of the narrowed region around point.
+This variable has effect only in buffers in which
+`long-line-optimizations-p' is non-nil.  For performance reasons, in
+such buffers, the `fontification-functions', `pre-command-hook' and
+`post-command-hook' hooks are executed on a narrowed buffer around
+point, as if they were called in a `with-restriction' form with a label.
+This variable specifies the size of the narrowed region around point.
 
 To disable that narrowing, set this variable to 0.
 
-See also `long-line-locked-narrowing-bol-search-limit'.
+See also `long-line-optimizations-bol-search-limit'.
 
 There is no reason to change that value except for debugging purposes.  */);
-  long_line_locked_narrowing_region_size = 500000;
+  long_line_optimizations_region_size = 500000;
 
-  DEFVAR_INT ("long-line-locked-narrowing-bol-search-limit",
-	      long_line_locked_narrowing_bol_search_limit,
+  DEFVAR_INT ("long-line-optimizations-bol-search-limit",
+	      long_line_optimizations_bol_search_limit,
 	      doc: /* Limit for beginning of line search in buffers with long lines.
 
-This variable has effect only in buffers which contain one or more
-lines whose length is above `long-line-threshold', which see.  For
-performance reasons, in such buffers, low-level hooks such as
-`fontification-functions' or `post-command-hook' are executed on a
-narrowed buffer, with a narrowing locked with `narrowing-lock'.  The
-variable `long-line-locked-narrowing-region-size' specifies the size
-of the narrowed region around point.  This variable, which should be a
-small integer, specifies the number of characters by which that region
-can be extended backwards to make it start at the beginning of a line.
+This variable has effect only in buffers in which
+`long-line-optimizations-p' is non-nil.  For performance reasons, in
+such buffers, the `fontification-functions', `pre-command-hook' and
+`post-command-hook' hooks are executed on a narrowed buffer around
+point, as if they were called in a `with-restriction' form with a label.
+The variable `long-line-optimizations-region-size' specifies the
+size of the narrowed region around point.  This variable, which should
+be a small integer, specifies the number of characters by which that
+region can be extended backwards to make it start at the beginning of
+a line.
 
 There is no reason to change that value except for debugging purposes.  */);
-  long_line_locked_narrowing_bol_search_limit = 128;
+  long_line_optimizations_bol_search_limit = 128;
 
   DEFVAR_INT ("large-hscroll-threshold", large_hscroll_threshold,
     doc: /* Horizontal scroll of truncated lines above which to use redisplay shortcuts.

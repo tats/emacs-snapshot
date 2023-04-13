@@ -1,6 +1,6 @@
 ;;; erc-button.el --- A way of buttonizing certain things in ERC buffers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2004, 2006-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2004, 2006-2023 Free Software Foundation, Inc.
 
 ;; Author: Mario Lang <mlang@delysid.org>
 ;; Maintainer: Amin Bandali <bandali@gnu.org>, F. Jason Park <jp@neverwas.me>
@@ -176,7 +176,7 @@ PAR is a number of a regexp grouping whose text will be passed to
   CALLBACK.  There can be several PAR arguments.  If REGEXP is
   `nicknames', these are ignored, and CALLBACK will be called with
   the nickname matched as the argument."
-  :version "29.1"
+  :package-version '(ERC . "5.5")
   :type '(repeat
           (list :tag "Button"
                 (choice :tag "Matches"

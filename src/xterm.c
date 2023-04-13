@@ -1,6 +1,6 @@
 /* X Communication module for terminals which understand the X protocol.
 
-Copyright (C) 1989, 1993-2022 Free Software Foundation, Inc.
+Copyright (C) 1989, 1993-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -4513,7 +4513,7 @@ x_dnd_send_position (struct frame *f, Window target, Window toplevel,
      maintained by the original author of the protocol specifies it
      for all versions.  Since at least one program supports these
      flags, but uses protocol v4 (and not v5), set them for all
-     protocool versions.  */
+     protocol versions.  */
   if (button >= 4 && button <= 7)
     {
       msg.xclient.data.l[1] |= (1 << 10);
@@ -5830,8 +5830,10 @@ void
 x_end_cr_clip (struct frame *f)
 {
   cairo_restore (FRAME_CR_CONTEXT (f));
+#ifdef HAVE_XDBE
   if (FRAME_X_DOUBLE_BUFFERED_P (f))
     x_mark_frame_dirty (f);
+#endif
 }
 
 void
@@ -7358,8 +7360,10 @@ x_update_end (struct frame *f)
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
 
 #ifdef USE_CAIRO
+# ifdef HAVE_XDBE
   if (!FRAME_X_DOUBLE_BUFFERED_P (f) && FRAME_CR_CONTEXT (f))
     cairo_surface_flush (cairo_get_target (FRAME_CR_CONTEXT (f)));
+# endif
 #endif
 
   /* If double buffering is disabled, finish the update here.
@@ -20900,8 +20904,10 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  x_flush (WINDOW_XFRAME (XWINDOW (bar->window)));
 		}
 
+#ifdef HAVE_XDBE
 	      if (f && FRAME_X_DOUBLE_BUFFERED_P (f))
 		x_drop_xrender_surfaces (f);
+#endif
 
 	      goto OTHER;
 	    }
@@ -26768,13 +26774,14 @@ x_wm_supports_1 (struct x_display_info *dpyinfo, Atom want_atom)
 
       if (rc != Success || actual_type != XA_ATOM || x_had_errors_p (dpy))
         {
-          if (tmp_data) XFree (tmp_data);
+          if (tmp_data)
+	    XFree (tmp_data);
           x_uncatch_errors ();
           unblock_input ();
           return false;
         }
 
-      dpyinfo->net_supported_atoms = (Atom *)tmp_data;
+      dpyinfo->net_supported_atoms = (Atom *) tmp_data;
       dpyinfo->nr_net_supported_atoms = actual_size;
       dpyinfo->net_supported_window = wmcheck_window;
     }
@@ -30630,6 +30637,9 @@ x_delete_display (struct x_display_info *dpyinfo)
 	}
     }
 
+  if (dpyinfo->net_supported_atoms)
+    XFree (dpyinfo->net_supported_atoms);
+
   xfree (dpyinfo->color_names);
   xfree (dpyinfo->color_names_length);
   xfree (dpyinfo->x_id_name);
@@ -30741,7 +30751,11 @@ static struct redisplay_interface x_redisplay_interface =
 void
 x_delete_terminal (struct terminal *terminal)
 {
-  struct x_display_info *dpyinfo = terminal->display_info.x;
+  struct x_display_info *dpyinfo;
+  struct frame *f;
+  Lisp_Object tail, frame;
+
+  dpyinfo = terminal->display_info.x;
 
   /* Protect against recursive calls.  delete_frame in
      delete_terminal calls us back when it deletes our last frame.  */
@@ -30749,6 +30763,19 @@ x_delete_terminal (struct terminal *terminal)
     return;
 
   block_input ();
+
+  /* Delete all remaining frames on the display that is going away.
+     Otherwise, font backends assume the display is still up, and
+     xftfont_end_for_frame crashes.  */
+  FOR_EACH_FRAME (tail, frame)
+    {
+      f = XFRAME (frame);
+
+      if (FRAME_LIVE_P (f) && f->terminal == terminal)
+	/* Pass Qnoelisp rather than Qt.  */
+	delete_frame (frame, Qnoelisp);
+    }
+
 #ifdef HAVE_X_I18N
   /* We must close our connection to the XIM server before closing the
      X display.  */
@@ -30761,6 +30788,10 @@ x_delete_terminal (struct terminal *terminal)
     {
       image_destroy_all_bitmaps (dpyinfo);
       XSetCloseDownMode (dpyinfo->display, DestroyAll);
+
+      /* Delete the scratch cursor GC, should it exist.  */
+      if (dpyinfo->scratch_cursor_gc)
+	XFreeGC (dpyinfo->display, dpyinfo->scratch_cursor_gc);
 
       /* Get rid of any drag-and-drop operation that might be in
 	 progress as well.  */

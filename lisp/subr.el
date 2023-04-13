@@ -1,6 +1,6 @@
 ;;; subr.el --- basic lisp subroutines for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2022 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994-1995, 1999-2023 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -45,7 +45,8 @@ declaration.  A FILE with an \"ext:\" prefix is an external file.
 `check-declare' will check such files if they are found, and skip
 them without error if they are not.
 
-Optional ARGLIST specifies FN's arguments, or is t to not specify
+Optional ARGLIST specifies FN's arguments, in the same form as
+in `defun' (including the parentheses); or it is t to not specify
 FN's arguments.  An omitted ARGLIST defaults to t, not nil: a nil
 ARGLIST specifies an empty argument list, and an explicit t
 ARGLIST is a placeholder that allows supplying a later arg.
@@ -163,7 +164,7 @@ of previous VARs.
 (defmacro setq-local (&rest pairs)
   "Make each VARIABLE buffer-local and assign to it the corresponding VALUE.
 
-The arguments are variable/value pairs  For each VARIABLE in a pair,
+The arguments are variable/value pairs.  For each VARIABLE in a pair,
 make VARIABLE buffer-local and assign to it the corresponding VALUE
 of the pair.  The VARIABLEs are literal symbols and should not be quoted.
 
@@ -1519,31 +1520,32 @@ EVENT may be an event or an event type.  If EVENT is a symbol
 that has never been used in an event that has been read as input
 in the current Emacs session, then this function may fail to include
 the `click' modifier."
-  (let ((type event))
-    (if (listp type)
-	(setq type (car type)))
-    (if (symbolp type)
-        ;; Don't read event-symbol-elements directly since we're not
-        ;; sure the symbol has already been parsed.
-	(cdr (internal-event-symbol-parse-modifiers type))
-      (let ((list nil)
-	    (char (logand type (lognot (logior ?\M-\0 ?\C-\0 ?\S-\0
-					       ?\H-\0 ?\s-\0 ?\A-\0)))))
-	(if (not (zerop (logand type ?\M-\0)))
-	    (push 'meta list))
-	(if (or (not (zerop (logand type ?\C-\0)))
-		(< char 32))
-	    (push 'control list))
-	(if (or (not (zerop (logand type ?\S-\0)))
-		(/= char (downcase char)))
-	    (push 'shift list))
-	(or (zerop (logand type ?\H-\0))
-	    (push 'hyper list))
-	(or (zerop (logand type ?\s-\0))
-	    (push 'super list))
-	(or (zerop (logand type ?\A-\0))
-	    (push 'alt list))
-	list))))
+  (unless (stringp event)
+    (let ((type event))
+      (if (listp type)
+	  (setq type (car type)))
+      (if (symbolp type)
+          ;; Don't read event-symbol-elements directly since we're not
+          ;; sure the symbol has already been parsed.
+	  (cdr (internal-event-symbol-parse-modifiers type))
+        (let ((list nil)
+	      (char (logand type (lognot (logior ?\M-\0 ?\C-\0 ?\S-\0
+					         ?\H-\0 ?\s-\0 ?\A-\0)))))
+	  (if (not (zerop (logand type ?\M-\0)))
+	      (push 'meta list))
+	  (if (or (not (zerop (logand type ?\C-\0)))
+		  (< char 32))
+	      (push 'control list))
+	  (if (or (not (zerop (logand type ?\S-\0)))
+		  (/= char (downcase char)))
+	      (push 'shift list))
+	  (or (zerop (logand type ?\H-\0))
+	      (push 'hyper list))
+	  (or (zerop (logand type ?\s-\0))
+	      (push 'super list))
+	  (or (zerop (logand type ?\A-\0))
+	      (push 'alt list))
+	  list)))))
 
 (defun event-basic-type (event)
   "Return the basic type of the given event (all modifiers removed).
@@ -1551,17 +1553,18 @@ The value is a printing character (not upper case) or a symbol.
 EVENT may be an event or an event type.  If EVENT is a symbol
 that has never been used in an event that has been read as input
 in the current Emacs session, then this function may return nil."
-  (if (consp event)
-      (setq event (car event)))
-  (if (symbolp event)
-      (car (get event 'event-symbol-elements))
-    (let* ((base (logand event (1- ?\A-\0)))
-	   (uncontrolled (if (< base 32) (logior base 64) base)))
-      ;; There are some numbers that are invalid characters and
-      ;; cause `downcase' to get an error.
-      (condition-case ()
-	  (downcase uncontrolled)
-	(error uncontrolled)))))
+  (unless (stringp event)
+    (if (consp event)
+        (setq event (car event)))
+    (if (symbolp event)
+        (car (get event 'event-symbol-elements))
+      (let* ((base (logand event (1- ?\A-\0)))
+	     (uncontrolled (if (< base 32) (logior base 64) base)))
+        ;; There are some numbers that are invalid characters and
+        ;; cause `downcase' to get an error.
+        (condition-case ()
+	    (downcase uncontrolled)
+	  (error uncontrolled))))))
 
 (defsubst mouse-movement-p (object)
   "Return non-nil if OBJECT is a mouse movement event."
@@ -1576,16 +1579,18 @@ in the current Emacs session, then this function may return nil."
   ;; Use `window-point' for the case when the current buffer
   ;; is temporarily switched to some other buffer (bug#50256)
   (let* ((pos (window-point))
-         (posn (posn-at-point pos)))
-    (if (null posn) ;; `pos' is "out of sight".
-        (list (selected-window) pos '(0 . 0) 0)
-      ;; If `pos' is inside a chunk of text hidden by an `invisible'
-      ;; or `display' property, `posn-at-point' returns the position
-      ;; that *is* visible, whereas `event--posn-at-point' is used
-      ;; when we have a keyboard event, whose position is `point' even
-      ;; if that position is invisible.
-      (setf (nth 5 posn) pos)
-      posn)))
+         (posn (posn-at-point pos (if (minibufferp (current-buffer))
+                                      (minibuffer-window)))))
+    (cond ((null posn) ;; `pos' is "out of sight".
+           (setq posn (list (selected-window) pos '(0 . 0) 0)))
+          ;; If `pos' is inside a chunk of text hidden by an `invisible'
+          ;; or `display' property, `posn-at-point' returns the position
+          ;; that *is* visible, whereas `event--posn-at-point' is used
+          ;; when we have a keyboard event, whose position is `point' even
+          ;; if that position is invisible.
+          ((> (length posn) 5)
+           (setf (nth 5 posn) pos)))
+    posn))
 
 (defun event-start (event)
   "Return the starting position of EVENT.
@@ -1892,8 +1897,13 @@ activations.  To prevent runaway recursion, use `max-lisp-eval-depth'
 instead; it will indirectly limit the specpdl stack size as well.")
 (make-obsolete-variable 'max-specpdl-size nil "29.1")
 
+(make-obsolete-variable 'comp-enable-subr-trampolines
+                        'native-comp-enable-subr-trampolines
+                        "29.1")
+
 (make-obsolete-variable 'native-comp-deferred-compilation
-                        'inhibit-automatic-native-compilation "29.1")
+                        'native-comp-jit-compilation
+                        "29.1")
 
 
 ;;;; Alternate names for functions - these are not being phased out.
@@ -2399,8 +2409,9 @@ If the variable `delay-mode-hooks' is non-nil, does not do anything,
 just adds the HOOKS to the list `delayed-mode-hooks'.
 Otherwise, runs hooks in the sequence: `change-major-mode-after-body-hook',
 `delayed-mode-hooks' (in reverse order), HOOKS, then runs
-`hack-local-variables', runs the hook `after-change-major-mode-hook', and
-finally evaluates the functions in `delayed-after-hook-functions' (see
+`hack-local-variables' (if the buffer is visiting a file),
+runs the hook `after-change-major-mode-hook', and finally
+evaluates the functions in `delayed-after-hook-functions' (see
 `define-derived-mode').
 
 Major mode functions should use this instead of `run-hooks' when
@@ -2538,11 +2549,13 @@ The variable list SPEC is the same as in `if-let'."
 Evaluate each binding in turn, stopping if a binding value is nil.
 If all bindings are non-nil, eval BODY and repeat.
 
-The variable list SPEC is the same as in `if-let'."
+The variable list SPEC is the same as in `if-let*'."
   (declare (indent 1) (debug if-let))
   (let ((done (gensym "done")))
     `(catch ',done
        (while t
+         ;; This is `if-let*', not `if-let', deliberately, despite the
+         ;; name of this macro.  See bug#60758.
          (if-let* ,spec
              (progn
                ,@body)
@@ -3186,34 +3199,40 @@ This function is used by the `interactive' code letter \"n\"."
     n))
 
 (defvar read-char-choice-use-read-key nil
-  "Prefer `read-key' when reading a character by `read-char-choice'.
-Otherwise, use the minibuffer.
+  "If non-nil, use `read-key' when reading a character by `read-char-choice'.
+Otherwise, use the minibuffer (this is the default).
 
-When using the minibuffer, the user is less constrained, and can
-use the normal commands available in the minibuffer, and can, for
-instance, switch to another buffer, do things there, and then
-switch back again to the minibuffer before entering the
-character.  This is not possible when using `read-key', but using
-`read-key' may be less confusing to some users.")
+When reading via the minibuffer, you can use the normal commands
+available in the minibuffer, and can, for instance, temporarily
+switch to another buffer, do things there, and then switch back
+to the minibuffer before entering the character.  This is not
+possible when using `read-key', but using `read-key' may be less
+confusing to some users.")
 
 (defun read-char-choice (prompt chars &optional inhibit-keyboard-quit)
-  "Read and return one of CHARS, prompting for PROMPT.
-Any input that is not one of CHARS is ignored.
+  "Read and return one of the characters in CHARS, prompting with PROMPT.
+CHARS should be a list of single characters.
+The function discards any input character that is not one of CHARS,
+and by default shows a message to the effect that it is not one of
+the expected characters.
 
-By default, the minibuffer is used to read the key
-non-modally (see `read-char-from-minibuffer').  If
+By default, this function uses the minibuffer to read the key
+non-modally (see `read-char-from-minibuffer'), and the optional
+argument INHIBIT-KEYBOARD-QUIT is ignored.  However, if
 `read-char-choice-use-read-key' is non-nil, the modal `read-key'
-function is used instead (see `read-char-choice-with-read-key')."
+function is used instead (see `read-char-choice-with-read-key'),
+and INHIBIT-KEYBOARD-QUIT is passed to it."
   (if (not read-char-choice-use-read-key)
       (read-char-from-minibuffer prompt chars)
     (read-char-choice-with-read-key prompt chars inhibit-keyboard-quit)))
 
 (defun read-char-choice-with-read-key (prompt chars &optional inhibit-keyboard-quit)
-  "Read and return one of CHARS, prompting for PROMPT.
+  "Read and return one of the characters in CHARS, prompting with PROMPT.
+CHARS should be a list of single characters.
 Any input that is not one of CHARS is ignored.
 
 If optional argument INHIBIT-KEYBOARD-QUIT is non-nil, ignore
-`keyboard-quit' events while waiting for a valid input.
+`keyboard-quit' events while waiting for valid input.
 
 If you bind the variable `help-form' to a non-nil value
 while calling this function, then pressing `help-char'
@@ -3509,22 +3528,22 @@ Also discard all previous input in the minibuffer."
     (sit-for 2)))
 
 (defvar y-or-n-p-use-read-key nil
-  "Prefer `read-key' when answering a \"y or n\" question by `y-or-n-p'.
-Otherwise, use the minibuffer.
+  "Use `read-key' when reading answers to \"y or n\" questions by `y-or-n-p'.
+Otherwise, use the `read-from-minibuffer' to read the answers.
 
-When using the minibuffer, the user is less constrained, and can
-use the normal commands available in the minibuffer, and can, for
-instance, switch to another buffer, do things there, and then
-switch back again to the minibuffer before entering the
-character.  This is not possible when using `read-key', but using
-`read-key' may be less confusing to some users.")
+When reading via the minibuffer, you can use the normal commands
+available in the minibuffer, and can, for instance, temporarily
+switch to another buffer, do things there, and then switch back
+to the minibuffer before entering the character.  This is not
+possible when using `read-key', but using `read-key' may be less
+confusing to some users.")
 
 (defvar from--tty-menu-p nil
   "Non-nil means the current command was invoked from a TTY menu.")
 (defun use-dialog-box-p ()
-  "Say whether the current command should prompt the user via a dialog box."
+  "Return non-nil if the current command should prompt the user via a dialog box."
   (and last-input-event                 ; not during startup
-       (or (listp last-nonmenu-event)   ; invoked by a mouse event
+       (or (consp last-nonmenu-event)   ; invoked by a mouse event
            from--tty-menu-p)            ; invoked via TTY menu
        use-dialog-box))
 
@@ -3533,8 +3552,7 @@ character.  This is not possible when using `read-key', but using
 Return t if answer is \"y\" and nil if it is \"n\".
 
 PROMPT is the string to display to ask the question; `y-or-n-p'
-adds \" (y or n) \" to it.  It does not need to end in space, but
-if it does up to one space will be removed.
+adds \"(y or n) \" to it.
 
 If you bind the variable `help-form' to a non-nil value
 while calling this function, then pressing `help-char'
@@ -3570,12 +3588,14 @@ like) while `y-or-n-p' is running)."
 			    (if (or (zerop l) (eq ?\s (aref prompt (1- l))))
 				"" " ")
 			    (if dialog ""
-                              (substitute-command-keys
-                               (if help-form
-                                   (format "(\\`y', \\`n' or \\`%s') "
-                                           (key-description
-                                            (vector help-char)))
-                                 "(\\`y' or \\`n') ")))))))
+                              ;; Don't clobber caller's match data.
+                              (save-match-data
+                                (substitute-command-keys
+                                 (if help-form
+                                     (format "(\\`y', \\`n' or \\`%s') "
+                                             (key-description
+                                              (vector help-char)))
+                                   "(\\`y' or \\`n') "))))))))
         ;; Preserve the actual command that eventually called
         ;; `y-or-n-p' (otherwise `repeat' will be repeating
         ;; `exit-minibuffer').
@@ -3855,7 +3875,7 @@ If MESSAGE is nil, instructions to type EXIT-CHAR are displayed there."
   (let ((o1 (if (overlay-buffer o)
                 (make-overlay (overlay-start o) (overlay-end o)
                               ;; FIXME: there's no easy way to find the
-                              ;; insertion-type of the two markers.
+                              ;; insertion-type of overlay's start and end.
                               (overlay-buffer o))
               (let ((o1 (make-overlay (point-min) (point-min))))
                 (delete-overlay o1)
@@ -3936,30 +3956,53 @@ See also `locate-user-emacs-file'.")
   "Return non-nil if the current buffer is narrowed."
   (/= (- (point-max) (point-min)) (buffer-size)))
 
-(defmacro with-narrowing (start end &rest rest)
+(defmacro with-restriction (start end &rest rest)
   "Execute BODY with restrictions set to START and END.
 
 The current restrictions, if any, are restored upon return.
 
-With the optional :locked TAG argument, inside BODY,
-`narrow-to-region' and `widen' can be used only within the START
-and END limits, unless the restrictions are unlocked by calling
-`narrowing-unlock' with TAG.  See `narrowing-lock' for a more
-detailed description.
+When the optional :label LABEL argument is present, in which
+LABEL is a symbol, inside BODY, `narrow-to-region' and `widen'
+can be used only within the START and END limits.  To gain access
+to other portions of the buffer, use `without-restriction' with the
+same LABEL argument.
 
-\(fn START END [:locked TAG] BODY)"
-  (if (eq (car rest) :locked)
-      `(internal--with-narrowing ,start ,end (lambda () ,@(cddr rest))
+\(fn START END [:label LABEL] BODY)"
+  (declare (indent 0) (debug t))
+  (if (eq (car rest) :label)
+      `(internal--with-restriction ,start ,end (lambda () ,@(cddr rest))
                                  ,(cadr rest))
-    `(internal--with-narrowing ,start ,end (lambda () ,@rest))))
+    `(internal--with-restriction ,start ,end (lambda () ,@rest))))
 
-(defun internal--with-narrowing (start end body &optional tag)
-  "Helper function for `with-narrowing', which see."
+(defun internal--with-restriction (start end body &optional label)
+  "Helper function for `with-restriction', which see."
   (save-restriction
-    (progn
-      (narrow-to-region start end)
-      (if tag (narrowing-lock tag))
-      (funcall body))))
+    (narrow-to-region start end)
+    (if label (internal--lock-narrowing label))
+    (funcall body)))
+
+(defmacro without-restriction (&rest rest)
+  "Execute BODY without restrictions.
+
+The current restrictions, if any, are restored upon return.
+
+When the optional :label LABEL argument is present, the
+restrictions set by `with-restriction' with the same LABEL argument
+are lifted.
+
+\(fn [:label LABEL] BODY)"
+  (declare (indent 0) (debug t))
+  (if (eq (car rest) :label)
+      `(internal--without-restriction (lambda () ,@(cddr rest))
+                                    ,(cadr rest))
+    `(internal--without-restriction (lambda () ,@rest))))
+
+(defun internal--without-restriction (body &optional label)
+  "Helper function for `without-restriction', which see."
+  (save-restriction
+    (if label (internal--unlock-narrowing label))
+    (widen)
+    (funcall body)))
 
 (defun find-tag-default-bounds ()
   "Determine the boundaries of the default tag, based on text at point.
@@ -4155,8 +4198,8 @@ or byte-code."
   "Return the SHA-1 (Secure Hash Algorithm) of an OBJECT.
 OBJECT is either a string or a buffer.  Optional arguments START and
 END are character positions specifying which portion of OBJECT for
-computing the hash.  If BINARY is non-nil, return a string in binary
-form.
+computing the hash.  If BINARY is non-nil, return a 40-byte unibyte
+string; otherwise returna 40-character string.
 
 Note that SHA-1 is not collision resistant and should not be used
 for anything security-related.  See `secure-hash' for
@@ -4945,13 +4988,13 @@ the function `undo--wrap-and-run-primitive-undo'."
 		(progn
 		  (while (and (not (eq (cdr ptr) old-bul))
 			      ;; In case garbage collection has removed OLD-BUL.
-			      (cdr ptr)
-			      ;; Don't include a timestamp entry.
-			      (not (and (consp (cdr ptr))
-					(consp (cadr ptr))
-					(eq (caadr ptr) t)
-					(setq old-bul (cdr ptr)))))
-		    (setq ptr (cdr ptr)))
+			      (cdr ptr))
+		    (if (and (consp (cdr ptr))
+			     (consp (cadr ptr))
+			     (eq (caadr ptr) t))
+			;; Don't include a timestamp entry.
+			(setcdr ptr (cddr ptr))
+		      (setq ptr (cdr ptr))))
 		  (unless (cdr ptr)
 		    (message "combine-change-calls: buffer-undo-list broken"))
 		  (setcdr ptr nil)
@@ -5435,9 +5478,11 @@ and replace a sub-expression, e.g.
       (apply #'concat (nreverse matches)))))
 
 (defsubst string-equal-ignore-case (string1 string2)
-  "Like `string-equal', but case-insensitive.
+  "Compare STRING1 and STRING2 case-insensitively.
 Upper-case and lower-case letters are treated as equal.
-Unibyte strings are converted to multibyte for comparison."
+Unibyte strings are converted to multibyte for comparison.
+
+See also `string-equal'."
   (declare (pure t) (side-effect-free t))
   (eq t (compare-strings string1 0 nil string2 0 nil t)))
 
@@ -6907,11 +6952,8 @@ sentence (see Info node `(elisp) Documentation Tips')."
 
 (defun json-available-p ()
   "Return non-nil if Emacs has libjansson support."
-  (and (fboundp 'json-serialize)
-       (condition-case nil
-           (json-serialize t)
-         (:success t)
-         (json-unavailable nil))))
+  (and (fboundp 'json--available-p)
+       (json--available-p)))
 
 (defun ensure-list (object)
   "Return OBJECT as a list.
@@ -7036,7 +7078,7 @@ CONDITION is either:
 - the symbol t, to always match,
 - the symbol nil, which never matches,
 - a regular expression, to match a buffer name,
-- a predicate function that takes a buffer object and ARG as
+- a predicate function that takes BUFFER-OR-NAME and ARG as
   arguments, and returns non-nil if the buffer matches,
 - a cons-cell, where the car describes how to interpret the cdr.
   The car can be one of the following:
@@ -7045,7 +7087,7 @@ CONDITION is either:
   * `major-mode': the buffer matches if the buffer's major mode
     is eq to the cons-cell's cdr.  Prefer using `derived-mode'
     instead when both can work.
-  * `not': the cdr is interpreted as a negation of a condition.
+  * `not': the cadr is interpreted as a negation of a condition.
   * `and': the cdr is a list of recursive conditions, that all have
     to be met.
   * `or': the cdr is a list of recursive condition, of which at
@@ -7062,8 +7104,8 @@ CONDITION is either:
                        (string-match-p condition (buffer-name buffer)))
                       ((pred functionp)
                        (if (eq 1 (cdr (func-arity condition)))
-                           (funcall condition buffer)
-                         (funcall condition buffer arg)))
+                           (funcall condition buffer-or-name)
+                         (funcall condition buffer-or-name arg)))
                       (`(major-mode . ,mode)
                        (eq
                         (buffer-local-value 'major-mode buffer)

@@ -1,6 +1,6 @@
 ;;; compile.el --- run compiler as inferior of Emacs, parse error messages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1993-1999, 2001-2022 Free Software
+;; Copyright (C) 1985-1987, 1993-1999, 2001-2023 Free Software
 ;; Foundation, Inc.
 
 ;; Authors: Roland McGrath <roland@gnu.org>,
@@ -186,6 +186,7 @@ and a string describing how the process finished.")
                      face compilation-info
                      help-echo "Number of informational messages so far")
     "]"))
+(put 'compilation-mode-line-errors 'risky-local-variable t)
 
 ;; If you make any changes to `compilation-error-regexp-alist-alist',
 ;; be sure to run the ERT test in test/lisp/progmodes/compile-tests.el.
@@ -648,6 +649,36 @@ File = \\(.+\\), Line = \\([0-9]+\\)\\(?:, Column = \\([0-9]+\\)\\)?"
     ;; we do not know what lines will follow.
     (guile-file "^In \\(.+\\..+\\):\n" 1 nil nil 0)
     (guile-line "^ *\\([0-9]+\\): *\\([0-9]+\\)" nil 1 2)
+
+    ;; Typescript compilation prior to tsc version 2.7, "plain" format:
+    ;; greeter.ts(30,12): error TS2339: Property 'foo' does not exist.
+    (typescript-tsc-plain
+     ,(rx bol
+          (group (not (in " \t\n()"))   ; 1: file
+                 (* (not (in "\n()"))))
+          "("
+          (group (+ (in "0-9")))        ; 2: line
+          ","
+          (group (+ (in "0-9")))        ; 3: column
+          "): error "
+          (+ (in "0-9A-Z"))             ; error code
+          ": ")
+     1 2 3 2)
+
+    ;; Typescript compilation after tsc version 2.7, "pretty" format:
+    ;; src/resources/document.ts:140:22 - error TS2362: something.
+    (typescript-tsc-pretty
+     ,(rx bol
+          (group (not (in " \t\n()"))   ; 1: file
+                 (* (not (in "\n()"))))
+          ":"
+          (group (+ (in "0-9")))        ; 2: line
+          ":"
+          (group (+ (in "0-9")))        ; 3: column
+          " - error "
+          (+ (in "0-9A-Z"))             ; error code
+          ": ")
+     1 2 3 2)
     ))
   "Alist of values for `compilation-error-regexp-alist'.")
 
@@ -2807,7 +2838,7 @@ This is the value of `next-error-function' in Compilation buffers."
             (goto-char (point-min))
             ;; Treat file's found lines in forward order, 1 by 1.
             (dolist (line (reverse (cddr (compilation--loc->file-struct loc))))
-              (when (car line)		; else this is a filename w/o a line#
+              (when (car line)		; else this is a filename without a line#
                 (compilation-beginning-of-line (- (car line) last -1))
                 (setq last (car line)))
               ;; Treat line's found columns and store/update a marker for each.

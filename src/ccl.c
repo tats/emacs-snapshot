@@ -1,5 +1,5 @@
 /* CCL (Code Conversion Language) interpreter.
-   Copyright (C) 2001-2022 Free Software Foundation, Inc.
+   Copyright (C) 2001-2023 Free Software Foundation, Inc.
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
      2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
@@ -1987,7 +1987,7 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
 /* Setup fields of the structure pointed by CCL appropriately for the
    execution of CCL program CCL_PROG.  CCL_PROG is the name (symbol)
    of the CCL program or the already compiled code (vector).
-   Return true iff successful.
+   Return true if successful.
 
    If CCL_PROG is nil, just reset the structure pointed by CCL.  */
 bool

@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990--1993, 1998--1999, 2001--2022 Free Software
+@c Copyright (C) 1990--1993, 1998--1999, 2001--2023 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node GNU Emacs Internals
@@ -558,12 +558,15 @@ The initial threshold value is @code{GC_DEFAULT_THRESHOLD}, defined in
 value is 400,000 for the default 32-bit configuration and 800,000 for
 the 64-bit one.  If you specify a larger value, garbage collection
 will happen less often.  This reduces the amount of time spent garbage
-collecting, but increases total memory use.  You may want to do this
-when running a program that creates lots of Lisp data.  However, we
+collecting (so Lisp programs will run faster between cycles of garbage
+collection that happen more rarely), but increases total memory use.
+You may want to do this when running a program that creates lots of
+Lisp data, especially if you need it to run faster.  However, we
 recommend against increasing the threshold for prolonged periods of
 time, and advise that you never set it higher than needed for the
 program to run in reasonable time.  Using thresholds higher than
-necessary could potentially cause system-wide memory pressure, and
+necessary could potentially cause higher system-wide memory pressure,
+and also make each garbage-collection cycle take much more time, and
 should therefore be avoided.
 
 You can make collections more frequent by specifying a smaller value, down
@@ -2423,19 +2426,6 @@ Buffers}), and avoids slowing down internal or temporary buffers, such
 as those created by @code{with-temp-buffer} (@pxref{Definition of
 with-temp-buffer,, Current Buffer}).
 
-@item overlay_center
-This field holds the current overlay center position.  @xref{Managing
-Overlays}.
-
-@item overlays_before
-@itemx overlays_after
-These fields hold, respectively, a list of overlays that end at or
-before the current overlay center, and a list of overlays that end
-after the current overlay center.  @xref{Managing Overlays}.
-@code{overlays_before} is sorted in order of decreasing end position,
-and @code{overlays_after} is sorted in order of increasing beginning
-position.
-
 @item name
 A Lisp string that names the buffer.  It is guaranteed to be unique.
 @xref{Buffer Names}.  This and the following fields have their names
@@ -2561,6 +2551,9 @@ These fields store the values of Lisp variables that are automatically
 buffer-local (@pxref{Buffer-Local Variables}), whose corresponding
 variable names have underscores replaced with dashes.  For instance,
 @code{mode_line_format} stores the value of @code{mode-line-format}.
+
+@item overlays
+The interval tree containing this buffer's overlays.
 
 @item last_selected_window
 This is the last window that was selected with this buffer in it, or @code{nil}

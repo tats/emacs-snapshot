@@ -1,6 +1,6 @@
 ;;; tramp.el --- Transparent Remote Access, Multiple Protocol  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2023 Free Software Foundation, Inc.
 
 ;; Author: Kai Großjohann <kai.grossjohann@gmx.net>
 ;;         Michael Albinus <michael.albinus@gmx.de>
@@ -643,7 +643,7 @@ This regexp must match both `tramp-initial-end-of-output' and
   (tramp-compat-rx
    bol (* nonl)
    (group (regexp (regexp-opt password-word-equivalents)))
-   (* nonl) ":" (? "\^@") (* blank))
+   (* nonl) (any ":：៖") (? "\^@") (* blank))
   "Regexp matching password-like prompts.
 The regexp should match at end of buffer.
 
@@ -653,13 +653,13 @@ usually more convenient to add new passphrases to that variable
 instead of altering this variable.
 
 The `sudo' program appears to insert a `^@' character into the prompt."
-  :version "24.4"
+  :version "29.1"
   :type 'regexp)
 
 (defcustom tramp-wrong-passwd-regexp
   (rx bol (* nonl)
       (| "Permission denied"
-	 "Login [Ii]ncorrect"
+	 (: "Login " (| "Incorrect" "incorrect"))
 	 "Connection refused"
 	 "Connection closed"
 	 "Timeout, server not responding."
@@ -684,7 +684,7 @@ See also `tramp-yn-prompt-regexp'."
   :type 'regexp)
 
 (defcustom tramp-yn-prompt-regexp
-  (rx (| "Store key in cache? (y/n)"
+  (rx (| (: "Store key in cache? (y/n" (* nonl) ")")
 	 "Update cached key? (y/n, Return cancels connection)")
       (* blank))
   "Regular expression matching all y/n queries which need to be confirmed.
@@ -1372,7 +1372,9 @@ special value `tramp-default-remote-path'.
 
 `Private Directories' are the settings of the $PATH environment,
 as given in your `~/.profile'.  This entry is represented in
-the list by the special value `tramp-own-remote-path'."
+the list by the special value `tramp-own-remote-path'.
+
+For a full discussion, see Info node `(tramp) Remote programs'."
   :group 'tramp
   :type '(repeat (choice
 		  (const :tag "Default Directories" tramp-default-remote-path)
@@ -2605,12 +2607,14 @@ Must be handled by the callers."
 	      file-selinux-context file-symlink-p file-truename
 	      file-writable-p find-backup-file-name get-file-buffer
 	      insert-directory insert-file-contents load
-	      make-directory make-directory-internal set-file-acl
-	      set-file-modes set-file-selinux-context set-file-times
+	      make-directory set-file-acl set-file-modes
+	      set-file-selinux-context set-file-times
 	      substitute-in-file-name unhandled-file-name-directory
 	      vc-registered
 	      ;; Emacs 27+ only.
 	      file-system-info
+	      ;; Emacs 28- only.
+	      make-directory-internal
 	      ;; Emacs 28+ only.
 	      file-locked-p lock-file make-lock-file-name unlock-file
 	      ;; Emacs 29+ only.
@@ -2949,7 +2953,7 @@ They are completed by \"M-x TAB\" only if the current buffer is remote."
   (tramp-tramp-file-p (tramp-get-default-directory buffer)))
 
 (defun tramp-connectable-p (vec-or-filename)
-  "Check, whether it is possible to connect the remote host w/o side-effects.
+  "Check if it is possible to connect the remote host without side-effects.
 This is true, if either the remote host is already connected, or if we are
 not in completion mode."
   (let ((tramp-verbose 0)
@@ -3999,7 +4003,7 @@ Let-bind it when necessary.")
    ((not (file-exists-p file1)) nil)
    ((not (file-exists-p file2)) t)
    ;; Tramp reads and writes timestamps on second level.  So we round
-   ;; the timestamps to seconds w/o fractions.
+   ;; the timestamps to seconds without fractions.
    ;; `time-convert' has been introduced with Emacs 27.1.
    ((fboundp 'time-convert)
     (time-less-p
@@ -4029,9 +4033,15 @@ Let-bind it when necessary.")
   "Like `file-regular-p' for Tramp files."
   (and (file-exists-p filename)
        ;; Sometimes, `file-attributes' does not return a proper value
-       ;; even if `file-exists-p' does.
-       (when-let ((attr (file-attributes filename)))
-	 (eq ?- (aref (file-attribute-modes attr) 0)))))
+       ;; even if `file-exists-p' does.  Protect by `ignore-errors',
+       ;; because `file-truename' could raise an error for cyclic
+       ;; symlinks.
+       (ignore-errors
+	 (when-let ((attr (file-attributes filename)))
+	   (cond
+	    ((eq ?- (aref (file-attribute-modes attr) 0)))
+	    ((eq ?l (aref (file-attribute-modes attr) 0))
+	     (file-regular-p (file-truename filename))))))))
 
 (defun tramp-handle-file-remote-p (filename &optional identification connected)
   "Like `file-remote-p' for Tramp files."
@@ -4692,7 +4702,8 @@ Do not set it manually, it is used buffer-local in `tramp-get-lock-pid'.")
 	      (or
 	       ;; The host name is used for the remote shell command.
 	       (member
-		'("%h") (tramp-get-method-parameter item 'tramp-login-args))
+		"%h" (tramp-compat-flatten-tree
+		      (tramp-get-method-parameter item 'tramp-login-args)))
 	       ;; The host name must match previous hop.
 	       (string-match-p previous-host host))
 	    (setq tramp-default-proxies-alist saved-tdpa)
@@ -4864,7 +4875,7 @@ substitution.  SPEC-LIST is a list of char/value pairs used for
 		:command (append `(,login-program) login-args command)
 		:coding coding :noquery noquery :connection-type connection-type
 		:sentinel sentinel :stderr stderr))
-	    ;; Set filter.  Prior Emacs 29.1, it doesn't work reliable
+	    ;; Set filter.  Prior Emacs 29.1, it doesn't work reliably
 	    ;; to provide it as `make-process' argument when filter is
 	    ;; t.  See Bug#51177.
 	    (when filter

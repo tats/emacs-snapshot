@@ -28,7 +28,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2022 Free Software
+Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2023 Free Software
 Foundation, Inc.
 
 This file is not considered part of GNU Emacs.
@@ -401,6 +401,9 @@ static void invalidate_nodes (fdesc *, node **);
 static void put_entries (node *);
 static void cleanup_tags_file (char const * const, char const * const);
 
+#if !MSDOS && !defined (DOS_NT)
+static char *escape_shell_arg_string (char *);
+#endif
 static void do_move_file (const char *, const char *);
 static char *concat (const char *, const char *, const char *);
 static char *skip_spaces (char *);
@@ -975,8 +978,8 @@ Relative ones are stored relative to the output file's directory.\n");
     puts
       ("\tand create tags for extern variables unless --no-globals is used.");
 
-  puts ("In Mercury, tag both declarations starting a line with ':-' and first\n\
-        predicates or functions in clauses.");
+  puts ("\tIn Mercury, tag both declarations starting a line with ':-' and\n\
+        first predicates or functions in clauses.");
 
   if (CTAGS)
     puts ("-d, --defines\n\
@@ -1413,7 +1416,7 @@ main (int argc, char **argv)
 	   setenv ("LC_COLLATE", "C", 1);
 	   setenv ("LC_ALL", "C", 1); */
 	char *cmd = xmalloc (8 * strlen (tagfile) + sizeof "sort -u -o '' ''");
-#if defined WINDOWSNT || defined MSDOS
+#if defined WINDOWSNT || MSDOS
 	/* Quote "like this".  No need to escape the quotes in the file name,
 	   since it is not allowed in file names on these systems.  */
 	char *z = stpcpy (cmd, "sort -u -o \"");
@@ -1713,13 +1716,25 @@ process_file_name (char *file, language *lang)
       else
 	{
 #if MSDOS || defined (DOS_NT)
-	  char *cmd1 = concat (compr->command, " \"", real_name);
-	  char *cmd = concat (cmd1, "\" > ", tmp_name);
+	  int buf_len =
+	    strlen (compr->command)
+	    + strlen (" \"\" > \"\"") + strlen (real_name)
+	    + strlen (tmp_name) + 1;
+	  char *cmd = xmalloc (buf_len);
+	  snprintf (cmd, buf_len, "%s \"%s\" > \"%s\"",
+		    compr->command, real_name, tmp_name);
 #else
-	  char *cmd1 = concat (compr->command, " '", real_name);
-	  char *cmd = concat (cmd1, "' > ", tmp_name);
+	  char *new_real_name = escape_shell_arg_string (real_name);
+	  char *new_tmp_name = escape_shell_arg_string (tmp_name);
+	  int buf_len =
+	    strlen (compr->command) + strlen ("  > ") + strlen (new_real_name)
+	    + strlen (new_tmp_name) + 1;
+	  char *cmd = xmalloc (buf_len);
+	  snprintf (cmd, buf_len, "%s %s > %s",
+		    compr->command, new_real_name, new_tmp_name);
+	  free (new_real_name);
+	  free (new_tmp_name);
 #endif
-	  free (cmd1);
 	  inf = (system (cmd) == -1
 		 ? NULL
 		 : fopen (tmp_name, "r" FOPEN_BINARY));
@@ -7706,6 +7721,57 @@ etags_mktmp (void)
 
   return templt;
 }
+
+#if !MSDOS && !defined (DOS_NT)
+/*
+ * Add single quotes around a string, and escape any single quotes.
+ * Return a newly-allocated string.
+ *
+ * For example:
+ * escape_shell_arg_string ("test.txt")  => "'test.txt'"
+ * escape_shell_arg_string ("'test.txt") => "''\''test.txt'"
+ */
+static char *
+escape_shell_arg_string (char *str)
+{
+  char *p = str;
+  int need_space = 2;		/* ' at begin and end */
+
+  while (*p != '\0')
+    {
+      if (*p == '\'')
+	need_space += 4;	/* ' to '\'', length is 4 */
+      else
+	need_space++;
+
+      p++;
+    }
+
+  char *new_str = xnew (need_space + 1, char);
+  new_str[0] = '\'';
+  new_str[need_space-1] = '\'';
+
+  int i = 1;			/* skip first byte */
+  p = str;
+  while (*p != '\0')
+    {
+      new_str[i] = *p;
+      if (*p == '\'')
+	{
+	  new_str[i+1] = '\\';
+	  new_str[i+2] = '\'';
+	  new_str[i+3] = '\'';
+	  i += 3;
+	}
+
+      i++;
+      p++;
+    }
+
+  new_str[need_space] = '\0';
+  return new_str;
+}
+#endif
 
 static void
 do_move_file(const char *src_file, const char *dst_file)

@@ -1,6 +1,6 @@
 ;;; mml-sec-tests.el --- Tests mml-sec.el, see README-mml-secure.txt.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2015, 2020-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2015, 2020-2023 Free Software Foundation, Inc.
 
 ;; Author: Jens Lechtenbörger <jens.lechtenboerger@fsfe.org>
 
@@ -789,7 +789,7 @@ With Ma Gnus v0.14 and earlier a signature would be created with a wrong key."
 
 ;; TODO Passphrase passing and caching in Emacs does not seem to work
 ;; with gpgsm at all.
-;; Independently of caching settings, a pinentry dialogue is displayed.
+;; Independently of caching settings, a pinentry dialog is displayed.
 ;; Thus, the following tests require the user to enter the correct gpgsm
 ;; passphrases at the correct points in time.  (Either empty string or
 ;; "Passphrase".)

@@ -1,6 +1,6 @@
 ;;; erc-services-tests.el --- Tests for erc-services.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2020-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 ;;
@@ -248,7 +248,8 @@
     (let ((auth-sources (list plstore-file))
           (auth-source-do-cache nil))
       (erc-services-tests--auth-source-standard
-       #'erc-services-test--call-with-plstore))))
+       #'erc-services-test--call-with-plstore))
+    (kill-buffer (get-file-buffer plstore-file))))
 
 (ert-deftest erc--auth-source-search--plstore-announced ()
   (ert-with-temp-file plstore-file
@@ -264,7 +265,8 @@
     (let ((auth-sources (list plstore-file))
           (auth-source-do-cache nil))
       (erc-services-tests--auth-source-announced
-       #'erc-services-test--call-with-plstore))))
+       #'erc-services-test--call-with-plstore))
+    (kill-buffer (get-file-buffer plstore-file))))
 
 (ert-deftest erc--auth-source-search--plstore-overrides ()
   (ert-with-temp-file plstore-file
@@ -296,7 +298,8 @@
     (let ((auth-sources (list plstore-file))
           (auth-source-do-cache nil))
       (erc-services-tests--auth-source-overrides
-       #'erc-services-test--call-with-plstore))))
+       #'erc-services-test--call-with-plstore))
+    (kill-buffer (get-file-buffer plstore-file))))
 
 ;; auth-source JSON backend
 

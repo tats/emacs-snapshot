@@ -1,6 +1,6 @@
 ;;; icons.el --- Handling icons  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2022 Free Software Foundation, Inc.
+;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
 
 ;; Author: Lars Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: icons buttons
@@ -202,6 +202,10 @@ present if the icon is represented by an image."
                       (list :height (if (eq height 'line)
                                         (window-default-line-height)
                                       height)))
+                  (if-let ((width (plist-get keywords :width)))
+                      (list :width (if (eq width 'font)
+                                       (default-font-width)
+                                     width)))
                   '(:scale 1)
                   (if-let ((rotation (plist-get keywords :rotation)))
                       (list :rotation rotation))

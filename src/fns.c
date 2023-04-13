@@ -1,6 +1,6 @@
 /* Random utility Lisp functions.
 
-Copyright (C) 1985-2022  Free Software Foundation, Inc.
+Copyright (C) 1985-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -37,6 +37,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "puresize.h"
 #include "gnutls.h"
+
+#ifdef HAVE_TREE_SITTER
+#include "treesit.h"
+#endif
 
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
 static bool internal_equal (Lisp_Object, Lisp_Object,
@@ -334,7 +338,9 @@ Letter-case is significant, but text properties are ignored. */)
 DEFUN ("string-equal", Fstring_equal, Sstring_equal, 2, 2, 0,
        doc: /* Return t if two strings have identical contents.
 Case is significant, but text properties are ignored.
-Symbols are also allowed; their print names are used instead.  */)
+Symbols are also allowed; their print names are used instead.
+
+See also `string-equal-ignore-case'.  */)
   (register Lisp_Object s1, Lisp_Object s2)
 {
   if (SYMBOLP (s1))
@@ -2821,6 +2827,11 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 			        bool_vector_bytes (size)));
 	  }
 
+#ifdef HAVE_TREE_SITTER
+	if (TS_NODEP (o1))
+	  return treesit_node_eq (o1, o2);
+#endif
+
 	/* Aside from them, only true vectors, char-tables, compiled
 	   functions, and fonts (font-spec, font-entity, font-object)
 	   are sensible to compare, so eliminate the others now.  */
@@ -3166,8 +3177,7 @@ DEFUN ("yes-or-no-p", Fyes_or_no_p, Syes_or_no_p, 1, 1, 0,
 Return t if answer is yes, and nil if the answer is no.
 
 PROMPT is the string to display to ask the question; `yes-or-no-p'
-adds \"(yes or no) \" to it.  It does not need to end in space, but if
-it does up to one space will be removed.
+adds \"(yes or no) \" to it.
 
 The user must confirm the answer with RET, and can edit it until it
 has been confirmed.
@@ -3936,7 +3946,7 @@ system.
 If the region can't be decoded, signal an error and don't modify the buffer.
 Optional third argument BASE64URL determines whether to use the URL variant
 of the base 64 encoding, as defined in RFC 4648.
-If optional fourth argument INGORE-INVALID is non-nil invalid characters
+If optional fourth argument IGNORE-INVALID is non-nil invalid characters
 are ignored instead of signaling an error.  */)
      (Lisp_Object beg, Lisp_Object end, Lisp_Object base64url,
       Lisp_Object ignore_invalid)
@@ -5794,8 +5804,9 @@ secure_hash (Lisp_Object algorithm, Lisp_Object object, Lisp_Object start,
 DEFUN ("md5", Fmd5, Smd5, 1, 5, 0,
        doc: /* Return MD5 message digest of OBJECT, a buffer or string.
 
-A message digest is a cryptographic checksum of a document, and the
-algorithm to calculate it is defined in RFC 1321.
+A message digest is the string representation of the cryptographic checksum
+of a document, and the algorithm to calculate it is defined in RFC 1321.
+The MD5 digest is 32-character long.
 
 The two optional arguments START and END are character positions
 specifying for which part of OBJECT the message digest should be
@@ -5829,12 +5840,12 @@ anything security-related.  See `secure-hash' for alternatives.  */)
 DEFUN ("secure-hash", Fsecure_hash, Ssecure_hash, 2, 5, 0,
        doc: /* Return the secure hash of OBJECT, a buffer or string.
 ALGORITHM is a symbol specifying the hash to use:
-- md5    corresponds to MD5
-- sha1   corresponds to SHA-1
-- sha224 corresponds to SHA-2 (SHA-224)
-- sha256 corresponds to SHA-2 (SHA-256)
-- sha384 corresponds to SHA-2 (SHA-384)
-- sha512 corresponds to SHA-2 (SHA-512)
+- md5    corresponds to MD5, produces a 32-character signature
+- sha1   corresponds to SHA-1, produces a 40-character signature
+- sha224 corresponds to SHA-2 (SHA-224), produces a 56-character signature
+- sha256 corresponds to SHA-2 (SHA-256), produces a 64-character signature
+- sha384 corresponds to SHA-2 (SHA-384), produces a 96-character signature
+- sha512 corresponds to SHA-2 (SHA-512), produces a 128-character signature
 
 The two optional arguments START and END are positions specifying for
 which part of OBJECT to compute the hash.  If nil or omitted, uses the

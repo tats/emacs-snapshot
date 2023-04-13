@@ -1,6 +1,6 @@
 ;;; vc-git.el --- VC backend for the git version control system -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2023 Free Software Foundation, Inc.
 
 ;; Author: Alexandre Julliard <julliard@winehq.org>
 ;; Keywords: vc tools
@@ -992,6 +992,8 @@ It is based on `log-edit-mode', and has Git-specific extensions."
   (let ((vc-git-patch-string patch-string))
     (vc-git-checkin nil comment)))
 
+(autoload 'vc-switches "vc")
+
 (defun vc-git-checkin (files comment &optional _rev)
   (let* ((file1 (or (car files) default-directory))
          (root (vc-git-root file1))
@@ -1021,7 +1023,14 @@ It is based on `log-edit-mode', and has Git-specific extensions."
         ;; currently staged to the index.  So remove the whole file diff
         ;; from the patch because commit will take it from the index.
         (with-temp-buffer
-          (vc-git-command (current-buffer) t nil "diff" "--cached")
+          ;; If the user has switches like -D, -M etc. in their
+          ;; `vc-git-diff-switches', we must pass them here too, or
+          ;; our string matches will fail.
+          (if vc-git-diff-switches
+              (apply #'vc-git-command (current-buffer) t nil
+                     "diff" "--cached" (vc-switches 'git 'diff))
+            ;; Following code doesn't understand plain diff(1) output.
+            (user-error "Cannot commit patch with nil `vc-git-diff-switches'"))
           (goto-char (point-min))
           (let ((pos (point)) file-diff file-beg)
             (while (not (eobp))
@@ -1041,12 +1050,13 @@ It is based on `log-edit-mode', and has Git-specific extensions."
                         (string-replace file-diff "" vc-git-patch-string))
                 (user-error "Index not empty"))
               (setq pos (point))))))
-      (let ((patch-file (make-temp-file "git-patch")))
-        (with-temp-file patch-file
-          (insert vc-git-patch-string))
-        (unwind-protect
-            (vc-git-command nil 0 patch-file "apply" "--cached")
-          (delete-file patch-file))))
+      (unless (string-empty-p vc-git-patch-string)
+        (let ((patch-file (make-nearby-temp-file "git-patch")))
+          (with-temp-file patch-file
+            (insert vc-git-patch-string))
+          (unwind-protect
+              (vc-git-command nil 0 patch-file "apply" "--cached")
+            (delete-file patch-file)))))
     (cl-flet ((boolean-arg-fn
                (argument)
                (lambda (value) (when (equal value "yes") (list argument)))))
@@ -1158,6 +1168,7 @@ If PROMPT is non-nil, prompt for the Git command to run."
                           (lambda (_name-of-mode) buffer)
                           nil))))
     (vc-set-async-update buffer)
+    ;; Return the process for `vc-pull-and-push'
     proc))
 
 (defun vc-git-pull (prompt)
@@ -1171,25 +1182,6 @@ for the Git command to run."
 Normally, this runs \"git push\".  If PROMPT is non-nil, prompt
 for the Git command to run."
   (vc-git--pushpull "push" prompt nil))
-
-(defun vc-git-pull-and-push (prompt)
-  "Pull changes into the current Git branch, and then push.
-The push will only be performed if the pull was successful.
-
-Normally, this runs \"git pull\".  If PROMPT is non-nil, prompt
-for the Git command to run."
-  (let ((proc (vc-git--pushpull "pull" prompt '("--stat"))))
-    (when (process-buffer proc)
-      (with-current-buffer (process-buffer proc)
-        (if (and (eq (process-status proc) 'exit)
-                 (zerop (process-exit-status proc)))
-            (let ((vc--inhibit-async-window t))
-              (vc-git-push nil))
-          (vc-exec-after
-           (lambda ()
-             (let ((vc--inhibit-async-window t))
-               (vc-git-push nil)))
-           proc))))))
 
 (defun vc-git-merge-branch ()
   "Merge changes into the current Git branch.
@@ -1290,8 +1282,6 @@ This prompts for a branch to merge from."
   :type 'boolean
   :version "26.1")
 
-(autoload 'vc-switches "vc")
-
 (defun vc-git-print-log (files buffer &optional shortlog start-revision limit)
   "Print commit log associated with FILES into specified BUFFER.
 If SHORTLOG is non-nil, use a short format based on `vc-git-root-log-format'.
@@ -1325,7 +1315,7 @@ If LIMIT is a revision string, use it as an end-revision."
                     ,(format "--pretty=tformat:%s"
                              (car vc-git-root-log-format))
                     "--abbrev-commit"))
-                vc-git-log-switches
+                (ensure-list vc-git-log-switches)
                 (when (numberp limit)
                   (list "-n" (format "%s" limit)))
 		(when start-revision

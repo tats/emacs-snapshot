@@ -1,6 +1,6 @@
 ;;; erc-common.el --- Macros and types for ERC  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2022 Free Software Foundation, Inc.
+;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
 ;;
 ;; Maintainer: Amin Bandali <bandali@gnu.org>, F. Jason Park <jp@neverwas.me>
 ;; Keywords: comm, IRC, chat, client, internet
@@ -48,9 +48,6 @@
   ;; User data
   nickname host login full-name info
   ;; Buffers
-  ;;
-  ;; This is an alist of the form (BUFFER . CHANNEL-DATA), where
-  ;; CHANNEL-DATA is either nil or an erc-channel-user struct.
   (buffers nil))
 
 (cl-defstruct (erc-channel-user (:type vector) :named)
@@ -130,7 +127,8 @@ canonical name.")
          (if val "Enable" "Disable")
          " ERC " (symbol-name name) " mode."
          (when localp
-           "\nWith ARG, do so in all buffers for the current connection."))
+           (concat "\nWhen called interactively,"
+                   " do so in all buffers for the current connection.")))
        (interactive ,@(when localp '("p")))
        ,@(if localp
              `((when (derived-mode-p 'erc-mode)
@@ -201,12 +199,13 @@ if ARG is omitted or nil.
            (,disable)))
        ,(erc--assemble-toggle local-p name enable mode t enable-body)
        ,(erc--assemble-toggle local-p name disable mode nil disable-body)
-       ,(when (and alias (not (eq name alias)))
-          `(defalias
-             ',(intern
-                (format "erc-%s-mode"
-                        (downcase (symbol-name alias))))
-             #',mode))
+       ,@(and-let* ((alias)
+                    ((not (eq name alias)))
+                    (aname (intern (format "erc-%s-mode"
+                                           (downcase (symbol-name alias))))))
+           `((defalias ',aname #',mode)
+             (put ',aname 'erc-module ',(erc--normalize-module-symbol name))))
+       (put ',mode 'erc-module ',(erc--normalize-module-symbol name))
        ;; For find-function and find-variable.
        (put ',mode    'definition-name ',name)
        (put ',enable  'definition-name ',name)
@@ -301,17 +300,11 @@ nil."
 (defun erc-downcase (string)
   "Return a downcased copy of STRING with properties.
 Use the CASEMAPPING ISUPPORT parameter to determine the style."
-  (let* ((mapping (erc--get-isupport-entry 'CASEMAPPING 'single))
-         (inhibit-read-only t))
-    (if (equal mapping "ascii")
-        (downcase string)
-      (with-temp-buffer
-        (insert string)
-        (translate-region (point-min) (point-max)
-                          (if (equal mapping "rfc1459-strict")
-                              erc--casemapping-rfc1459-strict
-                            erc--casemapping-rfc1459))
-        (buffer-string)))))
+  (with-case-table (pcase (erc--get-isupport-entry 'CASEMAPPING 'single)
+                     ("ascii" ascii-case-table)
+                     ("rfc1459-strict" erc--casemapping-rfc1459-strict)
+                     (_ erc--casemapping-rfc1459))
+    (downcase string)))
 
 (define-inline erc-get-channel-user (nick)
   "Find NICK in the current buffer's `erc-channel-users' hash table."

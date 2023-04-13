@@ -1,6 +1,6 @@
 /* Timestamp functions for Emacs
 
-Copyright (C) 1985-1987, 1989, 1993-2022 Free Software Foundation, Inc.
+Copyright (C) 1985-1987, 1989, 1993-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -39,6 +39,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef WINDOWSNT
+extern clock_t sys_clock (void);
+#endif
 
 #ifdef HAVE_TIMEZONE_T
 # include <sys/param.h>
@@ -176,6 +180,15 @@ static timezone_t const utc_tz = 0;
 static struct tm *
 emacs_localtime_rz (timezone_t tz, time_t const *t, struct tm *tm)
 {
+#ifdef WINDOWSNT
+  /* The Windows CRT functions are "optimized for speed", so they don't
+     check for timezone and DST changes if they were last called less
+     than 1 minute ago (see http://support.microsoft.com/kb/821231).
+     So all Emacs features that repeatedly call time functions (e.g.,
+     display-time) are in real danger of missing timezone and DST
+     changes.  Calling tzset before each localtime call fixes that.  */
+  tzset ();
+#endif
   tm = localtime_rz (tz, t, tm);
   if (!tm && errno == ENOMEM)
     memory_full (SIZE_MAX);

@@ -1,6 +1,6 @@
 ;;; diff-mode.el --- a mode for viewing/editing context diffs -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2023 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: convenience patch diff vc
@@ -272,8 +272,7 @@ and hunk-based syntax highlighting otherwise as a fallback."
 
 (defcustom diff-minor-mode-prefix "\C-c="
   "Prefix key for `diff-minor-mode' commands."
-  :type '(choice (string "ESC")
-                 (string "\C-c=") string))
+  :type '(choice (string "\e") (string "\C-c=") string))
 
 (defvar-keymap diff-minor-mode-map
   :doc "Keymap for `diff-minor-mode'.  See also `diff-mode-shared-map'."
@@ -486,17 +485,19 @@ use the face `diff-removed' for removed lines, and the face
 	  ;; if below, use `diff-added'.
 	  (save-match-data
 	    (let ((limit (save-excursion (diff-beginning-of-hunk))))
-	      (if (save-excursion (re-search-backward diff-context-mid-hunk-header-re limit t))
-		  diff-indicator-added-face
-		diff-indicator-removed-face)))))
+              (when (< limit (point))
+                (if (save-excursion (re-search-backward diff-context-mid-hunk-header-re limit t))
+		    diff-indicator-added-face
+		  diff-indicator-removed-face))))))
      (2 (if diff-use-changed-face
 	    'diff-changed-unspecified
 	  ;; Otherwise, use the same method as above.
 	  (save-match-data
 	    (let ((limit (save-excursion (diff-beginning-of-hunk))))
-	      (if (save-excursion (re-search-backward diff-context-mid-hunk-header-re limit t))
-		  'diff-added
-		'diff-removed))))))
+	      (when (< limit (point))
+                (if (save-excursion (re-search-backward diff-context-mid-hunk-header-re limit t))
+		    'diff-added
+		  'diff-removed)))))))
     ("^\\(?:Index\\|revno\\): \\(.+\\).*\n"
      (0 'diff-header) (1 'diff-index prepend))
     ("^\\(?:index .*\\.\\.\\|diff \\).*\n" . 'diff-header)

@@ -1,6 +1,6 @@
 ;;; esh-proc.el --- process management  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2023 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -296,8 +296,13 @@ Used only on systems which do not support async subprocesses.")
                                                      'unix))))
     (cond
      ((fboundp 'make-process)
-      (unless (equal (car (aref eshell-current-handles eshell-output-handle))
-                     (car (aref eshell-current-handles eshell-error-handle)))
+      (unless (or ;; FIXME: It's not currently possible to use a
+                  ;; stderr process for remote files.
+                  (file-remote-p default-directory)
+                  (equal (car (aref eshell-current-handles
+                                    eshell-output-handle))
+                         (car (aref eshell-current-handles
+                                    eshell-error-handle))))
         (eshell-protect-handles eshell-current-handles)
         (setq stderr-proc
               (make-pipe-process

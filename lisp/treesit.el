@@ -1,6 +1,10 @@
 ;;; treesit.el --- tree-sitter utilities -*- lexical-binding: t -*-
 
-;; Copyright (C) 2021-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2023 Free Software Foundation, Inc.
+
+;; Maintainer: 付禹安 (Yuan Fu) <casouri@gmail.com>
+;; Keywords: treesit, tree-sitter, languages
+;; Package: emacs
 
 ;; This file is part of GNU Emacs.
 
@@ -32,6 +36,7 @@
 (eval-when-compile (require 'subr-x)) ; For `string-join'.
 (require 'cl-seq)
 (require 'font-lock)
+(require 'seq)
 
 ;;; Function declarations
 
@@ -82,6 +87,7 @@
 (declare-function treesit-search-subtree "treesit.c")
 (declare-function treesit-search-forward "treesit.c")
 (declare-function treesit-induce-sparse-tree "treesit.c")
+(declare-function treesit-subtree-stat "treesit.c")
 
 (declare-function treesit-available-p "treesit.c")
 
@@ -141,6 +147,9 @@ parser in `treesit-parser-list', or nil if there is no parser."
 
 ;;; Node API supplement
 
+(define-error 'treesit-no-parser "No available parser for this buffer"
+              'treesit-error)
+
 (defun treesit-node-buffer (node)
   "Return the buffer in which NODE belongs."
   (treesit-parser-buffer
@@ -157,10 +166,13 @@ parser in `treesit-parser-list', or nil if there is no parser."
 A leaf node is a node that doesn't have any child nodes.
 
 The returned node's span covers POS: the node's beginning is before
-or at POS, and the node's end is at or after POS.
+or at POS, and the node's end is after POS.
 
-If no leaf node's span covers POS (e.g., POS is on whitespace
-between two leaf nodes), return the first leaf node after POS.
+If no such node exists, but there's a leaf node which ends at POS,
+return that node.
+
+Otherwise (e.g., when POS is on whitespace between two leaf
+nodes), return the first leaf node after POS.
 
 If there is no leaf node after POS, return the first leaf node
 before POS.
@@ -168,13 +180,14 @@ before POS.
 Return nil if no leaf node can be returned.  If NAMED is non-nil,
 only look for named nodes.
 
-If PARSER-OR-LANG is nil, use the first parser in
-`treesit-parser-list'; if PARSER-OR-LANG is a parser, use
-that parser; if PARSER-OR-LANG is a language, find a parser using
-that language in the current buffer, and use that."
+If PARSER-OR-LANG is a parser, use that parser; if PARSER-OR-LANG
+is a language, find the first parser for that language in the
+current buffer, or create one if none exists; If PARSER-OR-LANG
+is nil, try to guess the language at POS using `treesit-language-at'."
   (let* ((root (if (treesit-parser-p parser-or-lang)
                    (treesit-parser-root-node parser-or-lang)
-                 (treesit-buffer-root-node parser-or-lang)))
+                 (treesit-buffer-root-node
+                  (or parser-or-lang (treesit-language-at pos)))))
          (node root)
          (node-before root)
          (pos-1 (max (1- pos) (point-min)))
@@ -216,43 +229,51 @@ to use `treesit-node-at' instead.
 Return nil if none was found.  If NAMED is non-nil, only look for
 named node.
 
-If PARSER-OR-LANG is nil, use the first parser in
-`treesit-parser-list'; if PARSER-OR-LANG is a parser, use
-that parser; if PARSER-OR-LANG is a language, find a parser using
-that language in the current buffer, and use that."
+If PARSER-OR-LANG is a parser, use that parser; if PARSER-OR-LANG
+is a language, find the first parser for that language in the
+current buffer, or create one if none exists; If PARSER-OR-LANG
+is nil, try to guess the language at BEG using `treesit-language-at'."
   (let ((root (if (treesit-parser-p parser-or-lang)
                   (treesit-parser-root-node parser-or-lang)
-                (treesit-buffer-root-node parser-or-lang))))
+                (treesit-buffer-root-node
+                 (or parser-or-lang (treesit-language-at beg))))))
     (treesit-node-descendant-for-range root beg (or end beg) named)))
 
-(defun treesit-node-top-level (node &optional type)
+(defun treesit-node-top-level (node &optional pred include-node)
   "Return the top-level equivalent of NODE.
+
 Specifically, return the highest parent of NODE that has the same
 type as it.  If no such parent exists, return nil.
 
-If TYPE is non-nil, match each parent's type with TYPE as a
-regexp, rather than using NODE's type."
-  (let ((type (or type (treesit-node-type node)))
+If PRED is non-nil, match each parent's type with PRED as a
+regexp, rather than using NODE's type.  PRED can also be a
+function that takes the node as an argument, and return
+non-nil/nil for match/no match.
+
+If INCLUDE-NODE is non-nil, return NODE if it satisfies PRED."
+  (let ((pred (or pred (treesit-node-type node)))
         (result nil))
-    (cl-loop for cursor = (treesit-node-parent node)
+    (cl-loop for cursor = (if include-node node
+                            (treesit-node-parent node))
              then (treesit-node-parent cursor)
              while cursor
-             if (string-match-p type (treesit-node-type cursor))
+             if (if (stringp pred)
+                    (string-match-p pred (treesit-node-type cursor))
+                  (funcall pred cursor))
              do (setq result cursor))
     result))
 
 (defun treesit-buffer-root-node (&optional language)
   "Return the root node of the current buffer.
-Use the first parser in `treesit-parser-list'.
 
-If optional argument LANGUAGE is non-nil, use the first parser
-for LANGUAGE."
+Use the first parser in the parser list if LANGUAGE is omitted.
+If LANGUAGE is non-nil, use the first parser for LANGUAGE in the
+parser list, or create one if none exists."
   (if-let ((parser
-            (or (if language
-                    (treesit-parser-create language)
-                  (or (car (treesit-parser-list))
-                      (signal 'treesit-error
-                              '("Buffer has no parser")))))))
+            (if language
+                (treesit-parser-create language)
+              (or (car (treesit-parser-list))
+                  (signal 'treesit-no-parser (list (current-buffer)))))))
       (treesit-parser-root-node parser)))
 
 (defun treesit-filter-child (node pred &optional named)
@@ -282,26 +303,43 @@ properties."
          (treesit-node-start node)
          (treesit-node-end node))))))
 
-(defun treesit-parent-until (node pred)
+(defun treesit-parent-until (node pred &optional include-node)
   "Return the closest parent of NODE that satisfies PRED.
-Return nil if none was found.  PRED should be a function that
-takes one argument, the parent node."
-  (let ((node (treesit-node-parent node)))
+
+This function successively examines the parent of NODE, then
+the parent of the parent, etc., until it finds the first
+ancestor node which satisfies the predicate PRED; then it
+returns that ancestor node.  It returns nil if no ancestor
+node was found that satisfies PRED.
+
+PRED should be a function that takes one argument, the node to
+examine, and returns a boolean value indicating whether that
+node is a match.
+
+If INCLUDE-NODE is non-nil, return NODE if it satisfies PRED."
+  (let ((node (if include-node node
+                (treesit-node-parent node))))
     (while (and node (not (funcall pred node)))
       (setq node (treesit-node-parent node)))
     node))
 
 (defun treesit-parent-while (node pred)
-  "Return the furthest parent of NODE that satisfies PRED.
-Return nil if none was found.  PRED should be a function that
-takes one argument, the parent node."
+  "Return the furthest parent of NODE (including NODE) that satisfies PRED.
+
+This function successively examines NODE, the parent of NODE,
+then the parent of the parent, etc., until it finds a node which
+no longer satisfies the predicate PRED; it returns the last
+examined node that satisfies PRED.  If no node satisfies PRED, it
+returns nil.
+
+PRED should be a function that takes one argument, the node to
+examine, and returns a boolean value indicating whether that
+node is a match."
   (let ((last nil))
     (while (and node (funcall pred node))
       (setq last node
             node (treesit-node-parent node)))
     last))
-
-(defalias 'treesit-traverse-parent #'treesit-parent-until)
 
 (defun treesit-node-children (node &optional named)
   "Return a list of NODE's children.
@@ -520,7 +558,54 @@ omitted, default END to BEG."
               "Generic tree-sitter font-lock error"
               'treesit-error)
 
-(defvar-local treesit-font-lock-level 3
+(defvar-local treesit-font-lock-settings nil
+  "A list of SETTINGs for treesit-based fontification.
+
+The exact format of each SETTING is considered internal.  Use
+`treesit-font-lock-rules' to set this variable.
+
+Each SETTING has the form:
+
+    (QUERY ENABLE FEATURE OVERRIDE)
+
+QUERY must be a compiled query.  See Info node `(elisp)Pattern
+Matching' for how to write a query and compile it.
+
+For SETTING to be activated for font-lock, ENABLE must be t.  To
+disable this SETTING, set ENABLE to nil.
+
+FEATURE is the \"feature name\" of the query.  Users can control
+which features are enabled with `treesit-font-lock-level' and
+`treesit-font-lock-feature-list'.
+
+OVERRIDE is the override flag for this query.  Its value can be
+t, nil, append, prepend, keep.  See more in
+`treesit-font-lock-rules'.")
+
+(defun treesit--font-lock-level-setter (sym val)
+  "Custom setter for `treesit-font-lock-level'.
+Set the default value of SYM to VAL, recompute fontification
+features and refontify for every buffer where tree-sitter-based
+fontification is enabled."
+  (set-default sym val)
+  (and (treesit-available-p)
+       (named-let loop ((res nil)
+                        (buffers (buffer-list)))
+         (if (null buffers)
+             (mapc (lambda (b)
+                     (with-current-buffer b
+                       (setq-local treesit-font-lock-level val)
+                       (treesit-font-lock-recompute-features)
+                       (treesit-font-lock-fontify-region (point-min)
+                                                         (point-max))))
+                   res)
+           (let ((buffer (car buffers)))
+             (with-current-buffer buffer
+               (if treesit-font-lock-settings
+                   (loop (append res (list buffer)) (cdr buffers))
+                 (loop res (cdr buffers)))))))))
+
+(defcustom treesit-font-lock-level 3
   "Decoration level to be used by tree-sitter fontifications.
 
 Major modes categorize their fontification features into levels,
@@ -528,16 +613,25 @@ from 1 which is the absolute minimum, to 4 that yields the maximum
 fontifications.
 
 Level 1 usually contains only comments and definitions.
-Level 2 usually adds keywords, strings, constants, types, etc.
-Level 3 usually represents a full-blown fontification, including
-assignment, constants, numbers, properties, etc.
+Level 2 usually adds keywords, strings, data types, etc.
+Level 3 usually represents full-blown fontifications, including
+assignments, constants, numbers and literals, etc.
 Level 4 adds everything else that can be fontified: delimiters,
-operators, brackets, all functions and variables, etc.
+operators, brackets, punctuation, all functions, properties,
+variables, etc.
 
 In addition to the decoration level, individual features can be
 turned on/off by calling `treesit-font-lock-recompute-features'.
 Changing the decoration level requires calling
-`treesit-font-lock-recompute-features' to have an effect.")
+`treesit-font-lock-recompute-features' to have an effect, unless
+done via `customize-variable'.
+
+To see which syntactical categories are fontified by each level
+in a particular major mode, examine the buffer-local value of the
+variable `treesit-font-lock-feature-list'."
+  :type 'integer
+  :set #'treesit--font-lock-level-setter
+  :version "29.1")
 
 (defvar-local treesit--font-lock-query-expand-range (cons 0 0)
   "The amount to expand the start and end of the region when fontifying.
@@ -545,12 +639,7 @@ This should be a cons cell (START . END).  When fontifying a
 buffer, Emacs will move the start of the query range backward by
 START amount, and the end of the query range by END amount.  Both
 START and END should be positive integers or 0.  This doesn't
-affect the fontified range.
-
-Sometimes, querying on some parser with a restricted range
-returns nodes not in that range but before it, which breaks
-fontification.  Major modes can adjust this variable as a
-temporarily fix.")
+affect the fontified range.")
 
 (defvar-local treesit-font-lock-feature-list nil
   "A list of lists of feature symbols.
@@ -575,30 +664,6 @@ See the manual for more explanations on some of the features.
 
 For changes to this variable to take effect, run
 `treesit-font-lock-recompute-features'.")
-
-(defvar-local treesit-font-lock-settings nil
-  "A list of SETTINGs for treesit-based fontification.
-
-The exact format of each SETTING is considered internal.  Use
-`treesit-font-lock-rules' to set this variable.
-
-Each SETTING has the form:
-
-    (QUERY ENABLE FEATURE OVERRIDE)
-
-QUERY must be a compiled query.  See Info node `(elisp)Pattern
-Matching' for how to write a query and compile it.
-
-For SETTING to be activated for font-lock, ENABLE must be t.  To
-disable this SETTING, set ENABLE to nil.
-
-FEATURE is the \"feature name\" of the query.  Users can control
-which features are enabled with `treesit-font-lock-level' and
-`treesit-font-lock-feature-list'.
-
-OVERRIDE is the override flag for this query.  Its value can be
-t, nil, append, prepend, keep.  See more in
-`treesit-font-lock-rules'.")
 
 (defun treesit-font-lock-rules (&rest query-specs)
   "Return a value suitable for `treesit-font-lock-settings'.
@@ -774,25 +839,35 @@ signals the `treesit-font-lock-error' error if that happens."
                        ((memq feature remove-list) nil)
                        (t current-value))))))
 
-(defun treesit-fontify-with-override (start end face override)
+(defun treesit-fontify-with-override
+    (start end face override &optional bound-start bound-end)
   "Apply FACE to the region between START and END.
 OVERRIDE can be nil, t, `append', `prepend', or `keep'.
-See `treesit-font-lock-rules' for their semantic."
-  (pcase override
-    ('nil (unless (text-property-not-all
-                   start end 'face nil)
-            (put-text-property start end 'face face)))
-    ('t (put-text-property start end 'face face))
-    ('append (font-lock-append-text-property
+See `treesit-font-lock-rules' for their semantic.
+
+If BOUND-START and BOUND-END are non-nil, only fontify the region
+in between them."
+  (when (or (null bound-start) (null bound-end)
+            (and bound-start bound-end
+                 (<= bound-start end)
+                 (>= bound-end start)))
+    (when (and bound-start bound-end)
+      (setq start (max bound-start start)
+            end (min bound-end end)))
+    (pcase override
+      ('nil (unless (text-property-not-all start end 'face nil)
+              (put-text-property start end 'face face)))
+      ('t (put-text-property start end 'face face))
+      ('append (font-lock-append-text-property
+                start end 'face face))
+      ('prepend (font-lock-prepend-text-property
+                 start end 'face face))
+      ('keep (font-lock-fillin-text-property
               start end 'face face))
-    ('prepend (font-lock-prepend-text-property
-               start end 'face face))
-    ('keep (font-lock-fillin-text-property
-            start end 'face face))
-    (_ (signal 'treesit-font-lock-error
-               (list
-                "Unrecognized value of :override option"
-                override)))))
+      (_ (signal 'treesit-font-lock-error
+                 (list
+                  "Unrecognized value of :override option"
+                  override))))))
 
 (defun treesit--set-nonsticky (start end sym &optional remove)
   "Set `rear-nonsticky' property between START and END.
@@ -828,32 +903,40 @@ The range is between START and END."
         (nreverse result))
     (list node)))
 
-(defun treesit--children-covering-range-recurse (node start end threshold)
+(defun treesit--children-covering-range-recurse
+    (node start end threshold &optional limit)
   "Return a list of children of NODE covering a range.
+
 Recursively go down the parse tree and collect children, until
 all nodes in the returned list are smaller than THRESHOLD.  The
-range is between START and END."
+range is between START and END.
+
+LIMIT is the recursion limit, which defaults to 100."
   (let* ((child (treesit-node-first-child-for-pos node start))
+         (limit (or limit 100))
          result)
-    (while (and child (<= (treesit-node-start child) end))
+    ;; If LIMIT is exceeded, we are probably seeing the erroneously
+    ;; tall tree, in that case, just give up.
+    (while (and (> limit 0) child (<= (treesit-node-start child) end))
       ;; If child still too large, recurse down.  Otherwise collect
       ;; child.
       (if (> (- (treesit-node-end child)
                 (treesit-node-start child))
              threshold)
           (dolist (r (treesit--children-covering-range-recurse
-                      child start end threshold))
+                      child start end threshold (1- limit)))
             (push r result))
         (push child result))
       (setq child (treesit-node-next-sibling child)))
-    ;; If NODE has no child, keep NODE.
-    (or result node)))
+    ;; If NODE has no child, keep NODE.  If LIMIT is exceeded, return
+    ;; nil.
+    (or result (and (> limit 0) (list node)))))
 
 (defsubst treesit--node-length (node)
   "Return the length of the text of NODE."
   (- (treesit-node-end node) (treesit-node-start node)))
 
-(defvar-local treesit--font-lock-fast-mode nil
+(defvar-local treesit--font-lock-fast-mode 'unspecified
   "If this variable is t, change the way we query so it's faster.
 This is not a general optimization and should be RARELY needed!
 See comments in `treesit-font-lock-fontify-region' for more
@@ -881,7 +964,13 @@ detail.")
 ;; parse it into a enormously tall tree (10k levels tall).  In that
 ;; case querying the root node is very slow.  So we try to get
 ;; top-level nodes and query them.  This ensures that querying is fast
-;; everywhere else, except for the problematic region.
+;; everywhere else, except for the problematic region.  (Bug#59415).
+;;
+;; Some other time the source file has a top-level node that contains
+;; a huge number of immediate children (say, 10k children), querying
+;; that node is also very slow, so instead of getting the top-level
+;; node, we recursively go down the tree to find nodes that cover the
+;; region but are reasonably small.  (Bug#59738).
 ;;
 ;; 3. It is possible to capture a node that's completely outside the
 ;; region between START and END: as long as the whole pattern
@@ -889,8 +978,8 @@ detail.")
 ;; returned.  If the node is outside of that region, (max node-start
 ;; start) and friends return bad values, so we filter them out.
 ;; However, we don't filter these nodes out if a function will process
-;; the node, because could (and often do) fontify the relatives of the
-;; captured node, not just the node itself.  If we took out those
+;; the node, because it could (and often do) fontify the relatives of
+;; the captured node, not just the node itself.  If we took out those
 ;; nodes author of those functions would be very confused.
 (defun treesit-font-lock-fontify-region (start end &optional loudly)
   "Fontify the region between START and END.
@@ -904,32 +993,34 @@ If LOUDLY is non-nil, display some debugging information."
            (enable (nth 1 setting))
            (override (nth 3 setting))
            (language (treesit-query-language query)))
-      (when-let ((nodes (list (treesit-buffer-root-node language)))
-                 ;; Only activate if ENABLE flag is t.
-                 (activate (eq t enable)))
-        (ignore activate)
 
-        ;; If we run into problematic files, use the "fast mode" to
-        ;; try to recover.  See comment #2 above for more explanation.
-        (when treesit--font-lock-fast-mode
-          (setq nodes (treesit--children-covering-range
-                       (car nodes) start end)))
+      ;; Use deterministic way to decide whether to turn on "fast
+      ;; mode". (See bug#60691, bug#60223.)
+      (when (eq treesit--font-lock-fast-mode 'unspecified)
+        (pcase-let ((`(,max-depth ,max-width)
+                     (treesit-subtree-stat
+                      (treesit-buffer-root-node language))))
+          (if (or (> max-depth 100) (> max-width 4000))
+              (setq treesit--font-lock-fast-mode t)
+            (setq treesit--font-lock-fast-mode nil))))
+
+      (when-let* ((root (treesit-buffer-root-node language))
+                  (nodes (if (eq t treesit--font-lock-fast-mode)
+                             (treesit--children-covering-range-recurse
+                              root start end (* 4 jit-lock-chunk-size))
+                           (list (treesit-buffer-root-node language))))
+                  ;; Only activate if ENABLE flag is t.
+                  (activate (eq t enable)))
+        (ignore activate)
 
         ;; Query each node.
         (dolist (sub-node nodes)
           (let* ((delta-start (car treesit--font-lock-query-expand-range))
                  (delta-end (cdr treesit--font-lock-query-expand-range))
-                 (start-time (current-time))
                  (captures (treesit-query-capture
                             sub-node query
                             (max (- start delta-start) (point-min))
-                            (min (+ end delta-end) (point-max))))
-                 (end-time (current-time)))
-            ;; If for any query the query time is strangely long,
-            ;; switch to fast mode (see comments above).
-            (when (> (time-to-seconds (time-subtract end-time start-time))
-                     0.01)
-              (setq-local treesit--font-lock-fast-mode t))
+                            (min (+ end delta-end) (point-max)))))
 
             ;; For each captured node, fontify that node.
             (with-silent-modifications
@@ -938,12 +1029,14 @@ If LOUDLY is non-nil, display some debugging information."
                        (node (cdr capture))
                        (node-start (treesit-node-start node))
                        (node-end (treesit-node-end node)))
+
                   ;; If node is not in the region, take them out.  See
                   ;; comment #3 above for more detail.
                   (if (and (facep face)
                            (or (>= start node-end) (>= node-start end)))
                       (when (or loudly treesit--font-lock-verbose)
                         (message "Captured node %s(%s-%s) but it is outside of fontifing region" node node-start node-end))
+
                     (cond
                      ((facep face)
                       (treesit-fontify-with-override
@@ -951,6 +1044,7 @@ If LOUDLY is non-nil, display some debugging information."
                        face override))
                      ((functionp face)
                       (funcall face node override start end)))
+
                     ;; Don't raise an error if FACE is neither a face nor
                     ;; a function.  This is to allow intermediate capture
                     ;; names used for #match and #eq.
@@ -1013,9 +1107,11 @@ See `treesit-simple-indent-presets'.")
                 (&optional node-type parent-type node-field
                            node-index-min node-index-max)
                 (lambda (node parent &rest _)
-                  (and (or (null node-type)
-                           (string-match-p
-                            node-type (or (treesit-node-type node) "")))
+                  (and (pcase node-type
+                         ('nil t)
+                         ('null (null node))
+                         (_ (string-match-p
+                             node-type (or (treesit-node-type node) ""))))
                        (or (null parent-type)
                            (string-match-p
                             parent-type (treesit-node-type parent)))
@@ -1029,7 +1125,6 @@ See `treesit-simple-indent-presets'.")
                        (or (null node-index-max)
                            (<= (treesit-node-index node)
                                node-index-max))))))
-        ;; TODO: Document if genuinely useful.
         (cons 'n-p-gp
               (lambda (node-t parent-t grand-parent-t)
                 (lambda (node parent &rest _)
@@ -1040,10 +1135,12 @@ See `treesit-simple-indent-presets'.")
                            (string-match-p
                             parent-t (treesit-node-type parent)))
                        (or (null grand-parent-t)
-                           (string-match-p
-                            grand-parent-t
-                            (treesit-node-type
-                             (treesit-node-parent parent))))))))
+                           (and
+                            (treesit-node-parent parent)
+                            (string-match-p
+                             grand-parent-t
+                             (treesit-node-type
+                              (treesit-node-parent parent)))))))))
         (cons 'no-node (lambda (node &rest _) (null node)))
         (cons 'parent-is (lambda (type)
                            (lambda (_n parent &rest _)
@@ -1090,47 +1187,99 @@ See `treesit-simple-indent-presets'.")
                   (re-search-forward comment-start-skip)
                   (skip-syntax-backward "-")
                   (point))))
-        (cons 'comment-start-skip
-              (lambda (_n parent &rest _)
-                (save-excursion
-                  (goto-char (treesit-node-start parent))
-                  (re-search-forward comment-start-skip)
-                  (point))))
+        (cons 'prev-adaptive-prefix
+              (lambda (_n parent bol &rest _)
+                (let (comment-start-bol
+                      this-line-has-prefix)
+                  (save-excursion
+                    (goto-char (treesit-node-start parent))
+                    (setq comment-start-bol (line-beginning-position))
+
+                    (goto-char bol)
+                    (setq this-line-has-prefix
+                          (and (looking-at adaptive-fill-regexp)
+                               (match-string 1)))
+
+                    (forward-line -1)
+                    (and (>= (point) comment-start-bol)
+                         adaptive-fill-regexp
+                         (looking-at adaptive-fill-regexp)
+                         ;; If previous line is an empty line, don't
+                         ;; indent.
+                         (not (looking-at (rx (* whitespace) eol)))
+                         ;; Return the anchor.  If the indenting line
+                         ;; has a prefix and the previous line also
+                         ;; has a prefix, indent to the beginning of
+                         ;; prev line's prefix rather than the end of
+                         ;; prev line's prefix. (Bug#61314).
+                         (or (and this-line-has-prefix
+                                  (match-beginning 1))
+                             (match-end 0)))))))
         ;; TODO: Document.
         (cons 'grand-parent
               (lambda (_n parent &rest _)
                 (treesit-node-start (treesit-node-parent parent))))
+        (cons 'great-grand-parent
+              (lambda (_n parent &rest _)
+                (treesit-node-start
+                 (treesit-node-parent
+                  (treesit-node-parent parent)))))
         (cons 'parent-bol (lambda (_n parent &rest _)
                             (save-excursion
                               (goto-char (treesit-node-start parent))
                               (back-to-indentation)
                               (point))))
-        (cons 'prev-sibling (lambda (node &rest _)
+        (cons 'standalone-parent
+              (lambda (_n parent &rest _)
+                (save-excursion
+                  (catch 'term
+                    (while parent
+                      (goto-char (treesit-node-start parent))
+                      (when (looking-back (rx bol (* whitespace))
+                                          (line-beginning-position))
+                        (throw 'term (point)))
+                      (setq parent (treesit-node-parent parent)))))))
+        (cons 'prev-sibling (lambda (node parent bol &rest _)
                               (treesit-node-start
-                               (treesit-node-prev-sibling node))))
+                               (or (treesit-node-prev-sibling node t)
+                                   ;; If node is nil (indenting empty
+                                   ;; line), we still try to guess the
+                                   ;; previous sibling.
+                                   (treesit-node-prev-sibling
+                                    (treesit-node-first-child-for-pos
+                                     parent bol)
+                                    t)
+                                   (treesit-node-child parent -1 t)))))
         (cons 'no-indent (lambda (_n _p bol &rest _) bol))
         (cons 'prev-line (lambda (_n _p bol &rest _)
                            (save-excursion
                              (goto-char bol)
                              (forward-line -1)
-                             (skip-chars-forward " \t"))))
-        (cons 'point-min (lambda (&rest _) (point-min)))
+                             (skip-chars-forward " \t")
+                             (point))))
+        (cons 'column-0 (lambda (_n _p bol &rest _)
+                          (save-excursion
+                            (goto-char bol)
+                            (line-beginning-position))))
         ;; TODO: Document.
         (cons 'and (lambda (&rest fns)
                      (lambda (node parent bol &rest _)
-                       (cl-reduce (lambda (a b) (and a b))
-                                  (mapcar (lambda (fn)
-                                            (funcall fn node parent bol))
-                                          fns)))))
+                       (let (res)
+                         (catch 'break
+                           (dolist (fn fns)
+                             (setq res (funcall fn node parent bol))
+                             (unless res (throw 'break t))))
+                         res))))
         (cons 'or (lambda (&rest fns)
                     (lambda (node parent bol &rest _)
-                      (cl-reduce (lambda (a b) (or a b))
-                                 (mapcar (lambda (fn)
-                                           (funcall fn node parent bol))
-                                         fns)))))
+                      (let (res)
+                        (catch 'break
+                          (dolist (fn fns)
+                            (setq res (funcall fn node parent bol))
+                            (and res (throw 'break t))))
+                        res))))
         (cons 'not (lambda (fn)
                      (lambda (node parent bol &rest _)
-                       (debug)
                        (not (funcall fn node parent bol)))))
         (cons 'list (lambda (&rest fns)
                       (lambda (node parent bol &rest _)
@@ -1155,6 +1304,7 @@ MATCHER:
         (match nil \"argument_list\" nil nil 0 0).
 
     NODE-TYPE, PARENT-TYPE, and NODE-FIELD are regexps.
+    NODE-TYPE can also be `null', which matches when NODE is nil.
 
 no-node
 
@@ -1169,6 +1319,10 @@ no-node
 \(node-is TYPE)
 
     Checks that NODE's type matches regexp TYPE.
+
+\(n-p-gp NODE-TYPE PARENT-TYPE GRANDPARENT-TYPE)
+
+    Checks for NODE's, its parent's, and its grandparent's type.
 
 \(query QUERY)
 
@@ -1194,6 +1348,11 @@ parent-bol
     Returns the beginning of non-space characters on the line where
     PARENT is on.
 
+standalone-parent
+
+    Finds the first ancestor node (parent, grandparent, etc) that
+    starts on its own line, and return the start of that node.
+
 prev-sibling
 
     Returns the start of NODE's previous sibling.
@@ -1206,20 +1365,25 @@ prev-line
 
     Returns the first non-whitespace character on the previous line.
 
-point-min
+column-0
 
-    Returns the beginning of buffer, which is always at column 0.
+    Returns the beginning of the current line, which is at column 0.
 
 comment-start
 
-    Returns the position after a match for `treesit-comment-start'.
-    Assumes PARENT is a comment node.
+    Goes to the position that `comment-start-skip' would return,
+    skips whitespace backwards, and returns the resulting
+    position.  Assumes PARENT is a comment node.
 
-comment-start-skip
+prev-adaptive-prefix
 
-    Goes to the position that comment-start would return, skips
-    whitespace after that, and returns the resulting position.
-    Assumes PARENT is a comment node.")
+    Goes to the beginning of previous non-empty line, and tries
+    to match `adaptive-fill-regexp'.  If it matches, return the
+    end of the match, otherwise return nil.  However, if the
+    current line begins with a prefix, return the beginning of
+    the prefix of the previous line instead, so that the two
+    prefixes aligns.  This is useful for a `indent-relative'-like
+    indent behavior for block comments.")
 
 (defun treesit--simple-indent-eval (exp)
   "Evaluate EXP.
@@ -1236,8 +1400,7 @@ the function."
                         (cdr exp))))
         ;; Presets override functions, so this condition comes before
         ;; `functionp'.
-        ((alist-get exp treesit-simple-indent-presets)
-         (alist-get exp treesit-simple-indent-presets))
+        ((alist-get exp treesit-simple-indent-presets))
         ((functionp exp) exp)
         ((symbolp exp)
          (if (null exp)
@@ -1272,10 +1435,10 @@ and returns
     (ANCHOR . OFFSET).
 
 BOL is the position of the beginning of the line; NODE is the
-\"largest\" node that starts at BOL; PARENT is its parent; ANCHOR
-is a point (not a node), and OFFSET is a number.  Emacs finds the
-column of ANCHOR and adds OFFSET to it as the final indentation
-of the current line.")
+\"largest\" node that starts at BOL (and isn't a root node);
+PARENT is its parent; ANCHOR is a point (not a node), and OFFSET
+is a number.  Emacs finds the column of ANCHOR and adds OFFSET to
+it as the final indentation of the current line.")
 
 (defun treesit--indent-1 ()
   "Indent the current line.
@@ -1293,10 +1456,13 @@ Return (ANCHOR . OFFSET).  This function is used by
                 ((treesit-language-at (point))
                  (treesit-node-at bol (treesit-language-at (point))))
                 (t (treesit-node-at bol))))
+         (root (treesit-parser-root-node
+                (treesit-node-parser smallest-node)))
          (node (treesit-parent-while
                 smallest-node
                 (lambda (node)
-                  (eq bol (treesit-node-start node))))))
+                  (and (eq bol (treesit-node-start node))
+                       (not (treesit-node-eq node root)))))))
     (let*
         ((parser (if smallest-node
                      (treesit-node-parser smallest-node)
@@ -1381,14 +1547,24 @@ Similar to `treesit-indent', but indent a region instead."
                     (aref meta-vec (+ 1 (* idx meta-len))) nil)
             (pcase-let* ((`(,anchor . ,offset) (treesit--indent-1))
                          (marker (aref meta-vec (* idx meta-len))))
-              ;; Set ANCHOR.
-              (when anchor
+              (if (not (and anchor offset))
+                  ;; No indent for this line, either...
+                  (if (markerp marker)
+                      (progn
+                        ;; ... Set marker and offset to do a dummy
+                        ;; indent, or...
+                        (back-to-indentation)
+                        (move-marker marker (point))
+                        (setf (aref meta-vec (+ 1 (* idx meta-len))) 0))
+                    ;; ...Set anchor to nil so no indent is performed.
+                    (setf (aref meta-vec (* idx meta-len)) nil))
+                ;; Set ANCHOR.
                 (if (markerp marker)
                     (move-marker marker anchor)
                   (setf (aref meta-vec (* idx meta-len))
-                        (copy-marker anchor t))))
-              ;; SET OFFSET.
-              (setf (aref meta-vec (+ 1 (* idx meta-len))) offset)))
+                        (copy-marker anchor t)))
+                ;; SET OFFSET.
+                (setf (aref meta-vec (+ 1 (* idx meta-len))) offset))))
           (cl-incf idx)
           (setq lines-left-to-move (forward-line 1)))
         ;; Now IDX = last valid IDX + 1.
@@ -1397,7 +1573,7 @@ Similar to `treesit-indent', but indent a region instead."
         (dotimes (jdx idx)
           (let ((anchor (aref meta-vec (* jdx meta-len)))
                 (offset (aref meta-vec (+ 1 (* jdx meta-len)))))
-            (when offset
+            (when (and anchor offset)
               (let ((col (save-excursion
                            (goto-char anchor)
                            (+ offset (current-column)))))
@@ -1442,10 +1618,15 @@ OFFSET."
                return
                (let ((anchor-pos
                       (treesit--simple-indent-eval
-                       (list anchor node parent bol))))
-                 (cons anchor-pos (if (symbolp offset)
-                                      (symbol-value offset)
-                                    offset)))
+                       (list anchor node parent bol)))
+                     (offset-val
+                      (cond ((numberp offset) offset)
+                            ((and (symbolp offset)
+                                  (boundp offset))
+                             (symbol-value offset))
+                            (t (treesit--simple-indent-eval
+                                (list offset node parent bol))))))
+                 (cons anchor-pos offset-val))
                finally return
                (progn (when treesit--indent-verbose
                         (message "No matched rule"))
@@ -1482,6 +1663,10 @@ RULES."
                   (pcase func
                     (`(query ,qry)
                      (list 'query (treesit-query-compile lang qry)))
+                    (`(and . ,fns)
+                     (cons 'and (mapcar #'optimize-func fns)))
+                    (`(or . ,fns)
+                     (cons 'or (mapcar #'optimize-func fns)))
                     (_ func)))
                 ;; Optimize a rule (MATCHER ANCHOR OFFSET).
                 (optimize-rule (rule)
@@ -1545,76 +1730,538 @@ BACKWARD and ALL are the same as in `treesit-search-forward'."
       (goto-char current-pos)))
     node))
 
-;;; Navigation
+;;; Navigation, defun, things
+;;
+;; Emacs lets you define "things" by a regexp that matches the type of
+;; a node, and here are some functions that lets you find the "things"
+;; at/around point, navigate backward/forward a "thing", etc.
+;;
+;; The most obvious "thing" is a defun, and there are thin wrappers
+;; around thing functions for defun for convenience.
+;;
+;; We have more command-like functions like:
+;; - treesit-beginning-of-thing/defun
+;; - treesit-end-of-thing/defun
+;; - treesit-thing/defun-at-point
+;;
+;; And more generic functions like:
+;; - treesit--things-around
+;; - treesit--top-level-thing
+;; - treesit--navigate-thing
+;;
+;; There are also some defun-specific functions, like
+;; treesit-defun-name, treesit-add-log-current-defun.
+;;
+;; TODO: I'm not entirely sure how would this go, so I only documented
+;; the "defun" functions and didn't document any "thing" functions.
+;; We should also document `treesit-block-type-regexp' and support it
+;; in major modes if we can meaningfully integrate hideshow: I tried
+;; and failed, we need SomeOne that understands hideshow to look at
+;; it.  (BTW, hideshow should use its own
+;; `treesit-hideshow-block-type-regexp'.)
 
 (defvar-local treesit-defun-type-regexp nil
   "A regexp that matches the node type of defun nodes.
 For example, \"(function|class)_definition\".
 
+Sometimes not all nodes matched by the regexp are valid defuns.
+In that case, set this variable to a cons cell of the
+form (REGEXP . PRED), where PRED is a function that takes a
+node (the matched node) and returns t if node is valid, or nil
+for invalid node.
+
 This is used by `treesit-beginning-of-defun' and friends.")
 
-(defvar-local treesit-defun-prefer-top-level nil
-  "When non-nil, `treesit-beginning-of-defun' prefers top-level defun.
+(defvar-local treesit-block-type-regexp nil
+  "Like `treesit-defun-type-regexp', but for blocks.")
 
-In some languages, a defun (function, class, struct) could be
-nested in another one.  Normally `treesit-beginning-of-defun'
-just finds the first defun it encounter.  If this variable's
-value is t, `treesit-beginning-of-defun' tries to find the
-top-level defun, and ignores nested ones.
+(defvar-local treesit-defun-tactic 'nested
+  "Determines how does Emacs treat nested defuns.
+If the value is `top-level', Emacs only moves across top-level
+defuns, if the value is `nested', Emacs recognizes nested defuns.")
 
-This variable can also be a list of tree-sitter node type
-regexps.  Then, when `treesit-beginning-of-defun' finds a defun
-node and that node's type matches one in the list,
-`treesit-beginning-of-defun' finds the top-level node matching
-that particular regexp (as opposed to any node matched by
-`treesit-defun-type-regexp').")
+(defvar-local treesit-defun-skipper #'treesit-default-defun-skipper
+  "A function called after tree-sitter navigation moved a step.
 
-(defun treesit--defun-maybe-top-level (node)
-  "Maybe return the top-level equivalent of NODE.
-For the detailed semantic see `treesit-defun-prefer-top-level'."
-  (pcase treesit-defun-prefer-top-level
-    ('nil node)
-    ('t (or (treesit-node-top-level
-             node treesit-defun-type-regexp)
-            node))
-    ((pred consp)
-     (cl-loop
-      for re in treesit-defun-prefer-top-level
-      if (string-match-p re (treesit-node-type node))
-      return (or (treesit-node-top-level node re)
-                 node)
-      finally return node))))
+It is called with no arguments.  By default, this function tries
+to move to the beginning of a line, either by moving to the empty
+newline after a defun, or the beginning of a defun.
+
+If the value is nil, no skipping is performed.")
+
+(defvar-local treesit-defun-name-function nil
+  "A function that is called with a node and returns its defun name or nil.
+If the node is a defun node, return the defun name, e.g., the
+function name of a function.  If the node is not a defun node, or
+the defun node doesn't have a name, or the node is nil, return
+nil.")
+
+(defvar-local treesit-add-log-defun-delimiter "."
+  "The delimiter used to connect several defun names.
+This is used in `treesit-add-log-current-defun'.")
+
+(defsubst treesit--thing-unpack-pattern (pattern)
+  "Unpack PATTERN in the shape of `treesit-defun-type-regexp'.
+
+Basically,
+
+    (unpack REGEXP) = (REGEXP . nil)
+    (unpack (REGEXP . PRED)) = (REGEXP . PRED)"
+  (if (consp pattern)
+      pattern
+    (cons pattern nil)))
+
+(defun treesit-beginning-of-thing (pattern &optional arg)
+  "Like `beginning-of-defun', but generalized into things.
+
+PATTERN is like `treesit-defun-type-regexp', ARG
+is the same as in `beginning-of-defun'.
+
+Return non-nil if successfully moved, nil otherwise."
+  (pcase-let* ((arg (or arg 1))
+               (`(,regexp . ,pred) (treesit--thing-unpack-pattern
+                                    pattern))
+               (dest (treesit--navigate-thing
+                      (point) (- arg) 'beg regexp pred)))
+    (when dest
+      (goto-char dest))))
+
+(defun treesit-end-of-thing (pattern &optional arg)
+  "Like `end-of-defun', but generalized into things.
+
+PATTERN is like `treesit-defun-type-regexp', ARG is the same as
+in `end-of-defun'.
+
+Return non-nil if successfully moved, nil otherwise."
+  (pcase-let* ((arg (or arg 1))
+               (`(,regexp . ,pred) (treesit--thing-unpack-pattern
+                                    pattern))
+               (dest (treesit--navigate-thing
+                      (point) arg 'end regexp pred)))
+    (when dest
+      (goto-char dest))))
 
 (defun treesit-beginning-of-defun (&optional arg)
-  "Tree-sitter `beginning-of-defun' function.
-ARG is the same as in `beginning-of-defun'."
-  (let ((arg (or arg 1))
-        (node (treesit-node-at (point))))
-    (if (> arg 0)
-        ;; Go backward.
-        (while (and (> arg 0)
-                    (setq node (treesit-search-forward-goto
-                                node treesit-defun-type-regexp t t)))
-          (setq node (treesit--defun-maybe-top-level node))
-          (setq arg (1- arg)))
-      ;; Go forward.
-      (while (and (< arg 0)
-                  (setq node (treesit-search-forward-goto
-                              node treesit-defun-type-regexp)))
-        (setq node (treesit--defun-maybe-top-level node))
-        (setq arg (1+ arg))))
-    (when node
-      (goto-char (treesit-node-start node))
-      t)))
+  "Move backward to the beginning of a defun.
 
-(defun treesit-end-of-defun ()
-  "Tree-sitter `end-of-defun' function."
-  ;; Why not simply get the largest node at point: when point is at
-  ;; (point-min), that gives us the root node.
-  (let* ((node (treesit-search-forward
-                (treesit-node-at (point)) treesit-defun-type-regexp t t))
-         (top (treesit--defun-maybe-top-level node)))
-    (goto-char (treesit-node-end top))))
+With argument ARG, do it that many times.  Negative ARG means
+move forward to the ARGth following beginning of defun.
+
+If search is successful, return t, otherwise return nil.
+
+This is a tree-sitter equivalent of `beginning-of-defun'.
+Behavior of this function depends on `treesit-defun-type-regexp'
+and `treesit-defun-skipper'."
+  (interactive "^p")
+  (let ((orig-point (point))
+        (success nil))
+    (catch 'done
+      (dotimes (_ 2)
+
+        (when (treesit-beginning-of-thing treesit-defun-type-regexp arg)
+          (when treesit-defun-skipper
+            (funcall treesit-defun-skipper)
+            (setq success t)))
+
+        ;; If we end up at the same point, it means we went to the
+        ;; next beg-of-defun, but defun skipper moved point back to
+        ;; where we started, in this case we just move one step
+        ;; further.
+        (if (or (eq arg 0) (not (eq orig-point (point))))
+            (throw 'done success)
+          (setq arg (if (> arg 0) (1+ arg) (1- arg))))))))
+
+(defun treesit-end-of-defun (&optional arg _)
+  "Move forward to next end of defun.
+
+With argument ARG, do it that many times.
+Negative argument -N means move back to Nth preceding end of defun.
+
+This is a tree-sitter equivalent of `end-of-defun'.  Behavior of
+this function depends on `treesit-defun-type-regexp' and
+`treesit-defun-skipper'."
+  (interactive "^p\nd")
+  (let ((orig-point (point)))
+    (if (or (null arg) (= arg 0)) (setq arg 1))
+    (catch 'done
+      (dotimes (_ 2) ; Not making progress is better than infloop.
+
+        (when (treesit-end-of-thing treesit-defun-type-regexp arg)
+          (when treesit-defun-skipper
+            (funcall treesit-defun-skipper)))
+
+        ;; If we end up at the same point, it means we went to the
+        ;; prev end-of-defun, but defun skipper moved point back to
+        ;; where we started, in this case we just move one step
+        ;; further.
+        (if (or (eq arg 0) (not (eq orig-point (point))))
+            (throw 'done nil)
+          (setq arg (if (> arg 0) (1+ arg) (1- arg))))))))
+
+(defun treesit-default-defun-skipper ()
+  "Skips spaces after navigating a defun.
+This function tries to move to the beginning of a line, either by
+moving to the empty newline after a defun, or to the beginning of
+the current line if the beginning of the defun is indented."
+  ;; Moving forward, point at the end of a line and not already on an
+  ;; empty line: go to BOL of the next line (which hopefully is an
+  ;; empty line).
+  (cond ((and (looking-at (rx (* (or " " "\t")) "\n"))
+              (not (bolp)))
+         (forward-line 1))
+        ;; Moving backward, but there are some whitespace (and only
+        ;; whitespace) between point and BOL: go back to BOL.
+        ((looking-back (rx (+ (or " " "\t")))
+                       (line-beginning-position))
+         (beginning-of-line))))
+
+;; prev-sibling:
+;; 1. end-of-node before pos
+;; 2. highest such node
+;;
+;; next-sibling:
+;; 1. beg-of-node after pos
+;; 2. highest such node
+;;
+;; parent:
+;; 1. node covers pos
+;; 2. smallest such node
+(defun treesit--things-around (pos regexp &optional pred)
+  "Return the previous, next, and parent thing around POS.
+
+Return a list of (PREV NEXT PARENT), where PREV and NEXT are
+previous and next sibling things around POS, and PARENT is the
+parent thing surrounding POS.  All of three could be nil if no
+sound things exists.
+
+REGEXP and PRED are the same as in `treesit-thing-at-point'."
+  (let* ((node (treesit-node-at pos))
+         (result (list nil nil nil)))
+    ;; 1. Find previous and next sibling defuns.
+    (cl-loop
+     for idx from 0 to 1
+     for backward in '(t nil)
+     ;; Make sure we go in the right direction, and the defun we find
+     ;; doesn't cover POS.
+     for pos-pred in (list (lambda (n) (<= (treesit-node-end n) pos))
+                           (lambda (n) (>= (treesit-node-start n) pos)))
+     ;; We repeatedly find next defun candidate with
+     ;; `treesit-search-forward', and check if it is a valid defun,
+     ;; until the node we find covers POS, meaning we've gone through
+     ;; every possible sibling defuns.  But there is a catch:
+     ;; `treesit-search-forward' searches bottom-up, so for each
+     ;; candidate we need to go up the tree and find the top-most
+     ;; valid sibling, this defun will be at the same level as POS.
+     ;; Don't use `treesit-search-forward-goto', it skips nodes in
+     ;; order to enforce progress.
+     when node
+     do (let ((cursor node)
+              (iter-pred (lambda (node)
+                           (and (string-match-p
+                                 regexp (treesit-node-type node))
+                                (or (null pred) (funcall pred node))
+                                (funcall pos-pred node)))))
+          ;; Find the node just before/after POS to start searching.
+          (save-excursion
+            (while (and cursor (not (funcall pos-pred cursor)))
+              (setq cursor (treesit-search-forward-goto
+                            cursor "" backward backward t))))
+          ;; Keep searching until we run out of candidates.
+          (while (and cursor
+                      (funcall pos-pred cursor)
+                      (null (nth idx result)))
+            (setf (nth idx result)
+                  (treesit-node-top-level cursor iter-pred t))
+            (setq cursor (treesit-search-forward
+                          cursor regexp backward backward)))))
+    ;; 2. Find the parent defun.
+    (let ((cursor (or (nth 0 result) (nth 1 result) node))
+          (iter-pred (lambda (node)
+                       (and (string-match-p
+                             regexp (treesit-node-type node))
+                            (or (null pred) (funcall pred node))
+                            (not (treesit-node-eq node (nth 0 result)))
+                            (not (treesit-node-eq node (nth 1 result)))
+                            (< (treesit-node-start node)
+                               pos
+                               (treesit-node-end node))))))
+      (setf (nth 2 result)
+            (treesit-parent-until cursor iter-pred)))
+    result))
+
+(defun treesit--top-level-thing (node regexp &optional pred)
+  "Return the top-level parent thing of NODE.
+REGEXP and PRED are the same as in `treesit-thing-at-point'."
+  (treesit-node-top-level
+   node (lambda (node)
+          (and (string-match-p regexp (treesit-node-type node))
+               (or (null pred) (funcall pred node))))
+   t))
+
+;; The basic idea for nested defun navigation is that we first try to
+;; move across sibling defuns in the same level, if no more siblings
+;; exist, we move to parents's beg/end, rinse and repeat.  We never
+;; move into a defun, only outwards.
+;;
+;; Let me describe roughly what does this function do: there are four
+;; possible operations: prev-beg, next-end, prev-end, next-beg, and
+;; each of (prev-sibling next-sibling and parent) could exist or not
+;; exist.  So there are 4 times 8 = 32 situations.
+;;
+;; I'll only describe the situation when we go backward (prev-beg &
+;; prev-end), and consider only prev-sibling & parent. Deriving the
+;; reverse situations is left as an exercise for the reader.
+;;
+;; prev-beg (easy case):
+;; 1. prev-sibling or parent exists
+;;    -> go the prev-sibling/parent's beg
+;;
+;; prev-end (tricky):
+;; 1. prev-sibling exists
+;;    -> If we are already at prev-sibling's end, we need to go one
+;;       step further, either to prev-prev-sibling's end, or parent's
+;;       prev-sibling's end, etc.
+;; 2. prev-sibling is nil but parent exists
+;;    -> Obviously we don't want to go to parent's end, instead, we
+;;       want to go to parent's prev-sibling's end.  Again, we recurse
+;;       in the function to do that.
+(defun treesit--navigate-thing (pos arg side regexp &optional pred recursing)
+  "Navigate thing ARG steps from POS.
+
+If ARG is positive, move forward that many steps, if negative,
+move backward.  If SIDE is `beg', stop at the beginning of a
+thing, if SIDE is `end', stop at the end.
+
+This function doesn't actually move point, it just returns the
+position it would move to.  If there aren't enough things to move
+across, return nil.
+
+REGEXP and PRED are the same as in `treesit-thing-at-point'.
+
+RECURSING is an internal parameter, if non-nil, it means this
+function is called recursively."
+  (pcase-let*
+      ((counter (abs arg))
+       ;; Move POS to the beg/end of NODE.  If NODE is nil, terminate.
+       ;; Return the position we moved to.
+       (advance (lambda (node)
+                  (let ((dest (pcase side
+                                ('beg (treesit-node-start node))
+                                ('end (treesit-node-end node)))))
+                    (if (null dest)
+                        (throw 'term nil)
+                      dest)))))
+    (catch 'term
+      (while (> counter 0)
+        (pcase-let
+            ((`(,prev ,next ,parent)
+              (treesit--things-around pos regexp pred)))
+          ;; When PARENT is nil, nested and top-level are the same, if
+          ;; there is a PARENT, make PARENT to be the top-level parent
+          ;; and pretend there is no nested PREV and NEXT.
+          (when (and (eq treesit-defun-tactic 'top-level)
+                     parent)
+            (setq parent (treesit--top-level-thing
+                          parent regexp pred)
+                  prev nil
+                  next nil))
+          ;; Move...
+          (if (> arg 0)
+              ;; ...forward.
+              (if (and (eq side 'beg)
+                       ;; Should we skip the defun (recurse)?
+                       (cond (next (and (not recursing) ; [1] (see below)
+                                        (eq pos (funcall advance next))))
+                             (parent t))) ; [2]
+                  ;; Special case: go to next beg-of-defun, but point
+                  ;; is already on beg-of-defun.  Set POS to the end
+                  ;; of next-sib/parent defun, and run one more step.
+                  ;; If there is a next-sib defun, we only need to
+                  ;; recurse once, so we don't need to recurse if we
+                  ;; are already recursing [1]. If there is no
+                  ;; next-sib but a parent, keep stepping out
+                  ;; (recursing) until we got out of the parents until
+                  ;; (1) there is a next sibling defun, or (2) no more
+                  ;; parents [2].
+                  ;;
+                  ;; If point on beg-of-defun but we are already
+                  ;; recurring, that doesn't count as special case,
+                  ;; because we have already made progress (by moving
+                  ;; the end of next before recurring.)
+                  (setq pos (or (treesit--navigate-thing
+                                 (treesit-node-end (or next parent))
+                                 1 'beg regexp pred t)
+                                (throw 'term nil)))
+                ;; Normal case.
+                (setq pos (funcall advance (or next parent))))
+            ;; ...backward.
+            (if (and (eq side 'end)
+                     (cond (prev (and (not recursing)
+                                      (eq pos (funcall advance prev))))
+                           (parent t)))
+                ;; Special case: go to prev end-of-defun.
+                (setq pos (or (treesit--navigate-thing
+                               (treesit-node-start (or prev parent))
+                               -1 'end regexp pred t)
+                              (throw 'term nil)))
+              ;; Normal case.
+              (setq pos (funcall advance (or prev parent)))))
+          ;; A successful step! Decrement counter.
+          (cl-decf counter))))
+    ;; Counter equal to 0 means we successfully stepped ARG steps.
+    (if (eq counter 0) pos nil)))
+
+;; TODO: In corporate into thing-at-point.
+(defun treesit-thing-at-point (pattern tactic)
+  "Return the thing node at point or nil if none is found.
+
+\"Thing\" is defined by PATTERN, which can be either a string
+REGEXP or a cons cell (REGEXP . PRED): if a node's type matches
+REGEXP, it is a thing.  The \"thing\" could be further restricted
+by PRED: if non-nil, PRED should be a function that takes a node
+and returns t if the node is a \"thing\", and nil if not.
+
+Return the top-level defun if TACTIC is `top-level', return the
+immediate parent thing if TACTIC is `nested'."
+  (pcase-let* ((`(,regexp . ,pred)
+                (treesit--thing-unpack-pattern pattern))
+               (`(,_ ,next ,parent)
+                (treesit--things-around (point) regexp pred))
+               ;; If point is at the beginning of a thing, we
+               ;; prioritize that thing over the parent in nested
+               ;; mode.
+               (node (or (and (eq (treesit-node-start next) (point))
+                              next)
+                         parent)))
+    (if (eq tactic 'top-level)
+        (treesit--top-level-thing node regexp pred)
+      node)))
+
+(defun treesit-defun-at-point ()
+  "Return the defun node at point or nil if none is found.
+
+Respects `treesit-defun-tactic': return the top-level defun if it
+is `top-level', return the immediate parent defun if it is
+`nested'.
+
+Return nil if `treesit-defun-type-regexp' is not set."
+  (when treesit-defun-type-regexp
+    (treesit-thing-at-point
+     treesit-defun-type-regexp treesit-defun-tactic)))
+
+(defun treesit-defun-name (node)
+  "Return the defun name of NODE.
+
+Return nil if there is no name, or if NODE is not a defun node,
+or if NODE is nil.
+
+If `treesit-defun-name-function' is nil, always return nil."
+  (when treesit-defun-name-function
+    (funcall treesit-defun-name-function node)))
+
+(defun treesit-add-log-current-defun ()
+  "Return the name of the defun at point.
+
+Used for `add-log-current-defun-function'.
+
+The delimiter between nested defun names is controlled by
+`treesit-add-log-defun-delimiter'."
+  (let ((node (treesit-defun-at-point))
+        (name nil))
+    (while node
+      (when-let ((new-name (treesit-defun-name node)))
+        (if name
+            (setq name (concat new-name
+                               treesit-add-log-defun-delimiter
+                               name))
+          (setq name new-name)))
+      (setq node (treesit-node-parent node)))
+    name))
+
+;;; Imenu
+
+(defvar treesit-simple-imenu-settings nil
+  "Settings that configure `treesit-simple-imenu'.
+
+It should be a list of (CATEGORY REGEXP PRED NAME-FN).
+
+CATEGORY is the name of a category, like \"Function\", \"Class\",
+etc.  REGEXP should be a regexp matching the type of nodes that
+belong to CATEGORY.  PRED should be either nil or a function
+that takes a node an the argument.  It should return non-nil if
+the node is a valid node for CATEGORY, or nil if not.
+
+CATEGORY could also be nil.  In that case the entries matched by
+REGEXP and PRED are not grouped under CATEGORY.
+
+NAME-FN should be either nil or a function that takes a defun
+node and returns the name of that defun node.  If NAME-FN is nil,
+`treesit-defun-name' is used.
+
+`treesit-major-mode-setup' automatically sets up Imenu if this
+variable is non-nil.")
+
+(defun treesit--simple-imenu-1 (node pred name-fn)
+  "Given a sparse tree, create an Imenu index.
+
+NODE is a node in the tree returned by
+`treesit-induce-sparse-tree' (not a tree-sitter node, its car is
+a tree-sitter node).  Walk that tree and return an Imenu index.
+
+Return a list of entries where each ENTRY has the form:
+
+ENTRY := (NAME . MARKER)
+       | (NAME . ((\" \" . MARKER)
+                  ENTRY
+                  ...)
+
+PRED and NAME-FN are the same as described in
+`treesit-simple-imenu-settings'.  NAME-FN computes NAME in an
+ENTRY.  MARKER marks the start of each tree-sitter node."
+  (let* ((ts-node (car node))
+         (children (cdr node))
+         (subtrees (mapcan (lambda (node)
+                             (treesit--simple-imenu-1 node pred name-fn))
+                           children))
+         ;; The root of the tree could have a nil ts-node.
+         (name (when ts-node
+                 (or (if name-fn
+                         (funcall name-fn ts-node)
+                       (treesit-defun-name ts-node))
+                     "Anonymous")))
+         (marker (when ts-node
+                   (set-marker (make-marker)
+                               (treesit-node-start ts-node)))))
+    (cond
+     ;; The tree-sitter node in the root node of the tree returned by
+     ;; `treesit-induce-sparse-tree' is often nil.
+     ((null ts-node)
+      subtrees)
+     ;; This tree-sitter node is not a valid entry, skip it.
+     ((and pred (not (funcall pred ts-node)))
+      subtrees)
+     ;; Non-leaf node, return a (list of) subgroup.
+     (subtrees
+      `((,name
+         ,(cons " " marker)
+         ,@subtrees)))
+     ;; Leaf node, return a (list of) plain index entry.
+     (t (list (cons name marker))))))
+
+(defun treesit-simple-imenu ()
+  "Return an Imenu index for the current buffer."
+  (let ((root (treesit-buffer-root-node)))
+    (mapcan (lambda (setting)
+              (pcase-let ((`(,category ,regexp ,pred ,name-fn)
+                           setting))
+                (when-let* ((tree (treesit-induce-sparse-tree
+                                   root regexp))
+                            (index (treesit--simple-imenu-1
+                                    tree pred name-fn)))
+                  (if category
+                      (list (cons category index))
+                    index))))
+            treesit-simple-imenu-settings)))
 
 ;;; Activating tree-sitter
 
@@ -1646,7 +2293,7 @@ instead of emitting a warning."
         (pcase-let ((`(,available . ,err)
                      (treesit-language-available-p lang t)))
           (when (not available)
-            (setq msg (format "language definition for %s is unavailable (%s): %s"
+            (setq msg (format "language grammar for %s is unavailable (%s): %s"
                               lang (nth 0 err)
                               (string-join
                                (mapcar (lambda (x) (format "%s" x))
@@ -1673,6 +2320,11 @@ If `treesit-simple-indent-rules' is non-nil, setup indentation.
 If `treesit-defun-type-regexp' is non-nil, setup
 `beginning/end-of-defun' functions.
 
+If `treesit-defun-name-function' is non-nil, setup
+`add-log-current-defun'.
+
+If `treesit-simple-imenu-settings' is non-nil, setup Imenu.
+
 Make sure necessary parsers are created for the current buffer
 before calling this function."
   ;; Font-lock.
@@ -1697,8 +2349,27 @@ before calling this function."
     (setq-local indent-region-function #'treesit-indent-region))
   ;; Navigation.
   (when treesit-defun-type-regexp
+    (keymap-set (current-local-map) "<remap> <beginning-of-defun>"
+                #'treesit-beginning-of-defun)
+    (keymap-set (current-local-map) "<remap> <end-of-defun>"
+                #'treesit-end-of-defun)
+    ;; `end-of-defun' will not work completely correctly in nested
+    ;; defuns due to its implementation.  However, many lisp programs
+    ;; use `beginning/end-of-defun', so we should still set
+    ;; `beginning/end-of-defun-function' so they still mostly work.
+    ;; This is also what `cc-mode' does: rebind user commands and set
+    ;; the variables.  In future we should update `end-of-defun' to
+    ;; work with nested defuns.
     (setq-local beginning-of-defun-function #'treesit-beginning-of-defun)
-    (setq-local end-of-defun-function #'treesit-end-of-defun)))
+    (setq-local end-of-defun-function #'treesit-end-of-defun))
+  ;; Defun name.
+  (when treesit-defun-name-function
+    (setq-local add-log-current-defun-function
+                #'treesit-add-log-current-defun))
+  ;; Imenu.
+  (when treesit-simple-imenu-settings
+    (setq-local imenu-create-index-function
+                #'treesit-simple-imenu)))
 
 ;;; Debugging
 
@@ -1722,9 +2393,9 @@ in `treesit-parser-list'."
                    collect node))
          (largest-node (car (last node-list)))
          (parent (treesit-node-parent largest-node))
-         ;; node-list-acending contains all the node bottom-up, then
+         ;; node-list-ascending contains all the node bottom-up, then
          ;; the parent.
-         (node-list-acending
+         (node-list-ascending
           (if (null largest-node)
               ;; If there are no nodes that start at point, just show
               ;; the node at point and its parent.
@@ -1735,7 +2406,7 @@ in `treesit-parser-list'."
          (name ""))
     ;; We draw nodes like (parent field-name: (node)) recursively,
     ;; so it could be (node1 field-name: (node2 field-name: (node3))).
-    (dolist (node node-list-acending)
+    (dolist (node node-list-ascending)
       (setq
        name
        (concat
@@ -1766,7 +2437,7 @@ When this mode is enabled, the mode-line displays
 where NODE, CHILD, etc, are nodes which begin at point.  PARENT
 is the parent of NODE.  NODE is displayed in bold typeface.
 FIELD-NAMEs are field names of NODE and CHILD, etc (see Info
-node `(elisp)Language Definitions', heading \"Field names\").
+node `(elisp)Language Grammar', heading \"Field names\").
 
 If no node starts at point, i.e., point is in the middle of a
 node, then the mode line displays the earliest node that spans point,
@@ -1802,7 +2473,8 @@ to the offending pattern and highlight the pattern."
          (with-current-buffer buf
            (let* ((data (cdr err))
                   (message (nth 0 data))
-                  (start (nth 1 data)))
+                  (start (nth 1 data))
+                  (inhibit-read-only t))
              (erase-buffer)
              (insert (treesit-query-expand query))
              (goto-char start)
@@ -1812,9 +2484,22 @@ to the offending pattern and highlight the pattern."
              (goto-char (point-min))
              (insert (format "%s: %d\n" message start))
              (forward-char start)))
-         (pop-to-buffer buf))))))
+         (pop-to-buffer buf)
+         (view-mode))))))
 
 ;;; Explorer
+
+(defface treesit-explorer-anonymous-node
+  (let ((display t)
+        (atts '(:inherit shadow)))
+    `((,display . ,atts)))
+  "Face for anonymous nodes in tree-sitter explorer.")
+
+(defface treesit-explorer-field-name
+  (let ((display t)
+        (atts nil))
+    `((,display . ,atts)))
+  "Face for field names in tree-sitter explorer.")
 
 (defvar-local treesit--explorer-buffer nil
   "Buffer used to display the syntax tree.")
@@ -1872,11 +2557,15 @@ in the region."
                   (window-start) (window-end) treesit--explorer-language))
            ;; Only highlight the current top-level construct.
            ;; Highlighting the whole buffer is slow and unnecessary.
-           (top-level (treesit-node-first-child-for-pos
-                       root (if (eolp)
-                                (max (point-min) (1- (point)))
-                              (point))
-                       t))
+           ;; But if the buffer is small (ie, used in playground
+           ;; style), just highlight the whole buffer.
+           (top-level (if (< (buffer-size) 4000)
+                          root
+                        (treesit-node-first-child-for-pos
+                         root (if (eolp)
+                                  (max (point-min) (1- (point)))
+                                (point))
+                         t)))
            ;; Only highlight node when region is active, if we
            ;; highlight node at point the syntax tree is too jumpy.
            (nodes-hl
@@ -1994,7 +2683,8 @@ leaves point at the end of the last line of NODE."
     ;; draw everything in one line, other wise draw field name and the
     ;; rest of the node in two lines.
     (when field-name
-      (insert field-name ": ")
+      (insert (propertize (concat field-name ": ")
+                          'face 'treesit-explorer-field-name))
       (when (and children (not all-children-inline))
         (insert "\n")
         (indent-to-column (1+ before-field-column))))
@@ -2053,7 +2743,12 @@ leaves point at the end of the last line of NODE."
       (overlay-put ov 'treesit-node node)
       (overlay-put ov 'evaporate t)
       (when (not named)
-        (overlay-put ov 'face 'shadow)))))
+        (overlay-put ov 'face 'treesit-explorer-anonymous-node)))))
+
+(defun treesit--explorer-kill-explorer-buffer ()
+  "Kill the explorer buffer of this buffer."
+  (when (buffer-live-p treesit--explorer-buffer)
+    (kill-buffer treesit--explorer-buffer)))
 
 (define-derived-mode treesit--explorer-tree-mode special-mode
   "TS Explorer"
@@ -2066,30 +2761,241 @@ Pops up a window showing the syntax tree of the source in the
 current buffer in real time.  The corresponding node enclosing
 the text in the active region is highlighted in the explorer
 window."
-  :lighter " TSplay"
+  :lighter " TSexplore"
   (if treesit-explore-mode
-      (progn
-        (unless (buffer-live-p treesit--explorer-buffer)
-          (setq-local treesit--explorer-buffer
-                      (get-buffer-create
-                       (format "*tree-sitter playground for %s*"
-                               (buffer-name))))
-          (setq-local treesit--explorer-language
-                      (intern (completing-read
+      (let ((language (intern (completing-read
                                "Language: "
                                (mapcar #'treesit-parser-language
-                                       (treesit-parser-list)))))
-          (with-current-buffer treesit--explorer-buffer
-            (treesit--explorer-tree-mode)))
-        (display-buffer treesit--explorer-buffer
-                        (cons nil '((inhibit-same-window . t))))
-        (treesit--explorer-refresh)
-        (add-hook 'post-command-hook
-                  #'treesit--explorer-post-command 0 t)
-        (setq-local treesit--explorer-last-node nil))
+                                       (treesit-parser-list))))))
+        (if (not (treesit-language-available-p language))
+            (user-error "Cannot find tree-sitter grammar for %s: %s"
+                        language (cdr (treesit-language-available-p
+                                       language t)))
+          ;; Create explorer buffer.
+          (unless (buffer-live-p treesit--explorer-buffer)
+            (setq-local treesit--explorer-buffer
+                        (get-buffer-create
+                         (format "*tree-sitter explorer for %s*"
+                                 (buffer-name))))
+            (setq-local treesit--explorer-language language)
+            (with-current-buffer treesit--explorer-buffer
+              (treesit--explorer-tree-mode)))
+          (display-buffer treesit--explorer-buffer
+                          (cons nil '((inhibit-same-window . t))))
+          (treesit--explorer-refresh)
+          ;; Setup variables and hooks.
+          (add-hook 'post-command-hook
+                    #'treesit--explorer-post-command 0 t)
+          (add-hook 'kill-buffer-hook
+                    #'treesit--explorer-kill-explorer-buffer 0 t)
+          (setq-local treesit--explorer-last-node nil)
+          ;; Tell `desktop-save' to not save explorer buffers.
+          (when (boundp 'desktop-modes-not-to-save)
+            (unless (memq 'treesit--explorer-tree-mode
+                          desktop-modes-not-to-save)
+              (push 'treesit--explorer-tree-mode
+                    desktop-modes-not-to-save)))))
+    ;; Turn off explore mode.
     (remove-hook 'post-command-hook
                  #'treesit--explorer-post-command t)
-    (kill-buffer treesit--explorer-buffer)))
+    (remove-hook 'post-command-hook
+                 #'treesit--explorer-kill-explorer-buffer t)
+    (treesit--explorer-kill-explorer-buffer)))
+
+;;; Install & build language grammar
+
+(defvar treesit-language-source-alist nil
+  "Configuration for downloading and installing tree-sitter language grammars.
+
+The value should be an alist where each element has the form
+
+    (LANG . (URL REVISION SOURCE-DIR CC C++))
+
+Only LANG and URL are mandatory.  LANG is the language symbol.
+URL is the Git repository URL for the grammar.
+
+REVISION is the Git tag or branch of the desired version,
+defaulting to the latest default branch.
+
+SOURCE-DIR is the relative subdirectory in the repository in which
+the grammar's parser.c file resides, defaulting to \"src\".
+
+CC and C++ are C and C++ compilers, defaulting to \"cc\" and
+\"c++\", respectively.")
+
+(defun treesit--install-language-grammar-build-recipe (lang)
+  "Interactively produce a download/build recipe for LANG and return it.
+See `treesit-language-source-alist' for details."
+  (when (y-or-n-p (format "There is no recipe for %s, do you want to build it interactively?" lang))
+    (cl-labels ((empty-string-to-nil (string)
+                  (if (equal string "") nil string)))
+      (list
+       lang
+       (let ((repo-default (format "https://github.com/tree-sitter/tree-sitter-%s" lang)))
+         (read-string
+          "Enter the URL of the Git repository of the language grammar: "
+          (and (treesit--check-repo-url repo-default) repo-default)))
+       (empty-string-to-nil
+        (read-string
+         "Enter the tag or branch (default: default branch): "))
+       (empty-string-to-nil
+        (read-string
+         "Enter the subdirectory in which the parser.c file resides (default: \"src\"): "))
+       (empty-string-to-nil
+        (read-string
+         "Enter the C compiler to use (default: auto-detect): "))
+       (empty-string-to-nil
+        (read-string
+         "Enter the C++ compiler to use (default: auto-detect): "))))))
+
+(defun treesit--check-repo-url (url)
+  (defvar url-request-method)
+  (let ((url-request-method "HEAD"))
+    (let ((buffer (condition-case nil (url-retrieve-synchronously url t t)
+                    (file-error nil))))
+      (and buffer
+           (eql
+            (buffer-local-value 'url-http-response-status buffer)
+            200)))))
+
+;;;###autoload
+(defun treesit-install-language-grammar (lang)
+  "Build and install the tree-sitter language grammar library for LANG.
+
+Interactively, if `treesit-language-source-alist' doesn't already
+have data for building the grammar for LANG, prompt for its
+repository URL and the C/C++ compiler to use.
+
+This command requires Git, a C compiler and (sometimes) a C++ compiler,
+and the linker to be installed and on PATH.  It also requires that the
+recipe for LANG exists in `treesit-language-source-alist'.
+
+See `exec-path' for the current path where Emacs looks for
+executable programs, such as the C/C++ compiler and linker."
+  (interactive (list (intern
+                      (completing-read
+                       "Language: "
+                       (mapcar #'car treesit-language-source-alist)))))
+  (when-let ((recipe
+              (or (assoc lang treesit-language-source-alist)
+                  (treesit--install-language-grammar-build-recipe
+                   lang))))
+    (condition-case err
+        (apply #'treesit--install-language-grammar-1
+               ;; The nil is OUT-DIR.
+               (cons nil recipe))
+      (error
+       (display-warning
+        'treesit
+        (format "Error encountered when installing language grammar: %s"
+                err)))))
+
+  ;; Check that the installed language grammar is loadable.
+  (pcase-let ((`(,available . ,err)
+               (treesit-language-available-p lang t)))
+    (when (not available)
+      (display-warning
+       'treesit
+       (format "The installed language grammar for %s cannot be located or has problems (%s): %s"
+               lang (nth 0 err)
+               (string-join
+                (mapcar (lambda (x) (format "%s" x))
+                        (cdr err))
+                " "))))))
+
+(defun treesit--call-process-signal (&rest args)
+  "Run `call-process' with ARGS.
+If it returns anything but 0, signal an error.  Use the buffer
+content as signal data, and erase buffer afterwards."
+  (unless (eq 0 (apply #'call-process args))
+    (signal 'treesit-error (list "Command:"
+                                 (string-join (cons (car args)
+                                                    (nthcdr 4 args))
+                                              " ")
+                                 "Error output:"
+                                 (buffer-string)))
+    (erase-buffer)))
+
+(defun treesit--install-language-grammar-1
+    (out-dir lang url &optional revision source-dir cc c++)
+  "Install and compile a tree-sitter language grammar library.
+
+OUT-DIR is the directory to put the compiled library file.  If it
+is nil, the \"tree-sitter\" directory under user's Emacs
+configuration directory is used (and automatically created if it
+does not exist).
+
+For LANG, URL, REVISION, SOURCE-DIR, GRAMMAR-DIR, CC, C++, see
+`treesit-language-source-alist'.  If anything goes wrong, this
+function signals an error."
+  (let* ((lang (symbol-name lang))
+         (default-directory (make-temp-file "treesit-workdir" t))
+         (workdir (expand-file-name "repo"))
+         (source-dir (expand-file-name (or source-dir "src") workdir))
+         (cc (or cc (seq-find #'executable-find '("cc" "gcc" "c99"))
+                 ;; If no C compiler found, just use cc and let
+                 ;; `call-process' signal the error.
+                 "cc"))
+         (c++ (or c++ (seq-find #'executable-find '("c++" "g++"))
+                  "c++"))
+         (soext (or (car dynamic-library-suffixes)
+                    (signal 'treesit-error '("Emacs cannot figure out the file extension for dynamic libraries for this system, because `dynamic-library-suffixes' is nil"))))
+         (out-dir (or (and out-dir (expand-file-name out-dir))
+                      (locate-user-emacs-file "tree-sitter")))
+         (lib-name (concat "libtree-sitter-" lang soext)))
+    (unwind-protect
+        (with-temp-buffer
+          (message "Cloning repository")
+          ;; git clone xxx --depth 1 --quiet [-b yyy] workdir
+          (if revision
+              (treesit--call-process-signal
+               "git" nil t nil "clone" url "--depth" "1" "--quiet"
+               "-b" revision workdir)
+            (treesit--call-process-signal
+             "git" nil t nil "clone" url "--depth" "1" "--quiet"
+             workdir))
+          ;; We need to go into the source directory because some
+          ;; header files use relative path (#include "../xxx").
+          ;; cd "${sourcedir}"
+          (setq default-directory source-dir)
+          (message "Compiling library")
+          ;; cc -fPIC -c -I. parser.c
+          (treesit--call-process-signal
+           cc nil t nil "-fPIC" "-c" "-I." "parser.c")
+          ;; cc -fPIC -c -I. scanner.c
+          (when (file-exists-p "scanner.c")
+            (treesit--call-process-signal
+             cc nil t nil "-fPIC" "-c" "-I." "scanner.c"))
+          ;; c++ -fPIC -I. -c scanner.cc
+          (when (file-exists-p "scanner.cc")
+            (treesit--call-process-signal
+             c++ nil t nil "-fPIC" "-c" "-I." "scanner.cc"))
+          ;; cc/c++ -fPIC -shared *.o -o "libtree-sitter-${lang}.${soext}"
+          (apply #'treesit--call-process-signal
+                 (if (file-exists-p "scanner.cc") c++ cc)
+                 nil t nil
+                 `("-fPIC" "-shared"
+                   ,@(directory-files
+                      default-directory nil
+                      (rx bos (+ anychar) ".o" eos))
+                   "-o" ,lib-name))
+          ;; Copy out.
+          (unless (file-exists-p out-dir)
+            (make-directory out-dir t))
+          (let* ((library-fname (expand-file-name lib-name out-dir))
+                 (old-fname (concat library-fname ".old")))
+            ;; Rename the existing shared library, if any, then
+            ;; install the new one, and try deleting the old one.
+            ;; This is for Windows systems, where we cannot simply
+            ;; overwrite a DLL that is being used.
+            (if (file-exists-p library-fname)
+                (rename-file library-fname old-fname t))
+            (copy-file lib-name (file-name-as-directory out-dir) t t)
+            ;; Ignore errors, in case the old version is still used.
+            (ignore-errors (delete-file old-fname)))
+          (message "Library installed to %s/%s" out-dir lib-name))
+      (when (file-exists-p workdir)
+        (delete-directory workdir t)))))
 
 ;;; Etc
 
@@ -2154,7 +3060,7 @@ window."
 
   "Parsers"
   (treesit-parser-create
-   :no-eval (treesit-parser-create)
+   :no-eval (treesit-parser-create 'c)
    :eg-result-string "#<treesit-parser for c>")
   (treesit-parser-delete
    :no-value (treesit-parser-delete parser))
@@ -2179,10 +3085,10 @@ window."
    :no-value (treesit-parser-set-included-ranges parser '((1 . 4) (5 . 8))))
   (treesit-parser-included-ranges
    :no-eval (treesit-parser-included-ranges parser)
-   :eg-result '((1 . 4) (5 . 8)))
+   :eg-result ((1 . 4) (5 . 8)))
   (treesit-query-range
    :no-eval (treesit-query-range node '((script_element) @cap))
-   :eg-result-string '((1 . 4) (5 . 8)))
+   :eg-result ((1 . 4) (5 . 8)))
 
 
   "Retrieving a node"
@@ -2221,8 +3127,8 @@ window."
    :eg-result-string "#<treesit-node (init_declarator) in 5-10>")
 
 
-  (treesit-first-child-for-pos
-   :no-eval (treesit-first-child-for-pos node 1)
+  (treesit-node-first-child-for-pos
+   :no-eval (treesit-node-first-child-for-pos node 1)
    :eg-result-string "#<treesit-node (primitive_type) in 1-4>")
   (treesit-node-descendant-for-range
    :no-eval (treesit-node-descendant-for-range node 2 3)
@@ -2296,11 +3202,11 @@ window."
    :eg-result t)
 
 
-  (treesit-field-name-for-child
-   :no-eval (treesit-field-name-for-child node)
+  (treesit-node-field-name-for-child
+   :no-eval (treesit-node-field-name-for-child node)
    :eg-result "body")
-  (treesit-child-count
-   :no-eval (treesit-child-count node)
+  (treesit-node-child-count
+   :no-eval (treesit-node-child-count node)
    :eg-result 3)
 
 
@@ -2328,7 +3234,12 @@ window."
    :eg-result-string "#<treesit-node (translation_unit) in 1-11>")
   (treesit-query-string
    :no-eval (treesit-query-string "int c = 0;" '((identifier) @id) 'c)
-   :eg-result-string "((id . #<treesit-node (identifier) in 5-6>))"))
+   :eg-result-string "((id . #<treesit-node (identifier) in 5-6>))")
+
+  "Misc"
+  (treesit-subtree-stat
+   :no-eval (treesit-subtree-stat node)
+   :eg-result (6 33 487)))
 
 (provide 'treesit)
 

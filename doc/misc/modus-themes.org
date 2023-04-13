@@ -45,7 +45,7 @@ Current development target is {{{development-version}}}.
 :custom_id: h:b14c3fcb-13dd-4144-9d92-2c58b3ed16d3
 :end:
 
-Copyright (C) 2020-2022  Free Software Foundation, Inc.
+Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
 #+begin_quote
 Permission is granted to copy, distribute and/or modify this document
@@ -2811,7 +2811,7 @@ that can be overridden):
 As one can tell, we bind a key to a hexadecimal RGB color value.  Now
 say we wish to override those specific values and have our changes
 propagate to all faces that use those keys.  We could write something
-like this, which adds a subtle ochre tint:
+like this, which adds a subtle ocher tint:
 
 #+begin_src emacs-lisp
 (setq modus-themes-operandi-color-overrides
@@ -2886,7 +2886,7 @@ look like this:
 
 With those in place, one can use {{{kbd(M-x my-modus-themes-tinted)}}}
 and then load the Modus theme of their choice.  The new palette subset
-will come into effect: subtle ochre tints (or shades of gray) for Modus
+will come into effect: subtle ocher tints (or shades of gray) for Modus
 Operandi and night sky blue shades for Modus Vivendi.  Switching between
 the two themes, such as with {{{kbd(M-x modus-themes-toggle)}}} will
 also use the overrides.

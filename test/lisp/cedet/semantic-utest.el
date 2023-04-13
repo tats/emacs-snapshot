@@ -1,6 +1,6 @@
 ;;; semantic-utest.el --- Tests for semantic's parsing system. -*- lexical-binding:t -*-
 
-;; Copyright (C) 2003-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -593,7 +593,7 @@ INSERTME is the text to be inserted after the deletion."
   )
 
 (ert-deftest semantic-utest-Scheme()
-  (skip-unless nil) ;; There is a bug w/ scheme parser.  Skip this for now.
+  (skip-unless nil) ;; There is a bug with scheme parser.  Skip this for now.
   (semantic-utest-generic (semantic-utest-fname "tst.scm") semantic-utest-Scheme-buffer-contents  semantic-utest-Scheme-name-contents   '("fun2") ";1" ";deleted line")
   )
 

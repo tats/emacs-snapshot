@@ -1,6 +1,6 @@
 ;;; server.el --- Lisp code for GNU Emacs running as server process -*- lexical-binding: t -*-
 
-;; Copyright (C) 1986-1987, 1992, 1994-2022 Free Software Foundation,
+;; Copyright (C) 1986-1987, 1992, 1994-2023 Free Software Foundation,
 ;; Inc.
 
 ;; Author: William Sommerfeld <wesommer@athena.mit.edu>
@@ -1495,7 +1495,7 @@ so don't mark these buffers specially, just visit them normally."
 					  minibuffer-auto-raise))
 	       (filen (car file))
 	       (obuf (get-file-buffer filen)))
-	  (add-to-history 'file-name-history filen)
+          (file-name-history--add filen)
 	  (if (null obuf)
 	      (progn
 		(run-hooks 'pre-command-hook)
@@ -1780,29 +1780,43 @@ With ARG non-nil, silently save all file-visiting buffers, then kill.
 
 If emacsclient was started with a list of filenames to edit, then
 only these files will be asked to be saved."
-  (if server-stop-automatically
-      (server-stop-automatically--handle-delete-frame (selected-frame))
-    (let ((proc (frame-parameter nil 'client)))
-      (cond ((eq proc 'nowait)
-	     ;; Nowait frames have no client buffer list.
-	     (if (cdr (frame-list))
-	         (progn (save-some-buffers arg)
-		        (delete-frame))
-	       ;; If we're the last frame standing, kill Emacs.
-	       (save-buffers-kill-emacs arg)))
-	    ((processp proc)
-	     (let ((buffers (process-get proc 'buffers)))
-	       (save-some-buffers
-	        arg (if buffers
-                        ;; Only files from emacsclient file list.
-		        (lambda () (memq (current-buffer) buffers))
-                      ;; No emacsclient file list: don't override
-                      ;; `save-some-buffers-default-predicate' (unless
-                      ;; ARG is non-nil), since we're not killing
-                      ;; Emacs (unlike `save-buffers-kill-emacs').
-		      (and arg t)))
-	       (server-delete-client proc)))
-	    (t (error "Invalid client frame"))))))
+  (let ((proc (frame-parameter nil 'client)))
+    (cond ((eq proc 'nowait)
+	   ;; Nowait frames have no client buffer list.
+	   (if (length> (frame-list) (if server-stop-automatically 2 1))
+               ;; If there are any other frames, only delete this one.
+               ;; When `server-stop-automatically' is set, don't count
+               ;; the daemon frame.
+	       (progn (save-some-buffers arg)
+		      (delete-frame))
+	     ;; If we're the last frame standing, kill Emacs.
+	     (save-buffers-kill-emacs arg)))
+	  ((processp proc)
+           (if (or (not server-stop-automatically)
+                   (length> server-clients 1)
+                   (seq-some
+                    (lambda (frame)
+                      (when-let ((p (frame-parameter frame 'client)))
+                        (not (eq proc p))))
+                    (frame-list)))
+               ;; If `server-stop-automatically' is not enabled, there
+               ;; are any other clients, or there are frames not owned
+               ;; by the current client (e.g. `nowait' frames), then
+               ;; we just want to delete this client.
+	       (let ((buffers (process-get proc 'buffers)))
+	         (save-some-buffers
+	          arg (if buffers
+                          ;; Only files from emacsclient file list.
+		          (lambda () (memq (current-buffer) buffers))
+                        ;; No emacsclient file list: don't override
+                        ;; `save-some-buffers-default-predicate' (unless
+                        ;; ARG is non-nil), since we're not killing
+                        ;; Emacs (unlike `save-buffers-kill-emacs').
+		        (and arg t)))
+	         (server-delete-client proc))
+             ;; Otherwise, we want to kill Emacs.
+             (save-buffers-kill-emacs arg)))
+	  (t (error "Invalid client frame")))))
 
 (defun server-stop-automatically--handle-delete-frame (frame)
   "Handle deletion of FRAME when `server-stop-automatically' is used."
@@ -1897,10 +1911,11 @@ Returns the result of the evaluation, or signals an error if it
 cannot contact the specified server.  For example:
   (server-eval-at \"server\" \\='(emacs-pid))
 returns the process ID of the Emacs instance running \"server\"."
-  (let ((server-file (server--file-name))
-        (coding-system-for-read 'binary)
-        (coding-system-for-write 'binary)
-        address port secret process)
+  (let* ((server-dir (if server-use-tcp server-auth-dir server-socket-dir))
+         (server-file (expand-file-name server server-dir))
+         (coding-system-for-read 'binary)
+         (coding-system-for-write 'binary)
+         address port secret process)
     (unless (file-exists-p server-file)
       (error "No such server: %s" server))
     (with-temp-buffer

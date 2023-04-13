@@ -1,6 +1,6 @@
 ;;; epa-ks.el --- EasyPG Key Server Client -*- lexical-binding: t -*-
 
-;; Copyright (C) 2021-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2023 Free Software Foundation, Inc.
 
 ;; Author: Philip K. <philipk@posteo.net>
 ;; Keywords: PGP, GnuPG
@@ -109,7 +109,7 @@ When all keys have been selected, use \\[epa-ks-do-key-to-fetch] to
 actually import the keys.
 
 When called interactively, `epa-ks-mark-key-to-fetch' will always
-add a \"F\" tag.  Non-interactivly the tag must be specified by
+add a \"F\" tag.  Non-interactively the tag must be specified by
 setting the TAG parameter."
   (interactive (list "F"))
   (if (region-active-p)
@@ -135,13 +135,13 @@ Keys are marked using `epa-ks-mark-key-to-fetch'."
                 keys))
         (forward-line))
       (when (yes-or-no-p (format "Proceed with fetching all %d key(s)? "
-                                 (length keys))))
-      (dolist (id keys)
-        (epa-ks--fetch-key id))))
+                                 (length keys)))
+        (dolist (id keys)
+          (epa-ks--fetch-key id)))))
   (tabulated-list-clear-all-tags))
 
-(defun epa-ks--query-url (query exact)
-  "Return URL for QUERY.
+(defun epa-ks--query-url (query exact &optional operation)
+  "Return URL for QUERY and OPERATION (defaults to \"index\").
 If EXACT is non-nil, don't accept approximate matches."
   (format "https://%s/pks/lookup?%s"
           (cond ((null epa-keyserver)
@@ -154,13 +154,13 @@ If EXACT is non-nil, don't accept approximate matches."
           (url-build-query-string
            (append `(("search" ,query)
                      ("options" "mr")
-                     ("op" "index"))
+                     ("op" ,(or operation "index")))
                    (and exact '(("exact" "on")))))))
 
 (defun epa-ks--fetch-key (id)
   "Send request to import key with specified ID."
   (url-retrieve
-   (epa-ks--query-url (concat "0x" (url-hexify-string id)) t)
+   (epa-ks--query-url (concat "0x" (url-hexify-string id)) t "get")
    (lambda (status)
      (when (plist-get status :error)
        (error "Request failed: %s"
@@ -236,7 +236,7 @@ enough, since keyservers have strict timeout settings."
         (erase-buffer))
       (epa-ks-search-mode))
     (url-retrieve
-     (epa-ks--query-url query exact)
+     (epa-ks--query-url query exact "index")
      (lambda (status)
        (when (plist-get status :error)
          (when buf

@@ -1,6 +1,6 @@
 ;;; htmlfontify.el --- htmlize a buffer/source tree with optional hyperlinks -*- lexical-binding: t -*-
 
-;; Copyright (C) 2002-2003, 2009-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2003, 2009-2023 Free Software Foundation, Inc.
 
 ;; Emacs Lisp Archive Entry
 ;; Package: htmlfontify
@@ -78,7 +78,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(require 'cl-lib)
 (require 'cus-edit)
 
 (defconst hfy-meta-tags
@@ -372,11 +372,15 @@ otherwise."
   :tag   "istext-command"
   :type  '(string))
 
-(defcustom hfy-find-cmd
-  "find . -type f \\! -name \\*~ \\! -name \\*.flc \\! -path \\*/CVS/\\*"
-  "Find command used to harvest a list of files to attempt to fontify."
-  :tag   "find-command"
-  :type  '(string))
+(defcustom hfy-exclude-file-rules
+  '("\\.flc\\'"
+    "/CVS/"
+    "~\\'"
+    "/\\.git\\(?:/\\|\\'\\)")
+  "Regular expressions matching files to exclude."
+  :tag "exclude-rules"
+  :type '(repeat regexp)
+  :version "29.1")
 
 (defcustom hfy-display-class nil
   "Display class to use to determine which display class to use when
@@ -753,7 +757,9 @@ may happen."
                             255))
                        '(0 1 2))))))
 
-(defun hfy-family (family) (list (cons "font-family"  family)))
+(defun hfy-family (family)
+  (list (cons "font-family"
+              (format "\"%s\"" (string-replace "\"" "\\\\\"" family)))))
 (defun hfy-bgcol  (color) (list (cons "background"   (hfy-triplet color))))
 (defun hfy-color (color) (list (cons "color"        (hfy-triplet color))))
 (define-obsolete-function-alias 'hfy-colour #'hfy-color "27.1")
@@ -1826,8 +1832,12 @@ Strips any leading \"./\" from each filename."
   ;;(message "hfy-list-files");;DBUG
   ;; FIXME: this changes the dir of the current buffer.  Is that right??
   (cd directory)
-  (mapcar (lambda (F) (if (string-match "^./\\(.*\\)" F) (match-string 1 F) F))
-          (split-string (shell-command-to-string hfy-find-cmd))) )
+  (cl-remove-if (lambda (f)
+                  (or (null (file-regular-p f))
+                      (seq-some (lambda (r)
+                                  (string-match r f))
+                                hfy-exclude-file-rules)))
+                (directory-files-recursively "." "" nil t)))
 
 ;; strip the filename off, return a directory name
 ;; not a particularly thorough implementation, but it will be
@@ -1850,8 +1860,9 @@ Hardly bombproof, but good enough in the context in which it is being used."
 
 (defun hfy-text-p (srcdir file)
   "Is SRCDIR/FILE text?  Use `hfy-istext-command' to determine this."
-  (let* ((cmd (format hfy-istext-command (expand-file-name file srcdir)))
-         (rsp (shell-command-to-string    cmd)))
+  (let* ((cmd (format hfy-istext-command
+                      (shell-quote-argument (expand-file-name file srcdir))))
+         (rsp (shell-command-to-string cmd)))
     (string-match "text" rsp)))
 
 ;; open a file, check fontification, if fontified, write a fontified copy

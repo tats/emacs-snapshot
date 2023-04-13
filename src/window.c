@@ -1,6 +1,6 @@
 /* Window creation, deletion and examination for GNU Emacs.
    Does not include redisplay.
-   Copyright (C) 1985-1987, 1993-1998, 2000-2022 Free Software
+   Copyright (C) 1985-1987, 1993-1998, 2000-2023 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -762,10 +762,15 @@ future use.  */)
 
 DEFUN ("window-use-time", Fwindow_use_time, Swindow_use_time, 0, 1, 0,
        doc: /* Return the use time of window WINDOW.
-WINDOW must be a live window and defaults to the selected one.
-The window with the highest use time is the most recently selected
-one.  The window with the lowest use time is the least recently
-selected one.  */)
+WINDOW must specify a live window and defaults to the selected one.
+
+The window with the highest use time is usually the one most recently
+selected by calling `select-window' with NORECORD nil.  The window with
+the lowest use time is usually the least recently selected one chosen in
+such a way.
+
+Note that the use time of a window can be also changed by calling
+`window-bump-use-time' for that window.  */)
   (Lisp_Object window)
 {
   return make_fixnum (decode_live_window (window)->use_time);
@@ -773,15 +778,27 @@ selected one.  */)
 
 DEFUN ("window-bump-use-time", Fwindow_bump_use_time,
        Swindow_bump_use_time, 0, 1, 0,
-       doc: /* Mark WINDOW as having been most recently used.
-WINDOW must be a live window and defaults to the selected one.  */)
+       doc: /* Mark WINDOW as second most recently used.
+WINDOW must specify a live window.
+
+If WINDOW is not selected and the selected window has the highest use
+time of all windows, set the use time of WINDOW to that of the selected
+window, increase the use time of the selected window by one and return
+the new use time of WINDOW.  Otherwise, do nothing and return nil.  */)
   (Lisp_Object window)
 {
   struct window *w = decode_live_window (window);
+  struct window *sw = XWINDOW (selected_window);
 
-  w->use_time = ++window_select_count;
+  if (w != sw && sw->use_time == window_select_count)
+    {
+      w->use_time = window_select_count;
+      sw->use_time = ++window_select_count;
 
-  return Qnil;
+      return make_fixnum (w->use_time);
+    }
+  else
+    return Qnil;
 }
 
 DEFUN ("window-pixel-width", Fwindow_pixel_width, Swindow_pixel_width, 0, 1, 0,
@@ -1649,7 +1666,8 @@ check_window_containing (struct window *w, void *user_data)
    set *PART to the id of that element.
 
    If there is no window under X, Y return nil and leave *PART
-   unmodified.  TOOL_BAR_P means detect tool-bar windows.
+   unmodified.  TOOL_BAR_P means detect tool-bar windows, and
+   TAB_BAR_P means detect tab-bar windows.
 
    This function was previously implemented with a loop cycling over
    windows with Fnext_window, and starting with the frame's selected
@@ -1711,8 +1729,11 @@ window_from_coordinates (struct frame *f, int x, int y,
 DEFUN ("window-at", Fwindow_at, Swindow_at, 2, 3, 0,
        doc: /* Return window containing coordinates X and Y on FRAME.
 FRAME must be a live frame and defaults to the selected one.
-The top left corner of the frame is considered to be row 0,
-column 0.  */)
+X and Y are measured in units of canonical columns and rows.
+The top left corner of the frame is considered to be column 0, row 0.
+Tool-bar and tab-bar pseudo-windows are ignored by this function: if
+the specified coordinates are in any of these two windows, this
+function returns nil.  */)
   (Lisp_Object x, Lisp_Object y, Lisp_Object frame)
 {
   struct frame *f = decode_live_frame (frame);
@@ -2639,7 +2660,7 @@ window_list (void)
 	  Lisp_Object arglist = Qnil;
 
 	  /* We are visiting windows in canonical order, and add
-	     new windows at the front of args[1], which means we
+	     new windows at the front of arglist, which means we
 	     have to reverse this list at the end.  */
 	  foreach_window (XFRAME (frame), add_window_to_list, &arglist);
 	  arglist = Fnreverse (arglist);
@@ -7328,6 +7349,14 @@ the return value is nil.  Otherwise the value is t.  */)
       BVAR (XBUFFER (XWINDOW (selected_window)->contents),
 	    last_selected_window)
 	= selected_window;
+
+      /* We may have deleted windows above.  Then again, maybe we
+	 haven't: the functions we call to maybe delete windows can
+	 decide a window cannot be deleted.  Force recalculation of
+	 Vwindow_list next time it is needed, to make sure stale
+	 windows with no buffers don't escape into the wild, which
+	 will cause crashes elsewhere.  */
+      Vwindow_list = Qnil;
 
       if (NILP (data->focus_frame)
 	  || (FRAMEP (data->focus_frame)

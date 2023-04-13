@@ -1,6 +1,6 @@
 ;;; semantic/grammar-wy.el --- Generated parser support file  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2023 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -396,12 +396,12 @@
 	      (let
 		  ((s $1))
 	        (if
-                    (string-match "^{[\^M\n	 ]*" s)
+		    (string-match "^{[\n	 ]*" s)
 		    (setq s
 			  (substring s
 				     (match-end 0))))
 	        (if
-                    (string-match "[\^M\n	 ]*}$" s)
+		    (string-match "[\n	 ]*}$" s)
 		    (setq s
 			  (substring s 0
 				     (match-beginning 0))))

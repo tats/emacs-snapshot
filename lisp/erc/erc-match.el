@@ -1,6 +1,6 @@
 ;;; erc-match.el --- Highlight messages matching certain regexps  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2002-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2023 Free Software Foundation, Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
 ;; Maintainer: Amin Bandali <bandali@gnu.org>, F. Jason Park <jp@neverwas.me>
@@ -244,7 +244,7 @@ server and other miscellaneous functions."
   "Whether to `regexp-quote' when adding to a match list interactively.
 When the value is a boolean, the opposite behavior will be made
 available via universal argument."
-  :package-version '(ERC . "5.4.1") ; FIXME increment on next release
+  :package-version '(ERC . "5.5")
   :type '(choice (const ask)
                  (const t)
                  (const nil)))

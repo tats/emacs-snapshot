@@ -1,5 +1,5 @@
 /* GnuTLS glue for GNU Emacs.
-   Copyright (C) 2010-2022 Free Software Foundation, Inc.
+   Copyright (C) 2010-2023 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1060,7 +1060,7 @@ usage: (gnutls-error-string ERROR)  */)
 
 DEFUN ("gnutls-deinit", Fgnutls_deinit, Sgnutls_deinit, 1, 1, 0,
        doc: /* Deallocate GnuTLS resources associated with process PROC.
-See also `gnutls-init'.  */)
+See also `gnutls-boot'.  */)
   (Lisp_Object proc)
 {
   return emacs_gnutls_deinit (proc);

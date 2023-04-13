@@ -1,6 +1,6 @@
 ;;; cconv.el --- Closure conversion for statically scoped Emacs Lisp. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2011-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2023 Free Software Foundation, Inc.
 
 ;; Author: Igor Kuzmin <kzuminig@iro.umontreal.ca>
 ;; Maintainer: emacs-devel@gnu.org
@@ -891,7 +891,7 @@ Returns a pair (LEXV . DYNV) of those vars actually used by FORM."
               (pcase expanded-form
                 (`#'(lambda . ,cdr) cdr)
                 (_ (cdr fun))))
-         
+
              (dynvars (delq nil (mapcar (lambda (b) (if (symbolp b) b)) env)))
              (fvs (cconv-fv expanded-form lexvars dynvars))
              (newenv (nconc (mapcar (lambda (fv) (assq fv env)) (car fvs))

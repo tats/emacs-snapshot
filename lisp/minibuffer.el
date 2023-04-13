@@ -1,6 +1,6 @@
 ;;; minibuffer.el --- Minibuffer and completion functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Package: emacs
@@ -862,7 +862,18 @@ If a function returns a string, the returned string is given to the
 next function in the list, and if the last function returns a string,
 it's displayed in the echo area.
 If a function returns any other non-nil value, no more functions are
-called from the list, and no message will be displayed in the echo area."
+called from the list, and no message will be displayed in the echo area.
+
+Useful functions to add to this list are:
+
+ `inhibit-message'        -- if this function is the first in the list,
+                             messages that match the value of
+                             `inhibit-message-regexps' will be suppressed.
+ `set-multi-message'      -- accumulate multiple messages and display them
+                             together as a single message.
+ `set-minibuffer-message' -- if the minibuffer is active, display the
+                             message at the end of the minibuffer text
+                             (this is the default)."
   :type '(choice (const :tag "No special message handling" nil)
                  (repeat
                   (choice (function-item :tag "Inhibit some messages"
@@ -884,13 +895,18 @@ called from the list, and no message will be displayed in the echo area."
   message)
 
 (defcustom inhibit-message-regexps nil
-  "List of regexps that inhibit messages by the function `inhibit-message'."
+  "List of regexps that inhibit messages by the function `inhibit-message'.
+When the list in `set-message-functions' has `inhibit-message' as its
+first element, echo-area messages which match the value of this variable
+will not be displayed."
   :type '(repeat regexp)
   :version "29.1")
 
 (defun inhibit-message (message)
   "Don't display MESSAGE when it matches the regexp `inhibit-message-regexps'.
-This function is intended to be added to `set-message-functions'."
+This function is intended to be added to `set-message-functions'.
+To suppress display of echo-area messages that match `inhibit-message-regexps',
+make this function be the first element of `set-message-functions'."
   (or (and (consp inhibit-message-regexps)
            (string-match-p (mapconcat #'identity inhibit-message-regexps "\\|")
                            message))
@@ -912,6 +928,10 @@ This function is intended to be added to `set-message-functions'."
 
 (defun set-multi-message (message)
   "Return recent messages as one string to display in the echo area.
+Individual messages will be separated by a newline.
+Up to `multi-message-max' messages can be accumulated, and the
+accumulated messages are discarded when `multi-message-timeout'
+seconds have elapsed since the first message.
 Note that this feature works best only when `resize-mini-windows'
 is at its default value `grow-only'."
   (let ((last-message (car multi-message-list)))
@@ -986,7 +1006,7 @@ already visible.
 If the value is `visible', the *Completions* buffer is displayed
 whenever completion is requested but cannot be done for the first time,
 but remains visible thereafter, and the list of completions in it is
-updated for subsequent attempts to complete.."
+updated for subsequent attempts to complete."
   :type '(choice (const :tag "Don't show" nil)
                  (const :tag "Show only when cannot complete" t)
                  (const :tag "Show after second failed completion attempt" lazy)
@@ -1326,9 +1346,9 @@ pair of a group title string and a list of group candidate strings."
   :version "28.1")
 
 (defface completions-group-separator
-  '((t :inherit shadow :underline t))
+  '((t :inherit shadow :strike-through t))
   "Face used for the separator lines between the candidate groups."
-  :version "29.1")
+  :version "28.1")
 
 (defun completion--cycle-threshold (metadata)
   (let* ((cat (completion-metadata-get metadata 'category))
@@ -1474,7 +1494,10 @@ when the buffer's text is already an exact match."
               (if (and (eq this-command last-command) completion-auto-help)
                   (minibuffer-completion-help beg end))
               (completion--done completion 'exact
-                                (unless expect-exact
+                                (unless (or expect-exact
+                                            (and completion-auto-select
+                                                 (eq this-command last-command)
+                                                 completion-auto-help))
                                   "Complete, but not unique"))))
 
             (minibuffer--bitset completed t exact))))))))

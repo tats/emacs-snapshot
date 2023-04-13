@@ -1,6 +1,6 @@
 ;;; eww.el --- Emacs Web Wowser  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: html
@@ -64,16 +64,23 @@ The action to be taken can be further customized via
   :version "28.1"
   :type 'regexp)
 
+(defcustom eww-default-download-directory "~/Downloads/"
+  "Default directory where `eww' saves downloaded files.
+Used by `eww--download-directory', which see."
+  :version "29.1"
+  :group 'eww
+  :type 'directory)
+
 (defun eww--download-directory ()
-  "Return the name of the download directory.
-If ~/Downloads/ exists, that will be used, and if not, the
-DOWNLOAD XDG user directory will be returned.  If that's
-undefined, ~/Downloads/ is returned anyway."
-  (or (and (file-exists-p "~/Downloads/")
-           "~/Downloads/")
+  "Return the name of the EWW download directory.
+The default is specified by `eww-default-download-directory'; however,
+if that directory doesn't exist and the DOWNLOAD XDG user directory
+is defined, use the latter instead."
+  (or (and (file-exists-p eww-default-download-directory)
+           eww-default-download-directory)
       (when-let ((dir (xdg-user-dir "DOWNLOAD")))
         (file-name-as-directory dir))
-      "~/Downloads/"))
+      eww-default-download-directory))
 
 (defcustom eww-download-directory 'eww--download-directory
   "Directory where files will downloaded.
@@ -1005,7 +1012,7 @@ the like."
                       (list 'base (list (cons 'href base))
                             (eww-highest-readability dom))
 		      nil (current-buffer))
-    (dolist (elem '(:source :url :title :next :previous :up))
+    (dolist (elem '(:source :url :title :next :previous :up :peer))
       (plist-put eww-data elem (plist-get old-data elem)))
     (eww--after-page-change)))
 

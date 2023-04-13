@@ -1,6 +1,6 @@
 ;;; rcirc.el --- default, simple IRC client          -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2005-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2023 Free Software Foundation, Inc.
 
 ;; Author: Ryan Yeske <rcyeske@gmail.com>
 ;; Maintainers: Ryan Yeske <rcyeske@gmail.com>,
@@ -2062,12 +2062,11 @@ connection."
                 (next-single-property-change (point) 'hard)
                 (forward-char 1)
                 (throw 'exit nil))))
+          (goto-char (line-beginning-position))
           (set-marker-insertion-type rcirc-prompt-start-marker t)
           (set-marker-insertion-type rcirc-prompt-end-marker t)
 
           ;; run markup functions
-          (unless (bolp)
-            (newline))
           (save-excursion
             (save-restriction
               (narrow-to-region (point) (point))

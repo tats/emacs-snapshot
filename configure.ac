@@ -4,7 +4,7 @@ dnl	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2022 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2023 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -23,7 +23,7 @@ dnl  along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 AC_PREREQ([2.65])
 dnl Note this is parsed by (at least) make-dist and lisp/cedet/ede/emacs.el.
-AC_INIT([GNU Emacs], [29.0.60], [bug-gnu-emacs@gnu.org], [],
+AC_INIT([GNU Emacs], [29.0.90], [bug-gnu-emacs@gnu.org], [],
   [https://www.gnu.org/software/emacs/])
 
 dnl Set emacs_config_options to the options of 'configure', quoted for the shell,
@@ -2059,8 +2059,8 @@ if test "${with_ns}" != no; then
        GNUSTEP_LOCAL_HEADERS="-I${GNUSTEP_LOCAL_HEADERS}"
      test "x${GNUSTEP_LOCAL_LIBRARIES}" != "x" && \
        GNUSTEP_LOCAL_LIBRARIES="-L${GNUSTEP_LOCAL_LIBRARIES}"
-     CPPFLAGS="$CPPFLAGS -I${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
-     CFLAGS="$CFLAGS -I${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
+     CPPFLAGS="$CPPFLAGS -isystem ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
+     CFLAGS="$CFLAGS -isystem ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
      LDFLAGS="$LDFLAGS -L${GNUSTEP_SYSTEM_LIBRARIES} ${GNUSTEP_LOCAL_LIBRARIES}"
      LIBS_GNUSTEP="-lgnustep-gui -lgnustep-base -lobjc -lpthread"
      dnl GNUstep defines BASE_NATIVE_OBJC_EXCEPTIONS to 0 or 1.
@@ -2806,6 +2806,25 @@ if test "${with_webp}" != "no"; then
       WEBP_MODULE="libwebpdemux >= $WEBP_REQUIRED"
 
       EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])
+
+      # WebPGetInfo is sometimes not present inside libwebpdemux, so
+      # if it does not link, also check for libwebpdecoder.
+
+      OLD_CFLAGS=$CFLAGS
+      OLD_LIBS=$LIBS
+      CFLAGS="$CFLAGS $WEBP_CFLAGS"
+      LIBS="$LIBS $WEBP_LIBS"
+
+      AC_CHECK_FUNC([WebPGetInfo], [],
+        [WEBP_MODULE="$WEBP_MODULE libwebpdecoder >= $WEBP_REQUIRED"
+	 HAVE_WEBP=no
+	 AS_UNSET([WEBP_LIBS])
+	 AS_UNSET([WEBP_CFLAGS])
+	 EMACS_CHECK_MODULES([WEBP], [$WEBP_MODULE])])
+
+      CFLAGS=$OLD_CFLAGS
+      LIBS=$OLD_LIBS
+
       AC_SUBST([WEBP_CFLAGS])
       AC_SUBST([WEBP_LIBS])
    fi
@@ -3220,6 +3239,7 @@ AC_SUBST([JSON_OBJ])
 
 HAVE_TREE_SITTER=no
 TREE_SITTER_OBJ=
+NEED_DYNLIB=no
 
 if test "${with_tree_sitter}" != "no"; then
    dnl Tree-sitter 0.20.2 added support to change the malloc it uses
@@ -3245,6 +3265,7 @@ if test "${with_tree_sitter}" != "no"; then
       LIBS=$OLD_LIBS
       if test "$ac_cv_func_ts_set_allocator" = yes; then
         AC_DEFINE(HAVE_TREE_SITTER, 1, [Define if using tree-sitter.])
+	NEED_DYNLIB=yes
       else
         AC_MSG_ERROR([Tree-sitter library exists but its version is too old]);
         TREE_SITTER_CFLAGS=
@@ -3611,8 +3632,12 @@ XWIDGETS_OBJ=
 if test "$with_xwidgets" != "no"; then
   if test "$USE_GTK_TOOLKIT" = "GTK3" && test "$window_system" != "none"; then
     WEBKIT_REQUIRED=2.12
-    WEBKIT_MODULES="webkit2gtk-4.0 >= $WEBKIT_REQUIRED"
+    WEBKIT_MODULES="webkit2gtk-4.1 >= $WEBKIT_REQUIRED"
     EMACS_CHECK_MODULES([WEBKIT], [$WEBKIT_MODULES])
+    if test "$HAVE_WEBKIT" = "no"; then
+      WEBKIT_MODULES="webkit2gtk-4.0 >= $WEBKIT_REQUIRED"
+      EMACS_CHECK_MODULES([WEBKIT], [$WEBKIT_MODULES])
+    fi
     HAVE_XWIDGETS=$HAVE_WEBKIT
     XWIDGETS_OBJ="xwidget.o"
     if test "$HAVE_X_WINDOWS" = "yes" && test "${with_cairo}" = "no"; then
@@ -4154,7 +4179,6 @@ AC_SUBST(DYNAMIC_LIB_SECONDARY_SUFFIX)
 LIBMODULES=
 HAVE_MODULES=no
 MODULES_OBJ=
-NEED_DYNLIB=no
 MODULES_SUFFIX="${DYNAMIC_LIB_SUFFIX}"
 MODULES_SECONDARY_SUFFIX="${DYNAMIC_LIB_SECONDARY_SUFFIX}"
 
@@ -4304,8 +4328,8 @@ If you really want to try it anyway, use the configure option
 fi
 
 if test "${with_native_compilation}" != "no"; then
-    if test "${HAVE_PDUMPER}" = no; then
-       AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
+    if test "$with_unexec" = yes; then
+       AC_MSG_ERROR(['--with-native-compilation' is not compatible with unexec])
     fi
     if test "${HAVE_ZLIB}" = no; then
        AC_MSG_ERROR(['--with-native-compilation' requires zlib])
@@ -5247,6 +5271,7 @@ AC_CACHE_CHECK([whether signals can be handled on alternate stack],
 	       [emacs_cv_alternate_stack],
   [AC_COMPILE_IFELSE(
      [AC_LANG_PROGRAM([[#include <signal.h>
+			#include <stdlib.h>
 		      ]],
 		      [[stack_t ss;
 			struct sigaction sa;
@@ -5998,7 +6023,7 @@ case $opsys in
   gnu-linux | gnu-kfreebsd )
     AC_DEFINE([USG], [])
     AC_DEFINE([GNU_LINUX], [],
-      [Define if ths system is compatible with GNU/Linux.])
+      [Define if this system is compatible with GNU/Linux.])
     ;;
 
   hpux*)
@@ -6136,7 +6161,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2022 Free Software Foundation, Inc."
+copyright="Copyright (C) 2023 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED([COPYRIGHT], ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST([copyright])

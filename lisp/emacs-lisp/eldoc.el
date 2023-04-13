@@ -1,6 +1,6 @@
 ;;; eldoc.el --- Show function arglist or variable docstring in echo area  -*- lexical-binding:t; -*-
 
-;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2023 Free Software Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Keywords: extensions
@@ -388,6 +388,7 @@ Also store it in `eldoc-last-message' and return that value."
 (defun eldoc-display-message-no-interference-p ()
   "Return nil if displaying a message would cause interference."
   (not (or executing-kbd-macro
+           (bound-and-true-p edebug-active)
            ;; The following configuration shows "Matches..." in the
            ;; echo area when point is after a closing bracket, which
            ;; conflicts with eldoc.
@@ -570,7 +571,7 @@ known to be truncated."
 Honor `eldoc-echo-area-use-multiline-p' and
 `eldoc-echo-area-prefer-doc-buffer'."
   (cond
-   (;; Check if he wave permission to mess with echo area at all.  For
+   (;; Check if we have permission to mess with echo area at all.  For
     ;; example, if this-command is non-nil while running via an idle
     ;; timer, we're still in the middle of executing a command, e.g. a
     ;; query-replace where it would be annoying to overwrite the echo

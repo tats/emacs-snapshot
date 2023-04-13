@@ -1,10 +1,10 @@
 ;;; ol-w3m.el --- Copy and Paste From W3M            -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
 ;; Author: Andy Stewart <lazycat dot manatee at gmail dot com>
 ;; Keywords: outlines, hypermedia, calendar, wp
-;; Homepage: https://orgmode.org
+;; URL: https://orgmode.org
 ;;
 ;; This file is part of GNU Emacs.
 
@@ -40,6 +40,9 @@
 ;;
 
 ;;; Code:
+
+(require 'org-macs)
+(org-assert-version)
 
 (require 'ol)
 

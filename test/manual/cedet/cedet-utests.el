@@ -1,6 +1,6 @@
 ;;; cedet-utests.el --- Run all unit tests in the CEDET suite.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -333,7 +333,8 @@ ERRORCONDITION is some error that may have occurred during testing."
   "Add into the log that the last item is done.
 Apply NOTES to the doneness of the log.
 Apply ERR if there was an error in previous item.
-Optional argument PRECR indicates to prefix the done msg w/ a newline."
+Optional argument PRECR indicates to prefix the done message with
+a newline."
   (if noninteractive
       ;; Non-interactive-mode - show a message.
       (if notes

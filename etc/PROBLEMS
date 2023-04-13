@@ -1,6 +1,6 @@
 Known Problems with GNU Emacs
 
-Copyright (C) 1987-1989, 1993-1999, 2001-2022 Free Software Foundation,
+Copyright (C) 1987-1989, 1993-1999, 2001-2023 Free Software Foundation,
 Inc.
 See the end of the file for license conditions.
 
@@ -627,6 +627,18 @@ screen size changed.
 To work around the problem, customize the option
 'window-adjust-process-window-size-function' to "Do not adjust process
 window sizes" (Lisp value 'ignore').
+
+*** Displaying PDF files in DocView produces an empty buffer.
+
+This can happen if your Emacs is configured to convert PDF to SVG for
+display, and the version of the MuPDF package you have installed has a
+a known bug, whereby it sometimes produces invalid SVG images.
+Version 1.21 of MuPDF is known to be affected.
+
+The solution is either to upgrade or downgrade to a version of MuPDF
+that doesn't have this bug, or to disable conversion of PDF files to
+SVG images by customizing the user option 'doc-view-mupdf-use-svg'.
+Emacs will then convert PDF to PNG images instead.
 
 *** In Inferior Python mode, input is echoed and native completion doesn't work.
 <https://debbugs.gnu.org/cgi/bugreport.cgi?bug=25753>
@@ -2281,6 +2293,33 @@ recommended way of turning on Font-lock is by typing "M-x
 global-font-lock-mode RET" or by customizing the variable
 'global-font-lock-mode'.
 
+** Colors are not available or messed up on TTY frames inside 'screen'.
+
+This can happen if you have COLORTERM=truecolor defined in the
+environment when Emacs starts, but your version of 'screen' doesn't
+actually support 24-bit true colors.
+
+The COLORTERM environment variable is supposed to be set to the value
+"truecolor" only if the terminal used by Emacs actually supports true
+color.  Emacs does not have any means of verifying that this support
+is available, it takes the fact that the variable is defined to this
+value as an indication that true color support is, in fact, available,
+and uses color setting commands that COLORTERM=truecolor presumes,
+bypassing the usual Terminfo capabilities related to colors.
+
+Some text-mode terminals, such as GNOME Terminal, are known to set
+this environment variable, supposedly to announce their own support
+for true color; however the setting is then inherited by any other
+terminal emulators started from such a terminal, even though those
+other terminal emulators might not themselves support true color using
+the same commands as Emacs uses when it sees COLORTERM=truecolor.
+
+The solution is to either upgrade to a newer version of 'screen'
+(version 5.x or later reportedly supports true color), or to unset the
+COLORTERM variable before starting 'screen', and let Emacs use the
+color support provided by the terminal emulator as defined in the
+Terminfo database.
+
 ** Unexpected characters inserted into the buffer when you start Emacs.
 See e.g. <URL:https://debbugs.gnu.org/11129>
 
@@ -3173,7 +3212,7 @@ something like the following in your init file:
 
 ** Native Compilation on macOS
 
-Native complitation requires the libgccjit library to be installed and
+Native compilation requires the libgccjit library to be installed and
 its path available to Emacs.  Errors such as:
 
     libgccjit.so: error: error invoking gcc driver
@@ -3478,6 +3517,18 @@ Bootstrapping (compiling the .el files) is normally only necessary
 with development builds, since the .elc files are pre-compiled in releases.
 
 ** Dumping
+
+*** temacs.exe fails to run when invoked by the build for dumping
+
+The error message might be something like
+
+  make[2]: *** [Makefile:915: bootstrap-emacs.pdmp] Error 127
+
+This happens if you try to build Emacs on versions of MS-Windows older
+than the minimum version supported by MinGW-w64.  As of Dec 2022, the
+minimum supported Windows version is 8.1, and the computer hardware
+(CPU, memory, disk) should also match the minimum Windows 8.1
+requirements.
 
 *** Segfault during 'make'
 

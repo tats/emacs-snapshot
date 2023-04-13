@@ -1,22 +1,23 @@
 ;;; erc-scenarios-base-association.el --- base assoc scenarios -*- lexical-binding: t -*-
 
-;; Copyright (C) 2022 Free Software Foundation, Inc.
-;;
+;; Copyright (C) 2022-2023 Free Software Foundation, Inc.
+
 ;; This file is part of GNU Emacs.
-;;
-;; This program is free software: you can redistribute it and/or
-;; modify it under the terms of the GNU General Public License as
-;; published by the Free Software Foundation, either version 3 of the
-;; License, or (at your option) any later version.
-;;
-;; This program is distributed in the hope that it will be useful, but
-;; WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-;; General Public License for more details.
-;;
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see
-;; <https://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Code:
 
 (require 'ert-x)
 (eval-and-compile
@@ -25,7 +26,9 @@
 
 (declare-function erc-network-name "erc-networks")
 (declare-function erc-network "erc-networks")
+(declare-function erc-track-get-active-buffer "erc-track" (arg))
 (defvar erc-autojoin-channels-alist)
+(defvar erc-track-mode)
 (defvar erc-network)
 
 ;; Two networks, same channel name, no confusion (no bouncer).  Some
@@ -188,5 +191,52 @@
         (erc-d-t-search-for 10 "please your lordship"))
       (with-current-buffer "#chan@barnet"
         (erc-d-t-search-for 10 "I'll bid adieu")))))
+
+;; Some modules may need to perform housekeeping when a newly
+;; connected server buffer is deemed a duplicate after its persistent
+;; network context is discovered on MOTD end.  One such module is
+;; `track', which needs to rid its list of modified channels of the
+;; buffer being killed.  Without this, a user may encounter an
+;; "Attempt to display deleted buffer" error when they try switching
+;; to it.
+
+(ert-deftest erc-scenarios-networks-merge-server-track ()
+  :tags '(:expensive-test)
+  (erc-scenarios-common-with-cleanup
+      ((erc-scenarios-common-dialog "networks/merge-server")
+       (dumb-server (erc-d-run "localhost" t 'track 'track))
+       (port (process-contact dumb-server :service))
+       (erc-server-flood-penalty 0.1)
+       (expect (erc-d-t-make-expecter)))
+
+    (ert-info ("Connect")
+      (with-current-buffer (erc :server "127.0.0.1"
+                                :port port
+                                :nick "tester")
+        (should (string= (buffer-name) (format "127.0.0.1:%d" port)))
+        (should erc-track-mode)
+        (funcall expect 5 "changed mode for tester")
+        (erc-cmd-JOIN "#chan")))
+
+    (ert-info ("Join channel and quit")
+      (with-current-buffer (erc-d-t-wait-for 10 (get-buffer "#chan"))
+        (funcall expect 5 "The hour that fools should ask")
+        (erc-cmd-QUIT ""))
+      (with-current-buffer "FooNet"
+        (funcall expect 5 "finished")))
+
+    (ert-info ("Reconnect")
+      (with-current-buffer (erc :server "127.0.0.1"
+                                :port port
+                                :nick "tester")
+        (should (string= (buffer-name) (format "127.0.0.1:%d" port)))
+        (funcall expect 5 "changed mode for tester")))
+
+    (with-current-buffer "#chan"
+      (funcall expect 5 "The hour that fools should ask")
+      ;; Simulate the old `erc-track-switch-buffer'
+      (switch-to-buffer (erc-track-get-active-buffer 1))
+      (erc-d-t-wait-for 10 (eq (get-buffer "FooNet") (current-buffer)))
+      (erc-cmd-QUIT ""))))
 
 ;;; erc-scenarios-base-association.el ends here

@@ -1,6 +1,6 @@
 ;;; sh-script.el --- shell-script editing commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1997, 1999, 2001-2022 Free Software Foundation,
+;; Copyright (C) 1993-1997, 1999, 2001-2023 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Daniel Pfeiffer <occitan@esperanto.org>
@@ -149,6 +149,8 @@
   (require 'subr-x))
 (require 'executable)
 (require 'treesit)
+
+(declare-function treesit-parser-create "treesit.c")
 
 (autoload 'comint-completion-at-point "comint")
 (autoload 'comint-filename-completion "comint")
@@ -1611,14 +1613,18 @@ with your script for an edit-interpret-debug cycle."
   "Major mode for editing Bash shell scripts.
 This mode automatically falls back to `sh-mode' if the buffer is
 not written in Bash or sh."
+  :syntax-table sh-mode-syntax-table
   (when (treesit-ready-p 'bash)
+    (treesit-parser-create 'bash)
     (setq-local treesit-font-lock-feature-list
                 '(( comment function)
                   ( command declaration-command keyword string)
-                  ( builtin-variable constant heredoc number variable)
+                  ( builtin-variable constant heredoc number
+                    string-interpolation variable)
                   ( bracket delimiter misc-punctuation operator)))
     (setq-local treesit-font-lock-settings
                 sh-mode--treesit-settings)
+    (setq-local treesit-defun-type-regexp "function_definition")
     (treesit-major-mode-setup)))
 
 (advice-add 'bash-ts-mode :around #'sh--redirect-bash-ts-mode
@@ -1688,19 +1694,17 @@ This adds rules for comments and assignments."
 ;; (defun sh--var-completion-table (string pred action)
 ;;   (complete-with-action action (sh--vars-before-point) string pred))
 
-(defun sh--cmd-completion-table (string pred action)
-  (let ((cmds
-         (append (when (fboundp 'imenu--make-index-alist)
-                   (mapcar #'car
-                           (condition-case nil
-                               (imenu--make-index-alist)
-                             (imenu-unavailable nil))))
-                 (mapcar (lambda (v) (concat v "="))
-                         (sh--vars-before-point))
-                 (locate-file-completion-table
-                  exec-path exec-suffixes string pred t)
-                 sh--completion-keywords)))
-    (complete-with-action action cmds string pred)))
+(defun sh--cmd-completion-table-gen (string)
+  (append (when (fboundp 'imenu--make-index-alist)
+            (mapcar #'car
+                    (condition-case nil
+                        (imenu--make-index-alist)
+                      (imenu-unavailable nil))))
+          (mapcar (lambda (v) (concat v "="))
+                  (sh--vars-before-point))
+          (locate-file-completion-table
+           exec-path exec-suffixes string nil t)
+          sh--completion-keywords))
 
 (defun sh-completion-at-point-function ()
   (save-excursion
@@ -1713,14 +1717,14 @@ This adds rules for comments and assignments."
         (list start end (sh--vars-before-point)
               :company-kind (lambda (_) 'variable)))
        ((sh-smie--keyword-p)
-        (list start end #'sh--cmd-completion-table
+        (list start end
+              (completion-table-with-cache #'sh--cmd-completion-table-gen)
               :company-kind
               (lambda (s)
                 (cond
                  ((member s sh--completion-keywords) 'keyword)
                  ((string-suffix-p "=" s) 'variable)
-                 (t 'function)))
-              ))))))
+                 (t 'function)))))))))
 
 ;;; Indentation and navigation with SMIE.
 
@@ -3285,6 +3289,12 @@ See `sh-mode--treesit-other-keywords' and
    :feature 'string
    :language 'bash
    '([(string) (raw_string)] @font-lock-string-face)
+
+   :feature 'string-interpolation
+   :language 'bash
+   :override t
+   '((command_substitution) @sh-quoted-exec
+     (string (expansion (variable_name) @font-lock-variable-use-face)))
 
    :feature 'heredoc
    :language 'bash

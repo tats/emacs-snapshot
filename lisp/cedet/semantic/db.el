@@ -1,6 +1,6 @@
 ;;; semantic/db.el --- Semantic tag database manager  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2000-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: tags
@@ -351,7 +351,7 @@ Note: This index will not be saved in a persistent file.")
 	   ;; the tables without using the accessor.
 	   :accessor semanticdb-get-database-tables
 	   :protection :protected
-	   :documentation "List of `semantic-db-table' objects."))
+           :documentation "List of `semanticdb-table' objects."))
   "Database of file tables.")
 
 (cl-defmethod semanticdb-full-filename ((obj semanticdb-table))

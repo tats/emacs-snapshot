@@ -1,6 +1,6 @@
 ;;; message.el --- composing mail and news messages -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2023 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: mail, news
@@ -1926,9 +1926,10 @@ no, only reply back to the author."
   "Whether to generate X-Hashcash: headers.
 If t, always generate hashcash headers.  If `opportunistic',
 only generate hashcash headers if it can be done without the user
-waiting (i.e., only asynchronously).
+waiting (i.e., only asynchronously).  If nil, don't generate
+hashcash headers.
 
-You must have the \"hashcash\" binary installed, see `hashcash-path'."
+You must have the \"hashcash\" binary installed, see `hashcash-program'."
   :version "24.1"
   :group 'message-headers
   :link '(custom-manual "(message)Mail Headers")
@@ -2822,7 +2823,7 @@ systematically send encrypted emails when possible."
 
 The value must be a list of three elements, all strings:
 - Key ID, in hexadecimal form;
-- Key URL or ASCII armoured key; and
+- Key URL or ASCII armored key; and
 - Protection preference, one of: \"unprotected\", \"sign\",
   \"encrypt\" or \"signencrypt\".
 
@@ -2909,7 +2910,7 @@ Consider adding this function to `message-header-setup-hook'"
   "C-c C-f s"    #'message-change-subject
   ;;
   "C-c C-f x"    #'message-cross-post-followup-to
-  ;; prefix+message-cross-post-followup-to = same w/o cross-post
+  ;; prefix+message-cross-post-followup-to = same without cross-post
   "C-c C-f t"    #'message-reduce-to-to-cc
   "C-c C-f a"    #'message-add-archive-header
   ;; mark inserted text
@@ -3191,7 +3192,6 @@ Like `text-mode', but with these additional commands:
     (mail-abbrevs-setup))
    ((message-mail-alias-type-p 'ecomplete)
     (ecomplete-setup)))
-  (add-hook 'completion-at-point-functions #'eudc-capf-complete -1 t)
   (add-hook 'completion-at-point-functions #'message-completion-function nil t)
   (unless buffer-file-name
     (message-set-auto-save-file-name))

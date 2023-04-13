@@ -1,6 +1,6 @@
 ;;; cc-defs.el --- compile time definitions for CC Mode -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985, 1987, 1992-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2023 Free Software Foundation, Inc.
 
 ;; Authors:    2003- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -1361,6 +1361,28 @@ nil; point is then left undefined."
        (search-forward-regexp "\\(\n\\|.\\)")	; to set the match-data.
        (point))))
 
+(defmacro c-search-forward-non-nil-char-property (property &optional limit)
+  "Search forward for a text-property PROPERTY value non-nil.
+LIMIT bounds the search.
+
+Leave point just after the character.  The match data remain
+unchanged.  Return the value of PROPERTY.  If a non-nil value
+isn't found, return nil; point is then left undefined."
+  (declare (debug t))
+  `(let* ((-limit- (or ,limit (point-max)))
+	  (value (c-get-char-property (point) ,property)))
+     (cond
+      ((>= (point) -limit-)
+       nil)
+      (value
+       (forward-char)
+       value)
+      (t (let ((place (c-next-single-property-change
+		       (point) ,property nil -limit-)))
+	   (when place
+	     (goto-char (1+ place))
+	     (c-get-char-property place ,property)))))))
+
 (defmacro c-search-backward-char-property (property value &optional limit)
   "Search backward for a text-property PROPERTY having value VALUE.
 LIMIT bounds the search.  The comparison is done with `equal'.
@@ -1826,7 +1848,7 @@ with value CHAR in the region [FROM to)."
     '(or (looking-at
 	  "\\([;#]\\|\\'\\|\\s(\\|\\s)\\|\\s\"\\|\\s\\\\|\\s$\\|\\s<\\|\\s>\\)"
 	  (let ((prop (c-get-char-property (point) 'syntax-table)))
-	    (eq prop '(14)))))))		; '(14) is generic comment delimiter.
+	    (equal prop '(14))))))) ; '(14) is generic comment delimiter.
 
 
 (defsubst c-intersect-lists (list alist)
@@ -1972,7 +1994,7 @@ when it's needed.  The default is the current language taken from
 	    ;; doesn't occur in any word in LIST.  Append it to all
 	    ;; the alternatives where we want to add \>.  Run through
 	    ;; `regexp-opt' and then replace it with \>.
-	    (let ((unique "") pos)
+	    (let ((unique "") (list1 (copy-tree list)) pos)
 	      (while (let (found)
 		       (setq unique (concat unique "@")
 			     pos list)
@@ -1983,13 +2005,12 @@ when it's needed.  The default is the current language taken from
 				     t))
 			 (setq pos (cdr pos)))
 		       found))
-	      (setq pos (copy-tree list)
-		    )
+	      (setq pos list1)
 	      (while pos
 		(if (string-match "\\w\\'" (car pos))
 		    (setcar pos (concat (car pos) unique)))
 		(setq pos (cdr pos)))
-	      (setq re (regexp-opt list))
+	      (setq re (regexp-opt list1))
 	      (setq pos 0)
 	      (while (string-match unique re pos)
 		(setq pos (+ (match-beginning 0) 2)

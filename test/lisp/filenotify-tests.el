@@ -1,6 +1,6 @@
 ;;; filenotify-tests.el --- Tests of file notifications  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
@@ -1590,8 +1590,8 @@ the file watch."
   (unwind-protect
       (progn
 	(write-region "any text" nil file-notify--test-tmpfile1 nil 'no-message)
-        ;; Some systems, like MS Windows w/o sufficient privileges, do
-        ;; not allow creation of symbolic links.
+        ;; Some systems, like MS Windows without sufficient
+        ;; privileges, do not allow creation of symbolic links.
         (condition-case nil
             (make-symbolic-link
              file-notify--test-tmpfile1 file-notify--test-tmpfile)

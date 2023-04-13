@@ -1,6 +1,6 @@
 ;;; asm-mode.el --- mode for editing assembler code  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1991, 2001-2022 Free Software Foundation, Inc.
+;; Copyright (C) 1991, 2001-2023 Free Software Foundation, Inc.
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Maintainer: emacs-devel@gnu.org
@@ -209,7 +209,7 @@ repeatedly until you are satisfied with the kind of comment."
     (indent-according-to-mode)
     (insert asm-comment-char asm-comment-char ?\ ))
 
-   ;; Nonblank line w/o comment => start a comment at comment-column.
+   ;; Nonblank line without comment => start a comment at comment-column.
    ;; Also: point before the comment => jump inside.
    ((or (null comment) (< (point) comment))
     (indent-for-comment))
