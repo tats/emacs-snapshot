@@ -1962,19 +1962,19 @@ live.  */)
   TSNode treesit_node = XTS_NODE (node)->node;
   bool result;
 
-  if (EQ (property, Qoutdated))
+  if (BASE_EQ (property, Qoutdated))
     return treesit_node_uptodate_p (node) ? Qnil : Qt;
 
   treesit_check_node (node);
-  if (EQ (property, Qnamed))
+  if (BASE_EQ (property, Qnamed))
     result = ts_node_is_named (treesit_node);
-  else if (EQ (property, Qmissing))
+  else if (BASE_EQ (property, Qmissing))
     result = ts_node_is_missing (treesit_node);
-  else if (EQ (property, Qextra))
+  else if (BASE_EQ (property, Qextra))
     result = ts_node_is_extra (treesit_node);
-  else if (EQ (property, Qhas_error))
+  else if (BASE_EQ (property, Qhas_error))
     result = ts_node_has_error (treesit_node);
-  else if (EQ (property, Qlive))
+  else if (BASE_EQ (property, Qlive))
     result = treesit_parser_live_p (XTS_NODE (node)->parser);
   else
     signal_error ("Expecting `named', `missing', `extra', "
@@ -2293,19 +2293,19 @@ PATTERN can be
 See Info node `(elisp)Pattern Matching' for detailed explanation.  */)
   (Lisp_Object pattern)
 {
-  if (EQ (pattern, QCanchor))
+  if (BASE_EQ (pattern, QCanchor))
     return Vtreesit_str_dot;
-  if (EQ (pattern, intern_c_string (":?")))
+  if (BASE_EQ (pattern, intern_c_string (":?")))
     return Vtreesit_str_question_mark;
-  if (EQ (pattern, intern_c_string (":*")))
+  if (BASE_EQ (pattern, intern_c_string (":*")))
     return Vtreesit_str_star;
-  if (EQ (pattern, intern_c_string (":+")))
+  if (BASE_EQ (pattern, intern_c_string (":+")))
     return Vtreesit_str_plus;
-  if (EQ (pattern, QCequal))
+  if (BASE_EQ (pattern, QCequal))
     return Vtreesit_str_pound_equal;
-  if (EQ (pattern, QCmatch))
+  if (BASE_EQ (pattern, QCmatch))
     return Vtreesit_str_pound_match;
-  if (EQ (pattern, QCpred))
+  if (BASE_EQ (pattern, QCpred))
     return Vtreesit_str_pound_pred;
   Lisp_Object opening_delimeter
     = VECTORP (pattern)
@@ -2898,7 +2898,7 @@ the query.  */)
       /* 2. Get predicates and check whether this match can be
          included in the result list.  */
       Lisp_Object predicates = AREF (predicates_table, match.pattern_index);
-      if (EQ (predicates, Qt))
+      if (BASE_EQ (predicates, Qt))
 	{
 	  predicates = treesit_predicates_for_pattern (treesit_query,
 						       match.pattern_index);
@@ -3139,10 +3139,81 @@ treesit_traverse_child_helper (TSTreeCursor *cursor,
     }
 }
 
-/* Return true if the node at CURSOR matches PRED.  PRED can be a
-   string or a function.  This function assumes PRED is either a
-   string or a function.  If NAMED is true, also check that the node
-   is named.  */
+/* Validate the PRED passed to treesit_traverse_match_predicate.  If
+   there's an error, set SIGNAL_DATA to something signal accepts, and
+   return false, otherwise return true.  */
+static bool
+treesit_traverse_validate_predicate (Lisp_Object pred,
+				     Lisp_Object *signal_data)
+{
+  if (STRINGP (pred))
+    return true;
+  else if (FUNCTIONP (pred))
+    return true;
+  else if (CONSP (pred))
+    {
+      Lisp_Object car = XCAR (pred);
+      Lisp_Object cdr = XCDR (pred);
+      if (BASE_EQ (car, Qnot))
+	{
+	  if (!CONSP (cdr))
+	    {
+	      *signal_data = list2 (build_string ("Invalide `not' "
+						  "predicate"),
+				    pred);
+	      return false;
+	    }
+	  /* At this point CDR must be a cons.  */
+	  if (XFIXNUM (Flength (cdr)) != 1)
+	    {
+	      *signal_data = list2 (build_string ("`not' can only "
+						  "have one argument"),
+				    pred);
+	      return false;
+	    }
+	  return treesit_traverse_validate_predicate (XCAR (cdr),
+						      signal_data);
+	}
+      else if (BASE_EQ (car, Qor))
+	{
+	  if (!CONSP (cdr) || NILP (cdr))
+	    {
+	      *signal_data = list2 (build_string ("`or' must have a list "
+						  "of patterns as "
+						  "arguments "),
+				    pred);
+	      return false;
+	    }
+	  FOR_EACH_TAIL (cdr)
+	    {
+	      if (!treesit_traverse_validate_predicate (XCAR (cdr),
+							signal_data))
+		return false;
+	    }
+	  return true;
+	}
+      else if (STRINGP (car) && FUNCTIONP (cdr))
+	return true;
+    }
+  *signal_data = list2 (build_string ("Invalid predicate, see TODO for "
+				      "valid forms of predicate"),
+			pred);
+  return false;
+}
+
+/* Return true if the node at CURSOR matches PRED.  PRED can be a lot
+   of things:
+
+   PRED := string | function | (string . function)
+         | (or PRED...) | (not PRED)
+
+   See docstring of treesit-search-forward and friends for the meaning
+   of each shape.
+
+   This function assumes PRED is in one of its valid forms.  If NAMED
+   is true, also check that the node is named.
+
+   This function may signal if the predicate function signals.  */
 static bool
 treesit_traverse_match_predicate (TSTreeCursor *cursor, Lisp_Object pred,
 				  Lisp_Object parser, bool named)
@@ -3156,24 +3227,58 @@ treesit_traverse_match_predicate (TSTreeCursor *cursor, Lisp_Object pred,
       const char *type = ts_node_type (node);
       return fast_c_string_match (pred, type, strlen (type)) >= 0;
     }
-  else
+  else if (FUNCTIONP (pred))
     {
       Lisp_Object lisp_node = make_treesit_node (parser, node);
       return !NILP (CALLN (Ffuncall, pred, lisp_node));
     }
+  else if (CONSP (pred))
+    {
+      Lisp_Object car = XCAR (pred);
+      Lisp_Object cdr = XCDR (pred);
+
+      if (BASE_EQ (car, Qnot))
+	return !treesit_traverse_match_predicate (cursor, XCAR (cdr),
+						  parser, named);
+      else if (BASE_EQ (car, Qor))
+	{
+	  FOR_EACH_TAIL (cdr)
+	    {
+	      if (treesit_traverse_match_predicate (cursor, XCAR (cdr),
+						    parser, named))
+		return true;
+	    }
+	  return false;
+	}
+      else if (STRINGP (car) && FUNCTIONP (cdr))
+	{
+	  /* A bit of code duplication here, but should be fine.  */
+	  const char *type = ts_node_type (node);
+	  if (!(fast_c_string_match (car, type, strlen (type)) >= 0))
+	    return false;
+
+	  Lisp_Object lisp_node = make_treesit_node (parser, node);
+	  if (NILP (CALLN (Ffuncall, cdr, lisp_node)))
+	    return false;
+
+	  return true;
+	}
+    }
+  /* Returning false is better than UB. */
+  return false;
 }
 
-/* Traverse the parse tree starting from CURSOR.  PRED can be a
-   function (takes a node and returns nil/non-nil), or a string
-   (treated as regexp matching the node's type, must be all single
-   byte characters).  If the node satisfies PRED, leave CURSOR on that
-   node and return true.  If no node satisfies PRED, move CURSOR back
-   to starting position and return false.
+/* Traverse the parse tree starting from CURSOR.  See TODO for the
+   shapes PRED can have.  If the node satisfies PRED, leave CURSOR on
+   that node and return true.  If no node satisfies PRED, move CURSOR
+   back to starting position and return false.
 
    LIMIT is the number of levels we descend in the tree.  FORWARD
    controls the direction in which we traverse the tree, true means
    forward, false backward.  If SKIP_ROOT is true, don't match ROOT.
-   */
+
+   This function may signal if the predicate function signals.  */
+
 static bool
 treesit_search_dfs (TSTreeCursor *cursor,
 		    Lisp_Object pred, Lisp_Object parser,
@@ -3209,7 +3314,10 @@ treesit_search_dfs (TSTreeCursor *cursor,
    START.  PRED, PARSER, NAMED, FORWARD are the same as in
    ts_search_subtree.  If a match is found, leave CURSOR at that node,
    and return true, if no match is found, return false, and CURSOR's
-   position is undefined.  */
+   position is undefined.
+
+   This function may signal if the predicate function signals.  */
+
 static bool
 treesit_search_forward (TSTreeCursor *cursor,
 			Lisp_Object pred, Lisp_Object parser,
@@ -3219,8 +3327,7 @@ treesit_search_forward (TSTreeCursor *cursor,
      nodes.  This way repeated call of this function traverses each
      node in the tree once and only once:
 
-     (while node (setq node (treesit-search-forward node)))
-  */
+     (while node (setq node (treesit-search-forward node)))  */
   bool initial = true;
   while (true)
     {
@@ -3247,6 +3354,14 @@ treesit_search_forward (TSTreeCursor *cursor,
     }
 }
 
+/* Clean up the given tree cursor CURSOR.  */
+
+static void
+treesit_traverse_cleanup_cursor (void *cursor)
+{
+  ts_tree_cursor_delete (cursor);
+}
+
 DEFUN ("treesit-search-subtree",
        Ftreesit_search_subtree,
        Streesit_search_subtree, 2, 5, 0,
@@ -3266,10 +3381,12 @@ Return the first matched node, or nil if none matches.  */)
    Lisp_Object all, Lisp_Object depth)
 {
   CHECK_TS_NODE (node);
-  CHECK_TYPE (STRINGP (predicate) || FUNCTIONP (predicate),
-	      list3 (Qor, Qstringp, Qfunctionp), predicate);
   CHECK_SYMBOL (all);
   CHECK_SYMBOL (backward);
+
+  Lisp_Object signal_data = Qnil;
+  if (!treesit_traverse_validate_predicate (predicate, &signal_data))
+    xsignal1 (Qtreesit_invalid_predicate, signal_data);
 
   /* We use a default limit of 1000.  See bug#59426 for the
      discussion.  */
@@ -3288,14 +3405,17 @@ Return the first matched node, or nil if none matches.  */)
   if (!treesit_cursor_helper (&cursor, XTS_NODE (node)->node, parser))
     return return_value;
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   if (treesit_search_dfs (&cursor, predicate, parser, NILP (backward),
 			  NILP (all), the_limit, false))
     {
       TSNode node = ts_tree_cursor_current_node (&cursor);
       return_value = make_treesit_node (parser, node);
     }
-  ts_tree_cursor_delete (&cursor);
-  return return_value;
+
+  return unbind_to (count, return_value);
 }
 
 DEFUN ("treesit-search-forward",
@@ -3332,10 +3452,12 @@ always traverse leaf nodes first, then upwards.  */)
    Lisp_Object all)
 {
   CHECK_TS_NODE (start);
-  CHECK_TYPE (STRINGP (predicate) || FUNCTIONP (predicate),
-	      list3 (Qor, Qstringp, Qfunctionp), predicate);
   CHECK_SYMBOL (all);
   CHECK_SYMBOL (backward);
+
+  Lisp_Object signal_data = Qnil;
+  if (!treesit_traverse_validate_predicate (predicate, &signal_data))
+    xsignal1 (Qtreesit_invalid_predicate, signal_data);
 
   treesit_initialize ();
 
@@ -3345,20 +3467,25 @@ always traverse leaf nodes first, then upwards.  */)
   if (!treesit_cursor_helper (&cursor, XTS_NODE (start)->node, parser))
     return return_value;
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   if (treesit_search_forward (&cursor, predicate, parser,
 			      NILP (backward), NILP (all)))
     {
       TSNode node = ts_tree_cursor_current_node (&cursor);
       return_value = make_treesit_node (parser, node);
     }
-  ts_tree_cursor_delete (&cursor);
-  return return_value;
+
+  return unbind_to (count, return_value);
 }
 
 /* Recursively traverse the tree under CURSOR, and append the result
    subtree to PARENT's cdr.  See more in Ftreesit_induce_sparse_tree.
    Note that the top-level children list is reversed, because
-   reasons.  */
+   reasons.
+
+   This function may signal if the predicate function signals.  */
 static void
 treesit_build_sparse_tree (TSTreeCursor *cursor, Lisp_Object parent,
 			   Lisp_Object pred, Lisp_Object process_fn,
@@ -3444,8 +3571,10 @@ a regexp.  */)
    Lisp_Object depth)
 {
   CHECK_TS_NODE (root);
-  CHECK_TYPE (STRINGP (predicate) || FUNCTIONP (predicate),
-	      list3 (Qor, Qstringp, Qfunctionp), predicate);
+
+  Lisp_Object signal_data = Qnil;
+  if (!treesit_traverse_validate_predicate (predicate, &signal_data))
+    xsignal1 (Qtreesit_invalid_predicate, signal_data);
 
   if (!NILP (process_fn))
     CHECK_TYPE (FUNCTIONP (process_fn), Qfunctionp, process_fn);
@@ -3467,10 +3596,16 @@ a regexp.  */)
      to use treesit_cursor_helper.  */
   TSTreeCursor cursor = ts_tree_cursor_new (XTS_NODE (root)->node);
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   treesit_build_sparse_tree (&cursor, parent, predicate, process_fn,
 			     the_limit, parser);
-  ts_tree_cursor_delete (&cursor);
+
+  unbind_to (count, Qnil);
+
   Fsetcdr (parent, Fnreverse (Fcdr (parent)));
+
   if (NILP (Fcdr (parent)))
     return Qnil;
   else
@@ -3571,6 +3706,7 @@ syms_of_treesit (void)
   DEFSYM (Qoutdated, "outdated");
   DEFSYM (Qhas_error, "has-error");
   DEFSYM (Qlive, "live");
+  DEFSYM (Qnot, "not");
 
   DEFSYM (QCanchor, ":anchor");
   DEFSYM (QCequal, ":equal");
@@ -3595,6 +3731,7 @@ syms_of_treesit (void)
 	  "user-emacs-directory");
   DEFSYM (Qtreesit_parser_deleted, "treesit-parser-deleted");
   DEFSYM (Qtreesit_pattern_expand, "treesit-pattern-expand");
+  DEFSYM (Qtreesit_invalid_predicate, "treesit-invalid-predicate");
 
   DEFSYM (Qor, "or");
 
@@ -3621,6 +3758,9 @@ syms_of_treesit (void)
 		Qtreesit_error);
   define_error (Qtreesit_parser_deleted,
 		"This parser is deleted and cannot be used",
+		Qtreesit_error);
+  define_error (Qtreesit_invalid_predicate,
+		"Invalid predicate, see TODO for valid forms for a predicate",
 		Qtreesit_error);
 
   DEFVAR_LISP ("treesit-load-name-override-list",
