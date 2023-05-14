@@ -1848,8 +1848,8 @@ be a list of the form returned by `event-start' and `event-end'."
 (set-advertised-calling-convention 'unintern '(name obarray) "23.3")
 (set-advertised-calling-convention 'indirect-function '(object) "25.1")
 (set-advertised-calling-convention 'redirect-frame-focus '(frame focus-frame) "24.3")
-(set-advertised-calling-convention 'libxml-parse-xml-region '(start end &optional base-url) "27.1")
-(set-advertised-calling-convention 'libxml-parse-html-region '(start end &optional base-url) "27.1")
+(set-advertised-calling-convention 'libxml-parse-xml-region '(&optional start end base-url) "27.1")
+(set-advertised-calling-convention 'libxml-parse-html-region '(&optional start end base-url) "27.1")
 (set-advertised-calling-convention 'time-convert '(time form) "29.1")
 
 ;;;; Obsolescence declarations for variables, and aliases.
@@ -3978,7 +3978,7 @@ same LABEL argument.
   "Helper function for `with-restriction', which see."
   (save-restriction
     (narrow-to-region start end)
-    (if label (internal--lock-narrowing label))
+    (if label (internal--label-restriction label))
     (funcall body)))
 
 (defmacro without-restriction (&rest rest)
@@ -4000,7 +4000,7 @@ are lifted.
 (defun internal--without-restriction (body &optional label)
   "Helper function for `without-restriction', which see."
   (save-restriction
-    (if label (internal--unlock-narrowing label))
+    (if label (internal--unlabel-restriction label))
     (widen)
     (funcall body)))
 
@@ -7128,12 +7128,13 @@ CONDITION is either:
     (funcall match (list condition))))
 
 (defun match-buffers (condition &optional buffers arg)
-  "Return a list of buffers that match CONDITION.
-See `buffer-match-p' for details on CONDITION.  By default all
-buffers are checked, this can be restricted by passing an
-optional argument BUFFERS, set to a list of buffers to check.
-ARG is passed to `buffer-match', for predicate conditions in
-CONDITION."
+  "Return a list of buffers that match CONDITION, or nil if none match.
+See `buffer-match-p' for various supported CONDITIONs.
+By default all buffers are checked, but the optional
+argument BUFFERS can restrict that: its value should be
+an explicit list of buffers to check.
+Optional argument ARG is passed to `buffer-match-p', for
+predicate conditions in CONDITION."
   (let (bufs)
     (dolist (buf (or buffers (buffer-list)))
       (when (buffer-match-p condition (get-buffer buf) arg)

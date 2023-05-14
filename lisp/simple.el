@@ -4460,11 +4460,13 @@ whose `car' is BUFFER."
 Like `shell-command', but adds `&' at the end of COMMAND
 to execute it asynchronously.
 
-The output appears in the buffer whose name is stored in the
-variable `shell-command-buffer-name-async'.  That buffer is in
-shell mode.
+The output appears in OUTPUT-BUFFER, which could be a buffer or
+the name of a buffer, and defaults to `shell-command-buffer-name-async'
+if nil or omitted.  That buffer is in shell mode.  Note that, unlike
+with `shell-command', OUTPUT-BUFFER can only be a buffer, a buffer's
+name (a string), or nil.
 
-You can configure `async-shell-command-buffer' to specify what to do
+You can customize `async-shell-command-buffer' to specify what to do
 when the buffer specified by `shell-command-buffer-name-async' is
 already taken by another running shell command.
 
@@ -4472,6 +4474,10 @@ To run COMMAND without displaying the output in a window you can
 configure `display-buffer-alist' to use the action
 `display-buffer-no-window' for the buffer given by
 `shell-command-buffer-name-async'.
+
+Optional argument ERROR-BUFFER is for backward compatibility; it
+is ignored, and error output of the async command is always
+mingled with its regular output.
 
 In Elisp, you will often be better served by calling `start-process'
 directly, since it offers more control and does not impose the use of
@@ -4490,7 +4496,10 @@ a shell (with its need to quote arguments)."
 				((eq major-mode 'dired-mode)
 				 (dired-get-filename nil t)))))
 			  (and filename (file-relative-name filename))))
-    current-prefix-arg
+    nil
+    ;; FIXME: the following argument is always ignored by 'shell-commnd',
+    ;; when the command is invoked asynchronously, except, perhaps, when
+    ;; 'default-directory' is remote.
     shell-command-default-error-buffer))
   (unless (string-match "&[ \t]*\\'" command)
     (setq command (concat command " &")))
@@ -8668,12 +8677,22 @@ node `(elisp) Word Motion' for details."
   (forward-word (- (or arg 1))))
 
 (defun mark-word (&optional arg allow-extend)
-  "Set mark ARG words away from point.
-The place mark goes is the same place \\[forward-word] would
-move to with the same argument.
-Interactively, if this command is repeated
-or (in Transient Mark mode) if the mark is active,
-it marks the next ARG words after the ones already marked."
+  "Set mark ARG words from point or move mark one word.
+When called from Lisp with ALLOW-EXTEND ommitted or nil, mark is
+set ARG words from point.
+With ARG and ALLOW-EXTEND both non-nil (interactively, with prefix
+argument), the place to which mark goes is the same place \\[forward-word]
+would move to with the same argument; if the mark is active, it moves
+ARG words from its current position, otherwise it is set ARG words
+from point.
+When invoked interactively without a prefix argument and no active
+region, mark moves one word forward.
+When invoked interactively without a prefix argument, and region
+is active, mark moves one word away of point (i.e., forward
+if mark is at or after point, back if mark is before point), thus
+extending the region by one word.  Since the direction of region
+extension depends on the relative position of mark and point, you
+can change the direction by \\[exchange-point-and-mark]."
   (interactive "P\np")
   (cond ((and allow-extend
 	      (or (and (eq last-command this-command) (mark t))

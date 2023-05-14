@@ -404,6 +404,9 @@ init_treesit_functions (void)
 
 static Lisp_Object Vtreesit_str_libtree_sitter;
 static Lisp_Object Vtreesit_str_tree_sitter;
+#ifndef WINDOWSNT
+static Lisp_Object Vtreesit_str_dot_0;
+#endif
 static Lisp_Object Vtreesit_str_dot;
 static Lisp_Object Vtreesit_str_question_mark;
 static Lisp_Object Vtreesit_str_star;
@@ -529,8 +532,21 @@ treesit_load_language_push_for_each_suffix (Lisp_Object lib_base_name,
   suffixes = Vdynamic_library_suffixes;
 
   FOR_EACH_TAIL (suffixes)
-    *path_candidates = Fcons (concat2 (lib_base_name, XCAR (suffixes)),
-			      *path_candidates);
+    {
+      Lisp_Object candidate1 = concat2 (lib_base_name, XCAR (suffixes));
+#ifndef WINDOWSNT
+      /* On Posix hosts, support libraries named with ABI version
+         numbers.  In the foreseeable future we only need to support
+         version 0.0.  For more details, see
+         https://lists.gnu.org/archive/html/emacs-devel/2023-04/msg00386.html.  */
+      Lisp_Object candidate2 = concat2 (candidate1, Vtreesit_str_dot_0);
+      Lisp_Object candidate3 = concat2 (candidate2, Vtreesit_str_dot_0);
+
+      *path_candidates = Fcons (candidate3, *path_candidates);
+      *path_candidates = Fcons (candidate2, *path_candidates);
+#endif
+      *path_candidates = Fcons (candidate1, *path_candidates);
+    }
 }
 
 /* Load the dynamic library of LANGUAGE_SYMBOL and return the pointer
@@ -3156,6 +3172,13 @@ treesit_search_forward (TSTreeCursor *cursor,
     }
 }
 
+/* Cleanup function for cursor.  */
+static void
+treesit_traverse_cleanup_cursor(void *cursor)
+{
+  ts_tree_cursor_delete ((TSTreeCursor *) cursor);
+}
+
 DEFUN ("treesit-search-subtree",
        Ftreesit_search_subtree,
        Streesit_search_subtree, 2, 5, 0,
@@ -3197,14 +3220,17 @@ Return the first matched node, or nil if none matches.  */)
   if (!treesit_cursor_helper (&cursor, XTS_NODE (node)->node, parser))
     return return_value;
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   if (treesit_search_dfs (&cursor, predicate, parser, NILP (backward),
 			  NILP (all), the_limit, false))
     {
       TSNode node = ts_tree_cursor_current_node (&cursor);
       return_value = make_treesit_node (parser, node);
     }
-  ts_tree_cursor_delete (&cursor);
-  return return_value;
+
+  return unbind_to (count, return_value);
 }
 
 DEFUN ("treesit-search-forward",
@@ -3254,14 +3280,17 @@ always traverse leaf nodes first, then upwards.  */)
   if (!treesit_cursor_helper (&cursor, XTS_NODE (start)->node, parser))
     return return_value;
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   if (treesit_search_forward (&cursor, predicate, parser,
 			      NILP (backward), NILP (all)))
     {
       TSNode node = ts_tree_cursor_current_node (&cursor);
       return_value = make_treesit_node (parser, node);
     }
-  ts_tree_cursor_delete (&cursor);
-  return return_value;
+
+  return unbind_to (count, return_value);
 }
 
 /* Recursively traverse the tree under CURSOR, and append the result
@@ -3376,9 +3405,14 @@ a regexp.  */)
      to use treesit_cursor_helper.  */
   TSTreeCursor cursor = ts_tree_cursor_new (XTS_NODE (root)->node);
 
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_ptr (treesit_traverse_cleanup_cursor, &cursor);
+
   treesit_build_sparse_tree (&cursor, parent, predicate, process_fn,
 			     the_limit, parser);
-  ts_tree_cursor_delete (&cursor);
+
+  unbind_to (count, Qnil);
+
   Fsetcdr (parent, Fnreverse (Fcdr (parent)));
   if (NILP (Fcdr (parent)))
     return Qnil;
@@ -3518,9 +3552,9 @@ syms_of_treesit (void)
   define_error (Qtreesit_parse_error, "Parse failed",
 		Qtreesit_error);
   define_error (Qtreesit_range_invalid,
-		"RANGES are invalid, they have to be ordered and not overlapping",
+		"RANGES are invalid: they have to be ordered and should not overlap",
 		Qtreesit_error);
-  define_error (Qtreesit_buffer_too_large, "Buffer too large (> 4GB)",
+  define_error (Qtreesit_buffer_too_large, "Buffer too large (> 4GiB)",
 		Qtreesit_error);
   define_error (Qtreesit_load_language_error,
 		"Cannot load language definition",
@@ -3565,6 +3599,10 @@ then in the system default locations for dynamic libraries, in that order.  */);
   Vtreesit_str_libtree_sitter = build_pure_c_string ("libtree-sitter-");
   staticpro (&Vtreesit_str_tree_sitter);
   Vtreesit_str_tree_sitter = build_pure_c_string ("tree-sitter-");
+#ifndef WINDOWSNT
+  staticpro (&Vtreesit_str_dot_0);
+  Vtreesit_str_dot_0 = build_pure_c_string (".0");
+#endif
   staticpro (&Vtreesit_str_dot);
   Vtreesit_str_dot = build_pure_c_string (".");
   staticpro (&Vtreesit_str_question_mark);

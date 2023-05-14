@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2018-2023 Free Software Foundation, Inc.
 
-;; Version: 1.12-emacs29
+;; Version: 1.12.29
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Maintainer: João Távora <joaotavora@gmail.com>
 ;; URL: https://github.com/joaotavora/eglot
@@ -218,8 +218,9 @@ chosen (interactively or automatically)."
                                 ((R-mode ess-r-mode) . ("R" "--slave" "-e"
                                                         "languageserver::run()"))
                                 ((java-mode java-ts-mode) . ("jdtls"))
-                                (dart-mode . ("dart" "language-server"
-                                              "--client-id" "emacs.eglot-dart"))
+                                ((dart-mode dart-ts-mode)
+                                 . ("dart" "language-server"
+                                    "--client-id" "emacs.eglot-dart"))
                                 (elixir-mode . ("language_server.sh"))
                                 (ada-mode . ("ada_language_server"))
                                 (scala-mode . ,(eglot-alternatives
@@ -249,7 +250,11 @@ chosen (interactively or automatically)."
                                        ("csharp-ls"))))
                                 (purescript-mode . ("purescript-language-server" "--stdio"))
                                 ((perl-mode cperl-mode) . ("perl" "-MPerl::LanguageServer" "-e" "Perl::LanguageServer::run"))
-                                (markdown-mode . ("marksman" "server")))
+                                (markdown-mode
+                                 . ,(eglot-alternatives
+                                     '(("marksman" "server")
+                                       ("vscode-markdown-language-server" "--stdio"))))
+                                (graphviz-dot-mode . ("dot-language-server" "--stdio")))
   "How the command `eglot' guesses the server to start.
 An association list of (MAJOR-MODE . CONTACT) pairs.  MAJOR-MODE
 identifies the buffers that are to be managed by a specific
@@ -1669,7 +1674,7 @@ under cursor."
           (const :tag "Go to definition" :definitionProvider)
           (const :tag "Go to type definition" :typeDefinitionProvider)
           (const :tag "Go to implementation" :implementationProvider)
-          (const :tag "Go to declaration" :implementationProvider)
+          (const :tag "Go to declaration" :declarationProvider)
           (const :tag "Find references" :referencesProvider)
           (const :tag "Highlight symbols automatically" :documentHighlightProvider)
           (const :tag "List symbols in buffer" :documentSymbolProvider)
@@ -1960,6 +1965,19 @@ If it is activated, also signal textDocument/didOpen."
 (defun eglot-manual () "Open documentation."
        (declare (obsolete info "29.1"))
        (interactive) (info "(eglot)"))
+
+;;;###autoload
+(defun eglot-upgrade-eglot (&rest _) "Update Eglot to latest version."
+  (interactive)
+  (with-no-warnings
+    (require 'package)
+    (unless package-archive-contents (package-refresh-contents))
+    (when-let ((existing (cadr (assoc 'eglot package-alist))))
+      (package-delete existing t))
+    (package-install (cadr (assoc 'eglot package-archive-contents)))))
+
+;;;###autoload
+(define-obsolete-function-alias 'eglot-update 'eglot-upgrade-eglot "29.1")
 
 (easy-menu-define eglot-menu nil "Eglot"
   `("Eglot"
@@ -3051,8 +3069,7 @@ for which LSP on-type-formatting should be requested."
                         (funcall snippet-fn (or insertText label))))
                  (when (cl-plusp (length additionalTextEdits))
                    (eglot--apply-text-edits additionalTextEdits)))
-               (eglot--signal-textDocument/didChange)
-               (eldoc)))))))))
+               (eglot--signal-textDocument/didChange)))))))))
 
 (defun eglot--hover-info (contents &optional _range)
   (mapconcat #'eglot--format-markup
@@ -3659,7 +3676,19 @@ If NOERROR, return predicate, else erroring function."
      :success-fn (lambda (hints)
                    (eglot--when-live-buffer buf
                      (eglot--widening
-                      (remove-overlays from to 'eglot--inlay-hint t)
+                      ;; Overlays ending right at FROM with an
+                      ;; `after-string' property logically belong to
+                      ;; the (FROM TO) region.  Likewise, such
+                      ;; overlays ending at TO don't logically belong
+                      ;; to it.
+                      (dolist (o (overlays-in (1- from) to))
+                        (when (and (overlay-get o 'eglot--inlay-hint)
+                                   (cond ((eq (overlay-end o) from)
+                                          (overlay-get o 'after-string))
+                                         ((eq (overlay-end o) to)
+                                          (overlay-get o 'before-string))
+                                         (t)))
+                          (delete-overlay o)))
                       (mapc paint-hint hints))))
      :deferred 'eglot--update-hints-1)))
 
